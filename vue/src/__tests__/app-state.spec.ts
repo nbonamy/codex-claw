@@ -4379,6 +4379,92 @@ describe('useAppState', () => {
     });
   });
 
+  it('plays app-owned celebration events without adding conversation content', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    const messageCount = state.visibleMessages.value.length;
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'celebration.requested',
+      payload: { kind: 'stars' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(useConfetti().bursts.value).toEqual([
+      expect.objectContaining({ kind: 'stars' }),
+    ]);
+    expect(state.visibleMessages.value).toHaveLength(messageCount);
+  });
+
+  it('ignores celebration events when the user disabled them', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.general.celebrationsEnabled = false;
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'celebration.requested',
+      payload: { kind: 'confetti' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(useConfetti().bursts.value).toStrictEqual([]);
+  });
+
+  it('plays celebrations when a migrated live snapshot omits the setting', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    delete (remoteSnapshot.general as Partial<typeof remoteSnapshot.general>).celebrationsEnabled;
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'celebration.requested',
+      payload: { kind: 'shapes' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(useConfetti().bursts.value).toEqual([
+      expect.objectContaining({ kind: 'shapes' }),
+    ]);
+  });
+
   it('ignores malformed side panel events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

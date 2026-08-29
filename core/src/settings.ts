@@ -15,6 +15,7 @@ export const defaultAppshotSettings: AppshotSettings = {
 export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenAgentsRun: true,
   preventSleepWhenRemoteAccessEnabled: true,
+  celebrationsEnabled: true,
   codexBinaryPath: '',
   claudeCodeEnabled: false,
   agentListCompact: false,
@@ -94,6 +95,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
   return {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
     preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,
+    celebrationsEnabled: value.celebrationsEnabled !== false,
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     claudeCodeEnabled: value.claudeCodeEnabled === true,
     agentListCompact: value.agentListCompact === true,

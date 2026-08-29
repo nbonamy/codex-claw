@@ -4,11 +4,11 @@
     title-id="settings-general-title"
   >
     <SettingsSection
-      v-if="clawHostCapabilities.daemonManagement"
       :title="$t('surface.settingsGeneralPanel.behavior')"
       title-id="settings-general-behavior-title"
     >
       <SettingsRow
+        v-if="clawHostCapabilities.daemonManagement"
         as="label"
         :title="$t('surface.settingsGeneralPanel.preventSleepWhileAgentsRun')"
         :description="$t('surface.settingsGeneralPanel.keepThisComputerAwakeWhileAnAgentIsActive')"
@@ -22,6 +22,7 @@
         </template>
       </SettingsRow>
       <SettingsRow
+        v-if="clawHostCapabilities.daemonManagement"
         as="label"
         :title="$t('surface.settingsGeneralPanel.keepCodexClawReadyInTheBackground')"
         :description="daemonDescription"
@@ -55,6 +56,19 @@
               @update:model-value="updateDaemonEnabled"
             />
           </span>
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        as="label"
+        :title="$t('surface.settingsGeneralPanel.agentCelebrations')"
+        :description="$t('surface.settingsGeneralPanel.letAgentsCelebrateMeaningfulWinsWithVisualEffects')"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.celebrationsEnabled"
+            :aria-label="$t('surface.settingsGeneralPanel.agentCelebrations')"
+            @update:model-value="updateCelebrationsEnabled"
+          />
         </template>
       </SettingsRow>
     </SettingsSection>
@@ -350,6 +364,14 @@ function updatePreventSleep(value: boolean | string | number): void {
   void props.updateSettings?.({
     general: {
       preventSleepWhenAgentsRun: value === true,
+    },
+  });
+}
+
+function updateCelebrationsEnabled(value: boolean | string | number): void {
+  void props.updateSettings?.({
+    general: {
+      celebrationsEnabled: value === true,
     },
   });
 }

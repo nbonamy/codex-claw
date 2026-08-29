@@ -1219,11 +1219,11 @@ describe('CodexSurfaceAgentAdapter', () => {
         server: 'tools',
         tool: 'inspect',
         status: 'completed',
-        arguments: { path: '/tmp/data', to: 'agent-target', prompt: oversizedOutput },
+        arguments: { kind: 'schoolPride', path: '/tmp/data', to: 'agent-target', prompt: oversizedOutput },
         appContext: null,
         pluginId: null,
         result: {
-          structuredContent: { recipientName: 'Target agent', content: oversizedOutput },
+          structuredContent: { kind: 'schoolPride', recipientName: 'Target agent', content: oversizedOutput },
           content: [{ type: 'text', text: oversizedOutput }],
         },
         error: null,
@@ -1243,8 +1243,8 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
     expect(toolPart).not.toHaveProperty('body');
     expect(toolPart).toMatchObject({
-      input: { path: '/tmp/data', to: 'agent-target' },
-      output: { structuredContent: { recipientName: 'Target agent' } },
+      input: { kind: 'schoolPride', path: '/tmp/data', to: 'agent-target' },
+      output: { structuredContent: { kind: 'schoolPride', recipientName: 'Target agent' } },
     });
     expect(toolPart).not.toHaveProperty('input.prompt');
     expect(toolPart).not.toHaveProperty('output.content');

@@ -6932,10 +6932,11 @@ function createTestSnapshot(): AppSnapshot {
     general: {
       preventSleepWhenAgentsRun: true,
       preventSleepWhenRemoteAccessEnabled: true,
+      celebrationsEnabled: true,
       codexBinaryPath: '',
       claudeCodeEnabled: false,
-    agentListCompact: false,
-    collapsedRepositoryKeys: [],
+      agentListCompact: false,
+      collapsedRepositoryKeys: [],
       shareCodexSkillsAndPlugins: true,
       repositoryIcons: {},
       appshots: {

@@ -76,6 +76,8 @@ changes; specify feature behavior in tests:
   strategy, and remaining Claude-driver questions.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
+- `docs/custom-tools.md`: use when adding or presenting a `codex_claw` MCP tool,
+  including agent status, structured results, lifecycle titles, and tests.
 - `docs/backend-architecture.md`: architecture record and implementation
   slicing for extracting the backend core into a separate TypeScript process.
 - `docs/protocol.md`: app-owned JSON-RPC backend protocol between clients,

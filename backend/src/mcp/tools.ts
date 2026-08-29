@@ -67,6 +67,16 @@ export function createCodexClawMcpServer(
     statusLength: status.length,
   }, () => coordinator.setStatus(callerAgentId, status)));
 
+  server.registerTool('celebrate', {
+    description: 'Celebrate a meaningful user-visible win in Codex Claw. Use sparingly—normally once after a real accomplishment, never for routine progress. Choose confetti for shipping, stars or shapes for a delightful win, or schoolPride for a major team achievement.',
+    inputSchema: {
+      kind: z.enum(['confetti', 'stars', 'shapes', 'schoolPride']).default('confetti').describe('Visual celebration style.'),
+    },
+  }, ({ kind }) => toolResult('celebrate', {
+    agentId: callerAgentId,
+    kind,
+  }, () => coordinator.celebrate(callerAgentId, kind)));
+
   server.registerTool('update-work-item', {
     description: 'Update the lifecycle of a backlog work item assigned to you through Codex Claw. Use blocked with a note when you need help, inProgress when work resumes, readyForReview when the user can review the outcome, or completed when the assignment explicitly requires completion.',
     inputSchema: {

@@ -6,6 +6,7 @@ import {
   IconGitBranch as GitBranchIcon,
   IconMarkdown as MarkdownIcon,
   IconMessage as MessageIcon,
+  IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
   IconUsers as UsersIcon,
 } from '@tabler/icons-vue';
@@ -23,6 +24,7 @@ describe('Claw tool presentation', () => {
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
     ['update-work-item', SquareCheck, 'Updated work item'],
+    ['celebrate', SparklesIcon, 'Celebrated with stars'],
   ])('presents %s with a semantic Claw icon and title', (tool, icon, title) => {
     const args = tool === 'send-message'
       ? { to: 'codex-app-sdk' }
@@ -34,7 +36,9 @@ describe('Claw tool presentation', () => {
             ? { app: 'Codex Claw' }
             : tool === 'computer-use-screenshot'
               ? { scope: 'screen' }
-          : {};
+              : tool === 'celebrate'
+                ? { kind: 'stars' }
+                : {};
 
     expect(presentClawTool(context(tool, args), translate)).toStrictEqual({ icon, title });
   });

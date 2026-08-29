@@ -17,10 +17,15 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
+import { useConfetti } from '../../shared/confetti/use-confetti';
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
   centeredImageCropDataUrl: vi.fn().mockResolvedValue('data:image/png;base64,centered-fallback'),
+}));
+
+vi.mock('../../shared/confetti/canvas-celebration', () => ({
+  launchCanvasCelebration: vi.fn(),
 }));
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
@@ -3739,6 +3744,13 @@ describe('AppShell', () => {
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const wrapper = mountShell();
+
+    useConfetti().clear();
+    listener({ type: 'debug-celebrate', kind: 'stars' });
+    await nextTick();
+    expect(useConfetti().bursts.value).toEqual([
+      expect.objectContaining({ kind: 'stars' }),
+    ]);
 
     listener({
       type: 'debug-image-annotation',

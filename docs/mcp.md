@@ -194,6 +194,10 @@ smallest equivalent enablement path for that backend.
 Collaboration tool names are app-owned, and caller identity is inferred from
 the backend session.
 
+See [Custom MCP Tools](custom-tools.md) for the implementation path, structured
+results, agent status updates, tool-row lifecycle presentation, and required
+tests.
+
 ### `list-agents`
 
 Lists visible agents for the caller.
@@ -225,6 +229,22 @@ Effects:
 
 Developer instructions make this mandatory before starting work, changing
 direction, and finishing.
+
+### `celebrate`
+
+Requests a transient visual celebration in the Claw renderer after a
+meaningful user-visible accomplishment.
+
+Input:
+
+- `kind`: optional `confetti`, `stars`, `shapes`, or `schoolPride`; defaults to
+  `confetti`.
+
+The tool description deliberately tells agents to use it sparingly—normally
+once after a real accomplishment and never for routine progress. The request
+emits `celebration.requested`; it is not stored in conversation history or app
+state. Users can disable agent celebrations in General settings. The setting
+is enabled by default, and `clawd` suppresses the event when it is off.
 
 ### `send-message`
 

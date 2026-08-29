@@ -264,6 +264,7 @@ describe('app menu', () => {
     ]);
     expect(menuLabels(submenu(debugMenu, 'Debug'))).toStrictEqual([
       'Send Message',
+      'Celebrate',
       'Open Codex Claw Website',
       'Open Markdown',
       'Approval Request',
@@ -281,6 +282,10 @@ describe('app menu', () => {
     clickItem(debugMenu, 'View', 'Reload');
     clickItem(debugMenu, 'View', 'Toggle Developer Tools');
     clickItem(debugMenu, 'Debug', 'Send Message');
+    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'Confetti');
+    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'Stars');
+    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'Shapes');
+    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'School Pride');
     clickItem(debugMenu, 'Debug', 'Open Codex Claw Website');
     clickItem(debugMenu, 'Debug', 'Open Markdown');
     clickItem(debugMenu, 'Debug', 'Approval Request');
@@ -293,15 +298,31 @@ describe('app menu', () => {
     expect(debugCallbacks.toggleDeveloperTools).toHaveBeenCalledOnce();
     expect(debugCallbacks.sendDebugAgentMessage).toHaveBeenCalledOnce();
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(1, {
+      type: 'debug-celebrate',
+      kind: 'confetti',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, {
+      type: 'debug-celebrate',
+      kind: 'stars',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, {
+      type: 'debug-celebrate',
+      kind: 'shapes',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, {
+      type: 'debug-celebrate',
+      kind: 'schoolPride',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, {
       type: 'open-browser',
       url: 'https://codex-claw.nabocorp.com',
     });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'debug-open-markdown' });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'debug-approval-request' });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, {
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'debug-open-markdown' });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'debug-approval-request' });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, {
       type: 'debug-mark-unread',
     });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, {
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, {
       type: 'debug-image-annotation',
       imageDataUrl: 'data:image/png;base64,clipboard-image',
       pixelRatio: 2,
@@ -383,6 +404,21 @@ function clickItem(template: MenuItemConstructorOptions[], menuLabel: string, it
     throw new Error(`${itemLabel} menu item not found`);
   }
 
+  item.click({ checked: true } as never, undefined as never, undefined as never);
+}
+
+function clickNestedItem(
+  template: MenuItemConstructorOptions[],
+  menuLabel: string,
+  parentLabel: string,
+  itemLabel: string,
+): void {
+  const parent = menuItem(template, menuLabel, parentLabel);
+  if (!parent || !Array.isArray(parent.submenu)) {
+    throw new Error(`${parentLabel} submenu not found`);
+  }
+  const item = parent.submenu.find((candidate) => candidate.label === itemLabel);
+  if (!item?.click) throw new Error(`${itemLabel} menu item not found`);
   item.click({ checked: true } as never, undefined as never, undefined as never);
 }
 

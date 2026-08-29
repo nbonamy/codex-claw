@@ -25,6 +25,21 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
+  it('lets the user disable model-triggered celebrations', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+    await flushPromises();
+
+    const celebrationRow = wrapper.findAllComponents({ name: 'SettingsRow' })
+      .find((row) => row.text().includes('Agent celebrations'));
+    expect(celebrationRow).toBeDefined();
+    await celebrationRow!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { celebrationsEnabled: false },
+    });
+  });
+
   it('toggles the background service through Settings', async () => {
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
     let resolveInstall: () => void = () => undefined;

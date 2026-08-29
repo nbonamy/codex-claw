@@ -10,6 +10,7 @@ import type {
   Agent,
   AppSnapshot,
   BackendConversationRef,
+  CelebrationKind,
   CreateAgentInput,
   CreateSourceWorktreeInput,
   LoopAction,
@@ -29,7 +30,7 @@ import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -76,6 +77,7 @@ export class ClawMcpService {
         void this.deliverUnreadAgentMessages(agentId);
       },
       onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
+      onCelebrate: (agent, kind) => this.celebrateForAgent(agent, kind),
       onUpdateWorkItem: (agent, workItemId, status, note) => this.updateWorkItemForAgent(agent, workItemId, status, note),
       onListSourceRepositories: () => this.listSourceRepositories(),
       onListSourceWorktrees: (repoPath) => this.listSourceWorktrees(repoPath),
@@ -279,6 +281,23 @@ export class ClawMcpService {
       ...(resolvedPath ? { path: resolvedPath.relativePath } : {}),
       title,
     };
+  }
+
+  private celebrateForAgent(agent: Agent, kind: CelebrationKind): CelebrationResponse {
+    if (this.snapshot.general.celebrationsEnabled === false) {
+      return {
+        success: true,
+        displayed: false,
+        kind,
+        message: 'Celebrations are disabled in General settings.',
+      };
+    }
+    this.emit({
+      agentId: agent.id,
+      type: 'celebration.requested',
+      payload: { kind },
+    });
+    return { success: true, displayed: true, kind, message: 'Celebration started.' };
   }
 
   private updateWorkItemForAgent(agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): UpdateWorkItemResponse {

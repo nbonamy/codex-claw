@@ -2258,6 +2258,7 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   syncAnsweredClientRequestsFromMainEvent(event);
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
+  syncCelebrationFromMainEvent(event);
   syncFileActivityFromMainEvent(event);
   syncHistoryPageStateFromMainEvent(event);
   if (event.type === 'skills.changed') {
@@ -2266,6 +2267,14 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   if (event.type === 'models.changed') {
     applyModelsChangedEvent(event);
   }
+}
+
+function syncCelebrationFromMainEvent(event: MainToRendererEvent): void {
+  if (snapshot.value.general.celebrationsEnabled === false) return;
+  if (event.type !== 'celebration.requested' || !isRecord(event.payload)) return;
+  const kind = event.payload.kind;
+  if (kind !== 'confetti' && kind !== 'stars' && kind !== 'shapes' && kind !== 'schoolPride') return;
+  useConfetti().celebrate({ kind });
 }
 
 function recoverRendererAfterBackendConnection(): Promise<void> {

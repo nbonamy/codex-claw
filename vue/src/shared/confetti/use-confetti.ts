@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue';
+import type { CelebrationKind } from '@codex-claw/core/contracts';
 
 export type ConfettiPiece = {
   id: string;
@@ -13,12 +14,14 @@ export type ConfettiPiece = {
 
 export type ConfettiBurst = {
   id: string;
+  kind: CelebrationKind;
   pieces: ConfettiPiece[];
 };
 
 type ConfettiOptions = {
   count?: number;
   durationMs?: number;
+  kind?: CelebrationKind;
 };
 
 const confettiColors = [
@@ -44,11 +47,13 @@ export function celebrate(options: ConfettiOptions = {}): string {
   const id = `confetti-${++sequence}`;
   const count = options.count ?? 44;
   const durationMs = options.durationMs ?? 2400;
+  const kind = options.kind ?? 'confetti';
 
   bursts.value = [
     ...bursts.value,
     {
       id,
+      kind,
       pieces: Array.from({ length: count }, (_, index) => confettiPiece(id, index, durationMs)),
     },
   ];

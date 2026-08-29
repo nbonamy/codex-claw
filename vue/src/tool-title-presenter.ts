@@ -14,6 +14,7 @@ const TOOL_KEYS: Record<string, string> = {
   'browser-screenshot': 'browserScreenshot',
   'browser-scroll': 'browserScroll',
   'browser-type': 'browserType',
+  'celebrate': 'celebrate',
   'check-messages': 'checkMessages',
   'computer-use-click': 'computerUseClick',
   'computer-use-find-apps': 'computerUseFindApps',
@@ -116,15 +117,17 @@ function toolTarget(
       ? [args.url]
       : tool === 'display-markdown'
         ? [args.title, args.path]
-        : tool === 'create-agent'
-          ? [args.name, args.repoPath]
-          : tool === 'create-worktree'
-            ? [args.branchName, args.destinationPath]
-            : tool === 'list-worktrees'
-              ? [args.repoPath]
-              : tool.startsWith('computer-use-')
-                ? [computerUseTarget(tool, args, result)]
-                : [];
+        : tool === 'celebrate'
+          ? [celebrationKind(args.kind), celebrationKind(resultString(result, 'kind'))]
+          : tool === 'create-agent'
+            ? [args.name, args.repoPath]
+            : tool === 'create-worktree'
+              ? [args.branchName, args.destinationPath]
+              : tool === 'list-worktrees'
+                ? [args.repoPath]
+                : tool.startsWith('computer-use-')
+                  ? [computerUseTarget(tool, args, result)]
+                  : [];
 
   const target = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
   return target?.trim() ?? '';
@@ -233,9 +236,16 @@ function finiteNumber(value: unknown): number | undefined {
 }
 
 function resultString(result: unknown, key: string): string | undefined {
-  if (!isRecord(result)) return undefined;
-  const value = result[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  for (const payload of nestedResultRecords(result)) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function celebrationKind(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  return value.trim() === 'schoolPride' ? 'school pride' : value.trim();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

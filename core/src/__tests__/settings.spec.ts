@@ -7,6 +7,7 @@ describe('settings contracts', () => {
     expect(normalizeGeneralSettings({
       codexBinaryPath: ' /opt/homebrew/bin/codex ',
       claudeCodeEnabled: true,
+      celebrationsEnabled: false,
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
       appshots: defaultAppshotSettings,
@@ -14,6 +15,7 @@ describe('settings contracts', () => {
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
+      celebrationsEnabled: false,
       collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
@@ -84,6 +86,7 @@ describe('settings contracts', () => {
     expect(snapshot.general).toStrictEqual({
       codexBinaryPath: '',
       claudeCodeEnabled: false,
+      celebrationsEnabled: true,
       collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,

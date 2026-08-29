@@ -1,12 +1,12 @@
 <template>
   <Teleport to="body">
     <div
-      v-if="bursts.length"
+      v-if="confettiBursts.length"
       class="confetti-overlay"
       aria-hidden="true"
     >
       <div
-        v-for="burst in bursts"
+        v-for="burst in confettiBursts"
         :key="burst.id"
         class="confetti-overlay__burst"
       >
@@ -22,9 +22,26 @@
 </template>
 
 <script setup lang="ts">
+import { computed, watch } from 'vue';
+import { launchCanvasCelebration } from './canvas-celebration';
 import { useConfetti, type ConfettiPiece } from './use-confetti';
 
 const { bursts } = useConfetti();
+const confettiBursts = computed(() => bursts.value.filter((burst) => burst.kind === 'confetti'));
+const handledCanvasBursts = new Set<string>();
+
+watch(bursts, (nextBursts) => {
+  const activeIds = new Set(nextBursts.map((burst) => burst.id));
+  for (const id of handledCanvasBursts) {
+    if (!activeIds.has(id)) handledCanvasBursts.delete(id);
+  }
+  for (const burst of nextBursts) {
+    if (handledCanvasBursts.has(burst.id)) continue;
+    handledCanvasBursts.add(burst.id);
+    const durationMs = burst.pieces[0]?.durationMs ?? 2_400;
+    launchCanvasCelebration(burst.kind, durationMs);
+  }
+}, { immediate: true });
 
 function pieceStyle(piece: ConfettiPiece): Record<string, string> {
   return {

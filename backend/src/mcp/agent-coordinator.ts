@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus, WorkRoutingResult } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AgentStatus, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus, WorkRoutingResult } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 
 export type McpAgentInfo = {
@@ -59,6 +59,13 @@ export type DisplayMarkdownResponse = {
   title?: string;
 };
 
+export type CelebrationResponse = {
+  success: true;
+  displayed: boolean;
+  kind: CelebrationKind;
+  message: string;
+};
+
 export type UpdateWorkItemResponse =
   | {
     success: true;
@@ -104,6 +111,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
+  onCelebrate?: (agent: Agent, kind: CelebrationKind) => CelebrationResponse | Promise<CelebrationResponse>;
   onUpdateWorkItem?: (agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string) => UpdateWorkItemResponse | Promise<UpdateWorkItemResponse>;
   onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
   onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
@@ -127,6 +135,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onAgentUpdated?: (agent: Agent) => void;
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
+  private readonly onCelebrate?: (agent: Agent, kind: CelebrationKind) => CelebrationResponse | Promise<CelebrationResponse>;
   private readonly onUpdateWorkItem?: (agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string) => UpdateWorkItemResponse | Promise<UpdateWorkItemResponse>;
   private readonly onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
   private readonly onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
@@ -141,6 +150,7 @@ export class ClawMcpAgentCoordinator {
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
     this.onDisplayMarkdown = options.onDisplayMarkdown;
+    this.onCelebrate = options.onCelebrate;
     this.onUpdateWorkItem = options.onUpdateWorkItem;
     this.onListSourceRepositories = options.onListSourceRepositories;
     this.onListSourceWorktrees = options.onListSourceWorktrees;
@@ -245,6 +255,14 @@ export class ClawMcpAgentCoordinator {
       ...(filePath ? { path: filePath } : {}),
       ...(title ? { title } : {}),
     });
+  }
+
+  async celebrate(agentId: string, kind: CelebrationKind): Promise<CelebrationResponse> {
+    const agent = this.requireAgent(agentId);
+    if (!this.onCelebrate) {
+      throw new McpToolError('Celebrations are not available.');
+    }
+    return this.onCelebrate(agent, kind);
   }
 
   async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {

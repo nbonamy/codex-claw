@@ -667,6 +667,8 @@ export const surfaceMessages = {
     "behavior": "Behavior",
     "preventSleepWhileAgentsRun": "Prevent sleep while agents run",
     "keepThisComputerAwakeWhileAnAgentIsActive": "Keep this computer awake while an agent is active",
+    "agentCelebrations": "Agent celebrations",
+    "letAgentsCelebrateMeaningfulWinsWithVisualEffects": "Let agents celebrate meaningful wins with visual effects",
     "keepCodexClawReadyInTheBackground": "Keep Codex Claw ready in the background",
     "sourceFolder": "Source folder",
     "discoverRepositoriesAndWorktreesWhenCreatingAgents": "Discover repositories and worktrees when creating agents",

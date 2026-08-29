@@ -18,6 +18,8 @@ describe('Claw tool title presenter', () => {
     ['mcp__codex_claw__computer_use_screenshot', { displayId: 42, scope: 'screen' }, 'completed', 'Captured display 42 screenshot'],
     ['mcp__codex_claw__computer_use_request_screen_recording', {}, 'completed', 'Requested macOS Screen Recording access for Computer Use'],
     ['codex_claw.create-worktree', { branchName: 'feature/tool-labels' }, 'error', 'Failed creating worktree feature/tool-labels'],
+    ['codex_claw.celebrate', { kind: 'schoolPride' }, 'running', 'Celebrating with school pride'],
+    ['codex_claw.celebrate', { kind: 'schoolPride' }, 'completed', 'Celebrated with school pride'],
   ])('presents %s as user-facing activity text', (functionName, args, state, expected) => {
     expect(presentClawToolTitle(context(
       functionName,
@@ -87,6 +89,23 @@ describe('Claw tool title presenter', () => {
 
     expect(presentClawToolTitle(inspection)).toBe('Inspected Electron');
     expect(presentClawToolTitle(inspection)).not.toContain('74070');
+  });
+
+  it('uses the completed celebration result when the renderer did not retain its arguments', () => {
+    const celebration = context('codex_claw.celebrate', undefined, 'completed');
+    celebration.toolCall = {
+      ...celebration.toolCall,
+      result: {
+        structuredContent: {
+          displayed: true,
+          kind: 'schoolPride',
+          message: 'Celebration started.',
+          success: true,
+        },
+      },
+    };
+
+    expect(presentClawToolTitle(celebration)).toBe('Celebrated with school pride');
   });
 });
 

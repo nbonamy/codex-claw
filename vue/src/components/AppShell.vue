@@ -492,6 +492,7 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
+import { useConfetti } from '../shared/confetti/use-confetti';
 import { workItemAssignmentPrompt, workItemComposerPrompt, type WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
@@ -3088,6 +3089,11 @@ function handleAppCommand(command: AppCommand): void {
         '```',
       ].join('\n'),
     });
+    return;
+  }
+
+  if (command.type === 'debug-celebrate') {
+    useConfetti().celebrate({ kind: command.kind });
     return;
   }
 

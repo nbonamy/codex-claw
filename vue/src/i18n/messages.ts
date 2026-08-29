@@ -608,6 +608,11 @@ export const messages = {
               failed: 'Failed entering text on page',
               running: 'Entering text on page',
             },
+            celebrate: {
+              completed: 'Celebrated with {target}',
+              failed: 'Failed celebrating with {target}',
+              running: 'Celebrating with {target}',
+            },
             checkMessages: {
               completed: 'Checked messages',
               failed: 'Failed checking messages',

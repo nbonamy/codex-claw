@@ -409,7 +409,7 @@ describe('ClawMcpService', () => {
     expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', command: 'dom', arguments: { selector: '#save' } });
   });
 
-  it('displays generated Markdown and creates agents through the service boundary', async () => {
+  it('displays generated Markdown, requests celebrations, and creates agents through the service boundary', async () => {
     const snapshot = createInitialSnapshot();
     const events: any[] = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
@@ -431,8 +431,24 @@ describe('ClawMcpService', () => {
       payload: { kind: 'markdown', title: 'Coverage', content: '# Coverage report' },
     }));
 
-    const createResponse = await postJson(callerUrl, {
+    const celebrationResponse = await postJson(callerUrl, {
       jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'celebrate', arguments: { kind: 'shapes' } },
+    });
+    expect(celebrationResponse.result.structuredContent).toStrictEqual({
+      success: true,
+      displayed: true,
+      kind: 'shapes',
+      message: 'Celebration started.',
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'celebration.requested',
+      payload: { kind: 'shapes' },
+    }));
+
+    const createResponse = await postJson(callerUrl, {
+      jsonrpc: '2.0', id: 3, method: 'tools/call',
       params: {
         name: 'create-agent',
         arguments: { repoPath: '/tmp/new-agent', name: 'New Agent', avatar: 'NA', backend: 'claude' },
@@ -448,7 +464,7 @@ describe('ClawMcpService', () => {
     }));
 
     const missingRepo = await postJson(callerUrl, {
-      jsonrpc: '2.0', id: 3, method: 'tools/call',
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
       params: { name: 'create-agent', arguments: { repoPath: '   ' } },
     });
     expect(missingRepo.result.structuredContent).toStrictEqual({ success: false, message: 'repoPath is required' });
@@ -470,6 +486,37 @@ describe('ClawMcpService', () => {
       message: 'Created agent branch-agent.',
     });
     expect(snapshot.agents.at(-1)).toMatchObject({ name: null, folder: '/tmp/branch-agent' });
+  });
+
+  it('does not emit celebration events when the user disabled them', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.celebrationsEnabled = false;
+    const events: Array<{ type?: string }> = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const response = await callTool(url, 'agent-dina', 'celebrate', { kind: 'schoolPride' });
+
+    expect(response.result.structuredContent).toStrictEqual({
+      success: true,
+      displayed: false,
+      kind: 'schoolPride',
+      message: 'Celebrations are disabled in General settings.',
+    });
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+  });
+
+  it('keeps celebrations enabled when a migrated live snapshot omits the setting', async () => {
+    const snapshot = createInitialSnapshot();
+    delete (snapshot.general as Partial<typeof snapshot.general>).celebrationsEnabled;
+    const events: Array<{ type?: string }> = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const response = await callTool(url, 'agent-dina', 'celebrate', { kind: 'confetti' });
+
+    expect(response.result.structuredContent).toMatchObject({ displayed: true, kind: 'confetti' });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
   });
 
   it('requires loop completion instructions before confirming work completion', async () => {

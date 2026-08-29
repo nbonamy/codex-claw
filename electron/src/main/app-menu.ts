@@ -78,6 +78,27 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         click: () => callbacks.sendDebugAgentMessage?.(),
       },
       {
+        label: 'Celebrate',
+        submenu: [
+          {
+            label: 'Confetti',
+            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'confetti' }),
+          },
+          {
+            label: 'Stars',
+            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'stars' }),
+          },
+          {
+            label: 'Shapes',
+            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'shapes' }),
+          },
+          {
+            label: 'School Pride',
+            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'schoolPride' }),
+          },
+        ],
+      },
+      {
         label: 'Open Codex Claw Website',
         click: () => callbacks.sendAppCommand({
           type: 'open-browser',

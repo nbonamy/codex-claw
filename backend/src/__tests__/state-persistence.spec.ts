@@ -937,6 +937,7 @@ describe('AppStatePersistence', () => {
     snapshot.general = {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
+      celebrationsEnabled: false,
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       agentListCompact: true,

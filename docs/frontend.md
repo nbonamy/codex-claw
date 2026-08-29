@@ -109,6 +109,9 @@ typed actions. Keep Claw's wrapper limited to app-state mapping and product
 routing; the SDK retains its leaf UI, CSS, attachment, clipboard, and
 transcription code.
 
+For app-owned MCP icons, phase-aware titles, and bounded presentation metadata,
+follow [Custom MCP Tools](custom-tools.md).
+
 ## Interaction Patterns
 
 ### Dialogs and Pickers

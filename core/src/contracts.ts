@@ -665,6 +665,7 @@ export type AppshotSettings = {
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
+  celebrationsEnabled: boolean;
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
@@ -1352,6 +1353,7 @@ export type MainToRendererEvent = {
     | 'skills.changed'
     | 'sidePanel.markdownRequested'
     | 'sidePanel.gitDiffRequested'
+    | 'celebration.requested'
     | 'message.delta'
     | 'message.updated'
     | 'item.started'
@@ -1373,6 +1375,8 @@ export type MainToRendererEvent = {
   occurredAt: string;
 };
 
+export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
+
 export type AppCommand =
   | {
     type: 'attach-appshot';
@@ -1388,6 +1392,7 @@ export type AppCommand =
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
   | { type: 'debug-approval-request' }
+  | { type: 'debug-celebrate'; kind: CelebrationKind }
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-mark-unread' }
   | { type: 'debug-open-markdown' }
