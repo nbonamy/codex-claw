@@ -164,7 +164,7 @@ export class ClawBackendServer {
         await this.ensureRemoteControlStatus();
         await this.reconcileAgentWorkspaceIdentities();
         void this.backfillSubagentIdentities();
-        const snapshot = await this.clientSnapshot();
+        const snapshot = await this.clientSnapshot(false);
         if (snapshot.activeAgentId) {
           await this.refreshAgentGitStatus(snapshot.activeAgentId);
         }
@@ -176,7 +176,7 @@ export class ClawBackendServer {
       case backendMethods.clientStateGet:
         await this.initializeSourceFolderIfNeeded();
         await this.ensureRemoteControlStatus();
-        return createClawRpcResult(message.id, this.clientStateFromSnapshot(await this.clientSnapshot()));
+        return createClawRpcResult(message.id, this.clientStateFromSnapshot(await this.clientSnapshot(false)));
       case backendMethods.debugAgentMessageSend: {
         const agentId = requireAgentId(message.params);
         const recipient = this.snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -2254,8 +2254,8 @@ export class ClawBackendServer {
     this.onEvent?.(event);
   }
 
-  private async clientSnapshot(): Promise<AppSnapshot> {
-    const snapshot = this.clientSnapshotFromKnownRemotes();
+  private async clientSnapshot(includeMessages = true): Promise<AppSnapshot> {
+    const snapshot = this.clientSnapshotFromKnownRemotes(includeMessages);
     for (const team of snapshot.teams) {
       const pointer = this.remoteTeamPointerForTeam(team);
       if (!pointer || this.remoteSnapshots.has(pointer.connectionId)) {
@@ -2271,11 +2271,14 @@ export class ClawBackendServer {
       }
     }
     applyRemoteActiveAgent(snapshot);
+    if (!includeMessages) {
+      snapshot.messages = [];
+    }
     return snapshot;
   }
 
-  private clientSnapshotFromKnownRemotes(): AppSnapshot {
-    const snapshot = cloneAppSnapshot(this.snapshot);
+  private clientSnapshotFromKnownRemotes(includeMessages = true): AppSnapshot {
+    const snapshot = cloneAppSnapshot(includeMessages ? this.snapshot : { ...this.snapshot, messages: [] });
     for (const team of snapshot.teams) {
       const pointer = this.remoteTeamPointerForTeam(team);
       if (!pointer) {
