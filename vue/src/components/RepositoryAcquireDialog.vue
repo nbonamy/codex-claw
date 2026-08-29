@@ -1,36 +1,51 @@
 <template>
   <el-dialog
-    class="claw-dialog claw-dialog--compact repository-acquire-dialog"
+    class="claw-dialog repository-acquire-dialog"
+    :class="{ 'claw-dialog--compact': mode === 'github' }"
     :model-value="visible"
     :teleported="false"
-    width="680px"
+    :width="mode === 'url' ? '520px' : '680px'"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
-    <template #header>
+    <template v-if="mode === 'github'" #header>
       <div class="repository-acquire-dialog__search">
         <SearchIcon aria-hidden="true" />
         <input
           ref="input"
           v-model="query"
-          :placeholder="mode === 'url' ? 'Paste a Git repository URL' : 'Find a GitHub repository'"
-          :aria-label="mode === 'url' ? 'Repository URL' : 'Find a GitHub repository'"
+          placeholder="Find a GitHub repository"
+          aria-label="Find a GitHub repository"
           autocomplete="off"
           spellcheck="false"
-          @keydown.enter.prevent="submitUrl"
         >
+      </div>
+    </template>
+    <template v-else #header>
+      <div class="claw-form-dialog__header">
+        <h2 class="claw-dialog__title">Clone repository</h2>
       </div>
     </template>
 
     <section class="repository-acquire-dialog__body repository-acquire-dialog__scroll-region">
       <template v-if="mode === 'url'">
-        <div class="repository-acquire-dialog__url-state">
-          <LinkIcon aria-hidden="true" />
-          <div>
-            <strong>Clone from a repository URL</strong>
-            <span>HTTPS and SSH Git URLs are supported.</span>
+        <form class="claw-form-dialog repository-acquire-dialog__url-form" @submit.prevent="submitUrl">
+          <label class="claw-form-dialog__label" for="repository-acquire-url">Repository URL</label>
+          <div class="claw-form-dialog__control claw-form-dialog__input-control">
+            <input
+              id="repository-acquire-url"
+              ref="urlInput"
+              v-model="url"
+              class="claw-form-dialog__text-input"
+              type="url"
+              aria-label="Repository URL"
+              autocomplete="url"
+              placeholder="https://github.com/owner/repository.git"
+              spellcheck="false"
+            >
           </div>
-        </div>
+          <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
+        </form>
       </template>
       <template v-else>
         <p v-if="loading" class="repository-acquire-dialog__state">Loading repositories…</p>
@@ -67,7 +82,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { IconLink as LinkIcon, IconSearch as SearchIcon } from '@tabler/icons-vue';
+import { IconSearch as SearchIcon } from '@tabler/icons-vue';
 import type { WorkRepository } from '@codex-claw/core/contracts';
 import { GitHubIcon } from '../shared/icons/app-icons';
 
@@ -94,19 +109,23 @@ const emit = defineEmits<{
 }>();
 
 const input = ref<HTMLInputElement | null>(null);
+const urlInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
+const url = ref('');
 const localRepositoryNames = computed(() => new Set(props.localRepositoryNames));
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredRepositories = computed(() => props.repositories.filter((repository) => (
   `${repository.fullName} ${repository.name}`.toLocaleLowerCase().includes(normalizedQuery.value)
 )));
-const canSubmitUrl = computed(() => /^(?:https?:\/\/|ssh:\/\/|git@|[^\s]+@[^\s]+:)[^\s]+/iu.test(query.value.trim()));
+const canSubmitUrl = computed(() => /^(?:https?:\/\/|ssh:\/\/|git@|[^\s]+@[^\s]+:)[^\s]+/iu.test(url.value.trim()));
 
-watch(() => [props.visible, props.mode] as const, async ([visible]) => {
+watch(() => [props.visible, props.mode] as const, async ([visible, mode]) => {
   if (!visible) return;
   query.value = '';
+  url.value = '';
   await nextTick();
-  input.value?.focus();
+  if (mode === 'url') urlInput.value?.focus();
+  else input.value?.focus();
 }, { immediate: true });
 
 function onVisibilityChanged(visible: boolean): void {
@@ -114,7 +133,7 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 function submitUrl(): void {
-  if (canSubmitUrl.value && !props.busy) emit('clone-url', query.value.trim());
+  if (canSubmitUrl.value && !props.busy) emit('clone-url', url.value.trim());
 }
 </script>
 
@@ -143,7 +162,7 @@ function submitUrl(): void {
   font: inherit;
 }
 
-.repository-acquire-dialog__body {
+.claw-dialog--compact .repository-acquire-dialog__body {
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
@@ -206,12 +225,15 @@ function submitUrl(): void {
   font-style: normal;
 }
 
-.repository-acquire-dialog__url-state {
-  display: grid;
-  grid-template-columns: var(--icon-lg) minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-6);
-  padding: var(--space-6);
+.repository-acquire-dialog__url-form {
+  gap: var(--space-8);
+  padding: var(--space-6) 0;
+}
+
+.repository-acquire-dialog__url-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-13);
 }
 
 .repository-acquire-dialog__url-state svg {

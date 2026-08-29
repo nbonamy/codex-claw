@@ -59,10 +59,14 @@ describe('RepositoryAcquireDialog', () => {
     });
     await flushPromises();
 
+    expect(wrapper.find('.repository-acquire-dialog__search').exists()).toBe(false);
+    expect(wrapper.get('.claw-dialog__title').text()).toBe('Clone repository');
+    expect(wrapper.get('.el-dialog').classes()).not.toContain('claw-dialog--compact');
+    expect(wrapper.get('[aria-label="Repository URL"]').attributes('placeholder')).toBe('https://github.com/owner/repository.git');
     const submit = wrapper.findAll('button').find((button) => button.text() === 'Clone repository')!;
     expect(submit.attributes('disabled')).toBeDefined();
 
-    await wrapper.get('input').setValue('git@github.com:nbonamy/codex-claw.git');
+    await wrapper.get('[aria-label="Repository URL"]').setValue('git@github.com:nbonamy/codex-claw.git');
     await submit.trigger('click');
 
     expect(wrapper.emitted('clone-url')).toStrictEqual([['git@github.com:nbonamy/codex-claw.git']]);
