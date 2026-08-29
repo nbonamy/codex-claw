@@ -34,6 +34,7 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).toContain('Repository');
     expect(wrapper.text()).not.toContain('Checkout');
     expect(wrapper.get('[aria-label="Agent name"]').attributes('aria-label')).toBe('Agent name');
+    expect(wrapper.find('.agent-avatar-picker').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Resolved path');
     expect(wrapper.text()).not.toContain('Coding agent');
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
@@ -56,19 +57,16 @@ describe('AgentDialog', () => {
     ]));
   });
 
-  it('auto-fills the name from the chosen folder and creates an agent', async () => {
+  it('creates an unnamed agent from the chosen folder', async () => {
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent');
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({ chooseAgentFolder, createAgent });
 
     await chooseCustomFolder(wrapper);
-    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
-    await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'new-agent',
-      avatar: '🤖',
+      name: null,
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -88,7 +86,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Custom Agent',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -107,8 +104,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'claude-agent',
-      avatar: '🤖',
+      name: null,
       folder: '/Users/nbonamy/src/claude-agent',
       backend: 'claude',
     });
@@ -126,7 +122,7 @@ describe('AgentDialog', () => {
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
-  it('prefills edit mode and updates an idle agent', async () => {
+  it('edits only the optional name of an idle agent', async () => {
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/codex-claw-next');
     const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
@@ -142,29 +138,22 @@ describe('AgentDialog', () => {
     });
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit agent');
-    expect(wrapper.html().indexOf('agent-dialog__identity-group')).toBeLessThan(wrapper.html().indexOf('agent-dialog__workspace-group'));
-    expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/codex-claw');
-    expect(wrapper.text()).toContain('Work in...');
+    expect(wrapper.text()).not.toContain('Repository');
+    expect(wrapper.text()).not.toContain('Work in...');
+    expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'AgentAvatarPicker' }).exists()).toBe(false);
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
-    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
-    expect(wrapper.get('.agent-avatar-picker__popover').isVisible()).toBe(true);
-    await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
-    await emitSelect(wrapper, 'agent-dialog-repository', '__custom_folder__');
-    await flushPromises();
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
 
-    expect(chooseAgentFolder).toHaveBeenCalledOnce();
+    expect(chooseAgentFolder).not.toHaveBeenCalled();
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Dina Prime',
-      avatar: '🤖',
-      folder: '/Users/nbonamy/src/codex-claw-next',
-      backend: 'codex',
     });
   });
 
-  it('preserves the backend of an existing agent without exposing backend selection', async () => {
+  it('clears a custom name to restore the default name', async () => {
     const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
       agent: {
@@ -178,15 +167,12 @@ describe('AgentDialog', () => {
 
     expect(wrapper.text()).not.toContain('Backend');
     expect(wrapper.text()).not.toContain('Claude Code');
-    await wrapper.get('.agent-dialog__text-input').setValue('Legacy Claude');
+    await wrapper.get('.agent-dialog__text-input').setValue('');
     await saveButton(wrapper).trigger('click');
 
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
-      name: 'Legacy Claude',
-      avatar: 'DI',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'claude',
+      name: null,
     });
   });
 
@@ -216,8 +202,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'issue-agent',
-      avatar: '🤖',
+      name: null,
       folder: '/Users/nbonamy/src/issue-agent',
       backend: 'codex',
       newTeamName: 'GitHub #12',
@@ -251,26 +236,29 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'existing-team-agent',
-      avatar: '🤖',
+      name: null,
       folder: '/Users/nbonamy/src/existing-team-agent',
       backend: 'codex',
       teamId: 'team-skwad',
     });
   });
 
-  it('disables editing for non-idle agents', () => {
+  it('allows renaming non-idle agents', async () => {
+    const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
       agent: {
         ...idleAgent,
         status: { type: 'working', detail: 'Running tests' },
       },
       mode: 'edit',
+      updateAgent,
     });
 
-    expect(wrapper.text()).toContain('Agent must be idle before editing.');
-    expect(wrapper.get('.agent-dialog__text-input').attributes()).toHaveProperty('disabled');
-    expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
+    expect(wrapper.text()).not.toContain('Agent must be idle before editing.');
+    await wrapper.get('.agent-dialog__text-input').setValue('Dina Live');
+    await saveButton(wrapper).trigger('click');
+
+    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-dina', name: 'Dina Live' });
   });
 
   it('keeps dialog open and shows errors from create/update failures', async () => {
@@ -329,8 +317,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw-source-folder',
-      avatar: '🤖',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-source-folder',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -358,7 +345,7 @@ describe('AgentDialog', () => {
     await flushPromises();
 
     expect(wrapper.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
-    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('');
   });
 
   it('prefills ticket-driven agent identity and creates its named worktree automatically', async () => {
@@ -402,7 +389,6 @@ describe('AgentDialog', () => {
     });
     expect(createAgent).toHaveBeenCalledWith({
       name: 'codex-claw - gh-24',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-24',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -442,7 +428,7 @@ describe('AgentDialog', () => {
     await nextTick();
 
     expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
-    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('');
   });
 
   it('creates agents using the target team SSH connection for repositories and worktrees', async () => {
@@ -474,8 +460,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw-ssh-agent',
-      avatar: '🤖',
+      name: null,
       folder: '/home/nicolas/src/codex-claw-ssh-agent',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -526,8 +511,7 @@ describe('AgentDialog', () => {
     expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src' });
     expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src/witsy' });
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'witsy',
-      avatar: '🤖',
+      name: null,
       folder: '/home/nicolas/src/witsy',
       backend: 'codex',
     });
@@ -558,7 +542,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'codex-claw-backend-split',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-backend-split',
       sourceRepositoryName: 'codex-claw',
     }));

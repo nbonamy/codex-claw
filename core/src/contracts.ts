@@ -1,9 +1,16 @@
+export type AppTextDescriptor = {
+  key: string;
+  params?: Record<string, string | number>;
+};
+
+export type AppText = string | AppTextDescriptor;
+
 export type AgentStatus =
   | { type: 'idle' }
   | { type: 'starting' }
-  | { type: 'working'; detail?: string }
-  | { type: 'awaitingInput'; detail?: string }
-  | { type: 'error'; message: string };
+  | { type: 'working'; detail?: AppText }
+  | { type: 'awaitingInput'; detail?: AppText }
+  | { type: 'error'; message: AppText };
 
 export type Team = {
   id: string;
@@ -143,12 +150,33 @@ export type OpenInApplicationCatalog = {
   applications: OpenInApplicationOption[];
 };
 
+export type AgentWorkspaceIdentity =
+  | {
+      kind: 'git';
+      folder: string;
+      repositoryName: string;
+      repositoryRoot: string;
+      branch: string | null;
+      isLinkedWorktree: boolean;
+      primaryWorktreeRoot: string;
+      originUrl?: string;
+      updatedAt: string;
+    }
+  | {
+      kind: 'folder';
+      folder: string;
+      label: string;
+      updatedAt: string;
+    };
+
 export type Agent = {
   id: string;
   teamId?: string;
-  name: string;
+  name: string | null;
+  conversationTitle?: string;
   avatar?: string;
   folder: string;
+  workspace?: AgentWorkspaceIdentity;
   backend: AgentBackend;
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
@@ -200,7 +228,7 @@ export type WorkIntegrationConnection = {
   provider: WorkProviderKind;
   status: WorkIntegrationStatus;
   accountLabel?: string;
-  detail?: string;
+  detail?: AppText;
   connectedAt?: string;
 };
 
@@ -602,8 +630,8 @@ export type BackendCapabilities = {
 
 export type BackendPermissionModeOption = {
   id: string;
-  label: string;
-  description: string;
+  label: AppText;
+  description: AppText;
   dangerous?: boolean;
 };
 
@@ -640,7 +668,9 @@ export type AppGeneralSettings = {
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
+  collapsedRepositoryKeys: string[];
   shareCodexSkillsAndPlugins: boolean;
+  repositoryIcons: Record<string, string>;
   appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
   plugins?: AppPluginSettings;
@@ -835,7 +865,7 @@ export type AgentFilePreviewResult = {
 export type SidePanelMarkdownRequest = {
   kind: 'markdown';
   purpose?: 'plan';
-  title?: string;
+  title?: AppText;
   path?: string;
   content: string;
 };
@@ -843,8 +873,8 @@ export type SidePanelMarkdownRequest = {
 export type SidePanelGitDiffRequest = {
   kind: 'gitDiff';
   scope?: 'workingTree' | 'turn';
-  title?: string;
-  subtitle?: string;
+  title?: AppText;
+  subtitle?: AppText;
   diff: string;
   sections?: AgentGitDiffSection[];
   state?: 'idle' | 'error';
@@ -976,10 +1006,22 @@ export type SourceWorktree = {
   path: string;
 };
 
+export type SourceBranch = {
+  name: string;
+  isDefault: boolean;
+  worktreePath?: string;
+};
+
 export type SourceRepository = {
   name: string;
   path: string;
+  remoteIdentity?: string;
   worktrees: SourceWorktree[];
+};
+
+export type CloneSourceRepositoryInput = {
+  url: string;
+  remoteConnectionId?: string;
 };
 
 export type SourceFolderEntry = {
@@ -1222,6 +1264,7 @@ export type AppSnapshot = {
   activeAgentId: string | null;
   messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
+  workRoutingRequests?: WorkRoutingRequest[];
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
@@ -1249,13 +1292,13 @@ export type AgentHistoryLoadResult = {
 export type BackendRuntimeStatus = {
   backend: AgentBackend;
   status: 'notConfigured' | 'starting' | 'running' | 'error';
-  detail?: string;
+  detail?: AppText;
   capabilities?: Partial<BackendCapabilities>;
 };
 
 export type BackendConnectionState = {
   status: 'connecting' | 'connected' | 'reconnecting' | 'error';
-  detail?: string;
+  detail?: AppText;
 };
 
 export type RendererSnapshotState = {
@@ -1322,6 +1365,8 @@ export type MainToRendererEvent = {
     | 'backendApproval.resolved'
     | 'clientRequest.resolved'
     | 'toolInput.requested'
+    | 'workRouting.requested'
+    | 'workRouting.resolved'
     | 'browser.annotationCreated'
     | 'error';
   payload: unknown;
@@ -1355,11 +1400,10 @@ export type AppCommand =
   | { type: 'open-settings' }
   | { type: 'open-whats-new' }
   | { type: 'quit' }
-  | { type: 'restart-active-agent' }
-  | { type: 'set-agent-list-compact'; compact: boolean };
+  | { type: 'restart-active-agent' };
 
 export type CreateAgentInput = {
-  name: string;
+  name: string | null;
   folder: string;
   avatar?: string;
   backend?: AgentBackend;
@@ -1390,10 +1434,7 @@ export type ReorderTeamsInput = {
 
 export type UpdateAgentInput = {
   id: string;
-  name: string;
-  folder: string;
-  avatar?: string;
-  backend?: AgentBackend;
+  name: string | null;
 };
 
 export type DuplicateAgentOptions = {
@@ -1464,7 +1505,29 @@ export type ClientRequest =
     payload: {
       request: AskUserRequest;
     };
+  }
+  | WorkRoutingRequest;
+
+export type WorkRoutingMode = 'current' | 'branch' | 'delegate';
+
+export type WorkRoutingResult =
+  | { mode: 'cancelled' }
+  | { mode: 'current'; folder: string }
+  | { mode: 'branch'; branchName: string; folder: string }
+  | { mode: 'delegated'; agentId: string; agentName: string; branchName: string; folder: string };
+
+export type WorkRoutingRequest = {
+  id: string;
+  kind: 'work_routing';
+  payload: {
+    request: {
+      agentId: string;
+      task: string;
+      suggestedBranchName: string;
+      sharedFolderAgentNames: string[];
+    };
   };
+};
 
 export type ClientRequestResponse = {
   id: string;
@@ -1472,6 +1535,10 @@ export type ClientRequestResponse = {
     answers?: AskUserAnswers;
     cancelled?: boolean;
     decision?: ToolConfirmationDecision | null;
+    workRouting?: {
+      mode: WorkRoutingMode;
+      branchName?: string;
+    };
   };
 };
 
@@ -1535,6 +1602,8 @@ export type CodexClawApi = {
   chooseSourceFolder(): Promise<string | null>;
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
+  cloneSourceRepository(input: CloneSourceRepositoryInput): Promise<SourceRepository>;
+  listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]>;
   listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]>;
   suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string>;
   chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null>;

@@ -112,7 +112,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     return {
       backend: this.backend,
       status: 'notConfigured',
-      detail: 'Claude backend has not been started yet.',
+      detail: { key: 'backend.claudeNotStarted' },
     };
   }
 
@@ -934,7 +934,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       payload: {
         backend: this.backend,
         status: 'running',
-        detail: 'Claude backend connected.',
+        detail: { key: 'backend.claudeConnected' },
         capabilities: this.getCapabilities(),
       },
     });
@@ -1092,7 +1092,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       payload: {
         backend: this.backend,
         status: 'running',
-        detail: 'Claude backend connected.',
+        detail: { key: 'backend.claudeConnected' },
         capabilities: this.getCapabilities(),
       },
     });

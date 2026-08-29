@@ -11,7 +11,7 @@
         class="settings-menu__trigger"
         :class="{ 'settings-menu__trigger--active': active }"
         type="button"
-        :aria-label="account ? 'Account menu' : 'Settings menu'"
+        :aria-label="account ? $t('surface.settingsMenu.accountMenu') : $t('surface.settingsMenu.settingsMenu')"
         :aria-pressed="active"
       >
         <UserCircleIcon v-if="account" aria-hidden="true" />
@@ -19,7 +19,7 @@
       </button>
     </template>
 
-    <div class="settings-menu" aria-label="Settings menu">
+    <div class="settings-menu" :aria-label="$t('surface.settingsMenu.settingsMenu')">
       <div v-if="account" class="settings-menu__account">
         <UserCircleIcon aria-hidden="true" />
         <div>
@@ -28,10 +28,10 @@
         </div>
       </div>
 
-      <div class="settings-menu__rate-limits" aria-label="Rate limits">
+      <div class="settings-menu__rate-limits" :aria-label="$t('surface.settingsMenu.rateLimits')">
         <div class="settings-menu__rate-limits-header">
           <BrandSpeedTest />
-          <span>Usage remaining</span>
+          <span>{{ $t('surface.settingsMenu.usageRemaining') }}</span>
         </div>
         <div
           v-for="row in rateLimitRows"
@@ -47,12 +47,12 @@
       <div
         class="settings-menu__usage-divider"
         role="separator"
-        aria-label="Usage actions divider"
+        :aria-label="$t('surface.settingsMenu.usageActionsDivider')"
       />
 
       <AppMenu
         class="app-menu--embedded settings-menu__actions"
-        ariaLabel="Settings actions"
+        :ariaLabel="$t('surface.settingsMenu.settingsActions')"
         :items="menuItems"
         @select="selectMenuItem"
       />
@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref } from 'vue';
 import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -87,36 +88,36 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'open-settings',
     type: 'action',
-    label: 'Settings',
+    label: translate('surface.settingsMenu.settings'),
     icon: SettingsIcon,
     value: '⌘,',
   },
   {
     id: 'open-whats-new',
     type: 'action',
-    label: 'What’s New',
+    label: translate('surface.settingsMenu.whatSNew'),
     icon: SparklesIcon,
   },
   {
     id: 'logout',
     type: 'action',
-    label: 'Log out',
+    label: translate('surface.settingsMenu.logOut'),
     icon: QuitIcon,
   },
   ...(clawHostCapabilities.appLifecycle ? [{
     id: 'quit',
     type: 'action',
-    label: 'Quit',
+    label: translate('surface.settingsMenu.quit'),
     icon: QuitIcon,
     danger: true,
   } satisfies AppMenuItem] : []),
 ]);
 const accountLabel = computed(() => props.account?.type === 'chatgpt'
-  ? props.account.email ?? 'ChatGPT account'
-  : props.account?.type === 'apiKey' ? 'OpenAI API key' : 'Codex account');
+  ? props.account.email ?? translate('dynamic.misc.chatGptAccount')
+  : props.account?.type === 'apiKey' ? translate('surface.settingsMenu.openAIAPIKey') : translate('surface.settingsMenu.codexAccount'));
 const accountDescription = computed(() => props.account?.type === 'chatgpt'
   ? props.account.planType
-  : props.account?.type === 'apiKey' ? 'Usage-based billing' : '');
+  : props.account?.type === 'apiKey' ? translate('surface.settingsMenu.usageBasedBilling') : '');
 
 type RateLimitRow = {
   label: string;
@@ -130,7 +131,7 @@ const rateLimitRows = computed<RateLimitRow[]>(() => {
     rateLimitRow(props.rateLimits?.secondary ?? null, 'Weekly'),
   ].filter((row): row is RateLimitRow => Boolean(row));
 
-  return rows.length > 0 ? rows : [{ label: 'Usage', remaining: 'Unknown', reset: '' }];
+  return rows.length > 0 ? rows : [{ label: translate('surface.settingsMenu.usage'), remaining: 'Unknown', reset: '' }];
 });
 
 function rateLimitRow(window: AccountRateLimitWindow | null, fallbackLabel: string): RateLimitRow | null {
@@ -147,7 +148,7 @@ function rateLimitRow(window: AccountRateLimitWindow | null, fallbackLabel: stri
 
 function rateLimitLabel(window: AccountRateLimitWindow, fallbackLabel: string): string {
   if (window.windowDurationMins === 10_080) {
-    return 'Weekly';
+    return translate('surface.settingsMenu.weekly');
   }
 
   if (typeof window.windowDurationMins === 'number' && window.windowDurationMins > 0) {
@@ -163,7 +164,7 @@ function rateLimitLabel(window: AccountRateLimitWindow, fallbackLabel: string): 
 
 function rateLimitRemaining(window: AccountRateLimitWindow): string {
   if (!Number.isFinite(window.usedPercent)) {
-    return 'Unknown';
+    return translate('surface.settingsMenu.unknown');
   }
 
   return `${Math.max(0, Math.min(100, Math.round(100 - window.usedPercent)))}%`;

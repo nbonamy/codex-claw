@@ -32,9 +32,18 @@ function pointerEvent(type: string, clientX: number): PointerEvent {
   return event as PointerEvent;
 }
 
+async function clickPortaledMenuItem(label: string): Promise<void> {
+  const item = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    .find((candidate) => candidate.textContent?.trim() === label);
+  expect(item).toBeDefined();
+  item!.click();
+  await nextTick();
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.removeItem('cockpitGlobalScope:github');
+  document.body.innerHTML = '';
   delete window.codexClaw;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
@@ -123,7 +132,8 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
+    expect(wrapper.text()).toContain('Sessions');
     expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Ready to get going');
@@ -309,10 +319,13 @@ describe('AppShell', () => {
       placement: 'before',
       items: snapshot.teams[0]!.agentIds.map((agentId) => {
         const teamAgent = snapshot.agents.find((candidate) => candidate.id === agentId)!;
+        const workspace = teamAgent.workspace;
+        const repository = workspace?.kind === 'git' ? workspace.repositoryName : 'Quick chats';
+        const branch = workspace?.kind === 'git' ? workspace.branch : null;
         return {
           id: teamAgent.id,
           value: `agent:${teamAgent.id}`,
-          label: teamAgent.name,
+          label: `${teamAgent.name} · ${branch ? `${repository}/${branch}` : repository}`,
           payload: { agentId: teamAgent.id },
         };
       }),
@@ -2028,7 +2041,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
   });
 
@@ -2061,7 +2074,7 @@ describe('AppShell', () => {
     });
 
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.text()).toContain('SKWAD');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Skwad');
   });
 
   it('falls back to the first team when active agent team references are stale', () => {
@@ -2103,7 +2116,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
   });
@@ -2125,7 +2138,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
   });
 
@@ -2165,7 +2178,7 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
-    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
 
     await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
 
@@ -2504,6 +2517,234 @@ describe('AppShell', () => {
     expect(dialog.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
   });
 
+  it('opens and closes the resume-session dialog for the agent selected in the sidebar menu', async () => {
+    const snapshot = createInitialSnapshot();
+    const targetAgent = snapshot.agents[0]!;
+    const listAgentConversations = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({ snapshot, listAgentConversations });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('resume-session', targetAgent.id);
+    await flushPromises();
+
+    const dialog = wrapper.getComponent({ name: 'ConversationHistoryDialog' });
+    expect(dialog.props('agent')).toStrictEqual(targetAgent);
+    expect(listAgentConversations).toHaveBeenCalledWith(targetAgent.id);
+
+    dialog.vm.$emit('close');
+    await nextTick();
+    expect(wrapper.findComponent({ name: 'ConversationHistoryDialog' }).exists()).toBe(false);
+  });
+
+  it('wires repository session actions to agent creation and source selection', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = snapshot.agents.map((agent) => ({
+      ...agent,
+      workspace: {
+        kind: 'git' as const,
+        folder: '/Users/nbonamy/src/codex-claw',
+        repositoryName: 'codex-claw',
+        repositoryRoot: '/Users/nbonamy/src/codex-claw',
+        branch: 'main',
+        isLinkedWorktree: false,
+        primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+        updatedAt: '2026-08-28T00:00:00.000Z',
+      },
+    }));
+    const sourceRepository: SourceRepository = {
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+    };
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/codex-claw',
+      owner: 'nbonamy',
+      name: 'codex-claw',
+      fullName: 'nbonamy/codex-claw',
+      url: 'https://github.com/nbonamy/codex-claw',
+      isPrivate: true,
+    };
+    const issue = workItem({
+      id: 'github:nbonamy/codex-claw#24',
+      repositoryId: githubRepository.id,
+      repositoryFullName: githubRepository.fullName,
+      number: 24,
+      title: 'Repository-first sessions',
+    });
+    const listSourceBranches = vi.fn().mockResolvedValue([
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+      { name: 'feat/work-routing', isDefault: false },
+    ]);
+    const loadWorkItems = vi.fn().mockResolvedValue([issue]);
+    const createSourceWorktree = vi.fn().mockResolvedValue({
+      name: 'work-routing',
+      path: '/Users/nbonamy/src/codex-claw-work-routing',
+    });
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [sourceRepository],
+      listSourceBranches,
+      loadWorkItems,
+      createSourceWorktree,
+      createAgent,
+      workRepositoriesByProvider: { github: [githubRepository] },
+    });
+    const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
+
+    sidebar.vm.$emit('create-agent-on-branch', {
+      agentId: 'agent-dina',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      branch: { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+    });
+    await flushPromises();
+    expect(listSourceBranches).not.toHaveBeenCalled();
+    expect(createSourceWorktree).not.toHaveBeenCalled();
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    });
+    listSourceBranches.mockClear();
+    createAgent.mockClear();
+
+    sidebar.vm.$emit('create-agent-from-repository', {
+      agentId: 'agent-dina',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+    });
+    await flushPromises();
+
+    const sourceDialog = wrapper.getComponent({ name: 'RepositorySessionSourceDialog' });
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', undefined);
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, {
+      kind: 'all',
+      state: 'open',
+    });
+    expect(sourceDialog.props('branches')).toHaveLength(2);
+    expect(sourceDialog.props('workItems')).toStrictEqual([issue]);
+
+    sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
+    await flushPromises();
+    expect(createSourceWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feat/work-routing',
+    });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/Users/nbonamy/src/codex-claw-work-routing',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    });
+    expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('visible')).toBe(false);
+
+    createAgent.mockClear();
+    sidebar.vm.$emit('create-agent-worktree-in-repository', {
+      agentId: 'agent-dina',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+    });
+    await flushPromises();
+    const worktreeDialog = wrapper.getComponent({ name: 'NewSourceWorktreeDialog' });
+    expect(worktreeDialog.props('visible')).toBe(true);
+    await worktreeDialog.vm.$emit('created', {
+      name: 'feature-session',
+      path: '/Users/nbonamy/src/codex-claw-feature-session',
+    });
+    await flushPromises();
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/Users/nbonamy/src/codex-claw-feature-session',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    });
+  });
+
+  it('clones a GitHub repository before opening its contextual session picker', async () => {
+    const snapshot = createInitialSnapshot();
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/new-project',
+      owner: 'nbonamy',
+      name: 'new-project',
+      fullName: 'nbonamy/new-project',
+      url: 'https://github.com/nbonamy/new-project',
+      isPrivate: true,
+    };
+    const cloneSourceRepository = vi.fn().mockResolvedValue({
+      name: 'new-project',
+      path: '/Users/nbonamy/src/new-project',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/new-project' }],
+    });
+    const listSourceBranches = vi.fn().mockResolvedValue([
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/new-project' },
+    ]);
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [{
+        name: 'new-project',
+        path: '/Users/nbonamy/src/other-new-project',
+        remoteIdentity: 'github.com/another-owner/new-project',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/other-new-project' }],
+      }],
+      cloneSourceRepository,
+      listSourceBranches,
+      loadWorkRepositories: vi.fn().mockResolvedValue([githubRepository]),
+    });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'github');
+    await flushPromises();
+    const acquire = wrapper.getComponent({ name: 'RepositoryAcquireDialog' });
+    expect(acquire.props('repositories')).toStrictEqual([githubRepository]);
+
+    acquire.vm.$emit('select-repository', githubRepository);
+    await flushPromises();
+
+    expect(cloneSourceRepository).toHaveBeenCalledWith({ url: githubRepository.url });
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/new-project', undefined);
+    expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('repositoryName')).toBe('new-project');
+  });
+
+  it('opens an existing checkout only when its remote matches the selected GitHub repository', async () => {
+    const snapshot = createInitialSnapshot();
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/existing-project',
+      owner: 'nbonamy',
+      name: 'existing-project',
+      fullName: 'nbonamy/existing-project',
+      url: 'https://github.com/nbonamy/existing-project',
+      isPrivate: true,
+    };
+    const cloneSourceRepository = vi.fn();
+    const listSourceBranches = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [{
+        name: 'renamed-locally',
+        path: '/Users/nbonamy/src/renamed-locally',
+        remoteIdentity: 'github.com/nbonamy/existing-project',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/renamed-locally' }],
+      }],
+      cloneSourceRepository,
+      listSourceBranches,
+      loadWorkRepositories: vi.fn().mockResolvedValue([githubRepository]),
+    });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'github');
+    await flushPromises();
+    wrapper.getComponent({ name: 'RepositoryAcquireDialog' }).vm.$emit('select-repository', githubRepository);
+    await flushPromises();
+
+    expect(cloneSourceRepository).not.toHaveBeenCalled();
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/renamed-locally', undefined);
+  });
+
   it('persists cockpit backlog repository and tag configuration', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{
@@ -2632,108 +2873,21 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
-    expect(wrapper.text()).toContain('Add an agent to your team');
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
+    expect(wrapper.text()).toContain('Choose a source to start a session');
     expect(wrapper.find('.agent-header').exists()).toBe(false);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar__new').exists()).toBe(false);
 
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-    expect(wrapper.text()).toContain('New Agent');
-  });
-
-  it('forwards Bench deploy and remove intents from the empty team screen', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const snapshot = createEmptySnapshot();
-    snapshot.bench.push({
-      id: 'bench-dina',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/id8',
-      backend: 'codex',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
+    await wrapper.findAll('[role="menuitem"]')
+      .find((action) => action.text() === 'GitHub repository…')!
+      .trigger('click');
     await flushPromises();
 
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
-  });
-
-  it('opens the new agent dialog from the sidebar and forwards create requests', async () => {
-    const snapshot = createInitialSnapshot();
-    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent');
-    const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({
-      snapshot,
-      chooseAgentFolder,
-      createAgent,
-    });
-
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-
-    expect(wrapper.text()).toContain('New agent');
-    expect(wrapper.find('#agent-dialog-team').exists()).toBe(false);
-    expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
-    await chooseCustomAgentFolder(wrapper);
-    await wrapper.get('.agent-dialog__text-input').setValue('Jules');
-    await wrapper.find('.claw-dialog__footer .claw-button--primary').trigger('click');
-
-    expect(createAgent).toHaveBeenCalledWith({
-      name: 'Jules',
-      avatar: '🤖',
-      folder: '/Users/nbonamy/src/new-agent',
-      backend: 'codex',
-      teamId: 'team-codex-claw',
-    });
-  });
-
-  it('forwards the experimental Claude Code setting to the new agent dialog', async () => {
-    const snapshot = createInitialSnapshot();
-    Object.assign(snapshot.general, { claudeCodeEnabled: true });
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-
-    expect(wrapper.find('#agent-dialog-backend').exists()).toBe(true);
-    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
-      .toContain('Claude Code');
-  });
-
-  it('loads new-agent repositories through the active team connection', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
-    const listSourceRepositories = vi.fn().mockResolvedValue([{
-      name: 'codex-claw',
-      path: '/home/nicolas/src/codex-claw',
-      worktrees: [{ name: 'main', path: '/home/nicolas/src/codex-claw' }],
-    }]);
-    const listSourceWorktrees = vi.fn().mockResolvedValue([{ name: 'main', path: '/home/nicolas/src/codex-claw' }]);
-    const wrapper = mountShell({
-      snapshot,
-      listSourceRepositories,
-      listSourceWorktrees,
-    });
-
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-    await flushPromises();
-
-    expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
-    expect(listSourceWorktrees).toHaveBeenCalledWith('/home/nicolas/src/codex-claw', 'connection-devbox');
+    const acquireDialog = wrapper.getComponent({ name: 'RepositoryAcquireDialog' });
+    expect(acquireDialog.props('visible')).toBe(true);
+    expect(acquireDialog.props('mode')).toBe('github');
   });
 
   it('assigns a ticket to a new agent and can create a ticket-named team', async () => {
@@ -2783,7 +2937,7 @@ describe('AppShell', () => {
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
     expect(agentDialog.props()).toMatchObject({
-      initialAgentName: 'codex-claw - gh-12',
+      initialAgentName: '',
       initialNewWorktreeBranchName: 'fix/gh-12',
       initialSourceRepositoryName: 'codex-claw',
     });
@@ -2807,8 +2961,7 @@ describe('AppShell', () => {
       color: '#1B4FB2',
     });
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw - gh-12',
-      avatar: '🤖',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -2868,13 +3021,13 @@ describe('AppShell', () => {
       branchName: 'fix/gh-13',
     });
     expect(createAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      name: 'codex-claw - gh-12',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
       sourceRepositoryName: 'codex-claw',
       teamId: 'team-codex-claw',
     }));
     expect(createAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      name: 'codex-claw - gh-13',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-13',
       sourceRepositoryName: 'codex-claw',
       teamId: 'team-codex-claw',
@@ -3221,7 +3374,7 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
+    await clickPortaledMenuItem('Edit Agent');
 
     expect(wrapper.text()).toContain('Edit agent');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
@@ -3230,9 +3383,6 @@ describe('AppShell', () => {
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Dina Prime',
-      avatar: 'DI',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
     });
   });
 
@@ -3245,12 +3395,12 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
+    await clickPortaledMenuItem('Duplicate Agent');
 
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+    await clickPortaledMenuItem('Fork Agent');
 
     expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
 
@@ -3258,93 +3408,9 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Restart Agent')?.trigger('click');
+    await clickPortaledMenuItem('Restart Agent');
 
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
-  });
-
-  it('forwards Bench deploy and remove intents from the new agent menu', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const snapshot = createInitialSnapshot();
-    snapshot.bench.push({
-      id: 'bench-dina',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
-    await flushPromises();
-
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
-  });
-
-  it('shows the active remote team Bench instead of the local Bench', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.remoteConnections.connections = [{
-      id: 'connection-devbox',
-      kind: 'ssh',
-      name: 'devbox',
-      host: 'devbox',
-      status: 'ready',
-      createdAt: '2026-06-14T10:00:00.000Z',
-      updatedAt: '2026-06-14T10:00:00.000Z',
-    }];
-    snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
-    snapshot.bench.push({
-      id: 'bench-local',
-      name: 'Local Template',
-      folder: '/Users/nbonamy/src/local',
-      backend: 'codex',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    const loadBench = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({
-      snapshot,
-      loadBench,
-      remoteBenchByConnectionId: {
-        'connection-devbox': [{
-          id: 'bench-remote',
-          name: 'Remote Template',
-          folder: '/home/nicolas/src/remote',
-          backend: 'codex',
-          createdAt: '2026-06-05T00:00:00.000Z',
-          updatedAt: '2026-06-05T00:00:00.000Z',
-        }],
-      },
-      remoteBenchStatusByConnectionId: {
-        'connection-devbox': 'loaded',
-      },
-    });
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('Remote Template');
-    expect(wrapper.text()).not.toContain('Local Template');
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Remote Template'))?.trigger('click');
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
-      templateId: 'bench-remote',
-      teamId: 'team-codex-claw',
-    }]]);
-    expect(loadBench).not.toHaveBeenCalled();
   });
 
   it('loads existing remote teams for the Team dialog from the selected connection backend', async () => {
@@ -3392,7 +3458,7 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+    await clickPortaledMenuItem('Skwad');
 
     expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([[{
       agentId: 'agent-dina',
@@ -3555,8 +3621,7 @@ describe('AppShell', () => {
     });
     const quit = vi.fn().mockResolvedValue(undefined);
     const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff, updateSettings });
+    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
@@ -3566,9 +3631,6 @@ describe('AppShell', () => {
     wrapper.getComponent({ name: 'WhatsNewDialog' }).vm.$emit('close');
     await nextTick();
     expect(wrapper.getComponent({ name: 'WhatsNewDialog' }).props('visible')).toBe(false);
-    listener({ type: 'set-agent-list-compact', compact: false });
-    await nextTick();
-    expect(updateSettings).toHaveBeenCalledWith({ general: { agentListCompact: false } });
     listener({ type: 'new-team' });
     await nextTick();
     expect(wrapper.text()).toContain('Create Team');
@@ -3576,7 +3638,7 @@ describe('AppShell', () => {
     await nextTick();
     listener({ type: 'new-agent' });
     await nextTick();
-    expect(wrapper.text()).toContain('New Agent');
+    expect(wrapper.text()).toContain('New agent');
     await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
     await nextTick();
     listener({ type: 'close-active-agent' });
@@ -3614,6 +3676,53 @@ describe('AppShell', () => {
 
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('persists repository icons selected from the session sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.repositoryIcons = {
+      '/src/existing': '🦞',
+      '/src/codex-claw': '🧪',
+    };
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, updateSettings });
+    const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
+
+    expect(sidebar.props('repositoryIcons')).toStrictEqual({
+      '/src/existing': '🦞',
+      '/src/codex-claw': '🧪',
+    });
+    sidebar.vm.$emit('update-repository-icon', {
+      repositoryKey: 'remote:github.com/nbonamy/codex-claw',
+      repositoryRoot: '/src/codex-claw',
+      icon: '🚀',
+    });
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: {
+        repositoryIcons: {
+          '/src/existing': '🦞',
+          'remote:github.com/nbonamy/codex-claw': '🚀',
+        },
+      },
+    });
+  });
+
+  it('persists repository group collapse state selected from the session sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.collapsedRepositoryKeys = ['remote:github.com/nbonamy/existing'];
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, updateSettings });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('update-collapsed-repositories', [
+      'remote:github.com/nbonamy/codex-claw',
+    ]);
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'] },
+    });
   });
 
   it('opens deterministic Markdown and approval fixtures from Debug commands', async () => {
@@ -3898,7 +4007,8 @@ describe('AppShell', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
 
-    await wrapper.get('.agent-sidebar__new').trigger('click');
+    await wrapper.findAll('.agent-sidebar__agent')[0]!.trigger('contextmenu');
+    await clickPortaledMenuItem('Edit Agent');
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
 
@@ -3917,7 +4027,8 @@ describe('AppShell', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
 
-    await wrapper.get('.agent-sidebar__new').trigger('click');
+    listener({ type: 'edit-active-agent' });
+    await nextTick();
     listener({ type: 'duplicate-active-agent' });
     listener({ type: 'cycle-agents', direction: 1 });
 
@@ -3934,11 +4045,13 @@ function mountShell(overrides: Partial<{
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
   chooseAgentFolder: () => Promise<string | null>;
+  cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+  listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceBranch[]>;
   sourceRepositories: SourceRepository[];
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   deployBenchTemplateAction: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
@@ -3984,9 +4097,11 @@ function mountShell(overrides: Partial<{
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
+      cloneSourceRepository: overrides.cloneSourceRepository ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createSourceWorktree: overrides.createSourceWorktree ?? vi.fn().mockResolvedValue({ name: '', path: '' }),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
+      listSourceBranches: overrides.listSourceBranches ?? vi.fn().mockResolvedValue([]),
       sourceRepositories: overrides.sourceRepositories ?? [],
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),

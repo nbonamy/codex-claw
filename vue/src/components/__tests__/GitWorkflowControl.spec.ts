@@ -210,86 +210,16 @@ describe('GitWorkflowControl', () => {
   });
 
   it('shows icon-only action menu entries without descriptions', async () => {
-    const wrapper = mountControl({ createBranch: vi.fn() });
+    const wrapper = mountControl();
     await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
       'Commit',
       'Push',
-      'Branch',
       'Merge',
       'Create PR',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
-  });
-
-  it('creates and checks out a branch from any initialized Git checkout', async () => {
-    const cleanMain = {
-      ...workflow,
-      branch: 'main',
-      ahead: 0,
-      files: [],
-      stagedFiles: [],
-      unstagedFiles: [],
-    };
-    const createdWorkflow = { ...cleanMain, branch: 'feature/from-main' };
-    const pendingBranch = deferred<AgentGitWorkflow>();
-    const createBranch = vi.fn(() => pendingBranch.promise);
-    const wrapper = mountControl({
-      gitStatus: { ...status, branch: 'main', ahead: 0, changedFiles: 0, addedLines: 0, removedLines: 0, state: 'clean' },
-      getWorkflow: async () => cleanMain,
-      createBranch,
-    });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
-
-    await wrapper.get('.git-workflow-control__primary').trigger('click');
-    expect(wrapper.text()).toContain('Create branch');
-    const input = wrapper.get<HTMLInputElement>('.git-workflow-control__branch-form input');
-    expect(input.attributes('placeholder')).toBe('Branch name…');
-    await input.setValue(' feature/from-main ');
-    await submitButton(wrapper, 'Create branch').trigger('click');
-
-    expect(createBranch).toHaveBeenCalledWith('agent-1', { name: 'feature/from-main', createWorktree: false, confirmed: true });
-    expect(wrapper.text()).toContain('Creating branch');
-
-    vi.useFakeTimers();
-    pendingBranch.resolve(createdWorkflow);
-    await flushPromises();
-    expect(wrapper.text()).toContain('Branch created');
-    expect(wrapper.text()).toContain('feature/from-main');
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
-  });
-
-  it('can create a branch in a new worktree', async () => {
-    const createBranch = vi.fn().mockResolvedValue({ ...workflow, folder: '/repo-feature', branch: 'feature/worktree' });
-    const wrapper = mountControl({ createBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
-    await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Branch'))?.trigger('click');
-    await wrapper.get('.git-workflow-control__branch-form input').setValue('feature/worktree');
-    await wrapper.findComponent({ name: 'ElSwitch' }).setValue(true);
-    await submitButton(wrapper, 'Create branch').trigger('click');
-    await flushPromises();
-
-    expect(createBranch).toHaveBeenCalledWith('agent-1', { name: 'feature/worktree', createWorktree: true, confirmed: true });
-    expect(wrapper.text()).toContain('Branch and worktree created');
-  });
-
-  it('keeps an invalid branch error editable through the Back action', async () => {
-    const createBranch = vi.fn().mockRejectedValue(new Error('Enter a valid branch name.'));
-    const wrapper = mountControl({ createBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
-    await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Branch'))?.trigger('click');
-    await wrapper.get('.git-workflow-control__branch-form input').setValue('bad name');
-    await submitButton(wrapper, 'Create branch').trigger('click');
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('Branch creation failed');
-    expect(wrapper.text()).toContain('Enter a valid branch name.');
-    await submitButton(wrapper, 'Back').trigger('click');
-    expect((wrapper.get('.git-workflow-control__branch-form input').element as HTMLInputElement).value).toBe('bad name');
   });
 
   it('reloads action availability when the selected agent changes', async () => {

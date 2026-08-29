@@ -131,6 +131,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       return pluginStatus;
     },
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
+    workRouting: mcpService,
     workIntegrations,
     loopRunner,
     remoteClients: new RemoteClawdClientManager({
@@ -176,19 +177,18 @@ function requireBackendDriver(drivers: Map<Agent['backend'], AgentBackendDriver>
   return driver;
 }
 
-async function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): Promise<void> {
+function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): void {
   if (!wasNewSession || !driver.setConversationTitle) {
     return;
   }
 
-  try {
-    await driver.setConversationTitle(agent, formatConversationTitle(agent));
-  } catch (error) {
+  agent.conversationTitle = formatConversationTitle(agent);
+  void Promise.resolve(driver.setConversationTitle(agent, agent.conversationTitle)).catch((error) => {
     warnMain('conversation-title', 'failed', {
       agentId: agent.id,
       message: error instanceof Error ? error.message : String(error),
     });
-  }
+  });
 }
 
 function conversationRefFromSendResult(agent: Agent, result: BackendSendResult): BackendConversationRef {

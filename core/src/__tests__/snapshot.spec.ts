@@ -8,6 +8,7 @@ import {
   snapshotMetadata,
   updateAgentFromInput,
   updateAgentFolder,
+  updateAgentWorkspace,
 } from '../snapshot';
 import type { RendererMessage, RendererToolPart, RendererToolPartUpdate } from '../contracts';
 import { toolOutputText } from '../tool-output';
@@ -62,6 +63,24 @@ describe('snapshot reducer', () => {
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:01.000Z',
     });
+  });
+
+  it('stores workspace identity and clears it when the folder changes', () => {
+    const snapshot = createInitialSnapshot();
+    const workspace = {
+      kind: 'git' as const,
+      folder: '/Users/nbonamy/src/codex-claw',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    };
+
+    expect(updateAgentWorkspace(snapshot, 'agent-dina', workspace)).toMatchObject({ workspace });
+    updateAgentFolder(snapshot, 'agent-dina', '/Users/nbonamy/src/id8');
+    expect(snapshot.agents[0].workspace).toBeUndefined();
   });
 
   it('creates agents in the active team and selects the new agent', () => {
@@ -135,7 +154,7 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents.at(-1)).not.toHaveProperty('remoteConnectionId');
   });
 
-  it('defaults a blank created agent name from the folder basename', () => {
+  it('stores a blank created agent name as null', () => {
     const snapshot = createInitialSnapshot();
 
     createAgentInSnapshot(snapshot, {
@@ -143,13 +162,14 @@ describe('snapshot reducer', () => {
       folder: '/tmp/codex-claw',
     }, '2026-06-05T10:11:12.000Z', 'agent-new-codex-claw');
 
-    expect(snapshot.agents.at(-1)?.name).toBe('codex-claw');
+    expect(snapshot.agents.at(-1)?.name).toBeNull();
     expect(snapshot.agents.at(-1)?.id).toBe('agent-new-codex-claw');
   });
 
-  it('updates idle agents and clears Codex runtime state when the folder changes', () => {
+  it('renames working agents without clearing runtime state', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
+    agent.status = { type: 'working', detail: 'Running tests' };
     agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
     agent.contextUsage = {
       totalTokens: 397_740,
@@ -188,47 +208,35 @@ describe('snapshot reducer', () => {
     expect(updateAgentFromInput(snapshot, {
       id: 'agent-dina',
       name: 'Dina Prime',
-      avatar: 'DP',
-      folder: '/Users/nbonamy/src/id8',
-    }, '2026-06-05T10:11:12.000Z')).toStrictEqual({
+    }, '2026-06-05T10:11:12.000Z')).toMatchObject({
       id: 'agent-dina',
-      teamId: 'team-codex-claw',
       name: 'Dina Prime',
-      avatar: 'DP',
-      folder: '/Users/nbonamy/src/id8',
-      backend: 'codex',
-      backendDefaults: { kind: 'codex' },
-      status: { type: 'idle' },
-      createdAt: '2026-06-05T00:00:00.000Z',
+      avatar: 'DI',
+      folder: '~/src/codex-claw',
+      status: { type: 'working', detail: 'Running tests' },
+      backendSession: { kind: 'codex', threadId: 'thread-old' },
+      plan: { turnId: 'turn-plan' },
+      goal: { objective: 'Old goal' },
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
+    expect(snapshot.agents[0].contextUsage?.totalTokens).toBe(397_740);
+    expect(snapshot.agents[0].isRegistered).toBe(true);
+    expect(snapshot.agents[0].mcpSessionId).toBe('mcp-session');
   });
 
-  it('updates idle agents without clearing the thread when the folder is unchanged', () => {
+  it('clears an edited name without changing the existing agent workspace', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-existing' };
 
     updateAgentFromInput(snapshot, {
       id: 'agent-dina',
-      name: 'Dina Prime',
-      avatar: undefined,
-      folder: '~/src/codex-claw',
+      name: null,
     }, '2026-06-05T10:11:12.000Z');
 
+    expect(snapshot.agents[0].name).toBeNull();
+    expect(snapshot.agents[0].avatar).toBe('DI');
+    expect(snapshot.agents[0].folder).toBe('~/src/codex-claw');
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-existing' });
-    expect(snapshot.agents[0].avatar).toBeUndefined();
-  });
-
-  it('defaults blank edited names from the folder basename', () => {
-    const snapshot = createInitialSnapshot();
-
-    updateAgentFromInput(snapshot, {
-      id: 'agent-dina',
-      name: ' ',
-      folder: '~/src/codex-claw',
-    }, '2026-06-05T10:11:12.000Z');
-
-    expect(snapshot.agents[0].name).toBe('codex-claw');
   });
 
   it('returns null when updating a missing agent', () => {
@@ -237,19 +245,7 @@ describe('snapshot reducer', () => {
     expect(updateAgentFromInput(snapshot, {
       id: 'agent-missing',
       name: 'Missing',
-      folder: '/tmp/missing',
     })).toBeNull();
-  });
-
-  it('rejects edits for busy agents', () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].status = { type: 'working', detail: 'Running tests' };
-
-    expect(() => updateAgentFromInput(snapshot, {
-      id: 'agent-dina',
-      name: 'Dina Prime',
-      folder: '~/src/codex-claw',
-    })).toThrow('Agent must be idle before editing.');
   });
 
   it('selects the active agent on its team when switching agents', () => {
@@ -2993,6 +2989,43 @@ describe('snapshot reducer', () => {
     });
   });
 
+  it('tracks app-owned work-routing requests outside the transcript', () => {
+    const snapshot = createInitialSnapshot();
+    const request = {
+      id: 'work-routing-1',
+      kind: 'work_routing' as const,
+      payload: {
+        request: {
+          agentId: 'agent-dina',
+          task: 'Add queue retries',
+          suggestedBranchName: 'feat/queue-retries',
+          sharedFolderAgentNames: [],
+        },
+      },
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'workRouting.requested',
+      payload: request,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
+    expect(snapshot.messages).toHaveLength(0);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'workRouting.resolved',
+      payload: { id: 'work-routing-1' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([]);
+  });
+
   it('attaches approval requests to the only running MCP tool when metadata is incomplete', () => {
     const snapshot = createInitialSnapshot();
 
@@ -3528,6 +3561,51 @@ describe('snapshot reducer', () => {
 
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Backend error' });
     expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Backend error' }]);
+  });
+
+  it('keeps retryable connection errors transient until the retry sequence fails', () => {
+    const snapshot = createInitialSnapshot();
+    const agentId = snapshot.agents[0].id;
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      applyMainEventToSnapshot(snapshot, {
+        seq: attempt,
+        agentId,
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        type: 'error',
+        payload: {
+          message: `Reconnecting… ${attempt}/5`,
+          willRetry: true,
+          error: { message: `Reconnecting… ${attempt}/5` },
+        },
+        occurredAt: `2026-06-05T00:00:0${attempt}.000Z`,
+      });
+    }
+
+    expect(snapshot.messages).toStrictEqual([]);
+    expect(snapshot.agents[0].status).toStrictEqual({
+      type: 'working',
+      detail: 'Reconnecting… 5/5',
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 6,
+      agentId,
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'error',
+      payload: {
+        message: 'Connection failed',
+        willRetry: false,
+        error: { message: 'Connection failed' },
+      },
+      occurredAt: '2026-06-05T00:00:06.000Z',
+    });
+
+    expect(snapshot.messages).toHaveLength(1);
+    expect(snapshot.messages[0]?.parts).toStrictEqual([{ type: 'status', text: 'Connection failed' }]);
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Connection failed' });
   });
 
   it('builds and updates the current subagent tree from app-owned events', () => {

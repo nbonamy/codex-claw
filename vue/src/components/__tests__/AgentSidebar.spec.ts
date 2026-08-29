@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent, BenchTemplate, Team } from '@codex-claw/core/contracts';
+import type { Agent, Team } from '@codex-claw/core/contracts';
+
+const agentSidebarSource = readFileSync(resolve(process.cwd(), 'src/components/AgentSidebar.vue'), 'utf8');
 
 function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -43,12 +47,34 @@ function mockRect(element: Element, rect: { top: number; height: number }): void
   });
 }
 
+function portaledMenuItems(): HTMLElement[] {
+  return Array.from(document.body.querySelectorAll<HTMLElement>('.agent-context-menu [role="menuitem"]'));
+}
+
+async function clickPortaledMenuItem(label: string): Promise<void> {
+  const item = portaledMenuItems().find((candidate) => candidate.textContent?.trim() === label);
+  expect(item).toBeDefined();
+  item!.click();
+  await flushPromises();
+}
+
 const agents: Agent[] = [
   {
     id: 'agent-dina',
     name: 'Dina',
     avatar: 'DI',
     folder: '~/src/id8',
+    workspace: {
+      kind: 'git',
+      folder: '~/src/id8',
+      repositoryName: 'id8',
+      repositoryRoot: '~/src/id8',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '~/src/id8',
+      originUrl: 'git@github.com:nbonamy/id8.git',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    },
     backend: 'codex',
     backendDefaults: { kind: 'codex' },
     status: { type: 'idle' },
@@ -59,6 +85,16 @@ const agents: Agent[] = [
     id: 'agent-jesse',
     name: 'Jesse',
     folder: '~/src/multi-llm-ts',
+    workspace: {
+      kind: 'git',
+      folder: '~/src/multi-llm-ts',
+      repositoryName: 'multi-llm-ts',
+      repositoryRoot: '~/src/multi-llm-ts',
+      branch: 'feat/testing',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '~/src/multi-llm-ts',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    },
     backend: 'codex',
     backendDefaults: { kind: 'codex' },
     status: { type: 'working', detail: 'Testing' },
@@ -84,25 +120,14 @@ const teams: Team[] = [
   },
 ];
 
-const bench: BenchTemplate[] = [
-  {
-    id: 'bench-dina',
-    name: 'Dina',
-    avatar: 'DI',
-    folder: '~/src/id8',
-    backend: 'codex',
-    createdAt: '2026-06-05T00:00:00.000Z',
-    updatedAt: '2026-06-05T00:00:00.000Z',
-  },
-];
-
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
+  document.body.innerHTML = '';
 });
 
 describe('AgentSidebar', () => {
-  it('renders the team header, agents, statuses, folder basenames, and active selection without Bench chrome', () => {
+  it('renders repository headers, branch sessions, statuses, and active selection without Bench chrome', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -114,23 +139,108 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__header').text()).toContain('CODEX CLAW');
-    expect(wrapper.text()).toContain('CODEX CLAW');
+    expect(wrapper.get('.agent-sidebar__header').text()).toContain('Sessions');
     expect(wrapper.text()).not.toContain('Bench');
-    expect(wrapper.text()).toContain('Dina');
-    expect(wrapper.text()).toContain('Idle');
     expect(wrapper.text()).toContain('id8');
-    expect(wrapper.text()).not.toContain('~/src/id8');
-    expect(wrapper.text()).toContain('Jesse');
-    expect(wrapper.text()).toContain('Testing');
+    expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('multi-llm-ts');
-    expect(wrapper.text()).not.toContain('~/src/multi-llm-ts');
+    expect(wrapper.text()).toContain('Jesse');
     expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('Dina');
     expect(wrapper.find('.agent-sidebar__agent--active').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
   });
 
-  it('renders compact agent rows with only mini avatars, names, and status icons', () => {
+  it('collapses and expands a repository by clicking its title', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    let repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    let firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
+    expect(firstSession.attributes('style') ?? '').not.toContain('display: none');
+
+    await repositoryTitle.trigger('click');
+    expect(wrapper.emitted('update-collapsed-repositories')?.[0]).toStrictEqual([
+      ['remote:github.com/nbonamy/id8'],
+    ]);
+    await wrapper.setProps({ collapsedRepositoryKeys: ['remote:github.com/nbonamy/id8'] });
+    repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
+    expect(firstSession.attributes('style') ?? '').toContain('display: none');
+    expect(repositoryTitle.attributes('aria-expanded')).toBe('false');
+
+    await repositoryTitle.trigger('click');
+    expect(wrapper.emitted('update-collapsed-repositories')?.[1]).toStrictEqual([[]]);
+    await wrapper.setProps({ collapsedRepositoryKeys: [] });
+    repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
+    expect(repositoryTitle.attributes('aria-expanded')).toBe('true');
+    expect(firstSession.attributes('style') ?? '').not.toContain('display: none');
+  });
+
+  it('emits repository-scoped session creation actions', async () => {
+    const listRepositoryBranches = vi.fn().mockResolvedValue([{ name: 'main', isDefault: true, worktreePath: '~/src/id8' }]);
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        listRepositoryBranches,
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
+      popover.props('popperClass') === 'claw-popover agent-sidebar__repository-session-menu-popover'
+    ));
+    await sessionMenu?.vm.$emit('update:visible', true);
+    await flushPromises();
+    wrapper.findAllComponents({ name: 'AppMenu' }).find((menu) => menu.props('ariaLabel') === 'New session in id8')?.vm.$emit('select', 'default-branch');
+    await wrapper.get('[aria-label="Create agent from branch, pull request, or issue"]').trigger('click');
+
+    expect(listRepositoryBranches).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      repositoryRoot: '~/src/id8',
+    });
+    expect(wrapper.emitted('create-agent-on-branch')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      repositoryName: 'id8',
+      repositoryRoot: '~/src/id8',
+      branch: { name: 'main', isDefault: true, worktreePath: '~/src/id8' },
+    }]]);
+    expect(wrapper.emitted('create-agent-from-repository')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      repositoryName: 'id8',
+      repositoryRoot: '~/src/id8',
+    }]]);
+  });
+
+  it('shows repository branch loading failures in the session menu', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [agents[0]!],
+        activeAgentId: 'agent-dina',
+        listRepositoryBranches: vi.fn().mockRejectedValue(new Error('offline')),
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
+      popover.props('popperClass') === 'claw-popover agent-sidebar__repository-session-menu-popover'
+    ));
+    await sessionMenu?.vm.$emit('update:visible', true);
+    await flushPromises();
+
+    expect(document.body.textContent).toContain('Could not load branches: offline');
+  });
+
+  it('renders compact workspace rows with repository headers, branches, and status icons', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -144,11 +254,32 @@ describe('AgentSidebar', () => {
     });
 
     expect(wrapper.classes()).toContain('agent-sidebar--compact');
-    expect(wrapper.findAllComponents({ name: 'AgentAvatar' }).map((avatar) => avatar.props('size'))).toStrictEqual(['sm', 'sm']);
+    expect(wrapper.findAll('.agent-sidebar__workspace-header').map((header) => header.text())).toStrictEqual(['id8', 'multi-llm-ts']);
     expect(wrapper.findAll('.agent-sidebar__meta strong').map((name) => name.text())).toStrictEqual(['Dina', 'Jesse']);
     expect(wrapper.findAll('.agent-sidebar__status')).toHaveLength(2);
-    expect(wrapper.find('.agent-sidebar__status-text').exists()).toBe(false);
-    expect(wrapper.find('.agent-sidebar__folder').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
+  });
+
+  it('renders and updates repository-specific icons', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        repositoryIcons: { '~/src/id8': '🦞' },
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const picker = wrapper.findAllComponents({ name: 'RepositoryIconPicker' })
+      .find((component) => component.props('label') === 'id8')!;
+    expect(picker.props('modelValue')).toBe('🦞');
+    expect(wrapper.find('.agent-sidebar__workspace-toggle').exists()).toBe(false);
+    picker.vm.$emit('update:modelValue', '🚀');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('update-repository-icon')).toStrictEqual([
+      [{ repositoryKey: 'remote:github.com/nbonamy/id8', repositoryRoot: '~/src/id8', icon: '🚀' }],
+    ]);
   });
 
   it('replaces an unread agent runtime status with the unread indicator', () => {
@@ -200,6 +331,84 @@ describe('AgentSidebar', () => {
     });
     expect(hiddenWrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
     expect(hiddenWrapper.findAll('.agent-sidebar__status')).toHaveLength(10);
+  });
+
+  it('uses the branch fallback in an unnamed agent quick-switch label', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0]!, name: null }],
+        activeAgentId: 'agent-dina',
+        quickSwitchShortcutsVisible: true,
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-sidebar__quick-switch-shortcut').attributes('aria-label'))
+      .toBe('Switch to main with Command 1');
+  });
+
+  it('renders only the branch as the sidebar title when the agent name is null', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0]!, name: null, conversationTitle: 'Previous conversation' }],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-sidebar__meta strong').text()).toBe('main');
+  });
+
+  it('does not append repository names to duplicate unnamed branch titles', () => {
+    const computerUseAgent: Agent = {
+      ...agents[0]!,
+      id: 'agent-computer-use',
+      name: null,
+      folder: '~/src/computer-use',
+      workspace: {
+        kind: 'git',
+        folder: '~/src/computer-use',
+        repositoryName: 'computer-use',
+        repositoryRoot: '~/src/computer-use',
+        branch: 'main',
+        isLinkedWorktree: false,
+        primaryWorktreeRoot: '~/src/computer-use',
+        updatedAt: '2026-06-05T00:00:00.000Z',
+      },
+    };
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0]!, name: null }, computerUseAgent],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.findAll('.agent-sidebar__meta strong').map((title) => title.text()))
+      .toStrictEqual(['main', 'main']);
+  });
+
+  it('renders persisted repository collapse state and emits controlled updates', async () => {
+    const repositoryKey = 'remote:github.com/nbonamy/id8';
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [agents[0]!],
+        activeAgentId: 'agent-dina',
+        collapsedRepositoryKeys: [repositoryKey],
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const toggle = wrapper.get('[aria-label="Expand id8 sessions"]');
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.get('.agent-sidebar__agent').isVisible()).toBe(false);
+    await toggle.trigger('click');
+
+    expect(wrapper.emitted('update-collapsed-repositories')).toStrictEqual([[[]]]);
   });
 
   it('emits agent selection from agent rows', async () => {
@@ -277,7 +486,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('reorder-agents')).toBeUndefined();
   });
 
-  it('falls back to name initials when an avatar is not set', () => {
+  it('uses branch icons instead of agent avatars', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -289,7 +498,24 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.find('.agent-sidebar__agent--active .agent-sidebar__avatar').text()).toBe('JE');
+    expect(wrapper.findAll('.agent-sidebar__session-icon')).toHaveLength(2);
+    expect(wrapper.find('.agent-sidebar__avatar').exists()).toBe(false);
+  });
+
+  it('gives normal workspace rows larger icons and breathing room than compact rows', () => {
+    expect(agentSidebarSource).toContain('--agent-sidebar-row-min-height: 30px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-workspace-icon-size: 16px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-size: 20px;');
+    expect(agentSidebarSource).toContain('min-height: 30px;');
+    expect(agentSidebarSource).toContain('.agent-sidebar--compact {\n  --agent-sidebar-row-min-height: 28px;\n  --agent-sidebar-workspace-icon-size: 16px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-column-width: 24px;');
+    expect(agentSidebarSource).toContain('--agent-sidebar-workspace-column-gap: 4px;');
+    expect(agentSidebarSource).not.toContain('agent-sidebar__workspace-toggle');
+    expect(agentSidebarSource).toContain('width: calc(var(--icon-sm) + 2px);');
+    expect(agentSidebarSource).not.toContain('.agent-sidebar__workspace-header:focus-within');
+    expect(agentSidebarSource).toContain('.agent-sidebar__start-work {\n  flex: 0 0 auto;');
+    expect(agentSidebarSource).toContain('.agent-sidebar__list {\n  flex: 1 1 0;');
+    expect(agentSidebarSource).toContain('padding: 1px var(--space-6) 1px\n    calc(var(--agent-sidebar-workspace-inline-padding) + var(--space-6));');
   });
 
   it('labels non-idle statuses for assistive tech', () => {
@@ -313,7 +539,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });
 
-  it('surfaces short collaboration statuses while keeping folder basenames visible in compact rows', () => {
+  it('keeps workspace labels stable when collaboration status changes', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
@@ -327,16 +553,16 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Running tests');
+    expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('id8');
-    expect(wrapper.text()).not.toContain('~/src/id8');
+    expect(wrapper.get('.agent-sidebar__status').attributes('aria-label')).toBe('Idle');
   });
 
-  it('keeps blank folders blank instead of inventing a basename', () => {
+  it('places agents without workspace identity under Quick chats', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
-          { ...agents[0], folder: '' },
+          { ...agents[0], folder: '', workspace: undefined },
         ],
         activeAgentId: 'agent-dina',
         teamName: 'Codex Claw',
@@ -346,10 +572,11 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__folder').text()).toBe('');
+    expect(wrapper.get('.agent-sidebar__workspace-header').text()).toBe('Quick chats');
+    expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
   });
 
-  it('renders a taller rounded new agent action', () => {
+  it('renders the new session action at the top instead of a footer action', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -361,53 +588,8 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__new').text()).toContain('New Agent');
-    expect(wrapper.find('.new-agent-button__icon').exists()).toBe(true);
-  });
-
-  it('emits new agent requests from the footer action', async () => {
-    const wrapper = mount(AgentSidebar, {
-      props: {
-        agents,
-        activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
-      },
-      global: {
-        plugins: [ElementPlus],
-      },
-    });
-
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-
-    expect(wrapper.emitted('new-agent')).toStrictEqual([[]]);
-  });
-
-  it('emits Bench deploy and remove requests from the new agent menu', async () => {
-    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const wrapper = mount(AgentSidebar, {
-      props: {
-        agents,
-        activeAgentId: 'agent-dina',
-        bench,
-        teamName: 'Codex Claw',
-      },
-      global: {
-        plugins: [ElementPlus],
-      },
-    });
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
-    await flushPromises();
-
-    expect(confirm).toHaveBeenCalled();
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
+    expect(wrapper.get('.agent-sidebar__start-work').text()).toContain('Add project');
+    expect(wrapper.find('.agent-sidebar__footer').exists()).toBe(false);
   });
 
   it('opens a context menu, closes it on request, and emits agent actions', async () => {
@@ -427,25 +609,27 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
-    expect(wrapper.get('.agent-context-menu').findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
+    expect(document.body.querySelector('.agent-context-menu')).not.toBeNull();
+    expect(portaledMenuItems().map((item) => item.textContent?.trim())).toStrictEqual([
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
       'Save to Bench',
+      'Resume Session',
       'Restart Agent',
       'Close Agent',
     ]);
 
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
+    await clickPortaledMenuItem('Edit Agent');
 
     expect(wrapper.emitted('edit-agent')).toStrictEqual([['agent-dina']]);
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+    expect(document.body.querySelector('.agent-context-menu')).toBeNull();
 
     const expectedActions = [
       ['Duplicate Agent', 'duplicate-agent'],
       ['Save to Bench', 'save-agent-to-bench'],
+      ['Resume Session', 'resume-session'],
       ['Restart Agent', 'restart-agent'],
       ['Close Agent', 'close-agent'],
     ] as const;
@@ -455,7 +639,7 @@ describe('AgentSidebar', () => {
         clientX: 120,
         clientY: 80,
       });
-      await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === label)?.trigger('click');
+      await clickPortaledMenuItem(label);
       expect(wrapper.emitted(eventName)).toStrictEqual([['agent-dina']]);
     }
   });
@@ -479,7 +663,7 @@ describe('AgentSidebar', () => {
     });
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Finder')?.trigger('click');
+    await clickPortaledMenuItem('Finder');
 
     expect(wrapper.emitted('open-in')).toStrictEqual([[
       { agentId: 'agent-dina', application: 'finder' },
@@ -498,7 +682,7 @@ describe('AgentSidebar', () => {
     });
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+    await clickPortaledMenuItem('Fork Agent');
 
     expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
   });
@@ -520,7 +704,7 @@ describe('AgentSidebar', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+    await clickPortaledMenuItem('Skwad');
 
     expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([[{
       agentId: 'agent-dina',
@@ -553,8 +737,8 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Skwad')).toBe(true);
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Remote Core')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Skwad')).toBe(true);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Remote Core')).toBe(false);
   });
 
   it('hides all move targets for remote agents', async () => {
@@ -589,8 +773,8 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Skwad')).toBe(false);
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Codex Claw')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Skwad')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Codex Claw')).toBe(false);
   });
 
   it('closes the context menu when the menu emits close', async () => {
@@ -610,11 +794,11 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
+    expect(document.body.querySelector('.agent-context-menu')).not.toBeNull();
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+    expect(document.body.querySelector('.agent-context-menu')).toBeNull();
   });
 
   it('emits collapse requests from the team header icon', async () => {
@@ -716,26 +900,19 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[244], [276]]);
   });
 
-  it('shows the conversation history panel above the new agent footer', async () => {
-    const listConversations = vi.fn().mockResolvedValue([]);
+  it('does not render conversation history in the sidebar footer', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
         activeAgentId: 'agent-dina',
         teamName: 'Codex Claw',
-        listConversations,
       },
       global: {
         plugins: [ElementPlus],
       },
     });
 
-    const panel = wrapper.get('.agent-sidebar__conversations');
-    expect(Boolean(panel.element.compareDocumentPosition(wrapper.get('.agent-sidebar__footer').element) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-
-    await wrapper.get('.conversation-history__header').trigger('click');
-    await flushPromises();
-
-    expect(listConversations).toHaveBeenCalledWith('agent-dina');
+    expect(wrapper.find('.agent-sidebar__conversations').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('CONVERSATIONS');
   });
 });

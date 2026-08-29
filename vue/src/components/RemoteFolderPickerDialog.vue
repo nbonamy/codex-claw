@@ -13,16 +13,14 @@
           v-model="folderPath"
           class="claw-form-dialog__text-input"
           type="text"
-          aria-label="Remote folder path"
-          placeholder="$HOME"
+          :aria-label="$t('surface.remoteFolderPickerDialog.remoteFolderPath')"
+          :placeholder="$t('surface.remoteFolderPickerDialog.hOME')"
           @keydown.enter.prevent="loadFolders(folderPath)"
         />
         <el-button
           :loading="loading"
           @click="loadFolders(folderPath)"
-        >
-          Go
-        </el-button>
+        > {{ $t('surface.remoteFolderPickerDialog.go') }} </el-button>
       </div>
 
       <p
@@ -35,9 +33,7 @@
       <div
         v-if="loading && folderEntries.length === 0"
         class="remote-folder-picker-dialog__empty"
-      >
-        Loading folders...
-      </div>
+      > {{ $t('surface.remoteFolderPickerDialog.loadingFolders') }} </div>
       <div
         v-else
         class="remote-folder-picker-dialog__list"
@@ -64,29 +60,26 @@
         <div
           v-if="!loading && folderEntries.length === 0 && !folderListing?.parentPath"
           class="remote-folder-picker-dialog__empty"
-        >
-          No folders
-        </div>
+        > {{ $t('surface.remoteFolderPickerDialog.noFolders') }} </div>
       </div>
     </div>
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.remoteFolderPickerDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
           :disabled="!folderPath.trim()"
           @click="selectFolder"
-        >
-          Select this folder
-        </button>
+        > {{ $t('surface.remoteFolderPickerDialog.selectThisFolder') }} </button>
       </div>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { SourceFolderListing, SourceFolderListInput } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
@@ -99,7 +92,7 @@ const props = withDefaults(defineProps<{
   visible: boolean;
 }>(), {
   initialPath: '',
-  title: 'Choose remote folder',
+  title: translate('surface.remoteFolderPickerDialog.chooseRemoteFolder'),
 });
 
 const emit = defineEmits<{

@@ -1,11 +1,11 @@
 <template>
   <SettingsSection
-    title="Codex Device Pairing"
+    :title="$t('surface.settingsDevicePairingSection.codexDevicePairing')"
     title-id="settings-connections-device-pairing-title"
   >
     <div class="settings-device-pairing">
       <SettingsRow
-        title="Allow connections"
+        :title="$t('surface.settingsDevicePairingSection.allowConnections')"
         :description="description"
       >
         <template #control>
@@ -13,7 +13,7 @@
             :model-value="remoteControlEnabled"
             :loading="action === 'enable' || action === 'disable'"
             :disabled="status === null || status.allowRemoteControl === false || action === 'start'"
-            aria-label="Allow connections"
+            :aria-label="$t('surface.settingsDevicePairingSection.allowConnections')"
             @update:model-value="updateRemoteControlEnabled"
           />
         </template>
@@ -22,13 +22,13 @@
       <SettingsRow
         v-if="remoteControlEnabled"
         as="label"
-        title="Keep this Mac awake"
-        description="Prevent sleep when this Mac is plugged in and remote access is enabled"
+        :title="$t('surface.settingsDevicePairingSection.keepThisMacAwake')"
+        :description="$t('surface.settingsDevicePairingSection.preventSleepWhenThisMacIsPluggedInAndRemoteAccessIsEnabl')"
       >
         <template #control>
           <el-switch
             :model-value="settings.preventSleepWhenRemoteAccessEnabled"
-            aria-label="Keep this Mac awake"
+            :aria-label="$t('surface.settingsDevicePairingSection.keepThisMacAwake')"
             @update:model-value="updateRemoteAccessKeepAwake"
           />
         </template>
@@ -43,9 +43,7 @@
       <div
         v-else-if="loadingStatus"
         class="settings-device-pairing__loading"
-      >
-        Checking device pairing...
-      </div>
+      > {{ $t('surface.settingsDevicePairingSection.checkingDevicePairing') }} </div>
 
       <div
         v-if="session"
@@ -54,9 +52,9 @@
         <img
           v-if="qrDataUrl"
           :src="qrDataUrl"
-          alt="Codex device pairing QR code"
+          :alt="$t('surface.settingsDevicePairingSection.codexDevicePairingQRCode')"
         >
-        <span>Scan with the Codex mobile app or enter this code</span>
+        <span>{{ $t('surface.settingsDevicePairingSection.scanWithTheCodexMobileAppOrEnterThisCode') }}</span>
         <strong>{{ session.manualPairingCode || session.pairingCode }}</strong>
         <em>{{ sessionStatus }}</em>
       </div>
@@ -65,7 +63,7 @@
         v-if="remoteControlEnabled"
       >
         <SettingsRow
-          title="Paired devices"
+          :title="$t('surface.settingsDevicePairingSection.pairedDevices')"
           :description="pairedDevicesDescription"
         >
           <template #control>
@@ -76,26 +74,20 @@
                 size="small"
                 loading
                 disabled
-              >
-                Refreshing
-              </el-button>
+              > {{ $t('surface.settingsDevicePairingSection.refreshing') }} </el-button>
               <template v-else-if="status?.status === 'connected'">
                 <el-button
                   text
                   size="small"
                   :loading="action === 'start'"
                   @click="startPairing"
-                >
-                  Add device
-                </el-button>
+                > {{ $t('surface.settingsDevicePairingSection.addDevice') }} </el-button>
                 <el-button
                   text
                   size="small"
                   :loading="loadingDevices"
                   @click="loadDevices"
-                >
-                  Refresh
-                </el-button>
+                > {{ $t('surface.settingsDevicePairingSection.refresh') }} </el-button>
               </template>
             </span>
           </template>
@@ -111,7 +103,7 @@
           <SettingsRow
             v-for="device in devices"
             :key="device.clientId"
-            :title="device.displayName || device.deviceModel || 'Codex device'"
+            :title="device.displayName || device.deviceModel || $t('surface.settingsDevicePairingSection.codexDevice')"
             :description="deviceLabel(device)"
           >
             <template #control>
@@ -121,9 +113,7 @@
                 size="small"
                 :loading="revokingDeviceId === device.clientId"
                 @click="confirmRevoke(device)"
-              >
-                Revoke
-              </el-button>
+              > {{ $t('surface.settingsDevicePairingSection.revoke') }} </el-button>
             </template>
           </SettingsRow>
         </div>
@@ -133,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toString as qrCodeToString } from 'qrcode';
@@ -176,26 +167,26 @@ let pairingPollTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let statusPollTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
 const description = computed(() => {
-  if (status.value?.allowRemoteControl === false) return 'Disabled by your Codex configuration.';
-  if (status.value?.status === 'connected') return 'Remote control is on. Pair and manage devices that can access this Claw instance.';
-  if (status.value?.status === 'connecting') return 'Connecting to the Codex remote-control service...';
-  if (status.value?.status === 'errored') return 'Codex remote control needs attention.';
-  return 'Connect the official Codex mobile app to this Claw instance.';
+  if (status.value?.allowRemoteControl === false) return translate('surface.settingsDevicePairingSection.disabledByYourCodexConfiguration');
+  if (status.value?.status === 'connected') return translate('surface.settingsDevicePairingSection.remoteControlIsOnPairAndManageDevicesThatCanAccessThisCl');
+  if (status.value?.status === 'connecting') return translate('surface.settingsDevicePairingSection.connectingToTheCodexRemoteControlService');
+  if (status.value?.status === 'errored') return translate('surface.settingsDevicePairingSection.codexRemoteControlNeedsAttention');
+  return translate('surface.settingsDevicePairingSection.connectTheOfficialCodexMobileAppToThisClawInstance');
 });
 const remoteControlEnabled = computed(() => (
   status.value !== null && status.value.status !== 'disabled'
 ));
 const pairedDevicesDescription = computed(() => {
-  if (status.value?.status === 'connecting') return 'Connecting before devices can be paired';
-  if (status.value?.status === 'errored') return 'Remote control needs attention';
-  if (!loadingDevices.value && devices.value.length === 0) return 'No paired devices';
+  if (status.value?.status === 'connecting') return translate('surface.settingsDevicePairingSection.connectingBeforeDevicesCanBePaired');
+  if (status.value?.status === 'errored') return translate('surface.settingsDevicePairingSection.remoteControlNeedsAttention');
+  if (!loadingDevices.value && devices.value.length === 0) return translate('surface.settingsDevicePairingSection.noPairedDevices');
   return '';
 });
 
 const sessionStatus = computed(() => {
   if (!session.value) return '';
   return new Date(session.value.expiresAt).getTime() <= Date.now()
-    ? 'Code expired'
+    ? translate('surface.settingsDevicePairingSection.codeExpired')
     : `Expires ${new Date(session.value.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 });
 
@@ -336,9 +327,11 @@ async function confirmRevoke(device: PairedDevice): Promise<void> {
   if (!environmentId) return;
   try {
     await ElMessageBox.confirm(
-      `${device.displayName || device.deviceModel || 'This device'} will no longer be able to connect to this Claw instance.`,
-      'Revoke paired device?',
-      { cancelButtonText: 'Cancel', confirmButtonText: 'Revoke', type: 'warning' },
+      translate('dynamic.misc.deviceRevokeDetail', {
+        device: device.displayName || device.deviceModel || translate('dynamic.misc.deviceFallback'),
+      }),
+      translate('surface.settingsDevicePairingSection.revokePairedDevice'),
+      { cancelButtonText: translate('common.cancel'), confirmButtonText: translate('common.revoke'), type: 'warning' },
     );
   } catch {
     return;
@@ -357,7 +350,7 @@ async function confirmRevoke(device: PairedDevice): Promise<void> {
 function deviceLabel(device: PairedDevice): string {
   return [device.platform, device.deviceType, device.appVersion ? `Codex ${device.appVersion}` : null]
     .filter(Boolean)
-    .join(' · ') || 'Paired Codex client';
+    .join(' · ') || translate('dynamic.misc.pairedCodexClient');
 }
 
 function errorMessage(cause: unknown): string {

@@ -66,7 +66,7 @@ describe('agent chat service', () => {
       {
         backend: 'codex',
         status: 'running',
-        detail: 'Codex backend connected.',
+        detail: { key: 'backend.connected', params: { backend: 'Codex' } },
         capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
       },
     ]);

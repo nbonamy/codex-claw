@@ -1,5 +1,5 @@
-import { mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentContextMenu from '../AgentContextMenu.vue';
 import type { Team } from '@codex-claw/core/contracts';
 
@@ -10,24 +10,48 @@ afterEach(() => {
     wrapper.unmount();
   }
   mountedWrappers = [];
+  vi.restoreAllMocks();
 });
 
 describe('AgentContextMenu', () => {
   it('renders grouped agent actions at the requested position', () => {
     const wrapper = mountMenu();
 
-    expect(wrapper.attributes('style')).toContain('left: 120px');
-    expect(wrapper.attributes('style')).toContain('top: 80px');
+    expect(wrapper.get('.agent-context-menu').attributes('style')).toContain('left: 120px');
+    expect(wrapper.get('.agent-context-menu').attributes('style')).toContain('top: 80px');
     expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
       'Save to Bench',
+      'Resume Session',
       'Restart Agent',
       'Close Agent',
     ]);
     expect(wrapper.findAll('[role="separator"]')).toHaveLength(2);
+  });
+
+  it('portals above shell clipping and shifts upward when opened near the viewport bottom', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      bottom: 1_020,
+      height: 280,
+      left: 120,
+      right: 340,
+      top: 740,
+      width: 220,
+      x: 120,
+      y: 740,
+      toJSON: () => undefined,
+    });
+    const wrapper = mountMenu({ x: 120, y: 740 }, false);
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    const menu = document.body.querySelector<HTMLElement>('.agent-context-menu');
+    expect(menu).not.toBeNull();
+    expect(menu?.style.left).toBe('120px');
+    expect(menu?.style.top).toBe('480px');
   });
 
   it('emits the selected action', async () => {
@@ -83,6 +107,22 @@ describe('AgentContextMenu', () => {
     expect(moveItem?.find('.app-menu__chevron').exists()).toBe(true);
   });
 
+  it('allows nested menus to extend beyond the context menu wrapper', () => {
+    const wrapper = mountMenu({
+      moveTargets: [
+        {
+          id: 'team-skwad',
+          name: 'Skwad',
+          avatar: 'SK',
+          color: '#46A857',
+          agentIds: [],
+        },
+      ],
+    });
+
+    expect(wrapper.get('.agent-context-menu').attributes('style')).toContain('overflow: visible');
+  });
+
   it('emits the selected move target from the submenu', async () => {
     const wrapper = mountMenu({
       moveTargets: [
@@ -119,7 +159,10 @@ describe('AgentContextMenu', () => {
   });
 });
 
-function mountMenu(props: { forkDisabled?: boolean; moveTargets?: Team[] } = {}) {
+function mountMenu(
+  props: { forkDisabled?: boolean; moveTargets?: Team[]; x?: number; y?: number } = {},
+  stubTeleport = true,
+) {
   const wrapper = mount(AgentContextMenu, {
     props: {
       x: 120,
@@ -127,6 +170,9 @@ function mountMenu(props: { forkDisabled?: boolean; moveTargets?: Team[] } = {})
       ...props,
     },
     attachTo: document.body,
+    global: {
+      stubs: stubTeleport ? { Teleport: true } : {},
+    },
   });
   mountedWrappers.push(wrapper);
   return wrapper;

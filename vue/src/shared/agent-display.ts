@@ -1,35 +1,27 @@
 import type { Agent, AgentStatus } from '@codex-claw/core/contracts';
+import { localizedText } from '../i18n/errors';
 
-export function agentStatusLabel(status: AgentStatus['type']): string {
-  switch (status) {
-    case 'working':
-      return 'Working';
-    case 'starting':
-      return 'Starting';
-    case 'awaitingInput':
-      return 'Awaiting input';
-    case 'error':
-      return 'Error';
-    case 'idle':
-      return 'Idle';
-  }
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+export function agentStatusLabel(status: AgentStatus['type'], translate: Translate): string {
+  return translate(`status.${status}`);
 }
 
-export function agentStatusText(agent: Agent): string {
+export function agentStatusText(agent: Agent, translate: Translate): string {
   if (agent.statusText) {
     return agent.statusText;
   }
 
   switch (agent.status.type) {
     case 'working':
-      return agent.status.detail ?? agentStatusLabel(agent.status.type);
+      return localizedText(agent.status.detail, translate) ?? agentStatusLabel(agent.status.type, translate);
     case 'awaitingInput':
-      return agent.status.detail ?? agentStatusLabel(agent.status.type);
+      return localizedText(agent.status.detail, translate) ?? agentStatusLabel(agent.status.type, translate);
     case 'error':
-      return agent.status.message ?? agentStatusLabel(agent.status.type);
+      return localizedText(agent.status.message, translate) ?? agentStatusLabel(agent.status.type, translate);
     case 'starting':
     case 'idle':
-      return agentStatusLabel(agent.status.type);
+      return agentStatusLabel(agent.status.type, translate);
   }
 }
 

@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
-import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -19,6 +20,7 @@ import type {
   SourceWorktree,
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus,
+  WorkRoutingRequest,
 } from '@codex-claw/core/contracts';
 import { closeAgentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
@@ -27,7 +29,7 @@ import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type DisplayMarkdownInput, type DisplayMarkdownResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -53,6 +55,7 @@ export class ClawMcpService {
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
+  private readonly workRoutingResolvers = new Map<string, (response: PrepareWorkResponse) => void>();
 
   constructor(options: ClawMcpServiceOptions) {
     this.snapshot = options.snapshot;
@@ -78,6 +81,7 @@ export class ClawMcpService {
       onListSourceWorktrees: (repoPath) => this.listSourceWorktrees(repoPath),
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
       onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
+      onPrepareWork: (agent, input) => this.prepareWorkForAgent(agent, input),
     });
     this.server = new ClawMcpHttpServer({
       coordinator: this.coordinator,
@@ -111,7 +115,21 @@ export class ClawMcpService {
   }
 
   stop(): Promise<void> {
+    for (const [requestId] of this.workRoutingResolvers) {
+      this.resolveWorkRoutingRequest(requestId, { mode: 'cancelled' });
+    }
     return this.server.stop();
+  }
+
+  resolveWorkRoutingRequest(requestId: string, response: PrepareWorkResponse): boolean {
+    const resolve = this.workRoutingResolvers.get(requestId);
+    if (!resolve) return false;
+    this.workRoutingResolvers.delete(requestId);
+    this.snapshot.workRoutingRequests = (this.snapshot.workRoutingRequests ?? [])
+      .filter((request) => request.id !== requestId);
+    this.emit({ type: 'workRouting.resolved', payload: { id: requestId } });
+    resolve(response);
+    return true;
   }
 
   sendMessage(fromAgentId: string, toAgentId: string, content: string): void {
@@ -270,7 +288,7 @@ export class ClawMcpService {
     }
     if (assignment.agentId !== agent.id) {
       const assignedAgent = this.snapshot.agents.find((candidate) => candidate.id === assignment.agentId);
-      throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent?.name ?? assignment.agentId}, not ${agent.name}.`);
+      throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent ? agentDisplayName(assignedAgent) : assignment.agentId}, not ${agentDisplayName(agent)}.`);
     }
 
     const completionInstructions = status === 'completed' ? this.loopCompletionInstructionsForAssignment(assignment.loopId) : '';
@@ -421,7 +439,7 @@ export class ClawMcpService {
     }
 
     const createInput: CreateAgentInput = {
-      name: input.name?.trim() || path.basename(folder),
+      name: input.name?.trim() || null,
       folder,
       ...(input.avatar ? { avatar: input.avatar } : {}),
       backend: input.backend ?? 'codex',
@@ -442,8 +460,35 @@ export class ClawMcpService {
     return {
       success: true,
       agentId: createdAgent.id,
-      message: `Created agent ${createdAgent.name}.`,
+      message: `Created agent ${agentDisplayName(createdAgent)}.`,
     };
+  }
+
+  private prepareWorkForAgent(agent: Agent, input: PrepareWorkInput): Promise<PrepareWorkResponse> {
+    const id = createWorkRoutingRequestId();
+    const request: WorkRoutingRequest = {
+      id,
+      kind: 'work_routing',
+      payload: {
+        request: {
+          agentId: agent.id,
+          task: input.task,
+          suggestedBranchName: input.branchName ?? suggestedWorkBranch(input.task),
+          sharedFolderAgentNames: this.snapshot.agents
+            .filter((candidate) => candidate.id !== agent.id && candidate.folder === agent.folder)
+            .map((candidate) => agentDisplayName(candidate)),
+        },
+      },
+    };
+    this.snapshot.workRoutingRequests = [
+      ...(this.snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== id),
+      request,
+    ];
+    this.emit({ agentId: agent.id, type: 'workRouting.requested', payload: request });
+
+    return new Promise((resolve) => {
+      this.workRoutingResolvers.set(id, resolve);
+    });
   }
 
   private loopCompletionInstructionsForAssignment(loopId?: string): string {
@@ -466,6 +511,19 @@ export class ClawMcpService {
   private emit(event: BackendEvent): void {
     this.eventSink?.(event);
   }
+}
+
+function createWorkRoutingRequestId(): string {
+  return `work-routing-${randomUUID()}`;
+}
+
+function suggestedWorkBranch(task: string): string {
+  const slug = task.toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .slice(0, 48)
+    .replace(/-+$/gu, '');
+  return `work/${slug || 'task'}`;
 }
 
 function completionInstructionsResponse(workItemId: string, instructions: string): UpdateWorkItemResponse {
@@ -531,3 +589,4 @@ function resolveUserPath(value: string): string {
 function fileBasename(filePath: string): string {
   return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
 }
+import path from 'node:path';

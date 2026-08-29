@@ -36,6 +36,24 @@ Renderer responsibilities:
 - never import MCP SDK types;
 - never call MCP tools directly.
 
+## Work Routing
+
+The `prepare-work` tool lets an agent pause before substantial implementation
+and ask the user where the work should continue. The tool accepts a
+self-contained `task` plus an optional branch suggestion and blocks until the
+user chooses one of three app-owned outcomes:
+
+- continue in the current conversation and checkout;
+- create or switch to a branch in the same checkout and continue;
+- create an isolated worktree, duplicate the current agent without selecting
+  it, and dispatch the task to that new conversation.
+
+`clawd` emits `workRouting.requested`; the renderer only presents the choice
+and returns it through `client/request/respond`. `clawd` owns all git and agent
+mutations, then resolves the pending MCP call with the resulting folder,
+branch, and delegated-agent identity. Switching the shared checkout is disabled
+when another agent uses the same folder; delegation remains available.
+
 ## Transport
 
 The server uses the official TypeScript MCP SDK with Streamable HTTP on a
@@ -160,8 +178,8 @@ claude -p "<prompt>" \
   --append-system-prompt "<Codex Claw developer instructions>"
 ```
 
-The `--allowed-tools` pattern mirrors Skwad's Claude integration and
-authorizes only tools from the `codex_claw` MCP server.
+The `--allowed-tools` pattern authorizes only tools from the `codex_claw` MCP
+server.
 
 `clawd` also adds developer instructions that give the backend agent its Claw
 agent ID/name/folder and tell it to set status, list agents, send messages,
@@ -173,8 +191,8 @@ smallest equivalent enablement path for that backend.
 
 ## Tools
 
-The first collaboration tools copy Skwad's names where they still fit, but the
-caller identity is app-owned and inferred from the backend session.
+Collaboration tool names are app-owned, and caller identity is inferred from
+the backend session.
 
 ### `list-agents`
 
@@ -185,9 +203,11 @@ Input: none.
 Visibility is team-scoped. Agents with a `teamId` see agents in the same team.
 Agents without a team see other no-team agents.
 
-Output uses unique agent IDs, display names, folders, and status. If several
-visible agents share the same display name, `send-message` uses the agent ID as
-the disambiguator.
+Output uses unique agent IDs, display names, folders, and status. An agent name
+is an optional custom label; when it is absent, model-facing output uses the
+same branch-or-folder fallback as the product UI instead of rendering `null`.
+If several visible agents share the same display name, `send-message` uses the
+agent ID as the disambiguator.
 
 ### `set-status`
 
@@ -397,7 +417,7 @@ visible IDs, names, and folders so the agent can recover cleanly.
   Claw owns those product capabilities. `display-markdown` is allowed because
   Claw now owns a constrained Markdown side panel and agent-folder-limited file
   preview path.
-- Do not advertise copied Skwad tools unless Claw can actually perform them.
+- Advertise only tools backed by real Claw product capabilities.
 - Do not let renderer code call MCP directly.
 - Prefer request-local backend configuration over global user config mutation.
 
@@ -416,7 +436,7 @@ then any backend enablement tests needed to prove agents can see it.
 
 ## Future Tools
 
-Potential tools from Skwad are intentionally not exposed yet:
+Potential tools are intentionally not exposed yet:
 
 - repo/worktree operations;
 - create/close agent;

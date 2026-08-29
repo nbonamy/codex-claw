@@ -197,11 +197,11 @@ selection. The renderer asks through the typed bridge to re-select the active
 persisted agent after subscribing to events, so relaunch restores visible
 history without the renderer importing Codex protocol types.
 
-The sidebar conversation history uses `thread/list` with the active agent
-folder as an exact `cwd` filter, `archived: false`, and newest-first
-`updated_at` sorting. `clawd` sends app-owned `ConversationSummary` objects
-through backend RPC, which Electron forwards over typed IPC. Clicking a Codex
-conversation calls `thread/resume`, stores the
+The Resume Session dialog opened from an agent's sidebar menu uses `thread/list`
+with that agent's folder as an exact `cwd` filter, `archived: false`, and
+newest-first `updated_at` sorting. `clawd` sends app-owned
+`ConversationSummary` objects through backend RPC, which Electron forwards over
+typed IPC. Clicking a session row calls `thread/resume`, stores the
 returned `{ kind: "codex", threadId }` session on the agent, replaces that
 agent's visible messages with the resumed turns, and routes the next prompt to
 the selected thread. Resume is allowed only while the agent is idle.

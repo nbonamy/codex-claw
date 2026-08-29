@@ -7,8 +7,8 @@
       class="git-workflow-control__primary"
       type="button"
       :disabled="busy || !firstEnabledAction"
-      aria-label="Run Git action"
-      title="Run Git action"
+      :aria-label="$t('surface.gitWorkflowControl.runGitAction')"
+      :title="$t('surface.gitWorkflowControl.runGitAction')"
       @click="runFirstEnabled"
     >
       <GitHubIcon aria-hidden="true" />
@@ -16,8 +16,8 @@
     <button
       class="git-workflow-control__trigger"
       type="button"
-      aria-label="Choose Git action"
-      title="Choose Git action"
+      :aria-label="$t('surface.gitWorkflowControl.chooseGitAction')"
+      :title="$t('surface.gitWorkflowControl.chooseGitAction')"
       :aria-expanded="menuOpen"
       @click.stop="toggleMenu"
     >
@@ -26,7 +26,7 @@
     <AppMenu
       v-if="menuOpen"
       class="git-workflow-control__menu"
-      ariaLabel="Git actions"
+      :ariaLabel="$t('surface.gitWorkflowControl.gitActions')"
       :items="menuItems"
       @select="selectAction"
     />
@@ -44,7 +44,7 @@
     :close-on-press-escape="!commitOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Commit changes</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
+    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.commitChanges') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
     <div
       v-if="commitOperation.status === 'editing'"
       class="git-workflow-control__dialog-form"
@@ -55,7 +55,7 @@
           v-model="commitMessage"
           autofocus
           rows="4"
-          placeholder="Commit message…"
+          :placeholder="$t('surface.gitWorkflowControl.commitMessage')"
         />
         <button
           v-if="canGenerateMessage"
@@ -63,28 +63,28 @@
           type="button"
           :disabled="busy || commitAddedLines + commitRemovedLines === 0"
           :aria-busy="generatingKind === 'commit'"
-          aria-label="Generate commit message with Codex"
-          title="Generate with Codex"
+          :aria-label="$t('surface.gitWorkflowControl.generateCommitMessageWithCodex')"
+          :title="$t('surface.gitWorkflowControl.generateWithCodex')"
           @click="generateCommitMessage"
         >
           <SparklesIcon aria-hidden="true" />
-          <span>{{ generatingKind === 'commit' ? 'Generating…' : 'Generate' }}</span>
+          <span>{{ generatingKind === 'commit' ? $t('surface.gitWorkflowControl.generating') : $t('surface.gitWorkflowControl.generate') }}</span>
         </button>
       </div>
       <p v-if="generationError && generationErrorKind === 'commit'" class="git-workflow-control__generation-error">{{ generationError }}</p>
       <div class="git-workflow-control__check git-workflow-control__scope-row">
         <span class="git-workflow-control__scope-spacer" aria-hidden="true" />
-        <span>Staged changes</span>
+        <span>{{ $t('surface.gitWorkflowControl.stagedChanges') }}</span>
         <span class="git-workflow-control__stats">+{{ stagedAddedLines }} <em>−{{ stagedRemovedLines }}</em></span>
       </div>
       <label class="git-workflow-control__check git-workflow-control__scope-row">
         <el-switch v-model="includeUnstaged" size="small" :disabled="busy" />
-        <span>Include unstaged changes</span>
+        <span>{{ $t('surface.gitWorkflowControl.includeUnstagedChanges') }}</span>
         <span class="git-workflow-control__stats" :class="{ 'git-workflow-control__stats--muted': !includeUnstaged }">+{{ unstagedAddedLines }} <em>−{{ unstagedRemovedLines }}</em></span>
       </label>
       <label class="git-workflow-control__check git-workflow-control__scope-row">
         <el-switch v-model="includeUntracked" size="small" :disabled="!hasUntrackedFiles || busy" />
-        <span>{{ hasUntrackedFiles ? 'Include untracked files' : 'No untracked files' }}</span>
+        <span>{{ hasUntrackedFiles ? $t('surface.gitWorkflowControl.includeUntrackedFiles') : $t('surface.gitWorkflowControl.noUntrackedFiles') }}</span>
         <span class="git-workflow-control__stats" :class="{ 'git-workflow-control__stats--muted': !includeUntracked || !hasUntrackedFiles }">+{{ untrackedAddedLines }} <em>−{{ untrackedRemovedLines }}</em></span>
       </label>
     </div>
@@ -100,11 +100,11 @@
       <div
         v-if="commitOperation.status === 'editing'"
         class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">Cancel</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canCommit" @click="commit(false)">Commit</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">Commit and push</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canCommit" @click="commit(false)">{{ $t('surface.gitWorkflowControl.commit') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">{{ $t('surface.gitWorkflowControl.commitAndPush') }}</button></div>
       <div
         v-else-if="commitOperation.status === 'error'"
         class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">Close</button><button class="claw-button" :class="commitOperation.commitCreated ? 'claw-button--primary' : 'claw-button--secondary'" type="button" @click="commitOperation.commitCreated ? retryCommitPush() : returnToCommitForm()">{{ commitOperation.commitCreated ? 'Retry push' : 'Back' }}</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button" :class="commitOperation.commitCreated ? 'claw-button--primary' : 'claw-button--secondary'" type="button" @click="commitOperation.commitCreated ? retryCommitPush() : returnToCommitForm()">{{ commitOperation.commitCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.back') }}</button></div>
     </template>
   </el-dialog>
 
@@ -120,7 +120,7 @@
     :close-on-press-escape="!pushOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Push changes</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.pushChanges') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div
       v-if="pushOperation.status === 'confirming'"
       class="git-workflow-control__push-summary"
@@ -132,7 +132,7 @@
         <ArrowRightIcon class="git-workflow-control__push-arrow" aria-hidden="true" />
         <code>{{ pushDestination }}</code>
       </div>
-      <p v-if="workflow?.files.length" class="git-workflow-control__push-note">Uncommitted changes stay in this worktree and will not be pushed.</p>
+      <p v-if="workflow?.files.length" class="git-workflow-control__push-note">{{ $t('surface.gitWorkflowControl.uncommittedChangesStayInThisWorktreeAndWillNotBePushed') }}</p>
     </div>
     <GitOperationFeedback
       v-else
@@ -146,55 +146,11 @@
       <div
         v-if="pushOperation.status === 'confirming'"
         class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">Cancel</button><button class="claw-button claw-button--primary" type="button" :disabled="busy" @click="push">Push</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy" @click="push">{{ $t('surface.gitWorkflowControl.push') }}</button></div>
       <div
         v-else-if="pushOperation.status === 'error'"
         class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">Close</button><button class="claw-button claw-button--primary" type="button" @click="push">Retry</button></div>
-    </template>
-  </el-dialog>
-
-  <el-dialog
-    v-if="branchDialogOpen"
-    v-model="branchDialogOpen"
-    class="claw-dialog git-workflow-control__dialog"
-    :class="{ 'git-workflow-control__dialog--transient': branchOperation.status === 'creating' || branchOperation.status === 'success' }"
-    width="min(520px, calc(100vw - 32px))"
-    :teleported="false"
-    :show-close="false"
-    :close-on-click-modal="!branchOperationRunning"
-    :close-on-press-escape="!branchOperationRunning"
-    destroy-on-close
-  >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Create branch</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
-    <div
-      v-if="branchOperation.status === 'editing'"
-      class="git-workflow-control__dialog-form git-workflow-control__branch-form"
-    >
-      <input
-        ref="branchNameInput"
-        v-model="branchName"
-        type="text"
-        autofocus
-        placeholder="Branch name…"
-        @keydown.enter.prevent="createBranch"
-      />
-      <label class="git-workflow-control__check git-workflow-control__branch-worktree">
-        <el-switch v-model="createBranchWorktree" size="small" :disabled="busy" />
-        <span>Create in a new worktree</span>
-      </label>
-    </div>
-    <GitOperationFeedback
-      v-else
-      :status="branchFeedbackStatus"
-      :title="branchOperationTitle"
-      :detail="branchOperationDetail"
-    >
-      <template #icon><GitBranchIcon /></template>
-    </GitOperationFeedback>
-    <template #footer>
-      <div v-if="branchOperation.status === 'editing'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="branchDialogOpen = false">Cancel</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !branchName.trim()" @click="createBranch">Create branch</button></div>
-      <div v-else-if="branchOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="branchDialogOpen = false">Close</button><button class="claw-button claw-button--secondary" type="button" @click="returnToBranchForm">Back</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="push">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 
@@ -210,26 +166,26 @@
     :close-on-press-escape="!pullRequestOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Create pull request</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.createPullRequest') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div
       v-if="pullRequestOperation.status === 'editing'"
       class="git-workflow-control__dialog-form git-workflow-control__pull-request-form"
     >
       <div class="git-workflow-control__message-editor git-workflow-control__message-editor--pull-request">
-        <input v-model="pullRequestTitle" autofocus placeholder="Title" />
-        <textarea v-model="pullRequestBody" rows="5" placeholder="Describe the change (optional)" />
+        <input v-model="pullRequestTitle" autofocus :placeholder="$t('surface.gitWorkflowControl.title')" />
+        <textarea v-model="pullRequestBody" rows="5" :placeholder="$t('surface.gitWorkflowControl.describeTheChangeOptional')" />
         <button
           v-if="canGenerateMessage"
           class="git-workflow-control__generate"
           type="button"
           :disabled="busy"
           :aria-busy="generatingKind === 'pullRequest'"
-          aria-label="Generate pull request draft with Codex"
-          title="Generate with Codex"
+          :aria-label="$t('surface.gitWorkflowControl.generatePullRequestDraftWithCodex')"
+          :title="$t('surface.gitWorkflowControl.generateWithCodex')"
           @click="generatePullRequestMessage"
         >
           <SparklesIcon aria-hidden="true" />
-          <span>{{ generatingKind === 'pullRequest' ? 'Generating…' : 'Generate' }}</span>
+          <span>{{ generatingKind === 'pullRequest' ? $t('surface.gitWorkflowControl.generating') : $t('surface.gitWorkflowControl.generate') }}</span>
         </button>
       </div>
       <p v-if="generationError && generationErrorKind === 'pullRequest'" class="git-workflow-control__generation-error">{{ generationError }}</p>
@@ -246,11 +202,11 @@
       <div
         v-if="pullRequestOperation.status === 'editing'"
         class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">Cancel</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">Create PR</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.createPR') }}</button></div>
       <div
         v-else-if="pullRequestOperation.status === 'error'"
         class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">Close</button><button class="claw-button claw-button--primary" type="button" @click="createPullRequest">Retry</button></div>
+      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 
@@ -266,23 +222,23 @@
     :close-on-press-escape="!mergeOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">Merge branch</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.mergeBranch') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div v-if="mergeOperation.status === 'confirming'" class="git-workflow-control__dialog-form">
-      <div class="git-workflow-control__merge-strategy" role="radiogroup" aria-label="Merge strategy">
+      <div class="git-workflow-control__merge-strategy" role="radiogroup" :aria-label="$t('surface.gitWorkflowControl.mergeStrategy')">
         <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'merge' }">
           <input v-model="mergeStrategy" type="radio" value="merge" />
           <GitMergeIcon class="git-workflow-control__merge-icon" aria-hidden="true" />
           <span class="git-workflow-control__merge-copy">
-            <strong>Merge commit</strong>
-            <span>Preserve every commit in a merge commit.</span>
+            <strong>{{ $t('surface.gitWorkflowControl.mergeCommit') }}</strong>
+            <span>{{ $t('surface.gitWorkflowControl.preserveEveryCommitInAMergeCommit') }}</span>
           </span>
         </label>
         <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'squash' }">
           <input v-model="mergeStrategy" type="radio" value="squash" />
           <ArrowsMinimizeIcon class="git-workflow-control__merge-icon" aria-hidden="true" />
           <span class="git-workflow-control__merge-copy">
-            <strong>Squash and merge</strong>
-            <span>Combine all changes into a single commit.</span>
+            <strong>{{ $t('surface.gitWorkflowControl.squashAndMerge') }}</strong>
+            <span>{{ $t('surface.gitWorkflowControl.combineAllChangesIntoASingleCommit') }}</span>
           </span>
         </label>
       </div>
@@ -292,18 +248,18 @@
         v-model="squashCommitMessage"
         class="git-workflow-control__merge-message"
         rows="4"
-        aria-label="Squash commit message"
-        placeholder="Squash commit message…"
+        :aria-label="$t('surface.gitWorkflowControl.squashCommitMessage')"
+        :placeholder="$t('surface.gitWorkflowControl.squashCommitMessage2')"
       />
       <label v-if="workflow?.isLinkedWorktree" class="git-workflow-control__check git-workflow-control__merge-cleanup">
         <el-switch v-model="deleteWorktree" size="small" />
-        <span>Delete worktree after merging</span>
+        <span>{{ $t('surface.gitWorkflowControl.deleteWorktreeAfterMerging') }}</span>
       </label>
       <label v-if="workflow?.isLinkedWorktree" class="git-workflow-control__check git-workflow-control__merge-cleanup">
         <el-switch v-model="deleteBranch" size="small" :disabled="!deleteWorktree" />
-        <span>Delete branch after removing worktree</span>
+        <span>{{ $t('surface.gitWorkflowControl.deleteBranchAfterRemovingWorktree') }}</span>
       </label>
-      <p v-if="mergeUnavailable" class="git-workflow-control__hint">Merge is available once a merge target is configured for this worktree.</p>
+      <p v-if="mergeUnavailable" class="git-workflow-control__hint">{{ $t('surface.gitWorkflowControl.mergeIsAvailableOnceAMergeTargetIsConfiguredForThisWorkt') }}</p>
     </div>
     <GitOperationFeedback
       v-else
@@ -314,16 +270,17 @@
       <template #icon><GitMergeIcon /></template>
     </GitOperationFeedback>
     <template #footer>
-      <div v-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">Cancel</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">Merge</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">Merge and push</button></div>
-      <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">Close</button><button class="claw-button claw-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? 'Retry push' : 'Retry' }}</button></div>
+      <div v-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
+      <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import { ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitBranchIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import { ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
@@ -335,7 +292,6 @@ const props = defineProps<{
   generateMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
   commitChanges?: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
-  createBranch?: (agentId: string, input: AgentGitBranchInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
 }>();
@@ -348,19 +304,15 @@ const menuOpen = ref(false);
 const busy = ref(false);
 const commitDialogOpen = ref(false);
 const pushDialogOpen = ref(false);
-const branchDialogOpen = ref(false);
 const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
 const commitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const squashCommitMessageInput = ref<HTMLTextAreaElement | null>(null);
-const branchNameInput = ref<HTMLInputElement | null>(null);
 const commitMessage = ref('');
 const includeUnstaged = ref(true);
 const includeUntracked = ref(false);
 const pullRequestTitle = ref('');
 const pullRequestBody = ref('');
-const branchName = ref('');
-const createBranchWorktree = ref(false);
 const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const squashCommitMessage = ref('');
 const deleteBranch = ref(false);
@@ -383,12 +335,6 @@ type PushOperation =
   | { status: 'success' }
   | { status: 'error'; message: string };
 const pushOperation = ref<PushOperation>({ status: 'confirming' });
-type BranchOperation =
-  | { status: 'editing' }
-  | { status: 'creating' }
-  | { status: 'success'; name: string }
-  | { status: 'error'; message: string };
-const branchOperation = ref<BranchOperation>({ status: 'editing' });
 type PullRequestOperation =
   | { status: 'editing' }
   | { status: 'creating' }
@@ -404,7 +350,6 @@ type MergeOperation =
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
 let commitSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pushSuccessTimer: ReturnType<typeof setTimeout> | null = null;
-let branchSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pullRequestSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let mergeSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 const mergeUnavailable = computed(() => !props.mergeBranch);
@@ -425,10 +370,10 @@ const canCommit = computed(() => Boolean(commitMessage.value.trim()) && (commitA
 const commitOperationRunning = computed(() => commitOperation.value.status === 'committing' || commitOperation.value.status === 'pushing');
 const commitFeedbackStatus = computed<'running' | 'success' | 'error'>(() => commitOperation.value.status === 'success' ? 'success' : commitOperation.value.status === 'error' ? 'error' : 'running');
 const commitOperationTitle = computed(() => {
-  if (commitOperation.value.status === 'committing') return 'Creating commit';
-  if (commitOperation.value.status === 'pushing') return 'Pushing commit';
-  if (commitOperation.value.status === 'success') return commitOperation.value.pushed ? 'Committed and pushed' : 'Commit created';
-  if (commitOperation.value.status === 'error') return commitOperation.value.commitCreated ? 'Commit created, but push failed' : 'Commit failed';
+  if (commitOperation.value.status === 'committing') return translate('surface.gitWorkflowControl.creatingCommit');
+  if (commitOperation.value.status === 'pushing') return translate('surface.gitWorkflowControl.pushingCommit');
+  if (commitOperation.value.status === 'success') return commitOperation.value.pushed ? translate('surface.gitWorkflowControl.committedAndPushed') : translate('surface.gitWorkflowControl.commitCreated');
+  if (commitOperation.value.status === 'error') return commitOperation.value.commitCreated ? translate('surface.gitWorkflowControl.commitCreatedButPushFailed') : translate('surface.gitWorkflowControl.commitFailed');
   return '';
 });
 const commitOperationDetail = computed(() => commitOperation.value.status === 'error' ? commitOperation.value.message : commitOperation.value.status === 'pushing' || (commitOperation.value.status === 'success' && commitOperation.value.pushed) ? pushDestination.value : committedMessage.value);
@@ -436,26 +381,16 @@ const pendingPushCount = computed(() => workflow.value?.ahead ?? props.gitStatus
 const pushDestination = computed(() => workflow.value?.upstream ?? [workflow.value?.remote, workflow.value?.branch].filter(Boolean).join('/'));
 const pushOperationRunning = computed(() => pushOperation.value.status === 'pushing');
 const pushFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pushOperation.value.status === 'success' ? 'success' : pushOperation.value.status === 'error' ? 'error' : 'running');
-const pushOperationTitle = computed(() => pushOperation.value.status === 'pushing' ? `Pushing ${pendingPushCount.value} ${pendingPushCount.value === 1 ? 'commit' : 'commits'}` : pushOperation.value.status === 'success' ? 'Push complete' : 'Push failed');
+const pushOperationTitle = computed(() => pushOperation.value.status === 'pushing' ? `Pushing ${pendingPushCount.value} ${pendingPushCount.value === 1 ? 'commit' : 'commits'}` : pushOperation.value.status === 'success' ? translate('surface.gitWorkflowControl.pushComplete') : translate('surface.gitWorkflowControl.pushFailed'));
 const pushOperationDetail = computed(() => pushOperation.value.status === 'error' ? pushOperation.value.message : pushDestination.value);
-const branchOperationRunning = computed(() => branchOperation.value.status === 'creating');
-const branchFeedbackStatus = computed<'running' | 'success' | 'error'>(() => branchOperation.value.status === 'success' ? 'success' : branchOperation.value.status === 'error' ? 'error' : 'running');
-const branchOperationTitle = computed(() => branchOperation.value.status === 'creating'
-  ? createBranchWorktree.value ? 'Creating branch and worktree' : 'Creating branch'
-  : branchOperation.value.status === 'success'
-    ? createBranchWorktree.value ? 'Branch and worktree created' : 'Branch created'
-    : branchOperation.value.status === 'error'
-      ? 'Branch creation failed'
-      : '');
-const branchOperationDetail = computed(() => branchOperation.value.status === 'error' ? branchOperation.value.message : branchName.value.trim());
 const pullRequestOperationRunning = computed(() => pullRequestOperation.value.status === 'creating');
 const pullRequestFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pullRequestOperation.value.status === 'success' ? 'success' : pullRequestOperation.value.status === 'error' ? 'error' : 'running');
 const pullRequestOperationTitle = computed(() => pullRequestOperation.value.status === 'creating'
-  ? 'Creating pull request'
+  ? translate('surface.gitWorkflowControl.creatingPullRequest')
   : pullRequestOperation.value.status === 'success'
-    ? 'Pull request created'
+    ? translate('surface.gitWorkflowControl.pullRequestCreated')
     : pullRequestOperation.value.status === 'error'
-      ? 'Pull request failed'
+      ? translate('surface.gitWorkflowControl.pullRequestFailed')
       : '');
 const pullRequestOperationDetail = computed(() => pullRequestOperation.value.status === 'error'
   ? pullRequestOperation.value.message
@@ -463,11 +398,11 @@ const pullRequestOperationDetail = computed(() => pullRequestOperation.value.sta
 const mergeOperationRunning = computed(() => mergeOperation.value.status === 'merging' || mergeOperation.value.status === 'pushing');
 const mergeFeedbackStatus = computed<'running' | 'success' | 'error'>(() => mergeOperation.value.status === 'success' ? 'success' : mergeOperation.value.status === 'error' ? 'error' : 'running');
 const mergeOperationTitle = computed(() => mergeOperation.value.status === 'success'
-  ? mergeOperation.value.pushed ? 'Merged and pushed' : 'Merge complete'
+  ? mergeOperation.value.pushed ? translate('surface.gitWorkflowControl.mergedAndPushed') : translate('surface.gitWorkflowControl.mergeComplete')
   : mergeOperation.value.status === 'error'
-    ? mergeOperation.value.mergeCreated ? 'Merge complete, but push failed' : 'Merge failed'
+    ? mergeOperation.value.mergeCreated ? translate('surface.gitWorkflowControl.mergeCompleteButPushFailed') : translate('surface.gitWorkflowControl.mergeFailed')
     : mergeOperation.value.status === 'pushing'
-      ? 'Pushing merged branch'
+      ? translate('surface.gitWorkflowControl.pushingMergedBranch')
     : mergeOperation.value.status === 'merging'
       ? `Merging ${mergeOperation.value.branch}`
       : '');
@@ -476,29 +411,27 @@ const mergeOperationDetail = computed(() => mergeOperation.value.status === 'err
   : mergeOperation.value.status === 'success'
     ? mergeOperation.value.pushed ? `${mergeOperation.value.branch} merged and pushed successfully` : `${mergeOperation.value.branch} merged successfully`
     : mergeOperation.value.status === 'pushing'
-      ? 'Pushing the resulting base branch'
+      ? translate('surface.gitWorkflowControl.pushingTheResultingBaseBranch')
     : deleteWorktree.value
-      ? 'Merging changes and cleaning up the linked worktree'
-      : 'Merging changes into the base worktree');
+      ? translate('surface.gitWorkflowControl.mergingChangesAndCleaningUpTheLinkedWorktree')
+      : translate('surface.gitWorkflowControl.mergingChangesIntoTheBaseWorktree'));
 
 const commitEnabled = computed(() => workflow.value === null
   ? !workflowError.value && (props.gitStatus?.changedFiles ?? 0) > 0
   : Boolean(workflow.value.files.length));
 const pushEnabled = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && (workflow.value?.ahead ?? props.gitStatus?.ahead ?? 0) > 0));
 const pushCapable = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && props.pushBranch));
-const branchEnabled = computed(() => Boolean(workflow.value && props.createBranch));
 const currentBranchAvailable = computed(() => Boolean(workflow.value?.branch && !workflow.value?.detached));
 const integrationBranch = computed(() => ['main', 'master', 'develop', 'development', 'trunk'].includes(workflow.value?.branch ?? ''));
 const mergeEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
 const canMerge = computed(() => mergeStrategy.value === 'merge' || Boolean(squashCommitMessage.value.trim()));
 const prEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
-const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : branchEnabled.value ? 'branch' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
+const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
-  { id: 'commit', type: 'action', label: 'Commit', icon: GitCommitIcon, disabled: !commitEnabled.value },
-  { id: 'push', type: 'action', label: 'Push', icon: CloudUploadIcon, disabled: !pushEnabled.value },
-  { id: 'branch', type: 'action', label: 'Branch', icon: GitBranchIcon, disabled: !branchEnabled.value },
-  { id: 'merge', type: 'action', label: 'Merge', icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
-  { id: 'create-pr', type: 'action', label: 'Create PR', icon: GitForkIcon, disabled: !prEnabled.value },
+  { id: 'commit', type: 'action', label: translate('surface.gitWorkflowControl.commit'), icon: GitCommitIcon, disabled: !commitEnabled.value },
+  { id: 'push', type: 'action', label: translate('surface.gitWorkflowControl.push'), icon: CloudUploadIcon, disabled: !pushEnabled.value },
+  { id: 'merge', type: 'action', label: translate('surface.gitWorkflowControl.merge'), icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
+  { id: 'create-pr', type: 'action', label: translate('surface.gitWorkflowControl.createPR'), icon: GitForkIcon, disabled: !prEnabled.value },
 ]);
 
 watch(commitDialogOpen, (open) => {
@@ -512,14 +445,6 @@ watch(commitDialogOpen, (open) => {
 
 watch(pushDialogOpen, (open) => {
   if (!open) resetPushOperation();
-});
-
-watch(branchDialogOpen, (open) => {
-  if (open && branchOperation.value.status === 'editing') {
-    void nextTick(() => branchNameInput.value?.focus());
-  } else if (!open) {
-    resetBranchOperation();
-  }
 });
 
 watch(pullRequestDialogOpen, (open) => {
@@ -558,7 +483,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu);
   clearCommitSuccessTimer();
   clearPushSuccessTimer();
-  clearBranchSuccessTimer();
   clearPullRequestSuccessTimer();
   clearMergeSuccessTimer();
 });
@@ -614,11 +538,6 @@ function selectAction(action: string): void {
   else if (action === 'push' && pushEnabled.value) {
     resetPushOperation();
     pushDialogOpen.value = true;
-  }
-  else if (action === 'branch' && branchEnabled.value) {
-    resetBranchOperation();
-    branchName.value = '';
-    branchDialogOpen.value = true;
   }
   else if (action === 'create-pr' && prEnabled.value) {
     resetPullRequestOperation();
@@ -712,27 +631,6 @@ async function push(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
     pushOperation.value = { status: 'error', message };
-  } finally {
-    busy.value = false;
-  }
-}
-async function createBranch(): Promise<void> {
-  if (!props.createBranch || !branchName.value.trim()) return;
-  clearBranchSuccessTimer();
-  const name = branchName.value.trim();
-  busy.value = true;
-  workflowError.value = null;
-  branchOperation.value = { status: 'creating' };
-  try {
-    workflow.value = await props.createBranch(props.agent.id, { name, createWorktree: createBranchWorktree.value, confirmed: true });
-    branchOperation.value = { status: 'success', name };
-    branchSuccessTimer = setTimeout(() => {
-      branchDialogOpen.value = false;
-    }, 1500);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    workflowError.value = message;
-    branchOperation.value = { status: 'error', message };
   } finally {
     busy.value = false;
   }
@@ -835,10 +733,6 @@ function returnToCommitForm(): void {
   commitOperation.value = { status: 'editing' };
   void nextTick(() => commitMessageInput.value?.focus());
 }
-function returnToBranchForm(): void {
-  branchOperation.value = { status: 'editing' };
-  void nextTick(() => branchNameInput.value?.focus());
-}
 function showCommitSuccess(pushed: boolean): void {
   commitOperation.value = { status: 'success', pushed };
   commitSuccessTimer = setTimeout(() => {
@@ -866,17 +760,6 @@ function clearPushSuccessTimer(): void {
   if (pushSuccessTimer !== null) {
     clearTimeout(pushSuccessTimer);
     pushSuccessTimer = null;
-  }
-}
-function resetBranchOperation(): void {
-  clearBranchSuccessTimer();
-  createBranchWorktree.value = false;
-  branchOperation.value = { status: 'editing' };
-}
-function clearBranchSuccessTimer(): void {
-  if (branchSuccessTimer !== null) {
-    clearTimeout(branchSuccessTimer);
-    branchSuccessTimer = null;
   }
 }
 function resetPullRequestOperation(): void {
@@ -1045,28 +928,6 @@ function clearMergeSuccessTimer(): void {
 
 .git-workflow-control__pull-request-form textarea {
   padding: var(--space-6) 0 var(--space-4);
-}
-
-.git-workflow-control__branch-form {
-  padding: var(--space-4) 0 var(--space-2);
-}
-
-.git-workflow-control__branch-form input[type="text"] {
-  border: 0;
-  border-radius: 0;
-  padding: var(--space-4) 0;
-  background: transparent;
-}
-
-.git-workflow-control__branch-form input[type="text"]:focus {
-  border-color: transparent;
-  background: transparent;
-}
-
-.git-workflow-control__branch-worktree {
-  min-height: 40px;
-  margin-top: var(--space-2);
-  padding: var(--space-2) 0;
 }
 
 .git-workflow-control__message-editor {

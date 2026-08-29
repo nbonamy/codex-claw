@@ -110,7 +110,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'error',
-        detail: 'Token storage is not available on this device.',
+        detail: { key: 'workProvider.tokenStorageUnavailable' },
       });
       await this.options.saveSnapshot();
       return { snapshot: this.snapshot() };
@@ -120,7 +120,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'notConfigured',
-        detail: `${providerLabel(provider)} OAuth is not configured.`,
+        detail: { key: 'workProvider.oauthNotConfigured', params: { provider: providerLabel(provider) } },
       });
       await this.options.saveSnapshot();
       return { snapshot: this.snapshot() };
@@ -134,7 +134,7 @@ export class WorkIntegrationManager {
     this.setConnection({
       provider,
       status: 'connecting',
-      detail: `Enter code ${authorization.userCode} in ${providerLabel(provider)}.`,
+      detail: { key: 'workProvider.enterCode', params: { code: authorization.userCode, provider: providerLabel(provider) } },
     });
     await this.options.saveSnapshot();
 
@@ -155,7 +155,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'error',
-        detail: 'The verification code expired. Start the connection again.',
+        detail: { key: 'workProvider.verificationExpired' },
       });
       await this.options.saveSnapshot();
       return this.snapshot();
@@ -176,7 +176,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'error',
-        detail: 'The verification code expired. Start the connection again.',
+        detail: { key: 'workProvider.verificationExpired' },
       });
       await this.options.saveSnapshot();
       return this.snapshot();
@@ -188,7 +188,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'connecting',
-        detail: `GitHub is still waiting for authorization. Try again in ${Math.ceil(waitMs / 1000)}s.`,
+        detail: { key: 'workProvider.authorizationWaiting', params: { seconds: Math.ceil(waitMs / 1000) } },
       });
       await this.options.saveSnapshot();
       return this.snapshot();
@@ -203,7 +203,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'connecting',
-        detail: `${providerLabel(provider)} authorization is still pending.`,
+        detail: { key: 'workProvider.authorizationPending', params: { provider: providerLabel(provider) } },
       });
       await this.options.saveSnapshot();
       return this.snapshot();
@@ -214,7 +214,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: result.code === 'not_configured' ? 'notConfigured' : 'error',
-        detail: result.message,
+        detail: workProviderAuthorizationError(result.code, providerLabel(provider)),
       });
       await this.options.saveSnapshot();
       return this.snapshot();
@@ -307,7 +307,7 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: this.driver(provider).configured() ? 'disconnected' : 'notConfigured',
-        detail: `${providerLabel(provider)} needs to be connected.`,
+        detail: { key: 'workProvider.needsConnection', params: { provider: providerLabel(provider) } },
       });
       await this.options.saveSnapshot();
       throw new Error(`${providerLabel(provider)} is not connected.`);
@@ -346,7 +346,7 @@ export class WorkIntegrationManager {
     this.setConnection({
       provider,
       status: 'disconnected',
-      detail: `${providerLabel(provider)} authorization expired. Reconnect to continue.`,
+      detail: { key: 'workProvider.authorizationExpired', params: { provider: providerLabel(provider) } },
     });
     await this.options.saveSnapshot();
   }
@@ -421,4 +421,14 @@ function authorizationUrl(authorization: WorkProviderDeviceAuthorization): strin
 
 function providerLabel(provider: WorkProviderKind): string {
   return provider === 'github' ? 'GitHub' : provider;
+}
+
+function workProviderAuthorizationError(
+  code: 'access_denied' | 'expired' | 'not_configured' | 'unavailable',
+  provider: string,
+): { key: string; params?: Record<string, string | number> } {
+  if (code === 'access_denied') return { key: 'workProvider.authorizationCancelled', params: { provider } };
+  if (code === 'expired') return { key: 'workProvider.verificationExpired' };
+  if (code === 'not_configured') return { key: 'workProvider.oauthNotConfigured', params: { provider } };
+  return { key: 'workProvider.authorizationUnavailable', params: { provider } };
 }

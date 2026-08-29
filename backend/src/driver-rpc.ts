@@ -9,11 +9,12 @@ import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
 import { resolveCodexCommand } from './codex/codex-command';
 import { createCodexSurface } from '@codex-app-sdk/backend';
-import { createSourceWorktree, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
+import { createSourceWorktree, listSourceBranches, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
 import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
+import { cloneSourceRepository } from './clone-source-repository';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -340,6 +341,13 @@ export class BackendDriverRpc {
         const sourceFolderPath = requireString(record.sourceFolderPath, 'sourceFolderPath').trim();
         return sourceFolderPath ? scanSourceRepositories(sourceFolderPath) : [];
       }
+      case backendMethods.sourceRepositoryClone: {
+        const record = requireRecord(params);
+        return cloneSourceRepository(
+          requireString(record.sourceFolderPath, 'sourceFolderPath'),
+          requireString(record.url, 'url'),
+        );
+      }
       case backendMethods.sourceFoldersList: {
         const record = params === undefined ? {} : requireRecord(params);
         return listSourceFolders(typeof record.path === 'string' ? record.path : undefined);
@@ -352,6 +360,10 @@ export class BackendDriverRpc {
       case backendMethods.sourceWorktreesList: {
         const record = requireRecord(params);
         return listSourceWorktrees(requireString(record.repoPath, 'repoPath'));
+      }
+      case backendMethods.sourceBranchesList: {
+        const record = requireRecord(params);
+        return listSourceBranches(requireString(record.repoPath, 'repoPath'));
       }
       case backendMethods.sourceWorktreeCreate: {
         const record = requireRecord(params);

@@ -38,6 +38,7 @@ import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { workItemAssignmentKey } from './work-assignments';
+import { appText } from './app-text';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 const seedTeamId = 'team-codex-claw';
@@ -55,6 +56,7 @@ export function createEmptySnapshot(): AppSnapshot {
     activeAgentId: null,
     messages: [],
     queuedPrompts: [],
+    workRoutingRequests: [],
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
@@ -62,11 +64,11 @@ export function createEmptySnapshot(): AppSnapshot {
     backendRuntimes: [{
       backend: 'codex',
       status: 'notConfigured',
-      detail: 'Codex backend is not connected yet.',
+      detail: { key: 'backend.codexNotConnected' },
     }, {
       backend: 'claude',
       status: 'notConfigured',
-      detail: 'Claude backend has not been started yet.',
+      detail: { key: 'backend.claudeNotStarted' },
     }],
     workBacklog: createDefaultWorkBacklogState(),
     remoteConnections: createDefaultRemoteConnectionsState(),
@@ -93,6 +95,7 @@ export function createInitialSnapshot(): AppSnapshot {
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
     queuedPrompts: [],
+    workRoutingRequests: [],
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},
@@ -100,11 +103,11 @@ export function createInitialSnapshot(): AppSnapshot {
     backendRuntimes: [{
       backend: 'codex',
       status: 'notConfigured',
-      detail: 'Codex backend is not connected yet.',
+      detail: { key: 'backend.codexNotConnected' },
     }, {
       backend: 'claude',
       status: 'notConfigured',
-      detail: 'Claude backend has not been started yet.',
+      detail: { key: 'backend.claudeNotStarted' },
     }],
     workBacklog: createDefaultWorkBacklogState(),
     remoteConnections: createDefaultRemoteConnectionsState(),
@@ -133,7 +136,7 @@ export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnec
 }
 
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
-  const name = normalizedAgentName(input.name, input.folder);
+  const name = normalizedOptionalString(input.name) ?? null;
   const backend = normalizedBackend(input.backend);
 
   return {
@@ -166,24 +169,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   if (!agent) {
     return null;
   }
-  if (agent.status.type !== 'idle') {
-    throw new Error('Agent must be idle before editing.');
-  }
-
-  const nextFolder = normalizedFolder(input.folder);
-  const folderChanged = nextFolder !== agent.folder;
-  const nextBackend = normalizedBackend(input.backend ?? agent.backend);
-  const backendChanged = nextBackend !== agent.backend;
-  agent.name = normalizedAgentName(input.name, nextFolder);
-  agent.avatar = normalizedOptionalString(input.avatar);
-  agent.folder = nextFolder;
-  agent.backend = nextBackend;
-  if (backendChanged) {
-    agent.backendDefaults = defaultBackendDefaults(nextBackend);
-  }
-  if (folderChanged || backendChanged) {
-    clearAgentRuntimeState(agent);
-  }
+  agent.name = normalizedOptionalString(input.name) ?? null;
   agent.updatedAt = updatedAt;
 
   return agent;
@@ -269,10 +255,32 @@ export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder
     return null;
   }
 
-  agent.folder = normalizedFolder(folder);
+  const nextFolder = normalizedFolder(folder);
+  if (nextFolder !== agent.folder) {
+    delete agent.workspace;
+  }
+  agent.folder = nextFolder;
   clearAgentRuntimeState(agent);
   agent.updatedAt = updatedAt;
 
+  return agent;
+}
+
+export function updateAgentWorkspace(
+  snapshot: AppSnapshot,
+  agentId: string,
+  workspace: Agent['workspace'],
+  updatedAt = new Date().toISOString(),
+): Agent | null {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) return null;
+
+  if (workspace) {
+    agent.workspace = { ...workspace };
+  } else {
+    delete agent.workspace;
+  }
+  agent.updatedAt = updatedAt;
   return agent;
 }
 
@@ -309,13 +317,32 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     return;
   }
 
+  if (event.type === 'workRouting.requested') {
+    const request = workRoutingRequest(event.payload);
+    if (request) {
+      snapshot.workRoutingRequests = [
+        ...(snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== request.id),
+        request,
+      ];
+    }
+    return;
+  }
+
+  if (event.type === 'workRouting.resolved') {
+    const id = isRecord(event.payload) && typeof event.payload.id === 'string' ? event.payload.id : '';
+    if (id) {
+      snapshot.workRoutingRequests = (snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== id);
+    }
+    return;
+  }
+
   if (event.type === 'backend.statusChanged') {
     const payload = event.payload as unknown;
     if (isRecord(payload) && isBackend(payload.backend) && isBackendRuntimeStatus(payload.status)) {
       setBackendRuntimeStatus(snapshot, {
         backend: payload.backend,
         status: payload.status,
-        detail: typeof payload.detail === 'string' ? payload.detail : undefined,
+        detail: appText(payload.detail),
         capabilities: isRecord(payload.capabilities) ? backendCapabilities(payload.capabilities) : undefined,
       });
     }
@@ -733,8 +760,12 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'error') {
-    const payload = event.payload as { message?: unknown };
+    const payload = event.payload as { message?: unknown; willRetry?: unknown };
     const message = typeof payload.message === 'string' ? payload.message : 'Backend error';
+    if (payload.willRetry === true) {
+      setAgentStatus(snapshot, event.agentId, { type: 'working', detail: message });
+      return;
+    }
     appendSystemMessage(snapshot, event.agentId, message, event.occurredAt);
     setAgentStatus(snapshot, event.agentId, { type: 'error', message });
   }
@@ -1874,15 +1905,15 @@ function permissionModeOption(value: unknown): NonNullable<BackendRuntimeCapabil
   const record = value as Record<string, unknown>;
   if (
     typeof record.id !== 'string' ||
-    typeof record.label !== 'string' ||
-    typeof record.description !== 'string'
+    !appText(record.label) ||
+    !appText(record.description)
   ) {
     return [];
   }
   return [{
     id: record.id,
-    label: record.label,
-    description: record.description,
+    label: appText(record.label)!,
+    description: appText(record.description)!,
     ...(typeof record.dangerous === 'boolean' ? { dangerous: record.dangerous } : {}),
   }];
 }
@@ -2085,6 +2116,25 @@ function askUserRequest(payload: unknown): Extract<ClientRequest, { kind: 'ask_u
   }
 
   return payload as Extract<ClientRequest, { kind: 'ask_user' }>;
+}
+
+function workRoutingRequest(payload: unknown): Extract<ClientRequest, { kind: 'work_routing' }> | null {
+  if (
+    !isRecord(payload) ||
+    payload.kind !== 'work_routing' ||
+    typeof payload.id !== 'string' ||
+    !isRecord(payload.payload) ||
+    !isRecord(payload.payload.request) ||
+    typeof payload.payload.request.agentId !== 'string' ||
+    typeof payload.payload.request.task !== 'string' ||
+    typeof payload.payload.request.suggestedBranchName !== 'string' ||
+    !Array.isArray(payload.payload.request.sharedFolderAgentNames) ||
+    !payload.payload.request.sharedFolderAgentNames.every((name) => typeof name === 'string')
+  ) {
+    return null;
+  }
+
+  return payload as Extract<ClientRequest, { kind: 'work_routing' }>;
 }
 
 function parseJsonPreview(preview: string): unknown {
@@ -2428,15 +2478,11 @@ function normalizedBackendDefaults(defaults: BackendDefaults | undefined, backen
     : { ...defaults };
 }
 
-function normalizedAgentName(name: string, folder: string): string {
-  return name.trim() || folderBasename(folder) || 'Codex';
-}
-
 function normalizedFolder(folder: string): string {
   return folder.trim();
 }
 
-function normalizedOptionalString(value: string | undefined): string | undefined {
+function normalizedOptionalString(value: string | null | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized || undefined;
 }

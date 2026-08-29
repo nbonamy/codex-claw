@@ -115,7 +115,7 @@ describe('ConversationPane', () => {
       items: [{
         id: agent.id,
         value: `agent:${agent.id}`,
-        label: agent.name,
+        label: agent.name ?? 'Dina',
         payload: { agentId: agent.id },
       }],
     };

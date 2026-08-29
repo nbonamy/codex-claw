@@ -43,6 +43,23 @@ describe('AgentHeader', () => {
     expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Show agent sidebar"]').exists()).toBe(false);
     expect(wrapper.classes()).toContain('agent-header--with-sidebar-edge');
+    expect(wrapper.find('.agent-header__avatar').exists()).toBe(false);
+  });
+
+  it('uses the repository icon as the agent identity when one is configured', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        repositoryIcon: '🦞',
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-header__avatar').text()).toBe('🦞');
+    expect(wrapper.get('.agent-header__avatar').text()).not.toBe('DI');
   });
 
   it('renders repo diff stats and a separate bordered Git actions control', () => {
@@ -300,6 +317,7 @@ describe('AgentHeader', () => {
     const wrapper = mount(AgentHeader, {
       props: {
         agent,
+        repositoryIcon: '🦞',
         gitStatus: {
           folder: '/Users/nbonamy/src/id8',
           branch: 'main',
@@ -328,6 +346,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('+12');
     expect(wrapper.text()).toContain('-4');
     expect(wrapper.get('.agent-header__avatar').classes()).toContain('agent-avatar--sm');
+    expect(wrapper.get('.agent-header__avatar').text()).toBe('🦞');
     expect(wrapper.classes()).not.toContain('agent-header--sidebar-collapsed');
     expect(wrapper.classes()).not.toContain('agent-header--with-sidebar-edge');
 

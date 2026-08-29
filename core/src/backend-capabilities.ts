@@ -41,28 +41,28 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   permissionModes: [
     {
       id: 'default',
-      label: 'Default',
-      description: 'Claude asks before tools that need permission.',
+      label: { key: 'permissions.claude.default.label' },
+      description: { key: 'permissions.claude.default.description' },
     },
     {
       id: 'acceptEdits',
-      label: 'Accept edits',
-      description: 'Claude applies file edits without asking and still asks for other protected actions.',
+      label: { key: 'permissions.claude.acceptEdits.label' },
+      description: { key: 'permissions.claude.acceptEdits.description' },
     },
     {
       id: 'dontAsk',
-      label: "Don't ask",
-      description: 'Claude never asks for permission and denies tools that are not already allowed.',
+      label: { key: 'permissions.claude.dontAsk.label' },
+      description: { key: 'permissions.claude.dontAsk.description' },
     },
     {
       id: 'auto',
-      label: 'Auto (experimental)',
-      description: 'Claude uses its permission classifier to approve or deny tool requests.',
+      label: { key: 'permissions.claude.auto.label' },
+      description: { key: 'permissions.claude.auto.description' },
     },
     {
       id: 'bypassPermissions',
-      label: 'Dangerously skip permissions',
-      description: 'Claude bypasses every permission check. Use only in a trusted environment.',
+      label: { key: 'permissions.claude.bypass.label' },
+      description: { key: 'permissions.claude.bypass.description' },
       dangerous: true,
     },
   ],

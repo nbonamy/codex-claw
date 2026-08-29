@@ -2,23 +2,21 @@
 
 Status: updated for modular desktop/web hosts, 2026-08-07.
 
-Codex Claw is a modular app that merges the team/agent product model from
-Skwad with the native chat and artifact rendering already built in id8. The app
-implements Codex through Codex app-server and Claude through the local Claude
-Code CLI stream-json surface behind the `clawd` backend. It does not launch a
-terminal emulator as the primary user experience; backend drivers own
+Codex Claw is a modular team/agent app with native chat and artifact rendering.
+The app implements Codex through Codex app-server and Claude through the local
+Claude Code CLI stream-json surface behind the `clawd` backend. It does not
+launch a terminal emulator as the primary user experience; backend drivers own
 protocol/process communication and the renderer displays app-owned events.
 
 ## Goals
 
-- Ship a native desktop app shell with Skwad-like teams and agents.
+- Ship a native desktop app shell for teams and agents.
 - Use `docs/codex.png` as a concrete visual reference for the native shell:
   left team/agent navigation, central conversation, and right-side
   document/artifact panes.
 - Treat Bench as a first-class product primitive: saved agent templates that
   can be deployed into a team quickly.
-- Keep Codex as the primary implemented backend for the current product. Do not carry
-  Skwad's full multi-provider abstraction forward, but keep the narrow backend
+- Keep Codex as the primary implemented backend and preserve a narrow backend
   seam so coding backends such as Claude can be added without rewriting the UI.
 - Use the Codex app-server protocol as the long-term integration boundary.
 - Keep all app-server communication in `clawd`. Renderer and Electron main code
@@ -46,8 +44,7 @@ protocol/process communication and the renderer displays app-owned events.
 
 ## Product Model
 
-Skwad calls the top-level grouping a workspace. Codex Claw should use "team" in
-the product language unless we decide otherwise during UX review.
+Codex Claw uses "team" for its top-level agent grouping.
 
 Core persisted entities:
 
@@ -107,25 +104,27 @@ type AgentStatus =
 Codex app-server owns the conversation transcript and thread history in
 `CODEX_HOME`. Codex Claw owns only product state: teams, agents, selected
 folders, the global source folder, Bench templates, view preferences, theme
-preference, and backend session metadata such as the Codex thread id.
+preference, workspace identity, current-conversation display metadata, and
+backend session metadata such as the Codex thread id. Persisted Git remote
+identities are canonical and credential-free.
 
 Bench templates are reusable saved agents, not active sessions. Saving an agent
 to Bench captures the deployable shape: name, avatar, folder, backend, and
 backend defaults. Deploying from Bench creates a new active agent in the current
-team. Initially we can match Skwad and dedupe/update Bench entries by folder;
-later we may allow multiple templates for the same folder if the product needs
-different roles or model defaults.
+team. Initially dedupe or update Bench entries by folder; later we may allow
+multiple templates for the same folder if the product needs different roles or
+model defaults.
 
 On a fresh install, create a default team when no teams exist. Do not create a
-default agent automatically; an empty team shows the New Agent empty state.
+default agent automatically; an empty team offers the same local folder,
+GitHub repository, and explicit repository URL sources as **Add project**.
 
 ## Source Folder And Repo Discovery
 
-The source folder is a global convenience setting borrowed from Skwad. It is
-not team membership, it is not an agent backend setting, and it does not replace
-the explicit folder stored on each agent. Instead, it gives the app and Claw MCP
-tools a common place to discover local source repositories when creating agents
-or worktrees.
+The source folder is a global convenience setting. It is not team membership,
+it is not an agent backend setting, and it does not replace the explicit folder
+stored on each agent. Instead, it gives the app and Claw MCP tools a common
+place to discover local source repositories when creating agents or worktrees.
 
 Codex Claw persists the selected source folder path, whether initial detection
 has already run, and up to five recent repository names. On a fresh app state,
@@ -150,11 +149,12 @@ then refreshes discovery. Renderer code and MCP tools request this through
 typed app APIs; they never scan arbitrary folders or spawn git directly.
 
 The renderer uses source repositories only as creation affordances: Settings
-chooses or clears the source folder, the agent dialog can pick a discovered
-repo, asks `clawd` for that repo's explicit worktree list, or browses another
-folder, and new worktree creation can feed back into agent creation. The Claw
-MCP server exposes the same app-owned operations with `list-repos`,
-`list-worktrees`, `create-worktree`, and `create-agent`.
+chooses or clears the source folder; **Add project** can open a discovered
+local repository, clone a connected GitHub repository, or clone an explicit
+repository URL; and repository-level session creation can use the default
+branch or create a named worktree. The Claw MCP server exposes the same
+app-owned operations with `list-repos`, `list-worktrees`, `create-worktree`,
+and `create-agent`.
 
 ## Process Architecture
 
@@ -371,11 +371,12 @@ renderer UI. The required path is:
    provider adapter/session tests for protocol behavior, and renderer component
    tests against app-owned data.
 
-Conversation history is the canonical example. The sidebar renders
-`ConversationSummary` rows and sends a `BackendConversationRef` to main. Codex
-implements that with `thread/list` and `thread/resume`; Claude implements it by
-scanning local JSONL transcripts and resuming a session id. The renderer does
-not know either storage model.
+Conversation history is the canonical example. The searchable Resume Session
+dialog opened from the sidebar agent menu renders `ConversationSummary` rows
+and sends a `BackendConversationRef` to main. Codex implements that with
+`thread/list` and `thread/resume`; Claude implements it by scanning local JSONL
+transcripts and resuming a session id. The renderer does not know either
+storage model.
 
 ### Preload
 
@@ -432,8 +433,8 @@ process state.
 
 Renderer layers:
 
-- app shell inspired by Skwad: team rail, agent list, agent header, status, and
-  conversation area;
+- app shell with a team rail, agent list, agent header, status, and conversation
+  area;
 - native workspace panes inspired by `docs/codex.png`: the active conversation
   sits beside a tabbed right workspace, initially hosting Browser and GitHub
   Review, while focused document, plan, and read-only source previews can take
@@ -581,9 +582,9 @@ depend on app-owned IPC/event types instead of generated provider types.
 ## Agent Collaboration MCP
 
 Codex Claw's MCP server is the app-owned collaboration protocol for agents.
-It lives in `clawd`, exposes Skwad-shaped communication tools, stores runtime
-inbox state, and emits app-owned agent updates back to Electron as backend
-events. Detailed behavior lives in `docs/mcp.md`.
+It lives in `clawd`, exposes app-owned communication tools, stores runtime inbox
+state, and emits app-owned agent updates back to Electron as backend events.
+Detailed behavior lives in `docs/mcp.md`.
 
 Backend drivers enable this server in backend-specific ways. Codex receives the
 server through `thread/start.config` or `thread/resume.config` entries for
@@ -963,9 +964,9 @@ Still intentionally incomplete:
 ## Direction Set
 
 - Use "team" as the product term.
-- Bench is a first-class concept from Skwad: a global set of saved agent
-  templates that can be deployed into teams. It should not be hidden as merely
-  a create-agent shortcut.
+- Bench is a first-class global set of saved agent templates that can be
+  deployed into teams. It should not be hidden as merely a create-agent
+  shortcut.
 - Local desktop builds bundle a pinned, checksum-verified Codex executable and
   pass it to local `clawd`. SSH-installed remote `clawd` continues to discover
   Codex on the remote host.
@@ -987,10 +988,6 @@ Still intentionally incomplete:
 
 ## References Studied
 
-- Skwad: `Skwad/Models/Agent.swift`, `Workspace.swift`,
-  `AgentManager.swift`, `TerminalCommandBuilder.swift`,
-  `TerminalSessionController.swift`, sidebar/dashboard views, and
-  `CodexHookHandler.swift`.
 - Visual reference: `docs/codex.png`, a hacked Codex desktop shell with
   team/agent navigation, central native chat, and right-side document panes.
 - id8: Electron main/preload split, desktop settings patterns,

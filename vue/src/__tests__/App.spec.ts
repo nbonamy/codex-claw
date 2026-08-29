@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import AppShell from '../components/AppShell.vue';
 import AgentCloseDialog from '../components/AgentCloseDialog.vue';
+import WorkRoutingDialog from '../components/WorkRoutingDialog.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { setElectronTestClient } from '../test/client';
@@ -171,5 +172,46 @@ describe('App', () => {
       deleteRemoteBranch: true,
       confirmed: true,
     });
+  });
+
+  it('routes a pending MCP work choice through the app-owned client response', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workRoutingRequests = [{
+      id: 'work-routing-1',
+      kind: 'work_routing',
+      payload: {
+        request: {
+          agentId: snapshot.agents[0]!.id,
+          task: 'Implement the routed feature.',
+          suggestedBranchName: 'feat/routed-work',
+          sharedFolderAgentNames: [],
+        },
+      },
+    }];
+    const resolvedSnapshot = { ...snapshot, workRoutingRequests: [] };
+    const respondToClientRequest = vi.fn().mockResolvedValue(resolvedSnapshot);
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      onEvent: vi.fn(),
+      respondToClientRequest,
+    });
+    const wrapper = mount(App, {
+      global: {
+        plugins: [ElementPlus],
+        stubs: { ElPopover: { template: '<div><slot name="reference" /><slot /></div>' } },
+      },
+    });
+    await flushPromises();
+
+    const dialog = wrapper.findComponent(WorkRoutingDialog);
+    expect(dialog.props('visible')).toBe(true);
+    dialog.vm.$emit('respond', 'delegate', 'feat/routed-work');
+    await flushPromises();
+
+    expect(respondToClientRequest).toHaveBeenCalledWith({
+      id: 'work-routing-1',
+      payload: { workRouting: { mode: 'delegate', branchName: 'feat/routed-work' } },
+    });
+    expect(dialog.props('visible')).toBe(false);
   });
 });

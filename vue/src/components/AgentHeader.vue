@@ -7,7 +7,7 @@
       v-if="sidebarCollapsed"
       class="agent-header__expand"
       type="button"
-      aria-label="Show agent sidebar"
+      :aria-label="$t('surface.agentHeader.showAgentSidebar')"
       @click="emit('expand-sidebar')"
     >
       <PanelLeftOpenIcon class="agent-header__expand-icon" />
@@ -18,13 +18,14 @@
       class="agent-header__identity"
     >
       <AgentAvatar
+        v-if="repositoryIcon"
         class="agent-header__avatar"
-        :avatar="agent.avatar"
-        :name="agent.name"
+        :avatar="repositoryIcon"
+        :name="displayName"
         size="sm"
       />
       <div class="agent-header__agent-line">
-        <strong>{{ agent.name }}</strong>
+        <strong>{{ displayName }}</strong>
         <span
           class="agent-header__folder"
           :title="agent.folder"
@@ -47,7 +48,7 @@
       v-else
       class="agent-header__identity"
     >
-      <strong>No agent</strong>
+      <strong>{{ $t('surface.agentHeader.noAgent') }}</strong>
     </div>
 
     <div class="agent-header__activity">
@@ -58,20 +59,20 @@
         <button
           v-if="gitStatus?.addedLines || gitStatus?.removedLines"
           class="agent-header__git-diff"
-          aria-label="Open repository diff"
+          :aria-label="$t('surface.agentHeader.openRepositoryDiff')"
           type="button"
           @click="emit('open-git-diff')"
         >
           <CodexAnimatedDiffStat
             v-if="gitStatus?.addedLines"
             kind="added"
-            label="Added lines"
+            :label="$t('surface.agentHeader.addedLines')"
             :value="gitStatus?.addedLines ?? 0"
           />
           <CodexAnimatedDiffStat
             v-if="gitStatus?.removedLines"
             kind="deleted"
-            label="Removed lines"
+            :label="$t('surface.agentHeader.removedLines')"
             :value="gitStatus?.removedLines ?? 0"
           />
         </button>
@@ -84,7 +85,6 @@
         :generate-message="generateGitMessage"
         :commit-changes="commitGitChanges"
         :push-branch="pushGitBranch"
-        :create-branch="createGitBranch"
         :create-pull-request="createGitPullRequest"
         :merge-branch="mergeGitBranch"
       />
@@ -92,8 +92,8 @@
         v-if="githubBacklogAvailable"
         class="agent-header__repository-backlog"
         type="button"
-        aria-label="Open repository backlog"
-        title="Open repository backlog"
+        :aria-label="$t('surface.agentHeader.openRepositoryBacklog')"
+        :title="$t('surface.agentHeader.openRepositoryBacklog')"
         @click="emit('open-backlog')"
       >
         <BacklogIcon aria-hidden="true" />
@@ -114,8 +114,8 @@
         v-if="executionPlanAvailable"
         class="agent-header__execution-plan"
         type="button"
-        aria-label="Toggle execution plan"
-        title="Toggle execution plan"
+        :aria-label="$t('surface.agentHeader.toggleExecutionPlan')"
+        :title="$t('surface.agentHeader.toggleExecutionPlan')"
         :aria-pressed="executionPlanOpen"
         @click="emit('toggle-execution-plan')"
       >
@@ -124,8 +124,8 @@
       <button
         class="agent-header__workspace"
         type="button"
-        aria-label="Toggle right workspace"
-        :title="workspaceOpen ? 'Close right workspace' : 'Open right workspace'"
+        :aria-label="$t('surface.agentHeader.toggleRightWorkspace')"
+        :title="workspaceOpen ? $t('surface.agentHeader.closeRightWorkspace') : $t('surface.agentHeader.openRightWorkspace')"
         :aria-pressed="workspaceOpen"
         @click="emit('toggle-workspace')"
       >
@@ -141,8 +141,11 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
+import { localizedText } from '../i18n/errors';
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { BacklogIcon, ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
@@ -155,6 +158,7 @@ import { effectiveOpenInApplication } from '../shared/open-in';
 
 const props = defineProps<{
   agent: Agent | null;
+  repositoryIcon?: string;
   gitStatus?: AgentGitStatus | null;
   backendRuntime: BackendRuntimeStatus;
   workspaceOpen?: boolean;
@@ -172,7 +176,6 @@ const props = defineProps<{
   generateGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
   commitGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   pushGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  createGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   createGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   mergeGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
 }>();
@@ -188,6 +191,8 @@ const emit = defineEmits<{
   'select-subagent': [conversationId: string];
 }>();
 
+const displayName = computed(() => props.agent ? agentDisplayName(props.agent) : '');
+
 const displaySubagentTree = computed(() => {
   const tree = props.subagentTree;
   return tree && Object.values(tree.nodes).some((node) => node.conversationId !== tree.rootConversationId)
@@ -197,11 +202,11 @@ const displaySubagentTree = computed(() => {
 
 const statusLabel = computed(() => {
   if (props.isLoading) {
-    return 'Loading';
+    return translate('surface.agentHeader.loading');
   }
 
   if (props.backendRuntime.status === 'running') {
-    return 'Connected';
+    return translate('surface.agentHeader.connected');
   }
 
   if (props.backendRuntime.status === 'error') {
@@ -210,7 +215,7 @@ const statusLabel = computed(() => {
 
   return `${backendLabel.value} pending`;
 });
-const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? 'Claude' : 'Codex'));
+const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? translate('surface.agentHeader.claude') : translate('surface.agentHeader.codex')));
 const agentLocationLabel = computed(() => {
   const agent = props.agent;
   const gitStatus = props.gitStatus;
@@ -237,15 +242,15 @@ const agentStatusDetail = computed(() => {
 
   switch (props.agent.status.type) {
     case 'working':
-      return props.agent.status.detail ?? 'Working';
+      return localizedText(props.agent.status.detail, translate) ?? translate('status.working');
     case 'starting':
-      return 'Starting';
+      return translate('surface.agentHeader.starting');
     case 'awaitingInput':
-      return props.agent.status.detail ?? 'Awaiting input';
+      return localizedText(props.agent.status.detail, translate) ?? translate('dynamic.misc.awaitingInput');
     case 'error':
-      return props.agent.status.message;
+      return localizedText(props.agent.status.message, translate);
     case 'idle':
-      return 'Ready to get going';
+      return translate('surface.agentHeader.readyToGetGoing');
   }
 });
 

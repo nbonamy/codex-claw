@@ -1,18 +1,18 @@
 <template>
   <SettingsPanelFrame
-    title="Claude Code"
+    :title="$t('surface.settingsClaudeCodePanel.claudeCode')"
     title-id="settings-claude-code-title"
   >
     <SettingsSection>
       <SettingsRow
         as="label"
-        title="Enable Claude Code (experimental)"
-        description="Show Claude Code as an experimental option when creating agents."
+        :title="$t('surface.settingsClaudeCodePanel.enableClaudeCodeExperimental')"
+        :description="$t('surface.settingsClaudeCodePanel.showClaudeCodeAsAnExperimentalOptionWhenCreatingAgents')"
       >
         <template #control>
           <el-switch
             :model-value="settings.claudeCodeEnabled"
-            aria-label="Enable Claude Code (experimental)"
+            :aria-label="$t('surface.settingsClaudeCodePanel.enableClaudeCodeExperimental')"
             @update:model-value="updateClaudeCodeEnabled"
           />
         </template>

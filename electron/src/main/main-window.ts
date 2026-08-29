@@ -17,7 +17,6 @@ type MainWindowState = {
 };
 
 export function createMainWindow(
-  agentListCompact = false,
   appMenuOptions: Partial<Pick<AppMenuOptions, 'updateStatus'>> & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>> = {},
 ): BrowserWindow {
   const releaseMode = isReleaseMode();
@@ -63,7 +62,6 @@ export function createMainWindow(
   });
   installAppMenu(window, {
     debugMode: !releaseMode,
-    agentListCompact,
     ...appMenuOptions,
   });
   installFocusedAppShortcuts(window);

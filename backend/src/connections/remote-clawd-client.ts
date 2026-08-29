@@ -276,7 +276,7 @@ class RemoteClawdClient {
     this.pending.delete(response.id);
 
     if ('error' in response) {
-      pending.reject(new Error(response.error.message));
+      pending.reject(Object.assign(new Error(response.error.message), { data: response.error.data }));
       return;
     }
 

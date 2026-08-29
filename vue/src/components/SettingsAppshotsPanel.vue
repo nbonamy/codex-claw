@@ -1,6 +1,6 @@
 <template>
   <SettingsPanelFrame
-    title="Appshots"
+    :title="$t('surface.settingsAppshotsPanel.appshots')"
     title-id="settings-appshots-title"
   >
     <div class="settings-appshots-panel__intro">
@@ -8,53 +8,53 @@
         <PhotoIcon />
       </span>
       <span>
-        <strong>Take an Appshot to show Codex your frontmost window</strong>
-        <span>Appshots capture the window image and attach it to your active agent.</span>
+        <strong>{{ $t('surface.settingsAppshotsPanel.takeAnAppshotToShowCodexYourFrontmostWindow') }}</strong>
+        <span>{{ $t('surface.settingsAppshotsPanel.appshotsCaptureTheWindowImageAndAttachItToYourActiveAgen') }}</span>
       </span>
     </div>
 
     <SettingsSection>
       <SettingsRow
-        title="Hotkey"
+        :title="$t('surface.settingsAppshotsPanel.hotkey')"
         :description="hotkeyDescription"
       >
         <template #control>
           <el-select
             :model-value="settings.hotkey"
-            aria-label="Appshot hotkey"
+            :aria-label="$t('surface.settingsAppshotsPanel.appshotHotkey')"
             class="settings-appshots-panel__select"
             @update:model-value="updateHotkey"
           >
             <el-option label="⌘ + ⌘" value="command" />
             <el-option label="⌥ + ⌥" value="option" />
             <el-option label="⇧ + ⇧" value="shift" />
-            <el-option label="None" value="none" />
+            <el-option :label="$t('surface.settingsAppshotsPanel.none')" value="none" />
           </el-select>
         </template>
       </SettingsRow>
       <SettingsRow
-        title="Appshot destination"
-        description="Choose where Appshots go when you use the hotkey"
+        :title="$t('surface.settingsAppshotsPanel.appshotDestination')"
+        :description="$t('surface.settingsAppshotsPanel.chooseWhereAppshotsGoWhenYouUseTheHotkey')"
       >
         <template #control>
           <el-select
             model-value="active-agent"
-            aria-label="Appshot destination"
+            :aria-label="$t('surface.settingsAppshotsPanel.appshotDestination')"
             class="settings-appshots-panel__select"
           >
-            <el-option label="Active agent" value="active-agent" />
+            <el-option :label="$t('surface.settingsAppshotsPanel.activeAgent')" value="active-agent" />
           </el-select>
         </template>
       </SettingsRow>
       <SettingsRow
         as="label"
-        title="Play sound effect"
-        description="Confirm when the frontmost window has been captured"
+        :title="$t('surface.settingsAppshotsPanel.playSoundEffect')"
+        :description="$t('surface.settingsAppshotsPanel.confirmWhenTheFrontmostWindowHasBeenCaptured')"
       >
         <template #control>
           <el-switch
             :model-value="settings.playSound"
-            aria-label="Play Appshot sound effect"
+            :aria-label="$t('surface.settingsAppshotsPanel.playAppshotSoundEffect')"
             @update:model-value="updatePlaySound"
           />
         </template>
@@ -64,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed } from 'vue';
 import type { AppshotHotkey, AppshotSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import { PhotoIcon } from '../shared/icons/app-icons';
@@ -77,8 +78,8 @@ const props = defineProps<{
 }>();
 
 const hotkeyDescription = computed(() => {
-  if (props.settings.hotkey === 'none') return 'Appshots are disabled';
-  const label = props.settings.hotkey === 'command' ? 'Command' : props.settings.hotkey === 'option' ? 'Option' : 'Shift';
+  if (props.settings.hotkey === 'none') return translate('surface.settingsAppshotsPanel.appshotsAreDisabled');
+  const label = props.settings.hotkey === 'command' ? translate('surface.settingsAppshotsPanel.command') : props.settings.hotkey === 'option' ? translate('surface.settingsAppshotsPanel.option') : translate('surface.settingsAppshotsPanel.shift');
   return `Press both ${label} keys simultaneously`;
 });
 

@@ -1,7 +1,7 @@
 <template>
-  <aside class="right-workspace-panel" aria-label="Right workspace">
+  <aside class="right-workspace-panel" :aria-label="$t('surface.rightWorkspacePanel.rightWorkspace')">
     <header class="right-workspace-panel__tabs">
-      <div class="right-workspace-panel__tab-list" role="tablist" aria-label="Right workspace tabs">
+      <div class="right-workspace-panel__tab-list" role="tablist" :aria-label="$t('surface.rightWorkspacePanel.rightWorkspaceTabs')">
         <div
           v-for="tab in tabs"
           :key="tab"
@@ -30,7 +30,7 @@
           <button
             class="right-workspace-panel__tab-close"
             type="button"
-            :aria-label="`Close ${tabLabel(tab)} tab`"
+            :aria-label="$t('dynamic.files.closeTab', { tab: tabLabel(tab) })"
             @click="emit('closeTab', tab)"
           >
             <X aria-hidden="true" />
@@ -50,7 +50,7 @@
         v-if="fileExplorerToggleVisible"
         class="right-workspace-panel__files-toggle"
         type="button"
-        :aria-label="filesPaneOpen ? 'Collapse file explorer' : 'Show file explorer'"
+        :aria-label="filesPaneOpen ? $t('surface.rightWorkspacePanel.collapseFileExplorer') : $t('surface.rightWorkspacePanel.showFileExplorer')"
         :aria-pressed="filesPaneOpen"
         @click="emit('toggleFilesPane')"
       >
@@ -61,8 +61,8 @@
       <div ref="addMenuRoot" class="right-workspace-panel__add">
         <button
           type="button"
-          aria-label="Open right workspace tab"
-          title="New tab"
+          :aria-label="$t('surface.rightWorkspacePanel.openRightWorkspaceTab')"
+          :title="$t('surface.rightWorkspacePanel.newTab')"
           :aria-expanded="addMenuOpen"
           @click.stop="addMenuOpen = !addMenuOpen"
         >
@@ -71,7 +71,7 @@
         <AppMenu
           v-if="addMenuOpen"
           class="right-workspace-panel__add-menu"
-          ariaLabel="Open right workspace tab"
+          :ariaLabel="$t('surface.rightWorkspacePanel.openRightWorkspaceTab')"
           :items="addMenuItems"
           @select="openTabFromMenu"
         />
@@ -84,26 +84,26 @@
         <nav
       v-if="tabs.length === 0"
       class="right-workspace-panel__launcher"
-      aria-label="Open a workspace tab"
+      :aria-label="$t('surface.rightWorkspacePanel.openAWorkspaceTab')"
     >
       <button v-if="githubRepository" type="button" @click="emit('openTab', 'backlog')">
         <BacklogIcon aria-hidden="true" />
-        <span>Backlog</span>
+        <span>{{ $t('surface.rightWorkspacePanel.backlog') }}</span>
       </button>
       <button type="button" @click="emit('openTab', 'review')">
         <GitHubIcon aria-hidden="true" />
-        <span>Review</span>
-        <kbd>⌘G</kbd>
+        <span>{{ $t('surface.rightWorkspacePanel.review') }}</span>
+        <kbd>{{ $t('surface.rightWorkspacePanel.g') }}</kbd>
       </button>
       <button v-if="browserAvailable" type="button" @click="emit('openTab', 'browser')">
         <IconWorld aria-hidden="true" />
-        <span>Browser</span>
-        <kbd>⌘B</kbd>
+        <span>{{ $t('surface.rightWorkspacePanel.browser') }}</span>
+        <kbd>{{ $t('surface.rightWorkspacePanel.b') }}</kbd>
       </button>
       <button type="button" @click="emit('openTab', 'files')">
         <FoldersIcon aria-hidden="true" />
-        <span>Files</span>
-        <kbd>⌘P</kbd>
+        <span>{{ $t('surface.rightWorkspacePanel.files') }}</span>
+        <kbd>{{ $t('surface.rightWorkspacePanel.p') }}</kbd>
       </button>
         </nav>
 
@@ -156,7 +156,7 @@
           v-show="activeTab === 'files'"
           class="right-workspace-panel__open-file"
         >
-          <span>Select a file from the explorer.</span>
+          <span>{{ $t('surface.rightWorkspacePanel.selectAFileFromTheExplorer') }}</span>
         </div>
 
     <PlanReviewPanel
@@ -239,7 +239,7 @@
           <div
             class="right-workspace-panel__files-resizer"
             role="separator"
-            aria-label="Resize file explorer"
+            :aria-label="$t('surface.rightWorkspacePanel.resizeFileExplorer')"
             aria-orientation="vertical"
             tabindex="0"
             @pointerdown="startFilesPaneResize"
@@ -260,6 +260,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
@@ -388,10 +389,10 @@ const activeProjectFilePath = computed(() => {
   return filePath;
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
-  ...(props.githubRepository ? [{ id: 'backlog', type: 'action', label: 'Backlog', icon: BacklogIcon } satisfies AppMenuItem] : []),
-  { id: 'review', type: 'action', label: 'GitHub Review', icon: GitHubIcon },
-  ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: 'Browser', icon: IconWorld } satisfies AppMenuItem] : []),
-  { id: 'files', type: 'action', label: 'Files', icon: FoldersIcon },
+  ...(props.githubRepository ? [{ id: 'backlog', type: 'action', label: translate('surface.rightWorkspacePanel.backlog'), icon: BacklogIcon } satisfies AppMenuItem] : []),
+  { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.gitHubReview'), icon: GitHubIcon },
+  ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
+  { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },
 ]);
 
 watch(() => props.filesPaneWidth, (width) => {
@@ -428,10 +429,10 @@ function stopFilesPaneResize(): void {
 }
 
 function tabLabel(tab: RightWorkspaceTab): string {
-  if (tab === 'backlog') return 'Backlog';
-  if (tab === 'review') return 'Review';
+  if (tab === 'backlog') return translate('surface.rightWorkspacePanel.backlog');
+  if (tab === 'review') return translate('surface.rightWorkspacePanel.review');
   if (tab === 'browser') return props.browserVisualization?.title || 'Browser';
-  if (tab === 'files') return 'Open file';
+  if (tab === 'files') return translate('surface.rightWorkspacePanel.openFile');
   if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
   if (isRightWorkspaceSubagentTab(tab)) {
     const node = props.subagentTree?.nodes[rightWorkspaceSubagentConversationId(tab)];

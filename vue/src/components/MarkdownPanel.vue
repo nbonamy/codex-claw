@@ -6,14 +6,12 @@
     <div
       v-if="state === 'loading'"
       class="markdown-panel__empty codex-text-shimmer"
-    >
-      Loading markdown...
-    </div>
+    > {{ $t('surface.markdownPanel.loadingMarkdown') }} </div>
     <div
       v-else-if="state === 'error'"
       class="markdown-panel__empty markdown-panel__empty--error"
     >
-      {{ error ?? 'Unable to load markdown.' }}
+      {{ error ?? $t('surface.markdownPanel.unableToLoadMarkdown') }}
     </div>
     <div
       v-else-if="content.trim()"
@@ -23,9 +21,7 @@
     <div
       v-else
       class="markdown-panel__empty"
-    >
-      No markdown content.
-    </div>
+    > {{ $t('surface.markdownPanel.noMarkdownContent') }} </div>
   </article>
 </template>
 

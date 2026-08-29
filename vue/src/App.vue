@@ -54,6 +54,8 @@
     :choose-source-folder="chooseSourceFolder"
     :list-source-folders="listSourceFolders"
     :list-source-repositories="listSourceRepositories"
+    :clone-source-repository="cloneSourceRepository"
+    :list-source-branches="listSourceBranches"
     :list-source-worktrees="listSourceWorktrees"
     :suggest-source-worktree-path="suggestSourceWorktreePath"
     :choose-source-worktree-destination="chooseSourceWorktreeDestination"
@@ -167,6 +169,14 @@
     @keep-worktree="confirmAgentClose(false)"
     @delete-worktree="confirmAgentClose(true, $event)"
   />
+  <WorkRoutingDialog
+    :visible="pendingWorkRoutingRequest !== null"
+    :request="pendingWorkRoutingRequest"
+    :busy="workRoutingBusy"
+    :error="workRoutingError"
+    @cancel="cancelWorkRouting"
+    @respond="respondToWorkRouting"
+  />
   <ConfettiOverlay />
   <Transition name="backend-restart-overlay">
     <div
@@ -180,8 +190,8 @@
       <div class="backend-restart-overlay__card">
         <span class="backend-restart-overlay__spinner" aria-hidden="true" />
         <div class="backend-restart-overlay__copy">
-          <strong>Applying resource changes…</strong>
-          <span>Restarting the backend and reconnecting your chats.</span>
+          <strong>{{ $t('surface.app.applyingResourceChanges') }}</strong>
+          <span>{{ $t('surface.app.restartingTheBackendAndReconnectingYourChats') }}</span>
         </div>
       </div>
     </div>
@@ -189,14 +199,19 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, WorkRoutingMode } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
+import WorkRoutingDialog from './components/WorkRoutingDialog.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
 import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { localizedErrorMessage } from './i18n/errors';
+
+const { t } = useI18n();
 
 const {
   snapshot,
@@ -254,6 +269,8 @@ const {
   chooseSourceFolder,
   listSourceFolders,
   listSourceRepositories,
+  cloneSourceRepository,
+  listSourceBranches,
   listSourceWorktrees,
   suggestSourceWorktreePath,
   chooseSourceWorktreeDestination,
@@ -359,6 +376,50 @@ const updateStatus = ref<DesktopUpdateStatus>({ state: 'idle' });
 const pendingAgentClose = ref<{ agent: Agent; workflow: AgentGitWorkflow } | null>(null);
 const agentCloseBusy = ref(false);
 const agentCloseError = ref<string | null>(null);
+const pendingWorkRoutingRequest = computed(() => snapshot.value.workRoutingRequests?.[0] ?? null);
+const workRoutingBusy = ref(false);
+const workRoutingError = ref<string | null>(null);
+
+watch(() => pendingWorkRoutingRequest.value?.id, () => {
+  workRoutingBusy.value = false;
+  workRoutingError.value = null;
+});
+
+async function respondToWorkRouting(mode: WorkRoutingMode, branchName?: string): Promise<void> {
+  const request = pendingWorkRoutingRequest.value;
+  if (!request || workRoutingBusy.value) return;
+  workRoutingBusy.value = true;
+  workRoutingError.value = null;
+  try {
+    await respondToClientRequest({
+      id: request.id,
+      payload: {
+        workRouting: {
+          mode,
+          ...(branchName ? { branchName } : {}),
+        },
+      },
+    });
+  } catch (error) {
+    workRoutingError.value = localizedErrorMessage(error, t);
+  } finally {
+    workRoutingBusy.value = false;
+  }
+}
+
+async function cancelWorkRouting(): Promise<void> {
+  const request = pendingWorkRoutingRequest.value;
+  if (!request || workRoutingBusy.value) return;
+  workRoutingBusy.value = true;
+  workRoutingError.value = null;
+  try {
+    await respondToClientRequest({ id: request.id, payload: { cancelled: true } });
+  } catch (error) {
+    workRoutingError.value = localizedErrorMessage(error, t);
+  } finally {
+    workRoutingBusy.value = false;
+  }
+}
 let unsubscribeSystemAppearance: (() => void) | null = null;
 let unsubscribeUpdateStatus: (() => void) | null = null;
 

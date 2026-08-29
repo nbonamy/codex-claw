@@ -2,12 +2,12 @@
   <form class="loop-editor" @submit.prevent="submit">
     <header class="loop-editor__header">
       <div>
-        <h3>{{ mode === 'edit' ? 'Edit Loop' : 'Create Loop' }}</h3>
-        <p>Watch work, create the right agent, and send the assignment automatically.</p>
+        <h3>{{ mode === 'edit' ? $t('surface.loopEditor.editLoop') : $t('surface.loopEditor.createLoop') }}</h3>
+        <p>{{ $t('surface.loopEditor.watchWorkCreateTheRightAgentAndSendTheAssignmentAutomati') }}</p>
       </div>
       <el-switch
         v-model="form.enabled"
-        aria-label="Loop enabled"
+        :aria-label="$t('surface.loopEditor.loopEnabled')"
         active-text="On"
         inactive-text="Off"
       />
@@ -17,44 +17,42 @@
       <div
         v-if="!githubConnected"
         class="loop-editor__notice"
-      >
-        Connect GitHub in Settings before saving a loop.
-      </div>
+      > {{ $t('surface.loopEditor.connectGitHubInSettingsBeforeSavingALoop') }} </div>
 
       <section class="loop-editor__section">
-        <label for="loop-editor-name">Name</label>
+        <label for="loop-editor-name">{{ $t('surface.loopEditor.name') }}</label>
         <el-input
           id="loop-editor-name"
           v-model="form.name"
-          placeholder="Loop name"
+          :placeholder="$t('surface.loopEditor.loopName')"
         />
       </section>
 
       <section
         class="loop-editor__source-group"
-        aria-label="Loop source filters"
+        :aria-label="$t('surface.loopEditor.loopSourceFilters')"
       >
         <div class="loop-editor__source-row">
           <div class="loop-editor__section">
-            <label for="loop-editor-provider">Provider</label>
+            <label for="loop-editor-provider">{{ $t('surface.loopEditor.provider') }}</label>
             <el-select
               id="loop-editor-provider"
               v-model="form.provider"
               disabled
-              aria-label="Loop provider"
+              :aria-label="$t('surface.loopEditor.loopProvider')"
             >
-              <el-option label="GitHub" value="github" />
+              <el-option :label="$t('surface.loopEditor.gitHub')" value="github" />
             </el-select>
           </div>
 
           <div class="loop-editor__section">
-            <label for="loop-editor-repository">Repo</label>
+            <label for="loop-editor-repository">{{ $t('surface.loopEditor.repo') }}</label>
             <el-select
               id="loop-editor-repository"
               v-model="form.repositoryId"
               filterable
-              placeholder="Select repo"
-              aria-label="Loop repository"
+              :placeholder="$t('surface.loopEditor.selectRepo')"
+              :aria-label="$t('surface.loopEditor.loopRepository')"
               :disabled="!githubConnected || sortedRepositories.length === 0"
               @change="repositoryChanged"
             >
@@ -70,14 +68,14 @@
 
         <div class="loop-editor__source-row">
           <div class="loop-editor__section">
-            <label for="loop-editor-assignee">Assigned to</label>
+            <label for="loop-editor-assignee">{{ $t('surface.loopEditor.assignedTo') }}</label>
             <el-select
               id="loop-editor-assignee"
               v-model="form.assigneeLogin"
               clearable
               filterable
-              placeholder="Anyone"
-              aria-label="Loop assignee"
+              :placeholder="$t('surface.loopEditor.anyone')"
+              :aria-label="$t('surface.loopEditor.loopAssignee')"
               :disabled="!form.repositoryId || assigneeOptions.length === 0"
             >
               <el-option
@@ -90,14 +88,14 @@
           </div>
 
           <div class="loop-editor__section">
-            <label for="loop-editor-tag">Tag</label>
+            <label for="loop-editor-tag">{{ $t('surface.loopEditor.tag') }}</label>
             <el-select
               id="loop-editor-tag"
               v-model="form.tagName"
               clearable
               filterable
-              placeholder="Any tag"
-              aria-label="Loop tag"
+              :placeholder="$t('surface.loopEditor.anyTag')"
+              :aria-label="$t('surface.loopEditor.loopTag')"
               :disabled="!form.repositoryId || tagOptions.length === 0"
             >
               <el-option
@@ -112,48 +110,48 @@
       </section>
 
       <section class="loop-editor__section">
-        <label for="loop-editor-assignment-instructions">Assignment instructions</label>
+        <label for="loop-editor-assignment-instructions">{{ $t('surface.loopEditor.assignmentInstructions') }}</label>
         <el-input
           id="loop-editor-assignment-instructions"
           v-model="form.assignmentInstructions"
           type="textarea"
           :rows="3"
-          placeholder="Optional instructions to include when the ticket is assigned"
+          :placeholder="$t('surface.loopEditor.optionalInstructionsToIncludeWhenTheTicketIsAssigned')"
         />
       </section>
 
       <section class="loop-editor__section">
-        <label for="loop-editor-completion-instructions">Before completion</label>
+        <label for="loop-editor-completion-instructions">{{ $t('surface.loopEditor.beforeCompletion') }}</label>
         <el-input
           id="loop-editor-completion-instructions"
           v-model="form.beforeCompletionInstructions"
           type="textarea"
           :rows="3"
-          placeholder="Optional instructions to show when the agent marks the ticket complete"
+          :placeholder="$t('surface.loopEditor.optionalInstructionsToShowWhenTheAgentMarksTheTicketComp')"
         />
       </section>
 
       <section
         class="loop-editor__source-group"
-        aria-label="Loop agent target"
+        :aria-label="$t('surface.loopEditor.loopAgentTarget')"
       >
         <div class="loop-editor__source-row">
           <div class="loop-editor__section">
-            <label for="loop-editor-agent">Agent</label>
+            <label for="loop-editor-agent">{{ $t('surface.loopEditor.agent') }}</label>
             <el-select
               id="loop-editor-agent"
               v-model="form.actionMode"
               filterable
-              placeholder="Select agent"
-              aria-label="Loop agent"
+              :placeholder="$t('surface.loopEditor.selectAgent')"
+              :aria-label="$t('surface.loopEditor.loopAgent')"
             >
               <el-option
-                label="New Agent"
+                :label="$t('surface.loopEditor.newAgent')"
                 value="new-agent"
               />
               <el-option-group
                 v-if="benchTemplates.length > 0"
-                label="Bench"
+                :label="$t('surface.loopEditor.bench')"
               >
                 <el-option
                   v-for="template in benchTemplates"
@@ -162,11 +160,6 @@
                   :value="`bench:${template.id}`"
                 >
                   <span class="loop-editor__bench-option">
-                    <AgentAvatar
-                      :avatar="template.avatar"
-                      :name="template.name"
-                      size="sm"
-                    />
                     <span>
                       <strong>{{ template.name }}</strong>
                       <small>{{ template.folder }}</small>
@@ -178,14 +171,14 @@
           </div>
 
           <div class="loop-editor__section">
-            <label for="loop-editor-team-mode">Team</label>
+            <label for="loop-editor-team-mode">{{ $t('surface.loopEditor.team') }}</label>
             <el-select
               id="loop-editor-team-mode"
               v-model="form.teamMode"
-              aria-label="Loop team mode"
+              :aria-label="$t('surface.loopEditor.loopTeamMode')"
             >
-              <el-option label="Existing team" value="existing" />
-              <el-option label="Dedicated team per ticket" value="dedicated" />
+              <el-option :label="$t('surface.loopEditor.existingTeam')" value="existing" />
+              <el-option :label="$t('surface.loopEditor.dedicatedTeamPerTicket')" value="dedicated" />
             </el-select>
           </div>
         </div>
@@ -194,13 +187,13 @@
           v-if="form.teamMode === 'existing'"
           class="loop-editor__section"
         >
-          <label for="loop-editor-team">Target Team</label>
+          <label for="loop-editor-team">{{ $t('surface.loopEditor.targetTeam') }}</label>
           <el-select
             id="loop-editor-team"
             v-model="form.teamId"
             filterable
-            placeholder="Select team"
-            aria-label="Loop target team"
+            :placeholder="$t('surface.loopEditor.selectTeam')"
+            :aria-label="$t('surface.loopEditor.loopTargetTeam')"
           >
             <el-option
               v-for="team in teams"
@@ -215,13 +208,13 @@
           v-if="form.actionMode === 'new-agent'"
           class="loop-editor__section"
         >
-          <label for="loop-editor-source-repository">Repository</label>
+          <label for="loop-editor-source-repository">{{ $t('surface.loopEditor.repository') }}</label>
           <el-select
             id="loop-editor-source-repository"
             :model-value="form.sourceRepositoryPath"
             filterable
-            placeholder="Select repository"
-            aria-label="Loop source repository"
+            :placeholder="$t('surface.loopEditor.selectRepository')"
+            :aria-label="$t('surface.loopEditor.loopSourceRepository')"
             @update:model-value="selectSourceRepository"
           >
             <el-option
@@ -247,7 +240,7 @@
               :value="sourceDividerOptionValue"
             />
             <el-option
-              label="Pick folder..."
+              :label="$t('surface.loopEditor.pickFolder')"
               :value="pickFolderOptionValue"
             />
           </el-select>
@@ -256,29 +249,29 @@
         <div
           v-if="form.actionMode === 'new-agent'"
           class="loop-editor__source-row"
-          aria-label="Loop agent backend defaults"
+          :aria-label="$t('surface.loopEditor.loopAgentBackendDefaults')"
         >
           <div class="loop-editor__section">
-            <label for="loop-editor-backend">Backend</label>
+            <label for="loop-editor-backend">{{ $t('surface.loopEditor.backend') }}</label>
             <el-select
               id="loop-editor-backend"
               v-model="form.backend"
-              aria-label="Loop backend"
+              :aria-label="$t('surface.loopEditor.loopBackend')"
             >
-              <el-option label="Codex" value="codex" />
+              <el-option :label="$t('surface.loopEditor.codex')" value="codex" />
             </el-select>
           </div>
 
           <div class="loop-editor__section">
-            <label for="loop-editor-model">Model</label>
+            <label for="loop-editor-model">{{ $t('surface.loopEditor.model') }}</label>
             <el-select
               v-if="backendModels.length > 0"
               id="loop-editor-model"
               v-model="form.model"
               clearable
               filterable
-              placeholder="Default model"
-              aria-label="Loop model"
+              :placeholder="$t('surface.loopEditor.defaultModel')"
+              :aria-label="$t('surface.loopEditor.loopModel')"
             >
               <el-option
                 v-for="model in backendModels"
@@ -291,8 +284,8 @@
               v-else
               id="loop-editor-model"
               v-model="form.model"
-              placeholder="Default model"
-              aria-label="Loop model"
+              :placeholder="$t('surface.loopEditor.defaultModel')"
+              :aria-label="$t('surface.loopEditor.loopModel')"
             />
           </div>
         </div>
@@ -300,17 +293,17 @@
         <div
           v-if="form.actionMode === 'new-agent'"
           class="loop-editor__source-row"
-          aria-label="Loop thinking defaults"
+          :aria-label="$t('surface.loopEditor.loopThinkingDefaults')"
         >
           <div class="loop-editor__section">
-            <label for="loop-editor-thinking">Thinking</label>
+            <label for="loop-editor-thinking">{{ $t('surface.loopEditor.thinking') }}</label>
             <el-select
               id="loop-editor-thinking"
               v-model="form.reasoningEffort"
               clearable
               filterable
-              placeholder="Default"
-              aria-label="Loop thinking"
+              :placeholder="$t('surface.loopEditor.default')"
+              :aria-label="$t('surface.loopEditor.loopThinking')"
               :disabled="reasoningOptions.length === 0"
             >
               <el-option
@@ -329,35 +322,29 @@
         <el-checkbox
           v-if="form.teamMode === 'existing'"
           v-model="form.cleanupDeleteAgent"
-        >
-          Delete agent when work item completes
-        </el-checkbox>
+        > {{ $t('surface.loopEditor.deleteAgentWhenWorkItemCompletes') }} </el-checkbox>
         <el-checkbox
           v-else
           v-model="form.cleanupDeleteTeam"
-        >
-          Delete team when work item completes
-        </el-checkbox>
+        > {{ $t('surface.loopEditor.deleteTeamWhenWorkItemCompletes') }} </el-checkbox>
       </section>
     </div>
 
     <footer class="loop-editor__footer">
-      <el-button @click="emit('cancel')">Cancel</el-button>
+      <el-button @click="emit('cancel')">{{ $t('surface.loopEditor.cancel') }}</el-button>
       <el-button
         type="primary"
         native-type="submit"
         :disabled="!canSubmit"
-      >
-        Save Loop
-      </el-button>
+      > {{ $t('surface.loopEditor.saveLoop') }} </el-button>
     </footer>
   </form>
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, onMounted, reactive, watch } from 'vue';
 import type { BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import AgentAvatar from './AgentAvatar.vue';
 
 type TeamMode = 'existing' | 'dedicated';
 type ActionMode = 'new-agent' | `bench:${string}`;
@@ -463,7 +450,7 @@ const assigneeOptions = computed(() => {
   return [...assignees]
     .sort((left, right) => left.localeCompare(right))
     .map((assignee) => ({
-      label: accountLabel && assignee === accountLabel ? 'Me' : assignee,
+      label: accountLabel && assignee === accountLabel ? translate('surface.loopEditor.me') : assignee,
       value: assignee,
     }));
 });
@@ -638,7 +625,7 @@ function initialReasoningEffort(loop: Loop | null | undefined): ReasoningEffort 
 
 function effortLabel(effort: ReasoningEffort): string {
   if (effort.trim().toLowerCase() === 'xhigh') {
-    return 'Extra High';
+    return translate('surface.loopEditor.extraHigh');
   }
 
   return effort

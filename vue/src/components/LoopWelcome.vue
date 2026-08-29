@@ -1,20 +1,18 @@
 <template>
-  <section class="loop-welcome" aria-label="Loops welcome">
+  <section class="loop-welcome" :aria-label="$t('surface.loopWelcome.loopsWelcome')">
     <div class="loop-welcome__icon" aria-hidden="true">
       <InfinityIcon />
     </div>
     <div class="loop-welcome__copy">
-      <h3>No loops yet</h3>
-      <p>A loop is an automation that just works for you.</p>
-      <p>Start with GitHub issues, pick a Bench agent, and let Skwad create the right agent whenever matching work appears.</p>
+      <h3>{{ $t('surface.loopWelcome.noLoopsYet') }}</h3>
+      <p>{{ $t('surface.loopWelcome.aLoopIsAnAutomationThatJustWorksForYou') }}</p>
+      <p>{{ $t('surface.loopWelcome.startWithGitHubIssuesPickABenchAgentAndLetSkwadCreateThe') }}</p>
     </div>
     <el-button
       type="primary"
       class="loop-welcome__button"
       @click="emit('create')"
-    >
-      Create Loop
-    </el-button>
+    > {{ $t('surface.loopWelcome.createLoop') }} </el-button>
   </section>
 </template>
 

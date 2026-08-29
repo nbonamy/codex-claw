@@ -3,9 +3,9 @@
     class="loop-execution-log"
     :title="loop.name"
     :subtitle="executionCountLabel"
-    aria-label="Loop execution log"
+    :aria-label="$t('surface.loopExecutionLog.loopExecutionLog')"
     :columns="executionColumns"
-    empty-text="No executions yet."
+    :empty-text="$t('dynamic.loops.noExecutions')"
     :rows="executionRows"
   >
     <template #headerActions>
@@ -14,14 +14,10 @@
           type="danger"
           :disabled="loop.executionLog.length === 0"
           @click="emit('clear-history', loop.id)"
-        >
-          Clear
-        </el-button>
+        > {{ $t('surface.loopExecutionLog.clear') }} </el-button>
         <el-button
           @click="emit('close')"
-        >
-          Back
-        </el-button>
+        > {{ $t('surface.loopExecutionLog.back') }} </el-button>
       </div>
     </template>
 
@@ -81,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref } from 'vue';
 import type { BackendConversationRef, Loop, LoopExecutionStatus, RendererMessage } from '@codex-claw/core/contracts';
 import AppDataList from './AppDataList.vue';
@@ -121,21 +118,21 @@ const executionCountLabel = computed(() => (
 
 const executionColumns: AppDataListColumn[] = [{
   id: 'ticket',
-  label: 'Ticket',
+  label: translate('surface.loopExecutionLog.ticket'),
   width: 'minmax(0, 1fr)',
 }, {
   id: 'startedAt',
-  label: 'Start Time',
+  label: translate('surface.loopExecutionLog.startTime'),
   width: 'max-content',
   align: 'end',
 }, {
   id: 'duration',
-  label: 'Execution Time',
+  label: translate('surface.loopExecutionLog.executionTime'),
   width: 'max-content',
   align: 'end',
 }, {
   id: 'status',
-  label: 'Status',
+  label: translate('surface.loopExecutionLog.status'),
   width: 'max-content',
   align: 'end',
 }];
@@ -159,9 +156,9 @@ const selectedConversationMessages = computed<RendererMessage[]>(() => selectedC
 
 function statusLabel(status: LoopExecutionStatus): string {
   if (status === 'completed') {
-    return 'Completed';
+    return translate('surface.loopExecutionLog.completed');
   }
-  return status === 'failed' ? 'Failed' : 'Working';
+  return status === 'failed' ? translate('surface.loopExecutionLog.failed') : translate('surface.loopExecutionLog.working');
 }
 
 function startedAtForRow(row: AppDataListRow): string {
@@ -207,7 +204,7 @@ function agentIdForRow(row: AppDataListRow): string {
 }
 
 function agentNameForRow(row: AppDataListRow): string {
-  return typeof row.agentName === 'string' && row.agentName.trim() ? row.agentName : 'Agent';
+  return typeof row.agentName === 'string' && row.agentName.trim() ? row.agentName : translate('surface.loopExecutionLog.agent');
 }
 
 function executionIdForRow(row: AppDataListRow): string {
@@ -293,7 +290,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
 function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return 'Unknown time';
+    return translate('surface.loopExecutionLog.unknownTime');
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -312,7 +309,7 @@ function formatDuration(startedAt: string, completedAt?: string): string {
   const started = Date.parse(startedAt);
   const completed = Date.parse(completedAt);
   if (!Number.isFinite(started) || !Number.isFinite(completed) || completed < started) {
-    return 'Unknown';
+    return translate('surface.loopExecutionLog.unknown');
   }
 
   const seconds = Math.round((completed - started) / 1000);

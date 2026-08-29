@@ -4,6 +4,7 @@ import type {
   MessageBoxReturnValue,
 } from 'electron';
 import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import { mainT } from './i18n';
 
 type ManualUpdateCheckOptions = {
   getWindow: () => BrowserWindow | null;
@@ -70,13 +71,13 @@ export class ManualUpdateCheckController {
     this.promptOpen = true;
     try {
       const result = await this.showMessageBox(this.getWindow(), {
-        buttons: ['Install and Relaunch', 'Later'],
+        buttons: [mainT('update.install'), mainT('update.later')],
         cancelId: 1,
         defaultId: 0,
         detail: status.version
-          ? `Codex Claw ${status.version} has been downloaded. Install and relaunch now?`
-          : 'A Codex Claw update has been downloaded. Install and relaunch now?',
-        message: 'Update ready to install',
+          ? mainT('update.downloadedVersion', { version: status.version })
+          : mainT('update.downloaded'),
+        message: mainT('update.ready'),
         noLink: true,
         type: 'question',
       });
@@ -88,9 +89,9 @@ export class ManualUpdateCheckController {
 
   private async showDisabledMessage(): Promise<void> {
     await this.showMessageBox(this.getWindow(), {
-      buttons: ['OK'],
+      buttons: [mainT('update.ok')],
       defaultId: 0,
-      message: 'Update checks are not available',
+      message: mainT('update.unavailable'),
       noLink: true,
       type: 'info',
     });
@@ -98,10 +99,10 @@ export class ManualUpdateCheckController {
 
   private async showErrorMessage(status: DesktopUpdateStatus): Promise<void> {
     await this.showMessageBox(this.getWindow(), {
-      buttons: ['OK'],
+      buttons: [mainT('update.ok')],
       defaultId: 0,
       detail: status.error,
-      message: 'Unable to check for updates',
+      message: mainT('update.checkFailed'),
       noLink: true,
       type: 'error',
     });
@@ -109,10 +110,10 @@ export class ManualUpdateCheckController {
 
   private async showUpToDateMessage(): Promise<void> {
     await this.showMessageBox(this.getWindow(), {
-      buttons: ['OK'],
+      buttons: [mainT('update.ok')],
       defaultId: 0,
-      detail: 'You are using the latest version of Codex Claw.',
-      message: 'Codex Claw is up to date',
+      detail: mainT('update.latestDetail'),
+      message: mainT('update.latest'),
       noLink: true,
       type: 'info',
     });

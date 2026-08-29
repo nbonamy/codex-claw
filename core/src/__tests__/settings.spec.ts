@@ -14,10 +14,12 @@ describe('settings contracts', () => {
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
+      collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
       shareCodexSkillsAndPlugins: true,
+      repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
@@ -82,14 +84,48 @@ describe('settings contracts', () => {
     expect(snapshot.general).toStrictEqual({
       codexBinaryPath: '',
       claudeCodeEnabled: false,
+      collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
       shareCodexSkillsAndPlugins: true,
+      repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     });
     expect(snapshot.teams).toHaveLength(1);
+  });
+
+  it('normalizes and updates repository icons by canonical repository root', () => {
+    expect(normalizeGeneralSettings({
+      repositoryIcons: {
+        ' /src/codex-claw ': ' 🦞 ',
+        '': '🚫',
+        '/src/invalid': 12,
+      },
+    }).repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
+
+    const snapshot = createEmptySnapshot();
+    updateSettingsInSnapshot(snapshot, {
+      general: { repositoryIcons: { '/src/codex-claw': '🦞' } },
+    });
+    expect(snapshot.general.repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
+  });
+
+  it('migrates credential-bearing repository icon keys to canonical remote identities', () => {
+    expect(normalizeGeneralSettings({
+      repositoryIcons: {
+        'https://oauth2:secret@github.com/openai/codex-claw.git': '🦞',
+      },
+    }).repositoryIcons).toStrictEqual({
+      'remote:github.com/openai/codex-claw': '🦞',
+    });
+  });
+
+  it('normalizes persisted collapsed repository keys', () => {
+    expect(normalizeGeneralSettings({
+      collapsedRepositoryKeys: [' remote:github.com/openai/codex ', '', 'remote:github.com/openai/codex'],
+    }).collapsedRepositoryKeys).toStrictEqual(['remote:github.com/openai/codex']);
   });
 
   it('updates source folder settings without replacing unrelated state', () => {

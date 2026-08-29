@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -78,6 +79,7 @@ import type {
   RendererMessage,
   ThreadPlan,
 } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import AgentMention from './AgentMention.vue';
 import {
@@ -108,7 +110,10 @@ const props = withDefaults(defineProps<{
 });
 provideClawToolPresentation(
   (key, params) => t(key, params ?? {}),
-  (identifier) => props.agents.find((agent) => agent.id === identifier)?.name,
+  (identifier) => {
+    const agent = props.agents.find((candidate) => candidate.id === identifier);
+    return agent ? agentDisplayName(agent) : undefined;
+  },
 );
 
 const emit = defineEmits<{
@@ -123,9 +128,9 @@ watch(conversationKey, () => {
   collaborationMessagePresentations.clear();
   transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 });
-const heroHeadline = computed(() => (props.agent ? `Chat with ${props.agent.name}` : 'Select an agent'));
+const heroHeadline = computed(() => (props.agent ? `Chat with ${agentDisplayName(props.agent)}` : translate('surface.conversationPane.selectAnAgent')));
 const heroSubhead = computed(() => {
-  if (!props.agent) return 'Choose an agent from the left to start a native backend session.';
+  if (!props.agent) return translate('surface.conversationPane.chooseAnAgentFromTheLeftToStartANativeBackendSession');
   return props.agent.folder;
 });
 function collaborationMessageLabel(messageId: string | undefined): string | null {

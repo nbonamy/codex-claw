@@ -25,23 +25,17 @@
         <div class="agent-dialog__identity-rows">
           <div class="agent-dialog__workspace-row agent-dialog__identity-row">
             <div class="agent-dialog__row-copy">
-              <label class="agent-dialog__row-label" for="agent-dialog-name">Name</label>
+              <label class="agent-dialog__row-label" for="agent-dialog-name">{{ $t('surface.agentDialog.name') }}</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__identity-control">
-              <AgentAvatarPicker
-                v-model="avatar"
-                :name="name || folderName || 'Agent'"
-                class="agent-dialog__identity-avatar"
-              />
               <div class="agent-dialog__identity-input">
                 <input
                   id="agent-dialog-name"
                   v-model="name"
                   class="claw-form-dialog__text-input agent-dialog__text-input"
                   type="text"
-                  aria-label="Agent name"
-                  placeholder="Name this agent"
-                  :disabled="!canEdit"
+                  :aria-label="$t('surface.agentDialog.agentName')"
+                  :placeholder="$t('surface.agentDialog.nameThisAgent')"
                 />
               </div>
             </div>
@@ -50,6 +44,7 @@
       </section>
 
       <section
+        v-if="!isEditing"
         class="agent-dialog__workspace-group"
       >
         <div class="agent-dialog__workspace-rows">
@@ -58,14 +53,14 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-repository"
-              >Repository</label>
+              >{{ $t('surface.agentDialog.repository') }}</label>
             </div>
             <div class="agent-dialog__row-control">
               <el-select
                 id="agent-dialog-repository"
                 v-model="repositoryControlValue"
                 class="agent-dialog__workspace-select"
-                :disabled="!canEdit || choosingFolder"
+                :disabled="choosingFolder"
                 @update:model-value="selectRepositoryControl"
               >
                 <el-option
@@ -91,14 +86,14 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-worktree"
-              >Work in...</label>
+              >{{ $t('surface.agentDialog.workIn') }}</label>
             </div>
             <div class="agent-dialog__row-control">
               <el-select
                 id="agent-dialog-worktree"
                 v-model="selectedSourceWorktreePath"
                 class="agent-dialog__workspace-select"
-                :disabled="!canEdit || Boolean(initialNewWorktreeBranchName.trim())"
+                :disabled="Boolean(initialNewWorktreeBranchName.trim())"
                 @update:model-value="selectWorktreeControl"
               >
                 <el-option
@@ -109,7 +104,7 @@
                 />
                 <el-option
                   class="agent-dialog__source-custom-option"
-                  label="New Worktree..."
+                  :label="$t('surface.agentDialog.newWorktree')"
                   :value="newWorktreeOptionValue"
                 />
               </el-select>
@@ -124,7 +119,7 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-team"
-              >Team</label>
+              >{{ $t('surface.agentDialog.team') }}</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__row-control--stacked">
               <el-select
@@ -139,7 +134,7 @@
                   :value="team.id"
                 />
                 <el-option
-                  label="New team"
+                  :label="$t('surface.agentDialog.newTeam')"
                   :value="newTeamOptionId"
                 />
               </el-select>
@@ -149,8 +144,8 @@
                 v-model="newTeamName"
                 class="claw-form-dialog__text-input agent-dialog__new-team-input"
                 type="text"
-                aria-label="New team name"
-                placeholder="Enter team name"
+                :aria-label="$t('surface.agentDialog.newTeamName')"
+                :placeholder="$t('surface.agentDialog.enterTeamName')"
               />
             </div>
           </div>
@@ -164,23 +159,17 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-name"
-              >Name</label>
+              >{{ $t('surface.agentDialog.name') }}</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__identity-control">
-              <AgentAvatarPicker
-                v-model="avatar"
-                :name="name || folderName || 'Agent'"
-                class="agent-dialog__identity-avatar"
-              />
               <div class="agent-dialog__identity-input">
                 <input
                   id="agent-dialog-name"
                   v-model="name"
                   class="claw-form-dialog__text-input agent-dialog__text-input"
                   type="text"
-                  aria-label="Agent name"
-                  placeholder="Name this agent"
-                  :disabled="!canEdit"
+                  :aria-label="$t('surface.agentDialog.agentName')"
+                  :placeholder="$t('surface.agentDialog.nameThisAgent')"
                 />
               </div>
             </div>
@@ -194,30 +183,22 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-backend"
-              >Coding agent</label>
+              >{{ $t('surface.agentDialog.codingAgent') }}</label>
             </div>
             <div class="agent-dialog__row-control">
               <el-select
                 id="agent-dialog-backend"
                 v-model="backend"
                 class="agent-dialog__workspace-select"
-                aria-label="Coding agent"
+                :aria-label="$t('surface.agentDialog.codingAgent')"
               >
-                <el-option label="Codex" value="codex" />
-                <el-option label="Claude Code" value="claude" />
+                <el-option :label="$t('surface.agentDialog.codex')" value="codex" />
+                <el-option :label="$t('surface.agentDialog.claudeCode')" value="claude" />
               </el-select>
             </div>
           </div>
         </div>
       </section>
-
-      <el-alert
-        v-if="!canEdit"
-        title="Agent must be idle before editing."
-        type="warning"
-        :closable="false"
-        show-icon
-      />
 
       <el-alert
         v-if="errorMessage"
@@ -249,7 +230,7 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
@@ -265,9 +246,9 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
-import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 
@@ -322,7 +303,6 @@ const emit = defineEmits<{
 
 const name = ref('');
 const folder = ref('');
-const avatar = ref<string | undefined>(undefined);
 const backend = ref<AgentBackend>('codex');
 const teamSelection = ref('');
 const newTeamName = ref('');
@@ -346,10 +326,9 @@ const loadingRemoteSourceRepositories = ref(false);
 const remoteFolderDialogVisible = ref(false);
 
 const isEditing = computed(() => props.mode === 'edit');
-const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 'idle');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
-const title = computed(() => isEditing.value ? 'Edit agent' : 'New agent');
-const submitLabel = computed(() => isEditing.value ? 'Save' : 'Create agent');
+const title = computed(() => isEditing.value ? translate('surface.agentDialog.editAgent') : translate('surface.agentDialog.newAgent'));
+const submitLabel = computed(() => isEditing.value ? translate('surface.agentDialog.save') : translate('surface.agentDialog.createAgent'));
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
 const selectedTeam = computed(() => teams.value.find((team) => team.id === teamSelection.value) ?? null);
@@ -385,17 +364,17 @@ const selectedSourceWorktrees = computed(() => {
   return [...pendingWorktree, ...worktrees, created];
 });
 const showSourceWorktreeControl = computed(() => selectedSourceRepository.value !== null);
-const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
+const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? translate('surface.agentDialog.customFolder') : translate('surface.agentDialog.chooseFolder'));
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
   (teamSelection.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : teamSelection.value.trim().length > 0)
 ));
 const canSave = computed(() => (
-  canEdit.value &&
   !submitting.value &&
-  name.value.trim().length > 0 &&
-  folder.value.trim().length > 0 &&
-  teamCanSave.value
+  (isEditing.value || (
+    folder.value.trim().length > 0 &&
+    teamCanSave.value
+  ))
 ));
 
 watch([
@@ -440,9 +419,6 @@ async function chooseFolder(): Promise<void> {
     selectedSourceWorktreePath.value = '';
     repositoryControlValue.value = customFolderOptionValue;
     folder.value = selectedFolder;
-    if (!name.value.trim()) {
-      name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
-    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -468,9 +444,6 @@ function selectRemoteFolder(path: string): void {
   selectedSourceWorktreePath.value = '';
   repositoryControlValue.value = customFolderOptionValue;
   folder.value = selectedFolder;
-  if (!name.value.trim()) {
-    name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
-  }
 }
 
 async function selectRepositoryControl(value: string): Promise<void> {
@@ -580,9 +553,6 @@ function selectWorktreeControl(value: string): void {
 function selectSourceWorktree(worktreePath: string): void {
   selectedSourceWorktreePath.value = worktreePath;
   folder.value = worktreePath;
-  if (!isEditing.value && !props.initialAgentName.trim()) {
-    name.value = worktreePath.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
-  }
 }
 
 function openNewSourceWorktreeDialog(): void {
@@ -602,7 +572,7 @@ function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | 
 
 async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
   if (!props.createSourceWorktree) {
-    throw new Error('Source worktree creation is not available.');
+    throw new Error(translate('surface.agentDialog.sourceWorktreeCreationIsNotAvailable'));
   }
 
   return props.createSourceWorktree({
@@ -629,22 +599,18 @@ async function submit(): Promise<void> {
   try {
     if (isEditing.value) {
       if (!props.agent) {
-        throw new Error('No agent selected for editing.');
+        throw new Error(translate('surface.agentDialog.noAgentSelectedForEditing'));
       }
 
       await props.updateAgent({
         id: props.agent.id,
-        name: name.value,
-        folder: folder.value,
-        avatar: avatar.value,
-        backend: backend.value,
+        name: name.value.trim() || null,
       });
     } else {
       await ensureInitialWorktree();
       const createInput: AgentDialogCreateInput = {
-        name: name.value,
+        name: name.value.trim() || null,
         folder: folder.value,
-        avatar: avatar.value,
         backend: backend.value,
       };
       if (showTeamSelector.value) {
@@ -685,17 +651,12 @@ function resetForm(): void {
   submitting.value = false;
   choosingFolder.value = false;
   if (isEditing.value && props.agent) {
-    name.value = props.agent.name;
-    folder.value = props.agent.folder;
-    avatar.value = props.agent.avatar;
-    backend.value = props.agent.backend;
-    resetEditSourceSelection();
+    name.value = props.agent.name ?? '';
     return;
   }
 
   name.value = props.initialAgentName.trim();
   folder.value = '';
-  avatar.value = '🤖';
   backend.value = 'codex';
   teamSelection.value = initialTeamSelection();
   newTeamName.value = props.initialNewTeamName;
@@ -729,7 +690,7 @@ async function ensureInitialWorktree(): Promise<void> {
     return;
   }
   if (!props.createSourceWorktree) {
-    throw new Error('Source worktree creation is not available.');
+    throw new Error(translate('surface.agentDialog.sourceWorktreeCreationIsNotAvailable'));
   }
 
   const worktree = await props.createSourceWorktree({
@@ -767,20 +728,6 @@ function syncRepositoryControlValue(): void {
   repositoryControlValue.value = selectedSourceRepositoryPath.value || customFolderOptionValue;
 }
 
-function resetEditSourceSelection(): void {
-  createdSourceWorktree.value = null;
-  listedSourceWorktrees.value = [];
-  listedSourceWorktreesRepoPath.value = '';
-  const repository = sourceRepositories.value.find((candidate) => (
-    candidate.path === folder.value || candidate.worktrees.some((worktree) => worktree.path === folder.value)
-  ));
-  selectedSourceRepositoryPath.value = repository?.path ?? '';
-  selectedSourceWorktreePath.value = repository?.worktrees.find((worktree) => worktree.path === folder.value)?.path ?? '';
-  syncRepositoryControlValue();
-  if (repository) {
-    void loadSelectedSourceWorktrees(repository.path);
-  }
-}
 </script>
 
 <style scoped>
@@ -898,27 +845,6 @@ function resetEditSourceSelection(): void {
   height: var(--space-20);
   padding: 0 var(--space-4);
   line-height: var(--line-height-20);
-}
-
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker) {
-  justify-self: start;
-  justify-content: flex-start;
-}
-
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger) {
-  width: var(--space-20);
-  height: var(--space-20);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-low);
-}
-
-.agent-dialog__identity-avatar
-  :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
-  --agent-avatar-size: var(--space-20);
-}
-
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker__hint) {
-  display: none;
 }
 
 .agent-dialog__source-custom-option {

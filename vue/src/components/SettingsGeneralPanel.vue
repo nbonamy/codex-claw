@@ -1,29 +1,29 @@
 <template>
   <SettingsPanelFrame
-    title="General"
+    :title="$t('surface.settingsGeneralPanel.general')"
     title-id="settings-general-title"
   >
     <SettingsSection
       v-if="clawHostCapabilities.daemonManagement"
-      title="Behavior"
+      :title="$t('surface.settingsGeneralPanel.behavior')"
       title-id="settings-general-behavior-title"
     >
       <SettingsRow
         as="label"
-        title="Prevent sleep while agents run"
-        description="Keep this computer awake while an agent is active"
+        :title="$t('surface.settingsGeneralPanel.preventSleepWhileAgentsRun')"
+        :description="$t('surface.settingsGeneralPanel.keepThisComputerAwakeWhileAnAgentIsActive')"
       >
         <template #control>
           <el-switch
             :model-value="settings.preventSleepWhenAgentsRun"
-            aria-label="Prevent sleep while agents run"
+            :aria-label="$t('surface.settingsGeneralPanel.preventSleepWhileAgentsRun')"
             @update:model-value="updatePreventSleep"
           />
         </template>
       </SettingsRow>
       <SettingsRow
         as="label"
-        title="Keep Codex Claw ready in the background"
+        :title="$t('surface.settingsGeneralPanel.keepCodexClawReadyInTheBackground')"
         :description="daemonDescription"
         :error="daemonStatusError"
       >
@@ -51,7 +51,7 @@
             <el-switch
               :model-value="daemonEnabled"
               :disabled="daemonSwitchDisabled"
-              aria-label="Keep Codex Claw ready in the background"
+              :aria-label="$t('surface.settingsGeneralPanel.keepCodexClawReadyInTheBackground')"
               @update:model-value="updateDaemonEnabled"
             />
           </span>
@@ -61,12 +61,12 @@
 
     <SettingsSection
       v-if="clawHostCapabilities.nativeFileDialogs && showSourceFolderSetting"
-      title="Source folder"
+      :title="$t('surface.settingsGeneralPanel.sourceFolder')"
       title-id="settings-general-source-title"
     >
       <SettingsRow
-        title="Source folder"
-        description="Discover repositories and worktrees when creating agents"
+        :title="$t('surface.settingsGeneralPanel.sourceFolder')"
+        :description="$t('surface.settingsGeneralPanel.discoverRepositoriesAndWorktreesWhenCreatingAgents')"
         :error="sourceFolderError"
       >
         <template #control>
@@ -81,16 +81,12 @@
               size="small"
               :loading="choosingSourceFolder"
               @click="chooseSourceFolder"
-            >
-              Choose
-            </el-button>
+            > {{ $t('surface.settingsGeneralPanel.choose') }} </el-button>
             <el-button
               v-if="sourceFolderState.path"
               size="small"
               @click="clearSourceFolder"
-            >
-              Clear
-            </el-button>
+            > {{ $t('surface.settingsGeneralPanel.clear') }} </el-button>
           </span>
         </template>
       </SettingsRow>
@@ -98,11 +94,11 @@
 
     <SettingsSection
       v-if="clawHostCapabilities.systemPermissions"
-      title="System permissions"
+      :title="$t('surface.settingsGeneralPanel.systemPermissions')"
       title-id="settings-general-permissions-title"
     >
       <SettingsRow
-        title="Accessibility"
+        :title="$t('surface.settingsGeneralPanel.accessibility')"
         :description="accessibilityDescription"
       >
         <template #control>
@@ -119,22 +115,18 @@
               :loading="openingAccessibilitySettings"
               size="small"
               @click="grantAccessibility"
-            >
-              Grant
-            </el-button>
+            > {{ $t('surface.settingsGeneralPanel.grant') }} </el-button>
             <el-button
               v-else-if="permissions?.accessibility.required"
               :loading="loadingPermissions"
               size="small"
               @click="loadPermissions"
-            >
-              Refresh
-            </el-button>
+            > {{ $t('surface.settingsGeneralPanel.refresh') }} </el-button>
           </span>
         </template>
       </SettingsRow>
       <SettingsRow
-        title="Screen Recording"
+        :title="$t('surface.settingsGeneralPanel.screenRecording')"
         :description="screenRecordingDescription"
       >
         <template #control>
@@ -151,17 +143,13 @@
               :loading="openingScreenRecordingSettings"
               size="small"
               @click="grantScreenRecording"
-            >
-              Grant
-            </el-button>
+            > {{ $t('surface.settingsGeneralPanel.grant') }} </el-button>
             <el-button
               v-else-if="permissions?.screenRecording.required"
               :loading="loadingPermissions"
               size="small"
               @click="loadPermissions"
-            >
-              Refresh
-            </el-button>
+            > {{ $t('surface.settingsGeneralPanel.refresh') }} </el-button>
           </span>
         </template>
       </SettingsRow>
@@ -170,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
 import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
@@ -217,33 +206,33 @@ const sourceFolderError = ref<string | null>(null);
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
-const sourceFolderLabel = computed(() => sourceFolderState.value.path || 'Not configured');
+const sourceFolderLabel = computed(() => sourceFolderState.value.path || translate('dynamic.misc.notConfigured'));
 const daemonEnabled = computed(() => props.daemonStatus?.installed ?? false);
 const daemonRunning = computed(() => props.daemonStatus?.running ?? false);
 const daemonSwitchDisabled = computed(() => settingDaemon.value || props.daemonStatus?.supported !== true);
 const daemonStatusLabel = computed(() => {
   if (daemonOperation.value === 'installing') {
-    return 'Installing...';
+    return translate('surface.settingsGeneralPanel.installing');
   }
   if (daemonOperation.value === 'uninstalling') {
-    return 'Uninstalling...';
+    return translate('surface.settingsGeneralPanel.uninstalling');
   }
   if (!props.daemonStatus) {
-    return 'Checking';
+    return translate('surface.settingsGeneralPanel.checking');
   }
   if (!props.daemonStatus.supported) {
-    return 'Unavailable';
+    return translate('surface.settingsGeneralPanel.unavailable');
   }
   if (props.daemonStatus.running) {
-    return 'Running';
+    return translate('surface.settingsGeneralPanel.running');
   }
-  return props.daemonStatus.installed ? 'Installed' : 'Off';
+  return props.daemonStatus.installed ? translate('surface.settingsGeneralPanel.installed') : translate('surface.settingsGeneralPanel.off');
 });
 const daemonDescription = computed(() => {
   if (props.daemonStatus?.supported === false) {
-    return props.daemonStatus.detail ?? 'Install is available in packaged macOS builds.';
+    return props.daemonStatus.detail ?? translate('dynamic.misc.installAvailable');
   }
-  return 'Start the Codex Claw agent to keep your loops running.';
+  return translate('surface.settingsGeneralPanel.startTheCodexClawAgentToKeepYourLoopsRunning');
 });
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showAccessibilityGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
@@ -251,39 +240,39 @@ const screenRecordingGranted = computed(() => permissions.value?.screenRecording
 const showScreenRecordingGrantButton = computed(() => permissions.value?.screenRecording.required === true && !screenRecordingGranted.value);
 const accessibilityStatusLabel = computed(() => {
   if (!permissions.value) {
-    return 'Checking';
+    return translate('surface.settingsGeneralPanel.checking');
   }
 
   if (!permissions.value.accessibility.required) {
-    return 'Not needed';
+    return translate('surface.settingsGeneralPanel.notNeeded');
   }
 
-  return accessibilityGranted.value ? 'Granted' : 'Required';
+  return accessibilityGranted.value ? translate('surface.settingsGeneralPanel.granted') : translate('surface.settingsGeneralPanel.required');
 });
 const accessibilityDescription = computed(() => {
   if (permissions.value?.accessibility.required === false) {
-    return 'Computer Use does not need this permission on this platform.';
+    return translate('surface.settingsGeneralPanel.computerUseDoesNotNeedThisPermissionOnThisPlatform');
   }
 
-  return 'Required for Computer Use to inspect and click Codex Claw.';
+  return translate('surface.settingsGeneralPanel.requiredForComputerUseToInspectAndClickCodexClaw');
 });
 const screenRecordingStatusLabel = computed(() => {
   if (!permissions.value) {
-    return 'Checking';
+    return translate('surface.settingsGeneralPanel.checking');
   }
 
   if (!permissions.value.screenRecording.required) {
-    return 'Not needed';
+    return translate('surface.settingsGeneralPanel.notNeeded');
   }
 
-  return screenRecordingGranted.value ? 'Granted' : 'Required';
+  return screenRecordingGranted.value ? translate('surface.settingsGeneralPanel.granted') : translate('surface.settingsGeneralPanel.required');
 });
 const screenRecordingDescription = computed(() => {
   if (permissions.value?.screenRecording.required === false) {
-    return 'Appshots do not need this permission on this platform.';
+    return translate('surface.settingsGeneralPanel.appshotsDoNotNeedThisPermissionOnThisPlatform');
   }
 
-  return 'Required for Appshots to capture the frontmost window.';
+  return translate('surface.settingsGeneralPanel.requiredForAppshotsToCaptureTheFrontmostWindow');
 });
 
 onMounted(() => {
@@ -382,12 +371,12 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
   try {
     await ElMessageBox.confirm(
       enabled
-        ? 'Codex Claw needs to restart to connect to the background agent.'
-        : 'Codex Claw needs to restart to use the in-app agent.',
-      'Restart Codex Claw?',
+        ? translate('surface.settingsGeneralPanel.codexClawNeedsToRestartToConnectToTheBackgroundAgent')
+        : translate('surface.settingsGeneralPanel.codexClawNeedsToRestartToUseTheInAppAgent'),
+      translate('surface.settingsGeneralPanel.restartCodexClaw'),
       {
-        cancelButtonText: 'Later',
-        confirmButtonText: 'Restart now',
+        cancelButtonText: translate('common.later'),
+        confirmButtonText: translate('dynamic.misc.restartNow'),
         distinguishCancelAndClose: true,
         type: 'info',
       },

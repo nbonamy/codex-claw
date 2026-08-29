@@ -1,6 +1,9 @@
+
+import { translate } from './i18n';
+import { localizedText } from './i18n/errors';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -12,6 +15,7 @@ import {
 } from '@codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
+import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
 import { clawHostCapabilities, clawPlatformActions, codexClawApi } from './platform-api';
 
@@ -320,7 +324,7 @@ export function useAppState() {
       }
     }
     bufferedMainEvents = null;
-    throw new Error('Unable to synchronize the conversation after repeated backend event gaps.');
+    throw new Error(translate('surface.app-state.unableToSynchronizeTheConversationAfterRepeatedBackendEv'));
   }
 
   async function readRendererSnapshotState(): Promise<RendererSnapshotState> {
@@ -588,7 +592,7 @@ export function useAppState() {
 
   async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
     if (!codexClawApi?.createSourceWorktree) {
-      throw new Error('Source worktree creation is not available.');
+      throw new Error(translate('surface.app-state.sourceWorktreeCreationIsNotAvailable'));
     }
 
     const worktree = await codexClawApi.createSourceWorktree(input);
@@ -624,6 +628,18 @@ export function useAppState() {
     return codexClawApi.listSourceRepositories(remoteConnectionId);
   }
 
+  async function cloneSourceRepository(input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput): Promise<SourceRepository> {
+    if (!codexClawApi?.cloneSourceRepository) throw new Error(translate('surface.app-state.repositoryCloningIsNotAvailable'));
+    const repository = await codexClawApi.cloneSourceRepository(input);
+    await loadSourceRepositories();
+    return repository;
+  }
+
+  async function listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]> {
+    if (!codexClawApi?.listSourceBranches) return [];
+    return codexClawApi.listSourceBranches(repoPath, remoteConnectionId);
+  }
+
   async function listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]> {
     if (!codexClawApi?.listSourceWorktrees) {
       return [];
@@ -634,7 +650,7 @@ export function useAppState() {
 
   async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
     if (!codexClawApi?.previewAgentFile) {
-      throw new Error('File preview is not available.');
+      throw new Error(translate('surface.app-state.filePreviewIsNotAvailable'));
     }
 
     return codexClawApi.previewAgentFile(agentId, filePath);
@@ -642,49 +658,49 @@ export function useAppState() {
 
   async function openAgentGitDiff(agentId: string): Promise<void> {
     if (!codexClawApi?.openAgentGitDiff) {
-      throw new Error('Git diff preview is not available.');
+      throw new Error(translate('surface.app-state.gitDiffPreviewIsNotAvailable'));
     }
 
     await codexClawApi.openAgentGitDiff(agentId);
   }
 
   async function getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.getAgentGitWorkflow) throw new Error('Git workflow is not available.');
+    if (!codexClawApi?.getAgentGitWorkflow) throw new Error(translate('surface.app-state.gitWorkflowIsNotAvailable'));
     return codexClawApi.getAgentGitWorkflow(agentId);
   }
 
   async function generateAgentGitMessage(agentId: string, input: AgentGitMessageGenerationInput): Promise<AgentGitMessageGenerationResult> {
-    if (!codexClawApi?.generateAgentGitMessage) throw new Error('Git message generation is not available.');
+    if (!codexClawApi?.generateAgentGitMessage) throw new Error(translate('surface.app-state.gitMessageGenerationIsNotAvailable'));
     return codexClawApi.generateAgentGitMessage(agentId, input);
   }
 
   async function stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.stageAgentGitFiles) throw new Error('Git staging is not available.');
+    if (!codexClawApi?.stageAgentGitFiles) throw new Error(translate('surface.app-state.gitStagingIsNotAvailable'));
     return codexClawApi.stageAgentGitFiles(agentId, input);
   }
 
   async function commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.commitAgentGitChanges) throw new Error('Git commit is not available.');
+    if (!codexClawApi?.commitAgentGitChanges) throw new Error(translate('surface.app-state.gitCommitIsNotAvailable'));
     return codexClawApi.commitAgentGitChanges(agentId, input);
   }
 
   async function pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.pushAgentGitBranch) throw new Error('Git push is not available.');
+    if (!codexClawApi?.pushAgentGitBranch) throw new Error(translate('surface.app-state.gitPushIsNotAvailable'));
     return codexClawApi.pushAgentGitBranch(agentId, input);
   }
 
   async function createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.createAgentGitBranch) throw new Error('Git branch creation is not available.');
+    if (!codexClawApi?.createAgentGitBranch) throw new Error(translate('surface.app-state.gitBranchCreationIsNotAvailable'));
     return codexClawApi.createAgentGitBranch(agentId, input);
   }
 
   async function createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.createAgentGitPullRequest) throw new Error('Pull request creation is not available.');
+    if (!codexClawApi?.createAgentGitPullRequest) throw new Error(translate('surface.app-state.pullRequestCreationIsNotAvailable'));
     return codexClawApi.createAgentGitPullRequest(agentId, input);
   }
 
   async function mergeAgentGitBranch(agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.mergeAgentGitBranch) throw new Error('Git merge is not available.');
+    if (!codexClawApi?.mergeAgentGitBranch) throw new Error(translate('surface.app-state.gitMergeIsNotAvailable'));
     return codexClawApi.mergeAgentGitBranch(agentId, input);
   }
 
@@ -699,7 +715,7 @@ export function useAppState() {
     filePath?: string,
   ): Promise<void> {
     if (!clawHostCapabilities.openInApplications || !codexClawApi?.openAgentPath) {
-      throw new Error('Open In is not available.');
+      throw new Error(translate('surface.app-state.openInIsNotAvailable'));
     }
     adoptNavigationSnapshot(await codexClawApi.openAgentPath(agentId, application, filePath));
   }
@@ -1023,7 +1039,7 @@ export function useAppState() {
   }
 
   async function startDevicePairing(): Promise<DevicePairingSession> {
-    if (!codexClawApi?.startDevicePairing) throw new Error('Device pairing is not available.');
+    if (!codexClawApi?.startDevicePairing) throw new Error(translate('surface.app-state.devicePairingIsNotAvailable'));
     return codexClawApi.startDevicePairing();
   }
 
@@ -1178,7 +1194,7 @@ export function useAppState() {
       clearWorkProviderAuthorizationPoll(provider);
       workProviderAuthorization.value = null;
       workBacklogStatus.value = connection?.status === 'error' ? 'error' : 'loaded';
-      workBacklogError.value = connection?.status === 'error' ? connection.detail ?? null : null;
+      workBacklogError.value = connection?.status === 'error' ? localizedText(connection.detail, translate) : null;
     } catch (error) {
       clearWorkProviderAuthorizationPoll(provider);
       workBacklogStatus.value = 'error';
@@ -1329,7 +1345,7 @@ export function useAppState() {
 
   async function createWorkItem(input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem> {
     if (!codexClawApi?.createWorkItem) {
-      throw new Error('Issue creation is not available.');
+      throw new Error(translate('surface.app-state.issueCreationIsNotAvailable'));
     }
     return codexClawApi.createWorkItem(input);
   }
@@ -1353,7 +1369,7 @@ export function useAppState() {
 
     const connectionId = location.remoteConnectionId.trim();
     if (!codexClawApi?.getBenchSnapshot) {
-      setRemoteBenchState(connectionId, [], 'error', 'Bench is not available.');
+      setRemoteBenchState(connectionId, [], 'error', translate('surface.app-state.benchIsNotAvailable'));
       return [];
     }
 
@@ -1733,6 +1749,8 @@ export function useAppState() {
     chooseSourceFolder,
     listSourceFolders,
     listSourceRepositories,
+    cloneSourceRepository,
+    listSourceBranches,
     listSourceWorktrees,
     suggestSourceWorktreePath,
     chooseSourceWorktreeDestination,
@@ -2439,7 +2457,7 @@ function isBackendMainEvent(event: MainToRendererEvent): boolean {
 function isBackendConnectionState(value: unknown): value is BackendConnectionState {
   return isRecord(value) &&
     (value.status === 'connecting' || value.status === 'connected' || value.status === 'reconnecting' || value.status === 'error') &&
-    (value.detail === undefined || typeof value.detail === 'string');
+    (value.detail === undefined || appText(value.detail) !== undefined);
 }
 
 function syncAnsweredClientRequestsFromMainEvent(event: MainToRendererEvent): void {
@@ -2890,7 +2908,7 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
       kind: 'markdown',
       content: event.payload.content,
       ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
-      ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
+      ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
       ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
     };
     return;
@@ -2908,8 +2926,8 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
     diff: event.payload.diff,
     ...(sections ? { sections } : {}),
     ...(event.payload.scope === 'workingTree' || event.payload.scope === 'turn' ? { scope: event.payload.scope } : {}),
-    ...(typeof event.payload.title === 'string' ? { title: event.payload.title } : {}),
-    ...(typeof event.payload.subtitle === 'string' ? { subtitle: event.payload.subtitle } : {}),
+    ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
+    ...(appText(event.payload.subtitle) ? { subtitle: appText(event.payload.subtitle)! } : {}),
     ...(event.payload.state === 'error' ? { state: 'error' } : {}),
     ...(typeof event.payload.error === 'string' ? { error: event.payload.error } : {}),
   };

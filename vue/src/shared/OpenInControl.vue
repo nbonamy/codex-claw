@@ -7,8 +7,8 @@
     <button
       class="open-in-control__launch"
       type="button"
-      :aria-label="currentApplication ? `Open in ${currentApplication.label}` : 'Open in application'"
-      :title="currentApplication ? `Open in ${currentApplication.label}` : 'Open in application'"
+      :aria-label="currentApplication ? $t('dynamic.openIn', { application: currentApplication.label }) : $t('surface.openInControl.openInApplication')"
+      :title="currentApplication ? $t('dynamic.openIn', { application: currentApplication.label }) : $t('surface.openInControl.openInApplication')"
       :disabled="!currentApplication"
       @click="openCurrentApplication"
     >
@@ -22,8 +22,8 @@
     <button
       class="open-in-control__menu-trigger"
       type="button"
-      aria-label="Choose Open In application"
-      title="Choose application"
+      :aria-label="$t('surface.openInControl.chooseOpenInApplication')"
+      :title="$t('surface.openInControl.chooseApplication')"
       :aria-expanded="menuOpen"
       :disabled="catalog.applications.length === 0"
       @click.stop="menuOpen = !menuOpen"
@@ -33,7 +33,7 @@
     <AppMenu
       v-if="menuOpen"
       class="open-in-control__menu"
-      ariaLabel="Open in application"
+      :ariaLabel="$t('surface.openInControl.openInApplication')"
       :items="menuItems"
       @select="selectApplication"
     />

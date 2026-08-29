@@ -3,7 +3,26 @@ import type { MenuItemConstructorOptions } from 'electron';
 import { buildAppMenuTemplate, installAppMenu, type AppMenuCallbacks } from '../app-menu';
 
 const electronMenuMocks = vi.hoisted(() => ({
-  buildFromTemplate: vi.fn((template: MenuItemConstructorOptions[]) => template),
+  buildFromTemplate: vi.fn((template: MenuItemConstructorOptions[]) => ({
+    items: template.map((options) => {
+      if (options.role !== 'editMenu') return { ...options };
+      const items: MenuItemConstructorOptions[] = [];
+      return {
+        ...options,
+        submenu: {
+          items,
+          append(item: MenuItemConstructorOptions): void {
+            items.push(item);
+          },
+        },
+      };
+    }),
+  })),
+  MenuItem: class {
+    constructor(options: MenuItemConstructorOptions) {
+      Object.assign(this, options);
+    }
+  },
   setApplicationMenu: vi.fn(),
 }));
 const electronClipboardMocks = vi.hoisted(() => {
@@ -20,9 +39,15 @@ const electronClipboardMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('electron', () => ({ clipboard: electronClipboardMocks, Menu: electronMenuMocks }));
+vi.mock('electron', () => ({
+  clipboard: electronClipboardMocks,
+  Menu: electronMenuMocks,
+  MenuItem: electronMenuMocks.MenuItem,
+}));
 
 beforeEach(() => {
+  electronMenuMocks.buildFromTemplate.mockClear();
+  electronMenuMocks.setApplicationMenu.mockClear();
   electronClipboardMocks.availableFormats.mockReturnValue([]);
   electronClipboardMocks.image.getScaleFactors.mockReturnValue([2]);
 });
@@ -37,7 +62,7 @@ const callbacks = (): AppMenuCallbacks => ({
 });
 
 describe('app menu', () => {
-  it('builds app-owned file, edit, and view menus', () => {
+  it('builds app-owned file and view menus with the native Edit menu', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(menu, 'File'))).toStrictEqual([
@@ -47,21 +72,8 @@ describe('app menu', () => {
       'Close Team',
       'Quit',
     ]);
-    expect(menuLabels(submenu(menu, 'Edit'))).toStrictEqual([
-      'Undo',
-      'Redo',
-      'Cut',
-      'Copy',
-      'Paste',
-      'Paste and Match Style',
-      'Delete',
-      'Select All',
-      'Edit Agent',
-      'Duplicate Agent',
-      'Restart Agent',
-    ]);
+    expect(menu.find((item) => item.role === 'editMenu')).toBeDefined();
     expect(menuLabels(submenu(menu, 'View'))).toStrictEqual([
-      'Compact Agent List',
       'Compact Context',
       'Review',
       'Browser',
@@ -70,22 +82,27 @@ describe('app menu', () => {
       'Previous Agent',
     ]);
     expect(menuLabels(submenu(menu, 'Help'))).toStrictEqual(['What’s New']);
-    expect(JSON.stringify(menu)).not.toMatch(/editMenu|viewMenu|reload|forceReload|toggleDevTools/i);
+    expect(JSON.stringify(menu)).not.toMatch(/viewMenu|reload|forceReload|toggleDevTools/i);
   });
 
-  it('uses native edit roles before app-owned agent actions', () => {
-    const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
+  it('appends app-owned agent actions to the realized native Edit menu', () => {
+    installAppMenu({
+      webContents: {
+        reload: vi.fn(),
+        toggleDevTools: vi.fn(),
+      },
+    } as never, { debugMode: false });
 
-    expect(menuRoles(submenu(menu, 'Edit'))).toStrictEqual([
-      'undo',
-      'redo',
-      'cut',
-      'copy',
-      'paste',
-      'pasteAndMatchStyle',
-      'delete',
-      'selectAll',
+    const editItems = installedEditItems();
+    expect(editItems.map((item) => item.type ?? item.label)).toStrictEqual([
+      'separator',
+      'Edit Agent',
+      'Duplicate Agent',
+      'Restart Agent',
     ]);
+    expect(editItems[1]?.accelerator).toBe('CommandOrControl+E');
+    expect(editItems[2]?.accelerator).toBe('CommandOrControl+D');
+    expect(editItems[3]?.accelerator).toBe('CommandOrControl+R');
   });
 
   it('sends app commands from menu items', () => {
@@ -98,10 +115,6 @@ describe('app menu', () => {
       ['File', 'Close Agent'],
       ['File', 'Close Team'],
       ['File', 'Quit'],
-      ['Edit', 'Edit Agent'],
-      ['Edit', 'Duplicate Agent'],
-      ['Edit', 'Restart Agent'],
-      ['View', 'Compact Agent List'],
       ['View', 'Compact Context'],
       ['View', 'Review'],
       ['View', 'Browser'],
@@ -115,22 +128,18 @@ describe('app menu', () => {
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'close-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, { type: 'close-active-team' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, { type: 'quit' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'edit-active-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'duplicate-active-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'restart-active-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'set-agent-list-compact', compact: true });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, {
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, {
       type: 'open-agent-composer',
       prompt: '/compact',
       submit: true,
     });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'open-review' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'open-browser' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(13, { type: 'cycle-teams' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(14, { type: 'cycle-agents', direction: 1 });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(15, { type: 'cycle-agents', direction: -1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'open-review' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'open-browser' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-teams' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: 1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-agents', direction: -1 });
     clickItem(menu, 'Help', 'What’s New');
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(16, { type: 'open-whats-new' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'open-whats-new' });
   });
 
   it('uses the expected file menu accelerators', () => {
@@ -141,18 +150,9 @@ describe('app menu', () => {
     expect(menuItem(menu, 'File', 'Close Agent')?.accelerator).toBe('CommandOrControl+W');
     expect(menuItem(menu, 'File', 'Close Team')?.accelerator).toBe('CommandOrControl+Shift+W');
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');
-    expect(menuItem(menu, 'Edit', 'Duplicate Agent')?.accelerator).toBe('CommandOrControl+D');
-    expect(menuItem(menu, 'Edit', 'Restart Agent')?.accelerator).toBe('CommandOrControl+R');
-    expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: false });
     expect(menuItem(menu, 'View', 'Compact Context')?.accelerator).toBe('CommandOrControl+K');
     expect(menuItem(menu, 'View', 'Review')?.accelerator).toBe('CommandOrControl+G');
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
-  });
-
-  it('reflects the persisted compact agent-list setting', () => {
-    const menu = buildAppMenuTemplate(callbacks(), { debugMode: false, agentListCompact: true }, 'darwin');
-
-    expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: true });
   });
 
   it('offers update installation or checking in the Codex Claw menu', () => {
@@ -253,7 +253,6 @@ describe('app menu', () => {
     const releaseMenu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(debugMenu, 'View'))).toStrictEqual([
-      'Compact Agent List',
       'Compact Context',
       'Review',
       'Browser',
@@ -378,10 +377,6 @@ function menuLabels(items: MenuItemConstructorOptions[]): string[] {
     .filter((label): label is string => typeof label === 'string');
 }
 
-function menuRoles(items: MenuItemConstructorOptions[]): Array<NonNullable<MenuItemConstructorOptions['role']>> {
-  return items.flatMap((item) => item.type !== 'separator' && item.role ? [item.role] : []);
-}
-
 function clickItem(template: MenuItemConstructorOptions[], menuLabel: string, itemLabel: string): void {
   const item = menuItem(template, menuLabel, itemLabel);
   if (!item?.click) {
@@ -389,4 +384,13 @@ function clickItem(template: MenuItemConstructorOptions[], menuLabel: string, it
   }
 
   item.click({ checked: true } as never, undefined as never, undefined as never);
+}
+
+function installedEditItems(): MenuItemConstructorOptions[] {
+  const installedMenu = electronMenuMocks.setApplicationMenu.mock.calls.at(-1)?.[0] as {
+    items?: Array<{ role?: string; submenu?: { items?: MenuItemConstructorOptions[] } }>;
+  } | undefined;
+  const items = installedMenu?.items?.find((item) => item.role === 'editMenu')?.submenu?.items;
+  if (!items) throw new Error('Installed native Edit menu not found');
+  return items;
 }

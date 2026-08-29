@@ -10,7 +10,7 @@
   >
     <template #header>
       <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">New Worktree</h2>
+        <h2 class="claw-dialog__title">{{ $t('surface.newSourceWorktreeDialog.newWorktree') }}</h2>
       </div>
     </template>
 
@@ -23,9 +23,7 @@
           <label
             class="claw-form-dialog__label"
             for="new-source-worktree-branch"
-          >
-            Branch
-          </label>
+          > {{ $t('surface.newSourceWorktreeDialog.branch') }} </label>
         </div>
         <div class="claw-form-dialog__control claw-form-dialog__input-control">
           <input
@@ -33,19 +31,17 @@
             v-model="branchName"
             class="claw-form-dialog__text-input new-source-worktree-dialog__branch-input"
             type="text"
-            placeholder="feature/source-folder"
+            :placeholder="$t('repositories.worktree.branchPlaceholder')"
           />
         </div>
       </section>
 
-      <section class="claw-form-dialog__field">
+      <section v-if="allowDestinationOverride" class="claw-form-dialog__field">
         <div class="claw-form-dialog__field-heading">
           <label
             class="claw-form-dialog__label"
             for="new-source-worktree-folder"
-          >
-            Folder
-          </label>
+          > {{ $t('surface.newSourceWorktreeDialog.folder') }} </label>
         </div>
         <div class="claw-form-dialog__control claw-form-dialog__input-control new-source-worktree-dialog__folder-control">
           <input
@@ -54,13 +50,13 @@
             type="text"
             readonly
             :value="destinationPath"
-            placeholder="Enter a branch name"
+            :placeholder="$t('surface.newSourceWorktreeDialog.enterABranchName')"
           />
           <button
             class="new-source-worktree-dialog__folder-picker"
             type="button"
-            aria-label="Choose worktree folder"
-            title="Choose worktree folder"
+            :aria-label="$t('surface.newSourceWorktreeDialog.chooseWorktreeFolder')"
+            :title="$t('surface.newSourceWorktreeDialog.chooseWorktreeFolder')"
             :disabled="!repo"
             @click="chooseDestination"
           >
@@ -80,16 +76,14 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.newSourceWorktreeDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
           :aria-busy="creating"
           :disabled="creating || !canCreate"
           @click="create"
-        >
-          Create
-        </button>
+        > {{ $t('surface.newSourceWorktreeDialog.create') }} </button>
       </div>
     </template>
   </el-dialog>
@@ -101,12 +95,14 @@ import type { CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
+  allowDestinationOverride?: boolean;
   chooseDestination: (defaultPath: string) => Promise<string | null>;
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   repo: SourceRepository | null;
   suggestDestination: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   visible: boolean;
 }>(), {
+  allowDestinationOverride: true,
   repo: null,
 });
 

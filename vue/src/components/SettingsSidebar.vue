@@ -1,7 +1,7 @@
 <template>
   <aside
     class="settings-sidebar"
-    aria-label="Settings categories"
+    :aria-label="$t('surface.settingsSidebar.settingsCategories')"
   >
     <el-menu
       :default-active="activeTab"
@@ -9,35 +9,35 @@
     >
       <el-menu-item index="general">
         <SettingsIcon aria-hidden="true" />
-        <span>General</span>
+        <span>{{ $t('surface.settingsSidebar.general') }}</span>
       </el-menu-item>
       <el-menu-item index="codex">
         <BrandOpenaiIcon aria-hidden="true" />
-        <span>Codex</span>
+        <span>{{ $t('surface.settingsSidebar.codex') }}</span>
       </el-menu-item>
       <el-menu-item index="claude-code">
         <RobotFaceIcon aria-hidden="true" />
-        <span>Claude Code</span>
+        <span>{{ $t('surface.settingsSidebar.claudeCode') }}</span>
       </el-menu-item>
       <el-menu-item index="appearance">
         <PaletteIcon aria-hidden="true" />
-        <span>Appearance</span>
+        <span>{{ $t('surface.settingsSidebar.appearance') }}</span>
       </el-menu-item>
       <el-menu-item v-if="clawHostCapabilities.appshots" index="appshots">
         <PhotoIcon aria-hidden="true" />
-        <span>Appshots</span>
+        <span>{{ $t('surface.settingsSidebar.appshots') }}</span>
       </el-menu-item>
       <el-menu-item index="plugins">
         <PuzzleIcon aria-hidden="true" />
-        <span>Plugins</span>
+        <span>{{ $t('surface.settingsSidebar.plugins') }}</span>
       </el-menu-item>
       <el-menu-item index="integrations">
         <AffiliateIcon aria-hidden="true" />
-        <span>Integrations</span>
+        <span>{{ $t('surface.settingsSidebar.integrations') }}</span>
       </el-menu-item>
       <el-menu-item index="connections">
         <TerminalIcon aria-hidden="true" />
-        <span>Connections</span>
+        <span>{{ $t('surface.settingsSidebar.connections') }}</span>
       </el-menu-item>
     </el-menu>
   </aside>

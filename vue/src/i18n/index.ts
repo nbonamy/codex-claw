@@ -7,3 +7,7 @@ export const i18n = createI18n<[MessageSchema], 'en'>({
   locale: 'en',
   messages,
 });
+
+export function translate(key: string, params?: Record<string, string | number>): string {
+  return params ? i18n.global.t(key, params) : i18n.global.t(key);
+}

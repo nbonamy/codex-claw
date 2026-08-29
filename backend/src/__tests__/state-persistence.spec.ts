@@ -71,6 +71,32 @@ describe('AppStatePersistence', () => {
     expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBeUndefined();
   });
 
+  it('round-trips workspace identity and ignores invalid legacy metadata', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].name = null;
+    snapshot.agents[0].workspace = {
+      kind: 'git',
+      folder: '/Users/nbonamy/src/codex-claw-feature',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw-feature',
+      branch: 'feat/work-routing',
+      isLinkedWorktree: true,
+      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      originUrl: 'github.com:nbonamy/codex-claw.git',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    };
+    const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
+      agents: Array<Record<string, unknown>>;
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0]).toMatchObject({
+      name: null,
+      workspace: snapshot.agents[0].workspace,
+    });
+    persisted.agents[0].workspace = { kind: 'git', repositoryName: 42 };
+    expect(snapshotFromPersistedState(persisted).agents[0].workspace).toBeUndefined();
+  });
+
   it('persists the observed subagent tree for backend and renderer reloads', () => {
     const snapshot = createInitialSnapshot();
     const agentId = snapshot.agents[0].id;
@@ -914,7 +940,9 @@ describe('AppStatePersistence', () => {
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       agentListCompact: true,
+      collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
       shareCodexSkillsAndPlugins: false,
+      repositoryIcons: { '/src/codex-claw': '🦞' },
       appshots: {
         hotkey: 'option',
         destination: 'active-agent',
@@ -926,6 +954,37 @@ describe('AppStatePersistence', () => {
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.general).toStrictEqual(snapshot.general);
+  });
+
+  it('removes credentials from restored workspace origins', () => {
+    const snapshot = createInitialSnapshot();
+    const persisted = persistedStateFromSnapshot(snapshot);
+    persisted.agents[0]!.workspace = {
+      kind: 'git',
+      folder: '/src/codex-claw',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/src/codex-claw',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/src/codex-claw',
+      originUrl: 'https://oauth2:secret@github.com/openai/codex-claw.git?token=secret',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0]?.workspace).toMatchObject({
+      originUrl: 'https://github.com/openai/codex-claw.git',
+    });
+  });
+
+  it('persists the current conversation title separately from the agent name', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.name = null;
+    snapshot.agents[0]!.conversationTitle = 'work-routing';
+
+    expect(snapshotFromPersistedState(persistedStateFromSnapshot(snapshot)).agents[0]).toMatchObject({
+      name: null,
+      conversationTitle: 'work-routing',
+    });
   });
 
   it('persists and restores source folder settings', () => {

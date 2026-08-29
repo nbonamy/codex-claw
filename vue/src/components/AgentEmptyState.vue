@@ -1,7 +1,7 @@
 <template>
   <section
     class="agent-empty-state"
-    aria-label="No agents"
+    :aria-label="t('sidebar.noAgents')"
   >
 
     <div class="agent-empty-state__drag">
@@ -10,21 +10,21 @@
     <div class="agent-empty-state__mark">
       <img
         :src="appIconUrl"
-        alt="Codex Claw"
+        :alt="$t('surface.agentEmptyState.codexClaw')"
       >
     </div>
 
     <div class="agent-empty-state__copy">
-      <h1>Welcome to Codex Claw!</h1>
-      <p>Add an agent to your team</p>
+      <h1>{{ t('sidebar.welcome') }}</h1>
+      <p>{{ t('sidebar.welcomeDetail') }}</p>
     </div>
 
-    <div class="agent-empty-state__new">
-      <NewAgentButton
-        :bench="bench"
-        @deploy-bench-template="emit('deploy-bench-template', $event)"
-        @new-agent="emit('new-agent')"
-        @remove-bench-template="emit('remove-bench-template', $event)"
+    <div class="agent-empty-state__actions">
+      <AppMenu
+        class="app-menu--embedded"
+        :ariaLabel="t('startWork.addProjectFrom')"
+        :items="menuItems"
+        @select="select"
       />
     </div>
   </section>
@@ -32,22 +32,21 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { BenchTemplate } from '@codex-claw/core/contracts';
-import NewAgentButton from './NewAgentButton.vue';
+import { useI18n } from 'vue-i18n';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import { isStartWorkAction, startWorkMenuItems, type StartWorkAction } from './start-work-actions';
 
 const appIconUrl = new URL('../../assets/icon.png', import.meta.url).href;
-
-const props = defineProps<{
-  bench?: BenchTemplate[];
-}>();
+const { t } = useI18n();
+const menuItems = computed(() => startWorkMenuItems(t));
 
 const emit = defineEmits<{
-  'deploy-bench-template': [templateId: string];
-  'new-agent': [];
-  'remove-bench-template': [templateId: string];
+  'start-work': [action: StartWorkAction];
 }>();
 
-const bench = computed(() => props.bench ?? []);
+function select(action: string): void {
+  if (isStartWorkAction(action)) emit('start-work', action);
+}
 </script>
 
 <style scoped>
@@ -111,7 +110,18 @@ const bench = computed(() => props.bench ?? []);
   line-height: var(--line-height-28);
 }
 
-.agent-empty-state__new {
-  width: min(240px, 100%);
+.agent-empty-state__actions {
+  width: min(360px, 100%);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-sm);
+}
+
+.agent-empty-state__actions :deep(.app-menu__item) {
+  min-height: 42px;
+  padding-inline: var(--space-6);
+  border-radius: var(--radius-lg);
 }
 </style>

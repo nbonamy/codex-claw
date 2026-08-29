@@ -1,5 +1,6 @@
 import type { Agent, AppSnapshot, Loop, LoopExecutionLogEntry, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
 import { assignWorkItemToAgentInSnapshot, deployBenchTemplateInSnapshot } from '@codex-claw/core/agent-manager';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { recordLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
 import { createEntityId, type IdGenerator } from '@codex-claw/core/ids';
 import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
@@ -290,7 +291,7 @@ function createLoopExecutionEntry(
     createdCount: assignments.length,
     createdAgents: assignments.map(({ agent, item }) => ({
       agentId: agent.id,
-      agentName: agent.name,
+      agentName: agentDisplayName(agent),
       workItemId: workItemAssignmentKey(item),
       workItemTitle: item.title,
       workItemUrl: item.url,

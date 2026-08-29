@@ -26,7 +26,7 @@ describe('WorkIntegrationManager', () => {
     expect(snapshot.workBacklog.connections).toStrictEqual([{
       provider: 'github',
       status: 'notConfigured',
-      detail: 'GitHub OAuth is not configured.',
+      detail: { key: 'workProvider.oauthNotConfigured', params: { provider: 'GitHub' } },
     }]);
   });
 
@@ -170,7 +170,7 @@ describe('WorkIntegrationManager', () => {
     expect(snapshot.workBacklog.connections).toStrictEqual([{
       provider: 'github',
       status: 'disconnected',
-      detail: 'GitHub authorization expired. Reconnect to continue.',
+      detail: { key: 'workProvider.authorizationExpired', params: { provider: 'GitHub' } },
     }]);
     expect(saveSnapshot).toHaveBeenCalledOnce();
   });
@@ -203,7 +203,7 @@ describe('WorkIntegrationManager', () => {
     expect(snapshot.workBacklog.connections).toStrictEqual([{
       provider: 'github',
       status: 'error',
-      detail: 'The verification code expired. Start the connection again.',
+      detail: { key: 'workProvider.verificationExpired' },
     }]);
   });
 
@@ -224,7 +224,7 @@ describe('WorkIntegrationManager', () => {
     expect(snapshot.workBacklog.connections[0]).toMatchObject({
       provider: 'github',
       status: 'connecting',
-      detail: 'GitHub authorization is still pending.',
+      detail: { key: 'workProvider.authorizationPending', params: { provider: 'GitHub' } },
     });
   });
 

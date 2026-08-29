@@ -19,7 +19,7 @@
         </div>
         <button
           type="button"
-          aria-label="Close conversation preview"
+          :aria-label="$t('surface.loopExecutionConversationOverlay.closeConversationPreview')"
           @click="emit('close')"
         >
           <X aria-hidden="true" />
@@ -29,9 +29,7 @@
       <div
         v-if="loading"
         class="loop-execution-conversation-overlay__empty"
-      >
-        Loading conversation...
-      </div>
+      > {{ $t('surface.loopExecutionConversationOverlay.loadingConversation') }} </div>
       <div
         v-else-if="error"
         class="loop-execution-conversation-overlay__empty"
@@ -51,9 +49,7 @@
       <div
         v-else
         class="loop-execution-conversation-overlay__empty"
-      >
-        No messages for this execution.
-      </div>
+      > {{ $t('surface.loopExecutionConversationOverlay.noMessagesForThisExecution') }} </div>
     </div>
   </div>
 </template>

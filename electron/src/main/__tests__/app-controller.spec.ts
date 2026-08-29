@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -604,6 +604,22 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('source/repositories/list', undefined);
   });
 
+  it('routes source repository cloning through clawd', async () => {
+    const repository: SourceRepository = {
+      name: 'codex-claw',
+      path: '/Users/nbonamy/src/codex-claw',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+    };
+    const request = vi.fn().mockResolvedValue(repository);
+    const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));
+    const input: CloneSourceRepositoryInput = { url: 'https://github.com/nbonamy/codex-claw' };
+
+    await controller.initialize();
+
+    await expect(cloneSourceRepository(controller, input)).resolves.toStrictEqual(repository);
+    expect(request).toHaveBeenCalledWith(backendMethods.sourceRepositoryClone, { input });
+  });
+
   it('routes source worktree listing through clawd', async () => {
     const snapshot = createInitialSnapshot();
     const worktrees: SourceWorktree[] = [
@@ -888,8 +904,6 @@ describe('AppController', () => {
     const updateInput: UpdateAgentInput = {
       id: 'agent-dina',
       name: 'Backend Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
     };
     const moveInput: MoveAgentToTeamInput = {
       agentId: 'agent-dina',
@@ -2340,6 +2354,15 @@ async function listSourceRepositories(controller: AppController): Promise<Source
   return (controller as unknown as {
     listSourceRepositories(): Promise<SourceRepository[]>;
   }).listSourceRepositories();
+}
+
+async function cloneSourceRepository(
+  controller: AppController,
+  input: CloneSourceRepositoryInput,
+): Promise<SourceRepository> {
+  return (controller as unknown as {
+    cloneSourceRepository(input: CloneSourceRepositoryInput): Promise<SourceRepository>;
+  }).cloneSourceRepository(input);
 }
 
 async function listSourceWorktrees(controller: AppController, repoPath: string): Promise<SourceWorktree[]> {

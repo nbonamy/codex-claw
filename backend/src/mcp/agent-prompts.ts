@@ -1,4 +1,5 @@
 import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { defaultPluginSettings } from '@codex-claw/core/settings';
 import {
   collaborationInstructionsEnd,
@@ -51,7 +52,7 @@ export function agentMessagesPrompt(messages: MessageInfo[]): string {
 export function codexClawDeveloperInstructions(agent: Agent, settings: AppPluginSettings = defaultPluginSettings): string {
   const instructions = [
     'You are part of a team of agents collaborating in Codex Claw.',
-    `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agent.name} and your folder is ${agent.folder}.`,
+    `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`,
     'Use the codex_claw MCP server for agent collaboration.',
     'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
     'MANDATORY: before starting substantive work, changing direction, or finishing substantive work, call set-status with a short status. Use an empty status to clear it. Do not change status for informational teammate messages or coordination closure.',

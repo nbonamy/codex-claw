@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem, WorkRoutingRequest } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -15,6 +15,231 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import type { AgentGitService } from '../git/agent-git-service';
 
 describe('ClawBackendServer', () => {
+  it('backfills missing workspace identity before returning the startup snapshot', async () => {
+    const snapshot = workRoutingSnapshot();
+    const identity = vi.fn().mockResolvedValue({
+      kind: 'git',
+      folder: '/repo',
+      repositoryName: 'repo',
+      repositoryRoot: '/repo',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/repo',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    });
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      saveSnapshot,
+      agentGitService: { identity } as unknown as AgentGitService,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'startup-snapshot',
+      method: backendMethods.snapshotGet,
+    })).resolves.toMatchObject({
+      result: {
+        snapshot: {
+          agents: [expect.objectContaining({
+            workspace: expect.objectContaining({ repositoryName: 'repo', branch: 'main' }),
+          })],
+        },
+      },
+    });
+
+    expect(identity).toHaveBeenCalledWith('/repo');
+    expect(saveSnapshot).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('continues a routed task in the current checkout without mutating git', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn();
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent());
+
+    await expect(server.handleMessage(workRoutingResponseMessage('current'))).resolves.toMatchObject({ result: snapshot });
+
+    expect(createBranch).not.toHaveBeenCalled();
+    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', { mode: 'current', folder: '/repo' });
+    await server.close();
+  });
+
+  it('cancels a routed task without mutating git or agents', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn();
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent());
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'cancel-routing',
+      method: backendMethods.clientRequestRespond,
+      params: { response: { id: 'work-routing-1', payload: { cancelled: true } } },
+    });
+
+    expect(createBranch).not.toHaveBeenCalled();
+    expect(snapshot.agents).toHaveLength(1);
+    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', { mode: 'cancelled' });
+    await server.close();
+  });
+
+  it('switches the current checkout to the selected branch before continuing', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn().mockResolvedValue('/repo');
+    const status = vi.fn().mockResolvedValue(cleanGitStatus());
+    const identity = vi.fn().mockResolvedValue({
+      kind: 'git',
+      folder: '/repo',
+      repositoryName: 'repo',
+      repositoryRoot: '/repo',
+      branch: 'feat/routed-work',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/repo',
+      updatedAt: '2026-08-27T12:00:00.000Z',
+    });
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch, identity, status } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent());
+
+    await server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work'));
+
+    expect(createBranch).toHaveBeenCalledWith('/repo', 'feat/routed-work', false);
+    expect(status).toHaveBeenCalledWith('/repo');
+    expect(snapshot.agents[0].workspace).toMatchObject({ branch: 'feat/routed-work' });
+    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', {
+      mode: 'branch', branchName: 'feat/routed-work', folder: '/repo',
+    });
+    await server.close();
+  });
+
+  it('rejects switching a dirty checkout', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn();
+    const status = vi.fn().mockResolvedValue({ ...cleanGitStatus(), changedFiles: 1, state: 'dirty' });
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch, status } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent());
+
+    await expect(server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work')))
+      .rejects.toThrow('This checkout has uncommitted changes. Commit, stash, or delegate to a worktree instead.');
+
+    expect(createBranch).not.toHaveBeenCalled();
+    expect(resolveWorkRoutingRequest).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('rejects switching when checkout status cannot be verified', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn();
+    const status = vi.fn().mockResolvedValue({ ...cleanGitStatus(), state: 'unknown' });
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch, status } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent());
+
+    await expect(server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work')))
+      .rejects.toThrow('Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.');
+
+    expect(createBranch).not.toHaveBeenCalled();
+    expect(resolveWorkRoutingRequest).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('rejects switching a checkout shared with another agent', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn();
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { createBranch } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent(['Paul']));
+
+    await expect(server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work')))
+      .rejects.toThrow('This folder is also used by Paul. Delegate to a worktree instead.');
+
+    expect(createBranch).not.toHaveBeenCalled();
+    expect(resolveWorkRoutingRequest).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('delegates routed work to a background agent in an isolated worktree', async () => {
+    const snapshot = workRoutingSnapshot();
+    const createBranch = vi.fn().mockResolvedValue('/repo-feat-routed-work');
+    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
+    const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-delegated' } });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      getGitStatus: async () => null,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { createBranch } as unknown as AgentGitService,
+      workRouting: { resolveWorkRoutingRequest },
+    });
+    server.emitEvent(workRoutingRequestedEvent());
+
+    await server.handleMessage(workRoutingResponseMessage('delegate', 'feat/routed-work'));
+
+    expect(createBranch).toHaveBeenCalledWith('/repo', 'feat/routed-work', true);
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    const delegated = snapshot.agents.find((agent) => agent.id !== 'agent-dina');
+    expect(delegated).toMatchObject({ folder: '/repo-feat-routed-work', backend: 'codex' });
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: delegated!.id, folder: '/repo-feat-routed-work' }),
+      'Implement the routed feature.',
+      undefined,
+    ));
+    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', {
+      mode: 'delegated',
+      agentId: delegated!.id,
+      agentName: delegated!.name,
+      branchName: 'feat/routed-work',
+      folder: '/repo-feat-routed-work',
+    });
+    await server.close();
+  });
+
   it('duplicates an agent in the background when selection is disabled', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -333,6 +558,7 @@ describe('ClawBackendServer', () => {
 
     const invalidRequests: Array<[string, unknown, string]> = [
       [backendMethods.agentCreate, { input: { name: '', folder: '' } }, 'name'],
+      [backendMethods.agentUpdate, { input: { id: 'agent-1', name: 42 } }, 'agent name'],
       [backendMethods.agentFork, { agentId: 'agent-1', messageIndex: -1 }, 'fork message index'],
       [backendMethods.agentOpenInApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
       [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],
@@ -341,6 +567,7 @@ describe('ClawBackendServer', () => {
       [backendMethods.benchTemplateCreate, { input: { name: '', folder: '', backend: 'codex' } }, 'name'],
       [backendMethods.settingsCodexResourceSharingSet, { input: { enabled: false, mode: 'later' } }, 'sharing'],
       [backendMethods.sourceWorktreesList, { repoPath: '' }, 'repoPath'],
+      [backendMethods.sourceRepositoryClone, { input: { url: '' } }, 'url'],
       [backendMethods.sourceWorktreeCreate, { input: { repoPath: '', branchName: '' } }, 'configured'],
       [backendMethods.workProviderConnect, { provider: 'linear' }, 'work integrations'],
       [backendMethods.snapshotBenchGet, { location: { kind: 'elsewhere' } }, 'location'],
@@ -2422,8 +2649,8 @@ describe('ClawBackendServer', () => {
       payload: {
         kind: 'gitDiff',
         scope: 'turn',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
+        title: { key: 'panels.gitDiff' },
+        subtitle: { key: 'panels.currentTurn' },
         diff,
       },
     }));
@@ -2884,7 +3111,7 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams = [
       { id: 'team-test', name: 'Test Team', agentIds: ['agent-dina'], activeAgentId: 'agent-dina' },
-      { id: 'team-other', name: 'Other Team', agentIds: ['agent-jesse'], activeAgentId: 'agent-jesse' },
+      { id: 'team-other', name: 'Other Team', agentIds: ['agent-jesse', 'agent-sam'], activeAgentId: 'agent-jesse' },
     ];
     snapshot.activeTeamId = 'team-test';
     snapshot.activeAgentId = 'agent-dina';
@@ -2910,7 +3137,39 @@ describe('ClawBackendServer', () => {
         createdAt: '2026-06-13T00:00:00.000Z',
         updatedAt: '2026-06-13T00:00:00.000Z',
       },
+      {
+        id: 'agent-sam',
+        teamId: 'team-other',
+        name: 'Sam',
+        folder: '/Users/nbonamy/src/other-project',
+        workspace: {
+          kind: 'git',
+          folder: '/Users/nbonamy/src/other-project',
+          repositoryName: 'other-project',
+          repositoryRoot: '/Users/nbonamy/src/other-project',
+          branch: 'stale-branch',
+          isLinkedWorktree: false,
+          primaryWorktreeRoot: '/Users/nbonamy/src/other-project',
+          originUrl: 'https://github.com/old-owner/other-project.git',
+          updatedAt: '2026-06-12T00:00:00.000Z',
+        },
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
     ];
+    const identity = vi.fn().mockImplementation(async (folder: string) => ({
+      kind: 'git' as const,
+      folder,
+      repositoryName: folder.split('/').at(-1)!,
+      repositoryRoot: folder,
+      branch: folder.endsWith('other-project') ? 'current-branch' : 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: folder,
+      originUrl: `https://github.com/current-owner/${folder.split('/').at(-1)!}.git`,
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }));
     const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
     const getGitStatus = vi.fn().mockResolvedValue({
       folder: '/Users/nbonamy/src/multi-llm-ts',
@@ -2940,6 +3199,7 @@ describe('ClawBackendServer', () => {
       version: 'test-version',
       pid: 123,
       snapshot,
+      agentGitService: { identity } as unknown as AgentGitService,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
@@ -2954,7 +3214,8 @@ describe('ClawBackendServer', () => {
         activeAgentId: 'agent-jesse',
         agents: [
           { id: 'agent-dina' },
-          { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } },
+          { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' }, workspace: { branch: 'main' } },
+          { id: 'agent-sam', workspace: { branch: 'current-branch', originUrl: 'https://github.com/current-owner/other-project.git' } },
         ],
         agentGitStatuses: {
           'agent-jesse': expect.objectContaining({ branch: 'main', state: 'dirty' }),
@@ -2963,6 +3224,8 @@ describe('ClawBackendServer', () => {
     });
 
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
+    expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/multi-llm-ts');
+    expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/other-project');
     expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }));
     await server.close();
   });
@@ -3335,7 +3598,6 @@ describe('ClawBackendServer', () => {
 
   it('owns agent CRUD and layout mutations', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
-    const nextTempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-next-'));
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -3374,10 +3636,10 @@ describe('ClawBackendServer', () => {
         jsonrpc: '2.0',
         id: 'update-agent',
         method: 'agent/update',
-        params: { input: { id: agentId, name: 'Dina Backend', folder: nextTempDir, backend: 'codex' } },
+        params: { input: { id: agentId, name: 'Dina Backend' } },
       })).resolves.toMatchObject({
         result: {
-          agents: [{ id: agentId, name: 'Dina Backend', folder: nextTempDir }],
+          agents: [{ id: agentId, name: 'Dina Backend', folder: tempDir }],
         },
       });
       await expect(server.handleMessage({
@@ -3442,7 +3704,6 @@ describe('ClawBackendServer', () => {
     } finally {
       await server.close();
       await rm(tempDir, { recursive: true, force: true });
-      await rm(nextTempDir, { recursive: true, force: true });
     }
   });
 
@@ -5227,6 +5488,7 @@ describe('ClawBackendServer', () => {
 
       expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);
       expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+      expect(snapshot.agents[0]?.conversationTitle).toBe('Dina');
       expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
       expect(setConversationTitle).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
@@ -5251,13 +5513,26 @@ describe('ClawBackendServer', () => {
       teamId: 'team-test',
       name: 'Dina',
       folder: '/Users/nbonamy/src/codex-claw',
+      workspace: {
+        kind: 'git',
+        folder: '/Users/nbonamy/src/codex-claw-work-routing',
+        repositoryName: 'codex-claw',
+        repositoryRoot: '/Users/nbonamy/src/codex-claw-work-routing',
+        branch: 'codex-claw-work-routing',
+        isLinkedWorktree: true,
+        primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
-      status: { type: 'idle' },
+      status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+    const titleSyncResolves: Array<() => void> = [];
+    const setConversationTitle = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+      titleSyncResolves.push(resolve);
+    }));
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -5278,7 +5553,7 @@ describe('ClawBackendServer', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
-    await expect(server.handleMessage({
+    const renameResponse = server.handleMessage({
       jsonrpc: '2.0',
       id: 'rename-agent',
       method: 'agent/update',
@@ -5286,22 +5561,45 @@ describe('ClawBackendServer', () => {
         input: {
           id: 'agent-dina',
           name: 'Dina Renamed',
-          folder: '/Users/nbonamy/src/codex-claw',
-          backend: 'codex',
         },
       },
-    })).resolves.toMatchObject({
+    });
+    await flushMicrotasks();
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    await expect(renameResponse).resolves.toMatchObject({
       result: {
-        agents: [{ id: 'agent-dina', name: 'Dina Renamed' }],
+        agents: [{ id: 'agent-dina', name: 'Dina Renamed', conversationTitle: 'Dina Renamed' }],
       },
     });
 
-    expect(setConversationTitle).toHaveBeenCalledOnce();
-    expect(setConversationTitle).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'agent-dina', name: 'Dina Renamed' }),
+    const clearResponse = server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'clear-agent-name',
+      method: 'agent/update',
+      params: { input: { id: 'agent-dina', name: null } },
+    });
+    await flushMicrotasks();
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    await expect(clearResponse).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', name: null, conversationTitle: 'work-routing' }],
+      },
+    });
+
+    expect(setConversationTitle).toHaveBeenCalledTimes(2);
+    expect(setConversationTitle).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ id: 'agent-dina' }),
       'Dina Renamed',
     );
+    expect(setConversationTitle).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: 'agent-dina', name: null }),
+      'work-routing',
+    );
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    for (const resolveTitleSync of titleSyncResolves) resolveTitleSync();
+    await flushMicrotasks();
     await server.close();
   });
 
@@ -5870,14 +6168,26 @@ describe('ClawBackendServer', () => {
       method: 'settings/update',
       params: {
         input: {
-          general: { claudeCodeEnabled: true, preventSleepWhenAgentsRun: false },
+          general: {
+            claudeCodeEnabled: true,
+            preventSleepWhenAgentsRun: false,
+            repositoryIcons: {
+              'git@github.com:nbonamy/codex-claw.git': '🦞',
+            },
+          },
           sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['codex-claw', 'id8'] },
           theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
         },
       },
     })).resolves.toMatchObject({
       result: {
-        general: { claudeCodeEnabled: true, preventSleepWhenAgentsRun: false },
+        general: {
+          claudeCodeEnabled: true,
+          preventSleepWhenAgentsRun: false,
+          repositoryIcons: {
+            'remote:github.com/nbonamy/codex-claw': '🦞',
+          },
+        },
         sourceFolder: {
           path: '/Users/nbonamy/src',
           initialized: true,
@@ -5892,6 +6202,9 @@ describe('ClawBackendServer', () => {
     });
 
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    expect(snapshot.general.repositoryIcons).toStrictEqual({
+      'remote:github.com/nbonamy/codex-claw': '🦞',
+    });
   });
 
   it('changes Codex resource sharing only while chats are idle', async () => {
@@ -6026,6 +6339,47 @@ describe('ClawBackendServer', () => {
     expect(driverRpc.handle).toHaveBeenCalledWith('source/repositories/list', {
       sourceFolderPath: '/Users/nbonamy/src',
     });
+  });
+
+  it('clones repositories inside the runtime-owned source folder and records them as recent', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const repository = {
+      name: 'new-project',
+      path: '/Users/nbonamy/src/new-project',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/new-project' }],
+    };
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(repository),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+      saveSnapshot,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-repository-clone',
+      method: backendMethods.sourceRepositoryClone,
+      params: { input: { url: 'https://github.com/nbonamy/new-project' } },
+    })).resolves.toMatchObject({ result: repository });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith(backendMethods.sourceRepositoryClone, {
+      sourceFolderPath: '/Users/nbonamy/src',
+      url: 'https://github.com/nbonamy/new-project',
+    });
+    expect(snapshot.sourceFolder.recentRepoNames).toContain('new-project');
+    expect(saveSnapshot).toHaveBeenCalled();
   });
 
   it('routes source repository discovery to selected SSH connections', async () => {
@@ -6580,8 +6934,10 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '',
       claudeCodeEnabled: false,
-      agentListCompact: false,
+    agentListCompact: false,
+    collapsedRepositoryKeys: [],
       shareCodexSkillsAndPlugins: true,
+      repositoryIcons: {},
       appshots: {
         hotkey: 'command',
         destination: 'active-agent',
@@ -6604,6 +6960,67 @@ function createTestSnapshot(): AppSnapshot {
       chatFontSize: 15,
       codeFontSize: 13,
     },
+  };
+}
+
+function workRoutingSnapshot(): AppSnapshot {
+  const snapshot = createTestSnapshot();
+  snapshot.teams[0]!.agentIds = ['agent-dina'];
+  snapshot.agents = [{
+    id: 'agent-dina',
+    teamId: 'team-test',
+    name: 'Dina',
+    folder: '/repo',
+    backend: 'codex',
+    status: { type: 'idle' },
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  }];
+  snapshot.activeAgentId = 'agent-dina';
+  return snapshot;
+}
+
+function workRoutingRequestedEvent(sharedFolderAgentNames: string[] = []) {
+  const request: WorkRoutingRequest = {
+    id: 'work-routing-1',
+    kind: 'work_routing',
+    payload: {
+      request: {
+        agentId: 'agent-dina',
+        task: 'Implement the routed feature.',
+        suggestedBranchName: 'feat/routed-work',
+        sharedFolderAgentNames,
+      },
+    },
+  };
+  return { agentId: 'agent-dina', type: 'workRouting.requested' as const, payload: request };
+}
+
+function cleanGitStatus(): AgentGitStatus {
+  return {
+    folder: '/repo',
+    branch: 'main',
+    ahead: 0,
+    behind: 0,
+    changedFiles: 0,
+    addedLines: 0,
+    removedLines: 0,
+    hasUntracked: false,
+    state: 'clean',
+    updatedAt: '2026-08-29T00:00:00.000Z',
+  };
+}
+
+function workRoutingResponseMessage(mode: 'current' | 'branch' | 'delegate', branchName?: string) {
+  const workRouting: NonNullable<import('@codex-claw/core/contracts').ClientRequestResponse['payload']>['workRouting'] = {
+    mode,
+    ...(branchName ? { branchName } : {}),
+  };
+  return {
+    jsonrpc: '2.0' as const,
+    id: `respond-${mode}`,
+    method: backendMethods.clientRequestRespond,
+    params: { response: { id: 'work-routing-1', payload: { workRouting } } },
   };
 }
 

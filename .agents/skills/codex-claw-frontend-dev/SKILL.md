@@ -21,13 +21,34 @@ or updating component tests.
 - Keep raw Codex payloads out of renderer components; render app-owned state.
 - Use typed props and emits for every component.
 - Use Element Plus for standard controls when practical.
-- Use semantic CSS variables for all product colors, spacing, radii, shadows,
-  typography, and diff colors.
-- Match Skwad screenshots and `docs/codex.png` for the shell direction.
+- Use semantic CSS variables for product colors and repeated design-system
+  spacing, radii, shadows, typography, and diff values. Keep genuinely
+  component-specific geometry local.
+- Use `docs/codex.png` for the shell direction.
 - Keep operational UI dense, quiet, and scannable.
 - Avoid nested cards and decorative layouts.
 - Prevent layout jumps during streaming, loading, approvals, and artifact pane
   changes.
+
+## Reuse Audit
+
+Before creating or styling a picker, menu, dialog, list, popover, settings
+layout, button pattern, operation state, or icon control:
+
+1. Read `docs/frontend.md` through **Canonical UI primitives**.
+2. Search `vue/src/shared/` and `vue/src/components/` for the interaction and
+   product concept, including existing wrappers and tests.
+3. Reuse or extend the canonical primitive. A product wrapper may configure
+   copy, slots, placement, and domain events; it must delegate the shared
+   interaction and visual behavior.
+4. If no primitive fits, put a genuinely reusable primitive under
+   `vue/src/shared/`, add it to the inventory, and cover its public behavior in
+   an isolated test. Keep one-off product composition in `vue/src/components/`.
+
+The audit is complete when the implementation imports the matching primitive,
+or the handoff identifies the concrete contract mismatch that required a new
+one. Do not infer non-reuse from a component's historical product-specific
+name; inspect its contract first.
 
 ## Tests And Verification
 

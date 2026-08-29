@@ -1,34 +1,34 @@
 <template>
-  <section class="browser-panel" aria-label="In-app browser">
+  <section class="browser-panel" :aria-label="$t('surface.browserPanel.inAppBrowser')">
     <header class="browser-panel__toolbar" :class="{ 'browser-panel__toolbar--visualization': visualization }">
-      <div v-if="!visualization" class="browser-panel__navigation" aria-label="Browser navigation">
-        <button type="button" aria-label="Go back" title="Go back" :disabled="!state.canGoBack || loading" @click="goBack"><IconArrowLeft /></button>
-        <button type="button" aria-label="Go forward" title="Go forward" :disabled="!state.canGoForward || loading" @click="goForward"><IconArrowRight /></button>
-        <button type="button" aria-label="Reload page" title="Reload" :disabled="loading" @click="reload"><IconRefresh /></button>
+      <div v-if="!visualization" class="browser-panel__navigation" :aria-label="$t('surface.browserPanel.browserNavigation')">
+        <button type="button" :aria-label="$t('surface.browserPanel.goBack')" :title="$t('surface.browserPanel.goBack')" :disabled="!state.canGoBack || loading" @click="goBack"><IconArrowLeft /></button>
+        <button type="button" :aria-label="$t('surface.browserPanel.goForward')" :title="$t('surface.browserPanel.goForward')" :disabled="!state.canGoForward || loading" @click="goForward"><IconArrowRight /></button>
+        <button type="button" :aria-label="$t('surface.browserPanel.reloadPage')" :title="$t('surface.browserPanel.reload')" :disabled="loading" @click="reload"><IconRefresh /></button>
       </div>
       <form v-if="!annotationMode && !visualization" class="browser-panel__address" @submit.prevent="navigate">
-        <input v-model="address" aria-label="Browser address" spellcheck="false" :title="state.title || address" />
+        <input v-model="address" :aria-label="$t('surface.browserPanel.browserAddress')" spellcheck="false" :title="state.title || address" />
       </form>
       <div v-else-if="visualization" class="browser-panel__visualization-title">{{ visualization.title }}</div>
-      <div v-else class="browser-panel__annotation-title"><strong>Annotating</strong><span>•</span><span>{{ displayHost }}</span></div>
+      <div v-else class="browser-panel__annotation-title"><strong>{{ $t('surface.browserPanel.annotating') }}</strong><span>•</span><span>{{ displayHost }}</span></div>
       <div class="browser-panel__actions">
-        <button v-if="!visualization" class="browser-panel__annotate" type="button" :aria-label="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :title="annotationMode ? 'Exit annotation mode' : 'Annotate page'" :aria-pressed="annotationMode" @click="toggleAnnotation"><IconX v-if="annotationMode" /><IconCirclePlus v-else /></button>
+        <button v-if="!visualization" class="browser-panel__annotate" type="button" :aria-label="annotationMode ? $t('surface.browserPanel.exitAnnotationMode') : $t('surface.browserPanel.annotatePage')" :title="annotationMode ? $t('surface.browserPanel.exitAnnotationMode') : $t('surface.browserPanel.annotatePage')" :aria-pressed="annotationMode" @click="toggleAnnotation"><IconX v-if="annotationMode" /><IconCirclePlus v-else /></button>
         <AnnotationSendButton
           v-if="annotations.length"
           :count="annotations.length"
-          :label="`Send ${annotations.length} annotations`"
+          :label="$t('dynamic.annotation.send', { count: annotations.length })"
           @click="sendAnnotations"
         />
-        <button type="button" aria-label="Browser menu" title="Browser menu" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><IconDotsVertical /></button>
+        <button type="button" :aria-label="$t('surface.browserPanel.browserMenu')" :title="$t('surface.browserPanel.browserMenu')" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><IconDotsVertical /></button>
         <div v-if="menuOpen" class="browser-panel__menu" role="menu">
-          <button type="button" role="menuitem" @click="close">Close browser</button>
+          <button type="button" role="menuitem" @click="close">{{ $t('surface.browserPanel.closeBrowser') }}</button>
         </div>
       </div>
     </header>
     <p v-if="error" class="browser-panel__error" role="alert">{{ error }}</p>
     <div class="browser-panel__surface">
       <div ref="viewport" class="browser-panel__viewport">
-        <div v-if="loading" class="browser-panel__loading">Opening browser…</div>
+        <div v-if="loading" class="browser-panel__loading">{{ $t('surface.browserPanel.openingBrowser') }}</div>
       </div>
     </div>
 
@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRefresh, IconX } from '@tabler/icons-vue';
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/core/contracts';
@@ -222,7 +223,7 @@ async function close(): Promise<void> {
 }
 
 function requireBrowserApi() {
-  if (!codexClawApi) throw new Error('Browser is unavailable.');
+  if (!codexClawApi) throw new Error(translate('surface.browserPanel.browserIsUnavailable'));
   return codexClawApi;
 }
 
@@ -250,7 +251,7 @@ function isBrowserAnnotation(value: unknown): value is BrowserAnnotation {
 }
 
 function messageFor(reason: unknown): string {
-  return reason instanceof Error ? reason.message : 'Could not load this page.';
+  return reason instanceof Error ? reason.message : translate('surface.browserPanel.couldNotLoadThisPage');
 }
 </script>
 

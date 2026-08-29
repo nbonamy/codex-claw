@@ -47,6 +47,7 @@ describe('Codex Claw MCP tool registration', () => {
     listSourceWorktrees: vi.fn(),
     createSourceWorktree: vi.fn(),
     createAgent: vi.fn(),
+    prepareWork: vi.fn(),
     displayMarkdown: vi.fn(),
   };
 
@@ -84,6 +85,7 @@ describe('Codex Claw MCP tool registration', () => {
       'list-worktrees',
       'create-worktree',
       'create-agent',
+      'prepare-work',
       'display-markdown',
     ]);
     expect(mocks.registerComputerUseTools).toHaveBeenCalledWith(server, computerUse);
@@ -110,6 +112,7 @@ describe('Codex Claw MCP tool registration', () => {
     ['list-worktrees', { repoPath: '/src/claw' }, 'listSourceWorktrees', ['agent-dina', '/src/claw']],
     ['create-worktree', { repoPath: '/src/claw', branchName: 'tests' }, 'createSourceWorktree', ['agent-dina', { repoPath: '/src/claw', branchName: 'tests' }]],
     ['create-agent', { repoPath: '/src/claw', backend: 'claude' }, 'createAgent', ['agent-dina', { repoPath: '/src/claw', backend: 'claude' }]],
+    ['prepare-work', { task: 'Add queue retries', branchName: 'feat/queue-retries' }, 'prepareWork', ['agent-dina', { task: 'Add queue retries', branchName: 'feat/queue-retries' }]],
     ['display-markdown', { markdown: '# Report' }, 'displayMarkdown', ['agent-dina', { markdown: '# Report' }]],
   ])('adapts %s arguments to the coordinator', async (tool, input, method, expectedArguments) => {
     createServer();

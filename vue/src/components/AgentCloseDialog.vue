@@ -10,36 +10,26 @@
   >
     <template #header>
       <div class="claw-form-dialog__header agent-close-dialog__header">
-        <h2 class="claw-dialog__title">Close {{ agent?.name }}?</h2>
+        <h2 class="claw-dialog__title">{{ $t('surface.agentCloseDialog.close') }} {{ agent?.name }}?</h2>
       </div>
     </template>
 
     <div class="agent-close-dialog__body">
-      <p>
-        This agent is using the linked worktree
-        <strong>{{ workflow?.branch }}</strong>.
+      <p> {{ $t('surface.agentCloseDialog.thisAgentIsUsingTheLinkedWorktree') }} <strong>{{ workflow?.branch }}</strong>.
       </p>
-      <p>
-        Deleting the worktree also deletes its local branch. Keeping it leaves both untouched.
-      </p>
+      <p> {{ $t('surface.agentCloseDialog.deletingTheWorktreeAlsoDeletesItsLocalBranchKeepingItLea') }} </p>
       <label v-if="workflow?.upstream" class="agent-close-dialog__remote">
         <el-switch v-model="deleteRemoteBranch" size="small" :disabled="busy" />
-        <span>Also delete {{ workflow.upstream }}</span>
+        <span>{{ $t('surface.agentCloseDialog.alsoDelete') }} {{ workflow.upstream }}</span>
       </label>
       <p v-if="error" class="agent-close-dialog__error" role="alert">{{ error }}</p>
     </div>
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')">
-          Cancel
-        </button>
-        <button class="claw-button claw-button--secondary" type="button" :disabled="busy" @click="emit('keep-worktree')">
-          Keep worktree
-        </button>
-        <button class="claw-button claw-button--primary" type="button" :aria-busy="busy" :disabled="busy" @click="deleteWorktree">
-          Delete worktree
-        </button>
+        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')"> {{ $t('surface.agentCloseDialog.cancel') }} </button>
+        <button class="claw-button claw-button--secondary" type="button" :disabled="busy" @click="emit('keep-worktree')"> {{ $t('surface.agentCloseDialog.keepWorktree') }} </button>
+        <button class="claw-button claw-button--primary" type="button" :aria-busy="busy" :disabled="busy" @click="deleteWorktree"> {{ $t('surface.agentCloseDialog.deleteWorktree') }} </button>
       </div>
     </template>
   </el-dialog>

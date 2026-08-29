@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
+import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
 import { suggestedSourceWorktreePath } from '../git-worktrees';
 
@@ -20,6 +21,42 @@ export class AgentGitService {
     private readonly now: AgentGitServiceClock = () => new Date(),
     private readonly runGit: AgentGitRunner = git,
   ) {}
+
+  async identity(folder: string): Promise<AgentWorkspaceIdentity> {
+    const updatedAt = this.now().toISOString();
+    try {
+      const [rootResult, branchResult, commonDirectoryResult, originResult] = await Promise.all([
+        this.runGit(folder, ['rev-parse', '--show-toplevel']),
+        this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
+        this.runGit(folder, ['rev-parse', '--git-common-dir']),
+        this.runGit(folder, ['remote', 'get-url', 'origin']).catch(() => ({ stdout: '' })),
+      ]);
+      const repositoryRoot = resolve(rootResult.stdout.trim());
+      const commonDirectory = resolve(repositoryRoot, commonDirectoryResult.stdout.trim());
+      const primaryWorktreeRoot = dirname(commonDirectory);
+      const branch = branchResult.stdout.trim() || null;
+      const originUrl = sanitizeGitRemoteUrl(originResult.stdout);
+
+      return {
+        kind: 'git',
+        folder,
+        repositoryName: fileName(primaryWorktreeRoot),
+        repositoryRoot,
+        branch,
+        isLinkedWorktree: repositoryRoot !== primaryWorktreeRoot,
+        primaryWorktreeRoot,
+        ...(originUrl ? { originUrl } : {}),
+        updatedAt,
+      };
+    } catch {
+      return {
+        kind: 'folder',
+        folder,
+        label: fileName(resolve(folder)),
+        updatedAt,
+      };
+    }
+  }
 
   async status(folder: string): Promise<AgentGitStatus> {
     const updatedAt = this.now().toISOString();

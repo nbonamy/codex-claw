@@ -2,8 +2,8 @@
 
 ## Overview
 
-This repository is **Codex Claw**, an Electron desktop app that merges the
-team/agent product model from Skwad with native Codex rendering inspired by id8.
+This repository is **Codex Claw**, an Electron desktop app for coordinating
+teams of coding agents with native conversation and artifact rendering.
 
 - Electron + Electron Forge desktop app.
 - TypeScript across main, preload, renderer, shared contracts, and tests.
@@ -15,7 +15,7 @@ team/agent product model from Skwad with native Codex rendering inspired by id8.
 
 Core product surfaces:
 
-- **Teams**: Skwad-style top-level grouping for agents.
+- **Teams**: top-level grouping for agents.
 - **Agents**: named teammates with avatars, folders, backend sessions, and
   status.
 - **Bench**: saved deployable agent templates.
@@ -60,12 +60,13 @@ not a minor shortcut inside the New Agent button.
 ## Documentation Map
 
 Keep `AGENTS.md` high-level. Before changing a feature area, read the relevant
-doc and update it when behavior changes:
+doc. Update docs only when their architecture, process, or reusable convention
+changes; specify feature behavior in tests:
 
 - `docs/testing.md`: desktop testing principles, coverage expectations,
   Vitest/component/contract/smoke test guidance, and verification gates.
-- `docs/frontend.md`: Vue/Element Plus conventions, design tokens, app shell,
-  visual references, and UX standards.
+- `docs/frontend.md`: renderer ownership, component and reuse patterns,
+  canonical UI, visual references, and design tokens.
 - `docs/team-cockpit.md`: design note for a possible team-scoped Cockpit entry
   inside the agent sidebar while preserving the global Cockpit.
 - `docs/codex.md`: how Electron main communicates with Codex app-server,

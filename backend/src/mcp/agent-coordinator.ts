@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus, WorkRoutingResult } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 
 export type McpAgentInfo = {
   id: string;
@@ -91,6 +92,13 @@ export type McpCreateAgentResponse = {
   message: string;
 };
 
+export type PrepareWorkInput = {
+  branchName?: string;
+  task: string;
+};
+
+export type PrepareWorkResponse = WorkRoutingResult;
+
 export type ClawMcpAgentCoordinatorOptions = {
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
@@ -101,6 +109,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
+  onPrepareWork?: (agent: Agent, input: PrepareWorkInput) => PrepareWorkResponse | Promise<PrepareWorkResponse>;
   createId?: () => string;
   now?: () => Date;
 };
@@ -123,6 +132,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onListSourceWorktrees?: (repoPath: string) => SourceWorktree[] | Promise<SourceWorktree[]>;
   private readonly onCreateSourceWorktree?: (input: CreateSourceWorktreeInput) => SourceWorktree | Promise<SourceWorktree>;
   private readonly onCreateAgent?: (agent: Agent, input: McpCreateAgentInput & { backend: AgentBackend; teamId?: string }) => McpCreateAgentResponse | Promise<McpCreateAgentResponse>;
+  private readonly onPrepareWork?: (agent: Agent, input: PrepareWorkInput) => PrepareWorkResponse | Promise<PrepareWorkResponse>;
   private readonly createId: () => string;
   private readonly now: () => Date;
 
@@ -136,6 +146,7 @@ export class ClawMcpAgentCoordinator {
     this.onListSourceWorktrees = options.onListSourceWorktrees;
     this.onCreateSourceWorktree = options.onCreateSourceWorktree;
     this.onCreateAgent = options.onCreateAgent;
+    this.onPrepareWork = options.onPrepareWork;
     this.createId = options.createId ?? randomUUID;
     this.now = options.now ?? (() => new Date());
   }
@@ -173,7 +184,7 @@ export class ClawMcpAgentCoordinator {
       success: true,
       message: 'Message sent successfully. The recipient will process it when they are idle.',
       recipientId: recipient.id,
-      recipientName: recipient.name,
+      recipientName: agentDisplayName(recipient),
     };
   }
 
@@ -311,6 +322,23 @@ export class ClawMcpAgentCoordinator {
     });
   }
 
+  async prepareWork(agentId: string, input: PrepareWorkInput): Promise<PrepareWorkResponse> {
+    const agent = this.requireAgent(agentId);
+    const task = input.task.trim();
+    if (!task) {
+      throw new McpToolError('Describe the work to prepare.');
+    }
+    if (!this.onPrepareWork) {
+      throw new McpToolError('Work routing is not available.');
+    }
+
+    const branchName = input.branchName?.trim();
+    return this.onPrepareWork(agent, {
+      task,
+      ...(branchName ? { branchName } : {}),
+    });
+  }
+
   latestUnreadMessageId(agentId: string): string | null {
     const agent = this.findAgent(agentId);
     if (!agent) {
@@ -392,7 +420,7 @@ export class ClawMcpAgentCoordinator {
     }
 
     const normalized = identifier.toLowerCase();
-    const nameMatches = visibleAgents.filter((agent) => agent.name.toLowerCase() === normalized);
+    const nameMatches = visibleAgents.filter((agent) => agentDisplayName(agent).toLowerCase() === normalized);
     if (nameMatches.length > 1) {
       throw new McpToolError(`Failed to send message: Recipient name '${identifier}' is ambiguous. Use the recipient ID from list-agents.`);
     }
@@ -420,16 +448,17 @@ export class ClawMcpAgentCoordinator {
   private toAgentInfo(agent: Agent): McpAgentInfo {
     return {
       id: agent.id,
-      name: agent.name,
+      name: agentDisplayName(agent),
       folder: agent.folder,
       status: agent.statusText ? `${agentStatusLabel(agent.status)}: ${agent.statusText}` : agentStatusLabel(agent.status),
     };
   }
 
   private toMessageInfo(message: McpMessage): MessageInfo {
+    const sender = this.findAgent(message.from);
     return {
       id: message.id,
-      from: this.findAgent(message.from)?.name ?? message.from,
+      from: sender ? agentDisplayName(sender) : message.from,
       fromId: message.from,
       content: message.content,
       timestamp: message.timestamp.toISOString(),
@@ -463,26 +492,30 @@ export class ClawMcpAgentCoordinator {
       return `Agent '${identifier}' not found. No agents are currently available.`;
     }
 
-    const entries = agents.map((agent) => `- ${agent.id}: ${agent.name} (${agent.folder})`).join('\n');
+    const entries = agents.map((agent) => `- ${agent.id}: ${agentDisplayName(agent)} (${agent.folder})`).join('\n');
     return `Agent '${identifier}' not found. Visible agents:\n\n${entries}`;
   }
 }
 
 function matchesAgent(agent: Agent, identifier: string): boolean {
-  return agent.id === identifier || agent.name.toLowerCase() === identifier.toLowerCase();
+  return agent.id === identifier || agentDisplayName(agent).toLowerCase() === identifier.toLowerCase();
 }
 
 function agentStatusLabel(status: AgentStatus): string {
   switch (status.type) {
     case 'working':
-      return status.detail ?? 'Working';
+      return literalAppText(status.detail) ?? 'Working';
     case 'starting':
       return 'Starting';
     case 'awaitingInput':
-      return status.detail ?? 'Awaiting input';
+      return literalAppText(status.detail) ?? 'Awaiting input';
     case 'error':
-      return status.message ? `Error: ${status.message}` : 'Error';
+      return literalAppText(status.message) ? `Error: ${literalAppText(status.message)}` : 'Error';
     case 'idle':
       return 'Idle';
   }
+}
+
+function literalAppText(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }

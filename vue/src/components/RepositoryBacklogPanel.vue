@@ -1,8 +1,8 @@
 <template>
-  <section class="repository-backlog" aria-label="Repository backlog">
+  <section class="repository-backlog" :aria-label="$t('surface.repositoryBacklogPanel.repositoryBacklog')">
     <header class="repository-backlog__repository">
       <div>
-        <IconBrandGithub aria-hidden="true" />
+        <GitHubIcon aria-hidden="true" />
         <strong>{{ repositoryName }}</strong>
       </div>
       <span v-if="branch" class="repository-backlog__branch-pill">
@@ -20,7 +20,7 @@
     </header>
 
     <div class="repository-backlog__toolbar">
-      <div class="repository-backlog__segments" role="radiogroup" aria-label="Work item type">
+      <div class="repository-backlog__segments" role="radiogroup" :aria-label="$t('surface.repositoryBacklogPanel.workItemType')">
         <button
           type="button"
           role="radio"
@@ -84,7 +84,7 @@
             <div class="repository-backlog__filter-fields">
               <label>
                 <span>{{ t('repositoryBacklog.state') }}</span>
-                <el-select v-model="stateFilter" size="small" aria-label="Work item state">
+                <el-select v-model="stateFilter" size="small" :aria-label="$t('surface.repositoryBacklogPanel.workItemState')">
                   <el-option :label="t('repositoryBacklog.open')" value="open" />
                   <el-option :label="t('repositoryBacklog.closed')" value="closed" />
                   <el-option :label="t('repositoryBacklog.allStates')" value="all" />
@@ -92,7 +92,7 @@
               </label>
               <label>
                 <span>{{ t('repositoryBacklog.assignee') }}</span>
-                <el-select v-model="assigneeFilter" size="small" aria-label="Work item assignee">
+                <el-select v-model="assigneeFilter" size="small" :aria-label="$t('surface.repositoryBacklogPanel.workItemAssignee')">
                   <el-option :label="t('repositoryBacklog.anyone')" value="all" />
                   <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" :disabled="!accountLabel" />
                   <el-option :label="t('repositoryBacklog.unassigned')" value="unassigned" />
@@ -104,7 +104,7 @@
                   v-model="labelFilter"
                   size="small"
                   :placeholder="t('repositoryBacklog.allLabels')"
-                  aria-label="Work item label"
+                  :aria-label="$t('surface.repositoryBacklogPanel.workItemLabel')"
                 >
                   <el-option :label="t('repositoryBacklog.allLabels')" value="" />
                   <el-option v-for="label in labelOptions" :key="label" :label="label" :value="label" />
@@ -130,7 +130,7 @@
           v-model="searchQuery"
           type="search"
           :placeholder="kindFilter === 'issue' ? t('repositoryBacklog.searchIssues') : t('repositoryBacklog.searchPullRequests')"
-          aria-label="Search repository work"
+          :aria-label="$t('surface.repositoryBacklogPanel.searchRepositoryWork')"
           @keydown.esc="closeSearch"
         >
         <button type="button" :aria-label="t('repositoryBacklog.closeSearch')" @click="closeSearch">
@@ -208,7 +208,7 @@
         <template v-if="selectedAssignment">
           <AppMenu
             class="app-menu--embedded repository-backlog__assignment-menu"
-            ariaLabel="Work item assignment actions"
+            :ariaLabel="$t('surface.repositoryBacklogPanel.workItemAssignmentActions')"
             :items="assignmentMenuItems"
             @select="selectAssignmentMenuItem"
           />
@@ -216,7 +216,7 @@
         <template v-else-if="operationState === 'idle' || operationState === 'error'">
           <header>
             <strong>{{ t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
-            <button type="button" aria-label="Close" @click="closeStartWork"><IconX aria-hidden="true" /></button>
+            <button type="button" :aria-label="$t('surface.repositoryBacklogPanel.close')" @click="closeStartWork"><IconX aria-hidden="true" /></button>
           </header>
 
           <div class="repository-backlog__target-options">
@@ -338,7 +338,6 @@ import { computed, h, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IconAlertCircle,
-  IconBrandGithub,
   IconCircleCheck,
   IconCircleDot,
   IconCopy,
@@ -353,6 +352,7 @@ import {
   IconSearch,
   IconX,
 } from '@tabler/icons-vue';
+import { GitHubIcon } from '../shared/icons/app-icons';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';

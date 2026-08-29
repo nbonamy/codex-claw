@@ -14,24 +14,25 @@
   >
     <header class="cockpit-view__agent-header">
       <AgentAvatar
-        :avatar="agent.avatar"
-        :name="agent.name"
+        v-if="repositoryIcon"
+        :avatar="repositoryIcon"
+        :name="displayName"
         size="lg"
       />
       <div class="cockpit-view__agent-title">
-        <strong>{{ agent.name }}</strong>
+        <strong>{{ displayName }}</strong>
         <span>{{ folderBasename(agent.folder) }}</span>
       </div>
       <span
         class="cockpit-view__agent-state"
         :data-status="agent.status.type"
       >
-        {{ agentStatusLabel(agent.status.type) }}
+        {{ agentStatusLabel(agent.status.type, t) }}
       </span>
     </header>
 
     <div class="cockpit-view__agent-body">
-      <strong>{{ agentStatusText(agent) }}</strong>
+      <strong>{{ agentStatusText(agent, t) }}</strong>
     </div>
 
     <form
@@ -42,13 +43,13 @@
       <input
         v-model="promptDraft"
         :disabled="!canReceivePrompt"
-        :placeholder="canReceivePrompt ? 'Send prompt...' : 'Working...'"
-        :aria-label="`Prompt ${agent.name}`"
+        :placeholder="canReceivePrompt ? t('cockpit.sendPromptPlaceholder') : t('cockpit.workingPlaceholder')"
+        :aria-label="t('cockpit.prompt', { agent: displayName })"
       >
       <button
         type="submit"
         :disabled="!canSubmitPrompt"
-        :aria-label="`Send prompt to ${agent.name}`"
+        :aria-label="t('cockpit.sendPrompt', { agent: displayName })"
       >
         <SendIcon aria-hidden="true" />
       </button>
@@ -58,13 +59,16 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { Agent, WorkItem } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
   agent: Agent;
+  repositoryIcon?: string;
   draggedWorkItem: WorkItem | null;
   dropTarget: boolean;
 }>();
@@ -79,10 +83,13 @@ const emit = defineEmits<{
   select: [];
 }>();
 
+const { t } = useI18n();
+
 const promptDraft = ref('');
 const canReceivePrompt = computed(() => agentCanReceivePrompt(props.agent));
 const canSubmitPrompt = computed(() => canReceivePrompt.value && Boolean(promptDraft.value.trim()));
 const dropReady = computed(() => Boolean(props.draggedWorkItem && canReceivePrompt.value));
+const displayName = computed(() => agentDisplayName(props.agent));
 
 function submitPrompt(): void {
   if (!canSubmitPrompt.value) {

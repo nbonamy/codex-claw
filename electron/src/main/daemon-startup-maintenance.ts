@@ -5,6 +5,7 @@ import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { ClawBackendSocketClient } from './backend-socket-client';
 import { getClawdDaemonStatus, getResolvedClawdVersion, refreshClawdDaemon, type DaemonLaunchAgentDependencies } from './daemon-launch-agent';
 import { logMain, warnMain } from './log';
+import { mainT } from './i18n';
 
 type SnapshotClient = {
   close(): Promise<void>;
@@ -40,10 +41,10 @@ export async function ensureCurrentClawdDaemonForStartup(
   const active = await daemonHasActiveWork(status.socketPath, dependencies);
   if (active) {
     const response = await (dependencies.showMessageBox ?? dialog.showMessageBox)({
-      buttons: ['Continue with old backend', 'Restart backend now'],
+      buttons: [mainT('daemon.continueOld'), mainT('daemon.restartNow')],
       cancelId: 0,
       defaultId: 1,
-      message: 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or loops are running.',
+      message: mainT('daemon.restartRequired'),
       type: 'info',
     });
     if (response.response !== 1) {

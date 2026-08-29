@@ -10,7 +10,7 @@
   >
     <template #header>
       <div class="claw-dialog__header">
-        <h2 class="claw-dialog__title">Adjust Avatar</h2>
+        <h2 class="claw-dialog__title">{{ title }}</h2>
       </div>
     </template>
 
@@ -42,27 +42,29 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="emit('cancel')">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="emit('cancel')">{{ $t('surface.agentAvatarCropDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
           @click="apply"
-        >
-          Use Image
-        </button>
+        > {{ $t('surface.agentAvatarCropDialog.useImage') }} </button>
       </div>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ref, watch } from 'vue';
 import { clampAvatarCropPan, cropImageDataUrl, type AvatarCropPan } from './agent-avatar-crop';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   image: string | null;
+  title?: string;
   visible: boolean;
-}>();
+}>(), {
+  title: translate('surface.agentAvatarCropDialog.adjustAvatar'),
+});
 
 const emit = defineEmits<{
   apply: [avatar: string];

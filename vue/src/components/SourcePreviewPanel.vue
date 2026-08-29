@@ -10,14 +10,12 @@
     <div
       v-if="state === 'loading'"
       class="source-preview-panel__empty codex-text-shimmer"
-    >
-      Loading source...
-    </div>
+    > {{ $t('surface.sourcePreviewPanel.loadingSource') }} </div>
     <div
       v-else-if="state === 'error'"
       class="source-preview-panel__empty source-preview-panel__empty--error"
     >
-      {{ error ?? 'Unable to load source.' }}
+      {{ error ?? $t('surface.sourcePreviewPanel.unableToLoadSource') }}
     </div>
     <div
       v-else-if="content.trim()"
@@ -27,9 +25,7 @@
     <div
       v-else
       class="source-preview-panel__empty"
-    >
-      No source content.
-    </div>
+    > {{ $t('surface.sourcePreviewPanel.noSourceContent') }} </div>
   </article>
 </template>
 

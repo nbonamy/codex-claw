@@ -1,28 +1,28 @@
-import type { ApprovalPreset, BackendDefaults, CodexApprovalsReviewer } from './contracts';
+import type { AppTextDescriptor, ApprovalPreset, BackendDefaults, CodexApprovalsReviewer } from './contracts';
 
 export const defaultApprovalPreset: ApprovalPreset = 'full-access';
 
 export type ApprovalPresetOption = {
   id: ApprovalPreset;
-  label: string;
-  description: string;
+  label: AppTextDescriptor;
+  description: AppTextDescriptor;
 };
 
 export const approvalPresetOptions: readonly ApprovalPresetOption[] = [
   {
     id: 'ask-for-approval',
-    label: 'Ask for approval',
-    description: 'Pause before tool calls that need user approval.',
+    label: { key: 'permissions.approval.ask.label' },
+    description: { key: 'permissions.approval.ask.description' },
   },
   {
     id: 'approve-for-me',
-    label: 'Approve for me',
-    description: 'Let Claw approve safe tool calls for the active session.',
+    label: { key: 'permissions.approval.automatic.label' },
+    description: { key: 'permissions.approval.automatic.description' },
   },
   {
     id: 'full-access',
-    label: 'Full access',
-    description: 'Run trusted workspace tools without extra prompts.',
+    label: { key: 'permissions.approval.fullAccess.label' },
+    description: { key: 'permissions.approval.fullAccess.description' },
   },
 ] as const;
 

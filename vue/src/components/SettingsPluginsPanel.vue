@@ -1,6 +1,6 @@
 <template>
   <SettingsPanelFrame
-    title="Plugins"
+    :title="$t('surface.settingsPluginsPanel.plugins')"
     title-id="settings-plugins-title"
   >
     <template #banner>
@@ -9,19 +9,19 @@
 
     <SettingsSection
       v-if="clawHostCapabilities.computerUse"
-      title="Claw"
+      :title="$t('surface.settingsPluginsPanel.claw')"
       title-id="settings-plugins-claw-title"
     >
       <SettingsRow
         as="label"
-        title="Computer Use"
+        :title="$t('surface.settingsPluginsPanel.computerUse')"
         :error="computerUseError"
-        description="Let agents inspect and control macOS apps through the local Computer Use helper"
+        :description="$t('surface.settingsPluginsPanel.letAgentsInspectAndControlMacOSAppsThroughTheLocalComput')"
       >
         <template #control>
           <el-switch
             :model-value="pluginSettings.computerUseEnabled"
-            aria-label="Enable Computer Use"
+            :aria-label="$t('surface.settingsPluginsPanel.enableComputerUse')"
             @update:model-value="updatePlugin('computerUse', $event)"
           />
         </template>
@@ -29,33 +29,33 @@
     </SettingsSection>
 
     <SettingsSection
-      title="Codex"
+      :title="$t('surface.settingsPluginsPanel.codex')"
       title-id="settings-plugins-codex-title"
     >
       <SettingsRow
         as="label"
-        title="Chrome"
+        :title="$t('surface.settingsPluginsPanel.chrome')"
         :error="chromeError"
-        description="Let agents work with your existing Chrome tabs, sessions, and extensions"
+        :description="$t('surface.settingsPluginsPanel.letAgentsWorkWithYourExistingChromeTabsSessionsAndExtens')"
       >
         <template #control>
           <el-switch
             :model-value="chromeEnabled"
-            aria-label="Enable Chrome"
+            :aria-label="$t('surface.settingsPluginsPanel.enableChrome')"
             @update:model-value="updatePlugin('chrome', $event)"
           />
         </template>
       </SettingsRow>
       <SettingsRow
-        title="Install Codex plugins and MCP servers"
-        description="GitHub, Slack, Jira, Linear, Gmail, Google Drive, and more"
+        :title="$t('surface.settingsPluginsPanel.installCodexPluginsAndMCPServers')"
+        :description="$t('surface.settingsPluginsPanel.gitHubSlackJiraLinearGmailGoogleDriveAndMore')"
         :error="pluginManagerError"
       >
         <template #control>
           <el-button
             circle
             :loading="managingPlugins"
-            aria-label="Install Codex plugins and MCP servers"
+            :aria-label="$t('surface.settingsPluginsPanel.installCodexPluginsAndMCPServers')"
             @click="managePlugins('install')"
           >
             <ChevronRightIcon aria-hidden="true" />

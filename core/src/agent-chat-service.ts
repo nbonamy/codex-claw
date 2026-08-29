@@ -69,7 +69,10 @@ export function sendAgentPrompt(
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
         status: 'running',
-        detail: `${backendDisplayName(backendDriver.backend)} backend connected.`,
+        detail: {
+          key: 'backend.connected',
+          params: { backend: backendDisplayName(backendDriver.backend) },
+        },
         capabilities: backendDriver.getCapabilities(agent),
       }, emit, snapshot);
       void Promise.resolve(hooks?.onPromptStarted?.(result)).catch(() => undefined);

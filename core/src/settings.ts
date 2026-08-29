@@ -1,4 +1,5 @@
 import type { AppGeneralSettings, AppPluginSettings, AppshotSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import { repositoryIconKeyForRemote } from './git-remote';
 
 export const defaultPluginSettings: AppPluginSettings = {
   computerUseEnabled: false,
@@ -17,7 +18,9 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   codexBinaryPath: '',
   claudeCodeEnabled: false,
   agentListCompact: false,
+  collapsedRepositoryKeys: [],
   shareCodexSkillsAndPlugins: true,
+  repositoryIcons: {},
   appshots: { ...defaultAppshotSettings },
   plugins: { ...defaultPluginSettings },
 };
@@ -94,10 +97,35 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     claudeCodeEnabled: value.claudeCodeEnabled === true,
     agentListCompact: value.agentListCompact === true,
+    collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
     shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
+    repositoryIcons: normalizeRepositoryIcons(value.repositoryIcons),
     appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
   };
+}
+
+function normalizeRepositoryIcons(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const icons: Record<string, string> = {};
+  for (const [repositoryRoot, iconValue] of Object.entries(value)) {
+    const rawKey = repositoryRoot.trim();
+    const root = repositoryIconKeyForRemote(rawKey) ?? rawKey;
+    const icon = typeof iconValue === 'string' ? iconValue.trim() : '';
+    if (!root || root.length > 4_096 || !icon || icon.length > 64) continue;
+    icons[root] = icon;
+    if (Object.keys(icons).length >= 200) break;
+  }
+  return icons;
+}
+
+function normalizeStringList(value: unknown, maximum: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .filter((candidate): candidate is string => typeof candidate === 'string')
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate.length > 0 && candidate.length <= 4_096))]
+    .slice(0, maximum);
 }
 
 export function normalizeAppshotSettings(value: unknown): AppshotSettings {

@@ -1,6 +1,6 @@
 <template>
-  <section class="cockpit-view" aria-label="Cockpit">
-    <aside class="cockpit-view__navigation" aria-label="Cockpit navigation">
+  <section class="cockpit-view" :aria-label="$t('surface.cockpitView.cockpit')">
+    <aside class="cockpit-view__navigation" :aria-label="$t('surface.cockpitView.cockpitNavigation')">
       <nav>
         <button
           class="cockpit-view__navigation-item"
@@ -9,9 +9,7 @@
           :aria-current="activeSection === 'backlog' ? 'page' : undefined"
           @click="showBacklog"
         >
-          <BacklogIcon aria-hidden="true" />
-          Backlog
-        </button>
+          <BacklogIcon aria-hidden="true" /> {{ $t('surface.cockpitView.backlog') }} </button>
         <button
           class="cockpit-view__navigation-item"
           :class="{ 'cockpit-view__navigation-item--active': activeSection === 'agents' }"
@@ -19,13 +17,11 @@
           :aria-current="activeSection === 'agents' ? 'page' : undefined"
           @click="activeSection = 'agents'"
         >
-          <IconUser aria-hidden="true" />
-          Agents
-          <span>{{ agents.length }}</span>
+          <IconUser aria-hidden="true" /> {{ $t('surface.cockpitView.agents') }} <span>{{ agents.length }}</span>
         </button>
 
         <div class="cockpit-view__navigation-section">
-          <strong>Repositories</strong>
+          <strong>{{ $t('surface.cockpitView.repositories') }}</strong>
           <el-dropdown
             placement="bottom-end"
             trigger="click"
@@ -34,15 +30,15 @@
             <button
               class="cockpit-view__repository-sort"
               type="button"
-              :aria-label="`Sort repositories by ${repositorySortDescription}`"
+              :aria-label="$t('dynamic.cockpit.sortRepositories', { sort: repositorySortDescription })"
             >
               {{ repositorySortLabel }}
               <IconChevronDown aria-hidden="true" />
             </button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="recent">Recent activity</el-dropdown-item>
-                <el-dropdown-item command="alphabetical">Alphabetical</el-dropdown-item>
+                <el-dropdown-item command="recent">{{ $t('surface.cockpitView.recentActivity') }}</el-dropdown-item>
+                <el-dropdown-item command="alphabetical">{{ $t('surface.cockpitView.alphabetical') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -52,14 +48,12 @@
           <input
             v-model="repositoryFilter"
             type="search"
-            placeholder="Filter repositories"
-            aria-label="Filter repositories"
+            :placeholder="$t('surface.cockpitView.filterRepositories')"
+            :aria-label="$t('surface.cockpitView.filterRepositories')"
           />
         </label>
         <div v-if="workBacklog" class="cockpit-view__repositories">
-          <p v-if="filteredRepositories.length === 0" class="cockpit-view__repositories-empty">
-            No repositories found.
-          </p>
+          <p v-if="filteredRepositories.length === 0" class="cockpit-view__repositories-empty"> {{ $t('surface.cockpitView.noRepositoriesFound') }} </p>
           <div
             v-for="repository in filteredRepositories"
             :key="repository.id"
@@ -76,8 +70,8 @@
             <button
               class="cockpit-view__repository-launch"
               type="button"
-              :aria-label="`Start agent in ${repository.name}`"
-              :title="`Start agent in ${repository.name}`"
+              :aria-label="$t('dynamic.cockpit.startAgent', { repository: repository.name })"
+              :title="$t('dynamic.cockpit.startAgent', { repository: repository.name })"
               @click="emit('add-agent-for-repository', repository)"
             >
               <PlayerPlayIcon aria-hidden="true" />
@@ -91,8 +85,8 @@
     <div class="cockpit-view__workspace">
       <header class="cockpit-view__header" :class="{ 'cockpit-view__header--agents': activeSection === 'agents' }">
         <div class="cockpit-view__frame">
-          <h1>{{ activeSection === 'backlog' ? 'Cockpit' : 'Agents' }}</h1>
-          <div v-if="activeSection === 'backlog' && workBacklog" class="cockpit-view__summary" aria-label="Work summary filters">
+          <h1>{{ activeSection === 'backlog' ? $t('surface.cockpitView.cockpit') : $t('surface.cockpitView.agents') }}</h1>
+          <div v-if="activeSection === 'backlog' && workBacklog" class="cockpit-view__summary" :aria-label="$t('surface.cockpitView.workSummaryFilters')">
             <button
               v-for="metric in summaryMetrics"
               :key="metric.id"
@@ -121,6 +115,7 @@
         :page-loading="workBacklog.pageLoading"
         :page-size="workBacklog.pageSize"
         :repositories="workBacklog.repositories"
+        :repository-icons="repositoryIcons"
         :search-query="searchQuery"
         :selected-assignee-login="workBacklog.selectedAssigneeLogin ?? null"
         :selected-repository-id="workBacklog.selectedRepositoryId"
@@ -149,6 +144,7 @@
         :bench="bench"
         :bench-by-team-id="benchByTeamId"
         :forkable-agent-ids="forkableAgentIds"
+        :repository-icons="repositoryIcons"
         :teams="teams"
         @add-agent="emit('add-agent', $event)"
         @close-agent="emit('close-agent', $event)"
@@ -165,14 +161,13 @@
         @select-team="emit('select-team', $event)"
       />
 
-      <div v-else class="cockpit-view__empty">
-        Connect a work provider to build your operator inbox.
-      </div>
+      <div v-else class="cockpit-view__empty"> {{ $t('surface.cockpitView.connectAWorkProviderToBuildYourOperatorInbox') }} </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref } from 'vue';
 import { IconChevronDown, IconFolder, IconSearch, IconUser } from '@tabler/icons-vue';
 import type { Agent, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
@@ -210,11 +205,14 @@ const props = defineProps<{
   bench?: BenchTemplate[];
   benchByTeamId?: Record<string, BenchTemplate[]>;
   forkableAgentIds?: string[];
+  repositoryIcons?: Record<string, string>;
   teams: Team[];
   defaultTeamId?: string | null;
   startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
+
+const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 
 const startWorkItemsAction = props.startWorkItemsAction;
 
@@ -252,7 +250,7 @@ const repositoryFilter = ref('');
 const activeWorkView = ref<InboxView>('focus');
 const activeSummaryFilter = ref<SummaryFilter | null>(null);
 const repositorySortMode = ref<RepositorySortMode>('recent');
-const repositorySortLabel = computed(() => repositorySortMode.value === 'recent' ? 'Recent' : 'A–Z');
+const repositorySortLabel = computed(() => repositorySortMode.value === 'recent' ? translate('surface.cockpitView.recent') : 'A–Z');
 const repositorySortDescription = computed(() => repositorySortMode.value === 'recent' ? 'recent activity' : 'name');
 const sortedRepositories = computed(() => [...(props.workBacklog?.repositories ?? [])].sort((left, right) => {
   if (repositorySortMode.value === 'alphabetical') {
@@ -281,9 +279,9 @@ const workSummary = computed(() => {
   };
 });
 const summaryMetrics = computed<SummaryMetric[]>(() => [
-  { id: 'working', label: 'working', count: workSummary.value.working, filter: 'inProgress', view: 'wip' },
-  { id: 'blocked', label: 'blocked', count: workSummary.value.blocked, filter: 'blocked', view: 'focus' },
-  { id: 'review', label: 'ready for review', count: workSummary.value.review, filter: 'readyForReview', view: 'focus' },
+  { id: 'working', label: translate('surface.cockpitView.working'), count: workSummary.value.working, filter: 'inProgress', view: 'wip' },
+  { id: 'blocked', label: translate('surface.cockpitView.blocked'), count: workSummary.value.blocked, filter: 'blocked', view: 'focus' },
+  { id: 'review', label: translate('surface.cockpitView.readyForReview'), count: workSummary.value.review, filter: 'readyForReview', view: 'focus' },
 ]);
 function selectAssignedAgent(agentId: string): void {
   const agent = agentsById.value.get(agentId);
