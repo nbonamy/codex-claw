@@ -1,4 +1,4 @@
-import { clipboard, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
+import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
@@ -25,7 +25,7 @@ type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'ch
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
-  Menu.setApplicationMenu(Menu.buildFromTemplate(buildAppMenuTemplate({
+  const callbacks: AppMenuCallbacks = {
     checkForUpdates,
     installUpdate,
     reload: () => window.webContents.reload(),
@@ -34,7 +34,10 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
-  }, menuOptions)));
+  };
+  const menu = Menu.buildFromTemplate(buildAppMenuTemplate(callbacks, menuOptions));
+  appendAgentActionsToEditMenu(menu, callbacks);
+  Menu.setApplicationMenu(menu);
 }
 
 export function buildAppMenuTemplate(
@@ -45,7 +48,7 @@ export function buildAppMenuTemplate(
   return [
     ...(platform === 'darwin' ? [buildCodexClawMenu(callbacks, options)] : []),
     buildFileMenu(callbacks),
-    buildEditMenu(callbacks),
+    buildEditMenu(),
     buildViewMenu(callbacks, options),
     ...(options.debugMode ? [buildDebugMenu(callbacks)] : []),
     buildWindowMenu(callbacks, platform),
@@ -209,37 +212,32 @@ function buildFileMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions 
   };
 }
 
-function buildEditMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
-  return {
-    label: 'Edit',
-    submenu: [
-      { label: 'Undo', role: 'undo' },
-      { label: 'Redo', role: 'redo' },
-      { type: 'separator' },
-      { label: 'Cut', role: 'cut' },
-      { label: 'Copy', role: 'copy' },
-      { label: 'Paste', role: 'paste' },
-      { label: 'Paste and Match Style', role: 'pasteAndMatchStyle' },
-      { label: 'Delete', role: 'delete' },
-      { label: 'Select All', role: 'selectAll' },
-      { type: 'separator' },
-      {
-        label: 'Edit Agent',
-        accelerator: 'CommandOrControl+E',
-        click: () => callbacks.sendAppCommand({ type: 'edit-active-agent' }),
-      },
-      {
-        label: 'Duplicate Agent',
-        accelerator: 'CommandOrControl+D',
-        click: () => callbacks.sendAppCommand({ type: 'duplicate-active-agent' }),
-      },
-      {
-        label: 'Restart Agent',
-        accelerator: 'CommandOrControl+R',
-        click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
-      },
-    ],
-  };
+function buildEditMenu(): MenuItemConstructorOptions {
+  return { role: 'editMenu' };
+}
+
+function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): void {
+  const editMenu = menu.items.find((item) => item.role === 'editMenu')?.submenu;
+  if (!editMenu) return;
+
+  [
+    { type: 'separator' as const },
+    {
+      label: 'Edit Agent',
+      accelerator: 'CommandOrControl+E',
+      click: () => callbacks.sendAppCommand({ type: 'edit-active-agent' }),
+    },
+    {
+      label: 'Duplicate Agent',
+      accelerator: 'CommandOrControl+D',
+      click: () => callbacks.sendAppCommand({ type: 'duplicate-active-agent' }),
+    },
+    {
+      label: 'Restart Agent',
+      accelerator: 'CommandOrControl+R',
+      click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
+    },
+  ].forEach((item) => editMenu.append(new MenuItem(item)));
 }
 
 function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {
