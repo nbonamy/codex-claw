@@ -2683,6 +2683,12 @@ describe('AppShell', () => {
     ]);
     const wrapper = mountShell({
       snapshot,
+      sourceRepositories: [{
+        name: 'new-project',
+        path: '/Users/nbonamy/src/other-new-project',
+        remoteIdentity: 'github.com/another-owner/new-project',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/other-new-project' }],
+      }],
       cloneSourceRepository,
       listSourceBranches,
       loadWorkRepositories: vi.fn().mockResolvedValue([githubRepository]),
@@ -2699,6 +2705,41 @@ describe('AppShell', () => {
     expect(cloneSourceRepository).toHaveBeenCalledWith({ url: githubRepository.url });
     expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/new-project', undefined);
     expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('repositoryName')).toBe('new-project');
+  });
+
+  it('opens an existing checkout only when its remote matches the selected GitHub repository', async () => {
+    const snapshot = createInitialSnapshot();
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/existing-project',
+      owner: 'nbonamy',
+      name: 'existing-project',
+      fullName: 'nbonamy/existing-project',
+      url: 'https://github.com/nbonamy/existing-project',
+      isPrivate: true,
+    };
+    const cloneSourceRepository = vi.fn();
+    const listSourceBranches = vi.fn().mockResolvedValue([]);
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [{
+        name: 'renamed-locally',
+        path: '/Users/nbonamy/src/renamed-locally',
+        remoteIdentity: 'github.com/nbonamy/existing-project',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/renamed-locally' }],
+      }],
+      cloneSourceRepository,
+      listSourceBranches,
+      loadWorkRepositories: vi.fn().mockResolvedValue([githubRepository]),
+    });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'github');
+    await flushPromises();
+    wrapper.getComponent({ name: 'RepositoryAcquireDialog' }).vm.$emit('select-repository', githubRepository);
+    await flushPromises();
+
+    expect(cloneSourceRepository).not.toHaveBeenCalled();
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/renamed-locally', undefined);
   });
 
   it('persists cockpit backlog repository and tag configuration', async () => {

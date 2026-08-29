@@ -1006,6 +1006,7 @@ export type SourceBranch = {
 export type SourceRepository = {
   name: string;
   path: string;
+  remoteIdentity?: string;
   worktrees: SourceWorktree[];
 };
 

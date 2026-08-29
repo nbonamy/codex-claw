@@ -36,11 +36,13 @@ describe('source repository discovery', () => {
       {
         name: 'alpha',
         path: path.join(tempDir, 'alpha'),
+        remoteIdentity: 'github.com/example/alpha',
         worktrees: [{ name: 'develop', path: path.join(tempDir, 'alpha') }],
       },
       {
         name: 'zeta',
         path: path.join(tempDir, 'zeta'),
+        remoteIdentity: 'github.com/example/zeta',
         worktrees: [{ name: 'main', path: path.join(tempDir, 'zeta') }],
       },
     ]);
@@ -64,6 +66,7 @@ describe('source repository discovery', () => {
       {
         name: 'witsy',
         path: path.join(tempDir, 'witsy'),
+        remoteIdentity: 'github.com/example/witsy',
         worktrees: [
           { name: 'main', path: path.join(tempDir, 'witsy') },
           { name: 'feature-a', path: path.join(tempDir, 'witsy-feature-a') },
@@ -105,6 +108,7 @@ describe('source repository discovery', () => {
   async function createClone(name: string, branch: string | null = 'main'): Promise<void> {
     const gitPath = path.join(tempDir, name, '.git');
     await mkdir(gitPath, { recursive: true });
+    await writeFile(path.join(gitPath, 'config'), `[remote "origin"]\n\turl = https://token@github.com/example/${name}.git\n`);
     if (branch === null) {
       return;
     }

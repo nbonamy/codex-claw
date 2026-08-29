@@ -32,7 +32,7 @@ describe('RepositoryAcquireDialog', () => {
         visible: true,
         mode: 'github',
         repositories,
-        localRepositoryNames: ['codex-claw'],
+        localRepositoryIdentities: ['github.com/nbonamy/codex-claw'],
       },
       global: { plugins: [ElementPlus] },
     });
@@ -52,6 +52,22 @@ describe('RepositoryAcquireDialog', () => {
 
     await wrapper.get('.repository-acquire-dialog__row').trigger('click');
     expect(wrapper.emitted('select-repository')).toStrictEqual([[repositories[1]]]);
+  });
+
+  it('does not treat a same-named repository from another owner as local', async () => {
+    const wrapper = mount(RepositoryAcquireDialog, {
+      props: {
+        visible: true,
+        mode: 'github',
+        repositories: [{ ...repositories[0]!, id: 'openai/codex-claw', owner: 'openai', fullName: 'openai/codex-claw', url: 'https://github.com/openai/codex-claw' }],
+        localRepositoryIdentities: ['github.com/nbonamy/codex-claw'],
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('On this machine');
+    expect(wrapper.text()).toContain('Clone');
   });
 
   it('validates and submits an explicit repository URL', async () => {

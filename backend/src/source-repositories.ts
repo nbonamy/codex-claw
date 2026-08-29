@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
+import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 
 export function sourceFolderCandidates(): string[] {
   return [
@@ -66,6 +67,7 @@ export async function scanSourceRepositories(sourceFolderPath: string): Promise<
       clones.set(entryPath, {
         name: entry.name,
         path: entryPath,
+        ...(gitInfo.remoteIdentity ? { remoteIdentity: gitInfo.remoteIdentity } : {}),
         worktrees: [{
           name: gitInfo.branchName ?? entry.name,
           path: entryPath,
@@ -103,7 +105,7 @@ export async function scanSourceRepositories(sourceFolderPath: string): Promise<
 }
 
 type GitInfo =
-  | { kind: 'clone'; branchName: string | null }
+  | { kind: 'clone'; branchName: string | null; remoteIdentity?: string }
   | { kind: 'worktree'; parentPath: string };
 
 async function readGitInfo(repoPath: string): Promise<GitInfo | null> {
@@ -114,6 +116,7 @@ async function readGitInfo(repoPath: string): Promise<GitInfo | null> {
       return {
         kind: 'clone',
         branchName: branchNameFromHead(await readOptionalFile(path.join(gitPath, 'HEAD'))),
+        ...remoteIdentityFromConfig(await readOptionalFile(path.join(gitPath, 'config'))),
       };
     }
   } catch {
@@ -152,6 +155,23 @@ function branchNameFromHead(head: string): string | null {
   }
 
   return trimmed.replace(/^ref:\s*refs\/heads\//, '') || null;
+}
+
+function remoteIdentityFromConfig(config: string): { remoteIdentity?: string } {
+  let inOriginSection = false;
+  for (const line of config.split(/\r?\n/u)) {
+    const section = line.match(/^\s*\[([^\]]+)\]\s*$/u)?.[1];
+    if (section) {
+      inOriginSection = /^remote\s+"origin"$/iu.test(section);
+      continue;
+    }
+    if (!inOriginSection) continue;
+    const url = line.match(/^\s*url\s*=\s*(.+?)\s*$/iu)?.[1];
+    if (!url) continue;
+    const remoteIdentity = canonicalGitRemoteIdentity(url);
+    return remoteIdentity ? { remoteIdentity } : {};
+  }
+  return {};
 }
 
 function worktreeDisplayName(folderName: string, repoName: string): string {

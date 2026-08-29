@@ -62,9 +62,9 @@
             <GitHubIcon aria-hidden="true" />
             <span>
               <span class="repository-acquire-dialog__name">{{ repository.fullName }}</span>
-              <small>{{ localRepositoryNames.has(repository.name) ? 'On this machine' : repository.isPrivate ? 'Private repository' : 'GitHub repository' }}</small>
+              <small>{{ isRepositoryLocal(repository) ? 'On this machine' : repository.isPrivate ? 'Private repository' : 'GitHub repository' }}</small>
             </span>
-            <em>{{ localRepositoryNames.has(repository.name) ? 'Open' : 'Clone' }}</em>
+            <em>{{ isRepositoryLocal(repository) ? 'Open' : 'Clone' }}</em>
           </button>
           <p v-if="filteredRepositories.length === 0" class="repository-acquire-dialog__state">No matching repositories.</p>
         </template>
@@ -84,13 +84,14 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
 import type { WorkRepository } from '@codex-claw/core/contracts';
+import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { GitHubIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
   error?: string | null;
   loading?: boolean;
-  localRepositoryNames?: string[];
+  localRepositoryIdentities?: string[];
   mode: 'github' | 'url';
   repositories?: WorkRepository[];
   visible: boolean;
@@ -98,7 +99,7 @@ const props = withDefaults(defineProps<{
   busy: false,
   error: null,
   loading: false,
-  localRepositoryNames: () => [],
+  localRepositoryIdentities: () => [],
   repositories: () => [],
 });
 
@@ -112,7 +113,7 @@ const input = ref<HTMLInputElement | null>(null);
 const urlInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const url = ref('');
-const localRepositoryNames = computed(() => new Set(props.localRepositoryNames));
+const localRepositoryIdentities = computed(() => new Set(props.localRepositoryIdentities));
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredRepositories = computed(() => props.repositories.filter((repository) => (
   `${repository.fullName} ${repository.name}`.toLocaleLowerCase().includes(normalizedQuery.value)
@@ -134,6 +135,11 @@ function onVisibilityChanged(visible: boolean): void {
 
 function submitUrl(): void {
   if (canSubmitUrl.value && !props.busy) emit('clone-url', url.value.trim());
+}
+
+function isRepositoryLocal(repository: WorkRepository): boolean {
+  const identity = canonicalGitRemoteIdentity(repository.url);
+  return Boolean(identity && localRepositoryIdentities.value.has(identity));
 }
 </script>
 

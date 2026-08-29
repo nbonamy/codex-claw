@@ -334,7 +334,7 @@
       :visible="repositoryAcquireVisible"
       :mode="repositoryAcquireMode"
       :repositories="repositoryAcquireRepositories"
-      :local-repository-names="sourceRepositories.map((repository) => repository.name)"
+      :local-repository-identities="sourceRepositories.flatMap((repository) => repository.remoteIdentity ? [repository.remoteIdentity] : [])"
       :loading="repositoryAcquireLoading"
       :busy="repositoryAcquireBusy"
       :error="repositoryAcquireError"
@@ -437,6 +437,7 @@ import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url'
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
@@ -2058,7 +2059,10 @@ function closeRepositoryAcquire(): void {
 }
 
 async function selectWorkRepository(repository: WorkRepository): Promise<void> {
-  const local = props.sourceRepositories.find((candidate) => candidate.name === repository.name);
+  const selectedRemoteIdentity = canonicalGitRemoteIdentity(repository.url);
+  const local = selectedRemoteIdentity
+    ? props.sourceRepositories.find((candidate) => candidate.remoteIdentity === selectedRemoteIdentity)
+    : undefined;
   if (local) {
     closeRepositoryAcquire();
     await openRepositorySessionSource({
