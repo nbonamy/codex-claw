@@ -144,8 +144,25 @@ describe('agent git service parsers', () => {
       branch: null,
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/src/codex-claw',
-      originUrl: 'git@github.com:nbonamy/codex-claw.git',
+      originUrl: 'github.com:nbonamy/codex-claw.git',
       updatedAt: '2026-08-27T12:00:00.000Z',
+    });
+  });
+
+  it('removes credentials from the persisted workspace origin', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '.git\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return { stdout: 'https://oauth2:secret@github.com/openai/codex-claw.git?token=secret\n' };
+      }
+      throw new Error(`Unexpected git command: ${args.join(' ')}`);
+    });
+    const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
+
+    await expect(service.identity('/src/codex-claw')).resolves.toMatchObject({
+      originUrl: 'https://github.com/openai/codex-claw.git',
     });
   });
 

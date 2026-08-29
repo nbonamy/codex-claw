@@ -110,6 +110,16 @@ describe('settings contracts', () => {
     expect(snapshot.general.repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
   });
 
+  it('migrates credential-bearing repository icon keys to canonical remote identities', () => {
+    expect(normalizeGeneralSettings({
+      repositoryIcons: {
+        'https://oauth2:secret@github.com/openai/codex-claw.git': '🦞',
+      },
+    }).repositoryIcons).toStrictEqual({
+      'remote:github.com/openai/codex-claw': '🦞',
+    });
+  });
+
   it('updates source folder settings without replacing unrelated state', () => {
     const snapshot = createEmptySnapshot();
     snapshot.sourceFolder.recentRepoNames = ['skwad'];

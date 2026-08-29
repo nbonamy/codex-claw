@@ -116,7 +116,7 @@ describe('workspace sidebar projection', () => {
 
     expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]).toMatchObject({
       repositoryRoot: '/src/codex-claw',
-      repositoryKey: 'git@github.com:nbonamy/codex-claw.git',
+      repositoryKey: 'remote:github.com/nbonamy/codex-claw',
     });
   });
 
@@ -125,7 +125,7 @@ describe('workspace sidebar projection', () => {
     if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
 
     expect(repositoryIconForAgent(agent, {
-      'git@github.com:nbonamy/codex-claw.git': '🦞',
+      'remote:github.com/nbonamy/codex-claw': '🦞',
     })).toBe('🦞');
     expect(repositoryIconForAgent(agent, {})).toBeUndefined();
     expect(repositoryIconForAgent(baseAgent('agent-folder', 'Folder', '/src/folder'), {

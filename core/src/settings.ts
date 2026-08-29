@@ -1,4 +1,5 @@
 import type { AppGeneralSettings, AppPluginSettings, AppshotSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import { repositoryIconKeyForRemote } from './git-remote';
 
 export const defaultPluginSettings: AppPluginSettings = {
   computerUseEnabled: false,
@@ -106,7 +107,8 @@ function normalizeRepositoryIcons(value: unknown): Record<string, string> {
   if (!isRecord(value)) return {};
   const icons: Record<string, string> = {};
   for (const [repositoryRoot, iconValue] of Object.entries(value)) {
-    const root = repositoryRoot.trim();
+    const rawKey = repositoryRoot.trim();
+    const root = repositoryIconKeyForRemote(rawKey) ?? rawKey;
     const icon = typeof iconValue === 'string' ? iconValue.trim() : '';
     if (!root || root.length > 4_096 || !icon || icon.length > 64) continue;
     icons[root] = icon;

@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
+import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
 import { suggestedSourceWorktreePath } from '../git-worktrees';
 
@@ -34,7 +35,7 @@ export class AgentGitService {
       const commonDirectory = resolve(repositoryRoot, commonDirectoryResult.stdout.trim());
       const primaryWorktreeRoot = dirname(commonDirectory);
       const branch = branchResult.stdout.trim() || null;
-      const originUrl = originResult.stdout.trim();
+      const originUrl = sanitizeGitRemoteUrl(originResult.stdout);
 
       return {
         kind: 'git',

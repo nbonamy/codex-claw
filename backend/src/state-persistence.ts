@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
@@ -399,6 +400,9 @@ function sanitizeAgentWorkspace(value: unknown): AgentWorkspaceIdentity | undefi
       updatedAt: value.updatedAt,
     };
   }
+  const originUrl = typeof value.originUrl === 'string'
+    ? sanitizeGitRemoteUrl(value.originUrl)
+    : undefined;
   if (
     value.kind === 'git'
     && typeof value.repositoryName === 'string'
@@ -415,7 +419,7 @@ function sanitizeAgentWorkspace(value: unknown): AgentWorkspaceIdentity | undefi
       branch: value.branch,
       isLinkedWorktree: value.isLinkedWorktree,
       primaryWorktreeRoot: value.primaryWorktreeRoot,
-      ...(typeof value.originUrl === 'string' && value.originUrl.trim() ? { originUrl: value.originUrl } : {}),
+      ...(originUrl ? { originUrl } : {}),
       updatedAt: value.updatedAt,
     };
   }

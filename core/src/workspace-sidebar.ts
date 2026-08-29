@@ -1,5 +1,6 @@
 import type { Agent, AgentStatus } from './contracts';
 import { agentDisplayName } from './agent-display';
+import { repositoryIconKeyForRemote } from './git-remote';
 
 export type WorkspaceSidebarSession = {
   agentId: string;
@@ -31,7 +32,11 @@ export function repositoryIconForAgent(
   const workspace = agent?.workspace;
   if (workspace?.kind !== 'git') return undefined;
 
-  const keys = [workspace.originUrl?.trim(), workspace.primaryWorktreeRoot, workspace.repositoryRoot]
+  const keys = [
+    workspace.originUrl ? repositoryIconKeyForRemote(workspace.originUrl) : undefined,
+    workspace.primaryWorktreeRoot,
+    workspace.repositoryRoot,
+  ]
     .filter((key): key is string => Boolean(key));
   for (const key of keys) {
     const icon = repositoryIcons[key];
@@ -60,7 +65,8 @@ export function projectWorkspaceSidebar(input: {
             kind: 'repository',
             label: workspace.repositoryName,
             repositoryRoot: workspace.primaryWorktreeRoot,
-            repositoryKey: workspace.originUrl?.trim() || workspace.primaryWorktreeRoot,
+            repositoryKey: (workspace.originUrl ? repositoryIconKeyForRemote(workspace.originUrl) : undefined)
+              ?? workspace.primaryWorktreeRoot,
             sessions: [],
           }
         : {

@@ -82,7 +82,7 @@ describe('AppStatePersistence', () => {
       branch: 'feat/work-routing',
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
-      originUrl: 'git@github.com:nbonamy/codex-claw.git',
+      originUrl: 'github.com:nbonamy/codex-claw.git',
       updatedAt: '2026-08-27T12:00:00.000Z',
     };
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
@@ -953,6 +953,26 @@ describe('AppStatePersistence', () => {
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.general).toStrictEqual(snapshot.general);
+  });
+
+  it('removes credentials from restored workspace origins', () => {
+    const snapshot = createInitialSnapshot();
+    const persisted = persistedStateFromSnapshot(snapshot);
+    persisted.agents[0]!.workspace = {
+      kind: 'git',
+      folder: '/src/codex-claw',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/src/codex-claw',
+      branch: 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: '/src/codex-claw',
+      originUrl: 'https://oauth2:secret@github.com/openai/codex-claw.git?token=secret',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0]?.workspace).toMatchObject({
+      originUrl: 'https://github.com/openai/codex-claw.git',
+    });
   });
 
   it('persists and restores source folder settings', () => {
