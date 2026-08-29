@@ -178,8 +178,8 @@ claude -p "<prompt>" \
   --append-system-prompt "<Codex Claw developer instructions>"
 ```
 
-The `--allowed-tools` pattern mirrors Skwad's Claude integration and
-authorizes only tools from the `codex_claw` MCP server.
+The `--allowed-tools` pattern authorizes only tools from the `codex_claw` MCP
+server.
 
 `clawd` also adds developer instructions that give the backend agent its Claw
 agent ID/name/folder and tell it to set status, list agents, send messages,
@@ -191,8 +191,8 @@ smallest equivalent enablement path for that backend.
 
 ## Tools
 
-The first collaboration tools copy Skwad's names where they still fit, but the
-caller identity is app-owned and inferred from the backend session.
+Collaboration tool names are app-owned, and caller identity is inferred from
+the backend session.
 
 ### `list-agents`
 
@@ -417,7 +417,7 @@ visible IDs, names, and folders so the agent can recover cleanly.
   Claw owns those product capabilities. `display-markdown` is allowed because
   Claw now owns a constrained Markdown side panel and agent-folder-limited file
   preview path.
-- Do not advertise copied Skwad tools unless Claw can actually perform them.
+- Advertise only tools backed by real Claw product capabilities.
 - Do not let renderer code call MCP directly.
 - Prefer request-local backend configuration over global user config mutation.
 
@@ -436,7 +436,7 @@ then any backend enablement tests needed to prove agents can see it.
 
 ## Future Tools
 
-Potential tools from Skwad are intentionally not exposed yet:
+Potential tools are intentionally not exposed yet:
 
 - repo/worktree operations;
 - create/close agent;

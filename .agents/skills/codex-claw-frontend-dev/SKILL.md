@@ -21,9 +21,10 @@ or updating component tests.
 - Keep raw Codex payloads out of renderer components; render app-owned state.
 - Use typed props and emits for every component.
 - Use Element Plus for standard controls when practical.
-- Use semantic CSS variables for all product colors, spacing, radii, shadows,
-  typography, and diff colors.
-- Match Skwad screenshots and `docs/codex.png` for the shell direction.
+- Use semantic CSS variables for product colors and repeated design-system
+  spacing, radii, shadows, typography, and diff values. Keep genuinely
+  component-specific geometry local.
+- Use `docs/codex.png` for the shell direction.
 - Keep operational UI dense, quiet, and scannable.
 - Avoid nested cards and decorative layouts.
 - Prevent layout jumps during streaming, loading, approvals, and artifact pane
