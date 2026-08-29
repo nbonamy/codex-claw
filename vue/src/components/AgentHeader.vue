@@ -18,8 +18,9 @@
       class="agent-header__identity"
     >
       <AgentAvatar
+        v-if="repositoryIcon"
         class="agent-header__avatar"
-        :avatar="agent.avatar"
+        :avatar="repositoryIcon"
         :name="agent.name"
         size="sm"
       />
@@ -155,6 +156,7 @@ import { effectiveOpenInApplication } from '../shared/open-in';
 
 const props = defineProps<{
   agent: Agent | null;
+  repositoryIcon?: string;
   gitStatus?: AgentGitStatus | null;
   backendRuntime: BackendRuntimeStatus;
   workspaceOpen?: boolean;

@@ -131,6 +131,7 @@ describe('agent git service parsers', () => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw-feature\n' };
       if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '/src/codex-claw/.git\n' };
       if (args[0] === 'symbolic-ref') throw new Error('detached HEAD');
+      if (args[0] === 'remote' && args[1] === 'get-url') return { stdout: 'git@github.com:nbonamy/codex-claw.git\n' };
       throw new Error(`Unexpected git command: ${args.join(' ')}`);
     });
     const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
@@ -143,6 +144,7 @@ describe('agent git service parsers', () => {
       branch: null,
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/src/codex-claw',
+      originUrl: 'git@github.com:nbonamy/codex-claw.git',
       updatedAt: '2026-08-27T12:00:00.000Z',
     });
   });

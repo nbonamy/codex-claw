@@ -39,16 +39,6 @@
             class="bench-agent-assignment-dialog__select"
             :teleported="false"
           >
-            <template
-              v-if="selectedBenchTemplate"
-              #prefix
-            >
-              <AgentAvatar
-                :avatar="selectedBenchTemplate.avatar"
-                :name="selectedBenchTemplate.name"
-                size="sm"
-              />
-            </template>
             <el-option
               v-for="template in benchTemplates"
               :key="template.id"
@@ -56,11 +46,6 @@
               :value="template.id"
             >
               <span class="bench-agent-assignment-dialog__bench-option">
-                <AgentAvatar
-                  :avatar="template.avatar"
-                  :name="template.name"
-                  size="sm"
-                />
                 <span class="bench-agent-assignment-dialog__bench-copy">
                   <span>{{ template.name }}</span>
                   <span>{{ folderBasename(template.folder) }}</span>
@@ -136,7 +121,6 @@
 import { computed, ref, watch } from 'vue';
 import type { BenchTemplate, Team } from '@codex-claw/core/contracts';
 import { folderBasename } from '../shared/agent-display';
-import AgentAvatar from './AgentAvatar.vue';
 
 export type BenchAgentAssignmentDialogSubmit = {
   benchTemplateId?: string;

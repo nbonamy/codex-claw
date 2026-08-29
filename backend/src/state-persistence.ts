@@ -415,6 +415,7 @@ function sanitizeAgentWorkspace(value: unknown): AgentWorkspaceIdentity | undefi
       branch: value.branch,
       isLinkedWorktree: value.isLinkedWorktree,
       primaryWorktreeRoot: value.primaryWorktreeRoot,
+      ...(typeof value.originUrl === 'string' && value.originUrl.trim() ? { originUrl: value.originUrl } : {}),
       updatedAt: value.updatedAt,
     };
   }

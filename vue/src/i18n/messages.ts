@@ -94,6 +94,7 @@ export const messages = {
         loadingConversation: 'Loading conversation…',
         emptyConversation: 'No conversation activity yet',
         loadError: 'Unable to load subagent conversation',
+        retryConversation: 'Try again',
         status: {
           pendingInit: 'Starting',
           running: 'Running',

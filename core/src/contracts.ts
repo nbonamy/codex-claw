@@ -152,6 +152,7 @@ export type AgentWorkspaceIdentity =
       branch: string | null;
       isLinkedWorktree: boolean;
       primaryWorktreeRoot: string;
+      originUrl?: string;
       updatedAt: string;
     }
   | {

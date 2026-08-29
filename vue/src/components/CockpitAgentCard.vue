@@ -14,7 +14,8 @@
   >
     <header class="cockpit-view__agent-header">
       <AgentAvatar
-        :avatar="agent.avatar"
+        v-if="repositoryIcon"
+        :avatar="repositoryIcon"
         :name="agent.name"
         size="lg"
       />
@@ -65,6 +66,7 @@ import AgentAvatar from './AgentAvatar.vue';
 
 const props = defineProps<{
   agent: Agent;
+  repositoryIcon?: string;
   draggedWorkItem: WorkItem | null;
   dropTarget: boolean;
 }>();

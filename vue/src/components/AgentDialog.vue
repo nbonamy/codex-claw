@@ -28,11 +28,6 @@
               <label class="agent-dialog__row-label" for="agent-dialog-name">Name</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__identity-control">
-              <AgentAvatarPicker
-                v-model="avatar"
-                :name="name || folderName || 'Agent'"
-                class="agent-dialog__identity-avatar"
-              />
               <div class="agent-dialog__identity-input">
                 <input
                   id="agent-dialog-name"
@@ -167,11 +162,6 @@
               >Name</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__identity-control">
-              <AgentAvatarPicker
-                v-model="avatar"
-                :name="name || folderName || 'Agent'"
-                class="agent-dialog__identity-avatar"
-              />
               <div class="agent-dialog__identity-input">
                 <input
                   id="agent-dialog-name"
@@ -267,7 +257,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
-import AgentAvatarPicker from './AgentAvatarPicker.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 
@@ -322,7 +311,6 @@ const emit = defineEmits<{
 
 const name = ref('');
 const folder = ref('');
-const avatar = ref<string | undefined>(undefined);
 const backend = ref<AgentBackend>('codex');
 const teamSelection = ref('');
 const newTeamName = ref('');
@@ -636,7 +624,6 @@ async function submit(): Promise<void> {
         id: props.agent.id,
         name: name.value,
         folder: folder.value,
-        avatar: avatar.value,
         backend: backend.value,
       });
     } else {
@@ -644,7 +631,6 @@ async function submit(): Promise<void> {
       const createInput: AgentDialogCreateInput = {
         name: name.value,
         folder: folder.value,
-        avatar: avatar.value,
         backend: backend.value,
       };
       if (showTeamSelector.value) {
@@ -687,7 +673,6 @@ function resetForm(): void {
   if (isEditing.value && props.agent) {
     name.value = props.agent.name;
     folder.value = props.agent.folder;
-    avatar.value = props.agent.avatar;
     backend.value = props.agent.backend;
     resetEditSourceSelection();
     return;
@@ -695,7 +680,6 @@ function resetForm(): void {
 
   name.value = props.initialAgentName.trim();
   folder.value = '';
-  avatar.value = '🤖';
   backend.value = 'codex';
   teamSelection.value = initialTeamSelection();
   newTeamName.value = props.initialNewTeamName;
@@ -898,27 +882,6 @@ function resetEditSourceSelection(): void {
   height: var(--space-20);
   padding: 0 var(--space-4);
   line-height: var(--line-height-20);
-}
-
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker) {
-  justify-self: start;
-  justify-content: flex-start;
-}
-
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker__trigger) {
-  width: var(--space-20);
-  height: var(--space-20);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-low);
-}
-
-.agent-dialog__identity-avatar
-  :deep(.agent-avatar-picker__trigger .agent-avatar-picker__preview) {
-  --agent-avatar-size: var(--space-20);
-}
-
-.agent-dialog__identity-avatar :deep(.agent-avatar-picker__hint) {
-  display: none;
 }
 
 .agent-dialog__source-custom-option {

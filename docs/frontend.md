@@ -38,6 +38,32 @@ Component rules:
 - Use app-owned shared components only when behavior is genuinely shared across
   surfaces.
 
+### Canonical UI primitives
+
+Search this inventory before creating or styling a picker, menu, dialog, list,
+settings layout, operation state, or icon control. Extend the canonical
+primitive when its contract is close; keep a product-named wrapper only when it
+adds product semantics rather than duplicating interaction or visual behavior.
+New reusable primitives belong under `vue/src/shared/` and must be added here.
+
+| Need | Canonical primitive | Import or style |
+| --- | --- | --- |
+| Action, checkbox, radio, or nested menu content | `AppMenu` | `vue/src/shared/menu/AppMenu.vue` |
+| Emoji, custom-grapheme, or cropped-image identity selection | `IdentityPicker` | `vue/src/shared/identity/IdentityPicker.vue` |
+| Application icon catalog and segmented launcher | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
+| Product icon glyphs | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
+| Form-dialog chrome and actions | Shared dialog and button styles | `.claw-dialog`, `.claw-button` in `vue/src/styles/base.css` |
+| Settings page, section, and row structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow` | `vue/src/components/Settings*.vue` |
+| Dense tabular/list data | `AppDataList` | `vue/src/components/AppDataList.vue` |
+| Running, successful, or failed operation feedback | `GitOperationFeedback` | `vue/src/components/GitOperationFeedback.vue` |
+
+`AgentAvatarPicker` is a compatibility wrapper around `IdentityPicker`; new
+product code imports `IdentityPicker` directly. `RepositoryIconPicker` is a
+valid semantic wrapper because it supplies repository copy and folder fallback
+icons while delegating the complete picker interaction to `IdentityPicker`.
+Popover placement should come from Element Plus; menu rows inside popovers and
+context menus use `AppMenu` rather than local menu markup or typography.
+
 ## Small Component Principles
 
 Prefer small components with one clear job. This keeps visual work testable and
@@ -91,7 +117,7 @@ The first shell should support the product shape even before every feature is
 implemented:
 
 - team rail on the far left;
-- agent list with avatar, name, folder, and status;
+- repository-first session list with repository identity, session name, branch/worktree kind, and status;
 - a tall red leading-edge signal marks agents with completed turns,
   approval/input requests, or errors received outside the visible thread; teams
   containing at least one unread agent carry a short, thick red orbital sweep
@@ -103,7 +129,7 @@ implemented:
   team explicitly marks the agent it opens as read; selecting an agent or
   focusing its active thread does the same. The macOS Dock badge shows the
   number of unread agent threads;
-- persisted View-menu compact agent-list mode with mini avatars, names, and status icons;
+- persisted View-menu compact session-list mode with repository groups, session names, and status icons;
 - agent context actions for duplicating configuration or forking the active
   backend conversation; both insert the new selected agent directly below the
   source agent;
@@ -333,10 +359,13 @@ implemented:
   `Command+9` hints; pressing the matching number switches agents;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
-- repository-first Start work entry points. The global Sessions `+` menu opens
-  an existing local folder or repository, selects and clones a connected GitHub
-  repository, or clones an explicit HTTPS/SSH Git URL. A repository-scoped
+- repository-first Start work entry points. A prominent New session row at the
+  top of Sessions opens the shared app menu for an existing local folder or
+  repository, a connected GitHub repository, or an explicit HTTPS/SSH Git URL.
+  A repository-scoped
   shortcut opens one searchable picker for branches, pull requests, and issues.
+  The repository `+` shortcut starts immediately on its default checked-out
+  branch without creating a worktree.
   Selecting a checked-out branch creates its session directly; selecting any
   other local or remote branch creates an isolated worktree automatically;
   issue and pull-request selections reuse the existing contextual assignment
@@ -488,8 +517,8 @@ Rules:
 - Ensure text fits in compact desktop windows.
 - Preserve keyboard/composer behavior as the chat renderer grows.
 - Keep status language short and useful.
-- Render emoji avatars borderless and scale the glyph to the shared avatar box;
-  image and initials avatars keep the standard circular treatment.
+- Render repository emoji icons borderless and scale the glyph to the shared
+  identity box; cropped repository images keep the standard rounded treatment.
 - Keep rail, sidebar, and main-content titlebars on the shared workbench appbar
   height so adjacent shell regions align exactly.
 - On macOS, keep the native traffic lights vertically centered in that appbar
@@ -500,14 +529,24 @@ Rules:
   the native window shadow instead of simulating glass or shadow in CSS.
 
 The team sidebar is a repository-first session navigator rather than an agent
-directory. Repository names are borderless section rows; branch and worktree
+directory. Repository names are borderless section rows and the whole label
+toggles the group without separate chevron chrome. Closed groups use a root
+folder icon and expanded groups use an open-folder icon; branch and worktree
 sessions sit directly beneath them on the same dense 30-pixel cadence, with
 almost no space between groups. Main checkouts use the primary-colored branch
 icon, ordinary branches use success, linked worktrees use warning, and detached
 or folder-only sessions stay muted. Users can replace the default repository
-folder icon with a persisted one-grapheme icon without changing the canonical
-repository identity. Agent names remain available for deterministic
-disambiguation when multiple sessions share a branch label.
+folder icon through the shared identity picker, using a preset emoji, one
+custom grapheme, or a cropped image without changing the canonical repository
+identity. The picker is teleported outside the scrollable sidebar and opens to
+the right of the repository row so it remains fully visible. Custom icons are
+keyed by Git origin when available and fall back to the canonical local folder
+for repositories without a remote, so they survive restarts and linked-worktree
+path changes. Repository identity replaces agent-owned avatars: agent forms do
+not expose an avatar field, and headers, Cockpit cards, and assignment surfaces
+show the repository icon or omit the identity image when the repository has no
+custom icon. Session rows show the agent name when one exists and otherwise
+fall back to the branch name; never synthesize a mixed branch-and-agent label.
 
 ## Rendering Surfaces
 

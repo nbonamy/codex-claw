@@ -121,6 +121,7 @@
         :page-loading="workBacklog.pageLoading"
         :page-size="workBacklog.pageSize"
         :repositories="workBacklog.repositories"
+        :repository-icons="repositoryIcons"
         :search-query="searchQuery"
         :selected-assignee-login="workBacklog.selectedAssigneeLogin ?? null"
         :selected-repository-id="workBacklog.selectedRepositoryId"
@@ -149,6 +150,7 @@
         :bench="bench"
         :bench-by-team-id="benchByTeamId"
         :forkable-agent-ids="forkableAgentIds"
+        :repository-icons="repositoryIcons"
         :teams="teams"
         @add-agent="emit('add-agent', $event)"
         @close-agent="emit('close-agent', $event)"
@@ -210,11 +212,14 @@ const props = defineProps<{
   bench?: BenchTemplate[];
   benchByTeamId?: Record<string, BenchTemplate[]>;
   forkableAgentIds?: string[];
+  repositoryIcons?: Record<string, string>;
   teams: Team[];
   defaultTeamId?: string | null;
   startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
+
+const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 
 const startWorkItemsAction = props.startWorkItemsAction;
 

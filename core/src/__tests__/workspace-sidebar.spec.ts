@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../contracts';
-import { projectWorkspaceSidebar } from '../workspace-sidebar';
+import { projectWorkspaceSidebar, repositoryIconForAgent } from '../workspace-sidebar';
 
 describe('workspace sidebar projection', () => {
   it('groups primary checkouts and linked worktrees beneath the canonical repository', () => {
@@ -18,10 +18,11 @@ describe('workspace sidebar projection', () => {
       kind: 'repository',
       label: 'codex-claw',
       repositoryRoot: '/src/codex-claw',
+      repositoryKey: '/src/codex-claw',
       sessions: [{
         agentId: 'agent-main',
         title: 'Main conversation',
-        displayTitle: 'main',
+        displayTitle: 'Main conversation',
         branch: 'main',
         folder: '/src/codex-claw',
         isLinkedWorktree: false,
@@ -33,7 +34,7 @@ describe('workspace sidebar projection', () => {
       }, {
         agentId: 'agent-feature',
         title: 'Implement routing',
-        displayTitle: 'feat/routing',
+        displayTitle: 'Implement routing',
         branch: 'feat/routing',
         folder: '/src/codex-claw-routing',
         isLinkedWorktree: true,
@@ -84,15 +85,52 @@ describe('workspace sidebar projection', () => {
       }]);
   });
 
-  it('disambiguates duplicate branch sessions with their agent names', () => {
+  it('uses agent names without mixing them with branch names', () => {
     const first = gitAgent('agent-one', 'Fix tests', '/src/repo-one', 'feat/one', true);
     const second = gitAgent('agent-two', 'Review tests', '/src/repo-two', 'feat/one', true);
 
     expect(projectWorkspaceSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions)
       .toMatchObject([
-        { displayTitle: 'feat/one · Fix tests' },
-        { displayTitle: 'feat/one · Review tests' },
+        { displayTitle: 'Fix tests' },
+        { displayTitle: 'Review tests' },
       ]);
+  });
+
+  it('falls back to the branch when an agent has no name', () => {
+    const agent = gitAgent('agent-unnamed', '   ', '/src/repo', 'feat/sidebar', true);
+
+    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
+      .toMatchObject({ displayTitle: 'feat/sidebar' });
+  });
+
+  it('uses the Git origin as the stable repository preference key', () => {
+    const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
+    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
+
+    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]).toMatchObject({
+      repositoryRoot: '/src/codex-claw',
+      repositoryKey: 'git@github.com:nbonamy/codex-claw.git',
+    });
+  });
+
+  it('resolves agent identity from the repository icon catalog', () => {
+    const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
+    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
+
+    expect(repositoryIconForAgent(agent, {
+      'git@github.com:nbonamy/codex-claw.git': '🦞',
+    })).toBe('🦞');
+    expect(repositoryIconForAgent(agent, {})).toBeUndefined();
+    expect(repositoryIconForAgent(baseAgent('agent-folder', 'Folder', '/src/folder'), {
+      '/src/folder': '📁',
+    })).toBeUndefined();
+  });
+
+  it('falls back to persisted repository roots when migrating icon keys', () => {
+    const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
+    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
+
+    expect(repositoryIconForAgent(agent, { '/src/codex-claw': '🧠' })).toBe('🧠');
   });
 });
 

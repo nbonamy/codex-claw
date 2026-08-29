@@ -10,7 +10,7 @@
   >
     <template #header>
       <div class="claw-dialog__header">
-        <h2 class="claw-dialog__title">Adjust Avatar</h2>
+        <h2 class="claw-dialog__title">{{ title }}</h2>
       </div>
     </template>
 
@@ -59,10 +59,13 @@
 import { ref, watch } from 'vue';
 import { clampAvatarCropPan, cropImageDataUrl, type AvatarCropPan } from './agent-avatar-crop';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   image: string | null;
+  title?: string;
   visible: boolean;
-}>();
+}>(), {
+  title: 'Adjust Avatar',
+});
 
 const emit = defineEmits<{
   apply: [avatar: string];

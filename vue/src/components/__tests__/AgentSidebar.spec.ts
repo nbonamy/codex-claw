@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent, BenchTemplate, Team } from '@codex-claw/core/contracts';
+import type { Agent, Team } from '@codex-claw/core/contracts';
 
 const agentSidebarSource = readFileSync(resolve(process.cwd(), 'src/components/AgentSidebar.vue'), 'utf8');
 
@@ -61,6 +61,7 @@ const agents: Agent[] = [
       branch: 'main',
       isLinkedWorktree: false,
       primaryWorktreeRoot: '~/src/id8',
+      originUrl: 'git@github.com:nbonamy/id8.git',
       updatedAt: '2026-06-05T00:00:00.000Z',
     },
     backend: 'codex',
@@ -108,18 +109,6 @@ const teams: Team[] = [
   },
 ];
 
-const bench: BenchTemplate[] = [
-  {
-    id: 'bench-dina',
-    name: 'Dina',
-    avatar: 'DI',
-    folder: '~/src/id8',
-    backend: 'codex',
-    createdAt: '2026-06-05T00:00:00.000Z',
-    updatedAt: '2026-06-05T00:00:00.000Z',
-  },
-];
-
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
@@ -141,10 +130,10 @@ describe('AgentSidebar', () => {
     expect(wrapper.get('.agent-sidebar__header').text()).toContain('Sessions');
     expect(wrapper.text()).not.toContain('Bench');
     expect(wrapper.text()).toContain('id8');
-    expect(wrapper.text()).toContain('main');
+    expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('multi-llm-ts');
-    expect(wrapper.text()).toContain('feat/testing');
-    expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('main');
+    expect(wrapper.text()).toContain('Jesse');
+    expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('Dina');
     expect(wrapper.find('.agent-sidebar__agent--active').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
   });
@@ -186,10 +175,14 @@ describe('AgentSidebar', () => {
       global: { plugins: [ElementPlus] },
     });
 
-    await wrapper.get('[aria-label="New agent in repository"]').trigger('click');
+    await wrapper.get('[aria-label="New session on default branch"]').trigger('click');
     await wrapper.get('[aria-label="Create agent from branch, pull request, or issue"]').trigger('click');
 
-    expect(wrapper.emitted('create-agent-in-repository')).toStrictEqual([['id8']]);
+    expect(wrapper.emitted('create-agent-in-repository')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      repositoryName: 'id8',
+      repositoryRoot: '~/src/id8',
+    }]]);
     expect(wrapper.emitted('create-agent-from-repository')).toStrictEqual([[{
       agentId: 'agent-dina',
       repositoryName: 'id8',
@@ -212,7 +205,7 @@ describe('AgentSidebar', () => {
 
     expect(wrapper.classes()).toContain('agent-sidebar--compact');
     expect(wrapper.findAll('.agent-sidebar__workspace-header').map((header) => header.text())).toStrictEqual(['id8', 'multi-llm-ts']);
-    expect(wrapper.findAll('.agent-sidebar__meta strong').map((name) => name.text())).toStrictEqual(['main', 'feat/testing']);
+    expect(wrapper.findAll('.agent-sidebar__meta strong').map((name) => name.text())).toStrictEqual(['Dina', 'Jesse']);
     expect(wrapper.findAll('.agent-sidebar__status')).toHaveLength(2);
     expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
   });
@@ -231,10 +224,11 @@ describe('AgentSidebar', () => {
     const picker = wrapper.findAllComponents({ name: 'RepositoryIconPicker' })
       .find((component) => component.props('label') === 'id8')!;
     expect(picker.props('modelValue')).toBe('🦞');
+    expect(wrapper.find('.agent-sidebar__workspace-toggle').exists()).toBe(false);
     picker.vm.$emit('update:modelValue', '🚀');
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted('update-repository-icon')).toStrictEqual([
-      [{ repositoryRoot: '~/src/id8', icon: '🚀' }],
+      [{ repositoryKey: 'git@github.com:nbonamy/id8.git', repositoryRoot: '~/src/id8', icon: '🚀' }],
     ]);
   });
 
@@ -388,7 +382,12 @@ describe('AgentSidebar', () => {
     expect(agentSidebarSource).toContain('.agent-sidebar--compact {\n  --agent-sidebar-row-min-height: 28px;\n  --agent-sidebar-workspace-icon-size: 16px;');
     expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-column-width: 24px;');
     expect(agentSidebarSource).toContain('--agent-sidebar-workspace-column-gap: 4px;');
-    expect(agentSidebarSource).toContain('.agent-sidebar__workspace-toggle svg {\n  width: 10px;\n  height: 10px;');
+    expect(agentSidebarSource).not.toContain('agent-sidebar__workspace-toggle');
+    expect(agentSidebarSource).toContain('width: calc(var(--icon-sm) + 2px);');
+    expect(agentSidebarSource).not.toContain('.agent-sidebar__workspace-header:focus-within');
+    expect(agentSidebarSource).toContain('.agent-sidebar__start-work {\n  flex: 0 0 auto;');
+    expect(agentSidebarSource).toContain('.agent-sidebar__list {\n  flex: 1 1 0;');
+    expect(agentSidebarSource).toContain('padding: 1px var(--space-6) 1px\n    calc(var(--agent-sidebar-workspace-inline-padding) + var(--space-6));');
   });
 
   it('labels non-idle statuses for assistive tech', () => {
@@ -426,7 +425,7 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('main');
+    expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('id8');
     expect(wrapper.get('.agent-sidebar__status').attributes('aria-label')).toBe('Idle');
   });
@@ -449,7 +448,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
   });
 
-  it('renders a taller rounded new agent action', () => {
+  it('renders the new session action at the top instead of a footer action', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -461,53 +460,8 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__new').text()).toContain('New Agent');
-    expect(wrapper.find('.new-agent-button__icon').exists()).toBe(true);
-  });
-
-  it('emits new agent requests from the footer action', async () => {
-    const wrapper = mount(AgentSidebar, {
-      props: {
-        agents,
-        activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
-      },
-      global: {
-        plugins: [ElementPlus],
-      },
-    });
-
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-
-    expect(wrapper.emitted('new-agent')).toStrictEqual([[]]);
-  });
-
-  it('emits Bench deploy and remove requests from the new agent menu', async () => {
-    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const wrapper = mount(AgentSidebar, {
-      props: {
-        agents,
-        activeAgentId: 'agent-dina',
-        bench,
-        teamName: 'Codex Claw',
-      },
-      global: {
-        plugins: [ElementPlus],
-      },
-    });
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([['bench-dina']]);
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
-    await flushPromises();
-
-    expect(confirm).toHaveBeenCalled();
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([['bench-dina']]);
+    expect(wrapper.get('.agent-sidebar__start-work').text()).toContain('New session');
+    expect(wrapper.find('.agent-sidebar__footer').exists()).toBe(false);
   });
 
   it('opens a context menu, closes it on request, and emits agent actions', async () => {
@@ -816,7 +770,7 @@ describe('AgentSidebar', () => {
     expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[244], [276]]);
   });
 
-  it('shows the conversation history panel above the new agent footer', async () => {
+  it('shows the conversation history panel below repository sessions', async () => {
     const listConversations = vi.fn().mockResolvedValue([]);
     const wrapper = mount(AgentSidebar, {
       props: {
@@ -830,8 +784,7 @@ describe('AgentSidebar', () => {
       },
     });
 
-    const panel = wrapper.get('.agent-sidebar__conversations');
-    expect(Boolean(panel.element.compareDocumentPosition(wrapper.get('.agent-sidebar__footer').element) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    wrapper.get('.agent-sidebar__conversations');
 
     await wrapper.get('.conversation-history__header').trigger('click');
     await flushPromises();

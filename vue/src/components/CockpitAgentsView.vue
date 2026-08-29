@@ -50,6 +50,7 @@
           v-for="agent in section.agents"
           :key="agent.id"
           :agent="agent"
+          :repository-icon="repositoryIconForAgent(agent, repositoryIcons)"
           :dragged-work-item="null"
           :drop-target="false"
           @open-agent-menu="openAgentMenu"
@@ -88,6 +89,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue';
 import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import CockpitAddAgentTile from './CockpitAddAgentTile.vue';
@@ -110,8 +112,11 @@ const props = defineProps<{
   bench?: BenchTemplate[];
   benchByTeamId?: Record<string, BenchTemplate[]>;
   forkableAgentIds?: string[];
+  repositoryIcons?: Record<string, string>;
   teams: Team[];
 }>();
+
+const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];

@@ -1,37 +1,33 @@
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import StartWorkMenu from '../StartWorkMenu.vue';
 
+afterEach(() => {
+  document.body.innerHTML = '';
+});
+
 describe('StartWorkMenu', () => {
-  it('offers repository context and project acquisition from the global trigger', async () => {
+  it('offers project acquisition from a prominent new-session trigger', async () => {
     const wrapper = mount(StartWorkMenu, {
-      props: { repository: { name: 'codex-claw' } },
+      attachTo: document.body,
       global: { plugins: [ElementPlus] },
     });
 
-    await wrapper.get('[aria-label="Start work"]').trigger('click');
+    expect(wrapper.get('[aria-label="New session"]').text()).toBe('New session');
+    await wrapper.get('[aria-label="New session"]').trigger('click');
 
-    expect(wrapper.text()).toContain('Start session in');
-    expect(wrapper.text()).toContain('codex-claw');
-    expect(wrapper.text()).toContain('Local folder or repository…');
-    expect(wrapper.text()).toContain('GitHub repository…');
-    expect(wrapper.text()).toContain('Repository URL…');
+    expect(document.body.textContent).toContain('Add project from');
+    expect(document.body.textContent).toContain('Local folder or repository…');
+    expect(document.body.textContent).toContain('GitHub repository…');
+    expect(document.body.textContent).toContain('Repository URL…');
 
-    const github = wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('GitHub repository'));
-    await github!.trigger('click');
+    const github = [...document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes('GitHub repository'));
+    github!.click();
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted('select')).toStrictEqual([['github']]);
   });
 
-  it('omits repository context when no session is active', async () => {
-    const wrapper = mount(StartWorkMenu, {
-      global: { plugins: [ElementPlus] },
-    });
-
-    await wrapper.get('[aria-label="Start work"]').trigger('click');
-
-    expect(wrapper.text()).not.toContain('Start session in');
-    expect(wrapper.findAll('[role="menuitem"]')).toHaveLength(3);
-  });
 });

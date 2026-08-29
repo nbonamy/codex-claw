@@ -43,7 +43,6 @@
         :forkable-agent-ids="forkableAgentIds"
         :active-agent-id="currentAgent?.id ?? null"
         :unread-agent-ids="unreadAgentIds"
-        :bench="activeBench"
         :teams="snapshot.teams"
         :team-id="activeTeam?.id ?? null"
         :team-name="activeTeamName"
@@ -59,18 +58,15 @@
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
         @create-agent-from-repository="openRepositorySessionSource"
-        @create-agent-in-repository="openNewAgent(activeTeam?.id ?? undefined, $event)"
-        @deploy-bench-template="deployBenchTemplateForActiveTeam"
+        @create-agent-in-repository="createDefaultRepositorySession"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @open-in="openAgentIn($event.agentId, $event.application)"
-        @new-agent="openNewAgent"
         @reorder-agents="$emit('reorder-agents', $event)"
         @restart-agent="$emit('restart-agent', $event)"
         @resize-sidebar="setAgentSidebarWidth"
-        @remove-bench-template="removeBenchTemplateForActiveTeam"
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="selectAgentFromShell"
         @start-work="handleStartWorkAction"
@@ -167,6 +163,7 @@
         :forkable-agent-ids="forkableAgentIds"
         :bench-by-team-id="benchByTeamId"
         :default-team-id="snapshot.activeTeamId"
+        :repository-icons="snapshot.general.repositoryIcons"
         :start-work-items-action="startCockpitWorkItems"
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
@@ -199,6 +196,7 @@
         <AgentHeader
           v-if="!isAgentEmpty && currentAgent"
           :agent="currentAgent"
+          :repository-icon="repositoryIconForAgent(currentAgent, snapshot.general.repositoryIcons)"
           :git-status="currentAgentGitStatus"
           :backend-runtime="currentBackendRuntime"
           :workspace-open="rightWorkspaceVisible"
@@ -426,6 +424,7 @@ import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilitie
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
+import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { clawHostCapabilities, codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -1894,7 +1893,6 @@ async function createRepositorySession(source: RepositorySessionSource, branch: 
         });
     await props.createAgent({
       name: `${source.repositoryName} · ${branch.name}`,
-      avatar: '🤖',
       folder: worktree.path,
       backend: 'codex',
       sourceRepositoryName: source.repositoryName,
@@ -1905,21 +1903,28 @@ async function createRepositorySession(source: RepositorySessionSource, branch: 
   }
 }
 
-async function handleStartWorkAction(action: 'github' | 'local' | 'repository' | 'url'): Promise<void> {
-  if (action === 'repository') {
-    const agent = currentAgent.value;
-    const workspace = agent?.workspace;
-    if (agent && workspace?.kind === 'git') {
-      await openRepositorySessionSource({
-        agentId: agent.id,
-        teamId: agent.teamId,
-        repositoryName: workspace.repositoryName,
-        repositoryRoot: workspace.repositoryRoot,
-      });
-    }
-    return;
+async function createDefaultRepositorySession(source: RepositorySessionSource): Promise<void> {
+  try {
+    const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
+    const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+    const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
+    const remoteConnectionId = team?.remoteConnectionId?.trim();
+    const branches = await props.listSourceBranches(source.repositoryRoot, remoteConnectionId || undefined);
+    const defaultBranch = branches.find((branch) => branch.isDefault);
+    if (!defaultBranch) throw new Error(`The default branch for ${source.repositoryName} is unavailable.`);
+    await props.createAgent({
+      name: `${source.repositoryName} · ${defaultBranch.name}`,
+      folder: defaultBranch.worktreePath ?? source.repositoryRoot,
+      backend: 'codex',
+      sourceRepositoryName: source.repositoryName,
+      ...(teamId ? { teamId } : {}),
+    });
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
   }
+}
 
+async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promise<void> {
   if (action === 'local') {
     await openLocalRepositorySession();
     return;
@@ -1952,7 +1957,6 @@ async function openLocalRepositorySession(): Promise<void> {
   }
   await props.createAgent({
     name: repositoryName,
-    avatar: '🤖',
     folder,
     backend: 'codex',
     ...(teamId ? { teamId } : {}),
@@ -2058,7 +2062,6 @@ async function startCockpitWorkItems(input: {
     });
     const agent = await props.createAgent({
       name: `${repositoryName} - gh-${item.number}`,
-      avatar: '🤖',
       folder: worktree.path,
       backend: 'codex',
       sourceRepositoryName: repository.name,
@@ -3201,13 +3204,16 @@ async function updateSettings(input: UpdateSettingsInput): Promise<void> {
 }
 
 async function updateRepositoryIcon(payload: {
+  repositoryKey: string;
   repositoryRoot: string;
   icon: string | undefined;
 }): Promise<void> {
   const repositoryIcons = { ...props.snapshot.general.repositoryIcons };
   if (payload.icon) {
-    repositoryIcons[payload.repositoryRoot] = payload.icon;
+    repositoryIcons[payload.repositoryKey] = payload.icon;
+    if (payload.repositoryKey !== payload.repositoryRoot) delete repositoryIcons[payload.repositoryRoot];
   } else {
+    delete repositoryIcons[payload.repositoryKey];
     delete repositoryIcons[payload.repositoryRoot];
   }
   await updateSettings({ general: { repositoryIcons } });

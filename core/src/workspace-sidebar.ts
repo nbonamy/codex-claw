@@ -19,8 +19,25 @@ export type WorkspaceSidebarGroup = {
   kind: 'repository' | 'quickChats';
   label: string;
   repositoryRoot?: string;
+  repositoryKey?: string;
   sessions: WorkspaceSidebarSession[];
 };
+
+export function repositoryIconForAgent(
+  agent: Agent | null | undefined,
+  repositoryIcons: Readonly<Record<string, string>>,
+): string | undefined {
+  const workspace = agent?.workspace;
+  if (workspace?.kind !== 'git') return undefined;
+
+  const keys = [workspace.originUrl?.trim(), workspace.primaryWorktreeRoot, workspace.repositoryRoot]
+    .filter((key): key is string => Boolean(key));
+  for (const key of keys) {
+    const icon = repositoryIcons[key];
+    if (icon) return icon;
+  }
+  return undefined;
+}
 
 export function projectWorkspaceSidebar(input: {
   agents: readonly Agent[];
@@ -42,6 +59,7 @@ export function projectWorkspaceSidebar(input: {
             kind: 'repository',
             label: workspace.repositoryName,
             repositoryRoot: workspace.primaryWorktreeRoot,
+            repositoryKey: workspace.originUrl?.trim() || workspace.primaryWorktreeRoot,
             sessions: [],
           }
         : {
@@ -53,7 +71,8 @@ export function projectWorkspaceSidebar(input: {
       groups.set(id, group);
     }
 
-    const sessionLabel = isGit ? workspace.branch ?? 'Detached HEAD' : agent.name;
+    const agentName = agent.name.trim();
+    const sessionLabel = agentName || (isGit ? workspace.branch ?? 'Detached HEAD' : folderBasename(agent.folder));
     group.sessions.push({
       agentId: agent.id,
       title: agent.name,
@@ -69,9 +88,7 @@ export function projectWorkspaceSidebar(input: {
     });
   });
 
-  const projected = [...groups.values()];
-  for (const group of projected) disambiguateSessionTitles(group.sessions);
-  return projected;
+  return [...groups.values()];
 }
 
 function workspaceSessionKind(agent: Agent): WorkspaceSidebarSession['kind'] {
@@ -80,17 +97,6 @@ function workspaceSessionKind(agent: Agent): WorkspaceSidebarSession['kind'] {
   if (!workspace.branch) return 'detached';
   if (workspace.isLinkedWorktree) return 'worktree';
   return workspace.branch === 'main' || workspace.branch === 'master' ? 'main' : 'branch';
-}
-
-function disambiguateSessionTitles(sessions: WorkspaceSidebarSession[]): void {
-  const titleCounts = new Map<string, number>();
-  for (const session of sessions) {
-    titleCounts.set(session.displayTitle, (titleCounts.get(session.displayTitle) ?? 0) + 1);
-  }
-  for (const session of sessions) {
-    if ((titleCounts.get(session.displayTitle) ?? 0) < 2) continue;
-    session.displayTitle = `${session.displayTitle} · ${session.title || folderBasename(session.folder)}`;
-  }
 }
 
 function folderBasename(folder: string): string {

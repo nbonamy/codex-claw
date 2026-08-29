@@ -136,7 +136,12 @@
 
             <div class="cockpit-inbox__context">
               <template v-if="row.agent">
-                <AgentAvatar :avatar="row.agent.avatar" :name="row.agent.name" size="sm" />
+                <AgentAvatar
+                  v-if="repositoryIconForAgent(row.agent, repositoryIcons)"
+                  :avatar="repositoryIconForAgent(row.agent, repositoryIcons)"
+                  :name="row.agent.name"
+                  size="sm"
+                />
                 <span>{{ row.agent.name }}</span>
               </template>
               <template v-else>
@@ -256,6 +261,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
 import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 
@@ -276,6 +282,7 @@ const props = withDefaults(defineProps<{
   pageLoading?: boolean;
   pageSize?: number;
   repositories: WorkRepository[];
+  repositoryIcons?: Record<string, string>;
   searchQuery?: string;
   selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
@@ -286,7 +293,7 @@ const props = withDefaults(defineProps<{
   totalItems?: number;
   defaultTeamId?: string | null;
   startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
-}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null, totalItems: 0 });
+}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, repositoryIcons: () => ({}), searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null, totalItems: 0 });
 
 const emit = defineEmits<{
   refresh: [repositoryId: string | null];
@@ -316,6 +323,7 @@ watch(() => props.searchQuery, (query) => { effectiveSearchQuery.value = query; 
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
 const sortedRepositories = computed(() => [...props.repositories].sort((a, b) => a.fullName.localeCompare(b.fullName)));
 const providerLabel = computed(() => props.connection.provider === 'github' ? 'GitHub' : 'Provider');
+const repositoryIcons = computed(() => props.repositoryIcons);
 const tagOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const assigneeOptions = computed(() => [...new Set(props.items.flatMap((item) => item.assignees ?? []))].sort());
 const activeFilterCount = computed(() => [props.selectedRepositoryId, props.selectedTagName, props.selectedAssigneeLogin].filter(Boolean).length);

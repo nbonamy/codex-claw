@@ -81,6 +81,7 @@ describe('AppStatePersistence', () => {
       branch: 'feat/work-routing',
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      originUrl: 'git@github.com:nbonamy/codex-claw.git',
       updatedAt: '2026-08-27T12:00:00.000Z',
     };
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {

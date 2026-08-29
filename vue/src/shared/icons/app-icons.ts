@@ -30,6 +30,8 @@ export {
   IconFileDiff as FileDiffIcon,
   IconFileText as FileTextIcon,
   IconFolder as FolderIcon,
+  IconFolderOpen as FolderOpenIcon,
+  IconFolderRoot as FolderRootIcon,
   IconFolders as FoldersIcon,
   IconGitFork as GitForkIcon,
   IconGitBranch as GitBranchIcon,

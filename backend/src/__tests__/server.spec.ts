@@ -6026,14 +6026,26 @@ describe('ClawBackendServer', () => {
       method: 'settings/update',
       params: {
         input: {
-          general: { claudeCodeEnabled: true, preventSleepWhenAgentsRun: false },
+          general: {
+            claudeCodeEnabled: true,
+            preventSleepWhenAgentsRun: false,
+            repositoryIcons: {
+              'git@github.com:nbonamy/codex-claw.git': '🦞',
+            },
+          },
           sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['codex-claw', 'id8'] },
           theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
         },
       },
     })).resolves.toMatchObject({
       result: {
-        general: { claudeCodeEnabled: true, preventSleepWhenAgentsRun: false },
+        general: {
+          claudeCodeEnabled: true,
+          preventSleepWhenAgentsRun: false,
+          repositoryIcons: {
+            'git@github.com:nbonamy/codex-claw.git': '🦞',
+          },
+        },
         sourceFolder: {
           path: '/Users/nbonamy/src',
           initialized: true,
@@ -6048,6 +6060,9 @@ describe('ClawBackendServer', () => {
     });
 
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    expect(snapshot.general.repositoryIcons).toStrictEqual({
+      'git@github.com:nbonamy/codex-claw.git': '🦞',
+    });
   });
 
   it('changes Codex resource sharing only while chats are idle', async () => {

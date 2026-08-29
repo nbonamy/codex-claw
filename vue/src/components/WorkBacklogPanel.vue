@@ -164,9 +164,9 @@
           class="work-backlog-panel__item-assignee"
         >
           <AgentAvatar
-            v-if="row.assignedAgent"
-            :avatar="row.assignedAgent.avatar"
-            :name="row.assignedAgent.name"
+            v-if="repositoryIconForAgent(row.assignedAgent, repositoryIcons)"
+            :avatar="repositoryIconForAgent(row.assignedAgent, repositoryIcons)"
+            :name="row.assignedAgent?.name ?? ''"
             size="sm"
           />
           <span
@@ -198,6 +198,7 @@ import { computed, ref } from 'vue';
 import { IconRobotFace } from '@tabler/icons-vue';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { CircleXIcon, DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon, SaveToBenchIcon } from '../shared/icons/app-icons';
@@ -217,6 +218,7 @@ const props = withDefaults(defineProps<{
   error: string | null;
   items: WorkItem[];
   repositories: WorkRepository[];
+  repositoryIcons?: Record<string, string>;
   selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
   selectedTagName?: string | null;
@@ -225,9 +227,12 @@ const props = withDefaults(defineProps<{
   assignedAgentsByWorkItemKey: () => ({}),
   assignments: () => ({}),
   canAssignToBench: true,
+  repositoryIcons: () => ({}),
   selectedAssigneeLogin: null,
   selectedTagName: null,
 });
+
+const repositoryIcons = computed(() => props.repositoryIcons);
 
 const emit = defineEmits<{
   'assign-to-bench-agent': [item: WorkItem];

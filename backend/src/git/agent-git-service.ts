@@ -24,15 +24,17 @@ export class AgentGitService {
   async identity(folder: string): Promise<AgentWorkspaceIdentity> {
     const updatedAt = this.now().toISOString();
     try {
-      const [rootResult, branchResult, commonDirectoryResult] = await Promise.all([
+      const [rootResult, branchResult, commonDirectoryResult, originResult] = await Promise.all([
         this.runGit(folder, ['rev-parse', '--show-toplevel']),
         this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
         this.runGit(folder, ['rev-parse', '--git-common-dir']),
+        this.runGit(folder, ['remote', 'get-url', 'origin']).catch(() => ({ stdout: '' })),
       ]);
       const repositoryRoot = resolve(rootResult.stdout.trim());
       const commonDirectory = resolve(repositoryRoot, commonDirectoryResult.stdout.trim());
       const primaryWorktreeRoot = dirname(commonDirectory);
       const branch = branchResult.stdout.trim() || null;
+      const originUrl = originResult.stdout.trim();
 
       return {
         kind: 'git',
@@ -42,6 +44,7 @@ export class AgentGitService {
         branch,
         isLinkedWorktree: repositoryRoot !== primaryWorktreeRoot,
         primaryWorktreeRoot,
+        ...(originUrl ? { originUrl } : {}),
         updatedAt,
       };
     } catch {

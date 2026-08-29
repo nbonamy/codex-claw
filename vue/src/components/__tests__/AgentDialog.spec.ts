@@ -34,6 +34,7 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).toContain('Repository');
     expect(wrapper.text()).not.toContain('Checkout');
     expect(wrapper.get('[aria-label="Agent name"]').attributes('aria-label')).toBe('Agent name');
+    expect(wrapper.find('.agent-avatar-picker').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Resolved path');
     expect(wrapper.text()).not.toContain('Coding agent');
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
@@ -62,13 +63,10 @@ describe('AgentDialog', () => {
     const wrapper = mountDialog({ chooseAgentFolder, createAgent });
 
     await chooseCustomFolder(wrapper);
-    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
-    await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'new-agent',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -88,7 +86,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'Custom Agent',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -108,7 +105,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'claude-agent',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/claude-agent',
       backend: 'claude',
     });
@@ -146,9 +142,6 @@ describe('AgentDialog', () => {
     expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/codex-claw');
     expect(wrapper.text()).toContain('Work in...');
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
-    await wrapper.get('.agent-avatar-picker__trigger').trigger('click');
-    expect(wrapper.get('.agent-avatar-picker__popover').isVisible()).toBe(true);
-    await wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🤖')?.trigger('click');
     await emitSelect(wrapper, 'agent-dialog-repository', '__custom_folder__');
     await flushPromises();
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
@@ -158,7 +151,6 @@ describe('AgentDialog', () => {
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Dina Prime',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/codex-claw-next',
       backend: 'codex',
     });
@@ -184,7 +176,6 @@ describe('AgentDialog', () => {
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Legacy Claude',
-      avatar: 'DI',
       folder: '/Users/nbonamy/src/codex-claw',
       backend: 'claude',
     });
@@ -217,7 +208,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'issue-agent',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/issue-agent',
       backend: 'codex',
       newTeamName: 'GitHub #12',
@@ -252,7 +242,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'existing-team-agent',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/existing-team-agent',
       backend: 'codex',
       teamId: 'team-skwad',
@@ -330,7 +319,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'codex-claw-source-folder',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/codex-claw-source-folder',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -402,7 +390,6 @@ describe('AgentDialog', () => {
     });
     expect(createAgent).toHaveBeenCalledWith({
       name: 'codex-claw - gh-24',
-      avatar: '🤖',
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-24',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -475,7 +462,6 @@ describe('AgentDialog', () => {
 
     expect(createAgent).toHaveBeenCalledWith({
       name: 'codex-claw-ssh-agent',
-      avatar: '🤖',
       folder: '/home/nicolas/src/codex-claw-ssh-agent',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -527,7 +513,6 @@ describe('AgentDialog', () => {
     expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src/witsy' });
     expect(createAgent).toHaveBeenCalledWith({
       name: 'witsy',
-      avatar: '🤖',
       folder: '/home/nicolas/src/witsy',
       backend: 'codex',
     });

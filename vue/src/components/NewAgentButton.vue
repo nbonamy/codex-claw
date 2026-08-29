@@ -72,12 +72,6 @@
                 role="menuitem"
                 @click="deployTemplate(template.id)"
               >
-                <AgentAvatar
-                  class="new-agent-menu__avatar"
-                  :avatar="template.avatar"
-                  :name="template.name"
-                  size="md"
-                />
                 <span class="new-agent-menu__template-meta">
                   <strong>{{ template.name }}</strong>
                   <span>{{ folderBasename(template.folder) }}</span>
@@ -104,7 +98,6 @@ import { computed, nextTick, ref } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import type { BenchTemplate } from '@codex-claw/core/contracts';
 import { ChevronDown, PlusCircleIcon, Trash2Icon } from '../shared/icons/app-icons';
-import AgentAvatar from './AgentAvatar.vue';
 
 type NewAgentButtonPresentation = 'default' | 'tile';
 type NewAgentButtonSize = 'regular' | 'small';

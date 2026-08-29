@@ -162,11 +162,6 @@
                   :value="`bench:${template.id}`"
                 >
                   <span class="loop-editor__bench-option">
-                    <AgentAvatar
-                      :avatar="template.avatar"
-                      :name="template.name"
-                      size="sm"
-                    />
                     <span>
                       <strong>{{ template.name }}</strong>
                       <small>{{ template.folder }}</small>
@@ -357,7 +352,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue';
 import type { BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import AgentAvatar from './AgentAvatar.vue';
 
 type TeamMode = 'existing' | 'dedicated';
 type ActionMode = 'new-agent' | `bench:${string}`;
