@@ -1,19 +1,21 @@
 <template>
-  <div
-    ref="menuRoot"
-    class="agent-context-menu"
-    :style="menuStyle"
-  >
-    <AppMenu
-      ariaLabel="Agent actions"
-      :items="menuItems"
-      @select="selectMenuItem"
-    />
-  </div>
+  <Teleport to="body">
+    <div
+      ref="menuRoot"
+      class="agent-context-menu"
+      :style="menuStyle"
+    >
+      <AppMenu
+        ariaLabel="Agent actions"
+        :items="menuItems"
+        @select="selectMenuItem"
+      />
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -54,11 +56,13 @@ const emit = defineEmits<{
   'open-in': [application: OpenInApplication];
 }>();
 
+const viewportMargin = 8;
 const menuRoot = ref<HTMLElement | null>(null);
+const menuPosition = ref({ x: props.x, y: props.y });
 const moveTargets = computed(() => props.moveTargets ?? []);
 const menuStyle = computed<Record<string, string>>(() => ({
-  left: `${props.x}px`,
-  top: `${props.y}px`,
+  left: `${menuPosition.value.x}px`,
+  top: `${menuPosition.value.y}px`,
 }));
 const menuItems = computed<AppMenuItem[]>(() => [
   {
@@ -127,11 +131,19 @@ const menuItems = computed<AppMenuItem[]>(() => [
 onMounted(() => {
   document.addEventListener('click', closeOnDocumentClick);
   document.addEventListener('keydown', closeOnEscape);
+  window.addEventListener('resize', fitMenuInViewport);
+  void nextTick(fitMenuInViewport);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeOnDocumentClick);
   document.removeEventListener('keydown', closeOnEscape);
+  window.removeEventListener('resize', fitMenuInViewport);
+});
+
+watch(() => [props.x, props.y], ([x, y]) => {
+  menuPosition.value = { x: x ?? 0, y: y ?? 0 };
+  void nextTick(fitMenuInViewport);
 });
 
 function selectMenuItem(itemId: string): void {
@@ -166,6 +178,21 @@ function closeOnEscape(event: KeyboardEvent): void {
   }
 }
 
+function fitMenuInViewport(): void {
+  const menu = menuRoot.value;
+  if (!menu) return;
+
+  const { width, height } = menu.getBoundingClientRect();
+  menuPosition.value = {
+    x: clampToViewport(props.x, width, window.innerWidth),
+    y: clampToViewport(props.y, height, window.innerHeight),
+  };
+}
+
+function clampToViewport(position: number, size: number, viewportSize: number): number {
+  return Math.max(viewportMargin, Math.min(position, viewportSize - size - viewportMargin));
+}
+
 function moveTeamItemId(teamId: string): string {
   return `move-to-team:${teamId}`;
 }
@@ -187,6 +214,8 @@ function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAct
 <style scoped>
 .agent-context-menu {
   position: fixed;
-  z-index: 20;
+  z-index: 2000;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 </style>

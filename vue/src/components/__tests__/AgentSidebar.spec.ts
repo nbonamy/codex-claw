@@ -47,6 +47,17 @@ function mockRect(element: Element, rect: { top: number; height: number }): void
   });
 }
 
+function portaledMenuItems(): HTMLElement[] {
+  return Array.from(document.body.querySelectorAll<HTMLElement>('.agent-context-menu [role="menuitem"]'));
+}
+
+async function clickPortaledMenuItem(label: string): Promise<void> {
+  const item = portaledMenuItems().find((candidate) => candidate.textContent?.trim() === label);
+  expect(item).toBeDefined();
+  item!.click();
+  await flushPromises();
+}
+
 const agents: Agent[] = [
   {
     id: 'agent-dina',
@@ -112,6 +123,7 @@ const teams: Team[] = [
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
+  document.body.innerHTML = '';
 });
 
 describe('AgentSidebar', () => {
@@ -481,8 +493,8 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
-    expect(wrapper.get('.agent-context-menu').findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual([
+    expect(document.body.querySelector('.agent-context-menu')).not.toBeNull();
+    expect(portaledMenuItems().map((item) => item.textContent?.trim())).toStrictEqual([
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
@@ -492,10 +504,10 @@ describe('AgentSidebar', () => {
       'Close Agent',
     ]);
 
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
+    await clickPortaledMenuItem('Edit Agent');
 
     expect(wrapper.emitted('edit-agent')).toStrictEqual([['agent-dina']]);
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+    expect(document.body.querySelector('.agent-context-menu')).toBeNull();
 
     const expectedActions = [
       ['Duplicate Agent', 'duplicate-agent'],
@@ -509,7 +521,7 @@ describe('AgentSidebar', () => {
         clientX: 120,
         clientY: 80,
       });
-      await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === label)?.trigger('click');
+      await clickPortaledMenuItem(label);
       expect(wrapper.emitted(eventName)).toStrictEqual([['agent-dina']]);
     }
   });
@@ -533,7 +545,7 @@ describe('AgentSidebar', () => {
     });
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Finder')?.trigger('click');
+    await clickPortaledMenuItem('Finder');
 
     expect(wrapper.emitted('open-in')).toStrictEqual([[
       { agentId: 'agent-dina', application: 'finder' },
@@ -552,7 +564,7 @@ describe('AgentSidebar', () => {
     });
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+    await clickPortaledMenuItem('Fork Agent');
 
     expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
   });
@@ -574,7 +586,7 @@ describe('AgentSidebar', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+    await clickPortaledMenuItem('Skwad');
 
     expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([[{
       agentId: 'agent-dina',
@@ -607,8 +619,8 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Skwad')).toBe(true);
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Remote Core')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Skwad')).toBe(true);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Remote Core')).toBe(false);
   });
 
   it('hides all move targets for remote agents', async () => {
@@ -643,8 +655,8 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Skwad')).toBe(false);
-    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text() === 'Codex Claw')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Skwad')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Codex Claw')).toBe(false);
   });
 
   it('closes the context menu when the menu emits close', async () => {
@@ -664,11 +676,11 @@ describe('AgentSidebar', () => {
       clientY: 80,
     });
 
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(true);
+    expect(document.body.querySelector('.agent-context-menu')).not.toBeNull();
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('.agent-context-menu').exists()).toBe(false);
+    expect(document.body.querySelector('.agent-context-menu')).toBeNull();
   });
 
   it('emits collapse requests from the team header icon', async () => {

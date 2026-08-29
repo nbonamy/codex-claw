@@ -32,9 +32,18 @@ function pointerEvent(type: string, clientX: number): PointerEvent {
   return event as PointerEvent;
 }
 
+async function clickPortaledMenuItem(label: string): Promise<void> {
+  const item = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    .find((candidate) => candidate.textContent?.trim() === label);
+  expect(item).toBeDefined();
+  item!.click();
+  await nextTick();
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.removeItem('cockpitGlobalScope:github');
+  document.body.innerHTML = '';
   delete window.codexClaw;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
@@ -3305,7 +3314,7 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
+    await clickPortaledMenuItem('Edit Agent');
 
     expect(wrapper.text()).toContain('Edit agent');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
@@ -3328,12 +3337,12 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
+    await clickPortaledMenuItem('Duplicate Agent');
 
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
 
     await wrapper.findAll('.agent-sidebar__agent')[0].trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Fork Agent')?.trigger('click');
+    await clickPortaledMenuItem('Fork Agent');
 
     expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
 
@@ -3341,7 +3350,7 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Restart Agent')?.trigger('click');
+    await clickPortaledMenuItem('Restart Agent');
 
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
   });
@@ -3391,7 +3400,7 @@ describe('AppShell', () => {
       clientX: 120,
       clientY: 80,
     });
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Skwad')?.trigger('click');
+    await clickPortaledMenuItem('Skwad');
 
     expect(wrapper.emitted('move-agent-to-team')).toStrictEqual([[{
       agentId: 'agent-dina',
@@ -3929,7 +3938,7 @@ describe('AppShell', () => {
     const wrapper = mountShell({ snapshot });
 
     await wrapper.findAll('.agent-sidebar__agent')[0]!.trigger('contextmenu');
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Agent')?.trigger('click');
+    await clickPortaledMenuItem('Edit Agent');
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, cancelable: true }));
 
