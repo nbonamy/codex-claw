@@ -484,7 +484,7 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__start-work').text()).toContain('New session');
+    expect(wrapper.get('.agent-sidebar__start-work').text()).toContain('Add project');
     expect(wrapper.find('.agent-sidebar__footer').exists()).toBe(false);
   });
 

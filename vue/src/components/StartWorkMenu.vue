@@ -10,10 +10,10 @@
       <button
         class="start-work-menu__trigger"
         type="button"
-        aria-label="New session"
+        aria-label="Add project"
       >
-        <PlusIcon aria-hidden="true" />
-        <span>New session</span>
+        <PlusCircleIcon aria-hidden="true" />
+        <span>Add project</span>
       </button>
     </template>
 
@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { IconFolder as FolderIcon, IconLink as LinkIcon } from '@tabler/icons-vue';
-import { GitHubIcon, PlusIcon } from '../shared/icons/app-icons';
+import { GitHubIcon, PlusCircleIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 
@@ -60,15 +60,15 @@ function select(action: string): void {
 .start-work-menu__trigger {
   box-sizing: border-box;
   width: 100%;
-  min-height: 40px;
+  min-height: 32px;
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: 0 var(--space-8);
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
   border: 0;
   border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface-base);
+  color: var(--color-text-muted);
+  background: transparent;
   font: inherit;
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-medium);
@@ -78,7 +78,7 @@ function select(action: string): void {
 
 .start-work-menu__trigger:hover,
 .start-work-menu__trigger:focus-visible {
-  background: var(--color-surface-high);
+  color: var(--color-text);
   outline: 0;
 }
 

@@ -15,8 +15,8 @@ describe('StartWorkMenu', () => {
     });
 
     expect(wrapper.getComponent({ name: 'ElPopover' }).props('width')).toBe(240);
-    expect(wrapper.get('[aria-label="New session"]').text()).toBe('New session');
-    await wrapper.get('[aria-label="New session"]').trigger('click');
+    expect(wrapper.get('[aria-label="Add project"]').text()).toBe('Add project');
+    await wrapper.get('[aria-label="Add project"]').trigger('click');
 
     expect(document.body.textContent).toContain('Add project from');
     expect(document.body.textContent).toContain('Local folder or repository…');
