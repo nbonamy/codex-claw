@@ -1134,6 +1134,39 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
   });
 
+  it('preserves retry metadata when adapting SDK turn errors', async () => {
+    const { adapter, surface } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    const emitSurfaceEvent = (surface as unknown as {
+      emitEvent(origin: 'notification', event: unknown): void;
+    }).emitEvent.bind(surface);
+    emitSurfaceEvent('notification', {
+      type: 'turn.error',
+      conversationId: 'thread-a',
+      turnId: 'turn-thread-a',
+      payload: {
+        error: { message: 'Reconnecting… 3/5' },
+        willRetry: true,
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'error',
+      turnId: 'turn-thread-a',
+      payload: {
+        error: { message: 'Reconnecting… 3/5' },
+        message: 'Reconnecting… 3/5',
+        willRetry: true,
+      },
+    }));
+  });
+
   it('publishes the initial five full turns before prepending requested history incrementally', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

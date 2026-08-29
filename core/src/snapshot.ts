@@ -779,8 +779,12 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'error') {
-    const payload = event.payload as { message?: unknown };
+    const payload = event.payload as { message?: unknown; willRetry?: unknown };
     const message = typeof payload.message === 'string' ? payload.message : 'Backend error';
+    if (payload.willRetry === true) {
+      setAgentStatus(snapshot, event.agentId, { type: 'working', detail: message });
+      return;
+    }
     appendSystemMessage(snapshot, event.agentId, message, event.occurredAt);
     setAgentStatus(snapshot, event.agentId, { type: 'error', message });
   }
