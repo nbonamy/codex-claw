@@ -38,6 +38,8 @@ describe('RepositoryAcquireDialog', () => {
     });
     await flushPromises();
 
+    expect(wrapper.get('.el-dialog').classes()).toContain('claw-dialog--compact');
+    expect(wrapper.get('.repository-acquire-dialog__body').classes()).toContain('repository-acquire-dialog__scroll-region');
     expect(wrapper.text()).toContain('On this machine');
     expect(wrapper.text()).toContain('Open');
     expect(wrapper.text()).toContain('Clone');

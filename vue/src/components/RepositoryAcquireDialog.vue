@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog repository-acquire-dialog"
+    class="claw-dialog claw-dialog--compact repository-acquire-dialog"
     :model-value="visible"
     :teleported="false"
     width="680px"
@@ -22,7 +22,7 @@
       </div>
     </template>
 
-    <section class="repository-acquire-dialog__body">
+    <section class="repository-acquire-dialog__body repository-acquire-dialog__scroll-region">
       <template v-if="mode === 'url'">
         <div class="repository-acquire-dialog__url-state">
           <LinkIcon aria-hidden="true" />
@@ -123,7 +123,7 @@ function submitUrl(): void {
   grid-template-columns: var(--icon-md) minmax(0, 1fr);
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-6) var(--space-8);
+  padding: var(--space-4) var(--space-6);
 }
 
 .repository-acquire-dialog__search svg {
@@ -143,8 +143,13 @@ function submitUrl(): void {
 }
 
 .repository-acquire-dialog__body {
-  min-height: 320px;
-  padding: var(--space-8);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.repository-acquire-dialog__scroll-region {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .repository-acquire-dialog__body h3 {
