@@ -979,6 +979,5 @@ function onResizePointerEnd(event: PointerEvent): void {
   .agent-sidebar__start-work :deep(.start-work-menu__trigger span) {
     display: none;
   }
-
 }
 </style>
