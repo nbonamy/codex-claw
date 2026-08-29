@@ -106,6 +106,22 @@ describe('AgentContextMenu', () => {
     expect(moveItem?.find('.app-menu__chevron').exists()).toBe(true);
   });
 
+  it('allows nested menus to extend beyond the context menu wrapper', () => {
+    const wrapper = mountMenu({
+      moveTargets: [
+        {
+          id: 'team-skwad',
+          name: 'Skwad',
+          avatar: 'SK',
+          color: '#46A857',
+          agentIds: [],
+        },
+      ],
+    });
+
+    expect(wrapper.get('.agent-context-menu').attributes('style')).toContain('overflow: visible');
+  });
+
   it('emits the selected move target from the submenu', async () => {
     const wrapper = mountMenu({
       moveTargets: [

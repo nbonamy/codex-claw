@@ -62,6 +62,7 @@ const menuPosition = ref({ x: props.x, y: props.y });
 const moveTargets = computed(() => props.moveTargets ?? []);
 const menuStyle = computed<Record<string, string>>(() => ({
   left: `${menuPosition.value.x}px`,
+  overflow: 'visible',
   top: `${menuPosition.value.y}px`,
 }));
 const menuItems = computed<AppMenuItem[]>(() => [
@@ -215,7 +216,5 @@ function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAct
 .agent-context-menu {
   position: fixed;
   z-index: 2000;
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
 }
 </style>
