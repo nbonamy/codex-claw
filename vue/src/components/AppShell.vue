@@ -428,6 +428,7 @@ import {
   type CodexConversationPaneState,
   type CodexConversationVisualization,
   type CodexComposerMenuItem,
+  type CodexComposerMentionGroup,
   type CodexMessageImage,
   type CodexMessageImageContext,
   type CodexNativeAttachment,
@@ -870,6 +871,20 @@ const activeTeamAgents = computed(() => {
     .map((agentId) => props.snapshot.agents.find((agent) => agent.id === agentId))
     .filter((agent): agent is Agent => Boolean(agent));
 });
+const agentMentionGroups = computed<readonly CodexComposerMentionGroup[]>(() => {
+  if (activeTeamAgents.value.length === 0) return [];
+  return [{
+    id: 'agents',
+    label: 'Agents',
+    placement: 'before',
+    items: activeTeamAgents.value.map((agent) => ({
+      id: agent.id,
+      value: `agent:${agent.id}`,
+      label: agent.name,
+      payload: { agentId: agent.id },
+    })),
+  }];
+});
 const unreadTeamIds = computed(() => {
   const unreadAgentIdSet = new Set(props.unreadAgentIds);
   return props.snapshot.teams
@@ -1047,6 +1062,7 @@ const conversationPaneState: CodexConversationPaneState = {
     get commands() { return props.backendCommands; },
     get plugins() { return props.backendPlugins; },
     get skills() { return props.backendSkills; },
+    get mentionGroups() { return agentMentionGroups.value; },
     get modelCatalogStatus() { return props.modelCatalogStatus; },
     get skillCatalogStatus() { return props.skillCatalogStatus; },
   },

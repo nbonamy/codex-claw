@@ -183,6 +183,10 @@ implemented:
   icons and includes Finder, Terminal, iTerm2, Ghostty, Xcode, Android Studio,
   and a detected JetBrains IDE when installed;
 - central conversation and composer;
+- the composer exposes the current team's agents as a dedicated `@` suggestion
+  group above plugins and files. Agent selections persist as stable
+  `@agent:<agent-id>` values while Claw renders their current names with its
+  bot icon in both composer chips and restored user messages;
 - optimistic agent switching that reveals the cached conversation immediately;
   backend session hydration and agent catalogs refresh asynchronously, while
   Git status refreshes only when a thread becomes active, when the active

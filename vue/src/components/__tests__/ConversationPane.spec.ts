@@ -7,6 +7,7 @@ import {
   type CodexConversationPaneController,
   type CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
+import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPane from '../ConversationPane.vue';
@@ -104,6 +105,83 @@ describe('ConversationPane', () => {
 
     expect(wrapper.text()).toContain('Find the failing test.');
     expect(wrapper.text()).toContain('Looking now.');
+  });
+
+  it('renders persisted agent mentions with the app-owned bot treatment', () => {
+    const mentionGroup = {
+      id: 'agents',
+      label: 'Agents',
+      placement: 'before' as const,
+      items: [{
+        id: agent.id,
+        value: `agent:${agent.id}`,
+        label: agent.name,
+        payload: { agentId: agent.id },
+      }],
+    };
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'agent:agent-dina',
+          messages: [{
+            id: 'message-agent-mention',
+            role: 'user',
+            status: 'complete',
+            createdAt: '2026-08-18T00:00:00.000Z',
+            parts: [{ type: 'text', text: `Ask @agent:${agent.id} to review this.` }],
+          }],
+        },
+        catalogs: { mentionGroups: [mentionGroup] },
+      },
+      actions: {},
+    });
+
+    const wrapper = mountPane({ controller, agent });
+    const mention = wrapper.get('.agent-mention--message');
+
+    expect(mention.text()).toBe('Dina');
+    expect(mention.find('svg').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain(`agent:${agent.id}`);
+  });
+
+  it('renders agent suggestions above plugins and files with the app-owned bot treatment', async () => {
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: { conversationKey: 'agent:agent-dina', messages: [] },
+        catalogs: {
+          mentionGroups: [{
+            id: 'agents',
+            label: 'Agents',
+            placement: 'before',
+            items: [{
+              id: agent.id,
+              value: `agent:${agent.id}`,
+              label: 'Research agent',
+              payload: { agentId: agent.id },
+            }],
+          }],
+          plugins: [{
+            id: 'research@openai-curated-remote',
+            name: 'research',
+            displayName: 'Research plugin',
+            enabled: true,
+          }],
+          files: [{ path: 'docs/research.md', name: 'research.md' }],
+        },
+      },
+      actions: {},
+    });
+    const wrapper = mountPane({ controller, agent });
+    const editor = wrapper.get<HTMLElement>('.chat-rich-text-editor');
+
+    editor.element.textContent = '@resea';
+    await editor.trigger('input');
+    await nextTick();
+
+    expect(wrapper.findAll('.chat-composer-at-menu__section').map((section) => section.text()))
+      .toStrictEqual(['Agents', 'Plugins', 'Files']);
+    expect(wrapper.get('.agent-mention--menu').text()).toBe('Research agent');
+    expect(wrapper.get('.agent-mention--menu').find('svg').exists()).toBe(true);
   });
 
   it('falls back to SDK translations for SDK actions Claw has not overridden', () => {

@@ -18,6 +18,20 @@
           class="conversation-pane__message-header"
         >{{ collaborationMessageLabel(message.id) }}</span>
       </template>
+      <template #suggestion-item="{ group, item }">
+        <AgentMention
+          v-if="group.id === agentMentionGroupId"
+          :label="item.label"
+          surface="menu"
+        />
+      </template>
+      <template #mention="{ group, item, surface: mentionSurface }">
+        <AgentMention
+          v-if="group.id === agentMentionGroupId"
+          :label="item.label"
+          :surface="mentionSurface"
+        />
+      </template>
       <template #composer-attachment-actions="{ attachments, index, disabled }">
         <el-tooltip
           v-if="attachments[index]?.type === 'image'"
@@ -65,6 +79,7 @@ import type {
   ThreadPlan,
 } from '@codex-claw/core/contracts';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
+import AgentMention from './AgentMention.vue';
 import {
   presentCollaborationMessage,
   presentRendererCollaborationMessage,
@@ -73,6 +88,7 @@ import {
 import { provideClawToolPresentation } from '../tool-presentation';
 
 const { t, te } = useI18n();
+const agentMentionGroupId = 'agents';
 const surface = ref<{ focusComposer(): void } | null>(null);
 provideCodexChatTranslate((key, params) => te(key)
   ? t(key, params ?? {})

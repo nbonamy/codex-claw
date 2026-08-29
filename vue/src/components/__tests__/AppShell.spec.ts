@@ -303,6 +303,20 @@ describe('AppShell', () => {
       displayName: 'Dropbox',
       enabled: true,
     }]);
+    expect(state.catalogs?.mentionGroups).toStrictEqual([{
+      id: 'agents',
+      label: 'Agents',
+      placement: 'before',
+      items: snapshot.teams[0]!.agentIds.map((agentId) => {
+        const teamAgent = snapshot.agents.find((candidate) => candidate.id === agentId)!;
+        return {
+          id: teamAgent.id,
+          value: `agent:${teamAgent.id}`,
+          label: teamAgent.name,
+          payload: { agentId: teamAgent.id },
+        };
+      }),
+    }]);
     expect(state.policy?.canForkMessage).toBe(true);
 
     const updatedMessages: RendererMessage[] = [{
