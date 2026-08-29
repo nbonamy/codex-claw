@@ -120,9 +120,19 @@ describe('workspace sidebar projection', () => {
 
   it('falls back to the branch when an agent has no name', () => {
     const agent = gitAgent('agent-unnamed', '   ', '/src/repo', 'feat/sidebar', true);
+    agent.conversationTitle = 'Previous conversation';
 
     expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
-      .toMatchObject({ displayTitle: 'feat/sidebar' });
+      .toMatchObject({ customName: null, conversationTitle: 'Previous conversation', displayTitle: 'feat/sidebar' });
+  });
+
+  it('keeps duplicate unnamed branch labels literal across repositories', () => {
+    const first = gitAgent('agent-one', null, '/src/id8', 'main', false, '/src/id8');
+    const second = gitAgent('agent-two', null, '/src/computer-use', 'main', false, '/src/computer-use');
+
+    expect(projectWorkspaceSidebar({ agents: [first, second], activeAgentId: null })
+      .flatMap(({ sessions }) => sessions.map(({ displayTitle }) => displayTitle)))
+      .toStrictEqual(['main', 'main']);
   });
 
   it('removes the repository prefix from an unnamed agent branch', () => {

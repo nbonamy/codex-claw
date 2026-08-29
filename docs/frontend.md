@@ -556,15 +556,10 @@ they survive restarts and linked-worktree path changes without persisting Git
 credentials. Repository identity replaces agent-owned avatars: agent forms do
 not expose an avatar field, and headers, Cockpit cards, and assignment surfaces
 show the repository icon or omit the identity image when the repository has no
-custom icon. Session rows with a custom agent name show the persisted
-current-conversation title when available, then that custom name. An unnamed
-session always shows only its branch fallback, even when conversation metadata
-exists; never synthesize a mixed branch-and-agent label. Duplicate named labels are
-disambiguated by the shared projection; unnamed sessions keep the literal
-branch fallback because their repository header already supplies context.
-Composer mentions add repository/branch context while retaining the stable
-agent ID. Repository collapse keys are persisted in general settings. The
-sidebar has no permanent conversation-history footer;
+custom icon. Session labels and composer mentions come from the shared
+app-owned workspace projection rather than component-local naming logic.
+Repository collapse keys are persisted in general settings. The sidebar has no
+permanent conversation-history footer;
 **Resume session** in the agent menu opens the compact searchable history dialog.
 
 ## Rendering Surfaces
