@@ -172,12 +172,14 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
     throw new Error('Agent must be idle before editing.');
   }
 
-  const nextFolder = normalizedFolder(input.folder);
+  const nextFolder = input.folder === undefined ? agent.folder : normalizedFolder(input.folder);
   const folderChanged = nextFolder !== agent.folder;
   const nextBackend = normalizedBackend(input.backend ?? agent.backend);
   const backendChanged = nextBackend !== agent.backend;
   agent.name = normalizedAgentName(input.name, nextFolder);
-  agent.avatar = normalizedOptionalString(input.avatar);
+  if ('avatar' in input) {
+    agent.avatar = normalizedOptionalString(input.avatar);
+  }
   agent.folder = nextFolder;
   agent.backend = nextBackend;
   if (backendChanged) {

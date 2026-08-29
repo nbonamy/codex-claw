@@ -3323,8 +3323,6 @@ describe('AppShell', () => {
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Dina Prime',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
     });
   });
 

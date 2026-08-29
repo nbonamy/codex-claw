@@ -428,7 +428,10 @@ export class ClawBackendServer {
       case backendMethods.agentUpdate: {
         const input = requireAgentUpdateInput(message.params);
         return this.routeAgentSnapshotRequest(message.id, input.id, backendMethods.agentUpdate, { input }, async (existingAgent) => {
-          await this.validateAgentInput(input, this.remoteConnectionIdForAgent(existingAgent));
+          await this.validateAgentInput({
+            name: input.name.trim() ? input.name : existingAgent.name,
+            folder: input.folder ?? existingAgent.folder,
+          }, this.remoteConnectionIdForAgent(existingAgent));
           const previousName = existingAgent.name;
           const previousFolder = existingAgent.folder;
           const agent = updateAgentFromInput(this.snapshot, input);

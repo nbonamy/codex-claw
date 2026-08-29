@@ -5468,8 +5468,6 @@ describe('ClawBackendServer', () => {
         input: {
           id: 'agent-dina',
           name: 'Dina Renamed',
-          folder: '/Users/nbonamy/src/codex-claw',
-          backend: 'codex',
         },
       },
     })).resolves.toMatchObject({

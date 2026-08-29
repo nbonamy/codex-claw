@@ -122,7 +122,7 @@ describe('AgentDialog', () => {
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
 
-  it('prefills edit mode and updates an idle agent', async () => {
+  it('edits only the optional name of an idle agent', async () => {
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/codex-claw-next');
     const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
@@ -138,25 +138,22 @@ describe('AgentDialog', () => {
     });
 
     expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit agent');
-    expect(wrapper.html().indexOf('agent-dialog__identity-group')).toBeLessThan(wrapper.html().indexOf('agent-dialog__workspace-group'));
-    expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/codex-claw');
-    expect(wrapper.text()).toContain('Work in...');
+    expect(wrapper.text()).not.toContain('Repository');
+    expect(wrapper.text()).not.toContain('Work in...');
+    expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'AgentAvatarPicker' }).exists()).toBe(false);
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
-    await emitSelect(wrapper, 'agent-dialog-repository', '__custom_folder__');
-    await flushPromises();
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
 
-    expect(chooseAgentFolder).toHaveBeenCalledOnce();
+    expect(chooseAgentFolder).not.toHaveBeenCalled();
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: 'Dina Prime',
-      folder: '/Users/nbonamy/src/codex-claw-next',
-      backend: 'codex',
     });
   });
 
-  it('preserves the backend of an existing agent without exposing backend selection', async () => {
+  it('clears a custom name to restore the default name', async () => {
     const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
       agent: {
@@ -170,14 +167,12 @@ describe('AgentDialog', () => {
 
     expect(wrapper.text()).not.toContain('Backend');
     expect(wrapper.text()).not.toContain('Claude Code');
-    await wrapper.get('.agent-dialog__text-input').setValue('Legacy Claude');
+    await wrapper.get('.agent-dialog__text-input').setValue('');
     await saveButton(wrapper).trigger('click');
 
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
-      name: 'Legacy Claude',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'claude',
+      name: '',
     });
   });
 

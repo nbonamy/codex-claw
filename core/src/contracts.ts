@@ -1426,7 +1426,7 @@ export type ReorderTeamsInput = {
 export type UpdateAgentInput = {
   id: string;
   name: string;
-  folder: string;
+  folder?: string;
   avatar?: string;
   backend?: AgentBackend;
 };

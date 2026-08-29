@@ -238,16 +238,19 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].avatar).toBeUndefined();
   });
 
-  it('defaults blank edited names from the folder basename', () => {
+  it('defaults blank edited names from the existing folder when no folder update is supplied', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-existing' };
 
     updateAgentFromInput(snapshot, {
       id: 'agent-dina',
       name: ' ',
-      folder: '~/src/codex-claw',
     }, '2026-06-05T10:11:12.000Z');
 
     expect(snapshot.agents[0].name).toBe('codex-claw');
+    expect(snapshot.agents[0].avatar).toBe('DI');
+    expect(snapshot.agents[0].folder).toBe('~/src/codex-claw');
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-existing' });
   });
 
   it('returns null when updating a missing agent', () => {

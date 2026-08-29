@@ -45,6 +45,7 @@
       </section>
 
       <section
+        v-if="!isEditing"
         class="agent-dialog__workspace-group"
       >
         <div class="agent-dialog__workspace-rows">
@@ -381,9 +382,11 @@ const teamCanSave = computed(() => (
 const canSave = computed(() => (
   canEdit.value &&
   !submitting.value &&
-  name.value.trim().length > 0 &&
-  folder.value.trim().length > 0 &&
-  teamCanSave.value
+  (isEditing.value || (
+    name.value.trim().length > 0 &&
+    folder.value.trim().length > 0 &&
+    teamCanSave.value
+  ))
 ));
 
 watch([
@@ -623,8 +626,6 @@ async function submit(): Promise<void> {
       await props.updateAgent({
         id: props.agent.id,
         name: name.value,
-        folder: folder.value,
-        backend: backend.value,
       });
     } else {
       await ensureInitialWorktree();
@@ -672,9 +673,6 @@ function resetForm(): void {
   choosingFolder.value = false;
   if (isEditing.value && props.agent) {
     name.value = props.agent.name;
-    folder.value = props.agent.folder;
-    backend.value = props.agent.backend;
-    resetEditSourceSelection();
     return;
   }
 
@@ -751,20 +749,6 @@ function syncRepositoryControlValue(): void {
   repositoryControlValue.value = selectedSourceRepositoryPath.value || customFolderOptionValue;
 }
 
-function resetEditSourceSelection(): void {
-  createdSourceWorktree.value = null;
-  listedSourceWorktrees.value = [];
-  listedSourceWorktreesRepoPath.value = '';
-  const repository = sourceRepositories.value.find((candidate) => (
-    candidate.path === folder.value || candidate.worktrees.some((worktree) => worktree.path === folder.value)
-  ));
-  selectedSourceRepositoryPath.value = repository?.path ?? '';
-  selectedSourceWorktreePath.value = repository?.worktrees.find((worktree) => worktree.path === folder.value)?.path ?? '';
-  syncRepositoryControlValue();
-  if (repository) {
-    void loadSelectedSourceWorktrees(repository.path);
-  }
-}
 </script>
 
 <style scoped>
