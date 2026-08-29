@@ -2,7 +2,7 @@
   <section class="repository-backlog" aria-label="Repository backlog">
     <header class="repository-backlog__repository">
       <div>
-        <IconBrandGithub aria-hidden="true" />
+        <GitHubIcon aria-hidden="true" />
         <strong>{{ repositoryName }}</strong>
       </div>
       <span v-if="branch" class="repository-backlog__branch-pill">
@@ -338,7 +338,6 @@ import { computed, h, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IconAlertCircle,
-  IconBrandGithub,
   IconCircleCheck,
   IconCircleDot,
   IconCopy,
@@ -353,6 +352,7 @@ import {
   IconSearch,
   IconX,
 } from '@tabler/icons-vue';
+import { GitHubIcon } from '../shared/icons/app-icons';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';

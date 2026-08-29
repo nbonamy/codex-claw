@@ -371,7 +371,6 @@ const teamCanSave = computed(() => (
 const canSave = computed(() => (
   !submitting.value &&
   (isEditing.value || (
-    name.value.trim().length > 0 &&
     folder.value.trim().length > 0 &&
     teamCanSave.value
   ))
@@ -419,9 +418,6 @@ async function chooseFolder(): Promise<void> {
     selectedSourceWorktreePath.value = '';
     repositoryControlValue.value = customFolderOptionValue;
     folder.value = selectedFolder;
-    if (!name.value.trim()) {
-      name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
-    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -447,9 +443,6 @@ function selectRemoteFolder(path: string): void {
   selectedSourceWorktreePath.value = '';
   repositoryControlValue.value = customFolderOptionValue;
   folder.value = selectedFolder;
-  if (!name.value.trim()) {
-    name.value = selectedFolder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
-  }
 }
 
 async function selectRepositoryControl(value: string): Promise<void> {
@@ -559,9 +552,6 @@ function selectWorktreeControl(value: string): void {
 function selectSourceWorktree(worktreePath: string): void {
   selectedSourceWorktreePath.value = worktreePath;
   folder.value = worktreePath;
-  if (!isEditing.value && !props.initialAgentName.trim()) {
-    name.value = worktreePath.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
-  }
 }
 
 function openNewSourceWorktreeDialog(): void {
@@ -618,7 +608,7 @@ async function submit(): Promise<void> {
     } else {
       await ensureInitialWorktree();
       const createInput: AgentDialogCreateInput = {
-        name: name.value,
+        name: name.value.trim() || null,
         folder: folder.value,
         backend: backend.value,
       };

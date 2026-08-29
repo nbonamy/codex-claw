@@ -58,7 +58,9 @@
         @collapse-sidebar="agentSidebarCollapsed = true"
         @close-agent="$emit('close-agent', $event)"
         @create-agent-from-repository="openRepositorySessionSource"
-        @create-agent-in-repository="createDefaultRepositorySession"
+        @create-agent-on-branch="createRepositorySessionOnBranch"
+        @create-agent-worktree-in-repository="openRepositorySessionWorktree"
+        :list-repository-branches="listRepositorySessionBranches"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
@@ -322,6 +324,16 @@
       @select-branch="openNewAgentForSourceBranch"
       @select-work-item="openNewAgentForSourceWorkItem"
     />
+    <NewSourceWorktreeDialog
+      :allow-destination-override="false"
+      :visible="repositorySessionWorktreeSource !== null"
+      :repo="repositorySessionWorktreeRepository"
+      :choose-destination="chooseSourceWorktreeDestination"
+      :create-worktree="createRepositorySessionWorktree"
+      :suggest-destination="suggestRepositorySessionWorktreePath"
+      @close="repositorySessionWorktreeSource = null"
+      @created="createRepositorySessionFromWorktree"
+    />
     <RepositoryAcquireDialog
       :visible="repositoryAcquireVisible"
       :mode="repositoryAcquireMode"
@@ -431,6 +443,7 @@ import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
+import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationPane from './ConversationPane.vue';
@@ -853,6 +866,11 @@ const repositorySessionSourceBranches = ref<SourceBranch[]>([]);
 const repositorySessionSourceWorkItems = ref<WorkItem[]>([]);
 const repositorySessionSourceLoading = ref(false);
 const repositorySessionSourceError = ref<string | null>(null);
+const repositorySessionWorktreeSource = ref<RepositorySessionSource | null>(null);
+const repositorySessionWorktreeRepository = computed<SourceRepository | null>(() => {
+  const source = repositorySessionWorktreeSource.value;
+  return source ? { name: source.repositoryName, path: source.repositoryRoot, worktrees: [] } : null;
+});
 const repositoryAcquireVisible = ref(false);
 const repositoryAcquireMode = ref<'github' | 'url'>('github');
 const repositoryAcquireRepositories = ref<WorkRepository[]>([]);
@@ -1284,10 +1302,7 @@ watch(savedCockpitBacklogConfiguration, (configuration) => {
   }
 });
 const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'create' && pendingNewAgentWorkItem.value !== null);
-const pendingNewAgentName = computed(() => {
-  const item = pendingNewAgentWorkItem.value;
-  return item ? `${workItemRepositoryName(item)} - gh-${item.number}` : '';
-});
+const pendingNewAgentName = '';
 const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
 const pendingNewAgentWorktreeBranchName = computed(() => {
   const item = pendingNewAgentWorkItem.value;
@@ -1871,6 +1886,64 @@ function closeRepositorySessionSource(): void {
   repositorySessionSourceError.value = null;
 }
 
+async function listRepositorySessionBranches(input: { agentId: string; repositoryRoot: string }): Promise<SourceBranch[]> {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === input.agentId);
+  const team = agent ? props.snapshot.teams.find((candidate) => candidate.id === agent.teamId) : null;
+  return await props.listSourceBranches(input.repositoryRoot, team?.remoteConnectionId?.trim() || undefined);
+}
+
+function createRepositorySessionOnBranch(payload: RepositorySessionSource & { branch: SourceBranch }): void {
+  const { branch, ...source } = payload;
+  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
+  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  void createRepositorySession(source, branch, teamId);
+}
+
+function openRepositorySessionWorktree(source: RepositorySessionSource): void {
+  repositorySessionWorktreeSource.value = source;
+}
+
+async function createRepositorySessionWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
+  const source = repositorySessionWorktreeSource.value;
+  const sourceAgent = source?.agentId ? props.snapshot.agents.find((agent) => agent.id === source.agentId) : null;
+  const teamId = source?.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
+  return await props.createSourceWorktree({
+    ...input,
+    ...(team?.remoteConnectionId?.trim() ? { remoteConnectionId: team.remoteConnectionId.trim() } : {}),
+  });
+}
+
+async function suggestRepositorySessionWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
+  const source = repositorySessionWorktreeSource.value;
+  const sourceAgent = source?.agentId ? props.snapshot.agents.find((agent) => agent.id === source.agentId) : null;
+  const teamId = source?.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
+  return await props.suggestSourceWorktreePath({
+    ...input,
+    ...(team?.remoteConnectionId?.trim() ? { remoteConnectionId: team.remoteConnectionId.trim() } : {}),
+  });
+}
+
+async function createRepositorySessionFromWorktree(worktree: SourceWorktree): Promise<void> {
+  const source = repositorySessionWorktreeSource.value;
+  repositorySessionWorktreeSource.value = null;
+  if (!source) return;
+  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
+  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  try {
+    await props.createAgent({
+      name: null,
+      folder: worktree.path,
+      backend: 'codex',
+      sourceRepositoryName: source.repositoryName,
+      ...(teamId ? { teamId } : {}),
+    });
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
 function openNewAgentForSourceBranch(branch: SourceBranch): void {
   const source = repositorySessionSource.value;
   if (!source) return;
@@ -1909,29 +1982,8 @@ async function createRepositorySession(source: RepositorySessionSource, branch: 
           ...(remoteConnectionId ? { remoteConnectionId } : {}),
         });
     await props.createAgent({
-      name: `${source.repositoryName} · ${branch.name}`,
+      name: null,
       folder: worktree.path,
-      backend: 'codex',
-      sourceRepositoryName: source.repositoryName,
-      ...(teamId ? { teamId } : {}),
-    });
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-async function createDefaultRepositorySession(source: RepositorySessionSource): Promise<void> {
-  try {
-    const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
-    const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
-    const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
-    const remoteConnectionId = team?.remoteConnectionId?.trim();
-    const branches = await props.listSourceBranches(source.repositoryRoot, remoteConnectionId || undefined);
-    const defaultBranch = branches.find((branch) => branch.isDefault);
-    if (!defaultBranch) throw new Error(`The default branch for ${source.repositoryName} is unavailable.`);
-    await props.createAgent({
-      name: `${source.repositoryName} · ${defaultBranch.name}`,
-      folder: defaultBranch.worktreePath ?? source.repositoryRoot,
       backend: 'codex',
       sourceRepositoryName: source.repositoryName,
       ...(teamId ? { teamId } : {}),
@@ -1973,7 +2025,7 @@ async function openLocalRepositorySession(): Promise<void> {
     // A plain folder remains a valid session workspace.
   }
   await props.createAgent({
-    name: repositoryName,
+    name: null,
     folder,
     backend: 'codex',
     ...(teamId ? { teamId } : {}),
@@ -2078,7 +2130,7 @@ async function startCockpitWorkItems(input: {
       ...(remoteConnectionId ? { remoteConnectionId } : {}),
     });
     const agent = await props.createAgent({
-      name: `${repositoryName} - gh-${item.number}`,
+      name: null,
       folder: worktree.path,
       backend: 'codex',
       sourceRepositoryName: repository.name,

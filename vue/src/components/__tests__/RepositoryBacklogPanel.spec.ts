@@ -19,6 +19,8 @@ describe('RepositoryBacklogPanel', () => {
       ],
     });
 
+    expect(wrapper.findComponent({ name: 'GitHubIcon' }).exists()).toBe(true);
+
     expect(wrapper.findAll('.repository-backlog__segments button svg')).toHaveLength(2);
     expect(wrapper.text()).toContain('Fix backlog assignment');
     expect(wrapper.text()).not.toContain('Ship backlog workspace');

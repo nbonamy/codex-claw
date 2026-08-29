@@ -59,14 +59,33 @@
             >
               <GitForkIcon aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              aria-label="New session on default branch"
-              title="New session on default branch"
-              @click.stop="emit('create-agent-in-repository', { agentId: group.sessions[0]!.agentId, repositoryName: group.label, repositoryRoot: group.repositoryRoot! })"
+            <el-popover
+              :visible="repositorySessionMenuId === group.id"
+              placement="bottom-end"
+              trigger="click"
+              :width="220"
+              popper-class="claw-popover agent-sidebar__repository-session-menu-popover"
+              @update:visible="setRepositorySessionMenuVisible(group, $event)"
             >
-              <PlusIcon aria-hidden="true" />
-            </button>
+              <template #reference>
+                <button
+                  type="button"
+                  :aria-label="`New session in ${group.label}`"
+                  title="New session"
+                  @click.stop
+                >
+                  <PlusIcon aria-hidden="true" />
+                </button>
+              </template>
+              <p v-if="repositoryDefaultBranchLoading[group.id]" class="agent-sidebar__repository-session-menu-state">Loading default branch…</p>
+              <AppMenu
+                v-else
+                class="app-menu--embedded"
+                :ariaLabel="`New session in ${group.label}`"
+                :items="repositorySessionMenuItems(group)"
+                @select="selectRepositorySessionMenuItem(group, $event)"
+              />
+            </el-popover>
           </span>
         </header>
 
@@ -159,8 +178,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, BackendConversationRef, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, Team } from '@codex-claw/core/contracts';
-import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
+import type { Agent, BackendConversationRef, ConversationSummary, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, SourceBranch, Team } from '@codex-claw/core/contracts';
+import { projectWorkspaceSidebar, type WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
 import {
   GitBranchIcon,
   GitForkIcon,
@@ -173,6 +192,8 @@ import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import ConversationHistoryPanel from './ConversationHistoryPanel.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
 import StartWorkMenu from './StartWorkMenu.vue';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import { agentStatusLabel } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 
@@ -191,6 +212,7 @@ const props = defineProps<{
   quickSwitchShortcutsVisible?: boolean;
   repositoryIcons?: Record<string, string>;
   listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
+  listRepositoryBranches?: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
   openInCatalog?: OpenInApplicationCatalog;
   resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
 }>();
@@ -199,7 +221,8 @@ const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
   'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
-  'create-agent-in-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
+  'create-agent-on-branch': [payload: { agentId: string; repositoryName: string; repositoryRoot: string; branch: SourceBranch }];
+  'create-agent-worktree-in-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
   'edit-agent': [agentId: string];
@@ -229,6 +252,9 @@ const workspaceGroups = computed(() => projectWorkspaceSidebar({
   unreadAgentIds: props.unreadAgentIds,
 }));
 const contextMenuAgentId = ref<string | null>(null);
+const repositorySessionMenuId = ref<string | null>(null);
+const repositoryDefaultBranches = ref<Record<string, SourceBranch | null>>({});
+const repositoryDefaultBranchLoading = ref<Record<string, boolean>>({});
 const collapsedWorkspaceIds = ref(new Set<string>());
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
@@ -317,6 +343,68 @@ function repositoryIcon(repositoryKey: string | undefined, repositoryRoot: strin
 function updateRepositoryIcon(repositoryKey: string | undefined, repositoryRoot: string | undefined, icon: string | undefined): void {
   if (!repositoryRoot) return;
   emit('update-repository-icon', { repositoryKey: repositoryKey ?? repositoryRoot, repositoryRoot, icon });
+}
+
+async function setRepositorySessionMenuVisible(
+  group: WorkspaceSidebarGroup,
+  visible: boolean,
+): Promise<void> {
+  if (group.kind !== 'repository' || !group.repositoryRoot) return;
+  repositorySessionMenuId.value = visible ? group.id : null;
+  if (!visible || repositoryDefaultBranches.value[group.id] !== undefined || repositoryDefaultBranchLoading.value[group.id]) {
+    return;
+  }
+
+  repositoryDefaultBranchLoading.value = { ...repositoryDefaultBranchLoading.value, [group.id]: true };
+  try {
+    const branches = await props.listRepositoryBranches?.({
+      agentId: group.sessions[0]!.agentId,
+      repositoryRoot: group.repositoryRoot!,
+    }) ?? [];
+    repositoryDefaultBranches.value = {
+      ...repositoryDefaultBranches.value,
+      [group.id]: branches.find((branch) => branch.isDefault) ?? null,
+    };
+  } finally {
+    repositoryDefaultBranchLoading.value = { ...repositoryDefaultBranchLoading.value, [group.id]: false };
+  }
+}
+
+function repositorySessionMenuItems(
+  group: WorkspaceSidebarGroup,
+): AppMenuItem[] {
+  const defaultBranch = repositoryDefaultBranches.value[group.id];
+  return [
+    {
+      id: 'default-branch',
+      type: 'action',
+      label: defaultBranch?.name ?? 'Default branch unavailable',
+      icon: GitBranchIcon,
+      disabled: !defaultBranch,
+    },
+    { id: 'new-worktree', type: 'action', label: 'New worktree…', icon: GitForkIcon },
+  ];
+}
+
+function selectRepositorySessionMenuItem(
+  group: WorkspaceSidebarGroup,
+  itemId: string,
+): void {
+  if (group.kind !== 'repository' || !group.repositoryRoot) return;
+  const payload = {
+    agentId: group.sessions[0]!.agentId,
+    repositoryName: group.label,
+    repositoryRoot: group.repositoryRoot!,
+  };
+  if (itemId === 'default-branch') {
+    const branch = repositoryDefaultBranches.value[group.id];
+    if (branch) {
+      emit('create-agent-on-branch', { ...payload, branch });
+    }
+  } else if (itemId === 'new-worktree') {
+    emit('create-agent-worktree-in-repository', payload);
+  }
+  repositorySessionMenuId.value = null;
 }
 
 function openAgentMenu(agentId: string, event: MouseEvent): void {

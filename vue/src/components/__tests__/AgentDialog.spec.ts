@@ -57,7 +57,7 @@ describe('AgentDialog', () => {
     ]));
   });
 
-  it('auto-fills the name from the chosen folder and creates an agent', async () => {
+  it('creates an unnamed agent from the chosen folder', async () => {
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent');
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({ chooseAgentFolder, createAgent });
@@ -66,7 +66,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'new-agent',
+      name: null,
       folder: '/Users/nbonamy/src/new-agent',
       backend: 'codex',
     });
@@ -104,7 +104,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'claude-agent',
+      name: null,
       folder: '/Users/nbonamy/src/claude-agent',
       backend: 'claude',
     });
@@ -202,7 +202,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'issue-agent',
+      name: null,
       folder: '/Users/nbonamy/src/issue-agent',
       backend: 'codex',
       newTeamName: 'GitHub #12',
@@ -236,7 +236,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'existing-team-agent',
+      name: null,
       folder: '/Users/nbonamy/src/existing-team-agent',
       backend: 'codex',
       teamId: 'team-skwad',
@@ -317,7 +317,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw-source-folder',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-source-folder',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -345,7 +345,7 @@ describe('AgentDialog', () => {
     await flushPromises();
 
     expect(wrapper.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
-    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('');
   });
 
   it('prefills ticket-driven agent identity and creates its named worktree automatically', async () => {
@@ -428,7 +428,7 @@ describe('AgentDialog', () => {
     await nextTick();
 
     expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
-    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('mediastation');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('');
   });
 
   it('creates agents using the target team SSH connection for repositories and worktrees', async () => {
@@ -460,7 +460,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw-ssh-agent',
+      name: null,
       folder: '/home/nicolas/src/codex-claw-ssh-agent',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -511,7 +511,7 @@ describe('AgentDialog', () => {
     expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src' });
     expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox', path: '/home/nicolas/src/witsy' });
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'witsy',
+      name: null,
       folder: '/home/nicolas/src/witsy',
       backend: 'codex',
     });
@@ -542,7 +542,7 @@ describe('AgentDialog', () => {
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'codex-claw-backend-split',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-backend-split',
       sourceRepositoryName: 'codex-claw',
     }));

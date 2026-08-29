@@ -43,6 +43,7 @@ describe('RepositoryAcquireDialog', () => {
     expect(wrapper.text()).toContain('On this machine');
     expect(wrapper.text()).toContain('Open');
     expect(wrapper.text()).toContain('Clone');
+    expect(wrapper.findComponent({ name: 'GitHubIcon' }).exists()).toBe(true);
 
     await wrapper.get('input').setValue('multi');
     expect(wrapper.findAll('.repository-acquire-dialog__row')).toHaveLength(1);

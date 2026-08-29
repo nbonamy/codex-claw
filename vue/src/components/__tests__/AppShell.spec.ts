@@ -2571,16 +2571,17 @@ describe('AppShell', () => {
     });
     const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
 
-    sidebar.vm.$emit('create-agent-in-repository', {
+    sidebar.vm.$emit('create-agent-on-branch', {
       agentId: 'agent-dina',
       repositoryName: 'codex-claw',
       repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      branch: { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
     });
     await flushPromises();
-    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', undefined);
+    expect(listSourceBranches).not.toHaveBeenCalled();
     expect(createSourceWorktree).not.toHaveBeenCalled();
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw · main',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -2612,13 +2613,35 @@ describe('AppShell', () => {
       branchName: 'feat/work-routing',
     });
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw · feat/work-routing',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-work-routing',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
       teamId: 'team-codex-claw',
     });
     expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('visible')).toBe(false);
+
+    createAgent.mockClear();
+    sidebar.vm.$emit('create-agent-worktree-in-repository', {
+      agentId: 'agent-dina',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+    });
+    await flushPromises();
+    const worktreeDialog = wrapper.getComponent({ name: 'NewSourceWorktreeDialog' });
+    expect(worktreeDialog.props('visible')).toBe(true);
+    await worktreeDialog.vm.$emit('created', {
+      name: 'feature-session',
+      path: '/Users/nbonamy/src/codex-claw-feature-session',
+    });
+    await flushPromises();
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/Users/nbonamy/src/codex-claw-feature-session',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+      teamId: 'team-codex-claw',
+    });
   });
 
   it('clones a GitHub repository before opening its contextual session picker', async () => {
@@ -2877,7 +2900,7 @@ describe('AppShell', () => {
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
     expect(agentDialog.find('#agent-dialog-team').exists()).toBe(true);
     expect(agentDialog.props()).toMatchObject({
-      initialAgentName: 'codex-claw - gh-12',
+      initialAgentName: '',
       initialNewWorktreeBranchName: 'fix/gh-12',
       initialSourceRepositoryName: 'codex-claw',
     });
@@ -2901,7 +2924,7 @@ describe('AppShell', () => {
       color: '#1B4FB2',
     });
     expect(createAgent).toHaveBeenCalledWith({
-      name: 'codex-claw - gh-12',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
       backend: 'codex',
       sourceRepositoryName: 'codex-claw',
@@ -2961,13 +2984,13 @@ describe('AppShell', () => {
       branchName: 'fix/gh-13',
     });
     expect(createAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      name: 'codex-claw - gh-12',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
       sourceRepositoryName: 'codex-claw',
       teamId: 'team-codex-claw',
     }));
     expect(createAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      name: 'codex-claw - gh-13',
+      name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-13',
       sourceRepositoryName: 'codex-claw',
       teamId: 'team-codex-claw',

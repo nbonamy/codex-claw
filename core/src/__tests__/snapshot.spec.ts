@@ -154,7 +154,7 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents.at(-1)).not.toHaveProperty('remoteConnectionId');
   });
 
-  it('defaults a blank created agent name from the folder basename', () => {
+  it('stores a blank created agent name as null', () => {
     const snapshot = createInitialSnapshot();
 
     createAgentInSnapshot(snapshot, {
@@ -162,7 +162,7 @@ describe('snapshot reducer', () => {
       folder: '/tmp/codex-claw',
     }, '2026-06-05T10:11:12.000Z', 'agent-new-codex-claw');
 
-    expect(snapshot.agents.at(-1)?.name).toBe('codex-claw');
+    expect(snapshot.agents.at(-1)?.name).toBeNull();
     expect(snapshot.agents.at(-1)?.id).toBe('agent-new-codex-claw');
   });
 

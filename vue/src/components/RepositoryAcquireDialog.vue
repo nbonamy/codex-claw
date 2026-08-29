@@ -67,8 +67,9 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { IconBrandGithub as GitHubIcon, IconLink as LinkIcon, IconSearch as SearchIcon } from '@tabler/icons-vue';
+import { IconLink as LinkIcon, IconSearch as SearchIcon } from '@tabler/icons-vue';
 import type { WorkRepository } from '@codex-claw/core/contracts';
+import { GitHubIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;

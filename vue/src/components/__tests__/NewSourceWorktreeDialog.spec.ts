@@ -5,6 +5,13 @@ import type { SourceRepository } from '@codex-claw/core/contracts';
 import NewSourceWorktreeDialog from '../NewSourceWorktreeDialog.vue';
 
 describe('NewSourceWorktreeDialog', () => {
+  it('can prompt only for the worktree branch', () => {
+    const wrapper = mountDialog({ allowDestinationOverride: false } as never);
+
+    expect(wrapper.get('.new-source-worktree-dialog__branch-input').attributes('placeholder')).toBe('feature/new-worktree');
+    expect(wrapper.find('.new-source-worktree-dialog__folder-input').exists()).toBe(false);
+  });
+
   it('resolves the destination from the repo root and normalized branch name', async () => {
     const chooseDestination = vi.fn();
     const createWorktree = vi.fn().mockResolvedValue({

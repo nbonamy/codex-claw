@@ -31,8 +31,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { IconBrandGithub as GitHubIcon, IconFolder as FolderIcon, IconLink as LinkIcon } from '@tabler/icons-vue';
-import { PlusIcon } from '../shared/icons/app-icons';
+import { IconFolder as FolderIcon, IconLink as LinkIcon } from '@tabler/icons-vue';
+import { GitHubIcon, PlusIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 

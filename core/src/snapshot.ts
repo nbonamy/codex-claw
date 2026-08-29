@@ -135,7 +135,7 @@ export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnec
 }
 
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
-  const name = normalizedAgentName(input.name, input.folder);
+  const name = normalizedOptionalString(input.name) ?? null;
   const backend = normalizedBackend(input.backend);
 
   return {
@@ -2475,10 +2475,6 @@ function normalizedBackendDefaults(defaults: BackendDefaults | undefined, backen
   return defaults.kind === 'claude' && defaults.thinking
     ? { ...defaults, thinking: { ...defaults.thinking } }
     : { ...defaults };
-}
-
-function normalizedAgentName(name: string, folder: string): string {
-  return name.trim() || folderBasename(folder) || 'Codex';
 }
 
 function normalizedFolder(folder: string): string {

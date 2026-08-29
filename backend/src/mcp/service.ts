@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
-import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -440,7 +439,7 @@ export class ClawMcpService {
     }
 
     const createInput: CreateAgentInput = {
-      name: input.name?.trim() || path.basename(folder),
+      name: input.name?.trim() || null,
       folder,
       ...(input.avatar ? { avatar: input.avatar } : {}),
       backend: input.backend ?? 'codex',
@@ -590,3 +589,4 @@ function resolveUserPath(value: string): string {
 function fileBasename(filePath: string): string {
   return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
 }
+import path from 'node:path';

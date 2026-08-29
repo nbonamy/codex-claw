@@ -21,6 +21,7 @@ describe('StartWorkMenu', () => {
     expect(document.body.textContent).toContain('Local folder or repository…');
     expect(document.body.textContent).toContain('GitHub repository…');
     expect(document.body.textContent).toContain('Repository URL…');
+    expect(wrapper.findComponent({ name: 'GitHubIcon' }).exists()).toBe(true);
 
     const github = [...document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
       .find((item) => item.textContent?.includes('GitHub repository'));

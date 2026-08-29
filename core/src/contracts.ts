@@ -1394,7 +1394,7 @@ export type AppCommand =
   | { type: 'set-agent-list-compact'; compact: boolean };
 
 export type CreateAgentInput = {
-  name: string;
+  name: string | null;
   folder: string;
   avatar?: string;
   backend?: AgentBackend;

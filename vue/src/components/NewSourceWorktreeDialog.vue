@@ -33,12 +33,12 @@
             v-model="branchName"
             class="claw-form-dialog__text-input new-source-worktree-dialog__branch-input"
             type="text"
-            placeholder="feature/source-folder"
+            placeholder="feature/new-worktree"
           />
         </div>
       </section>
 
-      <section class="claw-form-dialog__field">
+      <section v-if="allowDestinationOverride" class="claw-form-dialog__field">
         <div class="claw-form-dialog__field-heading">
           <label
             class="claw-form-dialog__label"
@@ -101,12 +101,14 @@ import type { CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
+  allowDestinationOverride?: boolean;
   chooseDestination: (defaultPath: string) => Promise<string | null>;
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   repo: SourceRepository | null;
   suggestDestination: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>) => Promise<string>;
   visible: boolean;
 }>(), {
+  allowDestinationOverride: true,
   repo: null,
 });
 

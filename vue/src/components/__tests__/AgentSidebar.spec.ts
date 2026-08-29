@@ -178,22 +178,34 @@ describe('AgentSidebar', () => {
   });
 
   it('emits repository-scoped session creation actions', async () => {
+    const listRepositoryBranches = vi.fn().mockResolvedValue([{ name: 'main', isDefault: true, worktreePath: '~/src/id8' }]);
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
         activeAgentId: 'agent-dina',
+        listRepositoryBranches,
         teamName: 'Codex Claw',
       },
       global: { plugins: [ElementPlus] },
     });
 
-    await wrapper.get('[aria-label="New session on default branch"]').trigger('click');
+    const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
+      popover.props('popperClass') === 'claw-popover agent-sidebar__repository-session-menu-popover'
+    ));
+    await sessionMenu?.vm.$emit('update:visible', true);
+    await flushPromises();
+    wrapper.findAllComponents({ name: 'AppMenu' }).find((menu) => menu.props('ariaLabel') === 'New session in id8')?.vm.$emit('select', 'default-branch');
     await wrapper.get('[aria-label="Create agent from branch, pull request, or issue"]').trigger('click');
 
-    expect(wrapper.emitted('create-agent-in-repository')).toStrictEqual([[{
+    expect(listRepositoryBranches).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      repositoryRoot: '~/src/id8',
+    });
+    expect(wrapper.emitted('create-agent-on-branch')).toStrictEqual([[{
       agentId: 'agent-dina',
       repositoryName: 'id8',
       repositoryRoot: '~/src/id8',
+      branch: { name: 'main', isDefault: true, worktreePath: '~/src/id8' },
     }]]);
     expect(wrapper.emitted('create-agent-from-repository')).toStrictEqual([[{
       agentId: 'agent-dina',

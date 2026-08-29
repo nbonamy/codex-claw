@@ -2811,7 +2811,7 @@ export class ClawBackendServer {
   }
 
   private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>, remoteConnectionId: string | null = null): Promise<void> {
-    if (!input.name.trim()) {
+    if (input.name !== null && !input.name.trim()) {
       throw new Error('Agent name is required.');
     }
 
@@ -3344,7 +3344,11 @@ function globalWorkItemQuery(value: unknown): import('@codex-claw/core/contracts
 
 function requireAgentCreateInput(params: unknown): CreateAgentInput {
   const record = requireRecord(params);
-  return requireRecord(record.input) as CreateAgentInput;
+  const input = requireRecord(record.input);
+  return {
+    ...input,
+    name: input.name === null ? null : requireString(input.name, 'agent name'),
+  } as CreateAgentInput;
 }
 
 function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
