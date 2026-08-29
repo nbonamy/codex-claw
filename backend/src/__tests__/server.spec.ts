@@ -3111,7 +3111,7 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams = [
       { id: 'team-test', name: 'Test Team', agentIds: ['agent-dina'], activeAgentId: 'agent-dina' },
-      { id: 'team-other', name: 'Other Team', agentIds: ['agent-jesse'], activeAgentId: 'agent-jesse' },
+      { id: 'team-other', name: 'Other Team', agentIds: ['agent-jesse', 'agent-sam'], activeAgentId: 'agent-jesse' },
     ];
     snapshot.activeTeamId = 'team-test';
     snapshot.activeAgentId = 'agent-dina';
@@ -3137,7 +3137,39 @@ describe('ClawBackendServer', () => {
         createdAt: '2026-06-13T00:00:00.000Z',
         updatedAt: '2026-06-13T00:00:00.000Z',
       },
+      {
+        id: 'agent-sam',
+        teamId: 'team-other',
+        name: 'Sam',
+        folder: '/Users/nbonamy/src/other-project',
+        workspace: {
+          kind: 'git',
+          folder: '/Users/nbonamy/src/other-project',
+          repositoryName: 'other-project',
+          repositoryRoot: '/Users/nbonamy/src/other-project',
+          branch: 'stale-branch',
+          isLinkedWorktree: false,
+          primaryWorktreeRoot: '/Users/nbonamy/src/other-project',
+          originUrl: 'https://github.com/old-owner/other-project.git',
+          updatedAt: '2026-06-12T00:00:00.000Z',
+        },
+        backend: 'codex',
+        status: { type: 'idle' },
+        createdAt: '2026-06-13T00:00:00.000Z',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
     ];
+    const identity = vi.fn().mockImplementation(async (folder: string) => ({
+      kind: 'git' as const,
+      folder,
+      repositoryName: folder.split('/').at(-1)!,
+      repositoryRoot: folder,
+      branch: folder.endsWith('other-project') ? 'current-branch' : 'main',
+      isLinkedWorktree: false,
+      primaryWorktreeRoot: folder,
+      originUrl: `https://github.com/current-owner/${folder.split('/').at(-1)!}.git`,
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }));
     const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
     const getGitStatus = vi.fn().mockResolvedValue({
       folder: '/Users/nbonamy/src/multi-llm-ts',
@@ -3167,6 +3199,7 @@ describe('ClawBackendServer', () => {
       version: 'test-version',
       pid: 123,
       snapshot,
+      agentGitService: { identity } as unknown as AgentGitService,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
@@ -3181,7 +3214,8 @@ describe('ClawBackendServer', () => {
         activeAgentId: 'agent-jesse',
         agents: [
           { id: 'agent-dina' },
-          { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } },
+          { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' }, workspace: { branch: 'main' } },
+          { id: 'agent-sam', workspace: { branch: 'current-branch', originUrl: 'https://github.com/current-owner/other-project.git' } },
         ],
         agentGitStatuses: {
           'agent-jesse': expect.objectContaining({ branch: 'main', state: 'dirty' }),
@@ -3190,6 +3224,8 @@ describe('ClawBackendServer', () => {
     });
 
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
+    expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/multi-llm-ts');
+    expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/other-project');
     expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }));
     await server.close();
   });

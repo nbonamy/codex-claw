@@ -1291,6 +1291,10 @@ export class ClawBackendServer {
           this.snapshot.activeAgentId = remoteSnapshot.activeAgentId ?? remoteTeam?.activeAgentId ?? remoteTeam?.agentIds[0] ?? null;
         } else {
           selectTeam(this.snapshot, teamId);
+          const selectedTeam = this.snapshot.teams.find((candidate) => candidate.id === teamId);
+          if (selectedTeam) {
+            await this.reconcileAgentWorkspaceIdentities(selectedTeam.agentIds, true);
+          }
         }
         if (this.snapshot.activeAgentId) {
           await this.hydrateAndRefreshSelectedAgent(this.snapshot.activeAgentId);
@@ -2717,12 +2721,17 @@ export class ClawBackendServer {
     await this.refreshAgentGitStatus(agentId);
   }
 
-  private async reconcileAgentWorkspaceIdentities(): Promise<void> {
+  private async reconcileAgentWorkspaceIdentities(
+    agentIds?: readonly string[],
+    refreshExisting = false,
+  ): Promise<void> {
     if (this.workspaceIdentityReconciliationPromise) {
       return this.workspaceIdentityReconciliationPromise;
     }
+    const targetIds = agentIds ? new Set(agentIds) : null;
     const targets = this.snapshot.agents.filter((agent) => (
-      !agent.workspace || agent.workspace.folder !== agent.folder
+      (!targetIds || targetIds.has(agent.id))
+      && (refreshExisting || !agent.workspace || agent.workspace.folder !== agent.folder)
     ));
     if (targets.length === 0) return;
 
@@ -3778,7 +3787,8 @@ function sameWorkspaceIdentity(current: AgentWorkspaceIdentity | undefined, next
       && current.repositoryRoot === next.repositoryRoot
       && current.branch === next.branch
       && current.isLinkedWorktree === next.isLinkedWorktree
-      && current.primaryWorktreeRoot === next.primaryWorktreeRoot;
+      && current.primaryWorktreeRoot === next.primaryWorktreeRoot
+      && current.originUrl === next.originUrl;
   }
   return false;
 }
