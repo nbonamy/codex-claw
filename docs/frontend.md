@@ -363,6 +363,8 @@ implemented:
 - repository-first Start work entry points. A prominent New session row at the
   top of Sessions opens the shared app menu for an existing local folder or
   repository, a connected GitHub repository, or an explicit HTTPS/SSH Git URL.
+  Empty teams show those same three project-acquisition menu items inline
+  instead of a New Agent button.
   A repository-scoped
   shortcut opens one searchable picker for branches, pull requests, and issues.
   The repository `+` shortcut starts immediately on its default checked-out

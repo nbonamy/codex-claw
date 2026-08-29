@@ -2135,7 +2135,7 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
   });
 
@@ -2175,7 +2175,7 @@ describe('AppShell', () => {
     expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
-    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
 
     await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
 
@@ -2811,46 +2811,21 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Welcome to Codex Claw!');
-    expect(wrapper.text()).toContain('Add an agent to your team');
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
+    expect(wrapper.text()).toContain('Choose a source to start a session');
     expect(wrapper.find('.agent-header').exists()).toBe(false);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar__new').exists()).toBe(false);
 
-    await wrapper.get('.agent-sidebar__new').trigger('click');
-    expect(wrapper.text()).toContain('New agent');
-  });
-
-  it('forwards Bench deploy and remove intents from the empty team screen', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const snapshot = createEmptySnapshot();
-    snapshot.bench.push({
-      id: 'bench-dina',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/id8',
-      backend: 'codex',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    const wrapper = mountShell({ snapshot });
-
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.findAll('.new-agent-menu__template').find((row) => row.text().includes('Dina'))?.trigger('click');
-    await wrapper.get('[aria-label="Open Bench"]').trigger('click');
-    await flushPromises();
-    await wrapper.get('[aria-label="Remove Dina from Bench"]').trigger('click');
+    await wrapper.findAll('[role="menuitem"]')
+      .find((action) => action.text() === 'GitHub repository…')!
+      .trigger('click');
     await flushPromises();
 
-    expect(wrapper.emitted('deploy-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
-    expect(wrapper.emitted('remove-bench-template')).toStrictEqual([[{
-      templateId: 'bench-dina',
-      teamId: 'team-codex-claw',
-    }]]);
+    const acquireDialog = wrapper.getComponent({ name: 'RepositoryAcquireDialog' });
+    expect(acquireDialog.props('visible')).toBe(true);
+    expect(acquireDialog.props('mode')).toBe('github');
   });
 
   it('assigns a ticket to a new agent and can create a ticket-named team', async () => {

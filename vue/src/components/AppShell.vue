@@ -230,10 +230,7 @@
         <div ref="workspaceBody" class="app-shell__body">
           <AgentEmptyState
             v-if="isAgentEmpty"
-            :bench="activeBench"
-            @deploy-bench-template="deployBenchTemplateForActiveTeam"
-            @new-agent="openNewAgent"
-            @remove-bench-template="removeBenchTemplateForActiveTeam"
+            @start-work="handleStartWorkAction"
           />
           <ConversationPane
             v-else
@@ -2484,24 +2481,6 @@ function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): v
   emit('select-agent', payload.agentId);
 }
 
-function deployBenchTemplateForActiveTeam(templateId: string): void {
-  emit('deploy-bench-template', {
-    templateId,
-    ...(activeTeam.value?.id ? { teamId: activeTeam.value.id } : {}),
-  });
-}
-
-function removeBenchTemplateForActiveTeam(templateId: string): void {
-  removeBenchTemplateForTeam(templateId, activeTeam.value);
-}
-
-function removeBenchTemplateForTeam(templateId: string, team: Team | null | undefined): void {
-  emit('remove-bench-template', {
-    templateId,
-    ...(team?.id ? { teamId: team.id } : {}),
-  });
-}
-
 function confirmPlan(): void {
   emit('update:planMode', false);
   emit('sendPrompt', 'implement the plan');
@@ -3682,7 +3661,6 @@ function cycleAgents(direction: 1 | -1, event?: KeyboardEvent): void {
 }
 
 const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
-const activeBench = computed(() => benchForTeam(activeTeam.value));
 const benchByTeamId = computed<Record<string, BenchTemplate[]>>(() => {
   const next: Record<string, BenchTemplate[]> = {};
   for (const team of props.snapshot.teams) {

@@ -22,7 +22,7 @@
       <AppMenu
         class="app-menu--embedded"
         ariaLabel="Add project from"
-        :items="menuItems"
+        :items="startWorkMenuItems"
         @select="select"
       />
     </div>
@@ -31,26 +31,18 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { IconFolder as FolderIcon, IconLink as LinkIcon } from '@tabler/icons-vue';
-import { GitHubIcon, PlusCircleIcon } from '../shared/icons/app-icons';
+import { PlusCircleIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
-import type { AppMenuItem } from '../shared/menu/app-menu';
-
-type StartWorkAction = 'github' | 'local' | 'url';
+import { isStartWorkAction, startWorkMenuItems, type StartWorkAction } from './start-work-actions';
 
 const emit = defineEmits<{
   select: [action: StartWorkAction];
 }>();
 
 const visible = ref(false);
-const menuItems: AppMenuItem[] = [
-  { id: 'local', type: 'action', label: 'Local folder or repository…', icon: FolderIcon },
-  { id: 'github', type: 'action', label: 'GitHub repository…', icon: GitHubIcon },
-  { id: 'url', type: 'action', label: 'Repository URL…', icon: LinkIcon },
-];
 
 function select(action: string): void {
-  if (action !== 'local' && action !== 'github' && action !== 'url') return;
+  if (!isStartWorkAction(action)) return;
   visible.value = false;
   emit('select', action);
 }
