@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { CodexAppServerClient, type RpcMessage, type RpcTransport } from '@codex-app-sdk/backend/protocol';
 import { CodexSurface } from '@codex-app-sdk/backend';
@@ -939,7 +939,7 @@ describe('CodexSurfaceAgentAdapter', () => {
                 type: 'media',
                 itemId: 'image-live',
                 media: {
-                  url: `data:image/png;base64,${generatedPngBase64}`,
+                  url: 'file:///tmp/generated%20route.png',
                   alt: 'Generated image',
                   mimeType: 'image/png',
                   prompt: 'Draw the route map',
@@ -1206,6 +1206,49 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
     expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(1);
+  });
+
+  it('omits unused tool payloads from history', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    const oversizedOutput = 'x'.repeat(128 * 1024);
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-large-tool', 'completed', [{
+        type: 'mcpToolCall',
+        id: 'tool-large',
+        server: 'tools',
+        tool: 'inspect',
+        status: 'completed',
+        arguments: { path: '/tmp/data', to: 'agent-target', prompt: oversizedOutput },
+        appContext: null,
+        pluginId: null,
+        result: {
+          structuredContent: { recipientName: 'Target agent', content: oversizedOutput },
+          content: [{ type: 'text', text: oversizedOutput }],
+        },
+        error: null,
+        durationMs: 10,
+      }]),
+    ]);
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    const history = events.find((event) => event.type === 'thread.historyLoaded');
+    const toolPart = ((history?.payload as { messages: RendererMessage[] }).messages[0]?.parts[0]);
+    expect(toolPart).toMatchObject({
+      type: 'tool',
+      id: 'tool-large',
+      kind: 'mcp',
+    });
+    expect(toolPart).not.toHaveProperty('body');
+    expect(toolPart).toMatchObject({
+      input: { path: '/tmp/data', to: 'agent-target' },
+      output: { structuredContent: { recipientName: 'Target agent' } },
+    });
+    expect(toolPart).not.toHaveProperty('input.prompt');
+    expect(toolPart).not.toHaveProperty('output.content');
+    expect(Buffer.byteLength(JSON.stringify(history))).toBeLessThan(64 * 1024);
   });
 
   it('suppresses server-owned action echoes while keeping hydrate and explicit resume ownership exact', async () => {

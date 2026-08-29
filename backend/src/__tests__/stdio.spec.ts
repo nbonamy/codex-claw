@@ -220,4 +220,59 @@ describe('stdio JSON-RPC transport', () => {
     expect(output.destroyed).toBe(false);
     peer.stop();
   });
+
+  it('identifies an oversized event without inspecting its payload', () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const onOutputOverflow = vi.fn();
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      maxBufferedOutputBytes: 100,
+      onOutputOverflow,
+      onMessage: () => undefined,
+    });
+    peer.start();
+
+    peer.notify('backend/event/notify', { type: 'thread.historyLoaded', value: 'x'.repeat(200) });
+
+    expect(onOutputOverflow).toHaveBeenCalledWith({
+      bufferedBytes: 0,
+      eventType: 'thread.historyLoaded',
+      frameBytes: expect.any(Number),
+      kind: 'notification',
+      method: 'backend/event/notify',
+    });
+    peer.stop();
+  });
+
+  it('identifies the request method for an oversized response', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const onOutputOverflow = vi.fn();
+    const peer = new StdioRpcPeer({
+      input,
+      output,
+      maxBufferedOutputBytes: 100,
+      onOutputOverflow,
+      onMessage: (message) => ({
+        jsonrpc: '2.0',
+        id: 'id' in message ? message.id : null,
+        result: 'x'.repeat(200),
+      }),
+    });
+    peer.start();
+
+    input.write('{"jsonrpc":"2.0","id":"hydrate-1","method":"agent/history/hydrate"}\n');
+    await Promise.resolve();
+
+    expect(onOutputOverflow).toHaveBeenCalledWith({
+      bufferedBytes: 0,
+      frameBytes: expect.any(Number),
+      id: 'hydrate-1',
+      kind: 'response',
+      method: 'agent/history/hydrate',
+    });
+    peer.stop();
+  });
 });

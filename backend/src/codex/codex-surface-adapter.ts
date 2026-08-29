@@ -1,5 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type {
   Agent,
   AgentStatus,
@@ -1388,9 +1389,42 @@ function surfaceMessages(
     role: message.role,
     status: completeStreaming && message.status === 'streaming' ? 'complete' : message.status,
     ...(message.turnId ? { turnId: message.turnId } : {}),
-    parts: message.parts.map(rendererPart),
+    parts: rendererParts(message.parts),
     createdAt: message.createdAt ?? new Date(0).toISOString(),
   }));
+}
+
+const MAX_TOOL_LABEL_BYTES = 4 * 1024;
+const MAX_TOOL_METADATA_BYTES = 32 * 1024;
+const MAX_TOOL_STATUS_BYTES = 64 * 1024;
+
+function rendererParts(parts: readonly SurfaceMessagePart[]): RendererMessagePart[] {
+  const generatedImagePaths = new Map<string, string>();
+  for (const part of parts) {
+    if (part.type !== 'tool') continue;
+    const savedPath = part.metadata?.savedPath;
+    if (typeof savedPath === 'string' && path.isAbsolute(savedPath)) {
+      generatedImagePaths.set(part.id, savedPath);
+    }
+  }
+
+  return parts.map((part) => {
+    const rendered = rendererPart(part);
+    if (
+      rendered.type === 'media' &&
+      rendered.itemId &&
+      rendered.media.url.startsWith('data:image/')
+    ) {
+      const savedPath = generatedImagePaths.get(rendered.itemId);
+      if (savedPath) {
+        return {
+          ...rendered,
+          media: { ...rendered.media, url: pathToFileURL(savedPath).href },
+        };
+      }
+    }
+    return rendered;
+  });
 }
 
 function rendererPart(part: SurfaceMessagePart): RendererMessagePart {
@@ -1412,18 +1446,128 @@ function skillsChangedPayload(
 }
 
 function rendererToolPart(part: SurfaceMessageToolPart): RendererToolPart {
+  const metadata = boundedToolMetadata(part.metadata);
+  const input = toolInputProjection(part.input);
+  const output = toolOutputProjection(part.output);
   return {
-    ...part,
+    type: 'tool',
+    id: part.id,
     kind: part.kind ?? 'generic',
+    title: boundedToolLabel(part.title),
+    status: part.status,
+    ...(part.statusText ? { statusText: boundedToolStatus(part.statusText, part.status) } : {}),
+    ...(input !== undefined ? { input } : {}),
+    ...(output !== undefined ? { output } : {}),
+    ...(metadata ? { metadata } : {}),
   };
 }
 
 function rendererToolUpdate(update: SurfaceMessageToolPartUpdate): RendererToolPartUpdate {
-  const { fallbackToolPart, ...rest } = update;
+  const { fallbackToolPart } = update;
+  const metadata = boundedToolMetadata(update.metadata);
+  const input = toolInputProjection(update.input);
+  const output = toolOutputProjection(update.output);
   return {
-    ...rest,
+    itemId: update.itemId,
+    ...(update.title !== undefined ? { title: boundedToolLabel(update.title) } : {}),
+    ...(update.status !== undefined ? { status: update.status } : {}),
+    ...(update.statusText !== undefined ? { statusText: update.statusText === null ? null : boundedToolStatus(update.statusText, update.status ?? 'running') } : {}),
+    ...(input !== undefined ? { input } : {}),
+    ...(output !== undefined ? { output } : {}),
+    ...(metadata ? { metadata } : {}),
     ...(fallbackToolPart ? { fallbackToolPart: rendererToolPart(fallbackToolPart) } : {}),
   };
+}
+
+function boundedToolLabel(value: string): string {
+  const bytes = Buffer.byteLength(value);
+  return bytes <= MAX_TOOL_LABEL_BYTES
+    ? value
+    : `${value.slice(0, MAX_TOOL_LABEL_BYTES)}…`;
+}
+
+function boundedToolStatus(value: string, fallback: SurfaceMessageToolPart['status']): string {
+  return Buffer.byteLength(value) <= MAX_TOOL_STATUS_BYTES ? value : fallback;
+}
+
+const toolInputPresentationKeys = new Set([
+  'app', 'appName', 'branchName', 'bundleIdentifier', 'changes', 'command', 'commandActions',
+  'cwd', 'deltaY', 'destinationPath', 'displayId', 'element_index', 'name', 'path', 'pid',
+  'query', 'repoPath', 'rootElementIndex', 'scope', 'title', 'to', 'type', 'url', 'x', 'y',
+]);
+
+const toolOutputPresentationKeys = new Set([
+  'answers', 'app', 'apps', 'externalUrl', 'localizedName', 'name', 'path', 'prompt',
+  'recipientName', 'result', 'structuredContent', 'url',
+]);
+
+function toolInputProjection(value: unknown): unknown {
+  return boundedStructuredValue(toolPresentationProjection(value, toolInputPresentationKeys));
+}
+
+function toolOutputProjection(value: unknown): unknown {
+  return boundedStructuredValue(toolPresentationProjection(value, toolOutputPresentationKeys));
+}
+
+function toolPresentationProjection(value: unknown, keys: ReadonlySet<string>, depth = 0): unknown {
+  if (depth > 4 || value === null || value === undefined) return undefined;
+  if (typeof value === 'boolean' || typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    return Buffer.byteLength(value) <= MAX_TOOL_LABEL_BYTES ? value : undefined;
+  }
+  if (Array.isArray(value)) {
+    if (value.length > 100) return undefined;
+    const projected = value
+      .map((entry) => toolPresentationProjection(entry, keys, depth + 1))
+      .filter((entry) => entry !== undefined);
+    return projected.length > 0 ? projected : undefined;
+  }
+  if (typeof value !== 'object') return undefined;
+
+  const projected: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (!keys.has(key)) continue;
+    if (key === 'answers') {
+      const answers = boundedStructuredValue(entry);
+      if (answers !== undefined) projected[key] = answers;
+      continue;
+    }
+    const child = toolPresentationProjection(entry, keys, depth + 1);
+    if (child !== undefined) projected[key] = child;
+  }
+  return Object.keys(projected).length > 0 ? projected : undefined;
+}
+
+function boundedStructuredValue(value: unknown): unknown {
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined || Buffer.byteLength(serialized) > MAX_TOOL_METADATA_BYTES) return undefined;
+    return JSON.parse(serialized) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function boundedToolMetadata(metadata: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!metadata) return undefined;
+  try {
+    if (Buffer.byteLength(JSON.stringify(metadata)) <= MAX_TOOL_METADATA_BYTES) return { ...metadata };
+  } catch {
+    // Retain only small scalar identity fields below.
+  }
+
+  const bounded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (
+      value === null ||
+      typeof value === 'boolean' ||
+      typeof value === 'number' ||
+      (typeof value === 'string' && Buffer.byteLength(value) <= 4 * 1024)
+    ) {
+      bounded[key] = value;
+    }
+  }
+  return Object.keys(bounded).length > 0 ? bounded : undefined;
 }
 
 function statusFromSnapshot(snapshot: CodexConversationSnapshot): AgentStatus {
