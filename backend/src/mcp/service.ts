@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -288,7 +289,7 @@ export class ClawMcpService {
     }
     if (assignment.agentId !== agent.id) {
       const assignedAgent = this.snapshot.agents.find((candidate) => candidate.id === assignment.agentId);
-      throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent?.name ?? assignment.agentId}, not ${agent.name}.`);
+      throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent ? agentDisplayName(assignedAgent) : assignment.agentId}, not ${agentDisplayName(agent)}.`);
     }
 
     const completionInstructions = status === 'completed' ? this.loopCompletionInstructionsForAssignment(assignment.loopId) : '';
@@ -476,7 +477,7 @@ export class ClawMcpService {
           suggestedBranchName: input.branchName ?? suggestedWorkBranch(input.task),
           sharedFolderAgentNames: this.snapshot.agents
             .filter((candidate) => candidate.id !== agent.id && candidate.folder === agent.folder)
-            .map((candidate) => candidate.name),
+            .map((candidate) => agentDisplayName(candidate)),
         },
       },
     };

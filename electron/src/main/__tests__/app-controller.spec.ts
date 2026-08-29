@@ -904,8 +904,6 @@ describe('AppController', () => {
     const updateInput: UpdateAgentInput = {
       id: 'agent-dina',
       name: 'Backend Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
     };
     const moveInput: MoveAgentToTeamInput = {
       agentId: 'agent-dina',

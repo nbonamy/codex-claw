@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus, WorkRoutingResult } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 
 export type McpAgentInfo = {
   id: string;
@@ -183,7 +184,7 @@ export class ClawMcpAgentCoordinator {
       success: true,
       message: 'Message sent successfully. The recipient will process it when they are idle.',
       recipientId: recipient.id,
-      recipientName: recipient.name,
+      recipientName: agentDisplayName(recipient),
     };
   }
 
@@ -419,7 +420,7 @@ export class ClawMcpAgentCoordinator {
     }
 
     const normalized = identifier.toLowerCase();
-    const nameMatches = visibleAgents.filter((agent) => agent.name.toLowerCase() === normalized);
+    const nameMatches = visibleAgents.filter((agent) => agentDisplayName(agent).toLowerCase() === normalized);
     if (nameMatches.length > 1) {
       throw new McpToolError(`Failed to send message: Recipient name '${identifier}' is ambiguous. Use the recipient ID from list-agents.`);
     }
@@ -447,16 +448,17 @@ export class ClawMcpAgentCoordinator {
   private toAgentInfo(agent: Agent): McpAgentInfo {
     return {
       id: agent.id,
-      name: agent.name,
+      name: agentDisplayName(agent),
       folder: agent.folder,
       status: agent.statusText ? `${agentStatusLabel(agent.status)}: ${agent.statusText}` : agentStatusLabel(agent.status),
     };
   }
 
   private toMessageInfo(message: McpMessage): MessageInfo {
+    const sender = this.findAgent(message.from);
     return {
       id: message.id,
-      from: this.findAgent(message.from)?.name ?? message.from,
+      from: sender ? agentDisplayName(sender) : message.from,
       fromId: message.from,
       content: message.content,
       timestamp: message.timestamp.toISOString(),
@@ -490,13 +492,13 @@ export class ClawMcpAgentCoordinator {
       return `Agent '${identifier}' not found. No agents are currently available.`;
     }
 
-    const entries = agents.map((agent) => `- ${agent.id}: ${agent.name} (${agent.folder})`).join('\n');
+    const entries = agents.map((agent) => `- ${agent.id}: ${agentDisplayName(agent)} (${agent.folder})`).join('\n');
     return `Agent '${identifier}' not found. Visible agents:\n\n${entries}`;
   }
 }
 
 function matchesAgent(agent: Agent, identifier: string): boolean {
-  return agent.id === identifier || agent.name.toLowerCase() === identifier.toLowerCase();
+  return agent.id === identifier || agentDisplayName(agent).toLowerCase() === identifier.toLowerCase();
 }
 
 function agentStatusLabel(status: AgentStatus): string {

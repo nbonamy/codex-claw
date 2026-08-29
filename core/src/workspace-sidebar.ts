@@ -1,4 +1,5 @@
 import type { Agent, AgentStatus } from './contracts';
+import { agentDisplayName } from './agent-display';
 
 export type WorkspaceSidebarSession = {
   agentId: string;
@@ -71,11 +72,10 @@ export function projectWorkspaceSidebar(input: {
       groups.set(id, group);
     }
 
-    const agentName = agent.name.trim();
-    const sessionLabel = agentName || (isGit ? workspace.branch ?? 'Detached HEAD' : folderBasename(agent.folder));
+    const sessionLabel = agentDisplayName(agent);
     group.sessions.push({
       agentId: agent.id,
-      title: agent.name,
+      title: agent.name ?? '',
       displayTitle: sessionLabel,
       branch: isGit ? workspace.branch : null,
       folder: agent.folder,
@@ -97,8 +97,4 @@ function workspaceSessionKind(agent: Agent): WorkspaceSidebarSession['kind'] {
   if (!workspace.branch) return 'detached';
   if (workspace.isLinkedWorktree) return 'worktree';
   return workspace.branch === 'main' || workspace.branch === 'master' ? 'main' : 'branch';
-}
-
-function folderBasename(folder: string): string {
-  return folder.replace(/\\/gu, '/').split('/').filter(Boolean).at(-1) ?? folder;
 }

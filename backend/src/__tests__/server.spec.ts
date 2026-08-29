@@ -514,6 +514,7 @@ describe('ClawBackendServer', () => {
 
     const invalidRequests: Array<[string, unknown, string]> = [
       [backendMethods.agentCreate, { input: { name: '', folder: '' } }, 'name'],
+      [backendMethods.agentUpdate, { input: { id: 'agent-1', name: 42 } }, 'agent name'],
       [backendMethods.agentFork, { agentId: 'agent-1', messageIndex: -1 }, 'fork message index'],
       [backendMethods.agentOpenInApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
       [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],
@@ -3517,7 +3518,6 @@ describe('ClawBackendServer', () => {
 
   it('owns agent CRUD and layout mutations', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
-    const nextTempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-next-'));
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -3556,10 +3556,10 @@ describe('ClawBackendServer', () => {
         jsonrpc: '2.0',
         id: 'update-agent',
         method: 'agent/update',
-        params: { input: { id: agentId, name: 'Dina Backend', folder: nextTempDir, backend: 'codex' } },
+        params: { input: { id: agentId, name: 'Dina Backend' } },
       })).resolves.toMatchObject({
         result: {
-          agents: [{ id: agentId, name: 'Dina Backend', folder: nextTempDir }],
+          agents: [{ id: agentId, name: 'Dina Backend', folder: tempDir }],
         },
       });
       await expect(server.handleMessage({
@@ -3624,7 +3624,6 @@ describe('ClawBackendServer', () => {
     } finally {
       await server.close();
       await rm(tempDir, { recursive: true, force: true });
-      await rm(nextTempDir, { recursive: true, force: true });
     }
   });
 
@@ -5433,13 +5432,26 @@ describe('ClawBackendServer', () => {
       teamId: 'team-test',
       name: 'Dina',
       folder: '/Users/nbonamy/src/codex-claw',
+      workspace: {
+        kind: 'git',
+        folder: '/Users/nbonamy/src/codex-claw-work-routing',
+        repositoryName: 'codex-claw',
+        repositoryRoot: '/Users/nbonamy/src/codex-claw-work-routing',
+        branch: 'codex-claw-work-routing',
+        isLinkedWorktree: true,
+        primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
-      status: { type: 'idle' },
+      status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const setConversationTitle = vi.fn().mockResolvedValue(undefined);
+    const titleSyncResolves: Array<() => void> = [];
+    const setConversationTitle = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+      titleSyncResolves.push(resolve);
+    }));
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -5460,7 +5472,7 @@ describe('ClawBackendServer', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
-    await expect(server.handleMessage({
+    const renameResponse = server.handleMessage({
       jsonrpc: '2.0',
       id: 'rename-agent',
       method: 'agent/update',
@@ -5470,18 +5482,43 @@ describe('ClawBackendServer', () => {
           name: 'Dina Renamed',
         },
       },
-    })).resolves.toMatchObject({
+    });
+    await flushMicrotasks();
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    await expect(renameResponse).resolves.toMatchObject({
       result: {
         agents: [{ id: 'agent-dina', name: 'Dina Renamed' }],
       },
     });
 
-    expect(setConversationTitle).toHaveBeenCalledOnce();
-    expect(setConversationTitle).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'agent-dina', name: 'Dina Renamed' }),
+    const clearResponse = server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'clear-agent-name',
+      method: 'agent/update',
+      params: { input: { id: 'agent-dina', name: null } },
+    });
+    await flushMicrotasks();
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    await expect(clearResponse).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', name: null }],
+      },
+    });
+
+    expect(setConversationTitle).toHaveBeenCalledTimes(2);
+    expect(setConversationTitle).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ id: 'agent-dina' }),
       'Dina Renamed',
     );
+    expect(setConversationTitle).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: 'agent-dina', name: null }),
+      'work-routing',
+    );
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    for (const resolveTitleSync of titleSyncResolves) resolveTitleSync();
+    await flushMicrotasks();
     await server.close();
   });
 

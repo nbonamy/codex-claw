@@ -3064,7 +3064,7 @@ describe('useAppState', () => {
     await state.updateTeam({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
     await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
-    await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
+    await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime' });
     await state.forkActiveAgentMessage(4);
     await state.duplicateAgent('agent-jules');
     await state.forkAgent('agent-jules');
@@ -3083,7 +3083,7 @@ describe('useAppState', () => {
     expect(updateTeam).toHaveBeenCalledWith({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
     expect(reorderAgents).toHaveBeenCalledWith({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
-    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
+    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
     expect(forkAgent).toHaveBeenNthCalledWith(1, 'agent-jules', 4);
     expect(forkAgent).toHaveBeenNthCalledWith(2, 'agent-jules');
@@ -3217,7 +3217,7 @@ describe('useAppState', () => {
     await state.closeTeam('team-codex-claw');
     await state.selectTeam('team-codex-claw');
     await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
-    await state.updateAgent({ id: 'agent-dina', name: 'Ignored', folder: '/tmp/ignored' });
+    await state.updateAgent({ id: 'agent-dina', name: 'Ignored' });
     await state.duplicateAgent('agent-dina');
     await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-codex-claw' });
     await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-dina', beforeAgentId: null });

@@ -421,6 +421,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
@@ -932,7 +933,7 @@ const agentMentionGroups = computed<readonly CodexComposerMentionGroup[]>(() => 
     items: activeTeamAgents.value.map((agent) => ({
       id: agent.id,
       value: `agent:${agent.id}`,
-      label: agent.name,
+      label: agentDisplayName(agent),
       payload: { agentId: agent.id },
     })),
   }];
@@ -1664,7 +1665,8 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
 
   const workItem = await resolvePullRequestBranch(input.item);
 
-  const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgent.name}` : sourceAgent.name;
+  const sourceAgentName = agentDisplayName(sourceAgent);
+  const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgentName}` : sourceAgentName;
   if (!await confirmAssignedWorkItemOverride(workItem, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
     throw new Error('Assignment cancelled.');
   }
@@ -1672,7 +1674,7 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
   const targetAgent = input.target === 'duplicate'
     ? await props.duplicateAgentAction(sourceAgent.id, {
         select: false,
-        name: `${sourceAgent.name} gh-${workItem.number}`,
+        name: `${sourceAgentName} gh-${workItem.number}`,
       })
     : sourceAgent;
   if (!targetAgent) throw new Error('The duplicate agent could not be created.');

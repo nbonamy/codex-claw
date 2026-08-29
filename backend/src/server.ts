@@ -18,6 +18,7 @@ import { teamColors } from '@codex-claw/core/team-colors';
 import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/core/approval-presets';
 import { formatConversationTitle } from '@codex-claw/core/conversation-title';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { createEntityId } from '@codex-claw/core/ids';
 import { BackendDriverRpc } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
@@ -428,25 +429,15 @@ export class ClawBackendServer {
       case backendMethods.agentUpdate: {
         const input = requireAgentUpdateInput(message.params);
         return this.routeAgentSnapshotRequest(message.id, input.id, backendMethods.agentUpdate, { input }, async (existingAgent) => {
-          await this.validateAgentInput({
-            name: input.name.trim() ? input.name : existingAgent.name,
-            folder: input.folder ?? existingAgent.folder,
-          }, this.remoteConnectionIdForAgent(existingAgent));
           const previousName = existingAgent.name;
-          const previousFolder = existingAgent.folder;
           const agent = updateAgentFromInput(this.snapshot, input);
           if (!agent) {
             throw new Error(`Agent not found: ${input.id}`);
           }
-          if (agent.name !== previousName && agent.backendSession) {
-            await this.updateConversationTitle(agent.id);
-          }
-          if (agent.folder !== previousFolder) {
-            await this.refreshAgentWorkspaceIdentity(agent.id);
-          }
+          const shouldSyncConversationTitle = agent.name !== previousName && Boolean(agent.backendSession);
           const snapshot = await this.persistAndEmitSnapshot();
-          if (agent.folder !== previousFolder) {
-            await this.refreshAgentGitStatus(input.id);
+          if (shouldSyncConversationTitle) {
+            void this.updateConversationTitle(agent.id);
           }
           return snapshot;
         });
@@ -3115,7 +3106,7 @@ export class ClawBackendServer {
 
     const folder = await this.agentGitService.createBranch(agent.folder, branchName, true);
     const delegated = duplicateAgentInSnapshot(this.snapshot, agent.id, undefined, undefined, {
-      name: delegatedAgentName(agent.name, branchName),
+      name: delegatedAgentName(agentDisplayName(agent), branchName),
       select: false,
     });
     if (!delegated) {
@@ -3128,7 +3119,7 @@ export class ClawBackendServer {
     this.resolveWorkRouting(request.id, {
       mode: 'delegated',
       agentId: delegated.id,
-      agentName: delegated.name,
+      agentName: agentDisplayName(delegated),
       branchName,
       folder,
     });
@@ -3358,7 +3349,11 @@ function requireAgentCreateInput(params: unknown): CreateAgentInput {
 
 function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
   const record = requireRecord(params);
-  return requireRecord(record.input) as UpdateAgentInput;
+  const input = requireRecord(record.input);
+  return {
+    id: requireString(input.id, 'agent id'),
+    name: input.name === null ? null : requireString(input.name, 'agent name'),
+  };
 }
 
 function requireAgentOpenInApplicationUpdate(params: unknown): {
@@ -3703,7 +3698,7 @@ function validateBenchTemplateInput(input: CreateBenchTemplateInput): void {
 
 function benchTemplateInputFromAgent(agent: Agent): CreateBenchTemplateInput {
   return {
-    name: agent.name,
+    name: agentDisplayName(agent),
     ...(agent.avatar ? { avatar: agent.avatar } : {}),
     folder: agent.folder,
     backend: agent.backend,

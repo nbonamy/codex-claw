@@ -165,7 +165,7 @@ export type AgentWorkspaceIdentity =
 export type Agent = {
   id: string;
   teamId?: string;
-  name: string;
+  name: string | null;
   avatar?: string;
   folder: string;
   workspace?: AgentWorkspaceIdentity;
@@ -1425,10 +1425,7 @@ export type ReorderTeamsInput = {
 
 export type UpdateAgentInput = {
   id: string;
-  name: string;
-  folder?: string;
-  avatar?: string;
-  backend?: AgentBackend;
+  name: string | null;
 };
 
 export type DuplicateAgentOptions = {

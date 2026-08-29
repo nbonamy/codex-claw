@@ -73,6 +73,7 @@ describe('AppStatePersistence', () => {
 
   it('round-trips workspace identity and ignores invalid legacy metadata', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].name = null;
     snapshot.agents[0].workspace = {
       kind: 'git',
       folder: '/Users/nbonamy/src/codex-claw-feature',
@@ -88,7 +89,10 @@ describe('AppStatePersistence', () => {
       agents: Array<Record<string, unknown>>;
     };
 
-    expect(snapshotFromPersistedState(persisted).agents[0].workspace).toStrictEqual(snapshot.agents[0].workspace);
+    expect(snapshotFromPersistedState(persisted).agents[0]).toMatchObject({
+      name: null,
+      workspace: snapshot.agents[0].workspace,
+    });
     persisted.agents[0].workspace = { kind: 'git', repositoryName: 42 };
     expect(snapshotFromPersistedState(persisted).agents[0].workspace).toBeUndefined();
   });

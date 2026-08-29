@@ -36,6 +36,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { CodexMessageList, type CodexConversationLink } from '@codex-app-sdk/vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentSubagentTree, RendererMessage } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { provideClawToolPresentation } from '../tool-presentation';
 
 const props = withDefaults(defineProps<{
@@ -55,7 +56,10 @@ const emit = defineEmits<{
 const { t } = useI18n();
 provideClawToolPresentation(
   (key, params) => t(key, params ?? {}),
-  (identifier) => props.agents?.find((agent) => agent.id === identifier)?.name,
+  (identifier) => {
+    const agent = props.agents?.find((candidate) => candidate.id === identifier);
+    return agent ? agentDisplayName(agent) : undefined;
+  },
 );
 
 const messages = ref<RendererMessage[]>([]);

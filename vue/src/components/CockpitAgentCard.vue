@@ -16,11 +16,11 @@
       <AgentAvatar
         v-if="repositoryIcon"
         :avatar="repositoryIcon"
-        :name="agent.name"
+        :name="displayName"
         size="lg"
       />
       <div class="cockpit-view__agent-title">
-        <strong>{{ agent.name }}</strong>
+        <strong>{{ displayName }}</strong>
         <span>{{ folderBasename(agent.folder) }}</span>
       </div>
       <span
@@ -44,12 +44,12 @@
         v-model="promptDraft"
         :disabled="!canReceivePrompt"
         :placeholder="canReceivePrompt ? 'Send prompt...' : 'Working...'"
-        :aria-label="`Prompt ${agent.name}`"
+        :aria-label="`Prompt ${displayName}`"
       >
       <button
         type="submit"
         :disabled="!canSubmitPrompt"
-        :aria-label="`Send prompt to ${agent.name}`"
+        :aria-label="`Send prompt to ${displayName}`"
       >
         <SendIcon aria-hidden="true" />
       </button>
@@ -60,6 +60,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { Agent, WorkItem } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
@@ -85,6 +86,7 @@ const promptDraft = ref('');
 const canReceivePrompt = computed(() => agentCanReceivePrompt(props.agent));
 const canSubmitPrompt = computed(() => canReceivePrompt.value && Boolean(promptDraft.value.trim()));
 const dropReady = computed(() => Boolean(props.draggedWorkItem && canReceivePrompt.value));
+const displayName = computed(() => agentDisplayName(props.agent));
 
 function submitPrompt(): void {
   if (!canSubmitPrompt.value) {

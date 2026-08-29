@@ -103,6 +103,13 @@ describe('workspace sidebar projection', () => {
       .toMatchObject({ displayTitle: 'feat/sidebar' });
   });
 
+  it('removes the repository prefix from an unnamed agent branch', () => {
+    const agent = gitAgent('agent-unnamed', null, '/src/codex-claw-work-routing', 'codex-claw-work-routing', true);
+
+    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
+      .toMatchObject({ displayTitle: 'work-routing' });
+  });
+
   it('uses the Git origin as the stable repository preference key', () => {
     const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
     if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
@@ -134,7 +141,7 @@ describe('workspace sidebar projection', () => {
   });
 });
 
-function baseAgent(id: string, name: string, folder: string): Agent {
+function baseAgent(id: string, name: string | null, folder: string): Agent {
   return {
     id,
     teamId: 'team-test',
@@ -149,7 +156,7 @@ function baseAgent(id: string, name: string, folder: string): Agent {
 
 function gitAgent(
   id: string,
-  name: string,
+  name: string | null,
   folder: string,
   branch: string,
   linked: boolean,

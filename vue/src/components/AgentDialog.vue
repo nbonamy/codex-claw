@@ -36,7 +36,6 @@
                   type="text"
                   aria-label="Agent name"
                   placeholder="Name this agent"
-                  :disabled="!canEdit"
                 />
               </div>
             </div>
@@ -61,7 +60,7 @@
                 id="agent-dialog-repository"
                 v-model="repositoryControlValue"
                 class="agent-dialog__workspace-select"
-                :disabled="!canEdit || choosingFolder"
+                :disabled="choosingFolder"
                 @update:model-value="selectRepositoryControl"
               >
                 <el-option
@@ -94,7 +93,7 @@
                 id="agent-dialog-worktree"
                 v-model="selectedSourceWorktreePath"
                 class="agent-dialog__workspace-select"
-                :disabled="!canEdit || Boolean(initialNewWorktreeBranchName.trim())"
+                :disabled="Boolean(initialNewWorktreeBranchName.trim())"
                 @update:model-value="selectWorktreeControl"
               >
                 <el-option
@@ -171,7 +170,6 @@
                   type="text"
                   aria-label="Agent name"
                   placeholder="Name this agent"
-                  :disabled="!canEdit"
                 />
               </div>
             </div>
@@ -201,14 +199,6 @@
           </div>
         </div>
       </section>
-
-      <el-alert
-        v-if="!canEdit"
-        title="Agent must be idle before editing."
-        type="warning"
-        :closable="false"
-        show-icon
-      />
 
       <el-alert
         v-if="errorMessage"
@@ -335,7 +325,6 @@ const loadingRemoteSourceRepositories = ref(false);
 const remoteFolderDialogVisible = ref(false);
 
 const isEditing = computed(() => props.mode === 'edit');
-const canEdit = computed(() => !isEditing.value || props.agent?.status.type === 'idle');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
 const title = computed(() => isEditing.value ? 'Edit agent' : 'New agent');
 const submitLabel = computed(() => isEditing.value ? 'Save' : 'Create agent');
@@ -380,7 +369,6 @@ const teamCanSave = computed(() => (
   (teamSelection.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : teamSelection.value.trim().length > 0)
 ));
 const canSave = computed(() => (
-  canEdit.value &&
   !submitting.value &&
   (isEditing.value || (
     name.value.trim().length > 0 &&
@@ -625,7 +613,7 @@ async function submit(): Promise<void> {
 
       await props.updateAgent({
         id: props.agent.id,
-        name: name.value,
+        name: name.value.trim() || null,
       });
     } else {
       await ensureInitialWorktree();
@@ -672,7 +660,7 @@ function resetForm(): void {
   submitting.value = false;
   choosingFolder.value = false;
   if (isEditing.value && props.agent) {
-    name.value = props.agent.name;
+    name.value = props.agent.name ?? '';
     return;
   }
 

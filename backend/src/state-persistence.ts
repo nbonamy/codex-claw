@@ -352,7 +352,7 @@ function isSubagentActivityKind(value: unknown): value is SubagentActivity['kind
 }
 
 function sanitizeAgent(value: unknown): Agent | null {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string' || typeof value.folder !== 'string') {
+  if (!isRecord(value) || typeof value.id !== 'string' || (value.name !== null && typeof value.name !== 'string') || typeof value.folder !== 'string') {
     return null;
   }
 
@@ -369,7 +369,7 @@ function sanitizeAgent(value: unknown): Agent | null {
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
-    name: value.name,
+    name: typeof value.name === 'string' ? value.name : null,
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
     ...(workspace ? { workspace } : {}),

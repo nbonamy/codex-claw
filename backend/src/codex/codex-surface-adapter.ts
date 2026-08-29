@@ -30,6 +30,7 @@ import type {
 import type { BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type {
   CodexConversationEvent,
@@ -512,7 +513,7 @@ export class CodexSurfaceAgentAdapter {
     if (!threadId) throw new Error('Codex did not create a conversation.');
     const session = this.bindRuntime(agent, threadId, true, false);
     try {
-      await this.renameSessionIfNeeded(session, agent.name);
+      await this.renameSessionIfNeeded(session, agentDisplayName(agent));
     } catch {
       // Naming is best effort and must not prevent the first prompt. clawd
       // retries through its normal post-session title synchronization.

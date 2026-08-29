@@ -1,6 +1,7 @@
 import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, DuplicateAgentOptions, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
+import { agentDisplayName } from './agent-display';
 
 export function duplicateAgentInSnapshot(
   snapshot: AppSnapshot,
@@ -80,7 +81,7 @@ export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, created
   }
 
   return saveBenchTemplateToSnapshot(snapshot, {
-    name: agent.name,
+    name: agentDisplayName(agent),
     avatar: agent.avatar,
     folder: agent.folder,
     backend: agent.backend,
@@ -438,7 +439,7 @@ function copiedAgent(
   return {
     id: uniqueAgentId(snapshot, createId),
     teamId: source.teamId ?? activeTeamId(snapshot),
-    name: name?.trim() || `${source.name} (${suffix})`,
+    name: name?.trim() || `${agentDisplayName(source)} (${suffix})`,
     avatar: source.avatar,
     folder: source.folder,
     ...(source.workspace ? { workspace: { ...source.workspace } } : {}),

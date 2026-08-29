@@ -139,10 +139,10 @@
                 <AgentAvatar
                   v-if="repositoryIconForAgent(row.agent, repositoryIcons)"
                   :avatar="repositoryIconForAgent(row.agent, repositoryIcons)"
-                  :name="row.agent.name"
+                  :name="agentDisplayName(row.agent)"
                   size="sm"
                 />
-                <span>{{ row.agent.name }}</span>
+                <span>{{ agentDisplayName(row.agent) }}</span>
               </template>
               <template v-else>
                 <span v-for="label in row.item.labels.slice(0, 2)" :key="label.name" class="cockpit-inbox__label">{{ label.name }}</span>
@@ -260,6 +260,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
 import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';

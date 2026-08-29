@@ -172,7 +172,7 @@ describe('AgentDialog', () => {
 
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
-      name: '',
+      name: null,
     });
   });
 
@@ -243,18 +243,22 @@ describe('AgentDialog', () => {
     });
   });
 
-  it('disables editing for non-idle agents', () => {
+  it('allows renaming non-idle agents', async () => {
+    const updateAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({
       agent: {
         ...idleAgent,
         status: { type: 'working', detail: 'Running tests' },
       },
       mode: 'edit',
+      updateAgent,
     });
 
-    expect(wrapper.text()).toContain('Agent must be idle before editing.');
-    expect(wrapper.get('.agent-dialog__text-input').attributes()).toHaveProperty('disabled');
-    expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
+    expect(wrapper.text()).not.toContain('Agent must be idle before editing.');
+    await wrapper.get('.agent-dialog__text-input').setValue('Dina Live');
+    await saveButton(wrapper).trigger('click');
+
+    expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-dina', name: 'Dina Live' });
   });
 
   it('keeps dialog open and shows errors from create/update failures', async () => {

@@ -21,11 +21,11 @@
         v-if="repositoryIcon"
         class="agent-header__avatar"
         :avatar="repositoryIcon"
-        :name="agent.name"
+        :name="displayName"
         size="sm"
       />
       <div class="agent-header__agent-line">
-        <strong>{{ agent.name }}</strong>
+        <strong>{{ displayName }}</strong>
         <span
           class="agent-header__folder"
           :title="agent.folder"
@@ -144,6 +144,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { BacklogIcon, ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
@@ -189,6 +190,8 @@ const emit = defineEmits<{
   'open-in': [application: OpenInApplication];
   'select-subagent': [conversationId: string];
 }>();
+
+const displayName = computed(() => props.agent ? agentDisplayName(props.agent) : '');
 
 const displaySubagentTree = computed(() => {
   const tree = props.subagentTree;

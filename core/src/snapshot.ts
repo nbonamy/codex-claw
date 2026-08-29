@@ -168,29 +168,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   if (!agent) {
     return null;
   }
-  if (agent.status.type !== 'idle') {
-    throw new Error('Agent must be idle before editing.');
-  }
-
-  const nextFolder = input.folder === undefined ? agent.folder : normalizedFolder(input.folder);
-  const folderChanged = nextFolder !== agent.folder;
-  const nextBackend = normalizedBackend(input.backend ?? agent.backend);
-  const backendChanged = nextBackend !== agent.backend;
-  agent.name = normalizedAgentName(input.name, nextFolder);
-  if ('avatar' in input) {
-    agent.avatar = normalizedOptionalString(input.avatar);
-  }
-  agent.folder = nextFolder;
-  agent.backend = nextBackend;
-  if (backendChanged) {
-    agent.backendDefaults = defaultBackendDefaults(nextBackend);
-  }
-  if (folderChanged || backendChanged) {
-    clearAgentRuntimeState(agent);
-  }
-  if (folderChanged) {
-    delete agent.workspace;
-  }
+  agent.name = normalizedOptionalString(input.name) ?? null;
   agent.updatedAt = updatedAt;
 
   return agent;
@@ -2507,7 +2485,7 @@ function normalizedFolder(folder: string): string {
   return folder.trim();
 }
 
-function normalizedOptionalString(value: string | undefined): string | undefined {
+function normalizedOptionalString(value: string | null | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized || undefined;
 }

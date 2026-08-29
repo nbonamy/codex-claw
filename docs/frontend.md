@@ -129,7 +129,7 @@ implemented:
   team explicitly marks the agent it opens as read; selecting an agent or
   focusing its active thread does the same. The macOS Dock badge shows the
   number of unread agent threads;
-- persisted View-menu compact session-list mode with repository groups, session names, and status icons;
+- persisted View-menu compact session-list mode with repository groups, session names, and status icons; custom agent names are optional, and unnamed Git sessions use their branch name after removing a leading `<repository>-` prefix;
 - agent context actions for duplicating configuration or forking the active
   backend conversation; both insert the new selected agent directly below the
   source agent;
