@@ -14,6 +14,7 @@ describe('StartWorkMenu', () => {
       global: { plugins: [ElementPlus] },
     });
 
+    expect(wrapper.getComponent({ name: 'ElPopover' }).props('width')).toBe(240);
     expect(wrapper.get('[aria-label="New session"]').text()).toBe('New session');
     await wrapper.get('[aria-label="New session"]').trigger('click');
 

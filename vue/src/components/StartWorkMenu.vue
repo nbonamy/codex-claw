@@ -3,7 +3,7 @@
     v-model:visible="visible"
     placement="bottom-start"
     trigger="click"
-    :width="292"
+    :width="240"
     popper-class="claw-popover start-work-menu__popover"
   >
     <template #reference>
