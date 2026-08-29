@@ -3097,6 +3097,13 @@ export class ClawBackendServer {
       if (request.payload.request.sharedFolderAgentNames.length > 0) {
         throw new Error(`This folder is also used by ${request.payload.request.sharedFolderAgentNames.join(', ')}. Delegate to a worktree instead.`);
       }
+      const gitStatus = await this.agentGitService.status(agent.folder);
+      if (gitStatus.state === 'dirty') {
+        throw new Error('This checkout has uncommitted changes. Commit, stash, or delegate to a worktree instead.');
+      }
+      if (gitStatus.state === 'unknown') {
+        throw new Error('Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.');
+      }
       const folder = await this.agentGitService.createBranch(agent.folder, branchName, false);
       await this.refreshAgentWorkspaceIdentity(agent.id);
       await this.persistAndEmitSnapshot();
