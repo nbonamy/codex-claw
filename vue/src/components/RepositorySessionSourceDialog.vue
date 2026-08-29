@@ -171,7 +171,6 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 .repository-session-source-dialog__tabs :deep(.el-tabs__nav-wrap::after),
-.repository-session-source-dialog__tabs :deep(.el-tabs__active-bar),
 .repository-session-source-dialog__tabs :deep(.el-tabs__content) {
   display: none;
 }
@@ -180,7 +179,6 @@ function onVisibilityChanged(visible: boolean): void {
   height: auto;
   padding: var(--space-3) var(--space-6);
   border: 0;
-  border-radius: var(--radius-full);
   color: var(--color-text-muted);
   background: transparent;
   font-size: var(--font-size-13);
@@ -190,7 +188,7 @@ function onVisibilityChanged(visible: boolean): void {
 
 .repository-session-source-dialog__tabs :deep(.el-tabs__item.is-active) {
   color: var(--color-text);
-  background: var(--color-surface-base);
+  background: transparent;
 }
 
 .repository-session-source-dialog__repository {
