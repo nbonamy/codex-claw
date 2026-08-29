@@ -113,7 +113,7 @@ export function createCodexClawMcpServer(
   server.registerTool('create-agent', {
     description: 'Create a new Codex Claw agent in your team. Can optionally create a new git worktree first.',
     inputSchema: {
-      name: z.string().optional().describe('Name for the agent. Defaults to the folder basename.'),
+      name: z.string().optional().describe('Optional custom name. When omitted, the agent displays its branch or folder name.'),
       avatar: z.string().optional().describe('Avatar text or emoji for the agent.'),
       backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to codex.'),
       repoPath: z.string().describe('Repository or worktree folder path.'),

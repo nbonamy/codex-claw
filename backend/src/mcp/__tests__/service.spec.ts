@@ -460,6 +460,16 @@ describe('ClawMcpService', () => {
       success: false,
       message: 'branchName is required when createWorktree is true',
     });
+
+    const unnamed = await postJson(callerUrl, {
+      jsonrpc: '2.0', id: 5, method: 'tools/call',
+      params: { name: 'create-agent', arguments: { repoPath: '/tmp/branch-agent' } },
+    });
+    expect(unnamed.result.structuredContent).toMatchObject({
+      success: true,
+      message: 'Created agent branch-agent.',
+    });
+    expect(snapshot.agents.at(-1)).toMatchObject({ name: null, folder: '/tmp/branch-agent' });
   });
 
   it('requires loop completion instructions before confirming work completion', async () => {

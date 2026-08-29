@@ -460,7 +460,7 @@ export class ClawMcpService {
     return {
       success: true,
       agentId: createdAgent.id,
-      message: `Created agent ${createdAgent.name}.`,
+      message: `Created agent ${agentDisplayName(createdAgent)}.`,
     };
   }
 
