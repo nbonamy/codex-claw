@@ -203,9 +203,11 @@ Input: none.
 Visibility is team-scoped. Agents with a `teamId` see agents in the same team.
 Agents without a team see other no-team agents.
 
-Output uses unique agent IDs, display names, folders, and status. If several
-visible agents share the same display name, `send-message` uses the agent ID as
-the disambiguator.
+Output uses unique agent IDs, display names, folders, and status. An agent name
+is an optional custom label; when it is absent, model-facing output uses the
+same branch-or-folder fallback as the product UI instead of rendering `null`.
+If several visible agents share the same display name, `send-message` uses the
+agent ID as the disambiguator.
 
 ### `set-status`
 

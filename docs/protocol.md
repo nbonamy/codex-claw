@@ -186,7 +186,7 @@ of the current protocol.
 | `settings/codexResourceSharing/get` | none | `CodexResourceSharingStatus` | Reports whether an enabled existing home still needs explicit migration. |
 | `settings/codexResourceSharing/set` | `{ input: { enabled: true } \| { enabled: false, mode: "fresh" \| "copy" \| "keep" } }` | `AppSnapshot` | Links or isolates Claw skills/plugins; folder-changing modes require idle chats. |
 | `source/folders/list` | `{ path?, remoteConnectionId? }` | `SourceFolderListing` | Lists child directories from local or remote `clawd`; when `path` is omitted, the target backend starts at its `$HOME`. Used by renderer fake folder pickers without desktop filesystem access. |
-| `source/repositories/list` | `{ remoteConnectionId? }` | `SourceRepository[]` | Scans the configured source folder in local `clawd` or the selected remote `clawd`. |
+| `source/repositories/list` | `{ remoteConnectionId? }` | `SourceRepository[]` | Scans the configured source folder in local `clawd` or the selected remote `clawd`; each repository may include a canonical credential-free `remoteIdentity` for exact remote matching. |
 | `source/worktree/path/suggest` | `{ input: { repoPath, branchName, remoteConnectionId? } }` | `string` | Backend-owned path policy in local or remote location. |
 | `source/worktrees/list` | `{ repoPath, remoteConnectionId? }` | `SourceWorktree[]` | Runs `git worktree list --porcelain` in local or remote `clawd`. |
 | `source/worktree/create` | `{ input: CreateSourceWorktreeInput }` | `SourceWorktree` | Runs `git worktree add` in local or remote `clawd`. Local creations persist recent repo metadata. |
@@ -194,6 +194,12 @@ of the current protocol.
 Folder and save dialogs are not backend protocol messages. Electron may return
 selected paths through desktop IPC, but all validation, listing, creation, and
 state mutation happen in `clawd`.
+
+Snapshot agents may persist an optional `conversationTitle` for the current
+provider session. This display metadata is updated locally before the
+best-effort provider title update, so a slow provider request never blocks the
+renderer. Agent `name` remains an optional custom label; `null` restores the
+branch or folder-derived display fallback.
 
 When the source folder path is unset or was persisted as empty, `clawd`
 initializes it before repository listing by trying `~/src`, `~/code`, `~/dev`,

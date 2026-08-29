@@ -107,7 +107,9 @@ type AgentStatus =
 Codex app-server owns the conversation transcript and thread history in
 `CODEX_HOME`. Codex Claw owns only product state: teams, agents, selected
 folders, the global source folder, Bench templates, view preferences, theme
-preference, and backend session metadata such as the Codex thread id.
+preference, workspace identity, current-conversation display metadata, and
+backend session metadata such as the Codex thread id. Persisted Git remote
+identities are canonical and credential-free.
 
 Bench templates are reusable saved agents, not active sessions. Saving an agent
 to Bench captures the deployable shape: name, avatar, folder, backend, and
@@ -117,7 +119,8 @@ later we may allow multiple templates for the same folder if the product needs
 different roles or model defaults.
 
 On a fresh install, create a default team when no teams exist. Do not create a
-default agent automatically; an empty team shows the New Agent empty state.
+default agent automatically; an empty team offers the same local folder,
+GitHub repository, and explicit repository URL sources as **Add project**.
 
 ## Source Folder And Repo Discovery
 
@@ -150,11 +153,12 @@ then refreshes discovery. Renderer code and MCP tools request this through
 typed app APIs; they never scan arbitrary folders or spawn git directly.
 
 The renderer uses source repositories only as creation affordances: Settings
-chooses or clears the source folder, the agent dialog can pick a discovered
-repo, asks `clawd` for that repo's explicit worktree list, or browses another
-folder, and new worktree creation can feed back into agent creation. The Claw
-MCP server exposes the same app-owned operations with `list-repos`,
-`list-worktrees`, `create-worktree`, and `create-agent`.
+chooses or clears the source folder; **Add project** can open a discovered
+local repository, clone a connected GitHub repository, or clone an explicit
+repository URL; and repository-level session creation can use the default
+branch or create a named worktree. The Claw MCP server exposes the same
+app-owned operations with `list-repos`, `list-worktrees`, `create-worktree`,
+and `create-agent`.
 
 ## Process Architecture
 

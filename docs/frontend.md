@@ -368,7 +368,7 @@ implemented:
   `Command+9` hints; pressing the matching number switches agents;
 - focused artifact panes for documents, plans, and read-only source previews;
 - Bench entry point in the agent creation flow;
-- repository-first Start work entry points. A prominent New session row at the
+- repository-first Start work entry points. A prominent Add project row at the
   top of Sessions opens the shared app menu for an existing local folder or
   repository, a connected GitHub repository, or an explicit HTTPS/SSH Git URL.
   Empty teams show those same three project-acquisition menu items inline
@@ -380,9 +380,8 @@ implemented:
   Selecting a checked-out branch creates its session directly; selecting any
   other local or remote branch creates an isolated worktree automatically;
   issue and pull-request selections reuse the existing contextual assignment
-  flow. The lower-level New Agent dialog remains available for custom identity,
-  workspace, Bench, and experimental Claude Code choices, while resolved paths
-  and clone commands stay backend-owned and hidden;
+  flow. Custom agent creation remains available from Cockpit and Bench flows,
+  while resolved paths and clone commands stay backend-owned and hidden;
 - a theme-aware What’s New dialog that embeds the complete released changelog,
   opens on the current version, allows browsing previous versions, and opens
   from both the native Help menu and lower-left account menu;
@@ -551,13 +550,19 @@ folder icon through the shared identity picker, using a preset emoji, one
 custom grapheme, or a cropped image without changing the canonical repository
 identity. The picker is teleported outside the scrollable sidebar and opens to
 the right of the repository row so it remains fully visible. Custom icons are
-keyed by Git origin when available and fall back to the canonical local folder
-for repositories without a remote, so they survive restarts and linked-worktree
-path changes. Repository identity replaces agent-owned avatars: agent forms do
+keyed by a canonical, credential-free Git remote identity when available and
+fall back to the canonical local folder for repositories without a remote, so
+they survive restarts and linked-worktree path changes without persisting Git
+credentials. Repository identity replaces agent-owned avatars: agent forms do
 not expose an avatar field, and headers, Cockpit cards, and assignment surfaces
 show the repository icon or omit the identity image when the repository has no
-custom icon. Session rows show the agent name when one exists and otherwise
-fall back to the branch name; never synthesize a mixed branch-and-agent label.
+custom icon. Session rows show the persisted current-conversation title when
+available, then the optional agent name, and otherwise the branch name; never
+synthesize a mixed branch-and-agent label. Duplicate labels are disambiguated
+by the shared projection, and composer mentions add repository/branch context
+while retaining the stable agent ID. Repository collapse keys are persisted in
+general settings. The sidebar has no permanent conversation-history footer;
+**Resume session** in the agent menu opens the compact searchable history dialog.
 
 ## Rendering Surfaces
 

@@ -57,6 +57,7 @@ type AgentWorkspaceIdentity =
       branch: string | null;
       isLinkedWorktree: boolean;
       primaryWorktreeRoot: string;
+      originUrl?: string; // credential-free persisted remote identity
       updatedAt: string;
     }
   | {
@@ -105,8 +106,12 @@ summary/title changes, resume, and applicable rename. Never invoke
 - `projectWorkspaceSidebar`: framework-independent repository/session grouping,
   ordering, kind, and label projection.
 
-Reuse existing context menu, conversation history, New Agent, resize, collapse,
-and Bench behavior. Keep repository grouping dense, borderless, and quiet.
+Keep the agent context menu, resize, shortcuts, and Bench behavior. Conversation
+history opens on demand through **Resume session** in the agent menu. The
+sidebar-level creation entry point is **Add project**, offering the same local,
+GitHub, and explicit-URL sources shown inline for an empty team. Agent editing
+changes only the optional custom name; clearing it stores `null` and restores
+the branch fallback. Keep repository grouping dense, borderless, and quiet.
 
 ### Work routing
 
@@ -172,7 +177,7 @@ Checkpoint: `feat: route work into branches and worktrees`
 ### Phase 5 — Mentions, history, and migration polish
 
 - Contextualize mention labels.
-- Finish on-demand history integration.
+- Finish on-demand history integration through the compact Resume session dialog.
 - Finalize compact mode and group-collapse persistence.
 - Validate old snapshots and fallback states.
 - Update frontend, MCP, protocol, and architecture docs.
@@ -184,10 +189,10 @@ Checkpoint: `feat: finish workspace-first navigation`
 
 - [x] Workspace identity contract, persistence, reconciliation, and cleanup.
 - [x] Pure repository/session projection with Quick chats fallback.
-- [x] Repository-first AppShell sidebar with existing actions preserved.
+- [x] Repository-first AppShell sidebar with approved context actions and Add project entry points.
 - [x] Work-routing request flow for current checkout, branch, and worktree.
 - [x] Dense visual pass with colored session kinds and persisted repository icons.
-- [ ] Contextual mention labels and remaining history/migration polish.
+- [x] Contextual mention labels and remaining history/migration polish.
 
 ## Testing
 
@@ -231,9 +236,10 @@ lint, typecheck, Vue style checks, diff check, and desktop visual smoke.
 ## Migration and non-goals
 
 Existing agents require no destructive migration. Preserve agent IDs, names,
-avatars, teams, sessions, Bench templates, unread state, and ordering. Keep the
-old flat component until the new one reaches parity. Compact mode changes row
-density rather than restoring avatars.
+avatars, teams, sessions, Bench templates, unread state, and ordering. Legacy
+repository icon keys and workspace remotes are normalized to credential-free
+canonical identities while loading. The superseded flat sidebar is removed;
+compact mode changes row density rather than restoring avatars.
 
 This work does not remove teams or agents, replace provider session management,
 eagerly load all conversations, change Cockpit information architecture,
@@ -245,7 +251,7 @@ invent a Git project database, or expose provider protocol types to Vue.
 - A single main session still renders under a repository header.
 - Worktrees appear beneath their canonical repository.
 - Routing updates the hierarchy immediately and survives restart.
-- Existing actions, shortcuts, unread, and status behavior remain available.
+- Approved context actions, shortcuts, unread, and status behavior remain available.
 - Mentions remain stable and understandable.
 - No periodic Git-status requests are introduced.
 - Existing user data migrates without loss.
