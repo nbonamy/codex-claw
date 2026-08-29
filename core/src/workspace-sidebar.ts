@@ -122,17 +122,21 @@ export function projectAgentMentionLabels(agents: readonly Agent[]): AgentMentio
 
 function disambiguateDuplicateSessionLabels(groups: WorkspaceSidebarGroup[]): void {
   const sessions = groups.flatMap((group) => group.sessions.map((session) => ({ group, session })));
+  const namedSessions = sessions.filter(({ session }) => session.customName !== null);
   const counts = labelCounts(sessions.map(({ session }) => session.displayTitle));
-  const candidates = sessions.map(({ group, session }) => {
+  const candidates = namedSessions.map(({ group, session }) => {
     if ((counts.get(normalizedLabel(session.displayTitle)) ?? 0) < 2) return session.displayTitle;
     const context = session.branch && normalizedLabel(session.branch) !== normalizedLabel(session.displayTitle)
       ? session.branch
       : group.label;
     return `${session.displayTitle} · ${context}`;
   });
-  const disambiguated = disambiguateLabels(candidates.map((label, index) => ({ agentId: sessions[index]!.session.agentId, label })));
+  const disambiguated = disambiguateLabels(candidates.map((label, index) => ({
+    agentId: namedSessions[index]!.session.agentId,
+    label,
+  })));
   disambiguated.forEach(({ label }, index) => {
-    sessions[index]!.session.displayTitle = label;
+    namedSessions[index]!.session.displayTitle = label;
   });
 }
 

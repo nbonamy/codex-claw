@@ -361,6 +361,36 @@ describe('AgentSidebar', () => {
     expect(wrapper.get('.agent-sidebar__meta strong').text()).toBe('main');
   });
 
+  it('does not append repository names to duplicate unnamed branch titles', () => {
+    const computerUseAgent: Agent = {
+      ...agents[0]!,
+      id: 'agent-computer-use',
+      name: null,
+      folder: '~/src/computer-use',
+      workspace: {
+        kind: 'git',
+        folder: '~/src/computer-use',
+        repositoryName: 'computer-use',
+        repositoryRoot: '~/src/computer-use',
+        branch: 'main',
+        isLinkedWorktree: false,
+        primaryWorktreeRoot: '~/src/computer-use',
+        updatedAt: '2026-06-05T00:00:00.000Z',
+      },
+    };
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0]!, name: null }, computerUseAgent],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.findAll('.agent-sidebar__meta strong').map((title) => title.text()))
+      .toStrictEqual(['main', 'main']);
+  });
+
   it('renders persisted repository collapse state and emits controlled updates', async () => {
     const repositoryKey = 'remote:github.com/nbonamy/id8';
     const wrapper = mount(AgentSidebar, {
