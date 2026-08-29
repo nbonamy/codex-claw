@@ -22,11 +22,9 @@
     </template>
 
     <div class="repository-session-source-dialog__toolbar">
-      <div class="repository-session-source-dialog__tabs" role="tablist" aria-label="Session source type">
-        <button v-for="option in tabs" :key="option.id" type="button" role="tab" :aria-selected="tab === option.id" :class="{ 'is-active': tab === option.id }" @click="tab = option.id">
-          {{ option.label }}
-        </button>
-      </div>
+      <el-tabs v-model="tab" class="repository-session-source-dialog__tabs" aria-label="Session source type">
+        <el-tab-pane v-for="option in tabs" :key="option.id" :name="option.id" :label="option.label" />
+      </el-tabs>
       <span class="repository-session-source-dialog__repository"><RepositoryIcon aria-hidden="true" />{{ repositoryName }}</span>
     </div>
 
@@ -165,12 +163,21 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 .repository-session-source-dialog__tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  min-width: 0;
 }
 
-.repository-session-source-dialog__tabs button {
+.repository-session-source-dialog__tabs :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+.repository-session-source-dialog__tabs :deep(.el-tabs__nav-wrap::after),
+.repository-session-source-dialog__tabs :deep(.el-tabs__active-bar),
+.repository-session-source-dialog__tabs :deep(.el-tabs__content) {
+  display: none;
+}
+
+.repository-session-source-dialog__tabs :deep(.el-tabs__item) {
+  height: auto;
   padding: var(--space-3) var(--space-6);
   border: 0;
   border-radius: var(--radius-full);
@@ -181,7 +188,7 @@ function onVisibilityChanged(visible: boolean): void {
   cursor: pointer;
 }
 
-.repository-session-source-dialog__tabs button.is-active {
+.repository-session-source-dialog__tabs :deep(.el-tabs__item.is-active) {
   color: var(--color-text);
   background: var(--color-surface-base);
 }

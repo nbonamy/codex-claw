@@ -35,4 +35,25 @@ describe('RepositorySessionSourceDialog', () => {
     await rows[1].trigger('click');
     expect(wrapper.emitted('select-branch')).toStrictEqual([[branches[1]]]);
   });
+
+  it('uses Element Plus tabs to switch the searchable source type', async () => {
+    const wrapper = mount(RepositorySessionSourceDialog, {
+      props: {
+        visible: true,
+        repositoryName: 'codex-claw',
+        branches,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    const tabs = wrapper.findAll('[role="tab"]');
+    expect(tabs.map((candidate) => candidate.text())).toStrictEqual(['Branches', 'Pull requests', 'Issues']);
+    await tabs[1]!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[aria-label="Search session sources"]').attributes('placeholder'))
+      .toBe('Search by title, number, author, or URL');
+    expect(wrapper.text()).toContain('Recent pull requests');
+  });
 });
