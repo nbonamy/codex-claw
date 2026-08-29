@@ -90,11 +90,12 @@ Current implementation checkpoint:
   source folder path to use as a dialog default and whether display sleep should
   be prevented.
 - `clawd` owns durable snapshot loading and saving. Electron retains only
-  transcript-free snapshot metadata for menus and native effects. Full snapshots
-  are short-lived values fetched from `snapshot/get` while synchronizing or
-  crossing IPC to the renderer; Electron does not keep transcript bodies, read
-  or write `state.json`, keep a local snapshot service shim, or validate agent
-  folders before backend mutations.
+  transcript-free snapshot metadata for menus and native effects.
+  `snapshot/get` also returns a transcript-free snapshot (`messages: []`) so
+  reconnect synchronization stays bounded; the renderer restores the selected
+  transcript through lazy `agent/history/hydrate` events. Electron does not
+  keep transcript bodies, read or write `state.json`, keep a local snapshot
+  service shim, or validate agent folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
   they do not perform direct product-state updates. Desktop-native state is
   fetched from `client/state/get` or received on backend events instead of
@@ -547,9 +548,10 @@ type ClawBackendEvent = {
 ```
 
 The backend should keep a bounded event buffer. `snapshot/get` should return
-the current snapshot and the latest event sequence so a reloaded renderer can
-detect gaps. A later `events/since` request can replay recent events when we
-need multi-window or reconnect support.
+current transcript-free snapshot metadata and the latest event sequence so a
+reloaded renderer can detect gaps without serializing cached conversations.
+Transcripts use lazy history hydration. A later `events/since` request can
+replay recent events when we need multi-window or reconnect support.
 
 ## Transport Design
 
@@ -991,9 +993,10 @@ Remote migration path:
 - Agents do not move across backend locations. A local agent can move only
   between local teams; a remote agent remains owned by its remote team. To use
   a different location, create or deploy an agent in that location.
-- `snapshot/get` returns a projected client snapshot. Local `clawd` overlays
-  remote team state onto local remote-team pointers for the UI, but it does not
-  persist remote agents as local proxy agents.
+- `snapshot/get` returns a transcript-free projected client snapshot. Local
+  `clawd` overlays remote team metadata onto local remote-team pointers for the
+  UI, but it does not transfer conversation messages through synchronization
+  snapshots or persist remote agents as local proxy agents.
 - Remote backend events are filtered through the same ownership boundary:
   agent-scoped events only fan out locally when the remote agent belongs to a
   connected remote-team pointer.

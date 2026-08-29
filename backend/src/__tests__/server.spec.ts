@@ -1505,7 +1505,7 @@ describe('ClawBackendServer', () => {
       result: {
         snapshot: {
           agents: [expect.objectContaining({ id: remoteAgent.id, teamId: 'team-pointer' })],
-          messages: [expect.objectContaining({ id: 'message-remote', agentId: remoteAgent.id })],
+          messages: [],
           agentGitStatuses: {
             [remoteAgent.id]: expect.objectContaining({ branch: 'main' }),
           },
@@ -1635,6 +1635,32 @@ describe('ClawBackendServer', () => {
         },
       },
     });
+  });
+
+  it('keeps synchronization snapshots bounded when cached transcripts are large', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.messages.push(createTextMessage(
+      'message-large-transcript',
+      'agent-dina',
+      'A'.repeat(1_000_000),
+    ));
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'bounded-snapshot',
+      method: backendMethods.snapshotGet,
+    });
+
+    expect(JSON.stringify(response).length).toBeLessThan(100_000);
+    const responseSnapshot = (response as { result: { snapshot: AppSnapshot } }).result.snapshot;
+    expect(responseSnapshot.messages).toStrictEqual([]);
+    expect(snapshot.messages).toHaveLength(1);
+    await server.close();
   });
 
   it('derives client state from backend-owned snapshot state', async () => {

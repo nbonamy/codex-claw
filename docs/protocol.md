@@ -65,7 +65,9 @@ synced after this change.
   and Codex remote control is connected; Electron applies that reason only on
   AC power. Keeping the reasons separate prevents the remote-access power policy
   from changing the existing agent-activity behavior.
-- `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`.
+- `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`. Its
+  `snapshot` is a valid `AppSnapshot` with `messages: []`; transcripts are
+  deliberately excluded from synchronization frames.
 - `LoopLocation`: optional loop/work-provider location selector:
   `{ kind: "local" }` or `{ kind: "remote", remoteConnectionId }`.
 - `BenchLocation`: optional Bench catalog location selector with the same
@@ -83,14 +85,16 @@ Electron and the renderer both synchronize with a subscribe-buffer-snapshot
 barrier: subscribe first, buffer notifications while reading `snapshot/get`,
 discard buffered events at or below `lastEventSeq`, then apply only contiguous
 events above it. A gap triggers a fresh snapshot barrier. Duplicate deltas are
-therefore never replayed after reconnect or renderer reload.
+therefore never replayed after reconnect or renderer reload. The selected
+conversation is restored separately through `agent/history/hydrate`, keeping
+the synchronization barrier bounded even for very long threads.
 
 ## Client To `clawd`: Core
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `backend/health/get` | none | `ClawBackendHealth` | Liveness and version check. |
-| `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes source folder if needed and returns the authoritative snapshot. |
+| `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes source folder if needed and returns the authoritative transcript-free synchronization snapshot (`messages: []`). |
 | `client/state/get` | none | `ClientState` | Backend-derived client hints only. |
 | `client/request/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Resolves a provider-owned approval or ask-user request. |
 

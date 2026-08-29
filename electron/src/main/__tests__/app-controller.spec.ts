@@ -318,7 +318,7 @@ describe('AppController', () => {
     expect(currentClientState(controller)).toStrictEqual(clientState);
   });
 
-  it('forwards full snapshots to the renderer without retaining transcript bodies in main', async () => {
+  it('forwards transcript-free synchronization snapshots to the renderer', async () => {
     const backendSnapshot = createInitialSnapshot();
     backendSnapshot.messages.push({
       id: 'large-history-message',
@@ -334,7 +334,7 @@ describe('AppController', () => {
     });
     backendClient.request = vi.fn(async (method: string) => {
       if (method === backendMethods.snapshotGet) {
-        return { snapshot: backendSnapshot, lastEventSeq: 0, clientState };
+        return { snapshot: { ...backendSnapshot, messages: [] }, lastEventSeq: 0, clientState };
       }
       if (method === backendMethods.clientStateGet) return clientState;
       return {};
@@ -346,7 +346,7 @@ describe('AppController', () => {
 
     const rendererState = await callPrivate<RendererSnapshotState>(controller, 'getSnapshotState');
 
-    expect(rendererState.snapshot.messages).toStrictEqual(backendSnapshot.messages);
+    expect(rendererState.snapshot.messages).toStrictEqual([]);
     expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
 
