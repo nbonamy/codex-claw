@@ -1,19 +1,19 @@
 <template>
   <IdentityPicker
     class="repository-icon-picker"
-    :aria-label="`Change icon for ${label}`"
-    choose-image-aria-label="Choose repository image"
-    choose-image-label="Pick image…"
-    crop-title="Adjust repository icon"
-    custom-apply-aria-label="Use custom repository icon"
-    custom-character-aria-label="Custom repository icon"
-    :dialog-label="`Choose icon for ${label}`"
-    empty-label="Use default repository icon"
+    :aria-label="t('repositories.icon.change', { repository: label })"
+    :choose-image-aria-label="t('repositories.icon.chooseImage')"
+    :choose-image-label="t('repositories.icon.chooseImageAction')"
+    :crop-title="t('repositories.icon.cropTitle')"
+    :custom-apply-aria-label="t('repositories.icon.customApply')"
+    :custom-character-aria-label="t('repositories.icon.customCharacter')"
+    :dialog-label="t('repositories.icon.dialog', { repository: label })"
+    :empty-label="t('repositories.icon.empty')"
     :model-value="modelValue"
     :name="label"
-    preset-noun="repository icon"
+    :preset-noun="t('repositories.icon.title')"
     :show-hint="false"
-    title="Repository icon"
+    :title="t('repositories.icon.title')"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <template #fallback>
@@ -24,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { FolderOpenIcon, FolderRootIcon } from '../shared/icons/app-icons';
 import IdentityPicker from '../shared/identity/IdentityPicker.vue';
 
@@ -36,6 +37,8 @@ defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [icon: string | undefined];
 }>();
+
+const { t } = useI18n();
 </script>
 
 <style scoped>

@@ -39,13 +39,13 @@
           <el-button
             :type="buttonType"
             class="new-agent-button__chevron"
-            aria-label="Open Bench"
+            :aria-label="$t('surface.newAgentButton.openBench')"
             @click="toggleMenu"
           >
             <ChevronDown />
           </el-button>
         </template>
-        <div v-if="menuVisible" class="new-agent-menu" role="menu" aria-label="New agent options">
+        <div v-if="menuVisible" class="new-agent-menu" role="menu" :aria-label="$t('surface.newAgentButton.newAgentOptions')">
           <button
             class="new-agent-menu__create"
             type="button"
@@ -53,13 +53,11 @@
             @click="createFromMenu"
           >
             <PlusCircleIcon class="new-agent-menu__create-icon" />
-            <span>Create New Agent</span>
+            <span>{{ $t('surface.newAgentButton.createNewAgent') }}</span>
           </button>
 
-          <div class="new-agent-menu__section">Bench</div>
-          <p v-if="bench.length === 0" class="new-agent-menu__empty">
-            Right-click an agent → Save to Bench
-          </p>
+          <div class="new-agent-menu__section">{{ $t('surface.newAgentButton.bench') }}</div>
+          <p v-if="bench.length === 0" class="new-agent-menu__empty"> {{ $t('surface.newAgentButton.rightClickAnAgentSaveToBench') }} </p>
           <template v-else>
             <div
               v-for="template in bench"
@@ -80,7 +78,7 @@
               <button
                 class="new-agent-menu__delete"
                 type="button"
-                :aria-label="`Remove ${template.name} from Bench`"
+                :aria-label="$t('dynamic.bench.remove', { name: template.name })"
                 @click="confirmRemoveTemplate(template)"
               >
                 <Trash2Icon class="new-agent-menu__delete-icon" />
@@ -94,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, ref } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import type { BenchTemplate } from '@codex-claw/core/contracts';
@@ -112,7 +111,7 @@ const props = withDefaults(defineProps<{
   tone?: NewAgentButtonTone;
 }>(), {
   bench: () => [],
-  label: 'New Agent',
+  label: translate('surface.newAgentButton.newAgent'),
   presentation: 'default',
   showBenchMenu: true,
   size: 'regular',
@@ -159,11 +158,11 @@ async function confirmRemoveTemplate(template: BenchTemplate): Promise<void> {
 
   try {
     await ElMessageBox.confirm(
-      `${template.name} will be removed from Bench. Existing agents stay unchanged.`,
-      `Remove ${template.name} from Bench?`,
+      translate('dynamic.bench.removeDetail', { name: template.name }),
+      translate('dynamic.bench.removeConfirm', { name: template.name }),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Remove',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('dynamic.bench.removeAction'),
         type: 'warning',
       },
     );

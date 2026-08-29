@@ -10,19 +10,19 @@
       <button
         class="start-work-menu__trigger"
         type="button"
-        aria-label="Add project"
+        :aria-label="t('startWork.addProject')"
       >
         <PlusCircleIcon aria-hidden="true" />
-        <span>Add project</span>
+        <span>{{ t('startWork.addProject') }}</span>
       </button>
     </template>
 
     <div class="start-work-menu">
-      <span class="start-work-menu__heading">Add project from</span>
+      <span class="start-work-menu__heading">{{ t('startWork.addProjectFrom') }}</span>
       <AppMenu
         class="app-menu--embedded"
-        ariaLabel="Add project from"
-        :items="startWorkMenuItems"
+        :ariaLabel="t('startWork.addProjectFrom')"
+        :items="menuItems"
         @select="select"
       />
     </div>
@@ -30,7 +30,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { PlusCircleIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import { isStartWorkAction, startWorkMenuItems, type StartWorkAction } from './start-work-actions';
@@ -39,7 +40,9 @@ const emit = defineEmits<{
   select: [action: StartWorkAction];
 }>();
 
+const { t } = useI18n();
 const visible = ref(false);
+const menuItems = computed(() => startWorkMenuItems(t));
 
 function select(action: string): void {
   if (!isStartWorkAction(action)) return;

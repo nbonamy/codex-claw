@@ -4,7 +4,7 @@
     :model-value="visible"
     :teleported="false"
     width="520px"
-    aria-label="Resume session"
+    :aria-label="t('sessions.resume')"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
@@ -15,8 +15,8 @@
           ref="filterInput"
           v-model="history.query.value"
           type="search"
-          placeholder="Filter sessions"
-          aria-label="Filter sessions"
+          :placeholder="t('sessions.filter')"
+          :aria-label="t('sessions.filter')"
           autocomplete="off"
           spellcheck="false"
         >
@@ -25,10 +25,10 @@
 
     <section class="conversation-history-dialog__body">
       <div class="conversation-history-dialog__sessions" aria-live="polite">
-        <p v-if="history.loading.value" class="conversation-history-dialog__state">Loading sessions…</p>
+        <p v-if="history.loading.value" class="conversation-history-dialog__state">{{ t('sessions.loading') }}</p>
         <p v-else-if="history.error.value" class="conversation-history-dialog__state conversation-history-dialog__state--error">{{ history.error.value }}</p>
         <p v-else-if="history.filteredSessions.value.length === 0" class="conversation-history-dialog__state">
-          {{ history.sessions.value.length === 0 ? 'No sessions yet.' : 'No matching sessions.' }}
+          {{ history.sessions.value.length === 0 ? t('sessions.none') : t('sessions.noMatch') }}
         </p>
         <template v-else>
           <button
@@ -42,8 +42,8 @@
           >
             <MessageCircleIcon aria-hidden="true" />
             <strong :class="{ 'conversation-history-dialog__title--empty': !session.title.trim() }">{{ history.sessionTitle(session) }}</strong>
-            <span v-if="history.isCurrentSession(session)" class="conversation-history-dialog__badge">Current</span>
-            <small>{{ relativeSessionDate(session.updatedAt) }}</small>
+            <span v-if="history.isCurrentSession(session)" class="conversation-history-dialog__badge">{{ t('sessions.current') }}</span>
+            <small>{{ relativeSessionDate(session.updatedAt, Date.now(), t) }}</small>
           </button>
         </template>
       </div>
@@ -53,6 +53,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
 import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/core/contracts';
 import { MessageCircleIcon } from '../shared/icons/app-icons';
@@ -72,12 +73,14 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+const { t } = useI18n();
 const filterInput = ref<HTMLInputElement | null>(null);
 const history = useSessionHistory({
   agent: () => props.agent,
   visible: () => props.visible,
   listConversations: (agentId) => props.listConversations(agentId),
   resumeConversation: (agentId, conversationRef) => props.resumeConversation(agentId, conversationRef),
+  translate: t,
 });
 
 watch(() => props.visible, async (visible) => {

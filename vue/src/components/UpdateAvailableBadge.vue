@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { translate } from '../i18n';
 import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
 
 const props = defineProps<{
@@ -17,7 +18,7 @@ function title(): string {
   if (props.status.version) {
     return `Update ${props.status.version} available. Restart Codex Claw to install.`;
   }
-  return 'Update available. Restart Codex Claw to install.';
+  return translate('surface.updateAvailableBadge.updateAvailableRestartCodexClawToInstall');
 }
 </script>
 
@@ -29,9 +30,7 @@ function title(): string {
     :title="title()"
     :aria-label="title()"
     @click="emit('install')"
-  >
-    Update available
-  </button>
+  > {{ $t('surface.updateAvailableBadge.updateAvailable') }} </button>
 </template>
 
 <style scoped>

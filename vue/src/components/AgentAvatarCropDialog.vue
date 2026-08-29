@@ -42,20 +42,19 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="emit('cancel')">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="emit('cancel')">{{ $t('surface.agentAvatarCropDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
           @click="apply"
-        >
-          Use Image
-        </button>
+        > {{ $t('surface.agentAvatarCropDialog.useImage') }} </button>
       </div>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ref, watch } from 'vue';
 import { clampAvatarCropPan, cropImageDataUrl, type AvatarCropPan } from './agent-avatar-crop';
 
@@ -64,7 +63,7 @@ const props = withDefaults(defineProps<{
   title?: string;
   visible: boolean;
 }>(), {
-  title: 'Adjust Avatar',
+  title: translate('surface.agentAvatarCropDialog.adjustAvatar'),
 });
 
 const emit = defineEmits<{

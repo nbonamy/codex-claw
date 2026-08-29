@@ -2,7 +2,7 @@
   <section
     ref="panelRoot"
     class="plan-review-panel"
-    aria-label="Plan review"
+    :aria-label="$t('surface.planReviewPanel.planReview')"
   >
     <div class="plan-review-panel__markdown-frame">
       <MarkdownPanel

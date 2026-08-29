@@ -2649,8 +2649,8 @@ describe('ClawBackendServer', () => {
       payload: {
         kind: 'gitDiff',
         scope: 'turn',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
+        title: { key: 'panels.gitDiff' },
+        subtitle: { key: 'panels.currentTurn' },
         diff,
       },
     }));

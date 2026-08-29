@@ -1575,29 +1575,29 @@ function statusFromSnapshot(snapshot: CodexConversationSnapshot): AgentStatus {
   if (snapshot.error) return { type: 'error', message: snapshot.error };
   if (snapshot.threadStatus?.type === 'active') {
     if (snapshot.threadStatus.activeFlags.includes('waitingOnApproval')) {
-      return { type: 'awaitingInput', detail: 'Waiting for approval' };
+      return { type: 'awaitingInput', detail: { key: 'backend.awaitingApproval' } };
     }
     if (snapshot.threadStatus.activeFlags.includes('waitingOnUserInput')) {
-      return { type: 'awaitingInput', detail: 'Waiting for user input' };
+      return { type: 'awaitingInput', detail: { key: 'backend.awaitingUserInput' } };
     }
   }
   if (snapshot.clientRequests.length > 0 || snapshot.approvals.length > 0) {
-    return { type: 'awaitingInput', detail: 'Waiting for user input' };
+    return { type: 'awaitingInput', detail: { key: 'backend.awaitingUserInput' } };
   }
   return snapshot.busy ? { type: 'working' } : { type: 'idle' };
 }
 
 function runtimeStatus(snapshot: CodexSurfaceSnapshot): BackendRuntimeStatus {
   if (snapshot.status === 'connecting') {
-    return { backend: 'codex', status: 'starting', detail: 'Connecting to Codex app-server.' };
+    return { backend: 'codex', status: 'starting', detail: { key: 'backend.codexConnecting' } };
   }
   if (snapshot.status === 'ready') {
-    return { backend: 'codex', status: 'running', detail: 'Codex backend connected.' };
+    return { backend: 'codex', status: 'running', detail: { key: 'backend.codexConnected' } };
   }
   if (snapshot.status === 'error') {
     return { backend: 'codex', status: 'error', detail: snapshot.error ?? 'Codex app-server failed.' };
   }
-  return { backend: 'codex', status: 'notConfigured', detail: 'Codex backend is not connected yet.' };
+  return { backend: 'codex', status: 'notConfigured', detail: { key: 'backend.codexNotConnected' } };
 }
 
 function threadSettingsForPreset(preset: ApprovalPreset): Record<string, unknown> {

@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
   CodexComposerVoiceButton,
@@ -80,11 +81,11 @@ const props = withDefaults(defineProps<{
   description: '',
   commandEnterSubmit: false,
   initialValue: '',
-  label: 'Annotation comment',
+  label: translate('surface.annotationPopup.annotationComment'),
   placement: 'below',
-  placeholder: 'enter comment',
+  placeholder: translate('surface.annotationPopup.enterComment'),
   strategy: 'absolute',
-  submitLabel: 'Send annotation',
+  submitLabel: translate('dynamic.misc.sendAnnotation'),
 });
 
 const emit = defineEmits<{

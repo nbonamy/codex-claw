@@ -62,7 +62,11 @@ describe('useSessionHistory', () => {
 
     history.query.value = 'older';
     expect(history.filteredSessions.value.map((session) => session.id)).toStrictEqual(['thread-old']);
-    expect(relativeSessionDate('2026-06-10T09:30:00.000Z', Date.parse('2026-06-10T10:00:00.000Z'))).toBe('30m ago');
+    expect(relativeSessionDate(
+      '2026-06-10T09:30:00.000Z',
+      Date.parse('2026-06-10T10:00:00.000Z'),
+      translate,
+    )).toBe('30m ago');
   });
 
   it('resumes only an idle agent session and reports failures', async () => {
@@ -109,6 +113,21 @@ function createHistory(overrides: {
     visible: () => visible.value,
     listConversations: overrides.listConversations ?? vi.fn().mockResolvedValue(sessions),
     resumeConversation: overrides.resumeConversation ?? vi.fn().mockResolvedValue(undefined),
+    translate,
   }))!;
   return { agentRef, history, visible };
+}
+
+function translate(key: string, params?: Record<string, number>): string {
+  const messages: Record<string, string> = {
+    'sessions.loadError': 'Unable to load sessions',
+    'sessions.resumeError': 'Unable to resume session',
+    'sessions.currentTitle': 'Current session',
+    'sessions.untitled': 'Untitled session',
+    'sessions.now': 'now',
+    'sessions.minutesAgo': '{count}m ago',
+    'sessions.hoursAgo': '{count}h ago',
+    'sessions.daysAgo': '{count}d ago',
+  };
+  return (messages[key] ?? key).replace('{count}', String(params?.count ?? 0));
 }

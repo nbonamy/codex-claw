@@ -190,8 +190,8 @@
       <div class="backend-restart-overlay__card">
         <span class="backend-restart-overlay__spinner" aria-hidden="true" />
         <div class="backend-restart-overlay__copy">
-          <strong>Applying resource changes…</strong>
-          <span>Restarting the backend and reconnecting your chats.</span>
+          <strong>{{ $t('surface.app.applyingResourceChanges') }}</strong>
+          <span>{{ $t('surface.app.restartingTheBackendAndReconnectingYourChats') }}</span>
         </div>
       </div>
     </div>
@@ -200,6 +200,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, WorkRoutingMode } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
@@ -208,6 +209,9 @@ import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
 import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { localizedErrorMessage } from './i18n/errors';
+
+const { t } = useI18n();
 
 const {
   snapshot,
@@ -397,7 +401,7 @@ async function respondToWorkRouting(mode: WorkRoutingMode, branchName?: string):
       },
     });
   } catch (error) {
-    workRoutingError.value = error instanceof Error ? error.message : String(error);
+    workRoutingError.value = localizedErrorMessage(error, t);
   } finally {
     workRoutingBusy.value = false;
   }
@@ -411,7 +415,7 @@ async function cancelWorkRouting(): Promise<void> {
   try {
     await respondToClientRequest({ id: request.id, payload: { cancelled: true } });
   } catch (error) {
-    workRoutingError.value = error instanceof Error ? error.message : String(error);
+    workRoutingError.value = localizedErrorMessage(error, t);
   } finally {
     workRoutingBusy.value = false;
   }

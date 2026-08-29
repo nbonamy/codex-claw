@@ -15,14 +15,12 @@
         class="cockpit-view__add-drop-target"
         :class="{ 'cockpit-view__add-drop-target--active': activeDropTarget === 'new-agent' }"
         type="button"
-        :aria-label="`Assign issue to a new agent in ${teamName}`"
+        :aria-label="$t('dynamic.cockpit.assignNewAgent', { team: teamName })"
         @dragenter="activateDropTarget('new-agent', $event)"
         @dragover="activateDropTarget('new-agent', $event)"
         @dragleave="deactivateDropTarget('new-agent', $event)"
         @drop="dropToNewAgent"
-      >
-        Assign to New Agent
-      </button>
+      > {{ $t('surface.cockpitAddAgentTile.assignToNewAgent') }} </button>
       <button
         class="cockpit-view__add-drop-target"
         :class="{
@@ -30,21 +28,19 @@
           'cockpit-view__add-drop-target--disabled': !canAssignToBench,
         }"
         type="button"
-        :aria-label="`Assign issue to a Bench agent in ${teamName}`"
+        :aria-label="$t('dynamic.cockpit.assignBenchAgent', { team: teamName })"
         :disabled="!canAssignToBench"
         @dragenter="activateDropTarget('bench-agent', $event)"
         @dragover="activateDropTarget('bench-agent', $event)"
         @dragleave="deactivateDropTarget('bench-agent', $event)"
         @drop="dropToBenchAgent"
-      >
-        Assign to Bench Agent
-      </button>
+      > {{ $t('surface.cockpitAddAgentTile.assignToBenchAgent') }} </button>
     </div>
 
     <NewAgentButton
       v-else
       class="cockpit-view__add-button"
-      label="Add Agent"
+      :label="$t('surface.cockpitAddAgentTile.addAgent')"
       presentation="tile"
       tone="muted"
       :bench="bench"

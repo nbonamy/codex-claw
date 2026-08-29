@@ -504,14 +504,18 @@ function matchesAgent(agent: Agent, identifier: string): boolean {
 function agentStatusLabel(status: AgentStatus): string {
   switch (status.type) {
     case 'working':
-      return status.detail ?? 'Working';
+      return literalAppText(status.detail) ?? 'Working';
     case 'starting':
       return 'Starting';
     case 'awaitingInput':
-      return status.detail ?? 'Awaiting input';
+      return literalAppText(status.detail) ?? 'Awaiting input';
     case 'error':
-      return status.message ? `Error: ${status.message}` : 'Error';
+      return literalAppText(status.message) ? `Error: ${literalAppText(status.message)}` : 'Error';
     case 'idle':
       return 'Idle';
   }
+}
+
+function literalAppText(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }

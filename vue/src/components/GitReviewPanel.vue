@@ -1,5 +1,5 @@
 <template>
-  <section class="git-review-panel" aria-label="GitHub review">
+  <section class="git-review-panel" :aria-label="$t('surface.gitReviewPanel.gitHubReview')">
     <header class="git-review-panel__toolbar">
       <div class="git-review-panel__summary">
         <div class="git-review-panel__repository">
@@ -7,25 +7,25 @@
           <strong>{{ repositoryName }}</strong>
         </div>
         <div class="git-review-panel__branch">
-          <span>{{ gitStatus?.branch ?? 'Working tree' }}</span>
+          <span>{{ gitStatus?.branch ?? $t('surface.gitReviewPanel.workingTree') }}</span>
           <span v-if="gitStatus?.upstream" aria-hidden="true">→</span>
           <span v-if="gitStatus?.upstream" class="git-review-panel__upstream">{{ gitStatus.upstream }}</span>
         </div>
       </div>
 
-      <div class="git-review-panel__stats" aria-label="Diff statistics">
+      <div class="git-review-panel__stats" :aria-label="$t('surface.gitReviewPanel.diffStatistics')">
         <span class="git-review-panel__added">+{{ gitStatus?.addedLines ?? 0 }}</span>
         <span class="git-review-panel__removed">-{{ gitStatus?.removedLines ?? 0 }}</span>
       </div>
 
       <div ref="actionsRoot" class="git-review-panel__actions">
-        <button type="button" aria-label="Refresh repository diff" title="Refresh" @click="emit('refresh')">
+        <button type="button" :aria-label="$t('surface.gitReviewPanel.refreshRepositoryDiff')" :title="$t('surface.gitReviewPanel.refresh')" @click="emit('refresh')">
           <RefreshIcon aria-hidden="true" />
         </button>
         <button
           type="button"
-          aria-label="Review options"
-          title="Review options"
+          :aria-label="$t('surface.gitReviewPanel.reviewOptions')"
+          :title="$t('surface.gitReviewPanel.reviewOptions')"
           :aria-expanded="menuOpen"
           @click.stop="menuOpen = !menuOpen"
         >
@@ -34,7 +34,7 @@
         <AppMenu
           v-if="menuOpen"
           class="git-review-panel__menu"
-          ariaLabel="Review options"
+          :ariaLabel="$t('surface.gitReviewPanel.reviewOptions')"
           :items="menuItems"
           @select="selectMenuItem"
         />
@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { Agent, AgentGitDiffScope, AgentGitStatus } from '@codex-claw/core/contracts';
 import { DotsVerticalIcon, FileDiffIcon, FileTextIcon, GitCommitIcon, GitHubIcon, ListDetailsIcon, RefreshIcon, TextWrapDisabledIcon, TextWrapIcon } from '../shared/icons/app-icons';
@@ -94,9 +95,9 @@ const visibleDiff = computed(() => {
 const sectionMenuItems = computed<AppMenuItem[]>(() => {
   if (!props.panel.sections) return [];
   const labels: Record<AgentGitDiffScope, string> = {
-    staged: 'Staged changes',
-    unstaged: 'Unstaged changes',
-    untracked: 'Untracked files',
+    staged: translate('dynamic.misc.stagedChanges'),
+    unstaged: translate('dynamic.misc.unstagedChanges'),
+    untracked: translate('dynamic.misc.untrackedFiles'),
   };
   const icons = {
     staged: GitCommitIcon,
@@ -118,14 +119,14 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'word-wrap',
     type: 'checkbox',
-    label: 'Word wrap',
+    label: translate('surface.gitReviewPanel.wordWrap'),
     icon: wordWrap.value ? TextWrapIcon : TextWrapDisabledIcon,
     checked: wordWrap.value,
   },
   {
     id: allExpanded.value ? 'collapse-all' : 'expand-all',
     type: 'action',
-    label: allExpanded.value ? 'Collapse all' : 'Expand all',
+    label: allExpanded.value ? translate('surface.gitReviewPanel.collapseAll') : translate('surface.gitReviewPanel.expandAll'),
     icon: ListDetailsIcon,
   },
 ]);

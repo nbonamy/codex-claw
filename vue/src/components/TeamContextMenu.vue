@@ -5,7 +5,7 @@
     :style="menuStyle"
   >
     <AppMenu
-      ariaLabel="Team actions"
+      :ariaLabel="$t('surface.teamContextMenu.teamActions')"
       :items="menuItems"
       @select="selectMenuItem"
     />
@@ -13,6 +13,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { Team } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -42,13 +43,13 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'edit-team',
     type: 'action',
-    label: 'Edit Team',
+    label: translate('surface.teamContextMenu.editTeam'),
     icon: PencilIcon,
   },
   ...(props.team.remoteConnectionId ? [{
     id: 'disconnect-team',
     type: 'action' as const,
-    label: 'Disconnect',
+    label: translate('surface.teamContextMenu.disconnect'),
     icon: ExternalLinkIcon,
     disabled: !props.canClose,
   }] : []),
@@ -56,7 +57,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'close-team',
     type: 'action',
-    label: props.team.remoteConnectionId ? 'Delete Team' : 'Close Team',
+    label: props.team.remoteConnectionId ? translate('surface.teamContextMenu.deleteTeam') : translate('surface.teamContextMenu.closeTeam'),
     icon: props.team.remoteConnectionId ? Trash2Icon : X,
     danger: true,
     disabled: !props.canClose,

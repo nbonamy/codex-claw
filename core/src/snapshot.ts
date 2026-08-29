@@ -38,6 +38,7 @@ import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { workItemAssignmentKey } from './work-assignments';
+import { appText } from './app-text';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 const seedTeamId = 'team-codex-claw';
@@ -63,11 +64,11 @@ export function createEmptySnapshot(): AppSnapshot {
     backendRuntimes: [{
       backend: 'codex',
       status: 'notConfigured',
-      detail: 'Codex backend is not connected yet.',
+      detail: { key: 'backend.codexNotConnected' },
     }, {
       backend: 'claude',
       status: 'notConfigured',
-      detail: 'Claude backend has not been started yet.',
+      detail: { key: 'backend.claudeNotStarted' },
     }],
     workBacklog: createDefaultWorkBacklogState(),
     remoteConnections: createDefaultRemoteConnectionsState(),
@@ -102,11 +103,11 @@ export function createInitialSnapshot(): AppSnapshot {
     backendRuntimes: [{
       backend: 'codex',
       status: 'notConfigured',
-      detail: 'Codex backend is not connected yet.',
+      detail: { key: 'backend.codexNotConnected' },
     }, {
       backend: 'claude',
       status: 'notConfigured',
-      detail: 'Claude backend has not been started yet.',
+      detail: { key: 'backend.claudeNotStarted' },
     }],
     workBacklog: createDefaultWorkBacklogState(),
     remoteConnections: createDefaultRemoteConnectionsState(),
@@ -341,7 +342,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
       setBackendRuntimeStatus(snapshot, {
         backend: payload.backend,
         status: payload.status,
-        detail: typeof payload.detail === 'string' ? payload.detail : undefined,
+        detail: appText(payload.detail),
         capabilities: isRecord(payload.capabilities) ? backendCapabilities(payload.capabilities) : undefined,
       });
     }
@@ -1904,15 +1905,15 @@ function permissionModeOption(value: unknown): NonNullable<BackendRuntimeCapabil
   const record = value as Record<string, unknown>;
   if (
     typeof record.id !== 'string' ||
-    typeof record.label !== 'string' ||
-    typeof record.description !== 'string'
+    !appText(record.label) ||
+    !appText(record.description)
   ) {
     return [];
   }
   return [{
     id: record.id,
-    label: record.label,
-    description: record.description,
+    label: appText(record.label)!,
+    description: appText(record.description)!,
     ...(typeof record.dangerous === 'boolean' ? { dangerous: record.dangerous } : {}),
   }];
 }

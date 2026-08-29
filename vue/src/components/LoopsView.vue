@@ -1,7 +1,7 @@
 <template>
   <section
     class="loops-view"
-    aria-label="Loops"
+    :aria-label="$t('surface.loopsView.loops')"
   >
 
     <div class="loops-view__header" />
@@ -9,7 +9,7 @@
     <main class="loops-view__content">
       <div class="loops-view__panel">
         <SettingsPanelFrame
-          title="Loops"
+          :title="$t('surface.loopsView.loops')"
           title-id="loops-title"
         >
           <div
@@ -17,16 +17,16 @@
             class="loops-view__list-header"
           >
             <div class="loops-view__location-heading">
-              <h3>Loops</h3>
+              <h3>{{ $t('surface.loopsView.loops') }}</h3>
               <ChevronRightIcon aria-hidden="true" />
               <el-select
                 v-model="selectedLocationValue"
                 class="loops-view__location-select"
-                aria-label="Loop location"
+                :aria-label="$t('surface.loopsView.loopLocation')"
                 size="small"
               >
                 <el-option
-                  label="Local"
+                  :label="$t('surface.loopsView.local')"
                   value="local"
                 />
                 <el-option
@@ -41,9 +41,7 @@
               v-if="locationLoops.length > 0"
               type="primary"
               @click="openCreate"
-            >
-              New Loop
-            </el-button>
+            > {{ $t('surface.loopsView.newLoop') }} </el-button>
           </div>
 
           <LoopEditor
@@ -78,9 +76,7 @@
           <div
             v-else-if="locationStatus === 'loading'"
             class="loops-view__location-state"
-          >
-            Loading loops...
-          </div>
+          > {{ $t('surface.loopsView.loadingLoops') }} </div>
 
           <div
             v-else-if="locationStatus === 'error'"
@@ -99,7 +95,7 @@
             class="loops-view__list"
           >
             <AppDataList
-              aria-label="Loops"
+              :aria-label="$t('surface.loopsView.loops')"
               :columns="loopColumns"
               :rows="loopRows"
             >
@@ -128,7 +124,7 @@
                 <div class="loops-view__row-actions">
                   <button
                     type="button"
-                    :aria-label="`Run ${row.name}`"
+                    :aria-label="$t('dynamic.loops.run', { loop: row.name })"
                     :disabled="!row.enabled"
                     @click="runLoop(row.id)"
                   >
@@ -136,7 +132,7 @@
                   </button>
                   <button
                     type="button"
-                    :aria-label="`View logs for ${row.name}`"
+                    :aria-label="$t('dynamic.loops.viewLogs', { loop: row.name })"
                     @click="openLog(row.id)"
                   >
                     <LogsIcon aria-hidden="true" />
@@ -161,7 +157,7 @@
                     </template>
                     <AppMenu
                       class="app-menu--embedded"
-                      ariaLabel="Loop actions"
+                      :ariaLabel="$t('surface.loopsView.loopActions')"
                       :items="loopMenuItems"
                       @click.stop
                       @select="selectLoopMenuItem(row.id, $event)"
@@ -194,6 +190,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref, watch } from 'vue';
 import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
@@ -314,28 +311,28 @@ const locationGithubConnection = computed(() => locationWorkBacklog.value.connec
 const locationGithubRepositories = computed(() => locationWorkRepositoriesByProvider.value.github ?? []);
 const loopColumns: AppDataListColumn[] = [{
   id: 'loop',
-  label: 'Loop',
+  label: translate('surface.loopsView.loop'),
   width: 'minmax(220px, 1fr)',
 }, {
   id: 'lastExecution',
-  label: 'Last execution',
+  label: translate('surface.loopsView.lastExecution'),
   width: 'max-content',
   align: 'end',
 }, {
   id: 'executionCount',
-  label: 'Executions',
+  label: translate('surface.loopsView.executions'),
   width: 'max-content',
   align: 'end',
 }];
 const loopMenuItems: AppMenuItem[] = [{
   id: 'edit',
   type: 'action',
-  label: 'Edit',
+  label: translate('surface.loopsView.edit'),
   icon: PencilIcon,
 }, {
   id: 'delete',
   type: 'action',
-  label: 'Delete',
+  label: translate('surface.loopsView.delete'),
   icon: Trash2Icon,
   danger: true,
 }];
@@ -443,10 +440,10 @@ async function confirmDeleteLoop(loopId: string): Promise<void> {
   try {
     await ElMessageBox.confirm(
       `Loop "${loop.name}" will stop creating agents.`,
-      'Delete loop?',
+      translate('surface.loopsView.deleteLoop'),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Delete Loop',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('dynamic.misc.deleteLoop'),
         type: 'warning',
       },
     );
@@ -469,10 +466,10 @@ async function confirmClearLoopHistory(loopId: string): Promise<void> {
   try {
     await ElMessageBox.confirm(
       `Execution history for "${loop.name}" will be cleared.`,
-      'Clear history?',
+      translate('surface.loopsView.clearHistory'),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Clear History',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('dynamic.misc.clearHistory'),
         type: 'warning',
       },
     );
@@ -492,11 +489,11 @@ async function confirmDeleteLoopExecution(payload: { executionId: string; loopId
 
   try {
     await ElMessageBox.confirm(
-      'This execution will be removed from the loop history.',
-      'Delete execution?',
+      translate('surface.loopsView.thisExecutionWillBeRemovedFromTheLoopHistory'),
+      translate('surface.loopsView.deleteExecution'),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Delete Execution',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('dynamic.misc.deleteExecution'),
         type: 'warning',
       },
     );
@@ -671,22 +668,22 @@ function loopSourceLabel(loop: Loop): string {
       ? `${loop.source.repositoryId} / ${loop.source.tagName}`
       : loop.source.repositoryId;
   }
-  return 'Work provider';
+  return translate('surface.loopsView.workProvider');
 }
 
 function loopAgentName(loop: Loop): string {
   const action = loop.action;
   if (action.type === 'create-agent') {
-    return 'New Agent';
+    return translate('surface.loopsView.newAgent');
   }
 
   const template = locationBench.value.find((candidate) => candidate.id === action.benchTemplateId);
-  return template ? template.name : 'Missing Bench agent';
+  return template ? template.name : translate('surface.loopsView.missingBenchAgent');
 }
 
 function loopLastExecutionLabel(loop: Loop): string {
   if (!loop.lastRunAt) {
-    return 'Never';
+    return translate('surface.loopsView.never');
   }
 
   return formatShortDate(loop.lastRunAt);
@@ -700,7 +697,7 @@ function loopExecutionCountLabel(loop: Loop): string {
 function formatShortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return 'Unknown';
+    return translate('surface.loopsView.unknown');
   }
 
   return new Intl.DateTimeFormat(undefined, {

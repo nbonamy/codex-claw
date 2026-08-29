@@ -25,7 +25,7 @@
         <div class="agent-dialog__identity-rows">
           <div class="agent-dialog__workspace-row agent-dialog__identity-row">
             <div class="agent-dialog__row-copy">
-              <label class="agent-dialog__row-label" for="agent-dialog-name">Name</label>
+              <label class="agent-dialog__row-label" for="agent-dialog-name">{{ $t('surface.agentDialog.name') }}</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__identity-control">
               <div class="agent-dialog__identity-input">
@@ -34,8 +34,8 @@
                   v-model="name"
                   class="claw-form-dialog__text-input agent-dialog__text-input"
                   type="text"
-                  aria-label="Agent name"
-                  placeholder="Name this agent"
+                  :aria-label="$t('surface.agentDialog.agentName')"
+                  :placeholder="$t('surface.agentDialog.nameThisAgent')"
                 />
               </div>
             </div>
@@ -53,7 +53,7 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-repository"
-              >Repository</label>
+              >{{ $t('surface.agentDialog.repository') }}</label>
             </div>
             <div class="agent-dialog__row-control">
               <el-select
@@ -86,7 +86,7 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-worktree"
-              >Work in...</label>
+              >{{ $t('surface.agentDialog.workIn') }}</label>
             </div>
             <div class="agent-dialog__row-control">
               <el-select
@@ -104,7 +104,7 @@
                 />
                 <el-option
                   class="agent-dialog__source-custom-option"
-                  label="New Worktree..."
+                  :label="$t('surface.agentDialog.newWorktree')"
                   :value="newWorktreeOptionValue"
                 />
               </el-select>
@@ -119,7 +119,7 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-team"
-              >Team</label>
+              >{{ $t('surface.agentDialog.team') }}</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__row-control--stacked">
               <el-select
@@ -134,7 +134,7 @@
                   :value="team.id"
                 />
                 <el-option
-                  label="New team"
+                  :label="$t('surface.agentDialog.newTeam')"
                   :value="newTeamOptionId"
                 />
               </el-select>
@@ -144,8 +144,8 @@
                 v-model="newTeamName"
                 class="claw-form-dialog__text-input agent-dialog__new-team-input"
                 type="text"
-                aria-label="New team name"
-                placeholder="Enter team name"
+                :aria-label="$t('surface.agentDialog.newTeamName')"
+                :placeholder="$t('surface.agentDialog.enterTeamName')"
               />
             </div>
           </div>
@@ -159,7 +159,7 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-name"
-              >Name</label>
+              >{{ $t('surface.agentDialog.name') }}</label>
             </div>
             <div class="agent-dialog__row-control agent-dialog__identity-control">
               <div class="agent-dialog__identity-input">
@@ -168,8 +168,8 @@
                   v-model="name"
                   class="claw-form-dialog__text-input agent-dialog__text-input"
                   type="text"
-                  aria-label="Agent name"
-                  placeholder="Name this agent"
+                  :aria-label="$t('surface.agentDialog.agentName')"
+                  :placeholder="$t('surface.agentDialog.nameThisAgent')"
                 />
               </div>
             </div>
@@ -183,17 +183,17 @@
               <label
                 class="agent-dialog__row-label"
                 for="agent-dialog-backend"
-              >Coding agent</label>
+              >{{ $t('surface.agentDialog.codingAgent') }}</label>
             </div>
             <div class="agent-dialog__row-control">
               <el-select
                 id="agent-dialog-backend"
                 v-model="backend"
                 class="agent-dialog__workspace-select"
-                aria-label="Coding agent"
+                :aria-label="$t('surface.agentDialog.codingAgent')"
               >
-                <el-option label="Codex" value="codex" />
-                <el-option label="Claude Code" value="claude" />
+                <el-option :label="$t('surface.agentDialog.codex')" value="codex" />
+                <el-option :label="$t('surface.agentDialog.claudeCode')" value="claude" />
               </el-select>
             </div>
           </div>
@@ -230,7 +230,7 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
@@ -246,6 +246,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
@@ -326,8 +327,8 @@ const remoteFolderDialogVisible = ref(false);
 
 const isEditing = computed(() => props.mode === 'edit');
 const folderName = computed(() => folder.value.split(/[\\/]/).filter(Boolean).at(-1) ?? '');
-const title = computed(() => isEditing.value ? 'Edit agent' : 'New agent');
-const submitLabel = computed(() => isEditing.value ? 'Save' : 'Create agent');
+const title = computed(() => isEditing.value ? translate('surface.agentDialog.editAgent') : translate('surface.agentDialog.newAgent'));
+const submitLabel = computed(() => isEditing.value ? translate('surface.agentDialog.save') : translate('surface.agentDialog.createAgent'));
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
 const selectedTeam = computed(() => teams.value.find((team) => team.id === teamSelection.value) ?? null);
@@ -363,7 +364,7 @@ const selectedSourceWorktrees = computed(() => {
   return [...pendingWorktree, ...worktrees, created];
 });
 const showSourceWorktreeControl = computed(() => selectedSourceRepository.value !== null);
-const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? 'Custom folder' : 'Choose folder...');
+const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? translate('surface.agentDialog.customFolder') : translate('surface.agentDialog.chooseFolder'));
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
   (teamSelection.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : teamSelection.value.trim().length > 0)
@@ -571,7 +572,7 @@ function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | 
 
 async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
   if (!props.createSourceWorktree) {
-    throw new Error('Source worktree creation is not available.');
+    throw new Error(translate('surface.agentDialog.sourceWorktreeCreationIsNotAvailable'));
   }
 
   return props.createSourceWorktree({
@@ -598,7 +599,7 @@ async function submit(): Promise<void> {
   try {
     if (isEditing.value) {
       if (!props.agent) {
-        throw new Error('No agent selected for editing.');
+        throw new Error(translate('surface.agentDialog.noAgentSelectedForEditing'));
       }
 
       await props.updateAgent({
@@ -689,7 +690,7 @@ async function ensureInitialWorktree(): Promise<void> {
     return;
   }
   if (!props.createSourceWorktree) {
-    throw new Error('Source worktree creation is not available.');
+    throw new Error(translate('surface.agentDialog.sourceWorktreeCreationIsNotAvailable'));
   }
 
   const worktree = await props.createSourceWorktree({

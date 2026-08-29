@@ -1,4 +1,5 @@
-export type ImageAnnotationTool =
+
+import { translate } from '../i18n';export type ImageAnnotationTool =
   | 'arrow'
   | 'oval'
   | 'rectangle'
@@ -98,7 +99,7 @@ export async function centeredImageCropDataUrl(source: string, scale = 0.72): Pr
   output.width = crop.width;
   output.height = crop.height;
   const context = output.getContext('2d');
-  if (!context) throw new Error('Image annotation canvas is unavailable.');
+  if (!context) throw new Error(translate('surface.image-annotation.imageAnnotationCanvasIsUnavailable'));
   context.drawImage(
     image,
     crop.x,
@@ -120,7 +121,7 @@ async function loadImageElement(source: string): Promise<HTMLImageElement> {
     const timeout = setTimeout(() => {
       image.onload = null;
       image.onerror = null;
-      reject(new Error('Timed out loading the image annotation fixture.'));
+      reject(new Error(translate('surface.image-annotation.timedOutLoadingTheImageAnnotationFixture')));
     }, 1_200);
     image.onload = () => {
       clearTimeout(timeout);
@@ -128,7 +129,7 @@ async function loadImageElement(source: string): Promise<HTMLImageElement> {
     };
     image.onerror = () => {
       clearTimeout(timeout);
-      reject(new Error('Unable to load the image annotation fixture.'));
+      reject(new Error(translate('surface.image-annotation.unableToLoadTheImageAnnotationFixture')));
     };
     image.src = source;
   });

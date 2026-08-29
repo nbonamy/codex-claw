@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { Agent } from '../contracts';
 import { projectAgentMentionLabels, projectWorkspaceSidebar, repositoryIconForAgent } from '../workspace-sidebar';
 
+const projectSidebar = (input: Omit<Parameters<typeof projectWorkspaceSidebar>[0], 'quickChatsLabel'>) => (
+  projectWorkspaceSidebar({ ...input, quickChatsLabel: 'Quick chats' })
+);
+
 describe('workspace sidebar projection', () => {
   it('groups primary checkouts and linked worktrees beneath the canonical repository', () => {
     const agents = [
@@ -9,7 +13,7 @@ describe('workspace sidebar projection', () => {
       gitAgent('agent-feature', 'Implement routing', '/src/codex-claw-routing', 'feat/routing', true),
     ];
 
-    expect(projectWorkspaceSidebar({
+    expect(projectSidebar({
       agents,
       activeAgentId: 'agent-feature',
       unreadAgentIds: ['agent-main'],
@@ -55,7 +59,7 @@ describe('workspace sidebar projection', () => {
     if (detached.workspace?.kind === 'git') detached.workspace = { ...detached.workspace, branch: null };
     const folder = baseAgent('agent-folder', 'Notes', '/src/notes');
 
-    expect(projectWorkspaceSidebar({ agents: [branch, detached, folder], activeAgentId: null }))
+    expect(projectSidebar({ agents: [branch, detached, folder], activeAgentId: null }))
       .toMatchObject([
         { sessions: [{ kind: 'branch' }, { kind: 'detached' }] },
         { sessions: [{ kind: 'folder' }] },
@@ -73,7 +77,7 @@ describe('workspace sidebar projection', () => {
     const unclassified = baseAgent('agent-loose', 'Uninitialized', '/tmp/loose');
     const repo = gitAgent('agent-sdk', 'SDK work', '/src/codex-app-sdk', 'main', false, '/src/codex-app-sdk');
 
-    expect(projectWorkspaceSidebar({ agents: [folderAgent, repo, unclassified], activeAgentId: null }))
+    expect(projectSidebar({ agents: [folderAgent, repo, unclassified], activeAgentId: null }))
       .toMatchObject([{
         id: 'quick-chats',
         kind: 'quickChats',
@@ -91,7 +95,7 @@ describe('workspace sidebar projection', () => {
     const first = gitAgent('agent-one', 'Fix tests', '/src/repo-one', 'feat/one', true);
     const second = gitAgent('agent-two', 'Review tests', '/src/repo-two', 'feat/one', true);
 
-    expect(projectWorkspaceSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions)
+    expect(projectSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions)
       .toMatchObject([
         { displayTitle: 'Fix tests' },
         { displayTitle: 'Review tests' },
@@ -102,7 +106,7 @@ describe('workspace sidebar projection', () => {
     const agent = gitAgent('agent-one', 'Custom agent', '/src/repo-one', 'feat/one', true);
     agent.conversationTitle = 'Current thread title';
 
-    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
+    expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
       .toMatchObject({ customName: 'Custom agent', conversationTitle: 'Current thread title', displayTitle: 'Current thread title' });
   });
 
@@ -110,9 +114,9 @@ describe('workspace sidebar projection', () => {
     const first = gitAgent('agent-one', 'Fix tests', '/src/repo-one', 'feat/one', true);
     const second = gitAgent('agent-two', 'Fix tests', '/src/repo-two', 'feat/two', true);
 
-    expect(projectWorkspaceSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions.map(({ displayTitle }) => displayTitle))
+    expect(projectSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions.map(({ displayTitle }) => displayTitle))
       .toStrictEqual(['Fix tests · feat/one', 'Fix tests · feat/two']);
-    expect(projectAgentMentionLabels([first, second])).toStrictEqual([
+    expect(projectAgentMentionLabels([first, second], 'Quick chats')).toStrictEqual([
       { agentId: 'agent-one', label: 'Fix tests · feat/one · codex-claw/feat/one' },
       { agentId: 'agent-two', label: 'Fix tests · feat/two · codex-claw/feat/two' },
     ]);
@@ -122,7 +126,7 @@ describe('workspace sidebar projection', () => {
     const agent = gitAgent('agent-unnamed', '   ', '/src/repo', 'feat/sidebar', true);
     agent.conversationTitle = 'Previous conversation';
 
-    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
+    expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
       .toMatchObject({ customName: null, conversationTitle: 'Previous conversation', displayTitle: 'feat/sidebar' });
   });
 
@@ -130,7 +134,7 @@ describe('workspace sidebar projection', () => {
     const first = gitAgent('agent-one', null, '/src/id8', 'main', false, '/src/id8');
     const second = gitAgent('agent-two', null, '/src/computer-use', 'main', false, '/src/computer-use');
 
-    expect(projectWorkspaceSidebar({ agents: [first, second], activeAgentId: null })
+    expect(projectSidebar({ agents: [first, second], activeAgentId: null })
       .flatMap(({ sessions }) => sessions.map(({ displayTitle }) => displayTitle)))
       .toStrictEqual(['main', 'main']);
   });
@@ -138,7 +142,7 @@ describe('workspace sidebar projection', () => {
   it('removes the repository prefix from an unnamed agent branch', () => {
     const agent = gitAgent('agent-unnamed', null, '/src/codex-claw-work-routing', 'codex-claw-work-routing', true);
 
-    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
+    expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
       .toMatchObject({ displayTitle: 'work-routing' });
   });
 
@@ -146,7 +150,7 @@ describe('workspace sidebar projection', () => {
     const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
     if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
 
-    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]).toMatchObject({
+    expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]).toMatchObject({
       repositoryRoot: '/src/codex-claw',
       repositoryKey: 'remote:github.com/nbonamy/codex-claw',
     });

@@ -1,22 +1,22 @@
 <template>
-  <section class="file-explorer" aria-label="Workspace files">
+  <section class="file-explorer" :aria-label="$t('surface.fileExplorerPanel.workspaceFiles')">
     <header class="file-explorer__toolbar">
       <input
         ref="searchInput"
         v-model="query"
         type="search"
-        aria-label="Search workspace files"
-        placeholder="Search files"
+        :aria-label="$t('surface.fileExplorerPanel.searchWorkspaceFiles')"
+        :placeholder="$t('surface.fileExplorerPanel.searchFiles')"
         @keydown.escape="query = ''"
       />
     </header>
 
-    <p v-if="loading && files.length === 0" class="file-explorer__status">Loading files…</p>
+    <p v-if="loading && files.length === 0" class="file-explorer__status">{{ $t('surface.fileExplorerPanel.loadingFiles') }}</p>
     <p v-else-if="error" class="file-explorer__status file-explorer__status--error">{{ error }}</p>
-    <p v-else-if="files.length === 0" class="file-explorer__status">No files in this workspace.</p>
-    <p v-else-if="visibleRows.length === 0" class="file-explorer__status">No matching files.</p>
+    <p v-else-if="files.length === 0" class="file-explorer__status">{{ $t('surface.fileExplorerPanel.noFilesInThisWorkspace') }}</p>
+    <p v-else-if="visibleRows.length === 0" class="file-explorer__status">{{ $t('surface.fileExplorerPanel.noMatchingFiles') }}</p>
 
-    <div v-else class="file-explorer__tree" role="tree" aria-label="Workspace file tree">
+    <div v-else class="file-explorer__tree" role="tree" :aria-label="$t('surface.fileExplorerPanel.workspaceFileTree')">
       <div
         v-for="row in visibleRows"
         :key="`${row.kind}:${row.path}`"
@@ -39,7 +39,7 @@
           v-else
           class="file-explorer__item file-explorer__file"
           type="button"
-          :title="`Preview ${row.path}`"
+          :title="$t('dynamic.files.preview', { path: row.path })"
           @click="emit('preview', row.path)"
         >
           <FileTextIcon aria-hidden="true" />

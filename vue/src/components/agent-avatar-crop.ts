@@ -1,4 +1,5 @@
-export type AvatarCropPan = {
+
+import { translate } from '../i18n';export type AvatarCropPan = {
   x: number;
   y: number;
 };
@@ -65,7 +66,7 @@ function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Unable to load avatar image.'));
+    image.onerror = () => reject(new Error(translate('surface.agent-avatar-crop.unableToLoadAvatarImage')));
     image.src = source;
   });
 }

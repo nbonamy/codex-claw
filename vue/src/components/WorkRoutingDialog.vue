@@ -11,10 +11,10 @@
     <template #header>
       <div class="claw-dialog__header">
         <div class="claw-form-dialog__header">
-          <h2 class="claw-dialog__title">How should this work continue?</h2>
-          <p class="claw-dialog__subtitle">Choose where this conversation should do the implementation.</p>
+          <h2 class="claw-dialog__title">{{ t('workRouting.title') }}</h2>
+          <p class="claw-dialog__subtitle">{{ t('workRouting.subtitle') }}</p>
         </div>
-        <button class="claw-dialog__icon-button" type="button" aria-label="Cancel" :disabled="busy" @click="emit('cancel')">
+        <button class="claw-dialog__icon-button" type="button" :aria-label="t('common.cancel')" :disabled="busy" @click="emit('cancel')">
           <IconX aria-hidden="true" />
         </button>
       </div>
@@ -32,7 +32,7 @@
         @click="mode = 'current'"
       >
         <IconPlayerPlay aria-hidden="true" />
-        <span><strong>Continue here</strong><small>Keep this checkout and branch</small></span>
+        <span><strong>{{ t('workRouting.currentTitle') }}</strong><small>{{ t('workRouting.currentDetail') }}</small></span>
       </button>
       <button
         type="button"
@@ -43,7 +43,7 @@
         @click="mode = 'branch'"
       >
         <IconGitBranch aria-hidden="true" />
-        <span><strong>Continue on a branch</strong><small>Switch this checkout and continue here</small></span>
+        <span><strong>{{ t('workRouting.branchTitle') }}</strong><small>{{ t('workRouting.branchDetail') }}</small></span>
       </button>
       <button
         type="button"
@@ -54,16 +54,16 @@
         @click="mode = 'delegate'"
       >
         <IconCopy aria-hidden="true" />
-        <span><strong>Delegate in a worktree</strong><small>Create an isolated conversation and folder</small></span>
+        <span><strong>{{ t('workRouting.delegateTitle') }}</strong><small>{{ t('workRouting.delegateDetail') }}</small></span>
       </button>
     </div>
 
     <p v-if="branchUnavailable" class="work-routing-dialog__warning">
-      This folder is also used by {{ sharedAgentNames }}. Delegate to a worktree to avoid moving their checkout.
+      {{ t('workRouting.sharedFolderWarning', { agents: sharedAgentNames }) }}
     </p>
 
     <label v-if="mode !== 'current'" class="work-routing-dialog__branch-field">
-      <span>Branch</span>
+      <span>{{ t('workRouting.branch') }}</span>
       <span class="work-routing-dialog__branch-control">
         <IconGitBranch aria-hidden="true" />
         <input
@@ -80,9 +80,9 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('cancel')">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="claw-button claw-button--primary" type="button" :disabled="busy || !canSubmit" :aria-busy="busy" @click="submit">
-          Continue
+          {{ t('workRouting.continue') }}
         </button>
       </div>
     </template>
@@ -91,6 +91,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { IconCopy, IconGitBranch, IconPlayerPlay, IconX } from '@tabler/icons-vue';
 import type { WorkRoutingMode, WorkRoutingRequest } from '@codex-claw/core/contracts';
 
@@ -110,10 +111,11 @@ const emit = defineEmits<{
   respond: [mode: WorkRoutingMode, branchName?: string];
 }>();
 
+const { t } = useI18n();
 const mode = ref<WorkRoutingMode>('delegate');
 const branchName = ref('');
 const branchUnavailable = computed(() => (props.request?.payload.request.sharedFolderAgentNames.length ?? 0) > 0);
-const sharedAgentNames = computed(() => props.request?.payload.request.sharedFolderAgentNames.join(', ') ?? 'another agent');
+const sharedAgentNames = computed(() => props.request?.payload.request.sharedFolderAgentNames.join(', ') || t('workRouting.otherAgent'));
 const canSubmit = computed(() => mode.value === 'current' || branchName.value.trim().length > 0);
 
 watch(() => props.request?.id, () => {

@@ -1,6 +1,6 @@
 <template>
   <SettingsPanelFrame
-    title="Connections"
+    :title="$t('surface.settingsConnectionsPanel.connections')"
     title-id="settings-connections-title"
   >
     <template #actions>
@@ -8,21 +8,17 @@
         size="small"
         type="primary"
         @click="openAddDialog"
-      >
-        Add remote
-      </el-button>
+      > {{ $t('surface.settingsConnectionsPanel.addRemote') }} </el-button>
     </template>
 
     <SettingsSection
-      title="Remote Codex Claw agents"
+      :title="$t('surface.settingsConnectionsPanel.remoteCodexClawAgents')"
       title-id="settings-connections-remotes-title"
     >
       <div
         v-if="connections.length === 0"
         class="settings-connections-panel__empty"
-      >
-        No remote connections
-      </div>
+      > {{ $t('surface.settingsConnectionsPanel.noRemoteConnections') }} </div>
       <article
         v-for="connection in connections"
         :key="connection.id"
@@ -43,8 +39,8 @@
         <div class="settings-connections-panel__actions">
           <button
             type="button"
-            :aria-label="`Connection settings for ${connection.name}`"
-            title="Connection settings"
+            :aria-label="$t('dynamic.settings.connection', { connection: connection.name })"
+            :title="$t('surface.settingsConnectionsPanel.connectionSettings')"
             @click="openConnectionSettings(connection)"
           >
             <SettingsIcon aria-hidden="true" />
@@ -69,7 +65,7 @@
             </template>
             <AppMenu
               class="app-menu--embedded"
-              ariaLabel="Connection actions"
+              :ariaLabel="$t('surface.settingsConnectionsPanel.connectionActions')"
               :items="connectionMenuItems(connection)"
               @click.stop
               @select="selectConnectionMenuItem(connection, $event)"
@@ -102,18 +98,16 @@
         class="settings-connections-panel__settings"
         label-position="top"
       >
-        <el-form-item label="Source folder">
+        <el-form-item :label="$t('surface.settingsConnectionsPanel.sourceFolder')">
           <el-input
             v-model="settingsSourceFolderPath"
-            placeholder="~/src"
+            :placeholder="$t('surface.settingsConnectionsPanel.src')"
           >
             <template #append>
               <el-button
                 :disabled="!settingsConnection"
                 @click="openSettingsFolderPicker"
-              >
-                Browse
-              </el-button>
+              > {{ $t('surface.settingsConnectionsPanel.browse') }} </el-button>
             </template>
           </el-input>
         </el-form-item>
@@ -126,18 +120,14 @@
       </el-form>
       <template #footer>
         <div class="claw-dialog__footer">
-          <button class="claw-button claw-button--tertiary" type="button" @click="closeConnectionSettings">
-            Cancel
-          </button>
+          <button class="claw-button claw-button--tertiary" type="button" @click="closeConnectionSettings"> {{ $t('surface.settingsConnectionsPanel.cancel') }} </button>
           <button
             class="claw-button claw-button--primary"
             type="button"
             :aria-busy="savingConnectionSettings"
             :disabled="savingConnectionSettings"
             @click="saveConnectionSettings"
-          >
-            Save
-          </button>
+          > {{ $t('surface.settingsConnectionsPanel.save') }} </button>
         </div>
       </template>
     </el-dialog>
@@ -154,7 +144,7 @@
 
     <el-dialog
       v-model="addDialogVisible"
-      title="Add SSH connection"
+      :title="$t('surface.settingsConnectionsPanel.addSSHConnection')"
       width="680"
       append-to-body
       class="claw-dialog"
@@ -169,15 +159,11 @@
         <div
           v-else-if="loadingHosts"
           class="settings-connections-panel__loading"
-        >
-          Loading SSH hosts...
-        </div>
+        > {{ $t('surface.settingsConnectionsPanel.loadingSSHHosts') }} </div>
         <div
           v-else-if="sshHosts.length === 0"
           class="settings-connections-panel__empty"
-        >
-          No SSH hosts found
-        </div>
+        > {{ $t('surface.settingsConnectionsPanel.noSSHHostsFound') }} </div>
         <div v-else>
           <article
             v-for="host in sshHosts"
@@ -193,9 +179,7 @@
               :loading="addingHost === host.host"
               :disabled="addingHost !== null"
               @click="addConnection(host)"
-            >
-              Connect
-            </el-button>
+            > {{ $t('surface.settingsConnectionsPanel.connect') }} </el-button>
           </article>
         </div>
       </div>
@@ -204,6 +188,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
 import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
@@ -269,7 +254,7 @@ const settingsFolderPickerVisible = ref(false);
 
 const connections = computed(() => props.connections);
 const settingsDialogTitle = computed(() => (
-  settingsConnection.value ? `${settingsConnection.value.name} settings` : 'SSH settings'
+  settingsConnection.value ? `${settingsConnection.value.name} settings` : translate('surface.settingsConnectionsPanel.sSHSettings')
 ));
 const sshHosts = computed(() => {
   const connectedHosts = new Set(props.connections.map((connection) => connection.host));
@@ -379,13 +364,13 @@ function connectionMenuItems(connection: RemoteConnection): AppMenuItem[] {
   return [{
     id: 'check',
     type: 'action',
-    label: checkingConnectionId.value === connection.id ? 'Syncing...' : 'Sync',
+    label: checkingConnectionId.value === connection.id ? translate('surface.settingsConnectionsPanel.syncing') : translate('surface.settingsConnectionsPanel.sync'),
     disabled: checkingConnectionId.value === connection.id,
     icon: RefreshIcon,
   }, {
     id: 'delete',
     type: 'action',
-    label: 'Delete',
+    label: translate('surface.settingsConnectionsPanel.delete'),
     danger: true,
     icon: Trash2Icon,
   }];
@@ -407,8 +392,8 @@ async function confirmRemoveConnection(connection: RemoteConnection): Promise<vo
       connectionDeleteMessage(connection, connectedTeams),
       `Delete ${connection.name}?`,
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Delete',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('common.delete'),
         type: 'warning',
       },
     );
@@ -456,15 +441,15 @@ function hostLabel(host: Pick<SshHostCandidate, 'host' | 'hostName' | 'port' | '
 
 function statusLabel(status: RemoteConnection['status']): string {
   if (status === 'ready') {
-    return 'Ready';
+    return translate('surface.settingsConnectionsPanel.ready');
   }
   if (status === 'checking') {
-    return 'Checking';
+    return translate('surface.settingsConnectionsPanel.checking');
   }
   if (status === 'error') {
-    return 'Needs attention';
+    return translate('surface.settingsConnectionsPanel.needsAttention');
   }
-  return 'Saved';
+  return translate('surface.settingsConnectionsPanel.saved');
 }
 </script>
 

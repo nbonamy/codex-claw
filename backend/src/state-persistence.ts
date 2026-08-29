@@ -7,6 +7,7 @@ import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSet
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import { appText } from '@codex-claw/core/app-text';
 
 type PersistedState = {
   teams: Team[];
@@ -861,7 +862,7 @@ function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConne
     provider: value.provider,
     status: value.status,
     ...(typeof value.accountLabel === 'string' ? { accountLabel: value.accountLabel } : {}),
-    ...(typeof value.detail === 'string' ? { detail: value.detail } : {}),
+    ...(appText(value.detail) ? { detail: appText(value.detail)! } : {}),
     ...(typeof value.connectedAt === 'string' ? { connectedAt: value.connectedAt } : {}),
   };
 }

@@ -1,15 +1,15 @@
 <template>
   <SettingsPanelFrame
-    title="Codex"
+    :title="$t('surface.settingsCodexPanel.codex')"
     title-id="settings-codex-title"
   >
     <SettingsSection
-      title="ChatGPT"
+      :title="$t('surface.settingsCodexPanel.chatGPT')"
       title-id="settings-codex-chatgpt-title"
     >
       <SettingsRow
-        title="Launch ChatGPT"
-        description="Manage Codex plugins, skills, and sandbox policies in ChatGPT using the same Codex home as Claw."
+        :title="$t('surface.settingsCodexPanel.launchChatGPT')"
+        :description="$t('surface.settingsCodexPanel.manageCodexPluginsSkillsAndSandboxPoliciesInChatGPTUsing')"
         :error="launchError"
       >
         <template #control>
@@ -17,14 +17,12 @@
             :loading="launching"
             size="small"
             @click="launch"
-          >
-            Launch ChatGPT
-          </el-button>
+          > {{ $t('surface.settingsCodexPanel.launchChatGPT') }} </el-button>
         </template>
       </SettingsRow>
       <SettingsRow
         as="label"
-        title="Share skills and plugins with ChatGPT"
+        :title="$t('surface.settingsCodexPanel.shareSkillsAndPluginsWithChatGPT')"
         :description="codexResourceSharingDescription"
         :error="codexResourceSharingError"
       >
@@ -32,7 +30,7 @@
           <el-switch
             :model-value="settings.shareCodexSkillsAndPlugins"
             :loading="changingCodexResourceSharing"
-            aria-label="Share skills and plugins with ChatGPT"
+            :aria-label="$t('surface.settingsCodexPanel.shareSkillsAndPluginsWithChatGPT')"
             @update:model-value="updateCodexResourceSharing"
           />
         </template>
@@ -41,21 +39,21 @@
 
     <SettingsSection
       v-if="clawHostCapabilities.nativeFileDialogs"
-      title="Runtime"
+      :title="$t('surface.settingsCodexPanel.runtime')"
       title-id="settings-codex-runtime-title"
     >
       <SettingsRow
-        title="Codex executable"
-        description="Leave empty to use the bundled Codex. Changing this restarts Codex Claw."
+        :title="$t('surface.settingsCodexPanel.codexExecutable')"
+        :description="$t('surface.settingsCodexPanel.leaveEmptyToUseTheBundledCodexChangingThisRestartsCodexC')"
         :error="codexBinaryError"
       >
         <template #control>
           <span class="settings-codex-panel__runtime">
             <el-input
               v-model="codexBinaryDraft"
-              aria-label="Codex executable path"
+              :aria-label="$t('surface.settingsCodexPanel.codexExecutablePath')"
               clearable
-              placeholder="Bundled Codex"
+              :placeholder="$t('surface.settingsCodexPanel.bundledCodex')"
               size="small"
               @change="updateCodexBinaryPath"
               @clear="clearCodexBinaryPath"
@@ -64,16 +62,12 @@
               size="small"
               :loading="choosingCodexBinary"
               @click="chooseCodexBinary"
-            >
-              Choose
-            </el-button>
+            > {{ $t('surface.settingsCodexPanel.choose') }} </el-button>
             <el-button
               v-if="settings.codexBinaryPath"
               size="small"
               @click="clearCodexBinaryPath"
-            >
-              Clear
-            </el-button>
+            > {{ $t('surface.settingsCodexPanel.clear') }} </el-button>
           </span>
         </template>
       </SettingsRow>
@@ -82,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, ref, watch } from 'vue';
 import type { AppGeneralSettings, SetCodexResourceSharingInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
@@ -108,8 +103,8 @@ const changingCodexResourceSharing = ref(false);
 const codexResourceSharingError = ref<string | null>(null);
 
 const codexResourceSharingDescription = computed(() => props.codexResourceSharingBlocked
-  ? 'This option cannot be changed while chats are running.'
-  : 'Use the same skills and plugins as ChatGPT. Changing this restarts the backend.');
+  ? translate('surface.settingsCodexPanel.thisOptionCannotBeChangedWhileChatsAreRunning')
+  : translate('surface.settingsCodexPanel.useTheSameSkillsAndPluginsAsChatGPTChangingThisRestartsT'));
 
 watch(() => props.settings.codexBinaryPath, (path) => {
   codexBinaryDraft.value = path;
@@ -163,10 +158,10 @@ async function updateCodexResourceSharing(value: boolean | string | number): Pro
   codexResourceSharingError.value = null;
   if (props.codexResourceSharingBlocked) {
     await ElMessageBox.alert(
-      'This option cannot be changed while chats are running. Wait for every chat to finish and try again.',
-      'Chats are running',
+      translate('surface.settingsCodexPanel.thisOptionCannotBeChangedWhileChatsAreRunningWaitForEver'),
+      translate('surface.settingsCodexPanel.chatsAreRunning'),
       {
-        confirmButtonText: 'OK',
+        confirmButtonText: translate('common.ok'),
         type: 'warning',
       },
     );
@@ -192,11 +187,11 @@ async function updateCodexResourceSharing(value: boolean | string | number): Pro
 async function confirmSharingEnabled(): Promise<SetCodexResourceSharingInput | null> {
   try {
     await ElMessageBox.confirm(
-      'You are going to lose all plugins and skills installed only in Codex Claw. Continue?',
-      'Share skills and plugins with ChatGPT?',
+      translate('surface.settingsCodexPanel.youAreGoingToLoseAllPluginsAndSkillsInstalledOnlyInCodex'),
+      translate('surface.settingsCodexPanel.shareSkillsAndPluginsWithChatGPT2'),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Continue',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('common.continue'),
         distinguishCancelAndClose: true,
         type: 'warning',
       },
@@ -210,11 +205,11 @@ async function confirmSharingEnabled(): Promise<SetCodexResourceSharingInput | n
 async function chooseIsolatedResourceMode(): Promise<SetCodexResourceSharingInput | null> {
   try {
     await ElMessageBox.confirm(
-      'Do you want to start fresh or copy your existing ChatGPT skills and plugins into Codex Claw?',
-      'Stop sharing skills and plugins?',
+      translate('surface.settingsCodexPanel.doYouWantToStartFreshOrCopyYourExistingChatGPTSkillsAndP'),
+      translate('surface.settingsCodexPanel.stopSharingSkillsAndPlugins'),
       {
-        cancelButtonText: 'Fresh',
-        confirmButtonText: 'Copy',
+        cancelButtonText: translate('common.fresh'),
+        confirmButtonText: translate('common.copy'),
         distinguishCancelAndClose: true,
         type: 'info',
       },

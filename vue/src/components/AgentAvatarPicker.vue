@@ -3,14 +3,14 @@
     :aria-label="ariaLabel"
     :choose-image-aria-label="chooseImageAriaLabel"
     :choose-image-label="chooseImageLabel"
-    crop-title="Adjust Avatar"
-    custom-apply-aria-label="Use custom avatar"
-    custom-character-aria-label="Custom avatar character"
+    :crop-title="t('agents.avatar.cropTitle')"
+    :custom-apply-aria-label="t('agents.avatar.customApply')"
+    :custom-character-aria-label="t('agents.avatar.customCharacter')"
     :dialog-label="dialogLabel"
     :empty-label="emptyLabel"
     :model-value="modelValue"
     :name="name"
-    preset-noun="avatar"
+    :preset-noun="t('agents.avatar.noun')"
     :show-hint="showHint"
     :title="title"
     @update:model-value="emit('update:modelValue', $event)"
@@ -22,9 +22,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import IdentityPicker from '../shared/identity/IdentityPicker.vue';
 
-withDefaults(defineProps<{
+const props = defineProps<{
   ariaLabel?: string;
   chooseImageAriaLabel?: string;
   chooseImageLabel?: string;
@@ -34,16 +36,18 @@ withDefaults(defineProps<{
   name: string;
   showHint?: boolean;
   title?: string;
-}>(), {
-  ariaLabel: 'Change avatar',
-  chooseImageAriaLabel: 'Choose avatar image',
-  chooseImageLabel: 'Pick image…',
-  dialogLabel: 'Choose avatar',
-  emptyLabel: 'Use initials',
-  modelValue: undefined,
-  showHint: true,
-  title: '',
-});
+}>();
+
+const { t } = useI18n();
+const ariaLabel = computed(() => props.ariaLabel ?? t('agents.avatar.change'));
+const chooseImageAriaLabel = computed(() => props.chooseImageAriaLabel ?? t('agents.avatar.chooseImage'));
+const chooseImageLabel = computed(() => props.chooseImageLabel ?? t('agents.avatar.chooseImageAction'));
+const dialogLabel = computed(() => props.dialogLabel ?? t('agents.avatar.choose'));
+const emptyLabel = computed(() => props.emptyLabel ?? t('agents.avatar.empty'));
+const modelValue = computed(() => props.modelValue);
+const name = computed(() => props.name);
+const showHint = computed(() => props.showHint ?? true);
+const title = computed(() => props.title ?? '');
 
 const emit = defineEmits<{
   'update:modelValue': [avatar: string | undefined];

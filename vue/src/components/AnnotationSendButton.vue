@@ -5,9 +5,7 @@
     :aria-label="label"
     :disabled="disabled"
     @click="emit('click')"
-  >
-    Send
-    <span>{{ count }}</span>
+  > {{ $t('surface.annotationSendButton.send') }} <span>{{ count }}</span>
   </button>
 </template>
 

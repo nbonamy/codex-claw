@@ -175,6 +175,10 @@ transcription code.
 - Keep labels and status language short and concrete.
 - Put reusable renderer copy in `vue/src/i18n/messages.ts` and use `vue-i18n`
   for dynamic labels.
+- Send app-owned error and status descriptors across backend and IPC boundaries;
+  localize them only in the client that renders them.
+- Keep raw backend, provider, Git, and shell text as diagnostic detail rather
+  than durable presentation copy.
 
 Behavior is the ledger. Update the test at the owning seam when a rule changes;
 update this guide only when a reusable convention or canonical component

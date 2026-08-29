@@ -3,10 +3,10 @@ import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';
+import { mainT } from './i18n';
 
 export type AppMenuOptions = {
   debugMode: boolean;
-  agentListCompact?: boolean;
   updateStatus?: DesktopUpdateStatus;
 };
 
@@ -58,10 +58,10 @@ export function buildAppMenuTemplate(
 
 function buildHelpMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
   return {
-    label: 'Help',
+    label: mainT('menu.help'),
     submenu: [
       {
-        label: 'What’s New',
+        label: mainT('menu.whatsNew'),
         click: () => callbacks.sendAppCommand({ type: 'open-whats-new' }),
       },
     ],
@@ -133,7 +133,7 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
 
 function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {
   return {
-    label: 'Codex Claw',
+    label: mainT('menu.app'),
     submenu: [
       { role: 'about' },
       ...(options.updateStatus && callbacks.checkForUpdates && callbacks.installUpdate
@@ -141,7 +141,7 @@ function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions
         : []),
       { type: 'separator' },
       {
-        label: 'Settings...',
+        label: mainT('menu.settings'),
         accelerator: 'CommandOrControl+,',
         click: () => callbacks.sendAppCommand({ type: 'open-settings' }),
       },
@@ -153,7 +153,7 @@ function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions
       { role: 'unhide' },
       { type: 'separator' },
       {
-        label: 'Quit Codex Claw',
+        label: mainT('menu.quitApp'),
         accelerator: 'CommandOrControl+Q',
         click: () => callbacks.sendAppCommand({ type: 'quit' }),
       },
@@ -164,7 +164,7 @@ function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions
 function createUpdateMenuItem(status: DesktopUpdateStatus, callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
   if (status.state === 'downloaded') {
     return {
-      label: 'Install Update and Relaunch',
+      label: mainT('menu.installUpdate'),
       click: callbacks.installUpdate,
     };
   }
@@ -172,39 +172,39 @@ function createUpdateMenuItem(status: DesktopUpdateStatus, callbacks: AppMenuCal
   const busy = status.state === 'checking' || status.state === 'downloading';
   return {
     enabled: status.state !== 'disabled' && !busy,
-    label: busy ? 'Checking for Updates...' : 'Check for Updates...',
+    label: busy ? mainT('menu.checkingForUpdates') : mainT('menu.checkForUpdates'),
     click: callbacks.checkForUpdates,
   };
 }
 
 function buildFileMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
   return {
-    label: 'File',
+    label: mainT('menu.file'),
     submenu: [
       {
-        label: 'New Team',
+        label: mainT('menu.newTeam'),
         accelerator: 'CommandOrControl+N',
         click: () => callbacks.sendAppCommand({ type: 'new-team' }),
       },
       {
-        label: 'New Agent',
+        label: mainT('menu.newAgent'),
         accelerator: 'CommandOrControl+T',
         click: () => callbacks.sendAppCommand({ type: 'new-agent' }),
       },
       { type: 'separator' },
       {
-        label: 'Close Agent',
+        label: mainT('menu.closeAgent'),
         accelerator: 'CommandOrControl+W',
         click: () => callbacks.sendAppCommand({ type: 'close-active-agent' }),
       },
       {
-        label: 'Close Team',
+        label: mainT('menu.closeTeam'),
         accelerator: 'CommandOrControl+Shift+W',
         click: () => callbacks.sendAppCommand({ type: 'close-active-team' }),
       },
       { type: 'separator' },
       {
-        label: 'Quit',
+        label: mainT('menu.quit'),
         accelerator: 'CommandOrControl+Q',
         click: () => callbacks.sendAppCommand({ type: 'quit' }),
       },
@@ -223,17 +223,17 @@ function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): 
   [
     { type: 'separator' as const },
     {
-      label: 'Edit Agent',
+      label: mainT('menu.editAgent'),
       accelerator: 'CommandOrControl+E',
       click: () => callbacks.sendAppCommand({ type: 'edit-active-agent' }),
     },
     {
-      label: 'Duplicate Agent',
+      label: mainT('menu.duplicateAgent'),
       accelerator: 'CommandOrControl+D',
       click: () => callbacks.sendAppCommand({ type: 'duplicate-active-agent' }),
     },
     {
-      label: 'Restart Agent',
+      label: mainT('menu.restartAgent'),
       accelerator: 'CommandOrControl+R',
       click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
     },
@@ -242,17 +242,10 @@ function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): 
 
 function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {
   return {
-    label: 'View',
+    label: mainT('menu.view'),
     submenu: [
       {
-        label: 'Compact Agent List',
-        type: 'checkbox',
-        checked: options.agentListCompact ?? false,
-        click: (item) => callbacks.sendAppCommand({ type: 'set-agent-list-compact', compact: item.checked }),
-      },
-      { type: 'separator' },
-      {
-        label: 'Compact Context',
+        label: mainT('menu.compactContext'),
         accelerator: 'CommandOrControl+K',
         click: () => callbacks.sendAppCommand({
           type: 'open-agent-composer',
@@ -261,28 +254,28 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
         }),
       },
       {
-        label: 'Review',
+        label: mainT('menu.review'),
         accelerator: 'CommandOrControl+G',
         click: () => callbacks.sendAppCommand({ type: 'open-review' }),
       },
       {
-        label: 'Browser',
+        label: mainT('menu.browser'),
         accelerator: 'CommandOrControl+B',
         click: () => callbacks.sendAppCommand({ type: 'open-browser' }),
       },
       { type: 'separator' },
       {
-        label: 'Next Team',
+        label: mainT('menu.nextTeam'),
         accelerator: cycleTeamsAccelerator,
         click: () => callbacks.sendAppCommand({ type: 'cycle-teams' }),
       },
       {
-        label: 'Next Agent',
+        label: mainT('menu.nextAgent'),
         accelerator: 'Control+Tab',
         click: () => callbacks.sendAppCommand({ type: 'cycle-agents', direction: 1 }),
       },
       {
-        label: 'Previous Agent',
+        label: mainT('menu.previousAgent'),
         accelerator: 'Control+Shift+Tab',
         click: () => callbacks.sendAppCommand({ type: 'cycle-agents', direction: -1 }),
       },
@@ -305,13 +298,13 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
 
 function buildWindowMenu(callbacks: AppMenuCallbacks, platform: NodeJS.Platform): MenuItemConstructorOptions {
   return {
-    label: 'Window',
+    label: mainT('menu.window'),
     submenu: [
       { role: 'minimize' },
       ...(platform === 'darwin' ? [{ role: 'zoom' as const }] : []),
       { type: 'separator' },
       {
-        label: 'Next Team',
+        label: mainT('menu.nextTeam'),
         accelerator: cycleTeamsAccelerator,
         acceleratorWorksWhenHidden: true,
         visible: false,

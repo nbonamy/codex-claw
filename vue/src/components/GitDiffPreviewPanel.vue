@@ -7,14 +7,12 @@
     <div
       v-if="state === 'loading'"
       class="git-diff-preview-panel__empty codex-text-shimmer"
-    >
-      Loading diff...
-    </div>
+    > {{ $t('surface.gitDiffPreviewPanel.loadingDiff') }} </div>
     <div
       v-else-if="state === 'error'"
       class="git-diff-preview-panel__empty git-diff-preview-panel__empty--error"
     >
-      {{ error ?? 'Unable to load diff.' }}
+      {{ error ?? $t('surface.gitDiffPreviewPanel.unableToLoadDiff') }}
     </div>
     <div
       v-else-if="parseError"
@@ -73,7 +71,7 @@
               v-if="chunk.unmodifiedLinesBefore > 0"
               class="git-diff-preview-panel__hunk"
             >
-              {{ chunk.unmodifiedLinesBefore }} unmodified {{ chunk.unmodifiedLinesBefore === 1 ? 'line' : 'lines' }}
+              {{ chunk.unmodifiedLinesBefore }} {{ $t('surface.gitDiffPreviewPanel.unmodified') }} {{ chunk.unmodifiedLinesBefore === 1 ? 'line' : 'lines' }}
             </div>
             <div
               v-for="(line, index) in chunk.lines"
@@ -91,17 +89,13 @@
         <div
           v-else-if="isFileExpanded(file.key)"
           class="git-diff-preview-panel__empty git-diff-preview-panel__empty--file"
-        >
-          No textual hunks.
-        </div>
+        > {{ $t('surface.gitDiffPreviewPanel.noTextualHunks') }} </div>
       </section>
     </div>
     <div
       v-else
       class="git-diff-preview-panel__empty"
-    >
-      No diff content.
-    </div>
+    > {{ $t('surface.gitDiffPreviewPanel.noDiffContent') }} </div>
   </article>
 </template>
 
@@ -109,6 +103,7 @@
 import { computed, ref, watch } from 'vue';
 import { IconBrandJavascript, IconBrandTypescript, IconBrandVue, IconFileCode } from '@tabler/icons-vue';
 import parseGitDiff, { type AnyChunk, type AnyFileChange, type Chunk } from 'parse-git-diff';
+import { translate } from '../i18n';
 
 const props = withDefaults(defineProps<{
   diff: string;
@@ -176,7 +171,7 @@ const parsed = computed(() => {
   } catch (error) {
     return {
       files: [] as DiffFileView[],
-      error: error instanceof Error ? error.message : 'Unable to parse diff.',
+      error: error instanceof Error ? error.message : translate('surface.gitDiffPreviewPanel.unableToParseDiff'),
     };
   }
 });

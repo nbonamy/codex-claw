@@ -9,14 +9,14 @@
     <div class="loop-execution-log__row-actions">
       <button
         type="button"
-        :aria-label="`View conversation for ${ticket}`"
+        :aria-label="$t('dynamic.loops.viewConversation', { ticket })"
         @click.stop="emit('view-conversation')"
       >
         <EyeIcon aria-hidden="true" />
       </button>
       <button
         type="button"
-        :aria-label="`Delete execution for ${ticket}`"
+        :aria-label="$t('dynamic.loops.deleteExecution', { ticket })"
         @click.stop="emit('delete-execution')"
       >
         <Trash2Icon aria-hidden="true" />

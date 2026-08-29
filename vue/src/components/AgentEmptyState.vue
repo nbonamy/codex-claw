@@ -1,7 +1,7 @@
 <template>
   <section
     class="agent-empty-state"
-    aria-label="No agents"
+    :aria-label="t('sidebar.noAgents')"
   >
 
     <div class="agent-empty-state__drag">
@@ -10,20 +10,20 @@
     <div class="agent-empty-state__mark">
       <img
         :src="appIconUrl"
-        alt="Codex Claw"
+        :alt="$t('surface.agentEmptyState.codexClaw')"
       >
     </div>
 
     <div class="agent-empty-state__copy">
-      <h1>Welcome to Codex Claw</h1>
-      <p>Choose a source to start a session</p>
+      <h1>{{ t('sidebar.welcome') }}</h1>
+      <p>{{ t('sidebar.welcomeDetail') }}</p>
     </div>
 
     <div class="agent-empty-state__actions">
       <AppMenu
         class="app-menu--embedded"
-        ariaLabel="Add project from"
-        :items="startWorkMenuItems"
+        :ariaLabel="t('startWork.addProjectFrom')"
+        :items="menuItems"
         @select="select"
       />
     </div>
@@ -31,10 +31,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import { isStartWorkAction, startWorkMenuItems, type StartWorkAction } from './start-work-actions';
 
 const appIconUrl = new URL('../../assets/icon.png', import.meta.url).href;
+const { t } = useI18n();
+const menuItems = computed(() => startWorkMenuItems(t));
 
 const emit = defineEmits<{
   'start-work': [action: StartWorkAction];

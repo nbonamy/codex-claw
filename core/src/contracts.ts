@@ -1,9 +1,16 @@
+export type AppTextDescriptor = {
+  key: string;
+  params?: Record<string, string | number>;
+};
+
+export type AppText = string | AppTextDescriptor;
+
 export type AgentStatus =
   | { type: 'idle' }
   | { type: 'starting' }
-  | { type: 'working'; detail?: string }
-  | { type: 'awaitingInput'; detail?: string }
-  | { type: 'error'; message: string };
+  | { type: 'working'; detail?: AppText }
+  | { type: 'awaitingInput'; detail?: AppText }
+  | { type: 'error'; message: AppText };
 
 export type Team = {
   id: string;
@@ -221,7 +228,7 @@ export type WorkIntegrationConnection = {
   provider: WorkProviderKind;
   status: WorkIntegrationStatus;
   accountLabel?: string;
-  detail?: string;
+  detail?: AppText;
   connectedAt?: string;
 };
 
@@ -623,8 +630,8 @@ export type BackendCapabilities = {
 
 export type BackendPermissionModeOption = {
   id: string;
-  label: string;
-  description: string;
+  label: AppText;
+  description: AppText;
   dangerous?: boolean;
 };
 
@@ -858,7 +865,7 @@ export type AgentFilePreviewResult = {
 export type SidePanelMarkdownRequest = {
   kind: 'markdown';
   purpose?: 'plan';
-  title?: string;
+  title?: AppText;
   path?: string;
   content: string;
 };
@@ -866,8 +873,8 @@ export type SidePanelMarkdownRequest = {
 export type SidePanelGitDiffRequest = {
   kind: 'gitDiff';
   scope?: 'workingTree' | 'turn';
-  title?: string;
-  subtitle?: string;
+  title?: AppText;
+  subtitle?: AppText;
   diff: string;
   sections?: AgentGitDiffSection[];
   state?: 'idle' | 'error';
@@ -1285,13 +1292,13 @@ export type AgentHistoryLoadResult = {
 export type BackendRuntimeStatus = {
   backend: AgentBackend;
   status: 'notConfigured' | 'starting' | 'running' | 'error';
-  detail?: string;
+  detail?: AppText;
   capabilities?: Partial<BackendCapabilities>;
 };
 
 export type BackendConnectionState = {
   status: 'connecting' | 'connected' | 'reconnecting' | 'error';
-  detail?: string;
+  detail?: AppText;
 };
 
 export type RendererSnapshotState = {
@@ -1393,8 +1400,7 @@ export type AppCommand =
   | { type: 'open-settings' }
   | { type: 'open-whats-new' }
   | { type: 'quit' }
-  | { type: 'restart-active-agent' }
-  | { type: 'set-agent-list-compact'; compact: boolean };
+  | { type: 'restart-active-agent' };
 
 export type CreateAgentInput = {
   name: string | null;

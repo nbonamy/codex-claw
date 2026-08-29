@@ -1,14 +1,18 @@
 import { computed, ref, watch } from 'vue';
 import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/core/contracts';
 
+type SessionTranslation = (key: string, params?: Record<string, number>) => string;
+
 type SessionHistoryOptions = {
   agent: () => Agent;
   visible: () => boolean;
   listConversations: (agentId: string) => Promise<ConversationSummary[]>;
   resumeConversation: (agentId: string, ref: BackendConversationRef) => Promise<void>;
+  translate: SessionTranslation;
 };
 
 export function useSessionHistory(options: SessionHistoryOptions) {
+  const translate = options.translate;
   const sessions = ref<ConversationSummary[]>([]);
   const query = ref('');
   const loading = ref(false);
@@ -51,7 +55,7 @@ export function useSessionHistory(options: SessionHistoryOptions) {
       }
     } catch (caught) {
       if (requestId === currentRequestId) {
-        error.value = caught instanceof Error ? caught.message : 'Unable to load sessions';
+        error.value = caught instanceof Error ? caught.message : translate('sessions.loadError');
       }
     } finally {
       if (requestId === currentRequestId) loading.value = false;
@@ -66,7 +70,7 @@ export function useSessionHistory(options: SessionHistoryOptions) {
       await options.resumeConversation(options.agent().id, session.ref);
       return true;
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : 'Unable to resume session';
+      error.value = caught instanceof Error ? caught.message : translate('sessions.resumeError');
       return false;
     } finally {
       resumingSessionId.value = null;
@@ -92,7 +96,9 @@ export function useSessionHistory(options: SessionHistoryOptions) {
   }
 
   function sessionTitle(session: ConversationSummary): string {
-    return session.title.trim() || (isCurrentSession(session) ? 'Current session' : 'Untitled session');
+    return session.title.trim() || (isCurrentSession(session)
+      ? translate('sessions.currentTitle')
+      : translate('sessions.untitled'));
   }
 
   return {
@@ -110,21 +116,25 @@ export function useSessionHistory(options: SessionHistoryOptions) {
   };
 }
 
-export function relativeSessionDate(value: string, now = Date.now()): string {
+export function relativeSessionDate(
+  value: string,
+  now = Date.now(),
+  translate: SessionTranslation,
+): string {
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) return '';
 
   const diffMs = now - timestamp;
-  if (diffMs < 60_000) return 'now';
+  if (diffMs < 60_000) return translate('sessions.now');
 
   const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return translate('sessions.minutesAgo', { count: minutes });
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return translate('sessions.hoursAgo', { count: hours });
 
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return translate('sessions.daysAgo', { count: days });
 
   return new Date(timestamp).toLocaleDateString(undefined, {
     day: 'numeric',

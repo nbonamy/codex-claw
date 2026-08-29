@@ -23,7 +23,7 @@
           <label
             class="team-dialog__row-label"
             for="team-dialog-connection"
-          >Connection</label>
+          >{{ $t('surface.teamDialog.connection') }}</label>
           <div class="team-dialog__row-control">
             <el-select
               id="team-dialog-connection"
@@ -32,7 +32,7 @@
               :disabled="connectionLocked"
             >
               <el-option
-                label="Local"
+                :label="$t('surface.teamDialog.local')"
                 :value="localConnectionValue"
               />
               <el-option
@@ -52,7 +52,7 @@
           <label
             class="team-dialog__row-label"
             for="team-dialog-remote-team"
-          >Remote team</label>
+          >{{ $t('surface.teamDialog.remoteTeam') }}</label>
           <div class="team-dialog__row-control">
             <el-select
               id="team-dialog-remote-team"
@@ -61,7 +61,7 @@
               :loading="remoteTeamsLoading"
             >
               <el-option
-                label="Create new remote team"
+                :label="$t('surface.teamDialog.createNewRemoteTeam')"
                 :value="newRemoteTeamValue"
               />
               <el-option
@@ -83,25 +83,25 @@
           <label
             class="team-dialog__row-label"
             for="team-dialog-name"
-          >Name</label>
+          >{{ $t('surface.teamDialog.name') }}</label>
           <div class="team-dialog__row-control team-dialog__name-control">
             <input
               id="team-dialog-name"
               v-model="name"
               class="claw-form-dialog__text-input team-dialog__text-input"
               type="text"
-              placeholder="Enter team name"
+              :placeholder="$t('surface.teamDialog.enterTeamName')"
               autofocus
             />
           </div>
         </section>
 
         <section class="team-dialog__row team-dialog__field team-dialog__color-row">
-          <span class="team-dialog__row-label">Color</span>
+          <span class="team-dialog__row-label">{{ $t('surface.teamDialog.color') }}</span>
           <div
             class="team-dialog__row-control team-dialog__colors"
             role="radiogroup"
-            aria-label="Team color"
+            :aria-label="$t('surface.teamDialog.teamColor')"
           >
             <button
               v-for="color in teamColors"
@@ -111,7 +111,7 @@
               :style="{ '--team-color': color }"
               type="button"
               role="radio"
-              :aria-label="`Use color ${color}`"
+              :aria-label="$t('dynamic.teamColor', { color })"
               :aria-checked="color === selectedColor"
               @click="selectedColor = color"
             >
@@ -135,7 +135,7 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.teamDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
@@ -151,6 +151,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/core/contracts';
 import { defaultTeamColor, teamColors } from '@codex-claw/core/team-colors';
@@ -197,8 +198,8 @@ const selectedRemoteConnectionId = computed(() => (
     : connectionSelection.value === localConnectionValue ? '' : connectionSelection.value
 ));
 const connectionLocked = computed(() => props.mode === 'edit' && (props.team?.agentIds.length ?? 0) > 0);
-const dialogTitle = computed(() => props.mode === 'edit' ? 'Edit Team' : 'Create Team');
-const submitLabel = computed(() => props.mode === 'edit' ? 'Save' : 'Create Team');
+const dialogTitle = computed(() => props.mode === 'edit' ? translate('surface.teamDialog.editTeam') : translate('surface.teamDialog.createTeam'));
+const submitLabel = computed(() => props.mode === 'edit' ? translate('surface.teamDialog.save') : translate('surface.teamDialog.createTeam'));
 
 watch(() => props.visible, (visible) => {
   if (visible) {

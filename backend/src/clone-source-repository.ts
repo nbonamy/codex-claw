@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { AppError } from '@codex-claw/core/app-error';
 import type { SourceRepository } from '@codex-claw/core/contracts';
 import { resolveSourceFolderPath, scanSourceRepositories } from './source-repositories';
 
@@ -22,8 +23,8 @@ export async function cloneSourceRepository(
 ): Promise<SourceRepository> {
   const configuredSourceRoot = sourceFolderPath.trim();
   const url = repositoryUrl.trim();
-  if (!configuredSourceRoot) throw new Error('Source folder is not configured.');
-  if (!url) throw new Error('Repository URL is required.');
+  if (!configuredSourceRoot) throw new AppError('clone.sourceFolderMissing', 'Source folder is not configured.');
+  if (!url) throw new AppError('clone.urlRequired', 'Repository URL is required.');
 
   const sourceRoot = resolveSourceFolderPath(configuredSourceRoot);
   const repositoryName = repositoryNameFromUrl(url);
@@ -34,7 +35,7 @@ export async function cloneSourceRepository(
     const existingRemote = (await runner.run('git', ['remote', 'get-url', 'origin'], { cwd: destinationPath })
       .catch(() => ({ stdout: '' }))).stdout?.trim();
     if (!existingRemote || normalizeGitUrl(existingRemote) !== normalizeGitUrl(url)) {
-      throw new Error(`${repositoryName} already exists in the source folder.`);
+      throw new AppError('clone.alreadyExists', `${repositoryName} already exists in the source folder.`, { repository: repositoryName });
     }
   } else {
     await runner.run('git', ['clone', '--', url, destinationPath], { cwd: sourceRoot });
@@ -42,7 +43,13 @@ export async function cloneSourceRepository(
 
   const repositories = await scanSourceRepositories(sourceRoot);
   const repository = repositories.find((candidate) => candidate.path === destinationPath);
-  if (!repository) throw new Error(`Cloned ${repositoryName}, but could not discover it in the source folder.`);
+  if (!repository) {
+    throw new AppError(
+      'clone.discoveryFailed',
+      `Cloned ${repositoryName}, but could not discover it in the source folder.`,
+      { repository: repositoryName },
+    );
+  }
   return repository;
 }
 
@@ -54,7 +61,7 @@ export function repositoryNameFromUrl(repositoryUrl: string): string {
   const pathPart = repositoryPath.slice(repositoryPath.lastIndexOf('/') + 1);
   const name = pathPart.replace(/\.git$/iu, '').trim();
   if (!name || name === '.' || name === '..' || /[/\\]/u.test(name)) {
-    throw new Error('Repository URL does not contain a valid repository name.');
+    throw new AppError('clone.invalidName', 'Repository URL does not contain a valid repository name.');
   }
   return name;
 }

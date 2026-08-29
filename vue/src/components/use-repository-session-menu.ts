@@ -17,6 +17,7 @@ export type RepositorySessionMenuState = {
 
 export function useRepositorySessionMenu(
   branchLoader: () => RepositoryBranchLoader | undefined,
+  translate: (key: string, params?: Record<string, string>) => string,
 ): RepositorySessionMenuState {
   const visibleGroupId = ref<string | null>(null);
   const defaultBranches = ref<Record<string, SourceBranch | null>>({});
@@ -43,7 +44,9 @@ export function useRepositorySessionMenu(
       const detail = error instanceof Error ? error.message.trim() : '';
       errors.value = {
         ...errors.value,
-        [group.id]: detail ? `Could not load branches: ${detail}` : 'Could not load branches.',
+        [group.id]: detail
+          ? translate('errors.branchesLoadWithDetail', { detail })
+          : translate('errors.branchesLoad'),
       };
     } finally {
       loading.value = { ...loading.value, [group.id]: false };

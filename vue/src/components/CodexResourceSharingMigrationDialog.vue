@@ -6,19 +6,16 @@
     :show-close="false"
     append-to-body
     class="claw-dialog"
-    title="Share skills and plugins with ChatGPT?"
+    :title="$t('surface.codexResourceSharingMigrationDialog.shareSkillsAndPluginsWithChatGPT')"
     width="460px"
   >
-    <p class="codex-resource-sharing-migration-dialog__copy">
-      Codex Claw can use the skills and plugins installed in ChatGPT. Migrating replaces the existing Claw folders with links to <code>~/.codex</code>.
+    <p class="codex-resource-sharing-migration-dialog__copy"> {{ $t('surface.codexResourceSharingMigrationDialog.codexClawCanUseTheSkillsAndPluginsInstalledInChatGPTMigr') }} <code>{{ $t('surface.codexResourceSharingMigrationDialog.codex') }}</code>.
     </p>
     <p
       v-if="blocked"
       class="codex-resource-sharing-migration-dialog__warning"
       role="status"
-    >
-      Migration cannot run while chats are active. Wait for them to finish, or keep the current isolated setup.
-    </p>
+    > {{ $t('surface.codexResourceSharingMigrationDialog.migrationCannotRunWhileChatsAreActiveWaitForThemToFinish') }} </p>
     <template #footer>
       <div class="claw-dialog__footer">
         <button
@@ -26,18 +23,14 @@
           type="button"
           :disabled="pending"
           @click="$emit('decline')"
-        >
-          Keep isolated
-        </button>
+        > {{ $t('surface.codexResourceSharingMigrationDialog.keepIsolated') }} </button>
         <button
           class="claw-button claw-button--primary"
           type="button"
           :aria-busy="pending"
           :disabled="blocked || pending"
           @click="$emit('migrate')"
-        >
-          Migrate
-        </button>
+        > {{ $t('surface.codexResourceSharingMigrationDialog.migrate') }} </button>
       </div>
     </template>
   </el-dialog>

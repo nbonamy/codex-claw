@@ -30,7 +30,7 @@
         <NewAgentButton
           v-if="section.showHeaderAdd"
           class="cockpit-agents__header-add"
-          label="Add agent"
+          :label="$t('surface.cockpitAgentsView.addAgent')"
           size="small"
           tone="ghost"
           :bench="benchForTeam(section.team.id)"
@@ -40,7 +40,7 @@
         />
       </header>
 
-      <p v-if="section.agents.length === 0" class="cockpit-agents__empty">No agents</p>
+      <p v-if="section.agents.length === 0" class="cockpit-agents__empty">{{ $t('surface.cockpitAgentsView.noAgents') }}</p>
 
       <div
         :ref="(element) => setGridRef(section.team.id, element)"
@@ -85,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team } from '@codex-claw/core/contracts';
@@ -258,8 +259,8 @@ function statusCounts(agents: Agent[]): StatusSummaryItem[] {
 }
 
 function summaryLabel(status: AgentStatus['type'], count: number): string {
-  if (status === 'awaitingInput') return 'Awaiting input';
-  if (status === 'error') return count === 1 ? 'Error' : 'Errors';
+  if (status === 'awaitingInput') return translate('surface.cockpitAgentsView.awaitingInput');
+  if (status === 'error') return count === 1 ? translate('surface.cockpitAgentsView.error') : translate('surface.cockpitAgentsView.errors');
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 </script>

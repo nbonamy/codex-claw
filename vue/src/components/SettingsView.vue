@@ -1,7 +1,7 @@
 <template>
   <section
     class="settings-view"
-    aria-label="Settings"
+    :aria-label="$t('surface.settingsView.settings')"
   >
     <div class="settings-view__header" />
     

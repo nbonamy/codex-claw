@@ -3621,8 +3621,7 @@ describe('AppShell', () => {
     });
     const quit = vi.fn().mockResolvedValue(undefined);
     const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff, updateSettings });
+    const wrapper = mountShell({ snapshot, quit, openAgentGitDiff });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
@@ -3632,9 +3631,6 @@ describe('AppShell', () => {
     wrapper.getComponent({ name: 'WhatsNewDialog' }).vm.$emit('close');
     await nextTick();
     expect(wrapper.getComponent({ name: 'WhatsNewDialog' }).props('visible')).toBe(false);
-    listener({ type: 'set-agent-list-compact', compact: false });
-    await nextTick();
-    expect(updateSettings).toHaveBeenCalledWith({ general: { agentListCompact: false } });
     listener({ type: 'new-team' });
     await nextTick();
     expect(wrapper.text()).toContain('Create Team');

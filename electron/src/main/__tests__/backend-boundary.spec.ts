@@ -52,6 +52,7 @@ describe('Electron backend boundary', () => {
       'daemon-startup-maintenance.ts',
       'deep-links.ts',
       'forge-env.d.ts',
+      'i18n.ts',
       'index.ts',
       'ipc-events.ts',
       'log.ts',

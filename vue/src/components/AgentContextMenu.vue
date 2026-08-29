@@ -6,7 +6,7 @@
       :style="menuStyle"
     >
       <AppMenu
-        ariaLabel="Agent actions"
+        :ariaLabel="t('agents.actions')"
         :items="menuItems"
         @select="selectMenuItem"
       />
@@ -16,6 +16,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -58,6 +59,7 @@ const emit = defineEmits<{
   'open-in': [application: OpenInApplication];
 }>();
 
+const { t } = useI18n();
 const viewportMargin = 8;
 const menuRoot = ref<HTMLElement | null>(null);
 const menuPosition = ref({ x: props.x, y: props.y });
@@ -71,19 +73,19 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'edit-agent',
     type: 'action',
-    label: 'Edit Agent',
+    label: t('agents.edit'),
     icon: PencilIcon,
   },
   {
     id: 'duplicate-agent',
     type: 'action',
-    label: 'Duplicate Agent',
+    label: t('agents.duplicate'),
     icon: CopyIcon,
   },
   {
     id: 'fork-agent',
     type: 'action',
-    label: 'Fork Agent',
+    label: t('agents.fork'),
     icon: GitForkIcon,
     disabled: props.forkDisabled === true,
   },
@@ -91,7 +93,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
   ...(props.openInCatalog?.applications.length ? [{
     id: 'open-in',
     type: 'submenu',
-    label: 'Open In…',
+    label: t('agents.openIn'),
     icon: ExternalLinkIcon,
     disabled: props.openInDisabled === true,
     items: openInMenuItems(props.openInCatalog),
@@ -99,7 +101,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'move-to-team',
     type: 'submenu',
-    label: 'Move to Other Team',
+    label: t('agents.moveToTeam'),
     icon: SwitchHorizontalIcon,
     disabled: moveTargets.value.length === 0,
     items: moveTargets.value.map((team) => ({
@@ -112,26 +114,26 @@ const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'save-agent-to-bench',
     type: 'action',
-    label: 'Save to Bench',
+    label: t('agents.saveToBench'),
     icon: SaveToBenchIcon,
   },
   { id: 'group-danger', type: 'separator' },
   {
     id: 'resume-session',
     type: 'action',
-    label: 'Resume Session',
+    label: t('agents.resumeSession'),
     icon: MessageCircleIcon,
   },
   {
     id: 'restart-agent',
     type: 'action',
-    label: 'Restart Agent',
+    label: t('agents.restart'),
     icon: RefreshIcon,
   },
   {
     id: 'close-agent',
     type: 'action',
-    label: 'Close Agent',
+    label: t('agents.close'),
     icon: X,
     danger: true,
   },

@@ -1,6 +1,6 @@
 <template>
   <SettingsPanelFrame
-    title="Integrations"
+    :title="$t('surface.settingsIntegrationsPanel.integrations')"
     title-id="settings-integrations-title"
   >
     <template #banner>
@@ -17,7 +17,7 @@
             <GitHubIcon size="var(--icon-xl)" />
           </span>
           <div>
-            <strong>GitHub</strong>
+            <strong>{{ $t('surface.settingsIntegrationsPanel.gitHub') }}</strong>
             <span>{{ githubDescription }}</span>
           </div>
         </div>
@@ -29,17 +29,13 @@
             size="small"
             type="primary"
             @click="connectGithub"
-          >
-            Connect
-          </el-button>
+          > {{ $t('surface.settingsIntegrationsPanel.connect') }} </el-button>
           <template v-else>
-            <span class="settings-integrations-panel__connected">Connected</span>
+            <span class="settings-integrations-panel__connected">{{ $t('surface.settingsIntegrationsPanel.connected') }}</span>
             <el-button
               size="small"
               @click="emit('disconnect', 'github')"
-            >
-              Disconnect
-            </el-button>
+            > {{ $t('surface.settingsIntegrationsPanel.disconnect') }} </el-button>
           </template>
         </div>
       </article>
@@ -54,7 +50,7 @@
             id="github-client-id"
             v-model="clientIdInput"
             autocomplete="off"
-            placeholder="GitHub OAuth or App client ID"
+            :placeholder="$t('surface.settingsIntegrationsPanel.gitHubOAuthOrAppClientId')"
             size="small"
             spellcheck="false"
           />
@@ -77,13 +73,13 @@
         <li class="settings-integrations-panel__authorization-step">
           <div class="settings-integrations-panel__authorization-step-copy">
             <div class="settings-integrations-panel__authorization-step-text">
-              <strong>Step 1: Copy the code</strong>
-              <span>Click the code to copy it.</span>
+              <strong>{{ $t('surface.settingsIntegrationsPanel.step1CopyTheCode') }}</strong>
+              <span>{{ $t('surface.settingsIntegrationsPanel.clickTheCodeToCopyIt') }}</span>
             </div>
             <button
               class="settings-integrations-panel__code"
               type="button"
-              :aria-label="`Copy GitHub device code ${authorization.userCode}`"
+              :aria-label="$t('dynamic.settings.copyGithubCode', { code: authorization.userCode })"
               @click="copyAuthorizationCode"
             >
               <span>{{ authorization.userCode }}</span>
@@ -97,27 +93,23 @@
         </li>
         <li class="settings-integrations-panel__authorization-step">
           <div class="settings-integrations-panel__authorization-step-text">
-            <strong>Step 2: Open GitHub</strong>
-            <span>GitHub will ask for the code. Paste it there, authorize Codex Claw, then come back here.</span>
+            <strong>{{ $t('surface.settingsIntegrationsPanel.step2OpenGitHub') }}</strong>
+            <span>{{ $t('surface.settingsIntegrationsPanel.gitHubWillAskForTheCodePasteItThereAuthorizeCodexClawThe') }}</span>
           </div>
           <el-button
             :type="codeCopied ? 'primary' : undefined"
             @click="emit('open-authorization', 'github')"
-          >
-            Open GitHub
-          </el-button>
+          > {{ $t('surface.settingsIntegrationsPanel.openGitHub') }} </el-button>
         </li>
         <li class="settings-integrations-panel__authorization-step">
           <div class="settings-integrations-panel__authorization-step-text">
-            <strong>Step 3: Come back here</strong>
-            <span>Codex Claw will finish the connection automatically once GitHub approves it.</span>
+            <strong>{{ $t('surface.settingsIntegrationsPanel.step3ComeBackHere') }}</strong>
+            <span>{{ $t('surface.settingsIntegrationsPanel.codexClawWillFinishTheConnectionAutomaticallyOnceGitHubA') }}</span>
           </div>
           <span
             class="settings-integrations-panel__waiting"
-            aria-label="Waiting for GitHub authorization"
-          >
-            Waiting...
-          </span>
+            :aria-label="$t('surface.settingsIntegrationsPanel.waitingForGitHubAuthorization')"
+          > {{ $t('surface.settingsIntegrationsPanel.waiting') }} </span>
         </li>
         </ol>
       </div>
@@ -133,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
 import { CheckIcon, CopyIcon, GitHubIcon } from '../shared/icons/app-icons';
@@ -182,15 +175,15 @@ const clientIdChanged = computed(() => clientIdInput.value.trim() !== savedClien
 const githubDescription = computed(() => {
   const connection = githubConnection.value;
   if (connection.status === 'connected') {
-    return connection.accountLabel ? `Signed in as ${connection.accountLabel}` : 'Signed in';
+    return connection.accountLabel ? `Signed in as ${connection.accountLabel}` : translate('surface.settingsIntegrationsPanel.signedIn');
   }
   if (connection.status === 'connecting') {
-    return 'Waiting for authorization';
+    return translate('surface.settingsIntegrationsPanel.waitingForAuthorization');
   }
   if (connection.status === 'notConfigured') {
-    return 'GitHub OAuth is not configured';
+    return translate('surface.settingsIntegrationsPanel.gitHubOAuthIsNotConfigured');
   }
-  return 'Issues and pull requests';
+  return translate('surface.settingsIntegrationsPanel.issuesAndPullRequests');
 });
 
 watch(savedClientId, (value) => {

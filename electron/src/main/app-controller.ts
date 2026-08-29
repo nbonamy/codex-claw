@@ -1,4 +1,6 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { encodedAppError } from '@codex-claw/core/app-error';
+import { mainT } from './i18n';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, powerMonitor, shell } from 'electron';
 import path from 'node:path';
 import { CodexElectronAttachmentRegistry, registerCodexNativeIpc, TypedIpcMain } from '@codex-app-sdk/electron';
@@ -264,7 +266,11 @@ export class AppController {
     });
 
     ipc.handle(ipcChannels.cloneSourceRepository, async (_event, input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => {
-      return this.cloneSourceRepository(input);
+      try {
+        return await this.cloneSourceRepository(input);
+      } catch (error) {
+        throw encodedAppError(error);
+      }
     });
 
     ipc.handle(ipcChannels.listSourceBranches, async (_event, repoPath: string, remoteConnectionId?: string) => {
@@ -522,7 +528,11 @@ export class AppController {
     ipc.handle(ipcChannels.browserClose, (_event, agentId: string, browserId: string) => this.browserPane.close(agentId, browserId));
 
     ipc.handle(ipcChannels.respondToClientRequest, async (_event, response: ClientRequestResponse) => {
-      return this.respondToClientRequest(response);
+      try {
+        return await this.respondToClientRequest(response);
+      } catch (error) {
+        throw encodedAppError(error);
+      }
     });
   }
 
@@ -538,13 +548,10 @@ export class AppController {
       this.focusMainWindow();
       return;
     }
-    this.mainWindow = createMainWindow(
-      this.snapshot?.general.agentListCompact ?? false,
-      {
-        ...this.updateMenuOptions(),
-        ...this.debugMenuOptions(),
-      },
-    );
+    this.mainWindow = createMainWindow({
+      ...this.updateMenuOptions(),
+      ...this.debugMenuOptions(),
+    });
     logMain('window', 'created main window');
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
@@ -953,7 +960,7 @@ export class AppController {
     this.backendClientEventUnsubscribe = null;
     this.backendClientConnectionUnsubscribe?.();
     this.backendClientConnectionUnsubscribe = null;
-    this.setConnectionState({ status: 'reconnecting', detail: 'Restarting clawd…' });
+    this.setConnectionState({ status: 'reconnecting', detail: { key: 'backend.restarting' } });
     await this.backendClient?.close();
     if (daemonStatus.installed) {
       try {
@@ -1290,7 +1297,7 @@ export class AppController {
   private async chooseAgentFolder(): Promise<string | null> {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
-      title: 'Select agent folder',
+      title: mainT('dialog.agentFolder'),
     });
 
     return result.canceled ? null : result.filePaths[0] ?? null;
@@ -1299,7 +1306,7 @@ export class AppController {
   private async chooseCodexBinary(): Promise<string | null> {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
-      title: 'Select Codex executable',
+      title: mainT('dialog.codexExecutable'),
     });
 
     return result.canceled ? null : result.filePaths[0] ?? null;
@@ -1308,8 +1315,8 @@ export class AppController {
   private async chooseSourceFolder(): Promise<string | null> {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
-      title: 'Select source folder',
-      message: 'Select your source folder containing git repositories',
+      title: mainT('dialog.sourceFolder'),
+      message: mainT('dialog.sourceFolderMessage'),
       defaultPath: this.clientState.sourceFolderPath || undefined,
     });
 
@@ -1318,8 +1325,8 @@ export class AppController {
 
   private async chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
     const result = await dialog.showSaveDialog({
-      title: 'Choose worktree folder',
-      message: 'Choose location for the worktree',
+      title: mainT('dialog.worktreeFolder'),
+      message: mainT('dialog.worktreeFolderMessage'),
       defaultPath,
       properties: ['createDirectory'],
     });
@@ -1480,7 +1487,6 @@ export class AppController {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
     installAppMenu(this.mainWindow, {
       debugMode: !app.isPackaged,
-      agentListCompact: this.snapshot?.general.agentListCompact ?? false,
       ...this.updateMenuOptions(),
       ...this.debugMenuOptions(),
     });

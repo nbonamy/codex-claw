@@ -1,3 +1,5 @@
+
+import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import type { Team } from '@codex-claw/core/contracts';
 
@@ -10,8 +12,8 @@ export async function confirmCloseTeam(team: Team): Promise<boolean> {
         : `Agents and messages in ${team.name} will be removed from Codex Claw.`,
       isRemoteTeam ? `Delete ${team.name}?` : `Close ${team.name}?`,
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: isRemoteTeam ? 'Delete Team' : 'Close Team',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: isRemoteTeam ? translate('surface.team-close-confirmation.deleteTeam') : translate('surface.team-close-confirmation.closeTeam'),
         type: 'warning',
       },
     );
@@ -28,8 +30,8 @@ export async function confirmDisconnectTeam(team: Team): Promise<boolean> {
       `${team.name} will be removed from this app. Its agents keep running on the remote backend.`,
       `Disconnect from ${team.name}?`,
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Disconnect',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('common.disconnect'),
         type: 'info',
       },
     );

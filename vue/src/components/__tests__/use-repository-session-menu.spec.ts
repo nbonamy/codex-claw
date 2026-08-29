@@ -26,7 +26,7 @@ const group: WorkspaceSidebarGroup = {
 describe('useRepositorySessionMenu', () => {
   it('loads and caches the default branch for a repository group', async () => {
     const load = vi.fn().mockResolvedValue([{ name: 'main', isDefault: true }]);
-    const menu = useRepositorySessionMenu(() => load);
+    const menu = useRepositorySessionMenu(() => load, translate);
 
     await menu.setVisible(group, true);
     await menu.setVisible(group, false);
@@ -40,7 +40,7 @@ describe('useRepositorySessionMenu', () => {
     const load = vi.fn()
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce([{ name: 'main', isDefault: true }]);
-    const menu = useRepositorySessionMenu(() => load);
+    const menu = useRepositorySessionMenu(() => load, translate);
 
     await menu.setVisible(group, true);
     expect(menu.errors.value[group.id]).toBe('Could not load branches: offline');
@@ -50,3 +50,9 @@ describe('useRepositorySessionMenu', () => {
     expect(menu.errors.value[group.id]).toBeNull();
   });
 });
+
+function translate(key: string, params?: Record<string, string>): string {
+  return key === 'errors.branchesLoadWithDetail'
+    ? `Could not load branches: ${params?.detail ?? ''}`
+    : 'Could not load branches.';
+}

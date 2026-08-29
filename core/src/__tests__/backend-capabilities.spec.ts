@@ -31,10 +31,10 @@ describe('backend capabilities', () => {
       conversationFork: false,
       approvalPresets: [],
       permissionModes: [
-        expect.objectContaining({ id: 'default', label: 'Default' }),
-        expect.objectContaining({ id: 'acceptEdits', label: 'Accept edits' }),
-        expect.objectContaining({ id: 'dontAsk', label: "Don't ask" }),
-        expect.objectContaining({ id: 'auto', label: 'Auto (experimental)' }),
+        expect.objectContaining({ id: 'default', label: { key: 'permissions.claude.default.label' } }),
+        expect.objectContaining({ id: 'acceptEdits', label: { key: 'permissions.claude.acceptEdits.label' } }),
+        expect.objectContaining({ id: 'dontAsk', label: { key: 'permissions.claude.dontAsk.label' } }),
+        expect.objectContaining({ id: 'auto', label: { key: 'permissions.claude.auto.label' } }),
         expect.objectContaining({ id: 'bypassPermissions', dangerous: true }),
       ],
     });

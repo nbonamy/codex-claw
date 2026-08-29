@@ -1,20 +1,20 @@
 <template>
   <aside
     class="work-backlog-panel"
-    aria-label="Work backlog"
+    :aria-label="$t('surface.workBacklogPanel.workBacklog')"
   >
     <header class="work-backlog-panel__header">
       <div class="work-backlog-panel__title">
         <GitHubIcon aria-hidden="true" />
         <div>
-          <strong>Backlog</strong>
+          <strong>{{ $t('surface.workBacklogPanel.backlog') }}</strong>
           <!-- <span>{{ connection.accountLabel ?? 'GitHub' }}</span> -->
         </div>
       </div>
       <button
         class="work-backlog-panel__refresh"
         type="button"
-        aria-label="Refresh backlog"
+        :aria-label="$t('surface.workBacklogPanel.refreshBacklog')"
         :disabled="status === 'loading'"
         @click="emit('refresh', selectedRepositoryId)"
       >
@@ -26,10 +26,10 @@
       <el-select
         class="work-backlog-panel__select"
         :model-value="selectedRepositoryId"
-        placeholder="Select repo"
+        :placeholder="$t('surface.workBacklogPanel.selectRepo')"
         :disabled="repositories.length === 0"
         filterable
-        aria-label="Backlog repository"
+        :aria-label="$t('surface.workBacklogPanel.backlogRepository')"
         @update:model-value="selectRepository"
       >
         <el-option
@@ -43,11 +43,11 @@
       <el-select
         class="work-backlog-panel__select"
         :model-value="selectedAssigneeLogin"
-        placeholder="Assigned to"
+        :placeholder="$t('surface.workBacklogPanel.assignedTo')"
         :disabled="!selectedRepositoryId || assigneeOptions.length === 0"
         clearable
         filterable
-        aria-label="Backlog assignee"
+        :aria-label="$t('surface.workBacklogPanel.backlogAssignee')"
         @update:model-value="selectAssignee"
       >
         <el-option
@@ -61,11 +61,11 @@
       <el-select
         class="work-backlog-panel__select"
         :model-value="selectedTagName"
-        placeholder="All tags"
+        :placeholder="$t('surface.workBacklogPanel.allTags')"
         :disabled="!selectedRepositoryId || tagOptions.length === 0"
         clearable
         filterable
-        aria-label="Backlog tag"
+        :aria-label="$t('surface.workBacklogPanel.backlogTag')"
         @update:model-value="selectTag"
       >
         <el-option
@@ -80,9 +80,7 @@
     <div
       v-if="status === 'loading'"
       class="work-backlog-panel__state"
-    >
-      Loading issues...
-    </div>
+    > {{ $t('surface.workBacklogPanel.loadingIssues') }} </div>
     <div
       v-else-if="error"
       class="work-backlog-panel__state work-backlog-panel__state--error"
@@ -92,21 +90,15 @@
     <div
       v-else-if="!selectedRepositoryId"
       class="work-backlog-panel__state"
-    >
-      Select a repository
-    </div>
+    > {{ $t('surface.workBacklogPanel.selectARepository') }} </div>
     <div
       v-else-if="items.length === 0"
       class="work-backlog-panel__state"
-    >
-      No open issues
-    </div>
+    > {{ $t('surface.workBacklogPanel.noOpenIssues') }} </div>
     <div
       v-else-if="itemRows.length === 0"
       class="work-backlog-panel__state"
-    >
-      No issues with these filters
-    </div>
+    > {{ $t('surface.workBacklogPanel.noIssuesWithTheseFilters') }} </div>
 
     <div
       v-else
@@ -139,7 +131,7 @@
             <button
               class="work-backlog-panel__item-menu"
               type="button"
-              :aria-label="`Issue #${row.item.number} actions`"
+              :aria-label="$t('dynamic.repository.issueActions', { number: row.item.number })"
               draggable="false"
               @click.stop="setMenuVisible(row.item.id, openMenuItemId !== row.item.id)"
               @dragstart.stop
@@ -149,7 +141,7 @@
           </template>
           <AppMenu
             class="app-menu--embedded"
-            ariaLabel="Issue actions"
+            :ariaLabel="$t('surface.workBacklogPanel.issueActions')"
             :items="menuItemsForRow(row)"
             @click.stop
             @select="selectMenuItem(row.item, $event)"
@@ -174,7 +166,7 @@
             aria-hidden="true"
             class="work-backlog-panel__missing-agent-icon"
           />
-          <span>{{ row.assignedAgent?.name ?? 'Agent unavailable' }}</span>
+          <span>{{ row.assignedAgent?.name ?? $t('surface.workBacklogPanel.agentUnavailable') }}</span>
           <span
             class="work-backlog-panel__assignee-status"
             :data-status="workItemAssignmentStatus(row)"
@@ -194,6 +186,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref } from 'vue';
 import { IconRobotFace } from '@tabler/icons-vue';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
@@ -280,7 +273,7 @@ const assigneeOptions = computed(() => {
   return [...assignees]
     .sort((left, right) => left.localeCompare(right))
     .map((assignee) => ({
-      label: accountLabel && assignee === accountLabel ? 'Me' : assignee,
+      label: accountLabel && assignee === accountLabel ? translate('surface.workBacklogPanel.me') : assignee,
       value: assignee,
     }));
 });
@@ -313,10 +306,10 @@ function workItemAssignmentStatus(row: WorkBacklogItemRow): WorkBacklogAssignmen
 
 function workItemAssignmentStatusLabel(row: WorkBacklogItemRow): string {
   const status = workItemAssignmentStatus(row);
-  if (status === 'blocked') return 'Blocked';
-  if (status === 'completed') return 'Completed';
-  if (status === 'readyForReview') return 'Ready for review';
-  return 'In progress';
+  if (status === 'blocked') return translate('surface.workBacklogPanel.blocked');
+  if (status === 'completed') return translate('surface.workBacklogPanel.completed');
+  if (status === 'readyForReview') return translate('surface.workBacklogPanel.readyForReview');
+  return translate('surface.workBacklogPanel.inProgress');
 }
 
 function hasAssignmentContext(row: WorkBacklogItemRow): boolean {
@@ -329,13 +322,13 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
       ...(row.assignedAgent ? [{
         id: 'show-agent',
         type: 'action',
-        label: 'Show agent',
+        label: translate('surface.workBacklogPanel.showAgent'),
         icon: IconRobotFace,
       } satisfies AppMenuItem] : []),
       {
         id: 'clear-assignment',
         type: 'action',
-        label: 'Clear assignment',
+        label: translate('surface.workBacklogPanel.clearAssignment'),
         icon: CircleXIcon,
         danger: true,
       },
@@ -345,13 +338,13 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
     {
       id: 'assign-to-new-agent',
       type: 'action',
-      label: 'Assign to New Agent',
+      label: translate('surface.workBacklogPanel.assignToNewAgent'),
       icon: PlusCircleIcon,
     },
     {
       id: 'assign-to-bench',
       type: 'action',
-      label: 'Assign to Bench Agent',
+      label: translate('surface.workBacklogPanel.assignToBenchAgent'),
       icon: SaveToBenchIcon,
       disabled: !props.canAssignToBench,
     },
@@ -420,10 +413,10 @@ function endDrag(): void {
 
 function workProviderLabel(provider: WorkIntegrationConnection['provider']): string {
   if (provider === 'github') {
-    return 'GitHub';
+    return translate('surface.workBacklogPanel.gitHub');
   }
   provider satisfies never;
-  return 'Integration';
+  return translate('surface.workBacklogPanel.integration');
 }
 </script>
 

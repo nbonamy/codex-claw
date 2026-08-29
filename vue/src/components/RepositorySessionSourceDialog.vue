@@ -14,7 +14,7 @@
           ref="searchInput"
           v-model="query"
           :placeholder="searchPlaceholder"
-          aria-label="Search session sources"
+          :aria-label="t('repositories.sessionSource.search')"
           autocomplete="off"
           spellcheck="false"
         >
@@ -22,17 +22,17 @@
     </template>
 
     <div class="repository-session-source-dialog__toolbar">
-      <el-tabs v-model="tab" class="repository-session-source-dialog__tabs" aria-label="Session source type">
+      <el-tabs v-model="tab" class="repository-session-source-dialog__tabs" :aria-label="t('repositories.sessionSource.type')">
         <el-tab-pane v-for="option in tabs" :key="option.id" :name="option.id" :label="option.label" />
       </el-tabs>
       <span class="repository-session-source-dialog__repository"><RepositoryIcon aria-hidden="true" />{{ repositoryName }}</span>
     </div>
 
     <section class="repository-session-source-dialog__results" aria-live="polite">
-      <p v-if="loading" class="repository-session-source-dialog__state">Loading…</p>
+      <p v-if="loading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
       <p v-else-if="error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
       <template v-else-if="tab === 'branches'">
-        <h3>Recent branches</h3>
+        <h3>{{ t('repositories.sessionSource.recentBranches') }}</h3>
         <button v-for="branch in filteredBranches" :key="branch.name" class="repository-session-source-dialog__result" type="button" @click="emit('select-branch', branch)">
           <GitBranchIcon
             class="repository-session-source-dialog__result-icon repository-session-source-dialog__result-icon--branch"
@@ -44,15 +44,15 @@
           />
           <span class="repository-session-source-dialog__result-copy">
             <strong>{{ branch.name }}</strong>
-            <small v-if="branch.isDefault">Default</small>
+            <small v-if="branch.isDefault">{{ t('repositories.sessionSource.default') }}</small>
           </span>
-          <span v-if="branch.worktreePath" class="repository-session-source-dialog__badge">Checked out</span>
+          <span v-if="branch.worktreePath" class="repository-session-source-dialog__badge">{{ t('repositories.sessionSource.checkedOut') }}</span>
           <ArrowRightIcon class="repository-session-source-dialog__arrow" aria-hidden="true" />
         </button>
-        <p v-if="filteredBranches.length === 0" class="repository-session-source-dialog__state">No matching branches.</p>
+        <p v-if="filteredBranches.length === 0" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.noBranches') }}</p>
       </template>
       <template v-else>
-        <h3>{{ tab === 'pullRequests' ? 'Recent pull requests' : 'Recent issues' }}</h3>
+        <h3>{{ tab === 'pullRequests' ? t('repositories.sessionSource.recentPullRequests') : t('repositories.sessionSource.recentIssues') }}</h3>
         <button v-for="item in filteredWorkItems" :key="item.id" class="repository-session-source-dialog__result" type="button" @click="emit('select-work-item', item)">
           <GitPullRequestIcon v-if="item.kind === 'pullRequest'" class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <IssueIcon v-else class="repository-session-source-dialog__result-icon" aria-hidden="true" />
@@ -62,7 +62,7 @@
           </span>
           <ArrowRightIcon class="repository-session-source-dialog__arrow" aria-hidden="true" />
         </button>
-        <p v-if="filteredWorkItems.length === 0" class="repository-session-source-dialog__state">No matching {{ tab === 'pullRequests' ? 'pull requests' : 'issues' }}.</p>
+        <p v-if="filteredWorkItems.length === 0" class="repository-session-source-dialog__state">{{ tab === 'pullRequests' ? t('repositories.sessionSource.noPullRequests') : t('repositories.sessionSource.noIssues') }}</p>
       </template>
     </section>
   </el-dialog>
@@ -70,6 +70,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { IconCircleDot as IssueIcon, IconGitPullRequest as GitPullRequestIcon, IconSearch as SearchIcon } from '@tabler/icons-vue';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
@@ -96,15 +97,19 @@ const emit = defineEmits<{
   'select-work-item': [item: WorkItem];
 }>();
 
+const { t } = useI18n();
+
 const searchInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const tab = ref<SourceTab>('branches');
-const tabs: ReadonlyArray<{ id: SourceTab; label: string }> = [
-  { id: 'branches', label: 'Branches' },
-  { id: 'pullRequests', label: 'Pull requests' },
-  { id: 'issues', label: 'Issues' },
-];
-const searchPlaceholder = computed(() => tab.value === 'branches' ? 'Search by branch name' : 'Search by title, number, author, or URL');
+const tabs = computed<ReadonlyArray<{ id: SourceTab; label: string }>>(() => [
+  { id: 'branches', label: t('repositories.sessionSource.branches') },
+  { id: 'pullRequests', label: t('repositories.sessionSource.pullRequests') },
+  { id: 'issues', label: t('repositories.sessionSource.issues') },
+]);
+const searchPlaceholder = computed(() => tab.value === 'branches'
+  ? t('repositories.sessionSource.searchBranch')
+  : t('repositories.sessionSource.searchWork'));
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredBranches = computed(() => props.branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery.value)));
 const filteredWorkItems = computed(() => props.workItems.filter((item) => {

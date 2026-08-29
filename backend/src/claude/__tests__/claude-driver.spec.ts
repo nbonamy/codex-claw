@@ -25,10 +25,10 @@ describe('ClaudeBackendDriver', () => {
     };
 
     expect(driver.getCapabilities(configuredAgent).permissionModes).toStrictEqual([
-      expect.objectContaining({ id: 'default', label: 'Default' }),
-      expect.objectContaining({ id: 'acceptEdits', label: 'Accept edits' }),
-      expect.objectContaining({ id: 'dontAsk', label: "Don't ask" }),
-      expect.objectContaining({ id: 'auto', label: 'Auto (experimental)' }),
+      expect.objectContaining({ id: 'default', label: { key: 'permissions.claude.default.label' } }),
+      expect.objectContaining({ id: 'acceptEdits', label: { key: 'permissions.claude.acceptEdits.label' } }),
+      expect.objectContaining({ id: 'dontAsk', label: { key: 'permissions.claude.dontAsk.label' } }),
+      expect.objectContaining({ id: 'auto', label: { key: 'permissions.claude.auto.label' } }),
       expect.objectContaining({ id: 'bypassPermissions', dangerous: true }),
     ]);
     await expect(driver.setPermissionMode(configuredAgent, 'acceptEdits')).resolves.toStrictEqual({
@@ -392,7 +392,7 @@ describe('ClaudeBackendDriver', () => {
     expect(driver.getRuntimeStatus()).toStrictEqual({
       backend: 'claude',
       status: 'notConfigured',
-      detail: 'Claude backend has not been started yet.',
+      detail: { key: 'backend.claudeNotStarted' },
     });
     expect(driver.getCapabilities(agent)).toMatchObject({ attachments: true, approvals: true });
     await expect(driver.interrupt(agent)).rejects.toThrow('No active Claude turn');

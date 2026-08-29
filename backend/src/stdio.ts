@@ -1,4 +1,5 @@
 import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
+import { appErrorDescriptor } from '@codex-claw/core/app-error';
 import type { Readable, Writable } from 'node:stream';
 
 export type StdioRpcServerOptions = {
@@ -139,6 +140,7 @@ export class StdioRpcPeer {
           'id' in message ? message.id : null,
           clawRpcErrorCodes.internalError,
           error instanceof Error ? error.message : String(error),
+          appErrorDescriptor(error) ?? undefined,
         );
       }
       if (response) {
@@ -164,7 +166,7 @@ export class StdioRpcPeer {
     clearTimeout(pending.timeout);
     this.pending.delete(response.id);
     if ('error' in response) {
-      pending.reject(new Error(response.error.message));
+      pending.reject(Object.assign(new Error(response.error.message), { data: response.error.data }));
       return;
     }
 

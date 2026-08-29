@@ -3,14 +3,14 @@
     class="agent-sidebar"
     :class="{ 'agent-sidebar--compact': compact }"
     :style="sidebarStyle"
-    aria-label="Agents"
+    :aria-label="t('sidebar.agents')"
   >
     <header class="agent-sidebar__header">
-      <strong :title="teamName">Sessions</strong>
+      <strong :title="teamName">{{ t('sidebar.sessions') }}</strong>
       <button
         class="agent-sidebar__collapse"
         type="button"
-        aria-label="Hide agent sidebar"
+        :aria-label="t('sidebar.hide')"
         @click="emit('collapse-sidebar')"
       >
         <PanelLeftCloseIcon class="agent-sidebar__collapse-icon" />
@@ -21,7 +21,7 @@
       <StartWorkMenu @select="emit('start-work', $event)" />
     </div>
 
-    <nav class="agent-sidebar__list" aria-label="Workspace sessions">
+    <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
       <section
         v-for="group in workspaceGroups"
         :key="group.id"
@@ -44,7 +44,7 @@
           <button
             class="agent-sidebar__workspace-label"
             type="button"
-            :aria-label="`${isWorkspaceCollapsed(group) ? 'Expand' : 'Collapse'} ${group.label} sessions`"
+            :aria-label="t(isWorkspaceCollapsed(group) ? 'sidebar.expandRepository' : 'sidebar.collapseRepository', { repository: group.label })"
             :aria-expanded="!isWorkspaceCollapsed(group)"
             @click="toggleWorkspace(group)"
           >
@@ -53,8 +53,8 @@
           <span v-if="group.kind === 'repository'" class="agent-sidebar__workspace-actions">
             <button
               type="button"
-              aria-label="Create agent from branch, pull request, or issue"
-              title="Create from…"
+              :aria-label="t('sidebar.createFromRepository')"
+              :title="t('sidebar.createFrom')"
               @click.stop="emit('create-agent-from-repository', { agentId: group.sessions[0]!.agentId, repositoryName: group.label, repositoryRoot: group.repositoryRoot! })"
             >
               <GitForkIcon aria-hidden="true" />
@@ -70,19 +70,19 @@
               <template #reference>
                 <button
                   type="button"
-                  :aria-label="`New session in ${group.label}`"
-                  title="New session"
+                  :aria-label="t('sidebar.newSessionIn', { repository: group.label })"
+                  :title="t('sidebar.newSession')"
                   @click.stop
                 >
                   <PlusIcon aria-hidden="true" />
                 </button>
               </template>
-              <p v-if="repositorySessionMenu.loading.value[group.id]" class="agent-sidebar__repository-session-menu-state">Loading default branch…</p>
+              <p v-if="repositorySessionMenu.loading.value[group.id]" class="agent-sidebar__repository-session-menu-state">{{ t('sidebar.loadingDefaultBranch') }}</p>
               <p v-else-if="repositorySessionMenu.errors.value[group.id]" class="agent-sidebar__repository-session-menu-state agent-sidebar__repository-session-menu-state--error">{{ repositorySessionMenu.errors.value[group.id] }}</p>
               <AppMenu
                 v-else
                 class="app-menu--embedded"
-                :ariaLabel="`New session in ${group.label}`"
+                :ariaLabel="t('sidebar.newSessionIn', { repository: group.label })"
                 :items="repositorySessionMenuItems(group)"
                 @select="selectRepositorySessionMenuItem(group, $event)"
               />
@@ -123,14 +123,14 @@
           <span
             v-if="!session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
             class="agent-sidebar__quick-switch-shortcut"
-            :aria-label="`Switch to ${session.displayTitle} with Command ${session.quickSwitchIndex + 1}`"
+            :aria-label="t('sidebar.switchShortcut', { session: session.displayTitle, number: session.quickSwitchIndex + 1 })"
           ><span aria-hidden="true">⌘</span>{{ session.quickSwitchIndex + 1 }}</span>
           <span
             v-else
             class="agent-sidebar__status"
             :class="{ 'agent-sidebar__status--unread': session.isUnread }"
             :data-status="session.status.type"
-            :aria-label="session.isUnread ? 'Unread activity' : agentStatusLabel(session.status.type)"
+            :aria-label="session.isUnread ? t('sidebar.unread') : statusLabel(session.status.type)"
           />
         </button>
       </section>
@@ -153,7 +153,7 @@
     <div
       class="agent-sidebar__resize-handle"
       role="separator"
-      aria-label="Resize agent sidebar"
+      :aria-label="t('sidebar.resize')"
       aria-orientation="vertical"
       :aria-valuemin="minWidth"
       :aria-valuemax="maxWidth"
@@ -171,6 +171,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, SourceBranch, Team } from '@codex-claw/core/contracts';
 import { projectWorkspaceSidebar, type WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
 import {
@@ -186,7 +187,6 @@ import RepositoryIconPicker from './RepositoryIconPicker.vue';
 import StartWorkMenu from './StartWorkMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { agentStatusLabel } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import { useRepositorySessionMenu } from './use-repository-session-menu';
 
@@ -208,6 +208,8 @@ const props = defineProps<{
   listRepositoryBranches?: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
   openInCatalog?: OpenInApplicationCatalog;
 }>();
+
+const { t } = useI18n();
 
 const emit = defineEmits<{
   'collapse-sidebar': [];
@@ -242,10 +244,11 @@ const resolvedOpenInCatalog = computed<OpenInApplicationCatalog>(() => props.ope
 const workspaceGroups = computed(() => projectWorkspaceSidebar({
   agents: props.agents,
   activeAgentId: props.activeAgentId,
+  quickChatsLabel: t('sidebar.quickChats'),
   unreadAgentIds: props.unreadAgentIds,
 }));
 const contextMenuAgentId = ref<string | null>(null);
-const repositorySessionMenu = useRepositorySessionMenu(() => props.listRepositoryBranches);
+const repositorySessionMenu = useRepositorySessionMenu(() => props.listRepositoryBranches, t);
 const repositorySessionMenuId = repositorySessionMenu.visibleGroupId;
 const collapsedRepositoryKeys = computed(() => new Set(props.collapsedRepositoryKeys ?? []));
 const contextMenuPosition = ref({ x: 0, y: 0 });
@@ -349,12 +352,16 @@ function repositorySessionMenuItems(
     {
       id: 'default-branch',
       type: 'action',
-      label: defaultBranch?.name ?? 'Default branch unavailable',
+      label: defaultBranch?.name ?? t('sidebar.defaultBranchUnavailable'),
       icon: GitBranchIcon,
       disabled: !defaultBranch,
     },
-    { id: 'new-worktree', type: 'action', label: 'New worktree…', icon: GitForkIcon },
+    { id: 'new-worktree', type: 'action', label: t('sidebar.newWorktree'), icon: GitForkIcon },
   ];
+}
+
+function statusLabel(status: Agent['status']['type']): string {
+  return t(`status.${status}`);
 }
 
 function selectRepositorySessionMenuItem(

@@ -1,3 +1,5 @@
+
+import { translate } from './i18n';
 import {
   desktopClawHostCapabilities,
   webClawHostCapabilities,
@@ -36,7 +38,7 @@ export function configureClawClient(client?: ClawClient): void {
 function desktopPlatformActions(api: CodexClawApi | undefined): Readonly<ClawPlatformActions> {
   const launchChatGpt = async () => {
     if (typeof api?.launchChatGptApp !== 'function') {
-      throw new Error('ChatGPT could not be launched from this window.');
+      throw new Error(translate('surface.platform-api.chatGPTCouldNotBeLaunchedFromThisWindow'));
     }
     const result = await api.launchChatGptApp();
     if (result.status !== 'alreadyRunning') return;
@@ -52,11 +54,11 @@ function desktopPlatformActions(api: CodexClawApi | undefined): Readonly<ClawPla
 async function confirmChatGptRelaunch(): Promise<boolean> {
   try {
     await ElMessageBox.confirm(
-      'ChatGPT is already open. Codex Claw needs to relaunch it with Claw’s isolated Codex home.',
-      'Quit and relaunch ChatGPT?',
+      translate('surface.platform-api.chatGPTIsAlreadyOpenCodexClawNeedsToRelaunchItWithClawSI'),
+      translate('surface.platform-api.quitAndRelaunchChatGPT'),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Quit and relaunch',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('dynamic.misc.quitAndRelaunch'),
         type: 'warning',
       },
     );

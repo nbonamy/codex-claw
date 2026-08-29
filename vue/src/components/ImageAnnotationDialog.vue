@@ -16,7 +16,7 @@
       <div class="claw-dialog__header image-annotation-dialog__header">
         <div class="image-annotation-dialog__header-main">
           <h2 class="claw-dialog__title">{{ title }}</h2>
-          <div class="image-annotation-dialog__toolbar" role="toolbar" aria-label="Image annotation tools">
+          <div class="image-annotation-dialog__toolbar" role="toolbar" :aria-label="$t('surface.imageAnnotationDialog.imageAnnotationTools')">
             <el-tooltip
               v-for="item in tools"
               :key="item.id"
@@ -36,27 +36,25 @@
               </button>
             </el-tooltip>
             <span class="image-annotation-dialog__toolbar-separator" aria-hidden="true" />
-            <div class="image-annotation-dialog__toolbar-group" role="group" aria-label="Image scale">
-              <el-tooltip content="Retina mode — report pixels at half size" placement="bottom" :show-after="300">
+            <div class="image-annotation-dialog__toolbar-group" role="group" :aria-label="$t('surface.imageAnnotationDialog.imageScale')">
+              <el-tooltip :content="$t('dynamic.annotation.retinaHint')" placement="bottom" :show-after="300">
                 <button
                   class="image-annotation-dialog__tool image-annotation-dialog__tool--retina"
                   :class="{ 'image-annotation-dialog__tool--active': retinaMode }"
                   type="button"
-                  aria-label="Retina mode"
+                  :aria-label="$t('surface.imageAnnotationDialog.retinaMode')"
                   :aria-pressed="retinaMode"
                   @click="toggleRetinaMode"
-                >
-                  @2x
-                </button>
+                > {{ $t('surface.imageAnnotationDialog.2x') }} </button>
               </el-tooltip>
             </div>
             <span class="image-annotation-dialog__toolbar-separator" aria-hidden="true" />
-            <div class="image-annotation-dialog__toolbar-group" role="group" aria-label="Annotation history">
+            <div class="image-annotation-dialog__toolbar-group" role="group" :aria-label="$t('surface.imageAnnotationDialog.annotationHistory')">
               <button
                 class="image-annotation-dialog__tool"
                 type="button"
-                aria-label="Undo last annotation"
-                title="Undo last annotation (Delete)"
+                :aria-label="$t('surface.imageAnnotationDialog.undoLastAnnotation')"
+                :title="$t('surface.imageAnnotationDialog.undoLastAnnotationDelete')"
                 :disabled="annotations.length === 0"
                 @click="undoLastAnnotation"
               >
@@ -66,7 +64,7 @@
           </div>
         </div>
         <div class="image-annotation-dialog__header-trailing">
-          <div class="image-annotation-dialog__inspector" aria-label="Image information">
+          <div class="image-annotation-dialog__inspector" :aria-label="$t('surface.imageAnnotationDialog.imageInformation')">
             <div class="image-annotation-dialog__inspector-item image-annotation-dialog__inspector-color">
               <span
                 class="image-annotation-dialog__color-swatch"
@@ -76,16 +74,16 @@
               />
               <span>
                 <strong>{{ cursorColorText }}</strong>
-                <small>Tab to copy</small>
+                <small>{{ $t('surface.imageAnnotationDialog.tabToCopy') }}</small>
               </span>
             </div>
             <div class="image-annotation-dialog__inspector-item">
-              <strong>{{ reportedImageSize.width }}×{{ reportedImageSize.height }}px</strong>
-              <small>Image size</small>
+              <strong>{{ reportedImageSize.width }}×{{ reportedImageSize.height }}{{ $t('surface.imageAnnotationDialog.px') }}</strong>
+              <small>{{ $t('surface.imageAnnotationDialog.imageSize') }}</small>
             </div>
             <div class="image-annotation-dialog__inspector-item">
               <strong>{{ Math.round(zoom * 100) }}%</strong>
-              <small>Zoom</small>
+              <small>{{ $t('surface.imageAnnotationDialog.zoom') }}</small>
             </div>
           </div>
         </div>
@@ -125,7 +123,7 @@
               class="image-annotation-dialog__canvas"
               :width="canvasSize.width"
               :height="canvasSize.height"
-              aria-label="Image annotation canvas"
+              :aria-label="$t('surface.imageAnnotationDialog.imageAnnotationCanvas')"
               tabindex="0"
               @pointerdown="startDrawing"
               @pointerleave="leaveCanvas"
@@ -139,11 +137,11 @@
               command-enter-submit
               :description="activeComment.description"
               :initial-value="activeComment.initialValue"
-              label="Image annotation comment"
+              :label="$t('surface.imageAnnotationDialog.imageAnnotationComment')"
               :placement="activeComment.placement"
-              placeholder="What should change?"
+              :placeholder="$t('surface.imageAnnotationDialog.whatShouldChange')"
               strategy="fixed"
-              submit-label="Save annotation comment"
+              :submit-label="$t('surface.imageAnnotationDialog.saveAnnotationComment')"
               :width="320"
               @cancel="cancelComment"
               @command-submit="saveCommentAndSave"
@@ -152,32 +150,32 @@
           </div>
         </div>
 
-        <aside class="image-annotation-dialog__comments" aria-label="Image annotations">
+        <aside class="image-annotation-dialog__comments" :aria-label="$t('surface.imageAnnotationDialog.imageAnnotations')">
           <ol v-if="annotations.length > 0" class="image-annotation-dialog__comment-list">
             <li v-for="annotation in annotations" :key="annotation.id">
               <button
                 class="image-annotation-dialog__comment"
                 type="button"
-                :aria-label="`Edit annotation ${annotation.number}`"
+                :aria-label="$t('dynamic.annotation.edit', { number: annotation.number })"
                 @click="editComment(annotation)"
               >
                 <span class="image-annotation-dialog__comment-number">{{ annotation.number }}</span>
                 <span>
                   <strong>{{ toolLabel(annotation.tool) }}</strong>
-                  <small>{{ annotation.comment || 'Add a comment' }}</small>
+                  <small>{{ annotation.comment || $t('surface.imageAnnotationDialog.addAComment') }}</small>
                 </span>
               </button>
               <button
                 class="image-annotation-dialog__comment-remove"
                 type="button"
-                :aria-label="`Remove annotation ${annotation.number}`"
+                :aria-label="$t('dynamic.annotation.remove', { number: annotation.number })"
                 @click="removeAnnotation(annotation.id)"
               >
                 <X aria-hidden="true" />
               </button>
             </li>
           </ol>
-          <div v-else class="image-annotation-dialog__comments-empty">No annotations yet</div>
+          <div v-else class="image-annotation-dialog__comments-empty">{{ $t('surface.imageAnnotationDialog.noAnnotationsYet') }}</div>
         </aside>
       </div>
 
@@ -185,24 +183,22 @@
 
     <template #footer>
       <div class="claw-dialog__footer image-annotation-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="saving" @click="emit('close')">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" :disabled="saving" @click="emit('close')">{{ $t('surface.imageAnnotationDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--secondary"
           type="button"
-          aria-label="Clear image annotations"
+          :aria-label="$t('surface.imageAnnotationDialog.clearImageAnnotations')"
           :disabled="annotations.length === 0 || saving"
           @click="clearAnnotations"
-        >Clear</button>
+        >{{ $t('surface.imageAnnotationDialog.clear') }}</button>
         <button
           class="claw-button claw-button--primary image-annotation-dialog__save"
           type="button"
-          aria-label="Save image annotations"
+          :aria-label="$t('surface.imageAnnotationDialog.saveImageAnnotations')"
           :aria-busy="saving"
           :disabled="!imageReady || saving"
           @click="saveAnnotatedImage"
-        >
-          Save
-          <span class="image-annotation-dialog__save-count">{{ annotations.length }}</span>
+        > {{ $t('surface.imageAnnotationDialog.save') }} <span class="image-annotation-dialog__save-count">{{ annotations.length }}</span>
         </button>
       </div>
     </template>
@@ -210,6 +206,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue';
 import {
   ArrowBackUpIcon,
@@ -248,10 +245,10 @@ const props = withDefaults(defineProps<{
   visible: boolean;
 }>(), {
   fileName: 'annotated-image.png',
-  imageAlt: 'Image to annotate',
+  imageAlt: translate('dynamic.misc.imageToAnnotate'),
   initialAnnotations: () => [],
   initialPixelRatio: 1,
-  title: 'Annotate',
+  title: translate('surface.imageAnnotationDialog.annotate'),
 });
 
 const emit = defineEmits<{
@@ -268,11 +265,11 @@ type ToolItem = {
 };
 
 const tools: ToolItem[] = [
-  { id: 'arrow', label: 'Arrow', shortcut: 'a', icon: ArrowUpRightIcon },
-  { id: 'oval', label: 'Oval', shortcut: 'o', icon: Circle },
-  { id: 'rectangle', label: 'Rectangle', shortcut: 'r', icon: RectangleIcon },
-  { id: 'measure-horizontal', label: 'Measure horizontal gap', shortcut: 'h', icon: ArrowsHorizontalIcon },
-  { id: 'measure-vertical', label: 'Measure vertical gap', shortcut: 'v', icon: ArrowsVerticalIcon },
+  { id: 'arrow', label: translate('surface.imageAnnotationDialog.arrow'), shortcut: 'a', icon: ArrowUpRightIcon },
+  { id: 'oval', label: translate('surface.imageAnnotationDialog.oval'), shortcut: 'o', icon: Circle },
+  { id: 'rectangle', label: translate('surface.imageAnnotationDialog.rectangle'), shortcut: 'r', icon: RectangleIcon },
+  { id: 'measure-horizontal', label: translate('surface.imageAnnotationDialog.measureHorizontalGap'), shortcut: 'h', icon: ArrowsHorizontalIcon },
+  { id: 'measure-vertical', label: translate('surface.imageAnnotationDialog.measureVerticalGap'), shortcut: 'v', icon: ArrowsVerticalIcon },
 ];
 
 const dialogBody = ref<HTMLElement | null>(null);

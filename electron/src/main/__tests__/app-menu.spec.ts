@@ -74,7 +74,6 @@ describe('app menu', () => {
     ]);
     expect(menu.find((item) => item.role === 'editMenu')).toBeDefined();
     expect(menuLabels(submenu(menu, 'View'))).toStrictEqual([
-      'Compact Agent List',
       'Compact Context',
       'Review',
       'Browser',
@@ -116,7 +115,6 @@ describe('app menu', () => {
       ['File', 'Close Agent'],
       ['File', 'Close Team'],
       ['File', 'Quit'],
-      ['View', 'Compact Agent List'],
       ['View', 'Compact Context'],
       ['View', 'Review'],
       ['View', 'Browser'],
@@ -130,19 +128,18 @@ describe('app menu', () => {
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'close-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, { type: 'close-active-team' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, { type: 'quit' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'set-agent-list-compact', compact: true });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, {
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, {
       type: 'open-agent-composer',
       prompt: '/compact',
       submit: true,
     });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'open-review' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'open-browser' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-teams' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-agents', direction: 1 });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'cycle-agents', direction: -1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'open-review' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'open-browser' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-teams' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: 1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-agents', direction: -1 });
     clickItem(menu, 'Help', 'What’s New');
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(13, { type: 'open-whats-new' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'open-whats-new' });
   });
 
   it('uses the expected file menu accelerators', () => {
@@ -153,16 +150,9 @@ describe('app menu', () => {
     expect(menuItem(menu, 'File', 'Close Agent')?.accelerator).toBe('CommandOrControl+W');
     expect(menuItem(menu, 'File', 'Close Team')?.accelerator).toBe('CommandOrControl+Shift+W');
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');
-    expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: false });
     expect(menuItem(menu, 'View', 'Compact Context')?.accelerator).toBe('CommandOrControl+K');
     expect(menuItem(menu, 'View', 'Review')?.accelerator).toBe('CommandOrControl+G');
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
-  });
-
-  it('reflects the persisted compact agent-list setting', () => {
-    const menu = buildAppMenuTemplate(callbacks(), { debugMode: false, agentListCompact: true }, 'darwin');
-
-    expect(menuItem(menu, 'View', 'Compact Agent List')).toMatchObject({ type: 'checkbox', checked: true });
   });
 
   it('offers update installation or checking in the Codex Claw menu', () => {
@@ -263,7 +253,6 @@ describe('app menu', () => {
     const releaseMenu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(debugMenu, 'View'))).toStrictEqual([
-      'Compact Agent List',
       'Compact Context',
       'Review',
       'Browser',

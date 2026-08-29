@@ -1,16 +1,16 @@
 <template>
   <SettingsPanelFrame
-    title="Appearance"
+    :title="$t('surface.settingsAppearancePanel.appearance')"
     title-id="settings-appearance-title"
   >
     <SettingsSection
-      title="Color"
+      :title="$t('surface.settingsAppearancePanel.color')"
       title-id="settings-appearance-color-title"
     >
       <SettingsRow
         as="label"
-        title="Mode"
-        description="Choose how Codex Claw follows light and dark appearances"
+        :title="$t('surface.settingsAppearancePanel.mode')"
+        :description="$t('surface.settingsAppearancePanel.chooseHowCodexClawFollowsLightAndDarkAppearances')"
       >
         <template #control>
           <el-segmented
@@ -22,14 +22,14 @@
       </SettingsRow>
       <SettingsRow
         as="label"
-        title="Theme"
-        description="Select the color palette used across the app"
+        :title="$t('surface.settingsAppearancePanel.theme')"
+        :description="$t('surface.settingsAppearancePanel.selectTheColorPaletteUsedAcrossTheApp')"
       >
         <template #control>
           <el-select
             class="settings-appearance-panel__theme-select"
             :model-value="settings.id"
-            aria-label="Theme"
+            :aria-label="$t('surface.settingsAppearancePanel.theme')"
             @update:model-value="updateThemeId"
           >
             <el-option
@@ -44,27 +44,13 @@
     </SettingsSection>
 
     <SettingsSection
-      title="Typography"
+      :title="$t('surface.settingsAppearancePanel.typography')"
       title-id="settings-appearance-typography-title"
     >
-      <!-- <SettingsRow
-        as="label"
-        title="UI font size"
-        description="Adjust the interface text size"
-      >
-        <template #control>
-          <el-input-number
-            :model-value="settings.uiFontSize"
-            :min="11"
-            :max="22"
-            @update:model-value="updateNumericTheme('uiFontSize', $event)"
-          />
-        </template>
-      </SettingsRow> -->
       <SettingsRow
         as="label"
-        title="Chat font size"
-        description="Adjust conversation text size"
+        :title="$t('surface.settingsAppearancePanel.chatFontSize')"
+        :description="$t('surface.settingsAppearancePanel.adjustConversationTextSize')"
       >
         <template #control>
           <el-input-number
@@ -77,8 +63,8 @@
       </SettingsRow>
       <SettingsRow
         as="label"
-        title="Code font size"
-        description="Adjust monospace text size in code and command output"
+        :title="$t('surface.settingsAppearancePanel.codeFontSize')"
+        :description="$t('surface.settingsAppearancePanel.adjustMonospaceTextSizeInCodeAndCommandOutput')"
       >
         <template #control>
           <el-input-number
@@ -92,7 +78,7 @@
     </SettingsSection>
 
     <SettingsSection
-      title="Diff preview"
+      :title="$t('surface.settingsAppearancePanel.diffPreview')"
       title-id="settings-appearance-diff-preview-title"
     >
       <GitDiffPreviewPanel
@@ -104,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed } from 'vue';
 import type { AppThemeSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
@@ -126,9 +113,9 @@ const visibleThemes = computed(() => {
   return themes.filter((theme) => theme.appearance === props.settings.mode);
 });
 const modeOptions = [
-  { label: 'Light', value: 'light' },
-  { label: 'Dark', value: 'dark' },
-  { label: 'System', value: 'system' },
+  { label: translate('surface.settingsAppearancePanel.light'), value: 'light' },
+  { label: translate('surface.settingsAppearancePanel.dark'), value: 'dark' },
+  { label: translate('surface.settingsAppearancePanel.system'), value: 'system' },
 ];
 const diffPreview = [
   'diff --git a/src/theme.ts b/src/theme.ts',

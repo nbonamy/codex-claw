@@ -3,7 +3,7 @@
     ref="railRoot"
     class="team-rail"
     :class="{ 'team-rail--agent-sidebar-expanded': agentSidebarExpanded }"
-    aria-label="Teams"
+    :aria-label="$t('surface.teamRail.teams')"
   >
     <div class="team-rail__header" />
 
@@ -12,7 +12,7 @@
         class="team-rail__cockpit"
         :class="{ 'team-rail__cockpit--active': cockpitActive }"
         type="button"
-        aria-label="Cockpit"
+        :aria-label="$t('surface.teamRail.cockpit')"
         :aria-pressed="cockpitActive"
         @click="emit('select-cockpit')"
       >
@@ -31,7 +31,7 @@
         type="button"
         v-bind="teamReorder.dragItemAttributes(team.id)"
         :style="{ backgroundColor: team.color ?? defaultTeamColor }"
-        :aria-label="isTeamUnread(team.id) ? `${team.name}, unread activity` : team.name"
+        :aria-label="isTeamUnread(team.id) ? $t('dynamic.teamUnread', { team: team.name }) : team.name"
         :aria-pressed="isTeamActive(team.id)"
         @click="emit('select-team', team.id)"
         @contextmenu.prevent="openTeamMenu(team.id, $event)"
@@ -56,7 +56,7 @@
       <button
         class="team-rail__new"
         type="button"
-        aria-label="Create team"
+        :aria-label="$t('surface.teamRail.createTeam')"
         @click="emit('new-team')"
       >
         <PlusIcon aria-hidden="true" />
@@ -67,7 +67,7 @@
           class="team-rail__loops"
           :class="{ 'team-rail__loops--active': loopsActive }"
           type="button"
-          aria-label="Loops"
+          :aria-label="$t('surface.teamRail.loops')"
           :aria-pressed="loopsActive"
           @click="emit('select-loops')"
         >

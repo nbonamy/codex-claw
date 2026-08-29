@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -127,9 +128,9 @@ watch(conversationKey, () => {
   collaborationMessagePresentations.clear();
   transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 });
-const heroHeadline = computed(() => (props.agent ? `Chat with ${agentDisplayName(props.agent)}` : 'Select an agent'));
+const heroHeadline = computed(() => (props.agent ? `Chat with ${agentDisplayName(props.agent)}` : translate('surface.conversationPane.selectAnAgent')));
 const heroSubhead = computed(() => {
-  if (!props.agent) return 'Choose an agent from the left to start a native backend session.';
+  if (!props.agent) return translate('surface.conversationPane.chooseAnAgentFromTheLeftToStartANativeBackendSession');
   return props.agent.folder;
 });
 function collaborationMessageLabel(messageId: string | undefined): string | null {

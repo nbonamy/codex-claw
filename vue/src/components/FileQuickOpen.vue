@@ -1,13 +1,13 @@
 <template>
   <div class="file-quick-open" role="presentation" @mousedown.self="emit('close')">
-    <section class="file-quick-open__panel" role="dialog" aria-modal="true" aria-label="Open workspace file">
+    <section class="file-quick-open__panel" role="dialog" aria-modal="true" :aria-label="$t('surface.fileQuickOpen.openWorkspaceFile')">
       <div class="file-quick-open__search">
         <input
           ref="input"
           v-model="query"
           type="search"
-          aria-label="Quick open workspace file"
-          placeholder="Open file…"
+          :aria-label="$t('surface.fileQuickOpen.quickOpenWorkspaceFile')"
+          :placeholder="$t('surface.fileQuickOpen.openFile')"
           @keydown.escape.prevent="emit('close')"
           @keydown.enter.prevent="selectCurrent"
           @keydown.up.prevent="move(-1)"
@@ -27,7 +27,7 @@
           <span>{{ file.name }}</span>
           <small>{{ file.path }}</small>
         </button>
-        <p v-if="matches.length === 0">No matching files.</p>
+        <p v-if="matches.length === 0">{{ $t('surface.fileQuickOpen.noMatchingFiles') }}</p>
       </div>
     </section>
   </div>

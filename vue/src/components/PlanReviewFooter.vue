@@ -13,7 +13,7 @@
     <div
       v-if="comments.length"
       class="plan-review-footer__comments"
-      aria-label="Plan comments"
+      :aria-label="$t('surface.planReviewFooter.planComments')"
     >
       <article
         v-for="comment in comments"

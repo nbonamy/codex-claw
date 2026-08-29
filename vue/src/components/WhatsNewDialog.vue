@@ -14,24 +14,24 @@
           <el-select
             v-model="selectedVersion"
             class="whats-new-dialog__version-select"
-            aria-label="Release version"
+            :aria-label="$t('surface.whatsNewDialog.releaseVersion')"
             size="small"
             :teleported="false"
           >
             <el-option
               v-for="release in releaseNotes.releases"
               :key="release.version"
-              :label="`Version ${release.version}`"
+              :label="$t('dynamic.version', { version: release.version })"
               :value="release.version"
             />
           </el-select>
-          <h2 class="claw-dialog__title">What’s new in Codex Claw</h2>
-          <p class="claw-dialog__subtitle">Released {{ formattedReleaseDate }}</p>
+          <h2 class="claw-dialog__title">{{ $t('surface.whatsNewDialog.whatSNewInCodexClaw') }}</h2>
+          <p class="claw-dialog__subtitle">{{ $t('surface.whatsNewDialog.released') }} {{ formattedReleaseDate }}</p>
         </div>
         <button
           class="claw-dialog__icon-button"
           type="button"
-          aria-label="Close What’s New"
+          :aria-label="$t('surface.whatsNewDialog.closeWhatSNew')"
           @click="emit('close')"
         >
           <X aria-hidden="true" />

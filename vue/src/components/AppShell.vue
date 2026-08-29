@@ -86,8 +86,8 @@
       >
         <span class="app-shell__connection-status-dot" aria-hidden="true" />
         <span>{{ connectionStatusLabel }}</span>
-        <span v-if="connectionState.detail" class="app-shell__connection-status-detail">
-          {{ connectionState.detail }}
+        <span v-if="connectionStatusDetail" class="app-shell__connection-status-detail">
+          {{ connectionStatusDetail }}
         </span>
       </div>
       <SettingsView
@@ -305,7 +305,7 @@
           <div
             v-if="rightWorkspaceVisible"
             class="app-shell__right-workspace-resizer"
-            aria-label="Resize right workspace"
+            :aria-label="$t('surface.appShell.resizeRightWorkspace')"
             @pointerdown="startRightWorkspaceResize"
           />
         </div>
@@ -381,8 +381,8 @@
     />
     <BenchAgentAssignmentDialog
       :visible="benchAssignmentDialogVisible"
-      title="Assign to Bench Agent"
-      confirm-label="Assign"
+      :title="$t('surface.appShell.assignToBenchAgent')"
+      :confirm-label="$t('surface.appShell.assign')"
       :bench-templates="snapshot.bench"
       :bench-templates-by-team-id="benchByTeamId"
       :initial-new-team-name="pendingBenchAgentTeamName"
@@ -433,8 +433,11 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
+import { localizedErrorMessage, localizedText } from '../i18n/errors';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -672,28 +675,28 @@ const props = withDefaults(defineProps<{
   listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   sourceRepositories: () => [],
   listSourceRepositories: async () => [],
-  cloneSourceRepository: async () => { throw new Error('Repository cloning is not available.'); },
+  cloneSourceRepository: async () => { throw new Error(translate('surface.appShell.repositoryCloningIsNotAvailable')); },
   listSourceBranches: async () => [],
   suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
   createSourceWorktree: async () => ({ name: '', path: '' }),
   previewAgentFile: async () => {
-    throw new Error('File preview is not available.');
+    throw new Error(translate('surface.appShell.filePreviewIsNotAvailable'));
   },
   openAgentGitDiff: async () => {
-    throw new Error('Git diff preview is not available.');
+    throw new Error(translate('surface.appShell.gitDiffPreviewIsNotAvailable'));
   },
-  getAgentGitWorkflow: async () => { throw new Error('Git workflow is not available.'); },
-  generateAgentGitMessage: async () => { throw new Error('Git message generation is not available.'); },
-  stageAgentGitFiles: async () => { throw new Error('Git staging is not available.'); },
-  commitAgentGitChanges: async () => { throw new Error('Git commit is not available.'); },
-  pushAgentGitBranch: async () => { throw new Error('Git push is not available.'); },
-  createAgentGitBranch: async () => { throw new Error('Git branch creation is not available.'); },
-  createAgentGitPullRequest: async () => { throw new Error('Pull request creation is not available.'); },
-  mergeAgentGitBranch: async () => { throw new Error('Git merge is not available.'); },
+  getAgentGitWorkflow: async () => { throw new Error(translate('surface.appShell.gitWorkflowIsNotAvailable')); },
+  generateAgentGitMessage: async () => { throw new Error(translate('surface.appShell.gitMessageGenerationIsNotAvailable')); },
+  stageAgentGitFiles: async () => { throw new Error(translate('surface.appShell.gitStagingIsNotAvailable')); },
+  commitAgentGitChanges: async () => { throw new Error(translate('surface.appShell.gitCommitIsNotAvailable')); },
+  pushAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitPushIsNotAvailable')); },
+  createAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitBranchCreationIsNotAvailable')); },
+  createAgentGitPullRequest: async () => { throw new Error(translate('surface.appShell.pullRequestCreationIsNotAvailable')); },
+  mergeAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitMergeIsNotAvailable')); },
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
   openAgentPath: async () => {
-    throw new Error('Open In is not available.');
+    throw new Error(translate('surface.appShell.openInIsNotAvailable'));
   },
   createAgent: async () => undefined,
   createTeam: async () => undefined,
@@ -737,7 +740,7 @@ const props = withDefaults(defineProps<{
   loadWorkItems: async () => undefined,
   loadGlobalWorkItems: async (_provider, _location, query) => ({ items: [], page: query?.page ?? 1, pageSize: query?.pageSize ?? 50, totalItems: 0 }),
   loadAssignedWorkItems: async () => undefined,
-  createWorkItem: async () => { throw new Error('Issue creation is not available.'); },
+  createWorkItem: async () => { throw new Error(translate('surface.appShell.issueCreationIsNotAvailable')); },
   duplicateAgentAction: async () => null,
   assignWorkItemAction: async () => undefined,
   quit: async () => undefined,
@@ -785,6 +788,8 @@ const emit = defineEmits<{
   sendPrompt: [prompt: string, options?: RendererSendPromptOptions];
   steerPrompt: [prompt: string, options?: RendererSendPromptOptions];
 }>();
+
+const { t } = useI18n();
 
 type WorkItemAssignmentIntent = {
   item: WorkItem;
@@ -835,10 +840,11 @@ const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((a
   agent.status.type === 'awaitingInput'
 )));
 const connectionStatusLabel = computed(() => {
-  if (props.connectionState.status === 'connecting') return 'Connecting to clawd…';
-  if (props.connectionState.status === 'reconnecting') return 'Reconnecting to clawd… Agents keep working in the background.';
-  return 'Clawd is unavailable. Reconnection will continue automatically.';
+  if (props.connectionState.status === 'connecting') return translate('surface.appShell.connectingToClawd');
+  if (props.connectionState.status === 'reconnecting') return translate('surface.appShell.reconnectingToClawdAgentsKeepWorkingInTheBackground');
+  return translate('surface.appShell.clawdIsUnavailableReconnectionWillContinueAutomatically');
 });
+const connectionStatusDetail = computed(() => localizedText(props.connectionState.detail, translate));
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
@@ -949,9 +955,9 @@ const agentMentionGroups = computed<readonly CodexComposerMentionGroup[]>(() => 
   if (activeTeamAgents.value.length === 0) return [];
   return [{
     id: 'agents',
-    label: 'Agents',
+    label: translate('surface.appShell.agents'),
     placement: 'before',
-    items: projectAgentMentionLabels(activeTeamAgents.value).map(({ agentId, label }) => ({
+    items: projectAgentMentionLabels(activeTeamAgents.value, t('sidebar.quickChats')).map(({ agentId, label }) => ({
       id: agentId,
       value: `agent:${agentId}`,
       label,
@@ -1085,7 +1091,7 @@ const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
   return [{
     id: 'backend-permissions',
     type: 'submenu',
-    label: 'Permissions',
+    label: translate('surface.appShell.permissions'),
     icon: ShieldCheckIcon,
     submenuAlignment: 'bottom',
     submenuWidth: 'wide',
@@ -1119,9 +1125,9 @@ const conversationPaneState: CodexConversationPaneState = {
     get state() { return props.composerState; },
     get attachments() { return props.composerAttachments; },
     get placeholder() {
-      if (!currentAgent.value) return 'Select an agent';
-      const backend = currentAgent.value.backend === 'claude' ? 'Claude' : 'Codex';
-      return props.isSending ? `${backend} is working...` : 'Ask for follow-up changes';
+      if (!currentAgent.value) return translate('surface.appShell.selectAnAgent');
+      const backend = currentAgent.value.backend === 'claude' ? translate('surface.appShell.claude') : translate('surface.appShell.codex');
+      return props.isSending ? `${backend} is working...` : translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
     get leadingMenuItems() { return permissionModeMenuItems.value; },
@@ -1192,8 +1198,8 @@ function permissionModeMenuItem(
   return {
     id: `permission-mode:${mode.id}`,
     type: 'radio',
-    label: mode.label,
-    description: mode.description,
+    label: localizedText(mode.label, translate) ?? mode.id,
+    description: localizedText(mode.description, translate) ?? '',
     checked: mode.id === selectedMode,
     payload: { kind: 'permission-mode', mode: mode.id },
   };
@@ -1435,7 +1441,7 @@ async function startChatGptLogin(): Promise<void> {
   authenticationError.value = null;
   try {
     const api = codexClawApi;
-    if (!api) throw new Error('Codex Claw API is unavailable.');
+    if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
     await api.startCodexChatGptLogin();
     authentication.value = {
       account: null,
@@ -1456,7 +1462,7 @@ async function cancelChatGptLogin(): Promise<void> {
   stopAuthenticationPolling();
   try {
     const api = codexClawApi;
-    if (!api) throw new Error('Codex Claw API is unavailable.');
+    if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
     authentication.value = await api.cancelCodexChatGptLogin();
   } catch (error) {
     authenticationError.value = error instanceof Error ? error.message : String(error);
@@ -1468,7 +1474,7 @@ async function cancelChatGptLogin(): Promise<void> {
 async function logoutCodex(): Promise<void> {
   authenticationError.value = null;
   const api = codexClawApi;
-  if (!api) throw new Error('Codex Claw API is unavailable.');
+  if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
   authentication.value = await api.logoutCodex();
 }
 
@@ -1532,7 +1538,7 @@ function isRightWorkspaceVisible(agentId: string): boolean {
 function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {
   return rightWorkspaceFor(agent.id).gitReviewPanel ?? {
     kind: 'gitDiff',
-    title: 'Review',
+    title: translate('surface.appShell.review'),
     subtitle: agent.folder,
     diff: '',
     state: 'loading',
@@ -1585,7 +1591,7 @@ function selectedSubagentConversationIdFor(agentId: string): string | null {
 
 function loadSubagentMessages(agentId: string, conversationId: string): Promise<RendererMessage[]> {
   const tree = subagentTreeFor(agentId);
-  if (!tree?.nodes[conversationId]) return Promise.reject(new Error('Subagent conversation is unavailable.'));
+  if (!tree?.nodes[conversationId]) return Promise.reject(new Error(translate('surface.appShell.subagentConversationIsUnavailable')));
   return readConversationMessages({ backend: 'codex', threadId: conversationId }, agentId);
 }
 
@@ -1643,7 +1649,7 @@ async function loadRepositoryBacklog(agentId: string): Promise<void> {
   const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
   if (!repositoryId) {
     workspace.backlogStatus = 'error';
-    workspace.backlogError = 'This repository is not connected to GitHub.';
+    workspace.backlogError = translate('dynamic.misc.repositoryNotConnected');
     return;
   }
 
@@ -1663,7 +1669,7 @@ async function loadRepositoryBacklog(agentId: string): Promise<void> {
 
 async function createRepositoryIssue(agentId: string, description: string): Promise<WorkItem> {
   const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
-  if (!repositoryId) throw new Error('This repository is not connected to GitHub.');
+  if (!repositoryId) throw new Error(translate('surface.appShell.thisRepositoryIsNotConnectedToGitHub'));
   const item = await props.createWorkItem({
     agentId,
     provider: 'github',
@@ -1679,14 +1685,14 @@ async function createRepositoryIssue(agentId: string, description: string): Prom
 
 async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {
   const sourceAgent = props.snapshot.agents.find((agent) => agent.id === agentId);
-  if (!sourceAgent) throw new Error('The selected agent is unavailable.');
+  if (!sourceAgent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
 
   const workItem = await resolvePullRequestBranch(input.item);
 
   const sourceAgentName = agentDisplayName(sourceAgent);
   const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgentName}` : sourceAgentName;
   if (!await confirmAssignedWorkItemOverride(workItem, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
-    throw new Error('Assignment cancelled.');
+    throw new Error(translate('surface.appShell.assignmentCancelled'));
   }
 
   const targetAgent = input.target === 'duplicate'
@@ -1695,15 +1701,15 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
         name: `${sourceAgentName} gh-${workItem.number}`,
       })
     : sourceAgent;
-  if (!targetAgent) throw new Error('The duplicate agent could not be created.');
+  if (!targetAgent) throw new Error(translate('surface.appShell.theDuplicateAgentCouldNotBeCreated'));
 
   if (input.target === 'duplicate' && input.workspace.kind !== 'worktree') {
-    throw new Error('A duplicated agent requires a new worktree.');
+    throw new Error(translate('surface.appShell.aDuplicatedAgentRequiresANewWorktree'));
   }
 
   const pullRequestBranch = workItem.kind === 'pullRequest' ? workItem.branchName?.trim() : undefined;
   if (workItem.kind === 'pullRequest' && !pullRequestBranch) {
-    throw new Error('GitHub did not return the pull request branch.');
+    throw new Error(translate('surface.appShell.gitHubDidNotReturnThePullRequestBranch'));
   }
 
   const checkoutBranch = pullRequestBranch
@@ -1945,7 +1951,7 @@ function openNewAgentForSourceWorkItem(item: WorkItem): void {
   const { teamId } = repositorySessionContext(source);
   closeRepositorySessionSource();
   if (!teamId) {
-    ElMessage.error('Create or select a team before starting repository work.');
+    ElMessage.error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
     return;
   }
   void startCockpitWorkItems({
@@ -2028,7 +2034,7 @@ async function loadRepositoryAcquireCatalog(): Promise<void> {
       ?? props.workRepositoriesByProvider.github
       ?? [];
   } catch (error) {
-    repositoryAcquireError.value = error instanceof Error ? error.message : String(error);
+    repositoryAcquireError.value = localizedErrorMessage(error, t);
   } finally {
     repositoryAcquireLoading.value = false;
   }
@@ -2073,7 +2079,7 @@ async function cloneRepositoryAndOpen(url: string): Promise<void> {
       repositoryRoot: repository.path,
     });
   } catch (error) {
-    repositoryAcquireError.value = error instanceof Error ? error.message : String(error);
+    repositoryAcquireError.value = localizedErrorMessage(error, t);
   } finally {
     repositoryAcquireBusy.value = false;
   }
@@ -2101,7 +2107,7 @@ async function startCockpitWorkItems(input: {
   teamId: string;
 }): Promise<void> {
   const team = props.snapshot.teams.find((candidate) => candidate.id === input.teamId);
-  if (!team) throw new Error('The selected team is unavailable.');
+  if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
 
   await Promise.all(input.items.map(async (listedItem) => {
     const item = await resolvePullRequestBranch(listedItem);
@@ -2167,7 +2173,7 @@ function workItemRepositoryName(item: WorkItem): string {
 }
 
 function workProviderTitle(provider: WorkItem['provider']): string {
-  return provider === 'github' ? 'GitHub' : provider;
+  return provider === 'github' ? translate('surface.appShell.gitHub') : provider;
 }
 
 async function assignExistingAgentWorkItem(payload: { agentId: string; item: WorkItem }): Promise<void> {
@@ -2188,10 +2194,10 @@ async function confirmAssignedWorkItemOverride(item: WorkItem, targetLabel: stri
   try {
     await ElMessageBox.confirm(
       `${workProviderTitle(item.provider)} #${item.number} is already assigned to ${assignedAgent.name}. We don't know if ${assignedAgent.name} is still working on it. Assign it to ${targetLabel} anyway?`,
-      'Assign anyway?',
+      translate('surface.appShell.assignAnyway'),
       {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Assign Anyway',
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('dynamic.misc.assignAnyway'),
         type: 'warning',
       },
     );
@@ -2330,7 +2336,7 @@ function openAttachmentImageAnnotation(attachment: CodexNativeAttachment): void 
   const agentId = currentAgent.value?.id;
   if (!agentId || attachment.type !== 'image') return;
   if (!attachment.previewUrl) {
-    ElMessage.error('This image cannot be opened for annotation.');
+    ElMessage.error(translate('surface.appShell.thisImageCannotBeOpenedForAnnotation'));
     return;
   }
   debugImageAnnotationVisible.value = false;
@@ -2344,7 +2350,7 @@ function closeImageAnnotation(): void {
 
 function handleImageAnnotationError(): void {
   if (attachmentAnnotationTarget.value) {
-    ElMessage.error('This image cannot be opened for annotation.');
+    ElMessage.error(translate('surface.appShell.thisImageCannotBeOpenedForAnnotation'));
     closeImageAnnotation();
     return;
   }
@@ -2542,7 +2548,7 @@ async function forwardCodexPromptWithImageAnnotations(
 
   const nativeApi = getCodexNativeRendererApi();
   if (!nativeApi?.capabilities.attachments) {
-    throw new Error('Annotated images cannot be prepared by this host.');
+    throw new Error(translate('surface.appShell.annotatedImagesCannotBePreparedByThisHost'));
   }
   const composerState = { ...props.composerState };
   const composerAttachments = props.composerAttachments.map((attachment) => ({ ...attachment }));
@@ -2557,7 +2563,7 @@ async function forwardCodexPromptWithImageAnnotations(
       data: imageDataUrlArrayBuffer(draft.dataUrl),
     })));
     if (ingested.length !== annotatedImages.length) {
-      throw new Error('One or more annotated images could not be prepared.');
+      throw new Error(translate('surface.appShell.oneOrMoreAnnotatedImagesCouldNotBePrepared'));
     }
     const replacementReferences = new Map(annotatedImages.map(({ attachment }, index) => [
       attachment.reference,
@@ -2807,7 +2813,7 @@ async function openFilePreviewForAgent(agentId: string, filePath: string, reveal
     const unavailable = result.kind === 'tooLarge'
       ? `Preview unavailable: this file is ${formatFileSize(result.size)} and exceeds the preview limit.`
       : result.kind === 'binary'
-        ? 'Preview unavailable: this is a binary or unsupported file.'
+        ? translate('surface.appShell.previewUnavailableThisIsABinaryOrUnsupportedFile')
         : result.content ?? '';
     workspace.filePanels = {
       ...workspace.filePanels,
@@ -2879,7 +2885,7 @@ async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promis
   const workspace = rightWorkspaceFor(agent.id);
   workspace.gitReviewPanel = {
     kind: 'gitDiff',
-    title: 'Review',
+    title: translate('surface.appShell.review'),
     subtitle: agent.folder,
     diff: '',
     state: 'loading',
@@ -2891,7 +2897,7 @@ async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promis
   } catch (error) {
     workspace.gitReviewPanel = {
       kind: 'gitDiff',
-      title: 'Review',
+      title: translate('surface.appShell.review'),
       subtitle: agent.folder,
       diff: '',
       state: 'error',
@@ -3019,11 +3025,6 @@ function handleAppCommand(command: AppCommand): void {
     return;
   }
 
-  if (command.type === 'set-agent-list-compact') {
-    void updateSettings({ general: { agentListCompact: command.compact } });
-    return;
-  }
-
   if (command.type === 'open-settings') {
     openSettings();
     return;
@@ -3069,7 +3070,7 @@ function handleAppCommand(command: AppCommand): void {
     activeSurface.value = 'agent';
     openMarkdownRequest({
       kind: 'markdown',
-      title: 'Debug Markdown',
+      title: translate('surface.appShell.debugMarkdown'),
       content: [
         '# Debug Markdown',
         '',
@@ -3101,8 +3102,8 @@ function handleAppCommand(command: AppCommand): void {
         kind: 'command',
         conversationId: `debug-${agent.id}`,
         itemId: 'debug-command-item',
-        title: 'Allow debug command',
-        description: 'A deterministic approval request from the Debug menu.',
+        title: translate('surface.appShell.allowDebugCommand'),
+        description: translate('surface.appShell.aDeterministicApprovalRequestFromTheDebugMenu'),
         command: 'npm test -- --run debug-fixture',
         cwd: agent.folder,
         allowedScopes: ['once', 'session'],
@@ -3218,7 +3219,7 @@ async function attachAppshot(command: Extract<AppCommand, { type: 'attach-appsho
   const agent = currentAgent.value;
   const nativeApi = getCodexNativeRendererApi();
   if (!agent || !nativeApi || !props.backendCapabilities.attachments) {
-    ElMessage.error('Select an agent that supports image attachments before taking an Appshot.');
+    ElMessage.error(translate('surface.appShell.selectAnAgentThatSupportsImageAttachmentsBeforeTakingAnA'));
     return;
   }
 
@@ -3228,7 +3229,7 @@ async function attachAppshot(command: Extract<AppCommand, { type: 'attach-appsho
       mimeType: 'image/png',
       data: imageDataUrlArrayBuffer(command.imageDataUrl),
     }]);
-    if (!attachment) throw new Error('Appshot ingestion returned no attachment.');
+    if (!attachment) throw new Error(translate('surface.appShell.appshotIngestionReturnedNoAttachment'));
     activeSurface.value = 'agent';
     emit('update:composerAttachments', {
       agentId: agent.id,
@@ -3237,7 +3238,7 @@ async function attachAppshot(command: Extract<AppCommand, { type: 'attach-appsho
     await nextTick();
     conversationPane.value?.focusComposer();
   } catch {
-    ElMessage.error('The Appshot could not be attached.');
+    ElMessage.error(translate('surface.appShell.theAppshotCouldNotBeAttached'));
   }
 }
 
@@ -3407,9 +3408,9 @@ async function selectGlobalBacklogScope(scope: 'assignedToMe' | 'all'): Promise<
   if (scope === 'all') {
     try {
       await ElMessageBox.confirm(
-        'This loads your global GitHub backlog one page at a time. Large backlogs may use additional GitHub quota as you load more pages.',
-        'Load the global backlog?',
-        { confirmButtonText: 'Load everything', cancelButtonText: 'Cancel', type: 'warning' },
+        translate('surface.appShell.thisLoadsYourGlobalGitHubBacklogOnePageAtATimeLargeBackl'),
+        translate('surface.appShell.loadTheGlobalBacklog'),
+        { confirmButtonText: translate('dynamic.misc.loadEverything'), cancelButtonText: translate('common.cancel'), type: 'warning' },
       );
     } catch {
       return;
@@ -3718,7 +3719,7 @@ function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
       ...workspace.filePanels,
       [tab]: {
         kind: 'markdown',
-        title: request.title ?? (subtitle ? fileBasename(subtitle) : 'Markdown'),
+        title: localizedText(request.title, translate) ?? (subtitle ? fileBasename(subtitle) : translate('surface.appShell.markdown')),
         ...(subtitle ? { subtitle } : {}),
         content: request.content,
         state: 'idle',
@@ -3733,7 +3734,7 @@ function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
   rightWorkspaceFor(agent.id).planPanel = {
     kind: 'markdown',
     purpose: 'plan',
-    title: request.title ?? (subtitle ? fileBasename(subtitle) : 'Markdown'),
+    title: localizedText(request.title, translate) ?? (subtitle ? fileBasename(subtitle) : translate('surface.appShell.markdown')),
     ...(subtitle ? { subtitle } : {}),
     content: request.content,
     state: 'idle',
@@ -3751,8 +3752,8 @@ function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff'
   if (!agentId) return;
   rightWorkspaceFor(agentId).gitReviewPanel = {
     kind: 'gitDiff',
-    title: request.title ?? 'Review',
-    ...(request.subtitle ? { subtitle: request.subtitle } : {}),
+    title: localizedText(request.title, translate) ?? translate('surface.appShell.review'),
+    ...(localizedText(request.subtitle, translate) ? { subtitle: localizedText(request.subtitle, translate)! } : {}),
     diff: request.diff,
     ...(request.sections ? { sections: request.sections } : {}),
     state: request.state ?? 'idle',

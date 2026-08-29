@@ -2,9 +2,10 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
+import { AppError } from '@codex-claw/core/app-error';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -3072,8 +3073,8 @@ export class ClawBackendServer {
       payload: {
         kind: 'gitDiff',
         scope: 'turn',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
+        title: { key: 'panels.gitDiff' },
+        subtitle: { key: 'panels.currentTurn' },
         diff: event.payload.diff,
       },
     });
@@ -3109,19 +3110,30 @@ export class ClawBackendServer {
 
     const branchName = selection.branchName?.trim() ?? '';
     if (!branchName) {
-      throw new Error('Enter a branch name.');
+      throw new AppError('workRouting.branchRequired', 'Enter a branch name.');
     }
 
     if (selection.mode === 'branch') {
       if (request.payload.request.sharedFolderAgentNames.length > 0) {
-        throw new Error(`This folder is also used by ${request.payload.request.sharedFolderAgentNames.join(', ')}. Delegate to a worktree instead.`);
+        const agents = request.payload.request.sharedFolderAgentNames.join(', ');
+        throw new AppError(
+          'workRouting.sharedFolder',
+          `This folder is also used by ${agents}. Delegate to a worktree instead.`,
+          { agents },
+        );
       }
       const gitStatus = await this.agentGitService.status(agent.folder);
       if (gitStatus.state === 'dirty') {
-        throw new Error('This checkout has uncommitted changes. Commit, stash, or delegate to a worktree instead.');
+        throw new AppError(
+          'workRouting.dirtyCheckout',
+          'This checkout has uncommitted changes. Commit, stash, or delegate to a worktree instead.',
+        );
       }
       if (gitStatus.state === 'unknown') {
-        throw new Error('Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.');
+        throw new AppError(
+          'workRouting.dirtyCheckoutUnknown',
+          'Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.',
+        );
       }
       const folder = await this.agentGitService.createBranch(agent.folder, branchName, false);
       await this.refreshAgentWorkspaceIdentity(agent.id);
@@ -3967,14 +3979,14 @@ function parseGeneratedGitMessage(value: unknown, kind: 'commit' | 'pullRequest'
   return { kind, title, body };
 }
 
-function planReviewPreview(markdown: string): { title: string; content: string } {
+function planReviewPreview(markdown: string): { title: AppText; content: string } {
   const lines = markdown.trim().split('\n');
   const headingIndex = lines.findIndex((line) => /^#\s+\S/u.test(line.trim()));
   if (headingIndex < 0) {
-    return { title: 'Plan', content: markdown };
+    return { title: { key: 'panels.plan' }, content: markdown };
   }
 
-  const title = lines[headingIndex]!.trim().replace(/^#\s+/u, '').trim() || 'Plan';
+  const title = lines[headingIndex]!.trim().replace(/^#\s+/u, '').trim() || { key: 'panels.plan' };
   const content = [...lines.slice(0, headingIndex), ...lines.slice(headingIndex + 1)].join('\n').trim();
   return { title, content };
 }

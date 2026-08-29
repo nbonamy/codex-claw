@@ -1,10 +1,10 @@
 <template>
-  <section class="codex-login" aria-label="Sign in to Codex Claw">
+  <section class="codex-login" :aria-label="$t('surface.codexLoginLanding.signInToCodexClaw')">
     <div class="codex-login__content">
       <div class="codex-login__mark">
         <img
           :src="appIconUrl"
-          alt="Codex Claw"
+          :alt="$t('surface.codexLoginLanding.codexClaw')"
         >
       </div>
       <h1>{{ t('auth.title') }}</h1>

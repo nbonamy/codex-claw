@@ -26,11 +26,9 @@
           <label
             class="claw-form-dialog__label bench-agent-assignment-dialog__label"
             for="bench-agent-assignment-dialog-bench"
-          >
-            Bench
-          </label>
+          > {{ $t('surface.benchAgentAssignmentDialog.bench') }} </label>
           <span class="claw-form-dialog__heading-separator bench-agent-assignment-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help bench-agent-assignment-dialog__help">Choose the saved agent to deploy.</p>
+          <p class="claw-form-dialog__help bench-agent-assignment-dialog__help">{{ $t('surface.benchAgentAssignmentDialog.chooseTheSavedAgentToDeploy') }}</p>
         </div>
         <div class="claw-form-dialog__control bench-agent-assignment-dialog__input-shell bench-agent-assignment-dialog__input-shell--select">
           <el-select
@@ -61,11 +59,9 @@
           <label
             class="claw-form-dialog__label bench-agent-assignment-dialog__label"
             for="bench-agent-assignment-dialog-team"
-          >
-            Team
-          </label>
+          > {{ $t('surface.benchAgentAssignmentDialog.team') }} </label>
           <span class="claw-form-dialog__heading-separator bench-agent-assignment-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help bench-agent-assignment-dialog__help">Choose where the agent should be created.</p>
+          <p class="claw-form-dialog__help bench-agent-assignment-dialog__help">{{ $t('surface.benchAgentAssignmentDialog.chooseWhereTheAgentShouldBeCreated') }}</p>
         </div>
         <div class="claw-form-dialog__control bench-agent-assignment-dialog__input-shell bench-agent-assignment-dialog__input-shell--select">
           <el-select
@@ -81,7 +77,7 @@
               :value="team.id"
             />
             <el-option
-              label="New team"
+              :label="$t('surface.benchAgentAssignmentDialog.newTeam')"
               :value="newTeamOptionId"
             />
           </el-select>
@@ -94,8 +90,8 @@
             v-model="newTeamName"
             class="claw-form-dialog__text-input"
             type="text"
-            aria-label="New team name"
-            placeholder="Enter team name"
+            :aria-label="$t('surface.benchAgentAssignmentDialog.newTeamName')"
+            :placeholder="$t('surface.benchAgentAssignmentDialog.enterTeamName')"
           />
         </div>
       </section>
@@ -103,7 +99,7 @@
 
     <template #footer>
       <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">Cancel</button>
+        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.benchAgentAssignmentDialog.cancel') }}</button>
         <button
           class="claw-button claw-button--primary"
           type="button"
@@ -118,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { BenchTemplate, Team } from '@codex-claw/core/contracts';
 import { folderBasename } from '../shared/agent-display';
@@ -143,7 +140,7 @@ const props = withDefaults(defineProps<{
   confirmLabel: 'Continue',
   initialNewTeamName: '',
   initialTeamId: null,
-  title: 'Assign to Bench Agent',
+  title: translate('surface.benchAgentAssignmentDialog.assignToBenchAgent'),
 });
 
 const emit = defineEmits<{

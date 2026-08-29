@@ -7,7 +7,7 @@
       v-if="sidebarCollapsed"
       class="agent-header__expand"
       type="button"
-      aria-label="Show agent sidebar"
+      :aria-label="$t('surface.agentHeader.showAgentSidebar')"
       @click="emit('expand-sidebar')"
     >
       <PanelLeftOpenIcon class="agent-header__expand-icon" />
@@ -48,7 +48,7 @@
       v-else
       class="agent-header__identity"
     >
-      <strong>No agent</strong>
+      <strong>{{ $t('surface.agentHeader.noAgent') }}</strong>
     </div>
 
     <div class="agent-header__activity">
@@ -59,20 +59,20 @@
         <button
           v-if="gitStatus?.addedLines || gitStatus?.removedLines"
           class="agent-header__git-diff"
-          aria-label="Open repository diff"
+          :aria-label="$t('surface.agentHeader.openRepositoryDiff')"
           type="button"
           @click="emit('open-git-diff')"
         >
           <CodexAnimatedDiffStat
             v-if="gitStatus?.addedLines"
             kind="added"
-            label="Added lines"
+            :label="$t('surface.agentHeader.addedLines')"
             :value="gitStatus?.addedLines ?? 0"
           />
           <CodexAnimatedDiffStat
             v-if="gitStatus?.removedLines"
             kind="deleted"
-            label="Removed lines"
+            :label="$t('surface.agentHeader.removedLines')"
             :value="gitStatus?.removedLines ?? 0"
           />
         </button>
@@ -92,8 +92,8 @@
         v-if="githubBacklogAvailable"
         class="agent-header__repository-backlog"
         type="button"
-        aria-label="Open repository backlog"
-        title="Open repository backlog"
+        :aria-label="$t('surface.agentHeader.openRepositoryBacklog')"
+        :title="$t('surface.agentHeader.openRepositoryBacklog')"
         @click="emit('open-backlog')"
       >
         <BacklogIcon aria-hidden="true" />
@@ -114,8 +114,8 @@
         v-if="executionPlanAvailable"
         class="agent-header__execution-plan"
         type="button"
-        aria-label="Toggle execution plan"
-        title="Toggle execution plan"
+        :aria-label="$t('surface.agentHeader.toggleExecutionPlan')"
+        :title="$t('surface.agentHeader.toggleExecutionPlan')"
         :aria-pressed="executionPlanOpen"
         @click="emit('toggle-execution-plan')"
       >
@@ -124,8 +124,8 @@
       <button
         class="agent-header__workspace"
         type="button"
-        aria-label="Toggle right workspace"
-        :title="workspaceOpen ? 'Close right workspace' : 'Open right workspace'"
+        :aria-label="$t('surface.agentHeader.toggleRightWorkspace')"
+        :title="workspaceOpen ? $t('surface.agentHeader.closeRightWorkspace') : $t('surface.agentHeader.openRightWorkspace')"
         :aria-pressed="workspaceOpen"
         @click="emit('toggle-workspace')"
       >
@@ -141,6 +141,8 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
+import { localizedText } from '../i18n/errors';
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -200,11 +202,11 @@ const displaySubagentTree = computed(() => {
 
 const statusLabel = computed(() => {
   if (props.isLoading) {
-    return 'Loading';
+    return translate('surface.agentHeader.loading');
   }
 
   if (props.backendRuntime.status === 'running') {
-    return 'Connected';
+    return translate('surface.agentHeader.connected');
   }
 
   if (props.backendRuntime.status === 'error') {
@@ -213,7 +215,7 @@ const statusLabel = computed(() => {
 
   return `${backendLabel.value} pending`;
 });
-const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? 'Claude' : 'Codex'));
+const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ? translate('surface.agentHeader.claude') : translate('surface.agentHeader.codex')));
 const agentLocationLabel = computed(() => {
   const agent = props.agent;
   const gitStatus = props.gitStatus;
@@ -240,15 +242,15 @@ const agentStatusDetail = computed(() => {
 
   switch (props.agent.status.type) {
     case 'working':
-      return props.agent.status.detail ?? 'Working';
+      return localizedText(props.agent.status.detail, translate) ?? translate('status.working');
     case 'starting':
-      return 'Starting';
+      return translate('surface.agentHeader.starting');
     case 'awaitingInput':
-      return props.agent.status.detail ?? 'Awaiting input';
+      return localizedText(props.agent.status.detail, translate) ?? translate('dynamic.misc.awaitingInput');
     case 'error':
-      return props.agent.status.message;
+      return localizedText(props.agent.status.message, translate);
     case 'idle':
-      return 'Ready to get going';
+      return translate('surface.agentHeader.readyToGetGoing');
   }
 });
 

@@ -54,6 +54,7 @@ export function repositoryIconForAgent(
 export function projectWorkspaceSidebar(input: {
   agents: readonly Agent[];
   activeAgentId: string | null;
+  quickChatsLabel: string;
   unreadAgentIds?: readonly string[];
 }): WorkspaceSidebarGroup[] {
   const unreadIds = new Set(input.unreadAgentIds ?? []);
@@ -78,7 +79,7 @@ export function projectWorkspaceSidebar(input: {
         : {
             id,
             kind: 'quickChats',
-            label: 'Quick chats',
+            label: input.quickChatsLabel,
             sessions: [],
           };
       groups.set(id, group);
@@ -108,8 +109,8 @@ export function projectWorkspaceSidebar(input: {
   return projectedGroups;
 }
 
-export function projectAgentMentionLabels(agents: readonly Agent[]): AgentMentionProjection[] {
-  const labels = projectWorkspaceSidebar({ agents, activeAgentId: null })
+export function projectAgentMentionLabels(agents: readonly Agent[], quickChatsLabel: string): AgentMentionProjection[] {
+  const labels = projectWorkspaceSidebar({ agents, activeAgentId: null, quickChatsLabel })
     .flatMap((group) => group.sessions.map((session) => {
       const branchContext = session.branch ? `${group.label}/${session.branch}` : group.label;
       return {

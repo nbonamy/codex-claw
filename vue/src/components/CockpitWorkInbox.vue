@@ -1,7 +1,7 @@
 <template>
   <main class="cockpit-inbox">
     <div class="cockpit-inbox__toolbar">
-      <nav class="cockpit-inbox__views" aria-label="Cockpit views">
+      <nav class="cockpit-inbox__views" :aria-label="$t('surface.cockpitWorkInbox.cockpitViews')">
         <button
           v-for="option in viewOptions"
           :key="option.id"
@@ -21,15 +21,15 @@
           :model-value="effectiveSearchQuery"
           class="cockpit-inbox__search-input"
           clearable
-          placeholder="Search work"
-          aria-label="Search work"
+          :placeholder="$t('surface.cockpitWorkInbox.searchWork')"
+          :aria-label="$t('surface.cockpitWorkInbox.searchWork')"
           @update:model-value="updateSearchQuery"
         />
         <button
           v-else
           class="cockpit-inbox__icon-button"
           type="button"
-          aria-label="Search work"
+          :aria-label="$t('surface.cockpitWorkInbox.searchWork')"
           @click="openSearch"
         >
           <IconSearch aria-hidden="true" />
@@ -38,27 +38,19 @@
         <el-popover placement="bottom-end" trigger="click" :width="360" popper-class="claw-popover cockpit-inbox__filters-popover">
           <template #reference>
             <button class="cockpit-inbox__filter-button" type="button">
-              <IconFilter aria-hidden="true" />
-              Filters
-              <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
+              <IconFilter aria-hidden="true" /> {{ $t('surface.cockpitWorkInbox.filters') }} <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
             </button>
           </template>
-          <div class="cockpit-inbox__filters" aria-label="Work filters">
-            <label>
-              Repository
-              <el-select :model-value="selectedRepositoryId" clearable filterable placeholder="All repositories" aria-label="Repository filter" @update:model-value="selectRepository">
+          <div class="cockpit-inbox__filters" :aria-label="$t('surface.cockpitWorkInbox.workFilters')">
+            <label> {{ $t('surface.cockpitWorkInbox.repository') }} <el-select :model-value="selectedRepositoryId" clearable filterable :placeholder="$t('surface.cockpitWorkInbox.allRepositories')" :aria-label="$t('surface.cockpitWorkInbox.repositoryFilter')" @update:model-value="selectRepository">
                 <el-option v-for="repository in sortedRepositories" :key="repository.id" :label="repository.fullName" :value="repository.id" />
               </el-select>
             </label>
-            <label>
-              Label
-              <el-select :model-value="selectedTagName" clearable filterable placeholder="All labels" aria-label="Label filter" @update:model-value="selectTag">
+            <label> {{ $t('surface.cockpitWorkInbox.label') }} <el-select :model-value="selectedTagName" clearable filterable :placeholder="$t('surface.cockpitWorkInbox.allLabels')" :aria-label="$t('surface.cockpitWorkInbox.labelFilter')" @update:model-value="selectTag">
                 <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
               </el-select>
             </label>
-            <label>
-              Assignee
-              <el-select :model-value="selectedAssigneeLogin" clearable filterable placeholder="All assignees" aria-label="Assignee filter" @update:model-value="selectAssignee">
+            <label> {{ $t('surface.cockpitWorkInbox.assignee') }} <el-select :model-value="selectedAssigneeLogin" clearable filterable :placeholder="$t('surface.cockpitWorkInbox.allAssignees')" :aria-label="$t('surface.cockpitWorkInbox.assigneeFilter')" @update:model-value="selectAssignee">
                 <el-option v-for="assignee in assigneeOptions" :key="assignee" :label="assignee" :value="assignee" />
               </el-select>
             </label>
@@ -66,10 +58,8 @@
           </div>
         </el-popover>
 
-        <el-button class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog">
-          Start work
-        </el-button>
-        <button class="cockpit-inbox__refresh" type="button" :disabled="status === 'loading'" aria-label="Refresh work items" @click="emit('refresh', selectedRepositoryId)">
+        <el-button class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog"> {{ $t('surface.cockpitWorkInbox.startWork') }} </el-button>
+        <button class="cockpit-inbox__refresh" type="button" :disabled="status === 'loading'" :aria-label="$t('surface.cockpitWorkInbox.refreshWorkItems')" @click="emit('refresh', selectedRepositoryId)">
           <RefreshIcon aria-hidden="true" />
         </button>
       </div>
@@ -77,23 +67,16 @@
 
     <section v-if="scopePromptVisible" class="cockpit-inbox__scope" aria-labelledby="cockpit-global-scope-title">
       <div>
-        <span>Global backlog</span>
-        <h2 id="cockpit-global-scope-title">Choose what Claw should load</h2>
-        <p>
-          A backlog across every repository can contain a lot of work and consume significant provider quota.
-          For a focused view, select a repository from the sidebar.
-        </p>
+        <span>{{ $t('surface.cockpitWorkInbox.globalBacklog') }}</span>
+        <h2 id="cockpit-global-scope-title">{{ $t('surface.cockpitWorkInbox.chooseWhatClawShouldLoad') }}</h2>
+        <p> {{ $t('surface.cockpitWorkInbox.aBacklogAcrossEveryRepositoryCanContainALotOfWorkAndCons') }} </p>
       </div>
       <div class="cockpit-inbox__scope-actions">
-        <el-button type="primary" @click="emit('select-global-scope', 'assignedToMe')">
-          Show items assigned to me
-        </el-button>
-        <el-button plain @click="emit('select-global-scope', 'all')">
-          Load everything
-        </el-button>
+        <el-button type="primary" @click="emit('select-global-scope', 'assignedToMe')"> {{ $t('surface.cockpitWorkInbox.showItemsAssignedToMe') }} </el-button>
+        <el-button plain @click="emit('select-global-scope', 'all')"> {{ $t('surface.cockpitWorkInbox.loadEverything') }} </el-button>
       </div>
     </section>
-    <p v-else-if="status === 'loading' && items.length === 0" class="cockpit-inbox__state">Loading work items…</p>
+    <p v-else-if="status === 'loading' && items.length === 0" class="cockpit-inbox__state">{{ $t('surface.cockpitWorkInbox.loadingWorkItems') }}</p>
     <p v-else-if="error && items.length === 0" class="cockpit-inbox__state cockpit-inbox__state--error">{{ error }}</p>
     <p v-else-if="rows.length === 0" class="cockpit-inbox__state">{{ emptyMessage }}</p>
 
@@ -107,7 +90,7 @@
           </span>
           <strong>{{ group.label }}</strong>
           <span>{{ group.rows.length }}</span>
-          <button v-if="activeView !== 'all'" type="button" @click="selectView('all')">Show all</button>
+          <button v-if="activeView !== 'all'" type="button" @click="selectView('all')">{{ $t('surface.cockpitWorkInbox.showAll') }}</button>
         </header>
 
         <div class="cockpit-inbox__rows">
@@ -124,13 +107,13 @@
               class="cockpit-inbox__selection"
               :model-value="selectedItemIds.has(row.item.id)"
               :disabled="Boolean(row.assignment)"
-              :aria-label="row.assignment ? `#${row.item.number} is already assigned` : `Select #${row.item.number}`"
+              :aria-label="row.assignment ? $t('dynamic.cockpit.assigned', { number: row.item.number }) : $t('dynamic.cockpit.select', { number: row.item.number })"
               @click.stop
               @change="toggleSelection(row)"
             />
             <span class="cockpit-inbox__repository">{{ repositoryName(row.item) }}</span>
             <span class="cockpit-inbox__number">
-              {{ row.item.kind === 'pullRequest' ? 'PR' : '' }} #{{ row.item.number }}
+              {{ row.item.kind === 'pullRequest' ? $t('surface.cockpitWorkInbox.pR') : '' }} #{{ row.item.number }}
             </span>
             <strong class="cockpit-inbox__title">{{ row.item.title }}</strong>
 
@@ -159,22 +142,22 @@
             <span class="cockpit-inbox__elapsed">{{ elapsed(row.activityAt) }}</span>
 
             <div class="cockpit-inbox__row-actions">
-              <el-tooltip :content="row.assignment ? 'View agent' : 'Assign work'" placement="top" :show-after="300">
+              <el-tooltip :content="row.assignment ? $t('surface.cockpitWorkInbox.viewAgent') : $t('surface.cockpitWorkInbox.assignWork')" placement="top" :show-after="300">
                 <button
                   class="cockpit-inbox__row-action"
                   type="button"
-                  :aria-label="row.assignment ? `View agent for #${row.item.number}` : `Assign #${row.item.number}`"
+                  :aria-label="row.assignment ? $t('dynamic.cockpit.viewAgent', { number: row.item.number }) : $t('dynamic.cockpit.assign', { number: row.item.number })"
                   @click.stop="selectRow(row)"
                 >
                   <EyeIcon v-if="row.assignment" aria-hidden="true" />
                   <PlusCircleIcon v-else aria-hidden="true" />
                 </button>
               </el-tooltip>
-              <el-tooltip :content="`View #${row.item.number} in ${providerLabel}`" placement="top" :show-after="300">
+              <el-tooltip :content="$t('dynamic.cockpit.viewProvider', { number: row.item.number, provider: providerLabel })" placement="top" :show-after="300">
                 <button
                   class="cockpit-inbox__external-action"
                   type="button"
-                  :aria-label="`View #${row.item.number} in ${providerLabel}`"
+                  :aria-label="$t('dynamic.cockpit.viewProvider', { number: row.item.number, provider: providerLabel })"
                   @click.stop="openSource(row.item)"
                 >
                   <ExternalLinkIcon aria-hidden="true" />
@@ -189,26 +172,26 @@
     <footer
       v-if="!selectedRepositoryId && globalScope && items.length > 0"
       class="cockpit-inbox__pagination"
-      aria-label="Work item pagination"
+      :aria-label="$t('surface.cockpitWorkInbox.workItemPagination')"
     >
-      <span>{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }} total</span>
+      <span>{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }} {{ $t('surface.cockpitWorkInbox.total') }}</span>
       <span v-if="error" class="cockpit-inbox__pagination-error" role="alert">{{ error }}</span>
       <div class="cockpit-inbox__page-controls">
         <button
           class="cockpit-inbox__icon-button"
           type="button"
           :disabled="pageLoading || page <= 1"
-          aria-label="Previous page"
+          :aria-label="$t('surface.cockpitWorkInbox.previousPage')"
           @click="emit('change-page', page - 1)"
         >
           <IconChevronLeft aria-hidden="true" />
         </button>
-        <span>Page {{ page }} of {{ totalPages }}</span>
+        <span>{{ $t('surface.cockpitWorkInbox.page') }} {{ page }} {{ $t('surface.cockpitWorkInbox.of') }} {{ totalPages }}</span>
         <button
           class="cockpit-inbox__icon-button"
           type="button"
           :disabled="pageLoading || page >= totalPages"
-          aria-label="Next page"
+          :aria-label="$t('surface.cockpitWorkInbox.nextPage')"
           @click="emit('change-page', page + 1)"
         >
           <IconChevronRight aria-hidden="true" />
@@ -227,18 +210,13 @@
     >
       <template #header>
         <div class="claw-form-dialog__header">
-          <h2 class="claw-dialog__title">Start work</h2>
+          <h2 class="claw-dialog__title">{{ $t('surface.cockpitWorkInbox.startWork') }}</h2>
         </div>
       </template>
 
       <div class="cockpit-inbox__start-body">
-        <p>
-          Launch <strong>{{ selectedItems.length }} {{ selectedItems.length === 1 ? 'agent' : 'agents' }}</strong>?
-          Each agent will work in a dedicated worktree.
-        </p>
-        <label>
-          Team
-          <el-select v-model="selectedTeamId" aria-label="Team for new agents">
+        <p> {{ $t('surface.cockpitWorkInbox.launch') }} <strong>{{ selectedItems.length }} {{ selectedItems.length === 1 ? 'agent' : 'agents' }}</strong>{{ $t('surface.cockpitWorkInbox.eachAgentWillWorkInADedicatedWorktree') }} </p>
+        <label> {{ $t('surface.cockpitWorkInbox.team') }} <el-select v-model="selectedTeamId" :aria-label="$t('surface.cockpitWorkInbox.teamForNewAgents')">
             <el-option v-for="team in teams" :key="team.id" :label="team.name" :value="team.id" />
           </el-select>
         </label>
@@ -247,9 +225,9 @@
 
       <template #footer>
         <div class="claw-dialog__footer">
-          <button class="claw-button claw-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">Cancel</button>
-          <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('investigate')">Investigate</button>
-          <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('fix')">Fix</button>
+          <button class="claw-button claw-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">{{ $t('surface.cockpitWorkInbox.cancel') }}</button>
+          <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('investigate')">{{ $t('surface.cockpitWorkInbox.investigate') }}</button>
+          <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('fix')">{{ $t('surface.cockpitWorkInbox.fix') }}</button>
         </div>
       </template>
     </el-dialog>
@@ -257,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
 import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
@@ -323,7 +302,7 @@ watch(() => props.activeView, (view) => { localActiveView.value = view; });
 watch(() => props.searchQuery, (query) => { effectiveSearchQuery.value = query; });
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
 const sortedRepositories = computed(() => [...props.repositories].sort((a, b) => a.fullName.localeCompare(b.fullName)));
-const providerLabel = computed(() => props.connection.provider === 'github' ? 'GitHub' : 'Provider');
+const providerLabel = computed(() => props.connection.provider === 'github' ? translate('surface.cockpitWorkInbox.gitHub') : translate('surface.cockpitWorkInbox.provider'));
 const repositoryIcons = computed(() => props.repositoryIcons);
 const tagOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const assigneeOptions = computed(() => [...new Set(props.items.flatMap((item) => item.assignees ?? []))].sort());
@@ -373,15 +352,15 @@ const groupedRows = computed(() => priorityOrder.map((priority) => ({
   rows: rows.value.filter((row) => row.priority === priority).sort((a, b) => b.activityAt.localeCompare(a.activityAt)),
 })).filter((group) => group.rows.length > 0));
 const viewOptions = computed(() => [
-  { id: 'all' as const, label: 'All', count: effectiveTotalItems.value },
-  { id: 'backlog' as const, label: 'Backlog', count: totalBacklogCount.value },
-  { id: 'wip' as const, label: 'WIP', count: totalAssignmentCount.value },
-  { id: 'focus' as const, label: 'Focus', count: totalFocusCount.value },
+  { id: 'all' as const, label: translate('surface.cockpitWorkInbox.all'), count: effectiveTotalItems.value },
+  { id: 'backlog' as const, label: translate('surface.cockpitWorkInbox.backlog'), count: totalBacklogCount.value },
+  { id: 'wip' as const, label: translate('surface.cockpitWorkInbox.wIP'), count: totalAssignmentCount.value },
+  { id: 'focus' as const, label: translate('surface.cockpitWorkInbox.focus'), count: totalFocusCount.value },
 ]);
 const selectedItems = computed(() => rows.value
   .filter((row) => !row.assignment && selectedItemIds.value.has(row.item.id))
   .map((row) => row.item));
-const emptyMessage = computed(() => activeView.value === 'focus' ? 'Nothing needs your attention.' : `No work in ${viewOptions.value.find((view) => view.id === activeView.value)?.label ?? 'this view'}.`);
+const emptyMessage = computed(() => activeView.value === 'focus' ? translate('surface.cockpitWorkInbox.nothingNeedsYourAttention') : `No work in ${viewOptions.value.find((view) => view.id === activeView.value)?.label ?? 'this view'}.`);
 
 let activeViewInitialized = props.activeView !== 'focus';
 let pendingViewContext: string | null = viewContextKey.value;
@@ -446,16 +425,21 @@ function rowPriority(assignment: WorkBacklogAssignment | null, agent: Agent | nu
 }
 
 function statusLabel(assignment: WorkBacklogAssignment | null, agent: Agent | null): string {
-  if (agent?.status.type === 'awaitingInput') return 'Needs input';
-  if (agent?.status.type === 'error') return 'Failed';
-  if (assignment?.status === 'blocked') return 'Blocked';
-  if (assignment?.status === 'readyForReview') return 'Ready for review';
-  if (assignment?.status === 'completed') return 'Completed';
-  return assignment ? agent?.statusText || 'In progress' : 'Ready';
+  if (agent?.status.type === 'awaitingInput') return translate('surface.cockpitWorkInbox.needsInput');
+  if (agent?.status.type === 'error') return translate('surface.cockpitWorkInbox.failed');
+  if (assignment?.status === 'blocked') return translate('surface.cockpitWorkInbox.blocked');
+  if (assignment?.status === 'readyForReview') return translate('surface.cockpitWorkInbox.readyForReview');
+  if (assignment?.status === 'completed') return translate('surface.cockpitWorkInbox.completed');
+  return assignment ? agent?.statusText || translate('dynamic.misc.inProgress') : translate('surface.cockpitWorkInbox.ready');
 }
 
 function priorityLabel(priority: Priority): string {
-  return { attention: 'Needs attention', review: 'Ready for review', progress: 'In progress', ready: 'Ready' }[priority];
+  return {
+    attention: translate('surface.cockpitWorkInbox.needsAttention'),
+    review: translate('surface.cockpitWorkInbox.readyForReview'),
+    progress: translate('dynamic.misc.inProgress'),
+    ready: translate('surface.cockpitWorkInbox.ready'),
+  }[priority];
 }
 
 function repositoryName(item: WorkItem): string {

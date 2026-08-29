@@ -44,7 +44,7 @@
           v-if="$slots.actions"
           class="app-data-list__column-heading app-data-list__column-heading--actions"
           role="columnheader"
-          aria-label="Actions"
+          :aria-label="$t('surface.appDataList.actions')"
         />
       </div>
 
@@ -101,6 +101,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, useSlots } from 'vue';
 import type { CSSProperties } from 'vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
@@ -115,7 +116,7 @@ const props = withDefaults(defineProps<{
   title?: string;
 }>(), {
   ariaLabel: undefined,
-  emptyText: 'No items',
+  emptyText: translate('dynamic.misc.noItems'),
   showColumnHeader: false,
   subtitle: undefined,
   title: undefined,

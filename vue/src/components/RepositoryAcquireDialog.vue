@@ -14,8 +14,8 @@
         <input
           ref="input"
           v-model="query"
-          placeholder="Find a GitHub repository"
-          aria-label="Find a GitHub repository"
+          :placeholder="t('repositories.acquire.findGithub')"
+          :aria-label="t('repositories.acquire.findGithub')"
           autocomplete="off"
           spellcheck="false"
         >
@@ -23,14 +23,14 @@
     </template>
     <template v-else #header>
       <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">Clone repository</h2>
+        <h2 class="claw-dialog__title">{{ t('repositories.acquire.cloneRepository') }}</h2>
       </div>
     </template>
 
     <section class="repository-acquire-dialog__body repository-acquire-dialog__scroll-region">
       <template v-if="mode === 'url'">
         <form class="claw-form-dialog repository-acquire-dialog__url-form" @submit.prevent="submitUrl">
-          <label class="claw-form-dialog__label" for="repository-acquire-url">Repository URL</label>
+          <label class="claw-form-dialog__label" for="repository-acquire-url">{{ t('repositories.acquire.url') }}</label>
           <div class="claw-form-dialog__control claw-form-dialog__input-control">
             <input
               id="repository-acquire-url"
@@ -38,9 +38,9 @@
               v-model="url"
               class="claw-form-dialog__text-input"
               type="url"
-              aria-label="Repository URL"
+              :aria-label="t('repositories.acquire.url')"
               autocomplete="url"
-              placeholder="https://github.com/owner/repository.git"
+              :placeholder="t('repositories.acquire.urlPlaceholder')"
               spellcheck="false"
             >
           </div>
@@ -48,10 +48,10 @@
         </form>
       </template>
       <template v-else>
-        <p v-if="loading" class="repository-acquire-dialog__state">Loading repositories…</p>
+        <p v-if="loading" class="repository-acquire-dialog__state">{{ t('repositories.acquire.loading') }}</p>
         <p v-else-if="error" class="repository-acquire-dialog__state repository-acquire-dialog__state--error">{{ error }}</p>
         <template v-else>
-          <h3>Repositories</h3>
+          <h3>{{ t('repositories.acquire.repositories') }}</h3>
           <button
             v-for="repository in filteredRepositories"
             :key="repository.id"
@@ -62,19 +62,19 @@
             <GitHubIcon aria-hidden="true" />
             <span>
               <span class="repository-acquire-dialog__name">{{ repository.fullName }}</span>
-              <small>{{ isRepositoryLocal(repository) ? 'On this machine' : repository.isPrivate ? 'Private repository' : 'GitHub repository' }}</small>
+              <small>{{ repositoryKindLabel(repository) }}</small>
             </span>
-            <em>{{ isRepositoryLocal(repository) ? 'Open' : 'Clone' }}</em>
+            <em>{{ isRepositoryLocal(repository) ? t('repositories.acquire.open') : t('repositories.acquire.clone') }}</em>
           </button>
-          <p v-if="filteredRepositories.length === 0" class="repository-acquire-dialog__state">No matching repositories.</p>
+          <p v-if="filteredRepositories.length === 0" class="repository-acquire-dialog__state">{{ t('repositories.acquire.noMatch') }}</p>
         </template>
       </template>
     </section>
 
     <template v-if="mode === 'url'" #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">Cancel</button>
+      <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
       <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmitUrl || busy" @click="submitUrl">
-        {{ busy ? 'Cloning…' : 'Clone repository' }}
+        {{ busy ? t('repositories.acquire.cloning') : t('repositories.acquire.cloneRepository') }}
       </button>
     </template>
   </el-dialog>
@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
 import type { WorkRepository } from '@codex-claw/core/contracts';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -108,6 +109,8 @@ const emit = defineEmits<{
   'clone-url': [url: string];
   'select-repository': [repository: WorkRepository];
 }>();
+
+const { t } = useI18n();
 
 const input = ref<HTMLInputElement | null>(null);
 const urlInput = ref<HTMLInputElement | null>(null);
@@ -140,6 +143,13 @@ function submitUrl(): void {
 function isRepositoryLocal(repository: WorkRepository): boolean {
   const identity = canonicalGitRemoteIdentity(repository.url);
   return Boolean(identity && localRepositoryIdentities.value.has(identity));
+}
+
+function repositoryKindLabel(repository: WorkRepository): string {
+  if (isRepositoryLocal(repository)) return t('repositories.acquire.onMachine');
+  return repository.isPrivate
+    ? t('repositories.acquire.privateRepository')
+    : t('repositories.acquire.githubRepository');
 }
 </script>
 
