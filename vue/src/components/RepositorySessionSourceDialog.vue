@@ -218,12 +218,12 @@ function onVisibilityChanged(visible: boolean): void {
 
 .repository-session-source-dialog__result {
   width: 100%;
-  min-height: 46px;
+  min-height: 38px;
   display: grid;
   grid-template-columns: var(--icon-md) minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-6);
+  padding: var(--space-1) var(--space-6);
   border: 0;
   border-radius: var(--radius-md);
   color: var(--color-text);
