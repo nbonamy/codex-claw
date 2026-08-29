@@ -348,6 +348,19 @@ describe('AgentSidebar', () => {
       .toBe('Switch to main with Command 1');
   });
 
+  it('renders only the branch as the sidebar title when the agent name is null', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0]!, name: null, conversationTitle: 'Previous conversation' }],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-sidebar__meta strong').text()).toBe('main');
+  });
+
   it('renders persisted repository collapse state and emits controlled updates', async () => {
     const repositoryKey = 'remote:github.com/nbonamy/id8';
     const wrapper = mount(AgentSidebar, {

@@ -84,11 +84,12 @@ export function projectWorkspaceSidebar(input: {
       groups.set(id, group);
     }
 
+    const customName = agent.name?.trim() || null;
     const conversationTitle = agent.conversationTitle?.trim() || null;
-    const sessionLabel = conversationTitle ?? agentDisplayName(agent);
+    const sessionLabel = customName ? conversationTitle ?? customName : agentDisplayName(agent);
     group.sessions.push({
       agentId: agent.id,
-      customName: agent.name?.trim() || null,
+      customName,
       conversationTitle,
       displayTitle: sessionLabel,
       branch: isGit ? workspace.branch : null,
