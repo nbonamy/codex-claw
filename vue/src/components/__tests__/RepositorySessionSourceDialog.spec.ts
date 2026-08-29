@@ -61,9 +61,8 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.text()).toContain('Recent pull requests');
   });
 
-  it('uses the standard tab indicator without pill styling', () => {
-    expect(componentSource).not.toMatch(/el-tabs__active-bar[^}]*display:\s*none;/s);
-    expect(componentSource).not.toMatch(/el-tabs__item\)[^{]*\{[^}]*border-radius:/s);
-    expect(componentSource).not.toMatch(/el-tabs__item\.is-active\)[^{]*\{[^}]*background:\s*var\(--color-surface-base\);/s);
+  it('keeps text centered inside the outer pill tabs', () => {
+    expect(componentSource).toMatch(/el-tabs__item\.is-top:nth-child\(2\)\)[^{]*\{[^}]*padding-left:\s*var\(--space-6\);/s);
+    expect(componentSource).toMatch(/el-tabs__item\.is-top:last-child\)[^{]*\{[^}]*padding-right:\s*var\(--space-6\);/s);
   });
 });
