@@ -596,6 +596,11 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding: var(--space-6) var(--space-8) var(--space-4);
 }
 
+.agent-sidebar__start-work:deep() button {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .agent-sidebar__workspace-group + .agent-sidebar__workspace-group {
   margin-top: var(--space-2);
 }
