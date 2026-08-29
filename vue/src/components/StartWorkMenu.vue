@@ -56,7 +56,7 @@ function select(action: string): void {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-6);
   border: 0;
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
