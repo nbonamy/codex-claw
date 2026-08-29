@@ -214,7 +214,6 @@
           :generate-git-message="props.generateAgentGitMessage"
           :commit-git-changes="props.commitAgentGitChanges"
           :push-git-branch="props.pushAgentGitBranch"
-          :create-git-branch="props.createAgentGitBranch"
           :create-git-pull-request="props.createAgentGitPullRequest"
           :merge-git-branch="props.mergeAgentGitBranch"
           @expand-sidebar="agentSidebarCollapsed = false"

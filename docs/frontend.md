@@ -195,11 +195,8 @@ implemented:
   scopes separately: staged changes are fixed, unstaged changes default on,
   and untracked changes default off. Git Review includes all three scopes and
   exposes local visibility toggles for each one without reloading repository
-  state. The Git action menu is ordered Commit, Push, Branch, Merge, and Create
-  PR. Branch is available for every initialized Git checkout and creates plus
-  checks out a new branch from the current HEAD, or optionally creates an
-  adjacent worktree and relocates the agent there. Both paths use the shared
-  progress and passive-success treatment. Commit and pull-request editors can ask Codex for an ephemeral draft;
+  state. The Git action menu is ordered Commit, Push, Merge, and Create PR.
+  Commit and pull-request editors can ask Codex for an ephemeral draft;
   generated text stays editable and never creates or appears in a visible agent
   conversation;
 - ChatGPT-style split Open In controls in the active-agent header and project-file
