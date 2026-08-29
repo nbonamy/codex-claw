@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -36,6 +36,33 @@ describe('cloneSourceRepository', () => {
       'https://github.com/nbonamy/codex-claw.git',
       path.join(sourceRoot, 'codex-claw'),
     ], { cwd: sourceRoot });
+  });
+
+  it('normalizes a relative source folder before cloning and discovery', async () => {
+    const sourceRootPath = await mkdtemp(path.join(process.cwd(), '.claw-clone-relative-'));
+    const sourceRoot = path.relative(process.cwd(), sourceRootPath);
+    const run = vi.fn(async (_command: string, args: string[], options: { cwd: string }) => {
+      if (args[0] === 'clone') {
+        const destination = path.resolve(options.cwd, args.at(-1)!);
+        await mkdir(path.join(destination, '.git'), { recursive: true });
+        await writeFile(path.join(destination, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+      }
+      return { stdout: '' };
+    });
+
+    try {
+      await expect(cloneSourceRepository(
+        sourceRoot,
+        'https://github.com/openai/skills.git',
+        { run },
+      )).resolves.toStrictEqual({
+        name: 'skills',
+        path: path.join(sourceRootPath, 'skills'),
+        worktrees: [{ name: 'main', path: path.join(sourceRootPath, 'skills') }],
+      });
+    } finally {
+      await rm(sourceRootPath, { recursive: true, force: true });
+    }
   });
 
   it('reuses an existing clone only when its origin matches', async () => {

@@ -3,7 +3,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { SourceRepository } from '@codex-claw/core/contracts';
-import { scanSourceRepositories } from './source-repositories';
+import { resolveSourceFolderPath, scanSourceRepositories } from './source-repositories';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,11 +20,12 @@ export async function cloneSourceRepository(
   repositoryUrl: string,
   runner: CommandRunner = defaultRunner,
 ): Promise<SourceRepository> {
-  const sourceRoot = sourceFolderPath.trim();
+  const configuredSourceRoot = sourceFolderPath.trim();
   const url = repositoryUrl.trim();
-  if (!sourceRoot) throw new Error('Source folder is not configured.');
+  if (!configuredSourceRoot) throw new Error('Source folder is not configured.');
   if (!url) throw new Error('Repository URL is required.');
 
+  const sourceRoot = resolveSourceFolderPath(configuredSourceRoot);
   const repositoryName = repositoryNameFromUrl(url);
   const destinationPath = path.join(sourceRoot, repositoryName);
   await mkdir(sourceRoot, { recursive: true });

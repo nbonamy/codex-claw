@@ -33,14 +33,14 @@ export async function detectSourceFolder(): Promise<string> {
 
 export async function sourceFolderPathExists(folderPath: string): Promise<boolean> {
   try {
-    return (await stat(expandHome(folderPath.trim()))).isDirectory();
+    return (await stat(resolveSourceFolderPath(folderPath))).isDirectory();
   } catch {
     return false;
   }
 }
 
 export async function scanSourceRepositories(sourceFolderPath: string): Promise<SourceRepository[]> {
-  const sourceRoot = expandHome(sourceFolderPath);
+  const sourceRoot = resolveSourceFolderPath(sourceFolderPath);
   let entries;
   try {
     entries = await readdir(sourceRoot, { withFileTypes: true });
@@ -158,8 +158,10 @@ function worktreeDisplayName(folderName: string, repoName: string): string {
   return folderName.startsWith(`${repoName}-`) ? folderName.slice(repoName.length + 1) : folderName;
 }
 
-function expandHome(value: string): string {
-  return value === '~' || value.startsWith('~/')
-    ? path.join(os.homedir(), value.slice(2))
-    : value;
+export function resolveSourceFolderPath(value: string): string {
+  const trimmed = value.trim();
+  const expanded = trimmed === '~' || trimmed.startsWith('~/')
+    ? path.join(os.homedir(), trimmed.slice(2))
+    : trimmed;
+  return path.resolve(expanded);
 }
