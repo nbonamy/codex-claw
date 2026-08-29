@@ -4,7 +4,8 @@ import { repositoryIconKeyForRemote } from './git-remote';
 
 export type WorkspaceSidebarSession = {
   agentId: string;
-  title: string;
+  customName: string | null;
+  conversationTitle: string | null;
   displayTitle: string;
   branch: string | null;
   folder: string;
@@ -23,6 +24,11 @@ export type WorkspaceSidebarGroup = {
   repositoryRoot?: string;
   repositoryKey?: string;
   sessions: WorkspaceSidebarSession[];
+};
+
+export type AgentMentionProjection = {
+  agentId: string;
+  label: string;
 };
 
 export function repositoryIconForAgent(
@@ -78,10 +84,12 @@ export function projectWorkspaceSidebar(input: {
       groups.set(id, group);
     }
 
-    const sessionLabel = agentDisplayName(agent);
+    const conversationTitle = agent.conversationTitle?.trim() || null;
+    const sessionLabel = conversationTitle ?? agentDisplayName(agent);
     group.sessions.push({
       agentId: agent.id,
-      title: agent.name ?? '',
+      customName: agent.name?.trim() || null,
+      conversationTitle,
       displayTitle: sessionLabel,
       branch: isGit ? workspace.branch : null,
       folder: agent.folder,
@@ -94,7 +102,62 @@ export function projectWorkspaceSidebar(input: {
     });
   });
 
-  return [...groups.values()];
+  const projectedGroups = [...groups.values()];
+  disambiguateDuplicateSessionLabels(projectedGroups);
+  return projectedGroups;
+}
+
+export function projectAgentMentionLabels(agents: readonly Agent[]): AgentMentionProjection[] {
+  const labels = projectWorkspaceSidebar({ agents, activeAgentId: null })
+    .flatMap((group) => group.sessions.map((session) => {
+      const branchContext = session.branch ? `${group.label}/${session.branch}` : group.label;
+      return {
+        agentId: session.agentId,
+        label: `${session.displayTitle} · ${branchContext}`,
+      };
+    }));
+  return disambiguateLabels(labels);
+}
+
+function disambiguateDuplicateSessionLabels(groups: WorkspaceSidebarGroup[]): void {
+  const sessions = groups.flatMap((group) => group.sessions.map((session) => ({ group, session })));
+  const counts = labelCounts(sessions.map(({ session }) => session.displayTitle));
+  const candidates = sessions.map(({ group, session }) => {
+    if ((counts.get(normalizedLabel(session.displayTitle)) ?? 0) < 2) return session.displayTitle;
+    const context = session.branch && normalizedLabel(session.branch) !== normalizedLabel(session.displayTitle)
+      ? session.branch
+      : group.label;
+    return `${session.displayTitle} · ${context}`;
+  });
+  const disambiguated = disambiguateLabels(candidates.map((label, index) => ({ agentId: sessions[index]!.session.agentId, label })));
+  disambiguated.forEach(({ label }, index) => {
+    sessions[index]!.session.displayTitle = label;
+  });
+}
+
+function disambiguateLabels<T extends { agentId: string; label: string }>(values: T[]): T[] {
+  const counts = labelCounts(values.map(({ label }) => label));
+  const indexes = new Map<string, number>();
+  return values.map((value) => {
+    const key = normalizedLabel(value.label);
+    if ((counts.get(key) ?? 0) < 2) return value;
+    const index = (indexes.get(key) ?? 0) + 1;
+    indexes.set(key, index);
+    return { ...value, label: `${value.label} · ${index}` };
+  });
+}
+
+function labelCounts(labels: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const label of labels) {
+    const key = normalizedLabel(label);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function normalizedLabel(label: string): string {
+  return label.trim().toLocaleLowerCase();
 }
 
 function workspaceSessionKind(agent: Agent): WorkspaceSidebarSession['kind'] {

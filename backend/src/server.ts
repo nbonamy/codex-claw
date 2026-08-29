@@ -435,9 +435,12 @@ export class ClawBackendServer {
             throw new Error(`Agent not found: ${input.id}`);
           }
           const shouldSyncConversationTitle = agent.name !== previousName && Boolean(agent.backendSession);
+          if (shouldSyncConversationTitle) {
+            agent.conversationTitle = formatConversationTitle(agent);
+          }
           const snapshot = await this.persistAndEmitSnapshot();
           if (shouldSyncConversationTitle) {
-            void this.updateConversationTitle(agent.id);
+            void this.syncConversationTitle(agent.id);
           }
           return snapshot;
         });
@@ -542,7 +545,7 @@ export class ClawBackendServer {
           if (result.activeTurnId) {
             forked.status = { type: 'working' };
           }
-          await this.updateConversationTitle(forked.id);
+          this.setConversationTitle(forked.id);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -909,7 +912,7 @@ export class ClawBackendServer {
           if (!resumedAgent) {
             throw new Error(`Agent not found: ${agentId}`);
           }
-          await this.updateConversationTitle(resumedAgent.id);
+          this.setConversationTitle(resumedAgent.id);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -924,7 +927,7 @@ export class ClawBackendServer {
           const wasNewSession = !agent.backendSession;
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverGoalUpdate, { agent, objective }) as BackendGoalResult;
           agent.backendSession = result.backendSession;
-          await this.setNewConversationTitle(agentId, wasNewSession);
+          this.setNewConversationTitle(agentId, wasNewSession);
           if (result.goal) {
             agent.goal = result.goal;
             this.handleBackendEvent({
@@ -943,7 +946,7 @@ export class ClawBackendServer {
           const wasNewSession = !agent.backendSession;
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverGoalClear, { agent }) as BackendGoalResult;
           agent.backendSession = result.backendSession;
-          await this.setNewConversationTitle(agentId, wasNewSession);
+          this.setNewConversationTitle(agentId, wasNewSession);
           if (result.cleared) {
             delete agent.goal;
             this.handleBackendEvent({
@@ -967,7 +970,7 @@ export class ClawBackendServer {
           const wasNewSession = !agent.backendSession;
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverApprovalPresetUpdate, { agent, preset }) as BackendApprovalPresetResult;
           agent.backendSession = result.backendSession;
-          await this.setNewConversationTitle(agentId, wasNewSession);
+          this.setNewConversationTitle(agentId, wasNewSession);
           agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
           return this.persistAndEmitSnapshot();
         });
@@ -2344,7 +2347,7 @@ export class ClawBackendServer {
     }, {
       appendUserMessage: !queuedPrompt || (!queuedPrompt.submitted && (queuedPrompt.attempts ?? 0) === 0),
       onBackendSessionUpdated: async (_result, wasNewSession) => {
-        await this.setNewConversationTitle(agentId, wasNewSession);
+        this.setNewConversationTitle(agentId, wasNewSession);
         await this.persistSnapshotOnly();
       },
       onPromptStarted: () => {
@@ -2846,24 +2849,31 @@ export class ClawBackendServer {
     }
   }
 
-  private async setNewConversationTitle(agentId: string, wasNewSession: boolean): Promise<void> {
+  private setNewConversationTitle(agentId: string, wasNewSession: boolean): void {
     if (!wasNewSession) {
       return;
     }
 
-    await this.updateConversationTitle(agentId);
+    this.setConversationTitle(agentId);
   }
 
-  private async updateConversationTitle(agentId: string): Promise<void> {
+  private setConversationTitle(agentId: string): void {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
       return;
     }
+    agent.conversationTitle = formatConversationTitle(agent);
+    void this.syncConversationTitle(agentId);
+  }
+
+  private async syncConversationTitle(agentId: string): Promise<void> {
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return;
 
     try {
       await this.handleAgentDriverRequest(agent, backendMethods.driverConversationTitleUpdate, {
         agent,
-        title: formatConversationTitle(agent),
+        title: agent.conversationTitle ?? formatConversationTitle(agent),
       });
     } catch {
       // A title failure should not fail the user action that created the session.

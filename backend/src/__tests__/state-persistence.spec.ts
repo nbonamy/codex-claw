@@ -975,6 +975,17 @@ describe('AppStatePersistence', () => {
     });
   });
 
+  it('persists the current conversation title separately from the agent name', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.name = null;
+    snapshot.agents[0]!.conversationTitle = 'work-routing';
+
+    expect(snapshotFromPersistedState(persistedStateFromSnapshot(snapshot)).agents[0]).toMatchObject({
+      name: null,
+      conversationTitle: 'work-routing',
+    });
+  });
+
   it('persists and restores source folder settings', () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {

@@ -441,7 +441,7 @@ import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
-import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
+import { projectAgentMentionLabels, repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { clawHostCapabilities, codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -954,11 +954,11 @@ const agentMentionGroups = computed<readonly CodexComposerMentionGroup[]>(() => 
     id: 'agents',
     label: 'Agents',
     placement: 'before',
-    items: activeTeamAgents.value.map((agent) => ({
-      id: agent.id,
-      value: `agent:${agent.id}`,
-      label: agentDisplayName(agent),
-      payload: { agentId: agent.id },
+    items: projectAgentMentionLabels(activeTeamAgents.value).map(({ agentId, label }) => ({
+      id: agentId,
+      value: `agent:${agentId}`,
+      label,
+      payload: { agentId },
     })),
   }];
 });

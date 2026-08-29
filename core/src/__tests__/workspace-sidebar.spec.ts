@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../contracts';
-import { projectWorkspaceSidebar, repositoryIconForAgent } from '../workspace-sidebar';
+import { projectAgentMentionLabels, projectWorkspaceSidebar, repositoryIconForAgent } from '../workspace-sidebar';
 
 describe('workspace sidebar projection', () => {
   it('groups primary checkouts and linked worktrees beneath the canonical repository', () => {
@@ -21,7 +21,8 @@ describe('workspace sidebar projection', () => {
       repositoryKey: '/src/codex-claw',
       sessions: [{
         agentId: 'agent-main',
-        title: 'Main conversation',
+        customName: 'Main conversation',
+        conversationTitle: null,
         displayTitle: 'Main conversation',
         branch: 'main',
         folder: '/src/codex-claw',
@@ -33,7 +34,8 @@ describe('workspace sidebar projection', () => {
         quickSwitchIndex: 0,
       }, {
         agentId: 'agent-feature',
-        title: 'Implement routing',
+        customName: 'Implement routing',
+        conversationTitle: null,
         displayTitle: 'Implement routing',
         branch: 'feat/routing',
         folder: '/src/codex-claw-routing',
@@ -94,6 +96,26 @@ describe('workspace sidebar projection', () => {
         { displayTitle: 'Fix tests' },
         { displayTitle: 'Review tests' },
       ]);
+  });
+
+  it('prefers the persisted current conversation title', () => {
+    const agent = gitAgent('agent-one', 'Custom agent', '/src/repo-one', 'feat/one', true);
+    agent.conversationTitle = 'Current thread title';
+
+    expect(projectWorkspaceSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
+      .toMatchObject({ customName: 'Custom agent', conversationTitle: 'Current thread title', displayTitle: 'Current thread title' });
+  });
+
+  it('disambiguates duplicate session and mention labels deterministically', () => {
+    const first = gitAgent('agent-one', 'Fix tests', '/src/repo-one', 'feat/one', true);
+    const second = gitAgent('agent-two', 'Fix tests', '/src/repo-two', 'feat/two', true);
+
+    expect(projectWorkspaceSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions.map(({ displayTitle }) => displayTitle))
+      .toStrictEqual(['Fix tests · feat/one', 'Fix tests · feat/two']);
+    expect(projectAgentMentionLabels([first, second])).toStrictEqual([
+      { agentId: 'agent-one', label: 'Fix tests · feat/one · codex-claw/feat/one' },
+      { agentId: 'agent-two', label: 'Fix tests · feat/two · codex-claw/feat/two' },
+    ]);
   });
 
   it('falls back to the branch when an agent has no name', () => {

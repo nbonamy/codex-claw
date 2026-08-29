@@ -122,7 +122,7 @@
           <span
             v-if="!session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
             class="agent-sidebar__quick-switch-shortcut"
-            :aria-label="`Switch to ${session.title} with Command ${session.quickSwitchIndex + 1}`"
+            :aria-label="`Switch to ${session.displayTitle} with Command ${session.quickSwitchIndex + 1}`"
           ><span aria-hidden="true">⌘</span>{{ session.quickSwitchIndex + 1 }}</span>
           <span
             v-else

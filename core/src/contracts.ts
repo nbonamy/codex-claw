@@ -166,6 +166,7 @@ export type Agent = {
   id: string;
   teamId?: string;
   name: string | null;
+  conversationTitle?: string;
   avatar?: string;
   folder: string;
   workspace?: AgentWorkspaceIdentity;

@@ -252,7 +252,7 @@ describe('AgentSidebar', () => {
     picker.vm.$emit('update:modelValue', '🚀');
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted('update-repository-icon')).toStrictEqual([
-      [{ repositoryKey: 'git@github.com:nbonamy/id8.git', repositoryRoot: '~/src/id8', icon: '🚀' }],
+      [{ repositoryKey: 'remote:github.com/nbonamy/id8', repositoryRoot: '~/src/id8', icon: '🚀' }],
     ]);
   });
 
@@ -305,6 +305,21 @@ describe('AgentSidebar', () => {
     });
     expect(hiddenWrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
     expect(hiddenWrapper.findAll('.agent-sidebar__status')).toHaveLength(10);
+  });
+
+  it('uses the branch fallback in an unnamed agent quick-switch label', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{ ...agents[0]!, name: null }],
+        activeAgentId: 'agent-dina',
+        quickSwitchShortcutsVisible: true,
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-sidebar__quick-switch-shortcut').attributes('aria-label'))
+      .toBe('Switch to main with Command 1');
   });
 
   it('emits agent selection from agent rows', async () => {

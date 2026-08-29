@@ -5452,6 +5452,7 @@ describe('ClawBackendServer', () => {
 
       expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);
       expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+      expect(snapshot.agents[0]?.conversationTitle).toBe('Dina');
       expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
       expect(setConversationTitle).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
@@ -5531,7 +5532,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledOnce();
     await expect(renameResponse).resolves.toMatchObject({
       result: {
-        agents: [{ id: 'agent-dina', name: 'Dina Renamed' }],
+        agents: [{ id: 'agent-dina', name: 'Dina Renamed', conversationTitle: 'Dina Renamed' }],
       },
     });
 
@@ -5545,7 +5546,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
     await expect(clearResponse).resolves.toMatchObject({
       result: {
-        agents: [{ id: 'agent-dina', name: null }],
+        agents: [{ id: 'agent-dina', name: null, conversationTitle: 'work-routing' }],
       },
     });
 

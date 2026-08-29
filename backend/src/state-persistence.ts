@@ -25,6 +25,7 @@ type PersistedState = {
 };
 
 type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
+  conversationTitle?: string;
   avatar?: string;
   backend: AgentBackend;
   backendSession?: BackendSession;
@@ -143,6 +144,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     id: agent.id,
     teamId: agent.teamId,
     name: agent.name,
+    ...(agent.conversationTitle ? { conversationTitle: agent.conversationTitle } : {}),
     avatar: agent.avatar,
     folder: agent.folder,
     ...(agent.workspace ? { workspace: { ...agent.workspace } } : {}),
@@ -371,6 +373,9 @@ function sanitizeAgent(value: unknown): Agent | null {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
     name: typeof value.name === 'string' ? value.name : null,
+    ...(typeof value.conversationTitle === 'string' && value.conversationTitle.trim()
+      ? { conversationTitle: value.conversationTitle.trim() }
+      : {}),
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     folder: value.folder,
     ...(workspace ? { workspace } : {}),

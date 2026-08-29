@@ -319,10 +319,13 @@ describe('AppShell', () => {
       placement: 'before',
       items: snapshot.teams[0]!.agentIds.map((agentId) => {
         const teamAgent = snapshot.agents.find((candidate) => candidate.id === agentId)!;
+        const workspace = teamAgent.workspace;
+        const repository = workspace?.kind === 'git' ? workspace.repositoryName : 'Quick chats';
+        const branch = workspace?.kind === 'git' ? workspace.branch : null;
         return {
           id: teamAgent.id,
           value: `agent:${teamAgent.id}`,
-          label: teamAgent.name,
+          label: `${teamAgent.name} · ${branch ? `${repository}/${branch}` : repository}`,
           payload: { agentId: teamAgent.id },
         };
       }),
@@ -3694,7 +3697,7 @@ describe('AppShell', () => {
       '/src/codex-claw': '🧪',
     });
     sidebar.vm.$emit('update-repository-icon', {
-      repositoryKey: 'git@github.com:nbonamy/codex-claw.git',
+      repositoryKey: 'remote:github.com/nbonamy/codex-claw',
       repositoryRoot: '/src/codex-claw',
       icon: '🚀',
     });
@@ -3704,7 +3707,7 @@ describe('AppShell', () => {
       general: {
         repositoryIcons: {
           '/src/existing': '🦞',
-          'git@github.com:nbonamy/codex-claw.git': '🚀',
+          'remote:github.com/nbonamy/codex-claw': '🚀',
         },
       },
     });
