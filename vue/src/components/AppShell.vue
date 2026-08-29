@@ -450,6 +450,7 @@ import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
+import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import CockpitView from './CockpitView.vue';
@@ -863,12 +864,6 @@ const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
 const agentDialogSourceRepositoryName = ref<string | null>(null);
 const agentDialogSourceBranchName = ref('');
-type RepositorySessionSource = {
-  agentId?: string;
-  teamId?: string;
-  repositoryName: string;
-  repositoryRoot: string;
-};
 const repositorySessionSource = ref<RepositorySessionSource | null>(null);
 const repositorySessionSourceVisible = ref(false);
 const repositorySessionSourceBranches = ref<SourceBranch[]>([]);
@@ -1838,16 +1833,7 @@ async function openRepositorySessionSource(source: RepositorySessionSource): Pro
   repositorySessionSourceError.value = null;
   repositorySessionSourceLoading.value = true;
 
-  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
-  const sourceTeam = source.teamId
-    ? props.snapshot.teams.find((team) => team.id === source.teamId)
-    : sourceAgent
-    ? props.snapshot.teams.find((team) => team.id === sourceAgent.teamId)
-    : null;
-  const remoteConnectionId = sourceTeam?.remoteConnectionId?.trim();
-  const location: LoopLocation | undefined = remoteConnectionId
-    ? { kind: 'remote', remoteConnectionId }
-    : undefined;
+  const { remoteConnectionId, location } = repositorySessionContext(source);
 
   try {
     const branches = await props.listSourceBranches(
@@ -1896,15 +1882,13 @@ function closeRepositorySessionSource(): void {
 }
 
 async function listRepositorySessionBranches(input: { agentId: string; repositoryRoot: string }): Promise<SourceBranch[]> {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === input.agentId);
-  const team = agent ? props.snapshot.teams.find((candidate) => candidate.id === agent.teamId) : null;
-  return await props.listSourceBranches(input.repositoryRoot, team?.remoteConnectionId?.trim() || undefined);
+  const { remoteConnectionId } = repositorySessionContext({ agentId: input.agentId });
+  return await props.listSourceBranches(input.repositoryRoot, remoteConnectionId);
 }
 
 function createRepositorySessionOnBranch(payload: RepositorySessionSource & { branch: SourceBranch }): void {
   const { branch, ...source } = payload;
-  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
-  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const { teamId } = repositorySessionContext(source);
   void createRepositorySession(source, branch, teamId);
 }
 
@@ -1914,23 +1898,19 @@ function openRepositorySessionWorktree(source: RepositorySessionSource): void {
 
 async function createRepositorySessionWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
   const source = repositorySessionWorktreeSource.value;
-  const sourceAgent = source?.agentId ? props.snapshot.agents.find((agent) => agent.id === source.agentId) : null;
-  const teamId = source?.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
-  const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
+  const { remoteConnectionId } = repositorySessionContext(source);
   return await props.createSourceWorktree({
     ...input,
-    ...(team?.remoteConnectionId?.trim() ? { remoteConnectionId: team.remoteConnectionId.trim() } : {}),
+    ...(remoteConnectionId ? { remoteConnectionId } : {}),
   });
 }
 
 async function suggestRepositorySessionWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
   const source = repositorySessionWorktreeSource.value;
-  const sourceAgent = source?.agentId ? props.snapshot.agents.find((agent) => agent.id === source.agentId) : null;
-  const teamId = source?.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
-  const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
+  const { remoteConnectionId } = repositorySessionContext(source);
   return await props.suggestSourceWorktreePath({
     ...input,
-    ...(team?.remoteConnectionId?.trim() ? { remoteConnectionId: team.remoteConnectionId.trim() } : {}),
+    ...(remoteConnectionId ? { remoteConnectionId } : {}),
   });
 }
 
@@ -1938,8 +1918,7 @@ async function createRepositorySessionFromWorktree(worktree: SourceWorktree): Pr
   const source = repositorySessionWorktreeSource.value;
   repositorySessionWorktreeSource.value = null;
   if (!source) return;
-  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
-  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const { teamId } = repositorySessionContext(source);
   try {
     await props.createAgent({
       name: null,
@@ -1956,16 +1935,14 @@ async function createRepositorySessionFromWorktree(worktree: SourceWorktree): Pr
 function openNewAgentForSourceBranch(branch: SourceBranch): void {
   const source = repositorySessionSource.value;
   if (!source) return;
-  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
-  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const { teamId } = repositorySessionContext(source);
   void createRepositorySession(source, branch, teamId);
 }
 
 function openNewAgentForSourceWorkItem(item: WorkItem): void {
   const source = repositorySessionSource.value;
   if (!source) return;
-  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === source.agentId);
-  const teamId = source.teamId ?? sourceAgent?.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const { teamId } = repositorySessionContext(source);
   closeRepositorySessionSource();
   if (!teamId) {
     ElMessage.error('Create or select a team before starting repository work.');
@@ -1981,8 +1958,7 @@ function openNewAgentForSourceWorkItem(item: WorkItem): void {
 async function createRepositorySession(source: RepositorySessionSource, branch: SourceBranch, teamId?: string): Promise<void> {
   closeRepositorySessionSource();
   try {
-    const team = teamId ? props.snapshot.teams.find((candidate) => candidate.id === teamId) : null;
-    const remoteConnectionId = team?.remoteConnectionId?.trim();
+    const { remoteConnectionId } = repositorySessionContext({ ...source, teamId });
     const worktree = branch.worktreePath
       ? { name: branch.name, path: branch.worktreePath }
       : await props.createSourceWorktree({
@@ -2002,6 +1978,10 @@ async function createRepositorySession(source: RepositorySessionSource, branch: 
   }
 }
 
+function repositorySessionContext(source?: Pick<RepositorySessionSource, 'agentId' | 'teamId'> | null) {
+  return resolveRepositorySessionContext(props.snapshot, source, activeTeam.value?.id);
+}
+
 async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promise<void> {
   if (action === 'local') {
     await openLocalRepositorySession();
@@ -2019,7 +1999,7 @@ async function openLocalRepositorySession(): Promise<void> {
   const folder = await props.chooseAgentFolder();
   if (!folder) return;
   const repositoryName = folder.split(/[\\/]/u).filter(Boolean).at(-1) ?? 'workspace';
-  const teamId = activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined;
+  const { teamId } = repositorySessionContext(null);
   try {
     const branches = await props.listSourceBranches(folder);
     if (branches.length > 0) {
