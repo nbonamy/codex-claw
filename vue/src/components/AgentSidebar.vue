@@ -77,7 +77,8 @@
                   <PlusIcon aria-hidden="true" />
                 </button>
               </template>
-              <p v-if="repositoryDefaultBranchLoading[group.id]" class="agent-sidebar__repository-session-menu-state">Loading default branch…</p>
+              <p v-if="repositorySessionMenu.loading.value[group.id]" class="agent-sidebar__repository-session-menu-state">Loading default branch…</p>
+              <p v-else-if="repositorySessionMenu.errors.value[group.id]" class="agent-sidebar__repository-session-menu-state agent-sidebar__repository-session-menu-state--error">{{ repositorySessionMenu.errors.value[group.id] }}</p>
               <AppMenu
                 v-else
                 class="app-menu--embedded"
@@ -187,6 +188,7 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { agentStatusLabel } from '../shared/agent-display';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
+import { useRepositorySessionMenu } from './use-repository-session-menu';
 
 const props = defineProps<{
   agents: Agent[];
@@ -243,9 +245,8 @@ const workspaceGroups = computed(() => projectWorkspaceSidebar({
   unreadAgentIds: props.unreadAgentIds,
 }));
 const contextMenuAgentId = ref<string | null>(null);
-const repositorySessionMenuId = ref<string | null>(null);
-const repositoryDefaultBranches = ref<Record<string, SourceBranch | null>>({});
-const repositoryDefaultBranchLoading = ref<Record<string, boolean>>({});
+const repositorySessionMenu = useRepositorySessionMenu(() => props.listRepositoryBranches);
+const repositorySessionMenuId = repositorySessionMenu.visibleGroupId;
 const collapsedRepositoryKeys = computed(() => new Set(props.collapsedRepositoryKeys ?? []));
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
@@ -337,31 +338,13 @@ async function setRepositorySessionMenuVisible(
   group: WorkspaceSidebarGroup,
   visible: boolean,
 ): Promise<void> {
-  if (group.kind !== 'repository' || !group.repositoryRoot) return;
-  repositorySessionMenuId.value = visible ? group.id : null;
-  if (!visible || repositoryDefaultBranches.value[group.id] !== undefined || repositoryDefaultBranchLoading.value[group.id]) {
-    return;
-  }
-
-  repositoryDefaultBranchLoading.value = { ...repositoryDefaultBranchLoading.value, [group.id]: true };
-  try {
-    const branches = await props.listRepositoryBranches?.({
-      agentId: group.sessions[0]!.agentId,
-      repositoryRoot: group.repositoryRoot!,
-    }) ?? [];
-    repositoryDefaultBranches.value = {
-      ...repositoryDefaultBranches.value,
-      [group.id]: branches.find((branch) => branch.isDefault) ?? null,
-    };
-  } finally {
-    repositoryDefaultBranchLoading.value = { ...repositoryDefaultBranchLoading.value, [group.id]: false };
-  }
+  await repositorySessionMenu.setVisible(group, visible);
 }
 
 function repositorySessionMenuItems(
   group: WorkspaceSidebarGroup,
 ): AppMenuItem[] {
-  const defaultBranch = repositoryDefaultBranches.value[group.id];
+  const defaultBranch = repositorySessionMenu.defaultBranches.value[group.id];
   return [
     {
       id: 'default-branch',
@@ -385,7 +368,7 @@ function selectRepositorySessionMenuItem(
     repositoryRoot: group.repositoryRoot!,
   };
   if (itemId === 'default-branch') {
-    const branch = repositoryDefaultBranches.value[group.id];
+    const branch = repositorySessionMenu.defaultBranches.value[group.id];
     if (branch) {
       emit('create-agent-on-branch', { ...payload, branch });
     }
@@ -687,6 +670,17 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__workspace-actions button:hover {
   color: var(--color-text);
   background: var(--color-surface-base);
+}
+
+.agent-sidebar__repository-session-menu-state {
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.agent-sidebar__repository-session-menu-state--error {
+  color: var(--color-error);
 }
 
 .agent-sidebar__workspace-icon {

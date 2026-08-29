@@ -220,6 +220,26 @@ describe('AgentSidebar', () => {
     }]]);
   });
 
+  it('shows repository branch loading failures in the session menu', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [agents[0]!],
+        activeAgentId: 'agent-dina',
+        listRepositoryBranches: vi.fn().mockRejectedValue(new Error('offline')),
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
+      popover.props('popperClass') === 'claw-popover agent-sidebar__repository-session-menu-popover'
+    ));
+    await sessionMenu?.vm.$emit('update:visible', true);
+    await flushPromises();
+
+    expect(document.body.textContent).toContain('Could not load branches: offline');
+  });
+
   it('renders compact workspace rows with repository headers, branches, and status icons', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
