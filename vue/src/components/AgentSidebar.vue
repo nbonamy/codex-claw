@@ -37,16 +37,16 @@
           <RepositoryIconPicker
             v-else
             :label="group.label"
-            :expanded="!isWorkspaceCollapsed(group.id)"
+            :expanded="!isWorkspaceCollapsed(group)"
             :model-value="repositoryIcon(group.repositoryKey, group.repositoryRoot)"
             @update:model-value="updateRepositoryIcon(group.repositoryKey, group.repositoryRoot, $event)"
           />
           <button
             class="agent-sidebar__workspace-label"
             type="button"
-            :aria-label="`${isWorkspaceCollapsed(group.id) ? 'Expand' : 'Collapse'} ${group.label} sessions`"
-            :aria-expanded="!isWorkspaceCollapsed(group.id)"
-            @click="toggleWorkspace(group.id)"
+            :aria-label="`${isWorkspaceCollapsed(group) ? 'Expand' : 'Collapse'} ${group.label} sessions`"
+            :aria-expanded="!isWorkspaceCollapsed(group)"
+            @click="toggleWorkspace(group)"
           >
             <strong>{{ group.label }}</strong>
           </button>
@@ -91,7 +91,7 @@
 
         <button
           v-for="session in group.sessions"
-          v-show="!isWorkspaceCollapsed(group.id)"
+          v-show="!isWorkspaceCollapsed(group)"
           :key="session.agentId"
           class="agent-sidebar__agent"
           :class="[
@@ -194,6 +194,7 @@ const props = defineProps<{
   unreadAgentIds?: string[];
   forkableAgentIds?: string[];
   compact?: boolean;
+  collapsedRepositoryKeys?: string[];
   teams?: Team[];
   teamId?: string | null;
   teamName: string;
@@ -209,6 +210,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
+  'update-collapsed-repositories': [repositoryKeys: string[]];
   'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
   'create-agent-on-branch': [payload: { agentId: string; repositoryName: string; repositoryRoot: string; branch: SourceBranch }];
   'create-agent-worktree-in-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
@@ -244,7 +246,7 @@ const contextMenuAgentId = ref<string | null>(null);
 const repositorySessionMenuId = ref<string | null>(null);
 const repositoryDefaultBranches = ref<Record<string, SourceBranch | null>>({});
 const repositoryDefaultBranchLoading = ref<Record<string, boolean>>({});
-const collapsedWorkspaceIds = ref(new Set<string>());
+const collapsedRepositoryKeys = computed(() => new Set(props.collapsedRepositoryKeys ?? []));
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuAgent = computed(() => (
   contextMenuAgentId.value ? props.agents.find((agent) => agent.id === contextMenuAgentId.value) ?? null : null
@@ -305,15 +307,20 @@ function selectAgent(agentId: string): void {
   emit('select-agent', agentId);
 }
 
-function isWorkspaceCollapsed(groupId: string): boolean {
-  return collapsedWorkspaceIds.value.has(groupId);
+function workspaceCollapseKey(group: WorkspaceSidebarGroup): string {
+  return group.repositoryKey ?? group.id;
 }
 
-function toggleWorkspace(groupId: string): void {
-  const next = new Set(collapsedWorkspaceIds.value);
-  if (next.has(groupId)) next.delete(groupId);
-  else next.add(groupId);
-  collapsedWorkspaceIds.value = next;
+function isWorkspaceCollapsed(group: WorkspaceSidebarGroup): boolean {
+  return collapsedRepositoryKeys.value.has(workspaceCollapseKey(group));
+}
+
+function toggleWorkspace(group: WorkspaceSidebarGroup): void {
+  const key = workspaceCollapseKey(group);
+  const next = new Set(collapsedRepositoryKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  emit('update-collapsed-repositories', [...next]);
 }
 
 function repositoryIcon(repositoryKey: string | undefined, repositoryRoot: string | undefined): string | undefined {

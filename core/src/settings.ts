@@ -18,6 +18,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   codexBinaryPath: '',
   claudeCodeEnabled: false,
   agentListCompact: false,
+  collapsedRepositoryKeys: [],
   shareCodexSkillsAndPlugins: true,
   repositoryIcons: {},
   appshots: { ...defaultAppshotSettings },
@@ -96,6 +97,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     claudeCodeEnabled: value.claudeCodeEnabled === true,
     agentListCompact: value.agentListCompact === true,
+    collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
     shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
     repositoryIcons: normalizeRepositoryIcons(value.repositoryIcons),
     appshots: normalizeAppshotSettings(value.appshots),
@@ -115,6 +117,15 @@ function normalizeRepositoryIcons(value: unknown): Record<string, string> {
     if (Object.keys(icons).length >= 200) break;
   }
   return icons;
+}
+
+function normalizeStringList(value: unknown, maximum: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .filter((candidate): candidate is string => typeof candidate === 'string')
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate.length > 0 && candidate.length <= 4_096))]
+    .slice(0, maximum);
 }
 
 export function normalizeAppshotSettings(value: unknown): AppshotSettings {

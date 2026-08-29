@@ -14,6 +14,7 @@ describe('settings contracts', () => {
     })).toStrictEqual({
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
+      collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
@@ -83,6 +84,7 @@ describe('settings contracts', () => {
     expect(snapshot.general).toStrictEqual({
       codexBinaryPath: '',
       claudeCodeEnabled: false,
+      collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
@@ -118,6 +120,12 @@ describe('settings contracts', () => {
     }).repositoryIcons).toStrictEqual({
       'remote:github.com/openai/codex-claw': '🦞',
     });
+  });
+
+  it('normalizes persisted collapsed repository keys', () => {
+    expect(normalizeGeneralSettings({
+      collapsedRepositoryKeys: [' remote:github.com/openai/codex ', '', 'remote:github.com/openai/codex'],
+    }).collapsedRepositoryKeys).toStrictEqual(['remote:github.com/openai/codex']);
   });
 
   it('updates source folder settings without replacing unrelated state', () => {

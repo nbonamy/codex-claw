@@ -661,6 +661,7 @@ export type AppGeneralSettings = {
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
+  collapsedRepositoryKeys: string[];
   shareCodexSkillsAndPlugins: boolean;
   repositoryIcons: Record<string, string>;
   appshots: AppshotSettings;

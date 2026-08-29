@@ -3713,6 +3713,22 @@ describe('AppShell', () => {
     });
   });
 
+  it('persists repository group collapse state selected from the session sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.collapsedRepositoryKeys = ['remote:github.com/nbonamy/existing'];
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, updateSettings });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('update-collapsed-repositories', [
+      'remote:github.com/nbonamy/codex-claw',
+    ]);
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'] },
+    });
+  });
+
   it('opens deterministic Markdown and approval fixtures from Debug commands', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

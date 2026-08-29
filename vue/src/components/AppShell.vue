@@ -47,6 +47,7 @@
         :team-id="activeTeam?.id ?? null"
         :team-name="activeTeamName"
         :compact="agentListCompact"
+        :collapsed-repository-keys="snapshot.general.collapsedRepositoryKeys"
         :width="agentSidebarWidth"
         :min-width="agentSidebarMinWidth"
         :max-width="agentSidebarMaxWidth"
@@ -72,6 +73,7 @@
         @select-agent="selectAgentFromShell"
         @start-work="handleStartWorkAction"
         @update-repository-icon="updateRepositoryIcon"
+        @update-collapsed-repositories="updateCollapsedRepositories"
       />
     </Transition>
     <section class="app-shell__content">
@@ -3282,6 +3284,10 @@ async function updateRepositoryIcon(payload: {
     delete repositoryIcons[payload.repositoryRoot];
   }
   await updateSettings({ general: { repositoryIcons } });
+}
+
+async function updateCollapsedRepositories(collapsedRepositoryKeys: string[]): Promise<void> {
+  await updateSettings({ general: { collapsedRepositoryKeys } });
 }
 
 async function setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<void> {

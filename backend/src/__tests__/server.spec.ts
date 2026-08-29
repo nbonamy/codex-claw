@@ -6898,7 +6898,8 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenRemoteAccessEnabled: true,
       codexBinaryPath: '',
       claudeCodeEnabled: false,
-      agentListCompact: false,
+    agentListCompact: false,
+    collapsedRepositoryKeys: [],
       shareCodexSkillsAndPlugins: true,
       repositoryIcons: {},
       appshots: {

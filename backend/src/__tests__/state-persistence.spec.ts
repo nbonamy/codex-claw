@@ -940,6 +940,7 @@ describe('AppStatePersistence', () => {
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       agentListCompact: true,
+      collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
       shareCodexSkillsAndPlugins: false,
       repositoryIcons: { '/src/codex-claw': '🦞' },
       appshots: {

@@ -165,12 +165,18 @@ describe('AgentSidebar', () => {
     expect(firstSession.attributes('style') ?? '').not.toContain('display: none');
 
     await repositoryTitle.trigger('click');
+    expect(wrapper.emitted('update-collapsed-repositories')?.[0]).toStrictEqual([
+      ['remote:github.com/nbonamy/id8'],
+    ]);
+    await wrapper.setProps({ collapsedRepositoryKeys: ['remote:github.com/nbonamy/id8'] });
+    repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
+    firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
     expect(firstSession.attributes('style') ?? '').toContain('display: none');
     expect(repositoryTitle.attributes('aria-expanded')).toBe('false');
 
-    repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
     await repositoryTitle.trigger('click');
-    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('update-collapsed-repositories')?.[1]).toStrictEqual([[]]);
+    await wrapper.setProps({ collapsedRepositoryKeys: [] });
     repositoryTitle = wrapper.findAll('.agent-sidebar__workspace-label')[0]!;
     firstSession = wrapper.findAll('.agent-sidebar__agent')[0]!;
     expect(repositoryTitle.attributes('aria-expanded')).toBe('true');
@@ -320,6 +326,26 @@ describe('AgentSidebar', () => {
 
     expect(wrapper.get('.agent-sidebar__quick-switch-shortcut').attributes('aria-label'))
       .toBe('Switch to main with Command 1');
+  });
+
+  it('renders persisted repository collapse state and emits controlled updates', async () => {
+    const repositoryKey = 'remote:github.com/nbonamy/id8';
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [agents[0]!],
+        activeAgentId: 'agent-dina',
+        collapsedRepositoryKeys: [repositoryKey],
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const toggle = wrapper.get('[aria-label="Expand id8 sessions"]');
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.get('.agent-sidebar__agent').isVisible()).toBe(false);
+    await toggle.trigger('click');
+
+    expect(wrapper.emitted('update-collapsed-repositories')).toStrictEqual([[[]]]);
   });
 
   it('emits agent selection from agent rows', async () => {
