@@ -558,10 +558,12 @@ not expose an avatar field, and headers, Cockpit cards, and assignment surfaces
 show the repository icon or omit the identity image when the repository has no
 custom icon. Session rows show the persisted current-conversation title when
 available, then the optional agent name, and otherwise the branch name; never
-synthesize a mixed branch-and-agent label. Duplicate labels are disambiguated
-by the shared projection, and composer mentions add repository/branch context
-while retaining the stable agent ID. Repository collapse keys are persisted in
-general settings. The sidebar has no permanent conversation-history footer;
+synthesize a mixed branch-and-agent label. Duplicate named labels are
+disambiguated by the shared projection; unnamed sessions keep the literal
+branch fallback because their repository header already supplies context.
+Composer mentions add repository/branch context while retaining the stable
+agent ID. Repository collapse keys are persisted in general settings. The
+sidebar has no permanent conversation-history footer;
 **Resume session** in the agent menu opens the compact searchable history dialog.
 
 ## Rendering Surfaces
