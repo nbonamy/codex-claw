@@ -61,7 +61,7 @@
           >
             <GitHubIcon aria-hidden="true" />
             <span>
-              <strong>{{ repository.fullName }}</strong>
+              <span class="repository-acquire-dialog__name">{{ repository.fullName }}</span>
               <small>{{ localRepositoryNames.has(repository.name) ? 'On this machine' : repository.isPrivate ? 'Private repository' : 'GitHub repository' }}</small>
             </span>
             <em>{{ localRepositoryNames.has(repository.name) ? 'Open' : 'Clone' }}</em>
@@ -183,7 +183,7 @@ function submitUrl(): void {
   display: grid;
   grid-template-columns: var(--icon-lg) minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-6);
   padding: var(--space-4) var(--space-6);
   border: 0;
   border-radius: var(--radius-md);
@@ -211,11 +211,15 @@ function submitUrl(): void {
   gap: 2px;
 }
 
-.repository-acquire-dialog__row strong,
+.repository-acquire-dialog__name,
 .repository-acquire-dialog__row small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.repository-acquire-dialog__name {
+  font-weight: var(--font-weight-medium);
 }
 
 .repository-acquire-dialog__row small,
