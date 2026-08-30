@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.12.0",
+  "currentVersion": "0.13.0",
   "releases": [
+    {
+      "version": "0.13.0",
+      "releasedAt": "2026-08-30",
+      "sourceSha256": "3bbb12bcb9493bafb5a8a869b597bef9e66906689b3418b498a0abef8431b101",
+      "markdown": "### New features\n\n- Computer Use now provides an on-demand operating guide and semantic\n  Accessibility targeting for dialogs and native menus, including safe menu\n  dismissal without moving the physical pointer.\n\n### Improvements and fixes\n\n- Computer Use now bundles helper 0.3.0 with absolute screenshot coordinate\n  metadata, a guarded physical-click fallback for Electron controls, and\n  automatic virtual-cursor cleanup after inactivity.\n- Form dialogs now share one compact, labels-above-fields layout, while the\n  legacy File → New Agent action and Command-T shortcut have been removed in\n  favor of contextual repository and session entry points.\n- Team rail avatars and the new-team control now use a consistent square shape,\n  with a cleaner focus ring and a clearer unread indicator.\n- Agents created through MCP now use repository identity instead of accepting a\n  separate agent avatar; custom names remain optional."
+    },
     {
       "version": "0.12.0",
       "releasedAt": "2026-08-30",

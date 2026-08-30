@@ -4,6 +4,27 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.13.0] - 2026-08-30
+
+### New features
+
+- Computer Use now provides an on-demand operating guide and semantic
+  Accessibility targeting for dialogs and native menus, including safe menu
+  dismissal without moving the physical pointer.
+
+### Improvements and fixes
+
+- Computer Use now bundles helper 0.3.0 with absolute screenshot coordinate
+  metadata, a guarded physical-click fallback for Electron controls, and
+  automatic virtual-cursor cleanup after inactivity.
+- Form dialogs now share one compact, labels-above-fields layout, while the
+  legacy File → New Agent action and Command-T shortcut have been removed in
+  favor of contextual repository and session entry points.
+- Team rail avatars and the new-team control now use a consistent square shape,
+  with a cleaner focus ring and a clearer unread indicator.
+- Agents created through MCP now use repository identity instead of accepting a
+  separate agent avatar; custom names remain optional.
+
 ## [0.12.0] - 2026-08-30
 
 ### New features
