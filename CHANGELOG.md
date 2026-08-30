@@ -4,6 +4,40 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.12.0] - 2026-08-30
+
+### New features
+
+- Sessions is now organized around repositories, branches, worktrees, and chats,
+  with collapsible repository groups, persistent custom repository icons, and
+  compact controls for starting work where it belongs.
+- Projects can now be added from a local folder, a GitHub repository, or a
+  repository URL, then opened from a branch, pull request, or issue without
+  leaving Claw.
+- Repository work can now continue in an existing session on a branch or start
+  in a new isolated session and worktree, with branch-aware worktree creation
+  and assignment directly from the Sessions workflow.
+- Workspace-free Quick Chats now provide persistent conversations for work that
+  does not belong to a repository.
+- Team agents can now be mentioned in prompts with stable `@` suggestions, and
+  agents can trigger optional, user-controlled celebration effects for the
+  moments that deserve them.
+
+### Improvements and fixes
+
+- Long conversations now synchronize with bounded snapshot and transcript
+  payloads, keep retry progress out of durable history, and use Codex 0.151.0's
+  stable image-aware compaction support to reclaim substantially more context.
+- Fast mode now remains enabled for a conversation after Claw restarts.
+- Agent editing is now limited to an optional display name, while unnamed
+  sessions consistently use their branch or conversation title.
+- ChatGPT integrations now offer to quit an already-running normal instance
+  before relaunching it with Claw's isolated Codex home.
+- Cockpit now shows unread indicators for teams containing unread sessions,
+  native Edit menu actions are restored, subagent conversations recover from
+  oversized-history failures, and recalled prompts no longer depend on browser
+  text selection.
+
 ## [0.11.1] - 2026-08-14
 
 ### Improvements and fixes

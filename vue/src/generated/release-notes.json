@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.11.1",
+  "currentVersion": "0.12.0",
   "releases": [
+    {
+      "version": "0.12.0",
+      "releasedAt": "2026-08-30",
+      "sourceSha256": "b66c76ea9f50da085428acefe2d3ad449abed415a5ea661aba34a76fef3dcd53",
+      "markdown": "### New features\n\n- Sessions is now organized around repositories, branches, worktrees, and chats,\n  with collapsible repository groups, persistent custom repository icons, and\n  compact controls for starting work where it belongs.\n- Projects can now be added from a local folder, a GitHub repository, or a\n  repository URL, then opened from a branch, pull request, or issue without\n  leaving Claw.\n- Repository work can now continue in an existing session on a branch or start\n  in a new isolated session and worktree, with branch-aware worktree creation\n  and assignment directly from the Sessions workflow.\n- Workspace-free Quick Chats now provide persistent conversations for work that\n  does not belong to a repository.\n- Team agents can now be mentioned in prompts with stable `@` suggestions, and\n  agents can trigger optional, user-controlled celebration effects for the\n  moments that deserve them.\n\n### Improvements and fixes\n\n- Long conversations now synchronize with bounded snapshot and transcript\n  payloads, keep retry progress out of durable history, and use Codex 0.151.0's\n  stable image-aware compaction support to reclaim substantially more context.\n- Fast mode now remains enabled for a conversation after Claw restarts.\n- Agent editing is now limited to an optional display name, while unnamed\n  sessions consistently use their branch or conversation title.\n- ChatGPT integrations now offer to quit an already-running normal instance\n  before relaunching it with Claw's isolated Codex home.\n- Cockpit now shows unread indicators for teams containing unread sessions,\n  native Edit menu actions are restored, subagent conversations recover from\n  oversized-history failures, and recalled prompts no longer depend on browser\n  text selection."
+    },
     {
       "version": "0.11.1",
       "releasedAt": "2026-08-14",
