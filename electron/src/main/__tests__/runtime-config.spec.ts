@@ -258,8 +258,11 @@ describe('runtime config', () => {
     expect(prepareScript).toContain('CODEX_RELEASE: config.version');
     expect(prepareScript).toContain('HOME: installerUserHome');
     expect(prepareScript).toContain("SHELL: '/bin/sh'");
-    expect(prepareScript).toContain("execFileSync('lipo', ['-archs', filePath]");
+    expect(prepareScript).toContain("for (const executablePath of [filePath, codeModeHostPath])");
+    expect(prepareScript).toContain("execFileSync('lipo', ['-archs', executablePath]");
     expect(prepareScript).toContain("execFileSync('codesign', ['--verify', '--strict', '--verbose=2'");
+    expect(prepareScript).toContain("path.join(installBinDir, 'codex-code-mode-host')");
+    expect(prepareScript).toContain("path.join(outputDir, 'codex-code-mode-host')");
     expect(forgeConfig).toContain("'resources/codex'");
     expect(forgeConfig).toContain('ignore: shouldPreserveUpstreamCodexSignature');
   });

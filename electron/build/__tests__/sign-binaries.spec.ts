@@ -5,12 +5,18 @@ import {
 } from '../sign-binaries';
 
 describe('shouldPreserveUpstreamCodexSignature', () => {
-  it('excludes only the bundled Codex executable from Electron re-signing', () => {
+  it('excludes only the bundled upstream Codex executables from Electron re-signing', () => {
     expect(shouldPreserveUpstreamCodexSignature(
       '/build/Codex Claw.app/Contents/Resources/codex/codex',
     )).toBe(true);
     expect(shouldPreserveUpstreamCodexSignature(
       'Contents/Resources/codex/codex',
+    )).toBe(true);
+    expect(shouldPreserveUpstreamCodexSignature(
+      '/build/Codex Claw.app/Contents/Resources/codex/codex-code-mode-host',
+    )).toBe(true);
+    expect(shouldPreserveUpstreamCodexSignature(
+      'Contents/Resources/codex/codex-code-mode-host',
     )).toBe(true);
     expect(shouldPreserveUpstreamCodexSignature(
       '/build/Codex Claw.app/Contents/Resources/codex/codex-helper',

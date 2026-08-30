@@ -9,12 +9,15 @@ type SignDarwinBinariesDeps = {
   logger?: Pick<typeof console, 'log' | 'warn'>;
 };
 
-const bundledCodexPathSuffix = path.join('Contents', 'Resources', 'codex', 'codex');
+const bundledCodexPathSuffixes = [
+  path.join('Contents', 'Resources', 'codex', 'codex'),
+  path.join('Contents', 'Resources', 'codex', 'codex-code-mode-host'),
+];
 
 export function shouldPreserveUpstreamCodexSignature(filePath: string): boolean {
   const normalizedPath = path.normalize(filePath);
-  return normalizedPath === bundledCodexPathSuffix
-    || normalizedPath.endsWith(`${path.sep}${bundledCodexPathSuffix}`);
+  return bundledCodexPathSuffixes.some((suffix) => normalizedPath === suffix
+    || normalizedPath.endsWith(`${path.sep}${suffix}`));
 }
 
 export function signDarwinBinaries(

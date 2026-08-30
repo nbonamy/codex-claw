@@ -8,6 +8,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const configPath = path.join(rootDir, 'codex-app-server-release.json');
 const outputDir = path.join(rootDir, 'electron', 'resources', 'codex');
 const outputPath = path.join(outputDir, 'codex');
+const codeModeHostOutputPath = path.join(outputDir, 'codex-code-mode-host');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 const installerUrl = 'https://releases.openai.com/codex/install.sh';
 
@@ -20,7 +21,7 @@ if (process.platform !== config.platform || process.arch !== config.arch) {
   );
 }
 
-if (hasExpectedRelease(outputPath)) {
+if (hasExpectedRelease(outputPath, codeModeHostOutputPath)) {
   console.log(
     `[prepare-codex-app-server] Codex ${config.version} is already hosted at ${path.relative(rootDir, outputPath)}`,
   );
@@ -39,6 +40,10 @@ async function installRelease() {
   const installHomeDir = path.join(tempDir, 'home');
   const installerUserHome = path.join(tempDir, 'user-home');
   const temporaryOutputPath = path.join(outputDir, `.codex-${process.pid}.tmp`);
+  const temporaryCodeModeHostOutputPath = path.join(
+    outputDir,
+    `.codex-code-mode-host-${process.pid}.tmp`,
+  );
 
   try {
     run('curl', [
@@ -64,19 +69,26 @@ async function installRelease() {
     });
 
     const installedPath = fs.realpathSync(path.join(installBinDir, 'codex'));
-    if (!hasExpectedRelease(installedPath)) {
+    const installedCodeModeHostPath = fs.realpathSync(
+      path.join(installBinDir, 'codex-code-mode-host'),
+    );
+    if (!hasExpectedRelease(installedPath, installedCodeModeHostPath)) {
       throw new Error(`OpenAI's installer did not provide Codex ${config.version}.`);
     }
 
     fs.mkdirSync(outputDir, { recursive: true });
     fs.copyFileSync(installedPath, temporaryOutputPath);
+    fs.copyFileSync(installedCodeModeHostPath, temporaryCodeModeHostOutputPath);
     fs.chmodSync(temporaryOutputPath, 0o755);
-    if (!hasExpectedRelease(temporaryOutputPath)) {
+    fs.chmodSync(temporaryCodeModeHostOutputPath, 0o755);
+    if (!hasExpectedRelease(temporaryOutputPath, temporaryCodeModeHostOutputPath)) {
       throw new Error(`Copied Codex ${config.version} failed validation.`);
     }
+    fs.renameSync(temporaryCodeModeHostOutputPath, codeModeHostOutputPath);
     fs.renameSync(temporaryOutputPath, outputPath);
   } finally {
     fs.rmSync(temporaryOutputPath, { force: true });
+    fs.rmSync(temporaryCodeModeHostOutputPath, { force: true });
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
@@ -99,22 +111,24 @@ function verifyDarwinSignature(filePath) {
   });
 }
 
-function hasExpectedRelease(filePath) {
+function hasExpectedRelease(filePath, codeModeHostPath) {
   try {
-    if (!fs.statSync(filePath).isFile()) {
+    if (!fs.statSync(filePath).isFile() || !fs.statSync(codeModeHostPath).isFile()) {
       return false;
     }
     const version = execFileSync(filePath, ['--version'], { encoding: 'utf8' }).trim();
     if (version !== `codex-cli ${config.version}`) {
       return false;
     }
-    const architectures = execFileSync('lipo', ['-archs', filePath], { encoding: 'utf8' })
-      .trim()
-      .split(/\s+/);
-    if (!architectures.includes(config.arch)) {
-      return false;
+    for (const executablePath of [filePath, codeModeHostPath]) {
+      const architectures = execFileSync('lipo', ['-archs', executablePath], { encoding: 'utf8' })
+        .trim()
+        .split(/\s+/);
+      if (!architectures.includes(config.arch)) {
+        return false;
+      }
+      verifyDarwinSignature(executablePath);
     }
-    verifyDarwinSignature(filePath);
     return true;
   } catch {
     return false;
