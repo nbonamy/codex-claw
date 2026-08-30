@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -24,11 +24,11 @@ const api: CodexClawApi = {
   openWorkProviderAuthorization: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.openWorkProviderAuthorization, provider),
   completeWorkProviderConnection: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.completeWorkProviderConnection, provider),
   disconnectWorkProvider: (provider: WorkProviderKind) => ipc.invoke(ipcChannels.disconnectWorkProvider, provider),
-  listWorkRepositories: (provider: WorkProviderKind, location?: LoopLocation) => ipc.invoke(ipcChannels.listWorkRepositories, provider, location),
-  configureWorkBacklog: (input: WorkBacklogConfigurationInput, location?: LoopLocation) => ipc.invoke(ipcChannels.configureWorkBacklog, input, location),
-  listGlobalWorkItems: (provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery) => ipc.invoke(ipcChannels.listGlobalWorkItems, provider, location, query),
-  listAssignedWorkItems: (provider: WorkProviderKind, location?: LoopLocation) => ipc.invoke(ipcChannels.listAssignedWorkItems, provider, location),
-  listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => ipc.invoke(ipcChannels.listWorkItems, provider, repositoryId, location, query),
+  listWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => ipc.invoke(ipcChannels.listWorkRepositories, provider, location),
+  configureWorkBacklog: (input: WorkBacklogConfigurationInput, location?: AutomationLocation) => ipc.invoke(ipcChannels.configureWorkBacklog, input, location),
+  listGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery) => ipc.invoke(ipcChannels.listGlobalWorkItems, provider, location, query),
+  listAssignedWorkItems: (provider: WorkProviderKind, location?: AutomationLocation) => ipc.invoke(ipcChannels.listAssignedWorkItems, provider, location),
+  listWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery) => ipc.invoke(ipcChannels.listWorkItems, provider, repositoryId, location, query),
   createWorkItem: (input: CreateWorkItemInput) => ipc.invoke(ipcChannels.createWorkItem, input),
   listBackendModels: (agentId: string) => ipc.invoke(ipcChannels.listBackendModels, agentId),
   listBackendPlugins: (agentId: string) => ipc.invoke(ipcChannels.listBackendPlugins, agentId),
@@ -64,16 +64,16 @@ const api: CodexClawApi = {
   disconnectTeam: (teamId: string) => ipc.invoke(ipcChannels.disconnectTeam, teamId),
   selectTeam: (teamId: string) => ipc.invoke(ipcChannels.selectTeam, teamId),
   getBenchSnapshot: (location?: BenchLocation) => ipc.invoke(ipcChannels.getBenchSnapshot, location),
-  getLoopSnapshot: (location?: LoopLocation) => ipc.invoke(ipcChannels.getLoopSnapshot, location),
-  createLoop: (input: CreateLoopInput, location?: LoopLocation) => ipc.invoke(ipcChannels.createLoop, input, location),
-  updateLoop: (input: UpdateLoopInput, location?: LoopLocation) => ipc.invoke(ipcChannels.updateLoop, input, location),
-  runLoop: (loopId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.runLoop, loopId, location),
-  clearLoopHistory: (loopId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.clearLoopHistory, loopId, location),
-  deleteLoopExecution: (loopId: string, executionId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.deleteLoopExecution, loopId, executionId, location),
-  deleteLoop: (loopId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.deleteLoop, loopId, location),
+  getAutomationSnapshot: (location?: AutomationLocation) => ipc.invoke(ipcChannels.getAutomationSnapshot, location),
+  createAutomation: (input: CreateAutomationInput, location?: AutomationLocation) => ipc.invoke(ipcChannels.createAutomation, input, location),
+  updateAutomation: (input: UpdateAutomationInput, location?: AutomationLocation) => ipc.invoke(ipcChannels.updateAutomation, input, location),
+  runAutomation: (automationId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.runAutomation, automationId, location),
+  clearAutomationHistory: (automationId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.clearAutomationHistory, automationId, location),
+  deleteAutomationExecution: (automationId: string, executionId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.deleteAutomationExecution, automationId, executionId, location),
+  deleteAutomation: (automationId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.deleteAutomation, automationId, location),
   listAgentConversations: (agentId: string) => ipc.invoke(ipcChannels.listAgentConversations, agentId),
   resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => ipc.invoke(ipcChannels.resumeAgentConversation, agentId, ref),
-  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => ipc.invoke(ipcChannels.readConversationMessages, ref, agentId, location),
+  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.readConversationMessages, ref, agentId, location),
   createAgent: (input: CreateAgentInput) => ipc.invoke(ipcChannels.createAgent, input),
   createQuickChat: (input: CreateQuickChatInput) => ipc.invoke(ipcChannels.createQuickChat, input),
   updateAgent: (input: UpdateAgentInput) => ipc.invoke(ipcChannels.updateAgent, input),

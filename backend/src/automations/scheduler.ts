@@ -1,23 +1,23 @@
-export type LoopSchedulerOptions = {
+export type AutomationSchedulerOptions = {
   intervalMs?: number;
-  runLoops: () => Promise<void>;
+  runAutomations: () => Promise<void>;
   onError?: (error: unknown) => void;
 };
 
-const DEFAULT_LOOP_INTERVAL_MS = 1 * 60 * 1000;
+const DEFAULT_AUTOMATION_INTERVAL_MS = 1 * 60 * 1000;
 
-export class LoopScheduler {
+export class AutomationScheduler {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
-  constructor(private readonly options: LoopSchedulerOptions) {}
+  constructor(private readonly options: AutomationSchedulerOptions) {}
 
   start(): void {
     this.stop();
     void this.check();
     this.timer = setInterval(() => {
       void this.check();
-    }, this.options.intervalMs ?? DEFAULT_LOOP_INTERVAL_MS);
+    }, this.options.intervalMs ?? DEFAULT_AUTOMATION_INTERVAL_MS);
   }
 
   stop(): void {
@@ -34,7 +34,7 @@ export class LoopScheduler {
 
     this.running = true;
     try {
-      await this.options.runLoops();
+      await this.options.runAutomations();
     } catch (error) {
       this.options.onError?.(error);
     } finally {

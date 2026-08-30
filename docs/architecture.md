@@ -163,7 +163,7 @@ process. `docs/backend-architecture.md` is the canonical extraction record, and
 `docs/protocol.md` is the concrete bidirectional message catalog. The target
 invariant is that Electron main is a desktop adapter and stdio client; provider
 drivers, provider protocols, app state, backend-owned filesystem work, git,
-loops, worktree path policy, and agent runtime state belong behind `clawd`.
+automations, worktree path policy, and agent runtime state belong behind `clawd`.
 That includes file previews: desktop and future non-desktop clients may request
 file content from `clawd`, but they do not read backend-owned agent workspace
 paths themselves. If model output includes an absolute or `file://` link, the
@@ -176,7 +176,7 @@ Its `CodexAppBackend` owns one shared `CodexSurface` and accepts named app
 modules; Claw's Codex agent adapter has a host-owned lifecycle so it can sit at
 that app-module boundary once the SDK artifact containing the host is consumed.
 Generic Codex concerns remain in the SDK, while teams, agents, collaboration,
-loops, work integrations, and the provider-neutral `AgentBackendDriver` seam
+automations, work integrations, and the provider-neutral `AgentBackendDriver` seam
 remain in Claw. The SDK backend is embedded in `clawd`; it is not another
 process and does not replace Claw's existing Claude driver boundary.
 
@@ -287,7 +287,7 @@ Modules:
   bundle, and exposes app-owned requests to main-process callers.
 - `AppController`: desktop IPC and native-affordance adapter. Product state,
   provider operations, client request ownership, durable snapshot persistence,
-  loops, work integrations, git/file/source operations, and system permission
+  automations, work integrations, git/file/source operations, and system permission
   API calls belong in `clawd`; Electron forwards app-owned RPC requests, fans
   backend events to renderer windows, and registers the SDK native bridge.
 
@@ -449,6 +449,10 @@ Renderer layers:
   composer, markdown, mermaid, media, clipboard, attachment, and transcription
   behavior; the Claw wrapper only adapts provider capabilities and product
   events;
+- local generated-media paths remain backend/main data. Electron replaces them
+  with opaque `codex-claw-media` URLs at the renderer boundary and serves only
+  paths previously registered by main; the renderer never receives a local
+  filesystem path or broad file access;
 - git status and turn diff display consume runtime snapshot state. Repo git
   status is requested through the active `AgentBackendDriver` capability and is
   not persisted; turn diff state comes from app-owned backend events such as
@@ -874,7 +878,7 @@ Conversations with an active turn stay memory-authoritative and reconcile
 through their live backend events.
 Global snapshot notifications and hot-path acknowledgements contain metadata
 only. They are merged into the existing renderer state without replacing the
-root snapshot or cached message array, so an unrelated agent, queue, loop, or
+root snapshot or cached message array, so an unrelated agent, queue, automation, or
 status change cannot clone and invalidate a long active transcript.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
@@ -884,16 +888,16 @@ state is local and provider-neutral: newly assigned items are `inProgress`, and
 agents update them to `blocked`, `readyForReview`, or `completed` through the
 `update-work-item` Claw MCP tool using the exact work item id from that prompt.
 Blocked updates include a user-facing note explaining what help is needed.
-Loop-created assignments
-also store loop origin metadata so loop completion instructions can be shown at
+Automation-created assignments
+also store automation origin metadata so automation completion instructions can be shown at
 completion time without polluting the initial work context. Assigning the same
 work item to another agent overwrites that key and resets it to `inProgress`.
 Assignment status belongs to the backlog record, so it is preserved even when
 the stored agent id no longer exists; only the live assignee navigation/avatar
 depends on the agent still being present. Resetting an assignment clears Codex
 Claw's local assignment metadata and lifecycle state.
-Loops may also clean up their generated workspace after confirmed completion:
-existing-team loops can delete the generated agent, while dedicated-team loops
+Automations may also clean up their generated workspace after confirmed completion:
+existing-team automations can delete the generated agent, while dedicated-team automations
 can delete the generated team.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing

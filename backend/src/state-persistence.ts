@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Loop, LoopAction, LoopExecutionCreatedAgent, LoopExecutionLogEntry, LoopExecutionStatus, LoopSourceConfiguration, LoopTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Automation, AutomationAction, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationSourceConfiguration, AutomationTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
@@ -13,7 +13,7 @@ type PersistedState = {
   teams: Team[];
   agents: PersistedAgent[];
   bench: BenchTemplate[];
-  loops?: Loop[];
+  automations?: Automation[];
   activeTeamId: string | null;
   activeAgentId: string | null;
   accountRateLimits?: AccountRateLimits;
@@ -122,7 +122,7 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
     agents: snapshot.agents.map(persistedAgentFromSnapshot),
     bench: snapshot.bench.map((template) => ({ ...template })),
-    loops: snapshot.loops.map(cloneLoop),
+    automations: snapshot.automations.map(cloneAutomation),
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
     ...(snapshot.accountRateLimits ? { accountRateLimits: { ...snapshot.accountRateLimits } } : {}),
@@ -183,6 +183,9 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   const remotePointerTeamIds = localRemoteTeamPointerIds(teams);
   const agents = allAgents.filter((agent) => !agent.teamId || !remotePointerTeamIds.has(agent.teamId));
   const localAgentIds = new Set(agents.map((agent) => agent.id));
+  const persistedAutomations = Array.isArray(value.automations)
+    ? value.automations
+    : Array.isArray(value.loops) ? value.loops : [];
   workBacklog.assignments = assignmentsForAgents({
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
@@ -194,9 +197,9 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     bench: Array.isArray(value.bench)
       ? value.bench.map(sanitizeBenchTemplate).filter((template): template is BenchTemplate => Boolean(template))
       : seed.bench,
-    loops: Array.isArray(value.loops)
-      ? value.loops.map(sanitizeLoop).filter((loop): loop is Loop => Boolean(loop))
-      : seed.loops,
+    automations: persistedAutomations
+      .map(sanitizeAutomation)
+      .filter((automation): automation is Automation => Boolean(automation)),
     activeTeamId: typeof value.activeTeamId === 'string' ? value.activeTeamId : null,
     activeAgentId: typeof value.activeAgentId === 'string' ? value.activeAgentId : null,
     ...(accountRateLimits ? { accountRateLimits } : {}),
@@ -797,6 +800,9 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
     return null;
   }
 
+  const automationId = optionalTrimmedString(value.automationId) ?? optionalTrimmedString(value.loopId);
+  const automationExecutionId = optionalTrimmedString(value.automationExecutionId) ?? optionalTrimmedString(value.loopExecutionId);
+
   return {
     provider: value.provider,
     itemId: value.itemId,
@@ -804,15 +810,15 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
     assignedAt: value.assignedAt,
     policy: value.policy === 'complete' || value.policy === 'review'
       ? value.policy
-      : typeof value.loopId === 'string' || typeof value.loopExecutionId === 'string' ? 'complete' : 'review',
+      : automationId || automationExecutionId ? 'complete' : 'review',
     status: value.status === 'working'
       ? 'inProgress'
       : isWorkBacklogAssignmentStatus(value.status) ? value.status : 'inProgress',
     ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
     ...(typeof value.note === 'string' && value.note.trim() ? { note: value.note.trim() } : {}),
     ...(typeof value.updatedAt === 'string' ? { updatedAt: value.updatedAt } : {}),
-    ...(typeof value.loopId === 'string' && value.loopId.trim() ? { loopId: value.loopId.trim() } : {}),
-    ...(typeof value.loopExecutionId === 'string' && value.loopExecutionId.trim() ? { loopExecutionId: value.loopExecutionId.trim() } : {}),
+    ...(automationId ? { automationId } : {}),
+    ...(automationExecutionId ? { automationExecutionId } : {}),
     ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
   };
 }
@@ -938,17 +944,17 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
   return oauthClientId ? { oauthClientId } : null;
 }
 
-function cloneLoop(loop: Loop): Loop {
+function cloneAutomation(automation: Automation): Automation {
   return {
-    ...loop,
-    source: { ...loop.source },
-    action: cloneLoopAction(loop.action),
-    instructions: { ...(loop.instructions ?? {}) },
-    executionLog: (loop.executionLog ?? []).map(cloneLoopExecutionEntry),
+    ...automation,
+    source: { ...automation.source },
+    action: cloneAutomationAction(automation.action),
+    instructions: { ...(automation.instructions ?? {}) },
+    executionLog: (automation.executionLog ?? []).map(cloneAutomationExecutionEntry),
   };
 }
 
-function cloneLoopExecutionEntry(entry: LoopExecutionLogEntry): LoopExecutionLogEntry {
+function cloneAutomationExecutionEntry(entry: AutomationExecutionLogEntry): AutomationExecutionLogEntry {
   return {
     ...entry,
     createdAgents: entry.createdAgents.map((createdAgent) => ({
@@ -958,7 +964,7 @@ function cloneLoopExecutionEntry(entry: LoopExecutionLogEntry): LoopExecutionLog
   };
 }
 
-function cloneLoopAction(action: LoopAction): LoopAction {
+function cloneAutomationAction(action: AutomationAction): AutomationAction {
   if (action.type === 'create-agent') {
     return {
       type: action.type,
@@ -981,7 +987,7 @@ function cloneLoopAction(action: LoopAction): LoopAction {
   return action;
 }
 
-function sanitizeLoop(value: unknown): Loop | null {
+function sanitizeAutomation(value: unknown): Automation | null {
   if (
     !isRecord(value) ||
     typeof value.id !== 'string' ||
@@ -992,8 +998,8 @@ function sanitizeLoop(value: unknown): Loop | null {
     return null;
   }
 
-  const source = sanitizeLoopSource(value.source);
-  const action = sanitizeLoopAction(value.action);
+  const source = sanitizeAutomationSource(value.source);
+  const action = sanitizeAutomationAction(value.action);
   if (!source || !action) {
     return null;
   }
@@ -1001,18 +1007,18 @@ function sanitizeLoop(value: unknown): Loop | null {
   const lastCreatedCount = typeof value.lastCreatedCount === 'number' && Number.isFinite(value.lastCreatedCount)
     ? Math.max(0, Math.floor(value.lastCreatedCount))
     : undefined;
-  const loopId = value.id;
+  const automationId = value.id;
   const executionLog = Array.isArray(value.executionLog)
-    ? value.executionLog.map((entry) => sanitizeLoopExecutionEntry(entry, loopId)).filter((entry): entry is LoopExecutionLogEntry => Boolean(entry))
+    ? value.executionLog.map((entry) => sanitizeAutomationExecutionEntry(entry, automationId)).filter((entry): entry is AutomationExecutionLogEntry => Boolean(entry))
     : [];
 
   return {
     id: value.id,
-    name: value.name.trim() || 'Loop',
+    name: value.name.trim() || 'Automation',
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
     source,
     action,
-    instructions: sanitizeLoopInstructions(value.instructions),
+    instructions: sanitizeAutomationInstructions(value.instructions),
     executionLog,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
@@ -1022,7 +1028,7 @@ function sanitizeLoop(value: unknown): Loop | null {
   };
 }
 
-function sanitizeLoopInstructions(value: unknown): Loop['instructions'] {
+function sanitizeAutomationInstructions(value: unknown): Automation['instructions'] {
   if (!isRecord(value)) {
     return {};
   }
@@ -1035,32 +1041,34 @@ function sanitizeLoopInstructions(value: unknown): Loop['instructions'] {
   };
 }
 
-function sanitizeLoopExecutionEntry(value: unknown, loopId: string): LoopExecutionLogEntry | null {
+function sanitizeAutomationExecutionEntry(value: unknown, automationId: string): AutomationExecutionLogEntry | null {
   if (
     !isRecord(value) ||
     typeof value.id !== 'string' ||
     typeof value.startedAt !== 'string' ||
-    !isLoopExecutionStatus(value.status) ||
+    !isAutomationExecutionStatus(value.status) ||
     !Array.isArray(value.createdAgents)
   ) {
     return null;
   }
 
-  const entryLoopId = typeof value.loopId === 'string' && value.loopId.trim() ? value.loopId : loopId;
-  if (entryLoopId !== loopId) {
+  const entryAutomationId = optionalTrimmedString(value.automationId)
+    ?? optionalTrimmedString(value.loopId)
+    ?? automationId;
+  if (entryAutomationId !== automationId) {
     return null;
   }
 
   const createdAgents = value.createdAgents
-    .map(sanitizeLoopExecutionCreatedAgent)
-    .filter((createdAgent): createdAgent is LoopExecutionCreatedAgent => Boolean(createdAgent));
+    .map(sanitizeAutomationExecutionCreatedAgent)
+    .filter((createdAgent): createdAgent is AutomationExecutionCreatedAgent => Boolean(createdAgent));
   const createdCount = typeof value.createdCount === 'number' && Number.isFinite(value.createdCount)
     ? Math.max(0, Math.floor(value.createdCount))
     : createdAgents.length;
 
   return {
     id: value.id,
-    loopId,
+    automationId,
     startedAt: value.startedAt,
     status: value.status,
     createdCount,
@@ -1070,7 +1078,7 @@ function sanitizeLoopExecutionEntry(value: unknown, loopId: string): LoopExecuti
   };
 }
 
-function sanitizeLoopExecutionCreatedAgent(value: unknown): LoopExecutionCreatedAgent | null {
+function sanitizeAutomationExecutionCreatedAgent(value: unknown): AutomationExecutionCreatedAgent | null {
   if (
     !isRecord(value) ||
     typeof value.agentId !== 'string' ||
@@ -1091,7 +1099,7 @@ function sanitizeLoopExecutionCreatedAgent(value: unknown): LoopExecutionCreated
   };
 }
 
-function sanitizeBackendConversationRef(value: unknown): Partial<Pick<LoopExecutionCreatedAgent, 'conversationRef'>> | null {
+function sanitizeBackendConversationRef(value: unknown): Partial<Pick<AutomationExecutionCreatedAgent, 'conversationRef'>> | null {
   if (!isRecord(value) || typeof value.backend !== 'string') {
     return null;
   }
@@ -1124,17 +1132,17 @@ function sanitizeBackendConversationRef(value: unknown): Partial<Pick<LoopExecut
   return null;
 }
 
-function legacyCodexConversationRef(value: unknown): Partial<Pick<LoopExecutionCreatedAgent, 'conversationRef'>> {
+function legacyCodexConversationRef(value: unknown): Partial<Pick<AutomationExecutionCreatedAgent, 'conversationRef'>> {
   return typeof value === 'string' && value.trim()
     ? { conversationRef: { backend: 'codex', threadId: value } }
     : {};
 }
 
-function isLoopExecutionStatus(value: unknown): value is LoopExecutionStatus {
+function isAutomationExecutionStatus(value: unknown): value is AutomationExecutionStatus {
   return value === 'working' || value === 'completed' || value === 'failed';
 }
 
-function sanitizeLoopSource(value: unknown): LoopSourceConfiguration | null {
+function sanitizeAutomationSource(value: unknown): AutomationSourceConfiguration | null {
   if (!isRecord(value) || value.provider !== 'github') {
     return null;
   }
@@ -1154,12 +1162,12 @@ function sanitizeLoopSource(value: unknown): LoopSourceConfiguration | null {
   };
 }
 
-function sanitizeLoopAction(value: unknown): LoopAction | null {
+function sanitizeAutomationAction(value: unknown): AutomationAction | null {
   if (!isRecord(value)) {
     return null;
   }
 
-  const teamTarget = sanitizeLoopTeamTarget(value.teamTarget);
+  const teamTarget = sanitizeAutomationTeamTarget(value.teamTarget);
   if (!teamTarget) {
     return null;
   }
@@ -1178,7 +1186,7 @@ function sanitizeLoopAction(value: unknown): LoopAction | null {
       backend,
       ...(backendDefaults ? { backendDefaults } : {}),
       teamTarget,
-      cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
+      cleanup: sanitizeAutomationCleanup(value.cleanup, teamTarget),
     };
   }
 
@@ -1192,14 +1200,14 @@ function sanitizeLoopAction(value: unknown): LoopAction | null {
       type: 'create-agent-from-bench',
       benchTemplateId,
       teamTarget,
-      cleanup: sanitizeLoopCleanup(value.cleanup, teamTarget),
+      cleanup: sanitizeAutomationCleanup(value.cleanup, teamTarget),
     };
   }
 
   return null;
 }
 
-function sanitizeLoopCleanup(value: unknown, teamTarget: LoopTeamTarget): LoopAction['cleanup'] {
+function sanitizeAutomationCleanup(value: unknown, teamTarget: AutomationTeamTarget): AutomationAction['cleanup'] {
   if (teamTarget.mode === 'dedicated') {
     return {
       deleteTeam: !isRecord(value) || value.deleteTeam !== false,
@@ -1211,7 +1219,7 @@ function sanitizeLoopCleanup(value: unknown, teamTarget: LoopTeamTarget): LoopAc
   };
 }
 
-function sanitizeLoopTeamTarget(value: unknown): LoopTeamTarget | null {
+function sanitizeAutomationTeamTarget(value: unknown): AutomationTeamTarget | null {
   if (!isRecord(value) || typeof value.mode !== 'string') {
     return null;
   }

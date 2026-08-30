@@ -419,7 +419,7 @@ function connectionDeleteMessage(connection: RemoteConnection, teams: Team[]): s
 
   const teamNames = teams.map((team) => team.name).join(', ');
   const teamLabel = teams.length === 1 ? 'team' : 'teams';
-  return `${connection.name} will be removed. This will also remove ${teams.length} connected ${teamLabel} from this app: ${teamNames}. Remote agents, messages, and loops will keep running on the SSH host.`;
+  return `${connection.name} will be removed. This will also remove ${teams.length} connected ${teamLabel} from this app: ${teamNames}. Remote agents, messages, and automations will keep running on the SSH host.`;
 }
 
 function connectionLabel(connection: RemoteConnection): string {

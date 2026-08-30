@@ -52,7 +52,7 @@ export function createEmptySnapshot(): AppSnapshot {
     ],
     agents: [],
     bench: [],
-    loops: [],
+    automations: [],
     activeTeamId: seedTeamId,
     activeAgentId: null,
     messages: [],
@@ -91,7 +91,7 @@ export function createInitialSnapshot(): AppSnapshot {
     ],
     agents,
     bench: [],
-    loops: [],
+    automations: [],
     activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
     messages: [],
@@ -1586,13 +1586,13 @@ function workBacklogAssignment(value: unknown): WorkBacklogAssignment | null {
     assignedAt: value.assignedAt,
     policy: value.policy === 'complete' || value.policy === 'review'
       ? value.policy
-      : typeof value.loopId === 'string' || typeof value.loopExecutionId === 'string' ? 'complete' : 'review',
+      : typeof value.automationId === 'string' || typeof value.automationExecutionId === 'string' ? 'complete' : 'review',
     status,
     ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
     ...(typeof value.note === 'string' && value.note.trim() ? { note: value.note.trim() } : {}),
     ...(typeof value.updatedAt === 'string' ? { updatedAt: value.updatedAt } : {}),
-    ...(typeof value.loopId === 'string' && value.loopId.trim() ? { loopId: value.loopId.trim() } : {}),
-    ...(typeof value.loopExecutionId === 'string' && value.loopExecutionId.trim() ? { loopExecutionId: value.loopExecutionId.trim() } : {}),
+    ...(typeof value.automationId === 'string' && value.automationId.trim() ? { automationId: value.automationId.trim() } : {}),
+    ...(typeof value.automationExecutionId === 'string' && value.automationExecutionId.trim() ? { automationExecutionId: value.automationExecutionId.trim() } : {}),
     ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
   };
 }

@@ -68,10 +68,10 @@ synced after this change.
 - `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`. Its
   `snapshot` is a valid `AppSnapshot` with `messages: []`; transcripts are
   deliberately excluded from synchronization frames.
-- `LoopLocation`: optional loop/work-provider location selector:
+- `AutomationLocation`: optional automation/work-provider location selector:
   `{ kind: "local" }` or `{ kind: "remote", remoteConnectionId }`.
 - `BenchLocation`: optional Bench catalog location selector with the same
-  shape as `LoopLocation`. Bench locations are derived from the active or
+  shape as `AutomationLocation`. Bench locations are derived from the active or
   target team in the desktop UI.
 - `ClawBackendEvent`: event sent to clients:
   `{ seq, type, payload, occurredAt, agentId?, backend?, backendSessionId?,
@@ -214,7 +214,7 @@ and `~/sources` first.
 | `connections/ssh/create` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
 | `connections/sync` | `{ connectionId }` | `AppSnapshot` | Syncs a saved SSH connection: closes any cached remote stdio client, uploads the bundled `clawd` script, mirrors `provider-tokens.json`, records the daemon-first SSH transport, reads the installed version, then asks the remote `clawd` to run `workProvider/connections/reload`. Sync does not start or restart a persistent remote daemon. Remote `clawd` hydrates `workBacklog.connections` from the mirrored tokens instead of copying local `state.json`. The renderer labels this action `Sync`. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
-| `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and removes local team pointers attached to it. Remote teams, agents, messages, and loops keep running on the SSH host. If every local team used that connection, local `clawd` creates one empty local fallback team first. |
+| `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and removes local team pointers attached to it. Remote teams, agents, messages, and automations keep running on the SSH host. If every local team used that connection, local `clawd` creates one empty local fallback team first. |
 
 Remote connection state is owned by `clawd`, not Electron. The SSH transport
 command model is
@@ -242,11 +242,11 @@ removes. Deploying a remote Bench template creates the agent in the remote team;
 local `clawd` projects the remote team's agents/messages into the local pointer
 snapshot for clients.
 
-Loops are selected independently from the Loops screen. When the client omits
-`location`, loop and work-provider calls operate on local `clawd`. When the
-client passes `{ kind: "remote", remoteConnectionId }`, local `clawd` forwards
-the loop request to that remote backend and returns the remote snapshot without
-adopting it as the local product snapshot.
+The Automations surface selects its backend location independently. When the
+client omits `location`, automation and work-provider calls operate on local `clawd`.
+When the client passes `{ kind: "remote", remoteConnectionId }`, local `clawd`
+forwards the automation request to that remote backend and returns the remote snapshot
+without adopting it as the local product snapshot.
 
 ## Client To `clawd`: Work Providers
 
@@ -257,27 +257,27 @@ adopting it as the local product snapshot.
 | `workProvider/connection/complete` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/connections/reload` | none | `AppSnapshot` | Rehydrates provider connection metadata from token storage after token files are mirrored, without restarting `clawd`. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |
-| `workProvider/repositories/list` | `{ provider, location? }` | `WorkRepository[]` | Lists provider repositories from local `clawd` or the selected remote loop location. |
-| `workProvider/backlog/configure` | `{ input: WorkBacklogConfigurationInput, location? }` | `AppSnapshot` | Saves backlog configuration in local `clawd` or the selected remote loop location. Remote snapshots are returned but not adopted as local product state. |
-| `workProvider/items/list` | `{ provider, repositoryId, location? }` | `WorkItem[]` | Lists provider work items from local `clawd` or the selected remote loop location. |
+| `workProvider/repositories/list` | `{ provider, location? }` | `WorkRepository[]` | Lists provider repositories from local `clawd` or the selected remote automation location. |
+| `workProvider/backlog/configure` | `{ input: WorkBacklogConfigurationInput, location? }` | `AppSnapshot` | Saves backlog configuration in local `clawd` or the selected remote automation location. Remote snapshots are returned but not adopted as local product state. |
+| `workProvider/items/list` | `{ provider, repositoryId, location? }` | `WorkItem[]` | Lists provider work items from local `clawd` or the selected remote automation location. |
 | `workProvider/globalItems/list` | `{ provider, location?, query? }` | `WorkItemPage` | Lists one numbered page plus its exact total across visible repositories; Cockpit uses it instead of repository fan-out. |
 
-## Client To `clawd`: Loops
+## Client To `clawd`: Automations
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `snapshot/loops/get` | `{ location? }` | `AppSnapshot` | Returns the local or remote loop-management snapshot for the selected Loops screen location. Remote snapshots are not adopted locally. |
-| `loop/create` | `{ input: CreateLoopInput, location? }` | `AppSnapshot` | Creates scheduler configuration in local `clawd` or the selected remote loop location. |
-| `loop/update` | `{ input: UpdateLoopInput, location? }` | `AppSnapshot` | Updates scheduler configuration in local `clawd` or the selected remote loop location. |
-| `loop/run` | `{ loopId, location? }` | `AppSnapshot` | Runs one loop immediately in local `clawd` or the selected remote loop location. |
-| `loop/due/run` | none | `AppSnapshot` | Runs due loops. Used by backend scheduler and tests. |
-| `loop/history/clear` | `{ loopId, location? }` | `AppSnapshot` | Clears execution history in local `clawd` or the selected remote loop location. |
-| `loop/execution/delete` | `{ loopId, executionId, location? }` | `AppSnapshot` | Deletes one execution log entry in local `clawd` or the selected remote loop location. |
-| `loop/delete` | `{ loopId, location? }` | `AppSnapshot` | Deletes scheduler configuration in local `clawd` or the selected remote loop location. |
+| `snapshot/automations/get` | `{ location? }` | `AppSnapshot` | Returns the local or remote automation-management snapshot for the selected Automations screen location. Remote snapshots are not adopted locally. |
+| `automation/create` | `{ input: CreateAutomationInput, location? }` | `AppSnapshot` | Creates scheduler configuration in local `clawd` or the selected remote automation location. |
+| `automation/update` | `{ input: UpdateAutomationInput, location? }` | `AppSnapshot` | Updates scheduler configuration in local `clawd` or the selected remote automation location. |
+| `automation/run` | `{ automationId, location? }` | `AppSnapshot` | Runs one automation immediately in local `clawd` or the selected remote automation location. |
+| `automation/due/run` | none | `AppSnapshot` | Runs due automations. Used by backend scheduler and tests. |
+| `automation/history/clear` | `{ automationId, location? }` | `AppSnapshot` | Clears execution history in local `clawd` or the selected remote automation location. |
+| `automation/execution/delete` | `{ automationId, executionId, location? }` | `AppSnapshot` | Deletes one execution log entry in local `clawd` or the selected remote automation location. |
+| `automation/delete` | `{ automationId, location? }` | `AppSnapshot` | Deletes scheduler configuration in local `clawd` or the selected remote automation location. |
 
-The Electron renderer exposes this as `Loops > Local|<remote>`. Create/edit
+The Electron renderer exposes this as `Automations > Local|<remote>`. Create/edit
 forms use the selected location's teams, bench templates, source repositories,
-work-provider repositories, work items, and remote folder picker data. Loop
+work-provider repositories, work items, and remote folder picker data. Automation
 history conversation previews pass the same location to
 `agent/conversation/messages/get`.
 
@@ -400,7 +400,7 @@ If a client request method is unknown, the client responds with JSON-RPC
   backend snapshots and replay clawd-authored app events; neither client
   persists or independently invents product mutations.
 - Filesystem reads, git commands, provider tokens, provider protocol calls,
-  loops, scheduler execution, and transcription helper execution belong to
+  automations, scheduler execution, and transcription helper execution belong to
   `clawd`.
 - Electron owns only native desktop affordances: windows, menus, shortcuts,
   dialogs, `openExternal`, native permission callbacks, process launching, and

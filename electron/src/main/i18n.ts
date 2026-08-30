@@ -42,7 +42,7 @@ const messages = {
     'update.latest': 'Codex Claw is up to date',
     'daemon.continueOld': 'Continue with old backend',
     'daemon.restartNow': 'Restart backend now',
-    'daemon.restartRequired': 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or loops are running.',
+    'daemon.restartRequired': 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or automations are running.',
   },
 } as const;
 

@@ -1,22 +1,22 @@
 <template>
-  <div class="loop-execution-log__status-cell">
+  <div class="automation-execution-log__status-cell">
     <span
-      class="loop-execution-log__status"
+      class="automation-execution-log__status"
       :data-status="status"
     >
       {{ statusLabel }}
     </span>
-    <div class="loop-execution-log__row-actions">
+    <div class="automation-execution-log__row-actions">
       <button
         type="button"
-        :aria-label="$t('dynamic.loops.viewConversation', { ticket })"
+        :aria-label="$t('dynamic.automations.viewConversation', { ticket })"
         @click.stop="emit('view-conversation')"
       >
         <EyeIcon aria-hidden="true" />
       </button>
       <button
         type="button"
-        :aria-label="$t('dynamic.loops.deleteExecution', { ticket })"
+        :aria-label="$t('dynamic.automations.deleteExecution', { ticket })"
         @click.stop="emit('delete-execution')"
       >
         <Trash2Icon aria-hidden="true" />
@@ -26,11 +26,11 @@
 </template>
 
 <script setup lang="ts">
-import type { LoopExecutionStatus } from '@codex-claw/core/contracts';
+import type { AutomationExecutionStatus } from '@codex-claw/core/contracts';
 import { EyeIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 defineProps<{
-  status: LoopExecutionStatus;
+  status: AutomationExecutionStatus;
   statusLabel: string;
   ticket: string;
 }>();
@@ -42,7 +42,7 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-.loop-execution-log__status {
+.automation-execution-log__status {
   display: block;
   color: var(--color-success);
   font-size: var(--font-size-13);
@@ -51,7 +51,7 @@ const emit = defineEmits<{
   white-space: nowrap;
 }
 
-.loop-execution-log__status-cell {
+.automation-execution-log__status-cell {
   height: 18px;
   min-width: 68px;
   display: flex;
@@ -59,31 +59,31 @@ const emit = defineEmits<{
   justify-items: end;
 }
 
-.loop-execution-log__status[data-status="working"] {
+.automation-execution-log__status[data-status="working"] {
   color: var(--color-warning);
 }
 
-.loop-execution-log__status[data-status="failed"] {
+.automation-execution-log__status[data-status="failed"] {
   color: var(--color-error);
 }
 
-.loop-execution-log__row-actions {
+.automation-execution-log__row-actions {
   display: none;
   align-items: center;
   gap: var(--space-2);
 }
 
-.loop-execution-log__status-cell:hover .loop-execution-log__status,
-.loop-execution-log__status-cell:focus-within .loop-execution-log__status {
+.automation-execution-log__status-cell:hover .automation-execution-log__status,
+.automation-execution-log__status-cell:focus-within .automation-execution-log__status {
   display: none;
 }
 
-.loop-execution-log__status-cell:hover .loop-execution-log__row-actions,
-.loop-execution-log__status-cell:focus-within .loop-execution-log__row-actions {
+.automation-execution-log__status-cell:hover .automation-execution-log__row-actions,
+.automation-execution-log__status-cell:focus-within .automation-execution-log__row-actions {
   display: flex;
 }
 
-.loop-execution-log__row-actions button {
+.automation-execution-log__row-actions button {
   width: 28px;
   height: 28px;
   display: grid;
@@ -95,12 +95,12 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.loop-execution-log__row-actions button:hover,
-.loop-execution-log__row-actions button:focus-visible {
+.automation-execution-log__row-actions button:hover,
+.automation-execution-log__row-actions button:focus-visible {
   color: var(--color-text);
 }
 
-.loop-execution-log__row-actions svg {
+.automation-execution-log__row-actions svg {
   width: var(--icon-md);
   height: var(--icon-md);
 }

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { createLoopInSnapshot } from '@codex-claw/core/loop-manager';
+import { createAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import type { WorkItem } from '@codex-claw/core/contracts';
-import { LoopRunner, matchingLoopItems } from '../runner';
+import { AutomationRunner, matchingAutomationItems } from '../runner';
 
 const logMainMock = vi.hoisted(() => vi.fn());
 const warnMainMock = vi.hoisted(() => vi.fn());
@@ -13,7 +13,7 @@ vi.mock('../../log', () => ({
   warnMain: warnMainMock,
 }));
 
-describe('LoopRunner', () => {
+describe('AutomationRunner', () => {
   beforeEach(() => {
     logMainMock.mockReset();
     warnMainMock.mockReset();
@@ -29,7 +29,7 @@ describe('LoopRunner', () => {
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:00:00.000Z',
     });
-    createLoopInSnapshot(snapshot, {
+    createAutomationInSnapshot(snapshot, {
       name: 'GitHub bugs',
       source: {
         provider: 'github',
@@ -46,12 +46,12 @@ describe('LoopRunner', () => {
       instructions: {
         assignment: 'Remove the bug tag before closing this out.',
       },
-    }, '2026-06-09T10:01:00.000Z', () => 'loop-bugs');
+    }, '2026-06-09T10:01:00.000Z', () => 'automation-bugs');
 
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const notifySnapshotUpdated = vi.fn();
     const sendPrompt = vi.fn().mockResolvedValue(undefined);
-    const runner = new LoopRunner({
+    const runner = new AutomationRunner({
       getSnapshot: () => snapshot,
       listWorkItems: {
         listItems: vi.fn().mockResolvedValue([
@@ -62,7 +62,7 @@ describe('LoopRunner', () => {
       notifySnapshotUpdated,
       saveSnapshot,
       sendPrompt,
-      createExecutionId: () => 'loop-exec-bugs',
+      createExecutionId: () => 'automation-exec-bugs',
       now: () => new Date('2026-06-09T11:00:00.000Z'),
     });
 
@@ -73,8 +73,8 @@ describe('LoopRunner', () => {
       provider: 'github',
       itemId: 'nbonamy/codex-claw#12',
       assignedAt: '2026-06-09T11:00:00.000Z',
-      loopExecutionId: 'loop-exec-bugs',
-      loopId: 'loop-bugs',
+      automationExecutionId: 'automation-exec-bugs',
+      automationId: 'automation-bugs',
       policy: 'complete',
       status: 'inProgress',
     });
@@ -85,12 +85,12 @@ describe('LoopRunner', () => {
       name: 'Dina',
       teamId: expect.stringContaining('team-github-12'),
     });
-    expect(snapshot.loops[0]).toMatchObject({
+    expect(snapshot.automations[0]).toMatchObject({
       lastRunAt: '2026-06-09T11:00:00.000Z',
       lastCreatedCount: 1,
       executionLog: [{
-        id: 'loop-exec-bugs',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-bugs',
+        automationId: 'automation-bugs',
         status: 'working',
         createdCount: 1,
         createdAgents: [{
@@ -102,49 +102,49 @@ describe('LoopRunner', () => {
         }],
       }],
     });
-    expect(snapshot.loops[0]?.executionLog[0]).not.toHaveProperty('completedAt');
+    expect(snapshot.automations[0]?.executionLog[0]).not.toHaveProperty('completedAt');
     expect(saveSnapshot).toHaveBeenCalledOnce();
     expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
     expect(sendPrompt).toHaveBeenCalledWith(
       expect.any(String),
       expect.stringContaining('Assignment instructions:\nRemove the bug tag before closing this out.'),
       {
-        loopId: 'loop-bugs',
-        executionId: 'loop-exec-bugs',
+        automationId: 'automation-bugs',
+        executionId: 'automation-exec-bugs',
         workItemId: 'github:nbonamy/codex-claw#12',
       },
     );
-    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'started', expect.objectContaining({
-      loopId: 'loop-bugs',
-      executionId: 'loop-exec-bugs',
+    expect(logMainMock).toHaveBeenCalledWith('automation-runner', 'started', expect.objectContaining({
+      automationId: 'automation-bugs',
+      executionId: 'automation-exec-bugs',
       repositoryId: 'nbonamy/codex-claw',
     }));
-    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'listed work items', expect.objectContaining({
-      loopId: 'loop-bugs',
-      executionId: 'loop-exec-bugs',
+    expect(logMainMock).toHaveBeenCalledWith('automation-runner', 'listed work items', expect.objectContaining({
+      automationId: 'automation-bugs',
+      executionId: 'automation-exec-bugs',
       itemCount: 2,
       matchingCount: 1,
     }));
-    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'created assignment', expect.objectContaining({
-      loopId: 'loop-bugs',
-      executionId: 'loop-exec-bugs',
+    expect(logMainMock).toHaveBeenCalledWith('automation-runner', 'created assignment', expect.objectContaining({
+      automationId: 'automation-bugs',
+      executionId: 'automation-exec-bugs',
       agentId: assignment?.agentId,
       workItemId: 'github:nbonamy/codex-claw#12',
     }));
-    expect(logMainMock).toHaveBeenCalledWith('loop-runner', 'dispatching prompt', expect.objectContaining({
-      loopId: 'loop-bugs',
-      executionId: 'loop-exec-bugs',
+    expect(logMainMock).toHaveBeenCalledWith('automation-runner', 'dispatching prompt', expect.objectContaining({
+      automationId: 'automation-bugs',
+      executionId: 'automation-exec-bugs',
       agentId: assignment?.agentId,
       workItemId: 'github:nbonamy/codex-claw#12',
     }));
   });
 
   it('keeps the execution log when prompt dispatch fails after a real pickup', async () => {
-    const snapshot = snapshotWithLoop('loop-all');
+    const snapshot = snapshotWithAutomation('automation-all');
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const notifySnapshotUpdated = vi.fn();
     const sendPrompt = vi.fn().mockRejectedValue(new Error('backend offline'));
-    const runner = new LoopRunner({
+    const runner = new AutomationRunner({
       getSnapshot: () => snapshot,
       listWorkItems: {
         listItems: vi.fn().mockResolvedValue([workItem(12, 'Fix cockpit', ['bug'])]),
@@ -152,18 +152,18 @@ describe('LoopRunner', () => {
       notifySnapshotUpdated,
       saveSnapshot,
       sendPrompt,
-      createExecutionId: () => 'loop-exec-all',
+      createExecutionId: () => 'automation-exec-all',
       now: () => new Date('2026-06-09T11:00:00.000Z'),
     });
 
     await runner.runAll();
 
-    expect(snapshot.loops[0]).toMatchObject({
+    expect(snapshot.automations[0]).toMatchObject({
       lastRunAt: '2026-06-09T11:00:00.000Z',
       lastCreatedCount: 1,
       lastError: 'backend offline',
       executionLog: [{
-        id: 'loop-exec-all',
+        id: 'automation-exec-all',
         status: 'failed',
         createdCount: 1,
         error: 'backend offline',
@@ -177,22 +177,22 @@ describe('LoopRunner', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
     expect(notifySnapshotUpdated).toHaveBeenCalledTimes(2);
     expect(sendPrompt).toHaveBeenCalledOnce();
-    expect(warnMainMock).toHaveBeenCalledWith('loop-runner', 'prompt dispatch failed', expect.objectContaining({
-      loopId: 'loop-all',
-      executionId: 'loop-exec-all',
+    expect(warnMainMock).toHaveBeenCalledWith('automation-runner', 'prompt dispatch failed', expect.objectContaining({
+      automationId: 'automation-all',
+      executionId: 'automation-exec-all',
       workItemId: 'github:nbonamy/codex-claw#12',
       message: 'backend offline',
     }));
-    expect(warnMainMock).toHaveBeenCalledWith('loop-runner', 'failed', expect.objectContaining({
-      loopId: 'loop-all',
-      executionId: 'loop-exec-all',
+    expect(warnMainMock).toHaveBeenCalledWith('automation-runner', 'failed', expect.objectContaining({
+      automationId: 'automation-all',
+      executionId: 'automation-exec-all',
       createdCount: 1,
       message: 'backend offline',
     }));
   });
 
   it('logs created assignments if a later matching ticket fails before prompting', async () => {
-    const snapshot = snapshotWithLoop('loop-all');
+    const snapshot = snapshotWithAutomation('automation-all');
     const originalTeamFind = snapshot.teams.find;
     let teamFindCalls = 0;
     snapshot.teams.find = ((predicate: (team: (typeof snapshot.teams)[number], index: number, teams: typeof snapshot.teams) => unknown, thisArg?: unknown) => {
@@ -205,7 +205,7 @@ describe('LoopRunner', () => {
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const notifySnapshotUpdated = vi.fn();
     const sendPrompt = vi.fn().mockResolvedValue(undefined);
-    const runner = new LoopRunner({
+    const runner = new AutomationRunner({
       getSnapshot: () => snapshot,
       listWorkItems: {
         listItems: vi.fn().mockResolvedValue([
@@ -216,7 +216,7 @@ describe('LoopRunner', () => {
       notifySnapshotUpdated,
       saveSnapshot,
       sendPrompt,
-      createExecutionId: () => 'loop-exec-all',
+      createExecutionId: () => 'automation-exec-all',
       now: () => new Date('2026-06-09T11:00:00.000Z'),
     });
 
@@ -232,14 +232,14 @@ describe('LoopRunner', () => {
       status: 'inProgress',
     });
     expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#13']).toBeUndefined();
-    expect(snapshot.loops[0]).toMatchObject({
+    expect(snapshot.automations[0]).toMatchObject({
       lastRunAt: '2026-06-09T11:00:00.000Z',
       lastCreatedCount: 1,
       executionLog: [{
-        id: 'loop-exec-all',
+        id: 'automation-exec-all',
         status: 'failed',
         createdCount: 1,
-        error: 'Team is no longer available for loop "nbonamy/codex-claw".',
+        error: 'Team is no longer available for automation "nbonamy/codex-claw".',
         createdAgents: [{
           workItemId: 'github:nbonamy/codex-claw#12',
           workItemTitle: 'Fix cockpit',
@@ -253,7 +253,7 @@ describe('LoopRunner', () => {
   });
 
   it('does not create duplicate agents for already assigned work', async () => {
-    const snapshot = snapshotWithLoop('loop-all');
+    const snapshot = snapshotWithAutomation('automation-all');
     const item = workItem(12, 'Fix cockpit', ['bug']);
     snapshot.workBacklog.assignments[workItemAssignmentKey(item)] = {
       provider: 'github',
@@ -266,7 +266,7 @@ describe('LoopRunner', () => {
     const sendPrompt = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const notifySnapshotUpdated = vi.fn();
-    const runner = new LoopRunner({
+    const runner = new AutomationRunner({
       getSnapshot: () => snapshot,
       listWorkItems: {
         listItems: vi.fn().mockResolvedValue([item]),
@@ -274,22 +274,22 @@ describe('LoopRunner', () => {
       notifySnapshotUpdated,
       saveSnapshot,
       sendPrompt,
-      createExecutionId: () => 'loop-exec-all',
+      createExecutionId: () => 'automation-exec-all',
       now: () => new Date('2026-06-09T11:00:00.000Z'),
     });
 
     await runner.runAll();
 
     expect(snapshot.agents).toHaveLength(2);
-    expect(snapshot.loops[0]?.lastCreatedCount).toBeUndefined();
-    expect(snapshot.loops[0]?.executionLog).toStrictEqual([]);
+    expect(snapshot.automations[0]?.lastCreatedCount).toBeUndefined();
+    expect(snapshot.automations[0]?.executionLog).toStrictEqual([]);
     expect(saveSnapshot).not.toHaveBeenCalled();
     expect(notifySnapshotUpdated).not.toHaveBeenCalled();
     expect(sendPrompt).not.toHaveBeenCalled();
   });
 
   it('creates a new agent for an open matching issue with a completed assignment', async () => {
-    const snapshot = snapshotWithLoop('loop-all');
+    const snapshot = snapshotWithAutomation('automation-all');
     const item = workItem(12, 'Fix cockpit', ['bug']);
     snapshot.workBacklog.assignments[workItemAssignmentKey(item)] = {
       provider: 'github',
@@ -303,7 +303,7 @@ describe('LoopRunner', () => {
     const sendPrompt = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const notifySnapshotUpdated = vi.fn();
-    const runner = new LoopRunner({
+    const runner = new AutomationRunner({
       getSnapshot: () => snapshot,
       listWorkItems: {
         listItems: vi.fn().mockResolvedValue([item]),
@@ -311,7 +311,7 @@ describe('LoopRunner', () => {
       notifySnapshotUpdated,
       saveSnapshot,
       sendPrompt,
-      createExecutionId: () => 'loop-exec-all',
+      createExecutionId: () => 'automation-exec-all',
       now: () => new Date('2026-06-09T11:00:00.000Z'),
     });
 
@@ -321,13 +321,13 @@ describe('LoopRunner', () => {
     expect(snapshot.workBacklog.assignments[workItemAssignmentKey(item)]).toMatchObject({
       provider: 'github',
       itemId: item.id,
-      loopExecutionId: 'loop-exec-all',
-      loopId: 'loop-all',
+      automationExecutionId: 'automation-exec-all',
+      automationId: 'automation-all',
       policy: 'complete',
       status: 'inProgress',
     });
-    expect(snapshot.loops[0]?.lastCreatedCount).toBe(1);
-    expect(snapshot.loops[0]?.executionLog).toHaveLength(1);
+    expect(snapshot.automations[0]?.lastCreatedCount).toBe(1);
+    expect(snapshot.automations[0]?.executionLog).toHaveLength(1);
     expect(saveSnapshot).toHaveBeenCalledOnce();
     expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
     expect(sendPrompt).toHaveBeenCalledOnce();
@@ -335,7 +335,7 @@ describe('LoopRunner', () => {
 
   it('creates plain agents from a selected source repository', async () => {
     const snapshot = createInitialSnapshot();
-    createLoopInSnapshot(snapshot, {
+    createAutomationInSnapshot(snapshot, {
       name: 'GitHub bugs',
       source: {
         provider: 'github',
@@ -359,9 +359,9 @@ describe('LoopRunner', () => {
           teamId: 'team-codex-claw',
         },
       },
-    }, '2026-06-09T10:01:00.000Z', () => 'loop-bugs');
+    }, '2026-06-09T10:01:00.000Z', () => 'automation-bugs');
     const sendPrompt = vi.fn().mockResolvedValue(undefined);
-    const runner = new LoopRunner({
+    const runner = new AutomationRunner({
       getSnapshot: () => snapshot,
       listWorkItems: {
         listItems: vi.fn().mockResolvedValue([workItem(12, 'Fix cockpit', ['bug'])]),
@@ -369,7 +369,7 @@ describe('LoopRunner', () => {
       notifySnapshotUpdated: vi.fn(),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       sendPrompt,
-      createExecutionId: () => 'loop-exec-bugs',
+      createExecutionId: () => 'automation-exec-bugs',
       now: () => new Date('2026-06-09T11:00:00.000Z'),
     });
 
@@ -395,7 +395,7 @@ describe('LoopRunner', () => {
     expect(sendPrompt).toHaveBeenCalledOnce();
   });
 
-  it('filters loop items by repository, state, assignee, and tag', () => {
+  it('filters automation items by repository, state, assignee, and tag', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push({
       id: 'bench-dina',
@@ -405,7 +405,7 @@ describe('LoopRunner', () => {
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:00:00.000Z',
     });
-    const loop = createLoopInSnapshot(snapshot, {
+    const automation = createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -422,20 +422,20 @@ describe('LoopRunner', () => {
       },
     });
 
-    expect(loop).not.toBeNull();
-    expect(matchingLoopItems([
+    expect(automation).not.toBeNull();
+    expect(matchingAutomationItems([
       workItem(12, 'Bug', ['bug'], ['dina']),
       { ...workItem(13, 'Closed', ['bug'], ['dina']), state: 'closed' },
       { ...workItem(14, 'Other repo', ['bug'], ['dina']), repositoryId: 'nbonamy/id8' },
       workItem(15, 'Feature', ['feature'], ['dina']),
       workItem(16, 'Unassigned bug', ['bug'], ['jesse']),
-    ], loop!)).toStrictEqual([
+    ], automation!)).toStrictEqual([
       workItem(12, 'Bug', ['bug'], ['dina']),
     ]);
   });
 });
 
-function snapshotWithLoop(loopId: string, options: { assigneeLogin?: string; tagName?: string } = {}) {
+function snapshotWithAutomation(automationId: string, options: { assigneeLogin?: string; tagName?: string } = {}) {
   const snapshot = createInitialSnapshot();
   snapshot.bench.push({
     id: 'bench-dina',
@@ -445,7 +445,7 @@ function snapshotWithLoop(loopId: string, options: { assigneeLogin?: string; tag
     createdAt: '2026-06-09T10:00:00.000Z',
     updatedAt: '2026-06-09T10:00:00.000Z',
   });
-  createLoopInSnapshot(snapshot, {
+  createAutomationInSnapshot(snapshot, {
     source: {
       provider: 'github',
       repositoryId: 'nbonamy/codex-claw',
@@ -460,7 +460,7 @@ function snapshotWithLoop(loopId: string, options: { assigneeLogin?: string; tag
         teamId: 'team-codex-claw',
       },
     },
-  }, '2026-06-09T10:01:00.000Z', () => loopId);
+  }, '2026-06-09T10:01:00.000Z', () => automationId);
   return snapshot;
 }
 

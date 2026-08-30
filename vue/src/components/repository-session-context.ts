@@ -1,4 +1,4 @@
-import type { AppSnapshot, LoopLocation } from '@codex-claw/core/contracts';
+import type { AppSnapshot, AutomationLocation } from '@codex-claw/core/contracts';
 
 export type RepositorySessionSource = {
   agentId?: string;
@@ -10,7 +10,7 @@ export type RepositorySessionSource = {
 export type RepositorySessionContext = {
   teamId: string | undefined;
   remoteConnectionId: string | undefined;
-  location: LoopLocation | undefined;
+  location: AutomationLocation | undefined;
 };
 
 export function resolveRepositorySessionContext(

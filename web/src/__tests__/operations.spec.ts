@@ -37,16 +37,16 @@ describe('Claw web operations', () => {
 
     await expect(invokeClawWebOperation(backend, 'getSnapshot', [])).resolves.toBe(snapshot);
     await expect(invokeClawWebOperation(backend, 'getBenchSnapshot', [undefined])).resolves.toBe(snapshot);
-    await expect(invokeClawWebOperation(backend, 'getLoopSnapshot', [{ kind: 'local' }])).resolves.toBe(snapshot);
+    await expect(invokeClawWebOperation(backend, 'getAutomationSnapshot', [{ kind: 'local' }])).resolves.toBe(snapshot);
     const remote = { kind: 'remote', connectionId: 'ssh-1' };
     await invokeClawWebOperation(backend, 'getBenchSnapshot', [remote]);
-    await invokeClawWebOperation(backend, 'getLoopSnapshot', [remote]);
+    await invokeClawWebOperation(backend, 'getAutomationSnapshot', [remote]);
 
     expect(request).toHaveBeenNthCalledWith(1, backendMethods.snapshotGet);
     expect(request).toHaveBeenNthCalledWith(2, backendMethods.snapshotGet);
     expect(request).toHaveBeenNthCalledWith(3, backendMethods.snapshotGet);
     expect(request).toHaveBeenNthCalledWith(4, backendMethods.snapshotBenchGet, { location: remote });
-    expect(request).toHaveBeenNthCalledWith(5, backendMethods.snapshotLoopsGet, { location: remote });
+    expect(request).toHaveBeenNthCalledWith(5, backendMethods.snapshotAutomationsGet, { location: remote });
   });
 
   it('builds required, optional, and pass-through operation parameters', async () => {

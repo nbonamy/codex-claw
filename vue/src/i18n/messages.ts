@@ -41,12 +41,12 @@ export const messages = {
         closeTab: 'Close {tab} tab',
         preview: 'Preview {path}',
       },
-      loops: {
+      automations: {
         deleteExecution: 'Delete execution for {ticket}',
         noExecutions: 'No executions yet.',
-        run: 'Run {loop}',
+        run: 'Run {automation}',
         viewConversation: 'View conversation for {ticket}',
-        viewLogs: 'View logs for {loop}',
+        viewLogs: 'View logs for {automation}',
       },
       openIn: 'Open in {application}',
       repository: {
@@ -71,7 +71,7 @@ export const messages = {
         chatGptAccount: 'ChatGPT account',
         clearHistory: 'Clear History',
         deleteExecution: 'Delete Execution',
-        deleteLoop: 'Delete Loop',
+        deleteAutomation: 'Delete Automation',
         deviceFallback: 'This device',
         deviceRevokeDetail: '{device} will no longer be able to connect to this Claw instance.',
         imageToAnnotate: 'Image to annotate',

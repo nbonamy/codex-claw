@@ -3,7 +3,7 @@ import type { Agent, WorkBacklogAssignment, WorkItem, WorkProviderKind } from '.
 type WorkItemIdentity = Pick<WorkItem, 'provider' | 'id'> | Pick<WorkBacklogAssignment, 'provider' | 'itemId'>;
 export type WorkItemAssignmentSource = Pick<WorkItem, 'provider' | 'id' | 'repositoryId' | 'repositoryFullName' | 'number' | 'title' | 'url'>;
 
-export type WorkBacklogAssignmentMetadata = Partial<Pick<WorkBacklogAssignment, 'loopExecutionId' | 'loopId' | 'policy'>>;
+export type WorkBacklogAssignmentMetadata = Partial<Pick<WorkBacklogAssignment, 'automationExecutionId' | 'automationId' | 'policy'>>;
 
 export function workBacklogAssignmentFromWorkItem(
   item: WorkItemAssignmentSource,
@@ -18,8 +18,8 @@ export function workBacklogAssignmentFromWorkItem(
     assignedAt,
     policy: metadata.policy ?? 'review',
     status: 'inProgress',
-    ...(metadata.loopId ? { loopId: metadata.loopId } : {}),
-    ...(metadata.loopExecutionId ? { loopExecutionId: metadata.loopExecutionId } : {}),
+    ...(metadata.automationId ? { automationId: metadata.automationId } : {}),
+    ...(metadata.automationExecutionId ? { automationExecutionId: metadata.automationExecutionId } : {}),
   };
 }
 

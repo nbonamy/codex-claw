@@ -18,23 +18,23 @@ describe('AppDataList', () => {
           align: 'end',
         }],
         rows: [{
-          id: 'loop-bugs',
+          id: 'automation-bugs',
           name: 'GitHub bugs',
           schedule: 'Every few minutes',
         }],
       },
       slots: {
-        headerActions: '<button type="button">New Loop</button>',
+        headerActions: '<button type="button">New Automation</button>',
         'cell-name': '<template #default="{ row }"><strong>{{ row.name }}</strong></template>',
         actions: '<template #default="{ row }"><button type="button" :aria-label="`Edit ${row.id}`">Edit</button></template>',
       },
     });
 
     expect(wrapper.text()).toContain('Current');
-    expect(wrapper.text()).toContain('New Loop');
+    expect(wrapper.text()).toContain('New Automation');
     expect(wrapper.text()).toContain('GitHub bugs');
     expect(wrapper.text()).toContain('Every few minutes');
-    expect(wrapper.find('[aria-label="Edit loop-bugs"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit automation-bugs"]').exists()).toBe(true);
   });
 
   it('renders column headers, subtitles, default cells, and explicit aria labels', () => {

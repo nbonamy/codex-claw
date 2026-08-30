@@ -60,7 +60,7 @@ describe('daemon startup maintenance', () => {
 
     expect(showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
       buttons: ['Continue with old backend', 'Restart backend now'],
-      message: 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or loops are running.',
+      message: 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or automations are running.',
     }));
     expect(refreshDaemon).toHaveBeenCalledOnce();
   });
@@ -69,7 +69,7 @@ describe('daemon startup maintenance', () => {
     const refreshDaemon = vi.fn();
 
     await ensureCurrentClawdDaemonForStartup({
-      createSnapshotClient: () => snapshotClient(activeLoopSnapshot()),
+      createSnapshotClient: () => snapshotClient(activeAutomationSnapshot()),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ version: '0.1.0', pid: 123 })),
       getPackagedVersion: vi.fn().mockResolvedValue('0.2.0'),
       refreshDaemon,
@@ -141,10 +141,10 @@ function activeAgentSnapshot() {
   return snapshot;
 }
 
-function activeLoopSnapshot() {
+function activeAutomationSnapshot() {
   const snapshot = createEmptySnapshot();
-  snapshot.loops.push({
-    id: 'loop-bugs',
+  snapshot.automations.push({
+    id: 'automation-bugs',
     name: 'Bugs',
     enabled: true,
     source: {
@@ -161,7 +161,7 @@ function activeLoopSnapshot() {
     instructions: {},
     executionLog: [{
       id: 'execution-1',
-      loopId: 'loop-bugs',
+      automationId: 'automation-bugs',
       startedAt: '2026-06-14T10:00:00.000Z',
       status: 'working',
       createdCount: 0,

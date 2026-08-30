@@ -1,32 +1,32 @@
 <template>
   <section
-    class="loops-view"
-    :aria-label="$t('surface.loopsView.loops')"
+    class="automations-view"
+    :aria-label="$t('surface.automationsView.automations')"
   >
 
-    <div class="loops-view__header" />
+    <div class="automations-view__header" />
 
-    <main class="loops-view__content">
-      <div class="loops-view__panel">
+    <main class="automations-view__content">
+      <div class="automations-view__panel">
         <SettingsPanelFrame
-          :title="$t('surface.loopsView.loops')"
-          title-id="loops-title"
+          :title="$t('surface.automationsView.automations')"
+          title-id="automations-title"
         >
           <div
-            v-if="!editorVisible && !logLoop"
-            class="loops-view__list-header"
+            v-if="!editorVisible && !logAutomation"
+            class="automations-view__list-header"
           >
-            <div class="loops-view__location-heading">
-              <h3>{{ $t('surface.loopsView.loops') }}</h3>
+            <div class="automations-view__location-heading">
+              <h3>{{ $t('surface.automationsView.automations') }}</h3>
               <ChevronRightIcon aria-hidden="true" />
               <el-select
                 v-model="selectedLocationValue"
-                class="loops-view__location-select"
-                :aria-label="$t('surface.loopsView.loopLocation')"
+                class="automations-view__location-select"
+                :aria-label="$t('surface.automationsView.automationLocation')"
                 size="small"
               >
                 <el-option
-                  :label="$t('surface.loopsView.local')"
+                  :label="$t('surface.automationsView.local')"
                   value="local"
                 />
                 <el-option
@@ -38,21 +38,21 @@
               </el-select>
             </div>
             <el-button
-              v-if="locationLoops.length > 0"
+              v-if="locationAutomations.length > 0"
               type="primary"
               @click="openCreate"
-            > {{ $t('surface.loopsView.newLoop') }} </el-button>
+            > {{ $t('surface.automationsView.newAutomation') }} </el-button>
           </div>
 
-          <LoopEditor
+          <AutomationEditor
             v-if="editorVisible"
             :key="editorKey"
             :backend-models="backendModels"
             :bench-templates="locationBench"
-            :choose-agent-folder="chooseLoopAgentFolder"
+            :choose-agent-folder="chooseAutomationAgentFolder"
             :connection="locationGithubConnection"
             :items-by-repository="locationWorkItemsByRepository"
-            :loop="editingLoop"
+            :automation="editingAutomation"
             :mode="editorMode"
             :repositories="locationGithubRepositories"
             :source-repositories="locationSourceRepositories"
@@ -60,52 +60,52 @@
             @cancel="closeEditor"
             @load-items="loadGitHubItems"
             @load-repositories="loadGitHubRepositories"
-            @submit="saveLoop"
+            @submit="saveAutomation"
           />
 
-          <LoopExecutionLog
-            v-else-if="logLoop"
-            :loop="logLoop"
+          <AutomationExecutionLog
+            v-else-if="logAutomation"
+            :automation="logAutomation"
             :messages="messages"
             :read-conversation-messages="readLocationConversationMessages"
-            @clear-history="confirmClearLoopHistory"
+            @clear-history="confirmClearAutomationHistory"
             @close="closeLog"
-            @delete-execution="confirmDeleteLoopExecution"
+            @delete-execution="confirmDeleteAutomationExecution"
           />
 
           <div
             v-else-if="locationStatus === 'loading'"
-            class="loops-view__location-state"
-          > {{ $t('surface.loopsView.loadingLoops') }} </div>
+            class="automations-view__location-state"
+          > {{ $t('surface.automationsView.loadingAutomations') }} </div>
 
           <div
             v-else-if="locationStatus === 'error'"
-            class="loops-view__error"
+            class="automations-view__error"
           >
             {{ locationError }}
           </div>
 
-          <LoopWelcome
-            v-else-if="locationLoops.length === 0"
+          <AutomationWelcome
+            v-else-if="locationAutomations.length === 0"
             @create="openCreate"
           />
 
           <div
             v-else
-            class="loops-view__list"
+            class="automations-view__list"
           >
             <AppDataList
-              :aria-label="$t('surface.loopsView.loops')"
-              :columns="loopColumns"
-              :rows="loopRows"
+              :aria-label="$t('surface.automationsView.automations')"
+              :columns="automationColumns"
+              :rows="automationRows"
             >
-              <template #cell-loop="{ row }">
-                <div class="loops-view__loop-cell">
+              <template #cell-automation="{ row }">
+                <div class="automations-view__automation-cell">
                   <span
-                    class="loops-view__status"
+                    class="automations-view__status"
                     :data-enabled="row.enabled"
                   />
-                  <div class="loops-view__info">
+                  <div class="automations-view__info">
                     <strong>{{ row.name }}</strong>
                     <span>{{ row.sourceLine }}</span>
                   </div>
@@ -113,54 +113,54 @@
               </template>
 
               <template #cell-lastExecution="{ row }">
-                <span class="loops-view__meta-cell">{{ row.lastExecution }}</span>
+                <span class="automations-view__meta-cell">{{ row.lastExecution }}</span>
               </template>
 
               <template #cell-executionCount="{ row }">
-                <span class="loops-view__meta-cell">{{ row.executionCount }}</span>
+                <span class="automations-view__meta-cell">{{ row.executionCount }}</span>
               </template>
 
               <template #actions="{ row }">
-                <div class="loops-view__row-actions">
+                <div class="automations-view__row-actions">
                   <button
                     type="button"
-                    :aria-label="$t('dynamic.loops.run', { loop: row.name })"
+                    :aria-label="$t('dynamic.automations.run', { automation: row.name })"
                     :disabled="!row.enabled"
-                    @click="runLoop(row.id)"
+                    @click="runAutomation(row.id)"
                   >
                     <PlayerPlayIcon aria-hidden="true" />
                   </button>
                   <button
                     type="button"
-                    :aria-label="$t('dynamic.loops.viewLogs', { loop: row.name })"
+                    :aria-label="$t('dynamic.automations.viewLogs', { automation: row.name })"
                     @click="openLog(row.id)"
                   >
                     <LogsIcon aria-hidden="true" />
                   </button>
                   <el-popover
-                    :visible="openMenuLoopId === row.id"
+                    :visible="openMenuAutomationId === row.id"
                     placement="bottom-end"
                     trigger="manual"
                     width="180"
                     :teleported="true"
-                    popper-class="claw-popover loops-view__menu-popover"
+                    popper-class="claw-popover automations-view__menu-popover"
                     @update:visible="setMenuVisible(row.id, $event)"
                   >
                     <template #reference>
                       <button
                         type="button"
                         :aria-label="`${row.name} actions`"
-                        @click="setMenuVisible(row.id, openMenuLoopId !== row.id)"
+                        @click="setMenuVisible(row.id, openMenuAutomationId !== row.id)"
                       >
                         <DotsVerticalIcon aria-hidden="true" />
                       </button>
                     </template>
                     <AppMenu
                       class="app-menu--embedded"
-                      :ariaLabel="$t('surface.loopsView.loopActions')"
-                      :items="loopMenuItems"
+                      :ariaLabel="$t('surface.automationsView.automationActions')"
+                      :items="automationMenuItems"
                       @click.stop
-                      @select="selectLoopMenuItem(row.id, $event)"
+                      @select="selectAutomationMenuItem(row.id, $event)"
                     />
                   </el-popover>
                 </div>
@@ -169,7 +169,7 @@
 
             <div
               v-if="workBacklogStatus === 'error' && workBacklogError"
-              class="loops-view__error"
+              class="automations-view__error"
             >
               {{ workBacklogError }}
             </div>
@@ -180,7 +180,7 @@
 
     <RemoteFolderPickerDialog
       :initial-path="remoteFolderPickerInitialPath"
-      :list-source-folders="listLoopSourceFolders"
+      :list-source-folders="listAutomationSourceFolders"
       :remote-connection-id="selectedRemoteConnectionId ?? ''"
       :visible="remoteFolderPickerVisible"
       @close="cancelRemoteFolderPicker"
@@ -193,15 +193,15 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref, watch } from 'vue';
-import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateLoopInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateAutomationInput, Automation, AutomationLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateAutomationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import LoopEditor from './LoopEditor.vue';
-import LoopExecutionLog from './LoopExecutionLog.vue';
-import LoopWelcome from './LoopWelcome.vue';
+import AutomationEditor from './AutomationEditor.vue';
+import AutomationExecutionLog from './AutomationExecutionLog.vue';
+import AutomationWelcome from './AutomationWelcome.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import { ChevronRightIcon, DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
@@ -210,23 +210,23 @@ const props = withDefaults(defineProps<{
   backendModels?: BackendModelOption[];
   bench: AppSnapshot['bench'];
   chooseAgentFolder?: () => Promise<string | null>;
-  clearLoopHistory?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  createLoop?: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  deleteLoopExecution?: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  deleteLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  getLoopSnapshot?: (location?: LoopLocation) => Promise<AppSnapshot>;
+  clearAutomationHistory?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  deleteAutomationExecution?: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
-  loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
-  loops: Loop[];
+  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation) => Promise<WorkItem[] | void>;
+  loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+  automations: Automation[];
   messages?: RendererMessage[];
   remoteConnections?: RemoteConnection[];
-  runLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => Promise<RendererMessage[]>;
+  runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
   sourceRepositories?: SourceRepository[];
   teams: AppSnapshot['teams'];
-  updateLoop?: (input: UpdateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   workBacklog: AppSnapshot['workBacklog'];
   workBacklogError?: string | null;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -234,12 +234,12 @@ const props = withDefaults(defineProps<{
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
 }>(), {
   backendModels: () => [],
-  clearLoopHistory: async () => undefined,
+  clearAutomationHistory: async () => undefined,
   chooseAgentFolder: async () => null,
-  createLoop: async () => undefined,
-  deleteLoopExecution: async () => undefined,
-  deleteLoop: async () => undefined,
-  getLoopSnapshot: async () => createEmptySnapshot(),
+  createAutomation: async () => undefined,
+  deleteAutomationExecution: async () => undefined,
+  deleteAutomation: async () => undefined,
+  getAutomationSnapshot: async () => createEmptySnapshot(),
   listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   listSourceRepositories: async () => [],
   loadWorkItems: async () => undefined,
@@ -247,9 +247,9 @@ const props = withDefaults(defineProps<{
   messages: () => [],
   readConversationMessages: async () => [],
   remoteConnections: () => [],
-  runLoop: async () => undefined,
+  runAutomation: async () => undefined,
   sourceRepositories: () => [],
-  updateLoop: async () => undefined,
+  updateAutomation: async () => undefined,
   workBacklogError: null,
   workBacklogStatus: 'notLoaded',
   workItemsByRepository: () => ({}),
@@ -260,9 +260,9 @@ type EditorMode = 'create' | 'edit';
 type LocationStatus = 'idle' | 'loading' | 'error';
 
 const editorMode = ref<EditorMode>('create');
-const editingLoopId = ref<string | null>(null);
-const logLoopId = ref<string | null>(null);
-const openMenuLoopId = ref<string | null>(null);
+const editingAutomationId = ref<string | null>(null);
+const logAutomationId = ref<string | null>(null);
+const openMenuAutomationId = ref<string | null>(null);
 const selectedLocationValue = ref('local');
 const remoteSnapshot = ref<AppSnapshot | null>(null);
 const remoteSourceRepositories = ref<SourceRepository[]>([]);
@@ -276,7 +276,7 @@ let remoteFolderPickerResolve: ((path: string | null) => void) | null = null;
 let locationLoadId = 0;
 const emptyLocationSnapshot = createEmptySnapshot();
 
-const editorVisible = computed(() => editorMode.value === 'create' ? creating.value : Boolean(editingLoop.value));
+const editorVisible = computed(() => editorMode.value === 'create' ? creating.value : Boolean(editingAutomation.value));
 const creating = ref(false);
 const readyRemoteConnections = computed(() => props.remoteConnections.filter((connection) => (
   connection.status === 'ready' && Boolean(connection.transport)
@@ -291,61 +291,61 @@ const selectedRemoteConnection = computed(() => (
     ? readyRemoteConnections.value.find((connection) => connection.id === selectedRemoteConnectionId.value) ?? null
     : null
 ));
-const selectedLocation = computed<LoopLocation>(() => (
+const selectedLocation = computed<AutomationLocation>(() => (
   selectedRemoteConnectionId.value
     ? { kind: 'remote', remoteConnectionId: selectedRemoteConnectionId.value }
     : { kind: 'local' }
 ));
 const isRemoteLocation = computed(() => selectedLocation.value.kind === 'remote');
-const locationLoops = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.loops ?? [] : props.loops);
+const locationAutomations = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.automations ?? [] : props.automations);
 const locationBench = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.bench ?? [] : props.bench);
 const locationTeams = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.teams ?? [] : props.teams);
 const locationWorkBacklog = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.workBacklog ?? emptyLocationSnapshot.workBacklog : props.workBacklog);
 const locationSourceRepositories = computed(() => isRemoteLocation.value ? remoteSourceRepositories.value : props.sourceRepositories);
 const locationWorkRepositoriesByProvider = computed(() => isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : props.workRepositoriesByProvider);
 const locationWorkItemsByRepository = computed(() => isRemoteLocation.value ? remoteWorkItemsByRepository.value : props.workItemsByRepository);
-const editingLoop = computed(() => editingLoopId.value ? locationLoops.value.find((loop) => loop.id === editingLoopId.value) ?? null : null);
-const logLoop = computed(() => logLoopId.value ? locationLoops.value.find((loop) => loop.id === logLoopId.value) ?? null : null);
-const editorKey = computed(() => editingLoop.value?.id ?? `create-${creating.value ? 'open' : 'closed'}`);
+const editingAutomation = computed(() => editingAutomationId.value ? locationAutomations.value.find((automation) => automation.id === editingAutomationId.value) ?? null : null);
+const logAutomation = computed(() => logAutomationId.value ? locationAutomations.value.find((automation) => automation.id === logAutomationId.value) ?? null : null);
+const editorKey = computed(() => editingAutomation.value?.id ?? `create-${creating.value ? 'open' : 'closed'}`);
 const locationGithubConnection = computed(() => locationWorkBacklog.value.connections.find((connection) => connection.provider === 'github') ?? null);
 const locationGithubRepositories = computed(() => locationWorkRepositoriesByProvider.value.github ?? []);
-const loopColumns: AppDataListColumn[] = [{
-  id: 'loop',
-  label: translate('surface.loopsView.loop'),
+const automationColumns: AppDataListColumn[] = [{
+  id: 'automation',
+  label: translate('surface.automationsView.automation'),
   width: 'minmax(220px, 1fr)',
 }, {
   id: 'lastExecution',
-  label: translate('surface.loopsView.lastExecution'),
+  label: translate('surface.automationsView.lastExecution'),
   width: 'max-content',
   align: 'end',
 }, {
   id: 'executionCount',
-  label: translate('surface.loopsView.executions'),
+  label: translate('surface.automationsView.executions'),
   width: 'max-content',
   align: 'end',
 }];
-const loopMenuItems: AppMenuItem[] = [{
+const automationMenuItems: AppMenuItem[] = [{
   id: 'edit',
   type: 'action',
-  label: translate('surface.loopsView.edit'),
+  label: translate('surface.automationsView.edit'),
   icon: PencilIcon,
 }, {
   id: 'delete',
   type: 'action',
-  label: translate('surface.loopsView.delete'),
+  label: translate('surface.automationsView.delete'),
   icon: Trash2Icon,
   danger: true,
 }];
-const loopRows = computed<AppDataListRow[]>(() => locationLoops.value.map((loop) => ({
-  agentName: loopAgentName(loop),
-  executionCount: loopExecutionCountLabel(loop),
-  id: loop.id,
-  enabled: loop.enabled,
-  error: loop.lastError ?? '',
-  lastExecution: loopLastExecutionLabel(loop),
-  name: loop.name,
-  source: loopSourceLabel(loop),
-  sourceLine: `${loopAgentName(loop)} @ ${loopSourceLabel(loop)}`,
+const automationRows = computed<AppDataListRow[]>(() => locationAutomations.value.map((automation) => ({
+  agentName: automationAgentName(automation),
+  executionCount: automationExecutionCountLabel(automation),
+  id: automation.id,
+  enabled: automation.enabled,
+  error: automation.lastError ?? '',
+  lastExecution: automationLastExecutionLabel(automation),
+  name: automation.name,
+  source: automationSourceLabel(automation),
+  sourceLine: `${automationAgentName(automation)} @ ${automationSourceLabel(automation)}`,
 })));
 
 onMounted(() => {
@@ -373,77 +373,77 @@ watch(readyRemoteConnections, (connections) => {
 
 function openCreate(): void {
   editorMode.value = 'create';
-  editingLoopId.value = null;
-  logLoopId.value = null;
+  editingAutomationId.value = null;
+  logAutomationId.value = null;
   creating.value = true;
 }
 
-function openEdit(loopId: string): void {
+function openEdit(automationId: string): void {
   editorMode.value = 'edit';
-  editingLoopId.value = loopId;
-  logLoopId.value = null;
+  editingAutomationId.value = automationId;
+  logAutomationId.value = null;
   creating.value = false;
-  openMenuLoopId.value = null;
+  openMenuAutomationId.value = null;
 }
 
 function closeEditor(): void {
   creating.value = false;
-  editingLoopId.value = null;
+  editingAutomationId.value = null;
 }
 
-function openLog(loopId: string): void {
+function openLog(automationId: string): void {
   creating.value = false;
-  editingLoopId.value = null;
-  logLoopId.value = loopId;
-  openMenuLoopId.value = null;
+  editingAutomationId.value = null;
+  logAutomationId.value = automationId;
+  openMenuAutomationId.value = null;
 }
 
 function closeLog(): void {
-  logLoopId.value = null;
+  logAutomationId.value = null;
 }
 
-async function saveLoop(input: CreateLoopInput): Promise<void> {
-  const nextSnapshot = editorMode.value === 'edit' && editingLoop.value
-    ? await updateLocationLoop({
+async function saveAutomation(input: CreateAutomationInput): Promise<void> {
+  const nextSnapshot = editorMode.value === 'edit' && editingAutomation.value
+    ? await updateLocationAutomation({
       ...input,
-      id: editingLoop.value.id,
+      id: editingAutomation.value.id,
     })
-    : await createLocationLoop(input);
+    : await createLocationAutomation(input);
   refreshLocationFromSnapshot(nextSnapshot);
   closeEditor();
 }
 
-async function runLoop(loopId: string): Promise<void> {
-  openMenuLoopId.value = null;
-  refreshLocationFromSnapshot(await runLocationLoop(loopId));
+async function runAutomation(automationId: string): Promise<void> {
+  openMenuAutomationId.value = null;
+  refreshLocationFromSnapshot(await runLocationAutomation(automationId));
 }
 
-function setMenuVisible(loopId: string, visible: boolean): void {
-  openMenuLoopId.value = visible ? loopId : null;
+function setMenuVisible(automationId: string, visible: boolean): void {
+  openMenuAutomationId.value = visible ? automationId : null;
 }
 
-function selectLoopMenuItem(loopId: string, itemId: string): void {
-  openMenuLoopId.value = null;
+function selectAutomationMenuItem(automationId: string, itemId: string): void {
+  openMenuAutomationId.value = null;
   if (itemId === 'edit') {
-    openEdit(loopId);
+    openEdit(automationId);
   } else if (itemId === 'delete') {
-    void confirmDeleteLoop(loopId);
+    void confirmDeleteAutomation(automationId);
   }
 }
 
-async function confirmDeleteLoop(loopId: string): Promise<void> {
-  const loop = locationLoops.value.find((candidate) => candidate.id === loopId);
-  if (!loop) {
+async function confirmDeleteAutomation(automationId: string): Promise<void> {
+  const automation = locationAutomations.value.find((candidate) => candidate.id === automationId);
+  if (!automation) {
     return;
   }
 
   try {
     await ElMessageBox.confirm(
-      `Loop "${loop.name}" will stop creating agents.`,
-      translate('surface.loopsView.deleteLoop'),
+      `Automation "${automation.name}" will stop creating agents.`,
+      translate('surface.automationsView.deleteAutomation'),
       {
         cancelButtonText: translate('common.cancel'),
-        confirmButtonText: translate('dynamic.misc.deleteLoop'),
+        confirmButtonText: translate('dynamic.misc.deleteAutomation'),
         type: 'warning',
       },
     );
@@ -451,22 +451,22 @@ async function confirmDeleteLoop(loopId: string): Promise<void> {
     return;
   }
 
-  refreshLocationFromSnapshot(await deleteLocationLoop(loop.id));
-  if (logLoopId.value === loop.id) {
-    logLoopId.value = null;
+  refreshLocationFromSnapshot(await deleteLocationAutomation(automation.id));
+  if (logAutomationId.value === automation.id) {
+    logAutomationId.value = null;
   }
 }
 
-async function confirmClearLoopHistory(loopId: string): Promise<void> {
-  const loop = locationLoops.value.find((candidate) => candidate.id === loopId);
-  if (!loop || loop.executionLog.length === 0) {
+async function confirmClearAutomationHistory(automationId: string): Promise<void> {
+  const automation = locationAutomations.value.find((candidate) => candidate.id === automationId);
+  if (!automation || automation.executionLog.length === 0) {
     return;
   }
 
   try {
     await ElMessageBox.confirm(
-      `Execution history for "${loop.name}" will be cleared.`,
-      translate('surface.loopsView.clearHistory'),
+      `Execution history for "${automation.name}" will be cleared.`,
+      translate('surface.automationsView.clearHistory'),
       {
         cancelButtonText: translate('common.cancel'),
         confirmButtonText: translate('dynamic.misc.clearHistory'),
@@ -477,20 +477,20 @@ async function confirmClearLoopHistory(loopId: string): Promise<void> {
     return;
   }
 
-  refreshLocationFromSnapshot(await clearLocationLoopHistory(loop.id));
+  refreshLocationFromSnapshot(await clearLocationAutomationHistory(automation.id));
 }
 
-async function confirmDeleteLoopExecution(payload: { executionId: string; loopId: string }): Promise<void> {
-  const loop = locationLoops.value.find((candidate) => candidate.id === payload.loopId);
-  const execution = loop?.executionLog.find((candidate) => candidate.id === payload.executionId);
-  if (!loop || !execution) {
+async function confirmDeleteAutomationExecution(payload: { executionId: string; automationId: string }): Promise<void> {
+  const automation = locationAutomations.value.find((candidate) => candidate.id === payload.automationId);
+  const execution = automation?.executionLog.find((candidate) => candidate.id === payload.executionId);
+  if (!automation || !execution) {
     return;
   }
 
   try {
     await ElMessageBox.confirm(
-      translate('surface.loopsView.thisExecutionWillBeRemovedFromTheLoopHistory'),
-      translate('surface.loopsView.deleteExecution'),
+      translate('surface.automationsView.thisExecutionWillBeRemovedFromTheAutomationHistory'),
+      translate('surface.automationsView.deleteExecution'),
       {
         cancelButtonText: translate('common.cancel'),
         confirmButtonText: translate('dynamic.misc.deleteExecution'),
@@ -501,7 +501,7 @@ async function confirmDeleteLoopExecution(payload: { executionId: string; loopId
     return;
   }
 
-  refreshLocationFromSnapshot(await deleteLocationLoopExecution(loop.id, execution.id));
+  refreshLocationFromSnapshot(await deleteLocationAutomationExecution(automation.id, execution.id));
 }
 
 async function loadGitHubRepositories(): Promise<void> {
@@ -537,7 +537,7 @@ async function readLocationConversationMessages(ref: BackendConversationRef, age
     : props.readConversationMessages(ref, agentId);
 }
 
-async function chooseLoopAgentFolder(): Promise<string | null> {
+async function chooseAutomationAgentFolder(): Promise<string | null> {
   if (!isRemoteLocation.value || !selectedRemoteConnection.value) {
     return props.chooseAgentFolder();
   }
@@ -549,7 +549,7 @@ async function chooseLoopAgentFolder(): Promise<string | null> {
   });
 }
 
-function listLoopSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
+function listAutomationSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
   const remoteConnectionId = selectedRemoteConnectionId.value;
   return props.listSourceFolders({
     ...(input ?? {}),
@@ -584,7 +584,7 @@ async function loadSelectedLocation(): Promise<void> {
 
   locationStatus.value = 'loading';
   try {
-    const snapshot = await props.getLoopSnapshot(requestLocation());
+    const snapshot = await props.getAutomationSnapshot(requestLocation());
     if (loadId !== locationLoadId) {
       return;
     }
@@ -624,37 +624,37 @@ function remoteLocationValue(connectionId: string): string {
   return `remote:${connectionId}`;
 }
 
-function createLocationLoop(input: CreateLoopInput): Promise<AppSnapshot | void> {
+function createLocationAutomation(input: CreateAutomationInput): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.createLoop(input, location) : props.createLoop(input);
+  return location ? props.createAutomation(input, location) : props.createAutomation(input);
 }
 
-function updateLocationLoop(input: UpdateLoopInput): Promise<AppSnapshot | void> {
+function updateLocationAutomation(input: UpdateAutomationInput): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.updateLoop(input, location) : props.updateLoop(input);
+  return location ? props.updateAutomation(input, location) : props.updateAutomation(input);
 }
 
-function runLocationLoop(loopId: string): Promise<AppSnapshot | void> {
+function runLocationAutomation(automationId: string): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.runLoop(loopId, location) : props.runLoop(loopId);
+  return location ? props.runAutomation(automationId, location) : props.runAutomation(automationId);
 }
 
-function clearLocationLoopHistory(loopId: string): Promise<AppSnapshot | void> {
+function clearLocationAutomationHistory(automationId: string): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.clearLoopHistory(loopId, location) : props.clearLoopHistory(loopId);
+  return location ? props.clearAutomationHistory(automationId, location) : props.clearAutomationHistory(automationId);
 }
 
-function deleteLocationLoopExecution(loopId: string, executionId: string): Promise<AppSnapshot | void> {
+function deleteLocationAutomationExecution(automationId: string, executionId: string): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.deleteLoopExecution(loopId, executionId, location) : props.deleteLoopExecution(loopId, executionId);
+  return location ? props.deleteAutomationExecution(automationId, executionId, location) : props.deleteAutomationExecution(automationId, executionId);
 }
 
-function deleteLocationLoop(loopId: string): Promise<AppSnapshot | void> {
+function deleteLocationAutomation(automationId: string): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.deleteLoop(loopId, location) : props.deleteLoop(loopId);
+  return location ? props.deleteAutomation(automationId, location) : props.deleteAutomation(automationId);
 }
 
-function requestLocation(): LoopLocation | undefined {
+function requestLocation(): AutomationLocation | undefined {
   return isRemoteLocation.value ? selectedLocation.value : undefined;
 }
 
@@ -662,42 +662,42 @@ function workItemsKey(provider: WorkProviderKind, repositoryId: string): string 
   return `${provider}:${repositoryId}`;
 }
 
-function loopSourceLabel(loop: Loop): string {
-  if (loop.source.provider === 'github') {
-    return loop.source.tagName
-      ? `${loop.source.repositoryId} / ${loop.source.tagName}`
-      : loop.source.repositoryId;
+function automationSourceLabel(automation: Automation): string {
+  if (automation.source.provider === 'github') {
+    return automation.source.tagName
+      ? `${automation.source.repositoryId} / ${automation.source.tagName}`
+      : automation.source.repositoryId;
   }
-  return translate('surface.loopsView.workProvider');
+  return translate('surface.automationsView.workProvider');
 }
 
-function loopAgentName(loop: Loop): string {
-  const action = loop.action;
+function automationAgentName(automation: Automation): string {
+  const action = automation.action;
   if (action.type === 'create-agent') {
-    return translate('surface.loopsView.newAgent');
+    return translate('surface.automationsView.newAgent');
   }
 
   const template = locationBench.value.find((candidate) => candidate.id === action.benchTemplateId);
-  return template ? template.name : translate('surface.loopsView.missingBenchAgent');
+  return template ? template.name : translate('surface.automationsView.missingBenchAgent');
 }
 
-function loopLastExecutionLabel(loop: Loop): string {
-  if (!loop.lastRunAt) {
-    return translate('surface.loopsView.never');
+function automationLastExecutionLabel(automation: Automation): string {
+  if (!automation.lastRunAt) {
+    return translate('surface.automationsView.never');
   }
 
-  return formatShortDate(loop.lastRunAt);
+  return formatShortDate(automation.lastRunAt);
 }
 
-function loopExecutionCountLabel(loop: Loop): string {
-  const count = loop.executionLog.length;
+function automationExecutionCountLabel(automation: Automation): string {
+  const count = automation.executionLog.length;
   return `${count} ${count === 1 ? 'execution' : 'executions'}`;
 }
 
 function formatShortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return translate('surface.loopsView.unknown');
+    return translate('surface.automationsView.unknown');
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -710,7 +710,7 @@ function formatShortDate(value: string): string {
 </script>
 
 <style scoped>
-.loops-view {
+.automations-view {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -719,7 +719,7 @@ function formatShortDate(value: string): string {
   background: var(--color-shell-main);
 }
 
-.loops-view__header {
+.automations-view__header {
   position: absolute;
   top: 0;
   left: var(--team-rail-width);
@@ -730,7 +730,7 @@ function formatShortDate(value: string): string {
   -webkit-app-region: drag;
 }
 
-.loops-view__content {
+.automations-view__content {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -738,18 +738,18 @@ function formatShortDate(value: string): string {
   padding-top: 0;
 }
 
-.loops-view__panel {
+.automations-view__panel {
   max-width: 720px;
   margin: 0 auto;
 }
 
-.loops-view__list {
+.automations-view__list {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
 }
 
-.loops-view__list-header {
+.automations-view__list-header {
   min-width: 0;
   display: flex;
   align-items: center;
@@ -759,14 +759,14 @@ function formatShortDate(value: string): string {
   border-bottom: 1px solid var(--color-border);
 }
 
-.loops-view__location-heading {
+.automations-view__location-heading {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-8);
 }
 
-.loops-view__location-heading h3 {
+.automations-view__location-heading h3 {
   margin: 0;
   color: var(--color-text);
   font-size: var(--font-size-16);
@@ -774,24 +774,24 @@ function formatShortDate(value: string): string {
   line-height: var(--line-height-24);
 }
 
-.loops-view__location-heading svg {
+.automations-view__location-heading svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--color-text-muted);
 }
 
-.loops-view__location-select {
+.automations-view__location-select {
   width: 160px;
 }
 
-.loops-view__location-state {
+.automations-view__location-state {
   padding: var(--space-12);
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
 }
 
-.loops-view__error {
+.automations-view__error {
   padding: var(--space-10) var(--space-12);
   border: 1px solid var(--color-error-container);
   border-radius: var(--radius-md);
@@ -801,14 +801,14 @@ function formatShortDate(value: string): string {
   line-height: var(--line-height-18);
 }
 
-.loops-view__loop-cell {
+.automations-view__automation-cell {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-12);
 }
 
-.loops-view__status {
+.automations-view__status {
   flex: 0 0 12px;
   width: 12px;
   height: 12px;
@@ -817,12 +817,12 @@ function formatShortDate(value: string): string {
   background: var(--color-text-muted);
 }
 
-.loops-view__status[data-enabled="true"] {
+.automations-view__status[data-enabled="true"] {
   border-color: var(--color-success);
   background: var(--color-success);
 }
 
-.loops-view__info {
+.automations-view__info {
   min-width: 0;
   display: flex;
   flex-direction: row;
@@ -830,41 +830,41 @@ function formatShortDate(value: string): string {
   gap: var(--space-8);
 }
 
-.loops-view__loop-cell strong,
-.loops-view__loop-cell span,
-.loops-view__meta-cell {
+.automations-view__automation-cell strong,
+.automations-view__automation-cell span,
+.automations-view__meta-cell {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.loops-view__loop-cell strong {
+.automations-view__automation-cell strong {
   color: var(--color-text);
   font-size: var(--font-size-15);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-20);
 }
 
-.loops-view__loop-cell span,
-.loops-view__meta-cell {
+.automations-view__automation-cell span,
+.automations-view__meta-cell {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-18);
 }
 
-.loops-view__meta-cell {
+.automations-view__meta-cell {
   display: block;
   text-align: right;
 }
 
-.loops-view__row-actions {
+.automations-view__row-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.loops-view__row-actions button {
+.automations-view__row-actions button {
   width: 28px;
   height: 28px;
   display: grid;
@@ -876,22 +876,22 @@ function formatShortDate(value: string): string {
   cursor: pointer;
 }
 
-.loops-view__row-actions button:disabled {
+.automations-view__row-actions button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.loops-view__row-actions button:hover:not(:disabled),
-.loops-view__row-actions button:focus-visible:not(:disabled) {
+.automations-view__row-actions button:hover:not(:disabled),
+.automations-view__row-actions button:focus-visible:not(:disabled) {
   color: var(--color-text);
 }
 
-.loops-view__row-actions svg {
+.automations-view__row-actions svg {
   width: var(--icon-md);
   height: var(--icon-md);
 }
 
-.loops-view :deep(.app-data-list__actions) {
+.automations-view :deep(.app-data-list__actions) {
   opacity: 1;
   pointer-events: auto;
 }

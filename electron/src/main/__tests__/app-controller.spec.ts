@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationCleanup, AutomationLocation, AutomationTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -529,6 +529,55 @@ describe('AppController', () => {
       type: 'snapshot.updated',
       payload: payloadSnapshot,
     }));
+  });
+
+  it('replaces generated-image file URLs before sending messages to the renderer', async () => {
+    const snapshot = createInitialSnapshot();
+    const controller = new AppController(snapshot, createBackendClient());
+    const send = vi.fn();
+    const generatedImageUrl = 'file:///Users/nbonamy/.codex-claw/codex-home/generated_images/thread/image.png';
+
+    setMainWindowSend(controller, send);
+    await controller.initialize();
+    (controller as unknown as {
+      emitBackendEvent(event: ClawBackendEvent): void;
+    }).emitBackendEvent({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-dina',
+      turnId: 'turn-image',
+      type: 'message.updated',
+      payload: {
+        message: {
+          id: 'assistant-turn-image',
+          agentId: 'agent-dina',
+          role: 'assistant',
+          status: 'complete',
+          turnId: 'turn-image',
+          createdAt: '2026-08-30T18:33:55.000Z',
+          parts: [{
+            type: 'media',
+            itemId: 'image-live',
+            media: {
+              url: generatedImageUrl,
+              alt: 'Generated image',
+              mimeType: 'image/png',
+              title: 'Generated image',
+            },
+          }],
+        },
+      },
+      occurredAt: '2026-08-30T18:33:55.000Z',
+    });
+
+    const rendererEvent = send.mock.calls.find(([channel, event]) => (
+      channel === ipcChannels.event && event.type === 'message.updated'
+    ))?.[1] as MainToRendererEvent | undefined;
+    const message = (rendererEvent?.payload as { message?: RendererMessage } | undefined)?.message;
+    const media = message?.parts.find((part) => part.type === 'media');
+
+    expect(media?.type === 'media' ? media.media.url : null).toMatch(/^codex-claw-media:\/\/generated\//);
+    expect(media?.type === 'media' ? media.media.url : null).not.toBe(generatedImageUrl);
   });
 
   it('ignores malformed backend event snapshot fields', async () => {
@@ -1349,19 +1398,19 @@ describe('AppController', () => {
     });
   });
 
-  it('routes loop mutations and runs through clawd', async () => {
+  it('routes automation mutations and runs through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
       ...snapshot,
-      loops: [loopFixture({
+      automations: [automationFixture({
         cleanup: { deleteAgent: false },
         teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
       })],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
-    const createInput: CreateLoopInput = {
+    const createInput: CreateAutomationInput = {
       name: 'GitHub bugs',
       enabled: true,
       source: {
@@ -1378,42 +1427,42 @@ describe('AppController', () => {
       },
       instructions: {},
     };
-    const updateInput: UpdateLoopInput = {
+    const updateInput: UpdateAutomationInput = {
       ...createInput,
-      id: 'loop-bugs',
+      id: 'automation-bugs',
     };
 
     await controller.initialize();
 
-    await expect(createLoop(controller, createInput)).resolves.toBe(backendSnapshot);
-    await expect(updateLoop(controller, updateInput)).resolves.toBe(backendSnapshot);
-    await expect(runLoop(controller, 'loop-bugs')).resolves.toBe(backendSnapshot);
-    await expect(clearLoopHistory(controller, 'loop-bugs')).resolves.toBe(backendSnapshot);
-    await expect(deleteLoopExecution(controller, 'loop-bugs', 'loop-exec-1')).resolves.toBe(backendSnapshot);
-    await expect(deleteLoop(controller, 'loop-bugs')).resolves.toBe(backendSnapshot);
+    await expect(createAutomation(controller, createInput)).resolves.toBe(backendSnapshot);
+    await expect(updateAutomation(controller, updateInput)).resolves.toBe(backendSnapshot);
+    await expect(runAutomation(controller, 'automation-bugs')).resolves.toBe(backendSnapshot);
+    await expect(clearAutomationHistory(controller, 'automation-bugs')).resolves.toBe(backendSnapshot);
+    await expect(deleteAutomationExecution(controller, 'automation-bugs', 'automation-exec-1')).resolves.toBe(backendSnapshot);
+    await expect(deleteAutomation(controller, 'automation-bugs')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'loop/create', { input: createInput });
-    expect(request).toHaveBeenNthCalledWith(2, 'loop/update', { input: updateInput });
-    expect(request).toHaveBeenNthCalledWith(3, 'loop/run', { loopId: 'loop-bugs' });
-    expect(request).toHaveBeenNthCalledWith(4, 'loop/history/clear', { loopId: 'loop-bugs' });
-    expect(request).toHaveBeenNthCalledWith(5, 'loop/execution/delete', { loopId: 'loop-bugs', executionId: 'loop-exec-1' });
-    expect(request).toHaveBeenNthCalledWith(6, 'loop/delete', { loopId: 'loop-bugs' });
+    expect(request).toHaveBeenNthCalledWith(1, 'automation/create', { input: createInput });
+    expect(request).toHaveBeenNthCalledWith(2, 'automation/update', { input: updateInput });
+    expect(request).toHaveBeenNthCalledWith(3, 'automation/run', { automationId: 'automation-bugs' });
+    expect(request).toHaveBeenNthCalledWith(4, 'automation/history/clear', { automationId: 'automation-bugs' });
+    expect(request).toHaveBeenNthCalledWith(5, 'automation/execution/delete', { automationId: 'automation-bugs', executionId: 'automation-exec-1' });
+    expect(request).toHaveBeenNthCalledWith(6, 'automation/delete', { automationId: 'automation-bugs' });
   });
 
-  it('routes remote loop requests without adopting the remote snapshot', async () => {
+  it('routes remote automation requests without adopting the remote snapshot', async () => {
     const snapshot = createInitialSnapshot();
     const remoteSnapshot = {
       ...createInitialSnapshot(),
       activeTeamId: 'team-remote',
-      loops: [loopFixture({
+      automations: [automationFixture({
         cleanup: { deleteAgent: false },
         teamTarget: { mode: 'existing', teamId: 'team-remote' },
       })],
     };
     const request = vi.fn().mockResolvedValue(remoteSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
-    const location: LoopLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
-    const createInput: CreateLoopInput = {
+    const location: AutomationLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    const createInput: CreateAutomationInput = {
       name: 'Remote bugs',
       enabled: true,
       source: {
@@ -1433,13 +1482,13 @@ describe('AppController', () => {
 
     await controller.initialize();
 
-    await expect(getLoopSnapshot(controller, location)).resolves.toBe(remoteSnapshot);
-    await expect(createLoop(controller, createInput, location)).resolves.toBe(remoteSnapshot);
-    await expect(runLoop(controller, 'loop-bugs', location)).resolves.toBe(remoteSnapshot);
+    await expect(getAutomationSnapshot(controller, location)).resolves.toBe(remoteSnapshot);
+    await expect(createAutomation(controller, createInput, location)).resolves.toBe(remoteSnapshot);
+    await expect(runAutomation(controller, 'automation-bugs', location)).resolves.toBe(remoteSnapshot);
 
-    expect(request).toHaveBeenNthCalledWith(1, 'snapshot/loops/get', { location });
-    expect(request).toHaveBeenNthCalledWith(2, 'loop/create', { input: createInput, location });
-    expect(request).toHaveBeenNthCalledWith(3, 'loop/run', { loopId: 'loop-bugs', location });
+    expect(request).toHaveBeenNthCalledWith(1, 'snapshot/automations/get', { location });
+    expect(request).toHaveBeenNthCalledWith(2, 'automation/create', { input: createInput, location });
+    expect(request).toHaveBeenNthCalledWith(3, 'automation/run', { automationId: 'automation-bugs', location });
     expect(currentSnapshot(controller)).not.toBe(snapshot);
     expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
@@ -1842,20 +1891,38 @@ describe('AppController', () => {
 
   it('reads historical conversation messages through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const messages = [{
-      id: 'user-thread-dina-user-1',
-      agentId: 'agent-dina',
-      role: 'user' as const,
-      status: 'complete' as const,
-      createdAt: '2026-06-09T10:00:00.000Z',
-      parts: [{ type: 'text' as const, text: 'hello' }],
-    }];
+    const generatedImageUrl = 'file:///Users/nbonamy/.codex-claw/codex-home/generated_images/thread/history.png';
+    const messages: RendererMessage[] = [
+      {
+        id: 'user-thread-dina-user-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-06-09T10:00:00.000Z',
+        parts: [{ type: 'text', text: 'hello' }],
+      },
+      {
+        id: 'assistant-thread-dina-image-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-09T10:00:01.000Z',
+        parts: [{
+          type: 'media',
+          media: { url: generatedImageUrl, mimeType: 'image/png' },
+        }],
+      },
+    ];
     const request = vi.fn().mockResolvedValue(messages);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
 
-    await expect(readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(messages);
+    const loaded = await readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
+    expect(loaded[0]).toStrictEqual(messages[0]);
+    const media = loaded[1]?.parts.find((part) => part.type === 'media');
+    expect(media?.type === 'media' ? media.media.url : null).toMatch(/^codex-claw-media:\/\/generated\//);
+    expect(media?.type === 'media' ? media.media.url : null).not.toBe(generatedImageUrl);
     expect(request).toHaveBeenCalledWith('agent/conversation/messages/get', {
       ref: { backend: 'codex', threadId: 'thread-dina' },
       agentId: 'agent-dina',
@@ -2144,9 +2211,9 @@ describe('AppController', () => {
   });
 });
 
-function loopFixture(input: { cleanup: LoopCleanup; teamTarget: LoopTeamTarget }): Loop {
+function automationFixture(input: { cleanup: AutomationCleanup; teamTarget: AutomationTeamTarget }): Automation {
   return {
-    id: 'loop-bugs',
+    id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
     source: {
@@ -2557,56 +2624,56 @@ async function setCodexResourceSharing(controller: AppController, input: SetCode
   }).setCodexResourceSharing(input);
 }
 
-async function getLoopSnapshot(controller: AppController, location?: LoopLocation): Promise<AppSnapshot> {
+async function getAutomationSnapshot(controller: AppController, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot>;
-  }).getLoopSnapshot(location);
+    getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot>;
+  }).getAutomationSnapshot(location);
 }
 
-async function createLoop(controller: AppController, input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
+async function createAutomation(controller: AppController, input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
-  }).createLoop(input, location);
+    createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot>;
+  }).createAutomation(input, location);
 }
 
-async function updateLoop(controller: AppController, input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
+async function updateAutomation(controller: AppController, input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
-  }).updateLoop(input, location);
+    updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot>;
+  }).updateAutomation(input, location);
 }
 
-async function runLoop(controller: AppController, loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+async function runAutomation(controller: AppController, automationId: string, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  }).runLoop(loopId, location);
+    runAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  }).runAutomation(automationId, location);
 }
 
-async function clearLoopHistory(controller: AppController, loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+async function clearAutomationHistory(controller: AppController, automationId: string, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  }).clearLoopHistory(loopId, location);
+    clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  }).clearAutomationHistory(automationId, location);
 }
 
-async function deleteLoopExecution(controller: AppController, loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot> {
+async function deleteAutomationExecution(controller: AppController, automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  }).deleteLoopExecution(loopId, executionId, location);
+    deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  }).deleteAutomationExecution(automationId, executionId, location);
 }
 
-async function deleteLoop(controller: AppController, loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
+async function deleteAutomation(controller: AppController, automationId: string, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  }).deleteLoop(loopId, location);
+    deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  }).deleteAutomation(automationId, location);
 }
 
 async function readConversationMessages(
   controller: AppController,
   ref: unknown,
   agentId: string,
-  location?: LoopLocation,
+  location?: AutomationLocation,
 ): Promise<RendererMessage[]> {
   return (controller as unknown as {
-    readConversationMessages(ref: unknown, agentId: string, location?: LoopLocation): Promise<RendererMessage[]>;
+    readConversationMessages(ref: unknown, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]>;
   }).readConversationMessages(ref, agentId, location);
 }
 
@@ -2809,15 +2876,15 @@ function revokePairedDevice(controller: AppController, environmentId: string, cl
     .revokePairedDevice(environmentId, clientId);
 }
 
-async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot> {
+async function configureWorkBacklog(controller: AppController, input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<AppSnapshot> {
   return (controller as unknown as {
-    configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
+    configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<AppSnapshot>;
   }).configureWorkBacklog(input, location);
 }
 
 async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
   return (controller as unknown as {
-    listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: import('@codex-claw/core/contracts').LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]>;
+    listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: import('@codex-claw/core/contracts').AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]>;
   }).listWorkItems(provider, repositoryId, undefined, query);
 }
 
@@ -2833,7 +2900,7 @@ async function listGlobalWorkItems(
   query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery,
 ): Promise<import('@codex-claw/core/contracts').WorkItemPage> {
   return (controller as unknown as {
-    listGlobalWorkItems(provider: WorkProviderKind, location?: import('@codex-claw/core/contracts').LoopLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage>;
+    listGlobalWorkItems(provider: WorkProviderKind, location?: import('@codex-claw/core/contracts').AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage>;
   }).listGlobalWorkItems(provider, undefined, query);
 }
 

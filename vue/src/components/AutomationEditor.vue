@@ -1,58 +1,58 @@
 <template>
-  <form class="loop-editor" @submit.prevent="submit">
-    <header class="loop-editor__header">
+  <form class="automation-editor" @submit.prevent="submit">
+    <header class="automation-editor__header">
       <div>
-        <h3>{{ mode === 'edit' ? $t('surface.loopEditor.editLoop') : $t('surface.loopEditor.createLoop') }}</h3>
-        <p>{{ $t('surface.loopEditor.watchWorkCreateTheRightAgentAndSendTheAssignmentAutomati') }}</p>
+        <h3>{{ mode === 'edit' ? $t('surface.automationEditor.editAutomation') : $t('surface.automationEditor.createAutomation') }}</h3>
+        <p>{{ $t('surface.automationEditor.watchWorkCreateTheRightAgentAndSendTheAssignmentAutomati') }}</p>
       </div>
       <el-switch
         v-model="form.enabled"
-        :aria-label="$t('surface.loopEditor.loopEnabled')"
+        :aria-label="$t('surface.automationEditor.automationEnabled')"
         active-text="On"
         inactive-text="Off"
       />
     </header>
 
-    <div class="loop-editor__body">
+    <div class="automation-editor__body">
       <div
         v-if="!githubConnected"
-        class="loop-editor__notice"
-      > {{ $t('surface.loopEditor.connectGitHubInSettingsBeforeSavingALoop') }} </div>
+        class="automation-editor__notice"
+      > {{ $t('surface.automationEditor.connectGitHubInSettingsBeforeSavingAnAutomation') }} </div>
 
-      <section class="loop-editor__section">
-        <label for="loop-editor-name">{{ $t('surface.loopEditor.name') }}</label>
+      <section class="automation-editor__section">
+        <label for="automation-editor-name">{{ $t('surface.automationEditor.name') }}</label>
         <el-input
-          id="loop-editor-name"
+          id="automation-editor-name"
           v-model="form.name"
-          :placeholder="$t('surface.loopEditor.loopName')"
+          :placeholder="$t('surface.automationEditor.automationName')"
         />
       </section>
 
       <section
-        class="loop-editor__source-group"
-        :aria-label="$t('surface.loopEditor.loopSourceFilters')"
+        class="automation-editor__source-group"
+        :aria-label="$t('surface.automationEditor.automationSourceFilters')"
       >
-        <div class="loop-editor__source-row">
-          <div class="loop-editor__section">
-            <label for="loop-editor-provider">{{ $t('surface.loopEditor.provider') }}</label>
+        <div class="automation-editor__source-row">
+          <div class="automation-editor__section">
+            <label for="automation-editor-provider">{{ $t('surface.automationEditor.provider') }}</label>
             <el-select
-              id="loop-editor-provider"
+              id="automation-editor-provider"
               v-model="form.provider"
               disabled
-              :aria-label="$t('surface.loopEditor.loopProvider')"
+              :aria-label="$t('surface.automationEditor.automationProvider')"
             >
-              <el-option :label="$t('surface.loopEditor.gitHub')" value="github" />
+              <el-option :label="$t('surface.automationEditor.gitHub')" value="github" />
             </el-select>
           </div>
 
-          <div class="loop-editor__section">
-            <label for="loop-editor-repository">{{ $t('surface.loopEditor.repo') }}</label>
+          <div class="automation-editor__section">
+            <label for="automation-editor-repository">{{ $t('surface.automationEditor.repo') }}</label>
             <el-select
-              id="loop-editor-repository"
+              id="automation-editor-repository"
               v-model="form.repositoryId"
               filterable
-              :placeholder="$t('surface.loopEditor.selectRepo')"
-              :aria-label="$t('surface.loopEditor.loopRepository')"
+              :placeholder="$t('surface.automationEditor.selectRepo')"
+              :aria-label="$t('surface.automationEditor.automationRepository')"
               :disabled="!githubConnected || sortedRepositories.length === 0"
               @change="repositoryChanged"
             >
@@ -66,16 +66,16 @@
           </div>
         </div>
 
-        <div class="loop-editor__source-row">
-          <div class="loop-editor__section">
-            <label for="loop-editor-assignee">{{ $t('surface.loopEditor.assignedTo') }}</label>
+        <div class="automation-editor__source-row">
+          <div class="automation-editor__section">
+            <label for="automation-editor-assignee">{{ $t('surface.automationEditor.assignedTo') }}</label>
             <el-select
-              id="loop-editor-assignee"
+              id="automation-editor-assignee"
               v-model="form.assigneeLogin"
               clearable
               filterable
-              :placeholder="$t('surface.loopEditor.anyone')"
-              :aria-label="$t('surface.loopEditor.loopAssignee')"
+              :placeholder="$t('surface.automationEditor.anyone')"
+              :aria-label="$t('surface.automationEditor.automationAssignee')"
               :disabled="!form.repositoryId || assigneeOptions.length === 0"
             >
               <el-option
@@ -87,15 +87,15 @@
             </el-select>
           </div>
 
-          <div class="loop-editor__section">
-            <label for="loop-editor-tag">{{ $t('surface.loopEditor.tag') }}</label>
+          <div class="automation-editor__section">
+            <label for="automation-editor-tag">{{ $t('surface.automationEditor.tag') }}</label>
             <el-select
-              id="loop-editor-tag"
+              id="automation-editor-tag"
               v-model="form.tagName"
               clearable
               filterable
-              :placeholder="$t('surface.loopEditor.anyTag')"
-              :aria-label="$t('surface.loopEditor.loopTag')"
+              :placeholder="$t('surface.automationEditor.anyTag')"
+              :aria-label="$t('surface.automationEditor.automationTag')"
               :disabled="!form.repositoryId || tagOptions.length === 0"
             >
               <el-option
@@ -109,49 +109,49 @@
         </div>
       </section>
 
-      <section class="loop-editor__section">
-        <label for="loop-editor-assignment-instructions">{{ $t('surface.loopEditor.assignmentInstructions') }}</label>
+      <section class="automation-editor__section">
+        <label for="automation-editor-assignment-instructions">{{ $t('surface.automationEditor.assignmentInstructions') }}</label>
         <el-input
-          id="loop-editor-assignment-instructions"
+          id="automation-editor-assignment-instructions"
           v-model="form.assignmentInstructions"
           type="textarea"
           :rows="3"
-          :placeholder="$t('surface.loopEditor.optionalInstructionsToIncludeWhenTheTicketIsAssigned')"
+          :placeholder="$t('surface.automationEditor.optionalInstructionsToIncludeWhenTheTicketIsAssigned')"
         />
       </section>
 
-      <section class="loop-editor__section">
-        <label for="loop-editor-completion-instructions">{{ $t('surface.loopEditor.beforeCompletion') }}</label>
+      <section class="automation-editor__section">
+        <label for="automation-editor-completion-instructions">{{ $t('surface.automationEditor.beforeCompletion') }}</label>
         <el-input
-          id="loop-editor-completion-instructions"
+          id="automation-editor-completion-instructions"
           v-model="form.beforeCompletionInstructions"
           type="textarea"
           :rows="3"
-          :placeholder="$t('surface.loopEditor.optionalInstructionsToShowWhenTheAgentMarksTheTicketComp')"
+          :placeholder="$t('surface.automationEditor.optionalInstructionsToShowWhenTheAgentMarksTheTicketComp')"
         />
       </section>
 
       <section
-        class="loop-editor__source-group"
-        :aria-label="$t('surface.loopEditor.loopAgentTarget')"
+        class="automation-editor__source-group"
+        :aria-label="$t('surface.automationEditor.automationAgentTarget')"
       >
-        <div class="loop-editor__source-row">
-          <div class="loop-editor__section">
-            <label for="loop-editor-agent">{{ $t('surface.loopEditor.agent') }}</label>
+        <div class="automation-editor__source-row">
+          <div class="automation-editor__section">
+            <label for="automation-editor-agent">{{ $t('surface.automationEditor.agent') }}</label>
             <el-select
-              id="loop-editor-agent"
+              id="automation-editor-agent"
               v-model="form.actionMode"
               filterable
-              :placeholder="$t('surface.loopEditor.selectAgent')"
-              :aria-label="$t('surface.loopEditor.loopAgent')"
+              :placeholder="$t('surface.automationEditor.selectAgent')"
+              :aria-label="$t('surface.automationEditor.automationAgent')"
             >
               <el-option
-                :label="$t('surface.loopEditor.newAgent')"
+                :label="$t('surface.automationEditor.newAgent')"
                 value="new-agent"
               />
               <el-option-group
                 v-if="benchTemplates.length > 0"
-                :label="$t('surface.loopEditor.bench')"
+                :label="$t('surface.automationEditor.bench')"
               >
                 <el-option
                   v-for="template in benchTemplates"
@@ -159,7 +159,7 @@
                   :label="template.name"
                   :value="`bench:${template.id}`"
                 >
-                  <span class="loop-editor__bench-option">
+                  <span class="automation-editor__bench-option">
                     <span>
                       <strong>{{ template.name }}</strong>
                       <small>{{ template.folder }}</small>
@@ -170,30 +170,30 @@
             </el-select>
           </div>
 
-          <div class="loop-editor__section">
-            <label for="loop-editor-team-mode">{{ $t('surface.loopEditor.team') }}</label>
+          <div class="automation-editor__section">
+            <label for="automation-editor-team-mode">{{ $t('surface.automationEditor.team') }}</label>
             <el-select
-              id="loop-editor-team-mode"
+              id="automation-editor-team-mode"
               v-model="form.teamMode"
-              :aria-label="$t('surface.loopEditor.loopTeamMode')"
+              :aria-label="$t('surface.automationEditor.automationTeamMode')"
             >
-              <el-option :label="$t('surface.loopEditor.existingTeam')" value="existing" />
-              <el-option :label="$t('surface.loopEditor.dedicatedTeamPerTicket')" value="dedicated" />
+              <el-option :label="$t('surface.automationEditor.existingTeam')" value="existing" />
+              <el-option :label="$t('surface.automationEditor.dedicatedTeamPerTicket')" value="dedicated" />
             </el-select>
           </div>
         </div>
 
         <div
           v-if="form.teamMode === 'existing'"
-          class="loop-editor__section"
+          class="automation-editor__section"
         >
-          <label for="loop-editor-team">{{ $t('surface.loopEditor.targetTeam') }}</label>
+          <label for="automation-editor-team">{{ $t('surface.automationEditor.targetTeam') }}</label>
           <el-select
-            id="loop-editor-team"
+            id="automation-editor-team"
             v-model="form.teamId"
             filterable
-            :placeholder="$t('surface.loopEditor.selectTeam')"
-            :aria-label="$t('surface.loopEditor.loopTargetTeam')"
+            :placeholder="$t('surface.automationEditor.selectTeam')"
+            :aria-label="$t('surface.automationEditor.automationTargetTeam')"
           >
             <el-option
               v-for="team in teams"
@@ -206,15 +206,15 @@
 
         <div
           v-if="form.actionMode === 'new-agent'"
-          class="loop-editor__section"
+          class="automation-editor__section"
         >
-          <label for="loop-editor-source-repository">{{ $t('surface.loopEditor.repository') }}</label>
+          <label for="automation-editor-source-repository">{{ $t('surface.automationEditor.repository') }}</label>
           <el-select
-            id="loop-editor-source-repository"
+            id="automation-editor-source-repository"
             :model-value="form.sourceRepositoryPath"
             filterable
-            :placeholder="$t('surface.loopEditor.selectRepository')"
-            :aria-label="$t('surface.loopEditor.loopSourceRepository')"
+            :placeholder="$t('surface.automationEditor.selectRepository')"
+            :aria-label="$t('surface.automationEditor.automationSourceRepository')"
             @update:model-value="selectSourceRepository"
           >
             <el-option
@@ -228,7 +228,7 @@
               :label="repository.name"
               :value="repository.path"
             >
-              <span class="loop-editor__repository-option">
+              <span class="automation-editor__repository-option">
                 <strong>{{ repository.name }}</strong>
                 <small>{{ repository.path }}</small>
               </span>
@@ -240,7 +240,7 @@
               :value="sourceDividerOptionValue"
             />
             <el-option
-              :label="$t('surface.loopEditor.pickFolder')"
+              :label="$t('surface.automationEditor.pickFolder')"
               :value="pickFolderOptionValue"
             />
           </el-select>
@@ -248,30 +248,30 @@
 
         <div
           v-if="form.actionMode === 'new-agent'"
-          class="loop-editor__source-row"
-          :aria-label="$t('surface.loopEditor.loopAgentBackendDefaults')"
+          class="automation-editor__source-row"
+          :aria-label="$t('surface.automationEditor.automationAgentBackendDefaults')"
         >
-          <div class="loop-editor__section">
-            <label for="loop-editor-backend">{{ $t('surface.loopEditor.backend') }}</label>
+          <div class="automation-editor__section">
+            <label for="automation-editor-backend">{{ $t('surface.automationEditor.backend') }}</label>
             <el-select
-              id="loop-editor-backend"
+              id="automation-editor-backend"
               v-model="form.backend"
-              :aria-label="$t('surface.loopEditor.loopBackend')"
+              :aria-label="$t('surface.automationEditor.automationBackend')"
             >
-              <el-option :label="$t('surface.loopEditor.codex')" value="codex" />
+              <el-option :label="$t('surface.automationEditor.codex')" value="codex" />
             </el-select>
           </div>
 
-          <div class="loop-editor__section">
-            <label for="loop-editor-model">{{ $t('surface.loopEditor.model') }}</label>
+          <div class="automation-editor__section">
+            <label for="automation-editor-model">{{ $t('surface.automationEditor.model') }}</label>
             <el-select
               v-if="backendModels.length > 0"
-              id="loop-editor-model"
+              id="automation-editor-model"
               v-model="form.model"
               clearable
               filterable
-              :placeholder="$t('surface.loopEditor.defaultModel')"
-              :aria-label="$t('surface.loopEditor.loopModel')"
+              :placeholder="$t('surface.automationEditor.defaultModel')"
+              :aria-label="$t('surface.automationEditor.automationModel')"
             >
               <el-option
                 v-for="model in backendModels"
@@ -282,28 +282,28 @@
             </el-select>
             <el-input
               v-else
-              id="loop-editor-model"
+              id="automation-editor-model"
               v-model="form.model"
-              :placeholder="$t('surface.loopEditor.defaultModel')"
-              :aria-label="$t('surface.loopEditor.loopModel')"
+              :placeholder="$t('surface.automationEditor.defaultModel')"
+              :aria-label="$t('surface.automationEditor.automationModel')"
             />
           </div>
         </div>
 
         <div
           v-if="form.actionMode === 'new-agent'"
-          class="loop-editor__source-row"
-          :aria-label="$t('surface.loopEditor.loopThinkingDefaults')"
+          class="automation-editor__source-row"
+          :aria-label="$t('surface.automationEditor.automationThinkingDefaults')"
         >
-          <div class="loop-editor__section">
-            <label for="loop-editor-thinking">{{ $t('surface.loopEditor.thinking') }}</label>
+          <div class="automation-editor__section">
+            <label for="automation-editor-thinking">{{ $t('surface.automationEditor.thinking') }}</label>
             <el-select
-              id="loop-editor-thinking"
+              id="automation-editor-thinking"
               v-model="form.reasoningEffort"
               clearable
               filterable
-              :placeholder="$t('surface.loopEditor.default')"
-              :aria-label="$t('surface.loopEditor.loopThinking')"
+              :placeholder="$t('surface.automationEditor.default')"
+              :aria-label="$t('surface.automationEditor.automationThinking')"
               :disabled="reasoningOptions.length === 0"
             >
               <el-option
@@ -318,25 +318,25 @@
         </div>
       </section>
 
-      <section class="loop-editor__section loop-editor__section--compact">
+      <section class="automation-editor__section automation-editor__section--compact">
         <el-checkbox
           v-if="form.teamMode === 'existing'"
           v-model="form.cleanupDeleteAgent"
-        > {{ $t('surface.loopEditor.deleteAgentWhenWorkItemCompletes') }} </el-checkbox>
+        > {{ $t('surface.automationEditor.deleteAgentWhenWorkItemCompletes') }} </el-checkbox>
         <el-checkbox
           v-else
           v-model="form.cleanupDeleteTeam"
-        > {{ $t('surface.loopEditor.deleteTeamWhenWorkItemCompletes') }} </el-checkbox>
+        > {{ $t('surface.automationEditor.deleteTeamWhenWorkItemCompletes') }} </el-checkbox>
       </section>
     </div>
 
-    <footer class="loop-editor__footer">
-      <el-button @click="emit('cancel')">{{ $t('surface.loopEditor.cancel') }}</el-button>
+    <footer class="automation-editor__footer">
+      <el-button @click="emit('cancel')">{{ $t('surface.automationEditor.cancel') }}</el-button>
       <el-button
         type="primary"
         native-type="submit"
         :disabled="!canSubmit"
-      > {{ $t('surface.loopEditor.saveLoop') }} </el-button>
+      > {{ $t('surface.automationEditor.saveAutomation') }} </el-button>
     </footer>
   </form>
 </template>
@@ -344,7 +344,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, onMounted, reactive, watch } from 'vue';
-import type { BackendDefaults, BackendModelOption, BenchTemplate, CreateLoopInput, Loop, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { BackendDefaults, BackendModelOption, BenchTemplate, CreateAutomationInput, Automation, ReasoningEffort, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 
 type TeamMode = 'existing' | 'dedicated';
 type ActionMode = 'new-agent' | `bench:${string}`;
@@ -355,7 +355,7 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder?: () => Promise<string | null>;
   connection?: WorkIntegrationConnection | null;
   itemsByRepository?: Record<string, WorkItem[]>;
-  loop?: Loop | null;
+  automation?: Automation | null;
   mode: 'create' | 'edit';
   repositories: WorkRepository[];
   sourceRepositories?: SourceRepository[];
@@ -365,7 +365,7 @@ const props = withDefaults(defineProps<{
   chooseAgentFolder: async () => null,
   connection: null,
   itemsByRepository: () => ({}),
-  loop: null,
+  automation: null,
   sourceRepositories: () => [],
 });
 
@@ -373,37 +373,37 @@ const emit = defineEmits<{
   cancel: [];
   'load-items': [repositoryId: string];
   'load-repositories': [];
-  submit: [input: CreateLoopInput];
+  submit: [input: CreateAutomationInput];
 }>();
 
 const pickFolderOptionValue = '__pick-folder__';
 const sourceDividerOptionValue = '__source-divider__';
 
 const form = reactive({
-  name: props.loop?.name ?? '',
-  enabled: props.loop?.enabled ?? true,
+  name: props.automation?.name ?? '',
+  enabled: props.automation?.enabled ?? true,
   provider: 'github' as const,
-  repositoryId: props.loop?.source.repositoryId ?? props.repositories[0]?.id ?? '',
-  assigneeLogin: props.loop?.source.assigneeLogin ?? '',
-  tagName: props.loop?.source.tagName ?? '',
-  assignmentInstructions: props.loop?.instructions.assignment ?? '',
-  beforeCompletionInstructions: props.loop?.instructions.beforeCompletion ?? '',
-  actionMode: initialActionMode(props.loop),
+  repositoryId: props.automation?.source.repositoryId ?? props.repositories[0]?.id ?? '',
+  assigneeLogin: props.automation?.source.assigneeLogin ?? '',
+  tagName: props.automation?.source.tagName ?? '',
+  assignmentInstructions: props.automation?.instructions.assignment ?? '',
+  beforeCompletionInstructions: props.automation?.instructions.beforeCompletion ?? '',
+  actionMode: initialActionMode(props.automation),
   backend: 'codex' as const,
-  model: initialModel(props.loop),
-  reasoningEffort: initialReasoningEffort(props.loop),
-  sourceRepositoryPath: props.loop?.action.type === 'create-agent'
-    ? props.loop.action.sourceRepositoryPath
+  model: initialModel(props.automation),
+  reasoningEffort: initialReasoningEffort(props.automation),
+  sourceRepositoryPath: props.automation?.action.type === 'create-agent'
+    ? props.automation.action.sourceRepositoryPath
     : props.sourceRepositories[0]?.path ?? '',
-  teamMode: (props.loop?.action.teamTarget.mode ?? 'existing') as TeamMode,
-  teamId: props.loop?.action.teamTarget.mode === 'existing'
-    ? props.loop.action.teamTarget.teamId
+  teamMode: (props.automation?.action.teamTarget.mode ?? 'existing') as TeamMode,
+  teamId: props.automation?.action.teamTarget.mode === 'existing'
+    ? props.automation.action.teamTarget.teamId
     : props.teams[0]?.id ?? '',
-  cleanupDeleteAgent: props.loop?.action.teamTarget.mode === 'existing'
-    ? props.loop.action.cleanup?.deleteAgent !== false
+  cleanupDeleteAgent: props.automation?.action.teamTarget.mode === 'existing'
+    ? props.automation.action.cleanup?.deleteAgent !== false
     : true,
-  cleanupDeleteTeam: props.loop?.action.teamTarget.mode === 'dedicated'
-    ? props.loop.action.cleanup?.deleteTeam !== false
+  cleanupDeleteTeam: props.automation?.action.teamTarget.mode === 'dedicated'
+    ? props.automation.action.cleanup?.deleteTeam !== false
     : true,
 });
 
@@ -450,7 +450,7 @@ const assigneeOptions = computed(() => {
   return [...assignees]
     .sort((left, right) => left.localeCompare(right))
     .map((assignee) => ({
-      label: accountLabel && assignee === accountLabel ? translate('surface.loopEditor.me') : assignee,
+      label: accountLabel && assignee === accountLabel ? translate('surface.automationEditor.me') : assignee,
       value: assignee,
     }));
 });
@@ -583,7 +583,7 @@ function submit(): void {
         type: 'create-agent',
         sourceRepositoryPath: form.sourceRepositoryPath,
         backend: form.backend,
-        backendDefaults: loopBackendDefaults(),
+        backendDefaults: automationBackendDefaults(),
         teamTarget,
         cleanup,
       }
@@ -596,7 +596,7 @@ function submit(): void {
   });
 }
 
-function loopBackendDefaults(): BackendDefaults {
+function automationBackendDefaults(): BackendDefaults {
   return {
     kind: 'codex',
     ...(form.model.trim() ? { model: form.model.trim() } : {}),
@@ -604,28 +604,28 @@ function loopBackendDefaults(): BackendDefaults {
   };
 }
 
-function initialActionMode(loop: Loop | null | undefined): ActionMode {
-  if (loop?.action.type === 'create-agent-from-bench') {
-    return `bench:${loop.action.benchTemplateId}`;
+function initialActionMode(automation: Automation | null | undefined): ActionMode {
+  if (automation?.action.type === 'create-agent-from-bench') {
+    return `bench:${automation.action.benchTemplateId}`;
   }
   return 'new-agent';
 }
 
-function initialModel(loop: Loop | null | undefined): string {
-  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'codex'
-    ? loop.action.backendDefaults.model ?? ''
+function initialModel(automation: Automation | null | undefined): string {
+  return automation?.action.type === 'create-agent' && automation.action.backendDefaults?.kind === 'codex'
+    ? automation.action.backendDefaults.model ?? ''
     : '';
 }
 
-function initialReasoningEffort(loop: Loop | null | undefined): ReasoningEffort | '' {
-  return loop?.action.type === 'create-agent' && loop.action.backendDefaults?.kind === 'codex'
-    ? loop.action.backendDefaults.reasoningEffort ?? ''
+function initialReasoningEffort(automation: Automation | null | undefined): ReasoningEffort | '' {
+  return automation?.action.type === 'create-agent' && automation.action.backendDefaults?.kind === 'codex'
+    ? automation.action.backendDefaults.reasoningEffort ?? ''
     : '';
 }
 
 function effortLabel(effort: ReasoningEffort): string {
   if (effort.trim().toLowerCase() === 'xhigh') {
-    return translate('surface.loopEditor.extraHigh');
+    return translate('surface.automationEditor.extraHigh');
   }
 
   return effort
@@ -645,7 +645,7 @@ function basename(value: string): string {
 </script>
 
 <style scoped>
-.loop-editor {
+.automation-editor {
   max-height: calc(100vh - var(--workbench-appbar-height) - var(--space-32));
   min-height: 0;
   display: flex;
@@ -653,7 +653,7 @@ function basename(value: string): string {
   overflow: hidden;
 }
 
-.loop-editor__header {
+.automation-editor__header {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -667,7 +667,7 @@ function basename(value: string): string {
   background: var(--color-shell-main);
 }
 
-.loop-editor__body {
+.automation-editor__body {
   min-height: 0;
   display: flex;
   flex: 1 1 auto;
@@ -678,26 +678,26 @@ function basename(value: string): string {
   scrollbar-width: thin;
 }
 
-.loop-editor__header h3,
-.loop-editor__header p {
+.automation-editor__header h3,
+.automation-editor__header p {
   margin: 0;
 }
 
-.loop-editor__header h3 {
+.automation-editor__header h3 {
   color: var(--color-text);
   font-size: var(--font-size-18);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-24);
 }
 
-.loop-editor__header p,
-.loop-editor__notice {
+.automation-editor__header p,
+.automation-editor__notice {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
 }
 
-.loop-editor__notice {
+.automation-editor__notice {
   padding: var(--space-10) var(--space-12);
   border: 1px solid var(--color-warning-container);
   border-radius: var(--radius-md);
@@ -705,51 +705,51 @@ function basename(value: string): string {
   background: var(--color-warning-container);
 }
 
-.loop-editor__grid {
+.automation-editor__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-12);
 }
 
-.loop-editor__source-group {
+.automation-editor__source-group {
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
 }
 
-.loop-editor__source-row {
+.automation-editor__source-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-12);
 }
 
-.loop-editor__section {
+.automation-editor__section {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
 }
 
-.loop-editor__section--compact {
+.automation-editor__section--compact {
   gap: 0;
 }
 
-.loop-editor__section label {
+.automation-editor__section label {
   color: var(--color-text);
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-18);
 }
 
-.loop-editor__bench-option,
-.loop-editor__repository-option {
+.automation-editor__bench-option,
+.automation-editor__repository-option {
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
 }
 
-.loop-editor__bench-option span {
+.automation-editor__bench-option span {
   min-width: 0;
   display: flex;
   align-items: center;
@@ -757,33 +757,33 @@ function basename(value: string): string {
   line-height: var(--line-height-18);
 }
 
-.loop-editor__repository-option {
+.automation-editor__repository-option {
   width: 100%;
   justify-content: space-between;
   gap: var(--space-12);
 }
 
-.loop-editor__repository-option strong,
-.loop-editor__repository-option small,
-.loop-editor__bench-option strong,
-.loop-editor__bench-option small {
+.automation-editor__repository-option strong,
+.automation-editor__repository-option small,
+.automation-editor__bench-option strong,
+.automation-editor__bench-option small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.loop-editor__repository-option strong,
-.loop-editor__bench-option strong {
+.automation-editor__repository-option strong,
+.automation-editor__bench-option strong {
   color: var(--color-text);
   font-weight: var(--font-weight-regular);
 }
 
-.loop-editor__repository-option small,
-.loop-editor__bench-option small {
+.automation-editor__repository-option small,
+.automation-editor__bench-option small {
   color: var(--color-text-muted);
 }
 
-.loop-editor__footer {
+.automation-editor__footer {
   position: sticky;
   bottom: 0;
   z-index: 1;

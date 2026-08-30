@@ -1,28 +1,28 @@
 <template>
   <AppDataList
-    class="loop-execution-log"
-    :title="loop.name"
+    class="automation-execution-log"
+    :title="automation.name"
     :subtitle="executionCountLabel"
-    :aria-label="$t('surface.loopExecutionLog.loopExecutionLog')"
+    :aria-label="$t('surface.automationExecutionLog.automationExecutionLog')"
     :columns="executionColumns"
-    :empty-text="$t('dynamic.loops.noExecutions')"
+    :empty-text="$t('dynamic.automations.noExecutions')"
     :rows="executionRows"
   >
     <template #headerActions>
-      <div class="loop-execution-log__header-actions">
+      <div class="automation-execution-log__header-actions">
         <el-button
           type="danger"
-          :disabled="loop.executionLog.length === 0"
-          @click="emit('clear-history', loop.id)"
-        > {{ $t('surface.loopExecutionLog.clear') }} </el-button>
+          :disabled="automation.executionLog.length === 0"
+          @click="emit('clear-history', automation.id)"
+        > {{ $t('surface.automationExecutionLog.clear') }} </el-button>
         <el-button
           @click="emit('close')"
-        > {{ $t('surface.loopExecutionLog.back') }} </el-button>
+        > {{ $t('surface.automationExecutionLog.back') }} </el-button>
       </div>
     </template>
 
     <template #cell-ticket="{ row }">
-      <div class="loop-execution-log__ticket-cell">
+      <div class="automation-execution-log__ticket-cell">
         <a
           v-if="triggerUrlForRow(row)"
           :href="triggerUrlForRow(row)"
@@ -33,13 +33,13 @@
         </a>
         <span
           v-else
-          class="loop-execution-log__muted"
+          class="automation-execution-log__muted"
         >
           -
         </span>
         <p
           v-if="row.error"
-          class="loop-execution-log__error"
+          class="automation-execution-log__error"
         >
           {{ row.error }}
         </p>
@@ -51,11 +51,11 @@
     </template>
 
     <template #cell-duration="{ row }">
-      <span class="loop-execution-log__muted">{{ row.duration }}</span>
+      <span class="automation-execution-log__muted">{{ row.duration }}</span>
     </template>
 
     <template #cell-status="{ row }">
-      <LoopExecutionStatusActions
+      <AutomationExecutionStatusActions
         :status="statusForRow(row)"
         :status-label="statusLabelForRow(row)"
         :ticket="ticketForRow(row)"
@@ -65,7 +65,7 @@
     </template>
   </AppDataList>
 
-  <LoopExecutionConversationOverlay
+  <AutomationExecutionConversationOverlay
     v-if="selectedConversation"
     :agent-name="selectedConversation.agentName"
     :error="selectedConversation.error"
@@ -79,21 +79,21 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref } from 'vue';
-import type { BackendConversationRef, Loop, LoopExecutionStatus, RendererMessage } from '@codex-claw/core/contracts';
+import type { BackendConversationRef, Automation, AutomationExecutionStatus, RendererMessage } from '@codex-claw/core/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
-import LoopExecutionConversationOverlay from './LoopExecutionConversationOverlay.vue';
-import LoopExecutionStatusActions from './LoopExecutionStatusActions.vue';
+import AutomationExecutionConversationOverlay from './AutomationExecutionConversationOverlay.vue';
+import AutomationExecutionStatusActions from './AutomationExecutionStatusActions.vue';
 
 const props = defineProps<{
-  loop: Loop;
+  automation: Automation;
   messages: RendererMessage[];
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
 }>();
 
 const emit = defineEmits<{
-  'clear-history': [loopId: string];
-  'delete-execution': [payload: { executionId: string; loopId: string }];
+  'clear-history': [automationId: string];
+  'delete-execution': [payload: { executionId: string; automationId: string }];
   close: [];
 }>();
 
@@ -108,7 +108,7 @@ type SelectedConversation = {
 
 const selectedConversation = ref<SelectedConversation | null>(null);
 
-const entries = computed(() => [...props.loop.executionLog].sort((left, right) => (
+const entries = computed(() => [...props.automation.executionLog].sort((left, right) => (
   Date.parse(right.startedAt) - Date.parse(left.startedAt)
 )));
 
@@ -118,21 +118,21 @@ const executionCountLabel = computed(() => (
 
 const executionColumns: AppDataListColumn[] = [{
   id: 'ticket',
-  label: translate('surface.loopExecutionLog.ticket'),
+  label: translate('surface.automationExecutionLog.ticket'),
   width: 'minmax(0, 1fr)',
 }, {
   id: 'startedAt',
-  label: translate('surface.loopExecutionLog.startTime'),
+  label: translate('surface.automationExecutionLog.startTime'),
   width: 'max-content',
   align: 'end',
 }, {
   id: 'duration',
-  label: translate('surface.loopExecutionLog.executionTime'),
+  label: translate('surface.automationExecutionLog.executionTime'),
   width: 'max-content',
   align: 'end',
 }, {
   id: 'status',
-  label: translate('surface.loopExecutionLog.status'),
+  label: translate('surface.automationExecutionLog.status'),
   width: 'max-content',
   align: 'end',
 }];
@@ -154,11 +154,11 @@ const executionRows = computed<AppDataListRow[]>(() => entries.value.map((entry)
 
 const selectedConversationMessages = computed<RendererMessage[]>(() => selectedConversation.value?.messages ?? []);
 
-function statusLabel(status: LoopExecutionStatus): string {
+function statusLabel(status: AutomationExecutionStatus): string {
   if (status === 'completed') {
-    return translate('surface.loopExecutionLog.completed');
+    return translate('surface.automationExecutionLog.completed');
   }
-  return status === 'failed' ? translate('surface.loopExecutionLog.failed') : translate('surface.loopExecutionLog.working');
+  return status === 'failed' ? translate('surface.automationExecutionLog.failed') : translate('surface.automationExecutionLog.working');
 }
 
 function startedAtForRow(row: AppDataListRow): string {
@@ -169,7 +169,7 @@ function triggerUrlForRow(row: AppDataListRow): string {
   return typeof row.triggerUrl === 'string' ? row.triggerUrl : '';
 }
 
-function statusForRow(row: AppDataListRow): LoopExecutionStatus {
+function statusForRow(row: AppDataListRow): AutomationExecutionStatus {
   return row.status === 'completed' || row.status === 'failed' || row.status === 'working'
     ? row.status
     : 'working';
@@ -204,7 +204,7 @@ function agentIdForRow(row: AppDataListRow): string {
 }
 
 function agentNameForRow(row: AppDataListRow): string {
-  return typeof row.agentName === 'string' && row.agentName.trim() ? row.agentName : translate('surface.loopExecutionLog.agent');
+  return typeof row.agentName === 'string' && row.agentName.trim() ? row.agentName : translate('surface.automationExecutionLog.agent');
 }
 
 function executionIdForRow(row: AppDataListRow): string {
@@ -257,7 +257,7 @@ function deleteExecution(row: AppDataListRow): void {
   if (executionId) {
     emit('delete-execution', {
       executionId,
-      loopId: props.loop.id,
+      automationId: props.automation.id,
     });
   }
 }
@@ -290,7 +290,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
 function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return translate('surface.loopExecutionLog.unknownTime');
+    return translate('surface.automationExecutionLog.unknownTime');
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -309,7 +309,7 @@ function formatDuration(startedAt: string, completedAt?: string): string {
   const started = Date.parse(startedAt);
   const completed = Date.parse(completedAt);
   if (!Number.isFinite(started) || !Number.isFinite(completed) || completed < started) {
-    return translate('surface.loopExecutionLog.unknown');
+    return translate('surface.automationExecutionLog.unknown');
   }
 
   const seconds = Math.round((completed - started) / 1000);
@@ -325,7 +325,7 @@ function formatDuration(startedAt: string, completedAt?: string): string {
 </script>
 
 <style scoped>
-.loop-execution-log__muted {
+.automation-execution-log__muted {
   display: block;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
@@ -335,14 +335,14 @@ function formatDuration(startedAt: string, completedAt?: string): string {
   white-space: nowrap;
 }
 
-.loop-execution-log__ticket-cell {
+.automation-execution-log__ticket-cell {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
 }
 
-.loop-execution-log__ticket-cell a {
+.automation-execution-log__ticket-cell a {
   display: block;
   overflow: hidden;
   color: var(--color-text);
@@ -351,12 +351,12 @@ function formatDuration(startedAt: string, completedAt?: string): string {
   white-space: nowrap;
 }
 
-.loop-execution-log__ticket-cell a:hover,
-.loop-execution-log__ticket-cell a:focus-visible {
+.automation-execution-log__ticket-cell a:hover,
+.automation-execution-log__ticket-cell a:focus-visible {
   color: var(--color-primary);
 }
 
-.loop-execution-log__ticket-cell p {
+.automation-execution-log__ticket-cell p {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
@@ -364,11 +364,11 @@ function formatDuration(startedAt: string, completedAt?: string): string {
   line-height: var(--line-height-18);
 }
 
-.loop-execution-log__error {
+.automation-execution-log__error {
   color: var(--color-error);
 }
 
-.loop-execution-log time {
+.automation-execution-log time {
   display: block;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);

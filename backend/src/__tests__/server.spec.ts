@@ -571,7 +571,7 @@ describe('ClawBackendServer', () => {
       [backendMethods.sourceWorktreeCreate, { input: { repoPath: '', branchName: '' } }, 'configured'],
       [backendMethods.workProviderConnect, { provider: 'linear' }, 'work integrations'],
       [backendMethods.snapshotBenchGet, { location: { kind: 'elsewhere' } }, 'location'],
-      [backendMethods.snapshotLoopsGet, { location: { kind: 'elsewhere' } }, 'location'],
+      [backendMethods.snapshotAutomationsGet, { location: { kind: 'elsewhere' } }, 'location'],
     ];
 
     for (const [method, params, message] of invalidRequests) {
@@ -589,8 +589,8 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0', id: 'work-manager', method: backendMethods.workProviderConnectionsReload,
     })).rejects.toThrow('Work integrations are not configured');
     await expect(server.handleMessage({
-      jsonrpc: '2.0', id: 'loop-runner', method: backendMethods.loopDueRun,
-    })).rejects.toThrow('Loop runner is not configured');
+      jsonrpc: '2.0', id: 'automation-runner', method: backendMethods.automationDueRun,
+    })).rejects.toThrow('Automation runner is not configured');
     await server.close();
   });
 
@@ -3996,8 +3996,8 @@ describe('ClawBackendServer', () => {
         },
       },
     };
-    snapshot.loops = [{
-      id: 'loop-bugs',
+    snapshot.automations = [{
+      id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -4010,8 +4010,8 @@ describe('ClawBackendServer', () => {
       },
       instructions: {},
       executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-1',
+        automationId: 'automation-bugs',
         startedAt: '2026-06-13T00:00:00.000Z',
         status: 'completed',
         createdCount: 1,
@@ -4183,10 +4183,10 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('reads stored loop conversation messages after cleanup removes the agent', async () => {
+  it('reads stored automation conversation messages after cleanup removes the agent', async () => {
     const snapshot = createTestSnapshot();
-    snapshot.loops = [{
-      id: 'loop-bugs',
+    snapshot.automations = [{
+      id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -4199,8 +4199,8 @@ describe('ClawBackendServer', () => {
       },
       instructions: {},
       executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-1',
+        automationId: 'automation-bugs',
         startedAt: '2026-06-13T00:00:00.000Z',
         status: 'completed',
         completedAt: '2026-06-15T01:30:48.802Z',
@@ -4252,14 +4252,14 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('routes remote loop snapshots and mutations without adopting remote snapshot events', async () => {
+  it('routes remote automation snapshots and mutations without adopting remote snapshot events', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     const remoteSnapshot = createTestSnapshot();
     remoteSnapshot.activeTeamId = 'team-remote';
     remoteSnapshot.teams[0]!.id = 'team-remote';
-    remoteSnapshot.loops = [{
-      id: 'loop-remote',
+    remoteSnapshot.automations = [{
+      id: 'automation-remote',
       name: 'Remote bugs',
       enabled: true,
       source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
@@ -4316,14 +4316,14 @@ describe('ClawBackendServer', () => {
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-snapshot',
-      method: 'snapshot/loops/get',
+      id: 'remote-automation-snapshot',
+      method: 'snapshot/automations/get',
       params: { location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-create',
-      method: 'loop/create',
+      id: 'remote-automation-create',
+      method: 'automation/create',
       params: { input: createInput, location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
@@ -4337,12 +4337,12 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-update',
-      method: 'loop/update',
+      id: 'remote-automation-update',
+      method: 'automation/update',
       params: {
         input: {
           ...createInput,
-          id: 'loop-remote',
+          id: 'automation-remote',
           name: 'Remote regressions',
         },
         location,
@@ -4350,27 +4350,27 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-run',
-      method: 'loop/run',
-      params: { loopId: 'loop-remote', location },
+      id: 'remote-automation-run',
+      method: 'automation/run',
+      params: { automationId: 'automation-remote', location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-history-clear',
-      method: 'loop/history/clear',
-      params: { loopId: 'loop-remote', location },
+      id: 'remote-automation-history-clear',
+      method: 'automation/history/clear',
+      params: { automationId: 'automation-remote', location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-execution-delete',
-      method: 'loop/execution/delete',
-      params: { loopId: 'loop-remote', executionId: 'loop-exec-1', location },
+      id: 'remote-automation-execution-delete',
+      method: 'automation/execution/delete',
+      params: { automationId: 'automation-remote', executionId: 'automation-exec-1', location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'remote-loop-delete',
-      method: 'loop/delete',
-      params: { loopId: 'loop-remote', location },
+      id: 'remote-automation-delete',
+      method: 'automation/delete',
+      params: { automationId: 'automation-remote', location },
     })).resolves.toMatchObject({ result: remoteSnapshot });
 
     expect(remoteClients.request).toHaveBeenNthCalledWith(
@@ -4383,7 +4383,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       2,
       snapshot.remoteConnections.connections[0],
-      'loop/create',
+      'automation/create',
       { input: createInput },
       expect.any(Function),
     );
@@ -4397,11 +4397,11 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       4,
       snapshot.remoteConnections.connections[0],
-      'loop/update',
+      'automation/update',
       {
         input: {
           ...createInput,
-          id: 'loop-remote',
+          id: 'automation-remote',
           name: 'Remote regressions',
         },
       },
@@ -4410,29 +4410,29 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       5,
       snapshot.remoteConnections.connections[0],
-      'loop/run',
-      { loopId: 'loop-remote' },
+      'automation/run',
+      { automationId: 'automation-remote' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       6,
       snapshot.remoteConnections.connections[0],
-      'loop/history/clear',
-      { loopId: 'loop-remote' },
+      'automation/history/clear',
+      { automationId: 'automation-remote' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       7,
       snapshot.remoteConnections.connections[0],
-      'loop/execution/delete',
-      { loopId: 'loop-remote', executionId: 'loop-exec-1' },
+      'automation/execution/delete',
+      { automationId: 'automation-remote', executionId: 'automation-exec-1' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       8,
       snapshot.remoteConnections.connections[0],
-      'loop/delete',
-      { loopId: 'loop-remote' },
+      'automation/delete',
+      { automationId: 'automation-remote' },
       expect.any(Function),
     );
     expect(snapshot.activeTeamId).toBe('team-test');
@@ -6834,20 +6834,20 @@ describe('ClawBackendServer', () => {
     );
   });
 
-  it('owns loop mutations and loop runner dispatch', async () => {
+  it('owns automation mutations and automation runner dispatch', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const loopRunner = {
+    const automationRunner = {
       runAll: vi.fn().mockResolvedValue(undefined),
-      runLoop: vi.fn().mockResolvedValue(undefined),
+      runAutomation: vi.fn().mockResolvedValue(undefined),
     };
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
       saveSnapshot,
-      loopRunner,
+      automationRunner,
       onEvent: (event) => events.push(event),
     });
     const input = {
@@ -6868,21 +6868,21 @@ describe('ClawBackendServer', () => {
       instructions: {},
     };
 
-    const created = await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'loop/create', params: { input } });
-    const loopId = snapshot.loops[0]?.id ?? '';
-    expect(created).toMatchObject({ result: { loops: [{ name: 'GitHub bugs' }] } });
-    expect(loopId).toBeTruthy();
+    const created = await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'automation/create', params: { input } });
+    const automationId = snapshot.automations[0]?.id ?? '';
+    expect(created).toMatchObject({ result: { automations: [{ name: 'GitHub bugs' }] } });
+    expect(automationId).toBeTruthy();
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'update',
-      method: 'loop/update',
-      params: { input: { ...input, id: loopId, name: 'GitHub regressions' } },
-    })).resolves.toMatchObject({ result: { loops: [{ name: 'GitHub regressions' }] } });
+      method: 'automation/update',
+      params: { input: { ...input, id: automationId, name: 'GitHub regressions' } },
+    })).resolves.toMatchObject({ result: { automations: [{ name: 'GitHub regressions' }] } });
 
-    snapshot.loops[0]?.executionLog.push({
-      id: 'loop-exec-1',
-      loopId,
+    snapshot.automations[0]?.executionLog.push({
+      id: 'automation-exec-1',
+      automationId,
       startedAt: '2026-06-13T00:00:00.000Z',
       status: 'working',
       createdCount: 0,
@@ -6891,50 +6891,50 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'delete-execution',
-      method: 'loop/execution/delete',
-      params: { loopId, executionId: 'loop-exec-1' },
-    })).resolves.toMatchObject({ result: { loops: [{ executionLog: [] }] } });
+      method: 'automation/execution/delete',
+      params: { automationId, executionId: 'automation-exec-1' },
+    })).resolves.toMatchObject({ result: { automations: [{ executionLog: [] }] } });
 
-    snapshot.loops[0]?.executionLog.push({
-      id: 'loop-exec-2',
-      loopId,
+    snapshot.automations[0]?.executionLog.push({
+      id: 'automation-exec-2',
+      automationId,
       startedAt: '2026-06-13T00:01:00.000Z',
       status: 'working',
       createdCount: 0,
       createdAgents: [],
     });
-    if (snapshot.loops[0]) {
-      snapshot.loops[0].lastRunAt = '2026-06-13T00:01:00.000Z';
-      snapshot.loops[0].lastCreatedCount = 0;
-      snapshot.loops[0].lastError = 'GitHub failed';
+    if (snapshot.automations[0]) {
+      snapshot.automations[0].lastRunAt = '2026-06-13T00:01:00.000Z';
+      snapshot.automations[0].lastCreatedCount = 0;
+      snapshot.automations[0].lastError = 'GitHub failed';
     }
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'clear-history',
-      method: 'loop/history/clear',
-      params: { loopId },
-    })).resolves.toMatchObject({ result: { loops: [{ executionLog: [] }] } });
-    expect(snapshot.loops[0]).not.toHaveProperty('lastRunAt');
-    expect(snapshot.loops[0]).not.toHaveProperty('lastCreatedCount');
-    expect(snapshot.loops[0]).not.toHaveProperty('lastError');
+      method: 'automation/history/clear',
+      params: { automationId },
+    })).resolves.toMatchObject({ result: { automations: [{ executionLog: [] }] } });
+    expect(snapshot.automations[0]).not.toHaveProperty('lastRunAt');
+    expect(snapshot.automations[0]).not.toHaveProperty('lastCreatedCount');
+    expect(snapshot.automations[0]).not.toHaveProperty('lastError');
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'run',
-      method: 'loop/run',
-      params: { loopId },
-    })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'run-due', method: 'loop/due/run' })).resolves.toMatchObject({ result: { loops: [{ id: loopId }] } });
+      method: 'automation/run',
+      params: { automationId },
+    })).resolves.toMatchObject({ result: { automations: [{ id: automationId }] } });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'run-due', method: 'automation/due/run' })).resolves.toMatchObject({ result: { automations: [{ id: automationId }] } });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'delete',
-      method: 'loop/delete',
-      params: { loopId },
-    })).resolves.toMatchObject({ result: { loops: [] } });
+      method: 'automation/delete',
+      params: { automationId },
+    })).resolves.toMatchObject({ result: { automations: [] } });
 
-    expect(loopRunner.runLoop).toHaveBeenCalledWith(loopId);
-    expect(loopRunner.runAll).toHaveBeenCalledOnce();
+    expect(automationRunner.runAutomation).toHaveBeenCalledWith(automationId);
+    expect(automationRunner.runAll).toHaveBeenCalledOnce();
     expect(saveSnapshot).toHaveBeenCalled();
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
@@ -6951,7 +6951,7 @@ function createTestSnapshot(): AppSnapshot {
     }],
     agents: [],
     bench: [],
-    loops: [],
+    automations: [],
     activeTeamId: 'team-test',
     activeAgentId: null,
     messages: [],

@@ -33,7 +33,7 @@ Preserve the product and process boundaries:
   used to reach `clawd`.
 - `clawd` owns backend process lifecycle beyond the Electron-to-backend stdio
   process, backend drivers, provider protocols, approvals, server requests,
-  app persistence, backend-owned filesystem access, git, loops, and agent
+  app persistence, backend-owned filesystem access, git, automations, and agent
   runtime state.
 - Renderer owns visual state and interactions. It must not talk directly to
   Codex app-server or any future backend process, spawn tools, read arbitrary

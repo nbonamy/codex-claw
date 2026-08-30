@@ -8,7 +8,7 @@ still called `clawd`.
 
 `clawd` is not a replacement for Codex app-server. It is the Codex Claw product
 backend: the app-owned process that orchestrates Codex app-server, Claude Code,
-Claw MCP, git, file previews, backlog loops, work integrations, and persistent
+Claw MCP, git, file previews, backlog automations, work integrations, and persistent
 team state behind one app-owned protocol.
 
 ## Decision Summary
@@ -17,7 +17,7 @@ Build `clawd` as a pure TypeScript/Node backend core with an app-owned protocol.
 Electron main should become a desktop adapter: it owns windows, menus, native
 dialogs, preload IPC, and local desktop helpers, while the backend owns product
 state, backend driver orchestration, agent runtime state, MCP collaboration,
-file/git/artifact operations, loops, and work integrations.
+file/git/artifact operations, automations, and work integrations.
 
 Use an app-owned JSON-RPC 2.0-compatible protocol between Electron main and the
 backend. Start with stdio because it is simple, local, easy to test, and also
@@ -79,7 +79,7 @@ Current implementation checkpoint:
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
 - Electron main no longer contains backend orchestration implementation modules
-  for loops, work integrations, MCP, source scanning, git worktrees, agent file
+  for automations, work integrations, MCP, source scanning, git worktrees, agent file
   reads, or state persistence. Those live under `backend/src`; `shared/src`
   stays limited to app contracts and pure cross-process helpers.
 - Electron main still owns native desktop affordances and selected adapters:
@@ -100,8 +100,9 @@ Current implementation checkpoint:
   they do not perform direct product-state updates. Desktop-native state is
   fetched from `client/state/get` or received on backend events instead of
   being recomputed from agent statuses in Electron.
-- `clawd` now owns loop CRUD, manual loop runs, and the loop scheduler/runner.
-  Electron proxies loop IPC to backend RPC and adopts the returned snapshot.
+- `clawd` now owns automation CRUD, manual automation runs, and the automation
+  scheduler/runner. Electron proxies automation IPC to backend RPC and adopts
+  the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron
   proxies team IPC to backend RPC and adopts the returned snapshot; renderer
   selection controls also wait for backend snapshots instead of mutating active
@@ -169,7 +170,7 @@ Current implementation checkpoint:
   access remains a backend-internal capability after `clawd` resolves the agent
   folder from backend state.
 - `clawd` owns provider metadata and conversation-history reads. Electron asks
-  for models, skills, conversation lists, and loop-created conversation
+  for models, skills, conversation lists, and automation-created conversation
   messages by agent/ref ids; backend resolves agents and validates stored
   conversation refs before calling provider drivers.
 - `clawd` owns manual git diff preview requests. Electron forwards
@@ -191,7 +192,7 @@ Current implementation checkpoint:
 
 ## Goals
 
-- Keep agents and loops alive when the desktop app window is closed.
+- Keep agents and automations alive when the desktop app window is closed.
 - Let Electron main become a thin desktop adapter between renderer IPC and the
   backend core.
 - Support local packaged desktop installs without requiring Node.js to be
@@ -298,7 +299,7 @@ Package ownership:
   `RendererMessage`, IPC-facing DTOs, IDs, pure reducers, and pure helpers used
   by both backend and Electron. It must not import Electron, Vue, filesystem,
   child process, Codex app-server, Claude, or MCP implementation modules.
-- `backend` contains `clawd`, Codex/Claude drivers, MCP collaboration, loops,
+- `backend` contains `clawd`, Codex/Claude drivers, MCP collaboration, automations,
   git/files/source discovery, persistence, work integrations, and backend
   protocol server/client implementations. It depends on `@codex-claw/core`.
 - `vue` contains the reusable product shell, components, styles, i18n, and
@@ -415,7 +416,7 @@ renderer.
 
 ### Moves To `clawd`
 
-- Durable product state: teams, agents, Bench templates, loops, work backlog,
+- Durable product state: teams, agents, Bench templates, automations, work backlog,
   source folder settings, backend sessions, backend defaults, goals, plans, and
   preferences that should follow a backend location.
 - Runtime state: active turns, queued prompts, steering, pending approvals,
@@ -441,7 +442,7 @@ renderer.
 - Durable snapshot JSON persistence lives in `backend/src`, not `shared/src`,
   because it is a Node filesystem concern. `shared` must remain usable by
   desktop, mobile, and web clients without carrying local file-read authority.
-- Loop CRUD, scheduler, and runner.
+- Automation CRUD, scheduler, and runner.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
 - Durable snapshot persistence now uses the backend serializer/parser in
@@ -509,8 +510,9 @@ names that describe backend ownership:
   `agent/conversation/messages/get`
 - `snapshot/bench/get`, `bench/agent/template/create`, `bench/template/create`,
   `bench/template/deploy`, `bench/template/delete`
-- `snapshot/loops/get`, `loop/create`, `loop/update`, `loop/run`, `loop/delete`,
-  `loop/history/clear`, `loop/execution/delete`
+- `snapshot/automations/get`, `automation/create`, `automation/update`,
+  `automation/run`, `automation/delete`, `automation/history/clear`,
+  `automation/execution/delete`
 - `source/repositories/list`, `source/worktrees/list`,
   `source/worktree/path/suggest`, `source/worktree/create`
 - `agent/files/list`, `agent/file/preview` using agent ids only. `clawd` resolves
@@ -708,7 +710,7 @@ renderer remains free of filesystem access and does not own log persistence.
 On startup, packaged Electron resolves the current packaged `clawd --version`
 and compares it with the running daemon's `backend/health/get.version`. If an
 installed daemon is stale and idle, Electron refreshes the LaunchAgent before
-connecting. If active agents or loop executions are running, Electron asks the
+connecting. If active agents or automation executions are running, Electron asks the
 user whether to restart the daemon now or continue with the old backend for
 that launch.
 
@@ -828,7 +830,7 @@ Runtime execution in a packaged app:
    script and uses the message-port transport because utility processes cannot
    pipe stdin.
 4. Main sends the protocol initialize/health request, then `snapshot/get`.
-5. `clawd` owns Codex app-server, Claude Code, MCP, git/files, loops, and
+5. `clawd` owns Codex app-server, Claude Code, MCP, git/files, automations, and
    durable state.
 6. Electron main fans backend events to the renderer and owns desktop-only
    host callbacks such as dialogs, open-external, native permission prompts, and
@@ -1018,11 +1020,11 @@ Remote migration path:
   remote `settings/update`; local `clawd` mirrors the path on the connection
   record for settings UI defaults. Deleting a connection removes only local
   team pointers attached to that connection; remote teams, agents, messages, and
-  loops keep running on the SSH host. One empty local fallback team is created
+  automations keep running on the SSH host. One empty local fallback team is created
   only when every local team was remote-backed.
-- Loop management is also location-scoped, but independently selected in the
-  Loops surface rather than inherited from the active team. The UI shows
-  `Loops > Local|<remote>`, and local `clawd` forwards loop snapshot, CRUD,
+- Automation management is also location-scoped, but independently selected in the
+  Automations surface rather than inherited from the active team. The UI shows
+  `Automations > Local|<remote>`, and local `clawd` forwards automation snapshot, CRUD,
   run, history, work-provider repository/item, and history conversation reads
   to the selected remote. Remote snapshots are returned to the UI without
   replacing local `clawd`'s durable product snapshot.
@@ -1066,14 +1068,14 @@ Sync mirrors `provider-tokens.json` to the remote, then asks the remote
 `clawd` to run `workProvider/connections/reload`; it does not copy local
 `state.json`. The remote `clawd` hydrates safe work-integration connection
 metadata from those tokens during startup and on explicit reload, so remote
-loop management can see GitHub as connected while preserving the remote's own
-teams, agents, and loops.
+automation management can see GitHub as connected while preserving the remote's own
+teams, agents, and automations.
 The Team dialog can select Local or a ready SSH connection before any agents are
 created. It can also connect to an existing remote team by storing the remote
 team id on the local pointer. Agent creation inherits the target team's backend
 location; for remote-team pointers, creation is forwarded to the remote team and
 no local proxy agent is saved. Source repository/worktree controls query that
-backend location. The Loops surface uses a separate location selector so users
+backend location. The Automations surface uses a separate location selector so users
 can inspect and manage local or remote schedulers without changing the selected
 team. Keep the protocol boundary clear so the folder type can change behind
 clients later.
@@ -1128,7 +1130,7 @@ Work:
 - Add backend core modules under `backend/src` with no `electron` imports.
 - Define a `ClawCore` interface shaped around app-owned requests and events.
 - Move snapshot ownership, backend driver registry, MCP server ownership,
-  loop runner/scheduler, source repository scanning, file/git services, and
+  automation runner/scheduler, source repository scanning, file/git services, and
   work-provider orchestration behind that interface incrementally.
 - Replace direct Electron `AppController` mutation paths with calls into the
   backend core.
@@ -1150,7 +1152,7 @@ Commit checkpoints:
 - `feat: move shared contracts into workspace`
 - `feat: move snapshot ownership into backend core`
 - `feat: route agent backend operations through core`
-- `feat: route source file git and loop services through core`
+- `feat: route source file git and automation services through core`
 
 ### Phase 2: Define The Daemon Protocol
 
@@ -1231,7 +1233,7 @@ Commit checkpoints:
 
 ### Phase 5: Local Always-On Daemon
 
-Goal: let agents and loops keep running when the UI window is closed.
+Goal: let agents and automations keep running when the UI window is closed.
 
 Work:
 

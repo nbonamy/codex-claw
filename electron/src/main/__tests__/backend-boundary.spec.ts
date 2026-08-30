@@ -55,6 +55,7 @@ describe('Electron backend boundary', () => {
       'i18n.ts',
       'index.ts',
       'ipc-events.ts',
+      'local-media.ts',
       'log.ts',
       'main-window.ts',
       'manual-update-check.ts',
@@ -67,8 +68,8 @@ describe('Electron backend boundary', () => {
   it('keeps each extracted backend concern in the backend package', async () => {
     const backendDir = path.resolve(__dirname, '../../../../backend/src');
     const expectedBackendPaths = [
-      'loops/scheduler.ts',
-      'loops/runner.ts',
+      'automations/scheduler.ts',
+      'automations/runner.ts',
       'work-integrations/manager.ts',
       'work-integrations/github-driver.ts',
       'git-worktrees.ts',
@@ -88,7 +89,7 @@ describe('Electron backend boundary', () => {
       'agent-files.ts',
       'git',
       'git-worktrees.ts',
-      'loops',
+      'automations',
       'mcp',
       'source-repositories.ts',
       'state-persistence.ts',
@@ -106,8 +107,8 @@ describe('Electron backend boundary', () => {
     const sources = await readElectronMainRuntimeSources(path.resolve(__dirname, '..'));
 
     for (const { filePath, source } of sources) {
-      expect(source, filePath).not.toMatch(/from ['"].*\/(loops|mcp|work-integrations|git-worktrees|source-repositories|agent-files|state-persistence|state|transcription)(\/|['"])/);
-      expect(source, filePath).not.toMatch(/\b(LoopRunner|LoopScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService|AppStatePersistence)\b/);
+      expect(source, filePath).not.toMatch(/from ['"].*\/(automations|mcp|work-integrations|git-worktrees|source-repositories|agent-files|state-persistence|state|transcription)(\/|['"])/);
+      expect(source, filePath).not.toMatch(/\b(AutomationRunner|AutomationScheduler|WorkIntegrationManager|GitHubWorkProviderDriver|AgentCoordinator|McpService|AppStatePersistence)\b/);
     }
   });
 

@@ -47,8 +47,9 @@ Codex Claw is free to use with the Codex subscription you already have.
   Markdown, execution plans, and Plan-mode proposals beside the conversation.
 - **Keep coding from your phone** — Pair Codex mobile with your Claw workspace
   while agents continue running through the background `clawd` daemon.
-- **Automate the queue** — Assign GitHub work from the Cockpit or use Loops to
-  watch for matching issues, deploy the right agent, and keep work moving.
+- **Automate the queue** — Assign GitHub work from the Cockpit or use
+  Automations to watch for matching issues, deploy the right agent, and keep
+  work moving.
 
 ## Built around your workflow
 

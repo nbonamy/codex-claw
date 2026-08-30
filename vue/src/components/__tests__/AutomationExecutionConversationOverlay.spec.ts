@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { RendererMessage } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
-import LoopExecutionConversationOverlay from '../LoopExecutionConversationOverlay.vue';
+import AutomationExecutionConversationOverlay from '../AutomationExecutionConversationOverlay.vue';
 
 const messages: RendererMessage[] = [{
   id: 'message-user',
@@ -20,9 +20,9 @@ const messages: RendererMessage[] = [{
   parts: [{ type: 'text', text: 'The cockpit issue is fixed.' }],
 }];
 
-describe('LoopExecutionConversationOverlay', () => {
+describe('AutomationExecutionConversationOverlay', () => {
   it('renders the execution transcript and emits close', async () => {
-    const wrapper = mount(LoopExecutionConversationOverlay, {
+    const wrapper = mount(AutomationExecutionConversationOverlay, {
       props: {
         agentName: 'Dina',
         messages,
@@ -34,7 +34,7 @@ describe('LoopExecutionConversationOverlay', () => {
     });
 
     expect(wrapper.attributes('role')).toBe('dialog');
-    expect(wrapper.find('.loop-execution-conversation-overlay__scrim').exists()).toBe(true);
+    expect(wrapper.find('.automation-execution-conversation-overlay__scrim').exists()).toBe(true);
     expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Please fix the cockpit issue.');
@@ -46,7 +46,7 @@ describe('LoopExecutionConversationOverlay', () => {
   });
 
   it('uses Claw presentation for internal MCP tools in execution transcripts', () => {
-    const wrapper = mount(LoopExecutionConversationOverlay, {
+    const wrapper = mount(AutomationExecutionConversationOverlay, {
       props: {
         agentName: 'Dina',
         messages: [{

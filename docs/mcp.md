@@ -367,13 +367,13 @@ Input:
 Effects:
 
 - verifies that the work item is currently assigned to the caller;
-- if the assignment came from a loop with before-completion instructions, the
+- if the assignment came from an automation with before-completion instructions, the
   first `completed` update records that those instructions were delivered and
   returns them without completing the work item; after following them, the
   agent repeats the same `completed` update;
 - updates `workBacklog.assignments[workItemId]` with the requested status,
   timestamp, and optional note;
-- applies any loop cleanup configured for the assignment after confirmed
+- applies any automation cleanup configured for the assignment after confirmed
   completion;
 - emits `workBacklog.assignmentUpdated` so the cockpit backlog reflects the
   lifecycle state;

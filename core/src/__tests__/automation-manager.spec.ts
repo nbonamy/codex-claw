@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot';
-import type { LoopExecutionLogEntry } from '../contracts';
+import type { AutomationExecutionLogEntry } from '../contracts';
 import {
-  clearLoopExecutionHistoryInSnapshot,
-  completeLoopExecutionInSnapshot,
-  createLoopInSnapshot,
-  deleteLoopExecutionFromSnapshot,
-  deleteLoopFromSnapshot,
-  recordLoopExecutionInSnapshot,
-  updateLoopExecutionAgentConversationInSnapshot,
-  updateLoopInSnapshot,
-} from '../loop-manager';
+  clearAutomationExecutionHistoryInSnapshot,
+  completeAutomationExecutionInSnapshot,
+  createAutomationInSnapshot,
+  deleteAutomationExecutionFromSnapshot,
+  deleteAutomationFromSnapshot,
+  recordAutomationExecutionInSnapshot,
+  updateAutomationExecutionAgentConversationInSnapshot,
+  updateAutomationInSnapshot,
+} from '../automation-manager';
 
-describe('loop manager', () => {
-  it('creates, updates, records, and deletes loops', () => {
+describe('automation manager', () => {
+  it('creates, updates, records, and deletes automations', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push({
       id: 'bench-dina',
@@ -24,7 +24,7 @@ describe('loop manager', () => {
       updatedAt: '2026-06-09T10:00:00.000Z',
     });
 
-    const loop = createLoopInSnapshot(snapshot, {
+    const automation = createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: ' nbonamy/codex-claw ',
@@ -43,10 +43,10 @@ describe('loop manager', () => {
         assignment: ' Start by reproducing the issue. ',
         beforeCompletion: ' Remove the bug tag. ',
       },
-    }, '2026-06-09T11:00:00.000Z', () => 'loop-github-bugs');
+    }, '2026-06-09T11:00:00.000Z', () => 'automation-github-bugs');
 
-    expect(loop).toStrictEqual({
-      id: 'loop-github-bugs',
+    expect(automation).toStrictEqual({
+      id: 'automation-github-bugs',
       name: 'nbonamy/codex-claw / nbonamy / bug',
       enabled: true,
       source: {
@@ -75,8 +75,8 @@ describe('loop manager', () => {
       updatedAt: '2026-06-09T11:00:00.000Z',
     });
 
-    expect(updateLoopInSnapshot(snapshot, {
-      id: 'loop-github-bugs',
+    expect(updateAutomationInSnapshot(snapshot, {
+      id: 'automation-github-bugs',
       name: 'Triage bugs',
       enabled: false,
       source: {
@@ -114,9 +114,9 @@ describe('loop manager', () => {
       updatedAt: '2026-06-09T12:00:00.000Z',
     });
 
-    expect(recordLoopExecutionInSnapshot(snapshot, 'loop-github-bugs', {
-      id: 'loop-execution-1',
-      loopId: 'loop-github-bugs',
+    expect(recordAutomationExecutionInSnapshot(snapshot, 'automation-github-bugs', {
+      id: 'automation-execution-1',
+      automationId: 'automation-github-bugs',
       startedAt: '2026-06-09T12:01:00.000Z',
       completedAt: '2026-06-09T12:02:00.000Z',
       status: 'failed',
@@ -134,7 +134,7 @@ describe('loop manager', () => {
       lastCreatedCount: 2,
       lastError: 'GitHub failed',
       executionLog: [{
-        id: 'loop-execution-1',
+        id: 'automation-execution-1',
         status: 'failed',
         createdAgents: [{
           agentId: 'agent-dina',
@@ -142,13 +142,13 @@ describe('loop manager', () => {
       }],
     });
 
-    expect(updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-github-bugs', 'loop-execution-1', 'agent-dina', {
+    expect(updateAutomationExecutionAgentConversationInSnapshot(snapshot, 'automation-github-bugs', 'automation-execution-1', 'agent-dina', {
       conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       updatedAt: '2026-06-09T12:03:00.000Z',
     })).toMatchObject({
       updatedAt: '2026-06-09T12:03:00.000Z',
       executionLog: [{
-        id: 'loop-execution-1',
+        id: 'automation-execution-1',
         createdAgents: [{
           agentId: 'agent-dina',
           conversationRef: { backend: 'codex', threadId: 'thread-dina' },
@@ -156,15 +156,15 @@ describe('loop manager', () => {
       }],
     });
 
-    expect(deleteLoopFromSnapshot(snapshot, 'loop-github-bugs')?.id).toBe('loop-github-bugs');
-    expect(snapshot.loops).toStrictEqual([]);
+    expect(deleteAutomationFromSnapshot(snapshot, 'automation-github-bugs')?.id).toBe('automation-github-bugs');
+    expect(snapshot.automations).toStrictEqual([]);
   });
 
-  it('rejects loops with missing bench agents or teams', () => {
+  it('rejects automations with missing bench agents or teams', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push(createBenchTemplate());
 
-    expect(createLoopInSnapshot(snapshot, {
+    expect(createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -179,7 +179,7 @@ describe('loop manager', () => {
       },
     })).toBeNull();
 
-    expect(createLoopInSnapshot(snapshot, {
+    expect(createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -194,7 +194,7 @@ describe('loop manager', () => {
       },
     })).toBeNull();
 
-    expect(createLoopInSnapshot(snapshot, {
+    expect(createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: ' ',
@@ -209,10 +209,10 @@ describe('loop manager', () => {
     })).toBeNull();
   });
 
-  it('creates loops that create a new agent from a source repository', () => {
+  it('creates automations that create a new agent from a source repository', () => {
     const snapshot = createInitialSnapshot();
 
-    expect(createLoopInSnapshot(snapshot, {
+    expect(createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -234,7 +234,7 @@ describe('loop manager', () => {
           teamId: 'team-codex-claw',
         },
       },
-    }, '2026-06-09T11:00:00.000Z', () => 'loop-new-agent')).toMatchObject({
+    }, '2026-06-09T11:00:00.000Z', () => 'automation-new-agent')).toMatchObject({
       action: {
         type: 'create-agent',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
@@ -257,7 +257,7 @@ describe('loop manager', () => {
       },
     });
 
-    expect(createLoopInSnapshot(snapshot, {
+    expect(createAutomationInSnapshot(snapshot, {
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -273,12 +273,12 @@ describe('loop manager', () => {
     })).toBeNull();
   });
 
-  it('ignores updates and deletes for missing or invalid loops', () => {
+  it('ignores updates and deletes for missing or invalid automations', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push(createBenchTemplate());
 
-    expect(updateLoopInSnapshot(snapshot, {
-      id: 'missing-loop',
+    expect(updateAutomationInSnapshot(snapshot, {
+      id: 'missing-automation',
       name: 'Missing',
       enabled: true,
       source: {
@@ -294,8 +294,8 @@ describe('loop manager', () => {
       },
     })).toBeNull();
 
-    const loop = createLoopInSnapshot(snapshot, {
-      name: 'Existing loop',
+    const automation = createAutomationInSnapshot(snapshot, {
+      name: 'Existing automation',
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -309,10 +309,10 @@ describe('loop manager', () => {
       },
     }, '2026-06-09T11:00:00.000Z', () => '');
 
-    expect(loop?.id).toBe('loop-existing-loop-20260609t110000000z');
-    expect(updateLoopInSnapshot(snapshot, {
-      id: loop?.id ?? '',
-      name: 'Invalid loop',
+    expect(automation?.id).toBe('automation-existing-automation-20260609t110000000z');
+    expect(updateAutomationInSnapshot(snapshot, {
+      id: automation?.id ?? '',
+      name: 'Invalid automation',
       enabled: true,
       source: {
         provider: 'github',
@@ -326,14 +326,14 @@ describe('loop manager', () => {
         },
       },
     })).toBeNull();
-    expect(deleteLoopFromSnapshot(snapshot, 'missing-loop')).toBeNull();
-    expect(clearLoopExecutionHistoryInSnapshot(snapshot, 'missing-loop')).toBeNull();
+    expect(deleteAutomationFromSnapshot(snapshot, 'missing-automation')).toBeNull();
+    expect(clearAutomationExecutionHistoryInSnapshot(snapshot, 'missing-automation')).toBeNull();
   });
 
   it('records successful executions, deduplicates entries, and clears history', () => {
     const snapshot = createInitialSnapshot();
     snapshot.bench.push(createBenchTemplate());
-    const loop = createLoopInSnapshot(snapshot, {
+    const automation = createAutomationInSnapshot(snapshot, {
       name: 'Backlog',
       enabled: true,
       source: {
@@ -347,29 +347,29 @@ describe('loop manager', () => {
           mode: 'dedicated',
         },
       },
-    }, '2026-06-09T11:00:00.000Z', () => 'loop-backlog');
+    }, '2026-06-09T11:00:00.000Z', () => 'automation-backlog');
 
-    expect(recordLoopExecutionInSnapshot(snapshot, 'missing-loop', createExecutionEntry('run-1', 'loop-backlog'))).toBeNull();
-    expect(recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', createExecutionEntry('run-1', 'other-loop'))).toBeNull();
+    expect(recordAutomationExecutionInSnapshot(snapshot, 'missing-automation', createExecutionEntry('run-1', 'automation-backlog'))).toBeNull();
+    expect(recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', createExecutionEntry('run-1', 'other-automation'))).toBeNull();
 
-    const failed = createExecutionEntry('run-1', 'loop-backlog', 'failed');
+    const failed = createExecutionEntry('run-1', 'automation-backlog', 'failed');
     failed.error = 'GitHub failed';
-    expect(recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', failed)?.lastError).toBe('GitHub failed');
+    expect(recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', failed)?.lastError).toBe('GitHub failed');
 
-    const working = createExecutionEntry('run-1', 'loop-backlog', 'working');
-    const workingLoop = recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', working);
-    expect(workingLoop).toMatchObject({
+    const working = createExecutionEntry('run-1', 'automation-backlog', 'working');
+    const workingAutomation = recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', working);
+    expect(workingAutomation).toMatchObject({
       lastCreatedCount: 1,
       executionLog: [{
         id: 'run-1',
         status: 'working',
       }],
     });
-    expect(workingLoop).not.toHaveProperty('lastError');
-    expect(loop?.executionLog).toHaveLength(1);
-    expect(loop?.executionLog[0]).not.toHaveProperty('completedAt');
+    expect(workingAutomation).not.toHaveProperty('lastError');
+    expect(automation?.executionLog).toHaveLength(1);
+    expect(automation?.executionLog[0]).not.toHaveProperty('completedAt');
 
-    expect(completeLoopExecutionInSnapshot(snapshot, 'loop-backlog', 'run-1', '2026-06-09T12:03:00.000Z')).toMatchObject({
+    expect(completeAutomationExecutionInSnapshot(snapshot, 'automation-backlog', 'run-1', '2026-06-09T12:03:00.000Z')).toMatchObject({
       updatedAt: '2026-06-09T12:03:00.000Z',
       executionLog: [{
         id: 'run-1',
@@ -377,25 +377,25 @@ describe('loop manager', () => {
         completedAt: '2026-06-09T12:03:00.000Z',
       }],
     });
-    expect(completeLoopExecutionInSnapshot(snapshot, 'loop-backlog', 'missing-run')).toBeNull();
+    expect(completeAutomationExecutionInSnapshot(snapshot, 'automation-backlog', 'missing-run')).toBeNull();
 
-    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'run-1', '2026-06-09T12:03:30.000Z')).toMatchObject({
+    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'automation-backlog', 'run-1', '2026-06-09T12:03:30.000Z')).toMatchObject({
       executionLog: [],
       updatedAt: '2026-06-09T12:03:30.000Z',
     });
-    expect(loop).not.toHaveProperty('lastRunAt');
-    expect(loop).not.toHaveProperty('lastCreatedCount');
-    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'missing-run')).toBeNull();
+    expect(automation).not.toHaveProperty('lastRunAt');
+    expect(automation).not.toHaveProperty('lastCreatedCount');
+    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'automation-backlog', 'missing-run')).toBeNull();
 
-    const olderCompleted = createExecutionEntry('run-old', 'loop-backlog', 'completed');
+    const olderCompleted = createExecutionEntry('run-old', 'automation-backlog', 'completed');
     olderCompleted.startedAt = '2026-06-09T12:00:00.000Z';
     olderCompleted.createdCount = 2;
-    recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', olderCompleted);
-    const latestFailed = createExecutionEntry('run-failed', 'loop-backlog', 'failed');
+    recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', olderCompleted);
+    const latestFailed = createExecutionEntry('run-failed', 'automation-backlog', 'failed');
     latestFailed.startedAt = '2026-06-09T12:10:00.000Z';
     latestFailed.error = 'Latest failed';
-    recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', latestFailed);
-    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'run-failed', '2026-06-09T12:10:30.000Z')).toMatchObject({
+    recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', latestFailed);
+    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'automation-backlog', 'run-failed', '2026-06-09T12:10:30.000Z')).toMatchObject({
       lastRunAt: '2026-06-09T12:00:00.000Z',
       lastCreatedCount: 2,
       executionLog: [{
@@ -403,36 +403,36 @@ describe('loop manager', () => {
         status: 'completed',
       }],
     });
-    expect(loop).not.toHaveProperty('lastError');
-    expect(deleteLoopExecutionFromSnapshot(snapshot, 'loop-backlog', 'run-old')).toMatchObject({
+    expect(automation).not.toHaveProperty('lastError');
+    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'automation-backlog', 'run-old')).toMatchObject({
       executionLog: [],
     });
 
-    recordLoopExecutionInSnapshot(snapshot, 'loop-backlog', working);
-    const loopWithConversation = updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-backlog', 'run-1', 'agent-dina', {
+    recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', working);
+    const automationWithConversation = updateAutomationExecutionAgentConversationInSnapshot(snapshot, 'automation-backlog', 'run-1', 'agent-dina', {
       conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       updatedAt: '2026-06-09T12:04:00.000Z',
     });
-    expect(loopWithConversation).toMatchObject({
+    expect(automationWithConversation).toMatchObject({
       executionLog: [{
         createdAgents: [{
           conversationRef: { backend: 'codex', threadId: 'thread-dina' },
         }],
       }],
     });
-    expect(loopWithConversation?.executionLog[0].createdAgents[0]).not.toHaveProperty('turnId');
-    expect(updateLoopExecutionAgentConversationInSnapshot(snapshot, 'loop-backlog', 'missing-run', 'agent-dina', {
+    expect(automationWithConversation?.executionLog[0].createdAgents[0]).not.toHaveProperty('turnId');
+    expect(updateAutomationExecutionAgentConversationInSnapshot(snapshot, 'automation-backlog', 'missing-run', 'agent-dina', {
       conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       updatedAt: '2026-06-09T12:05:00.000Z',
     })).toBeNull();
 
-    expect(clearLoopExecutionHistoryInSnapshot(snapshot, 'loop-backlog', '2026-06-09T12:06:00.000Z')).toMatchObject({
+    expect(clearAutomationExecutionHistoryInSnapshot(snapshot, 'automation-backlog', '2026-06-09T12:06:00.000Z')).toMatchObject({
       executionLog: [],
       updatedAt: '2026-06-09T12:06:00.000Z',
     });
-    expect(loop).not.toHaveProperty('lastRunAt');
-    expect(loop).not.toHaveProperty('lastCreatedCount');
-    expect(loop).not.toHaveProperty('lastError');
+    expect(automation).not.toHaveProperty('lastRunAt');
+    expect(automation).not.toHaveProperty('lastCreatedCount');
+    expect(automation).not.toHaveProperty('lastError');
   });
 });
 
@@ -449,12 +449,12 @@ function createBenchTemplate() {
 
 function createExecutionEntry(
   id: string,
-  loopId: string,
-  status: LoopExecutionLogEntry['status'] = 'completed',
-): LoopExecutionLogEntry {
+  automationId: string,
+  status: AutomationExecutionLogEntry['status'] = 'completed',
+): AutomationExecutionLogEntry {
   return {
     id,
-    loopId,
+    automationId,
     startedAt: '2026-06-09T12:01:00.000Z',
     status,
     createdCount: 1,

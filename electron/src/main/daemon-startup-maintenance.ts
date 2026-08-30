@@ -92,7 +92,7 @@ function snapshotHasActiveWork(snapshot: AppSnapshot): boolean {
     agent.status.type === 'starting' ||
     agent.status.type === 'working' ||
     agent.status.type === 'awaitingInput'
-  )) || snapshot.loops.some((loop) => (
-    loop.executionLog.some((entry) => entry.status === 'working')
+  )) || snapshot.automations.some((automation) => (
+    automation.executionLog.some((entry) => entry.status === 'working')
   ));
 }

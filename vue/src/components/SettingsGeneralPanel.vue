@@ -246,7 +246,7 @@ const daemonDescription = computed(() => {
   if (props.daemonStatus?.supported === false) {
     return props.daemonStatus.detail ?? translate('dynamic.misc.installAvailable');
   }
-  return translate('surface.settingsGeneralPanel.startTheCodexClawAgentToKeepYourLoopsRunning');
+  return translate('surface.settingsGeneralPanel.startTheCodexClawAgentToKeepYourAutomationsRunning');
 });
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showAccessibilityGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);

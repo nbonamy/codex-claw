@@ -56,12 +56,12 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   closeTeam: [backendMethods.teamDelete, named('teamId')],
   disconnectTeam: [backendMethods.teamDisconnect, named('teamId')],
   selectTeam: [backendMethods.teamSelect, named('teamId')],
-  createLoop: [backendMethods.loopCreate, namedOptional('input', 'location')],
-  updateLoop: [backendMethods.loopUpdate, namedOptional('input', 'location')],
-  runLoop: [backendMethods.loopRun, namedOptional('loopId', 'location')],
-  clearLoopHistory: [backendMethods.loopHistoryClear, namedOptional('loopId', 'location')],
-  deleteLoopExecution: [backendMethods.loopExecutionDelete, namedOptional('loopId', 'executionId', 'location')],
-  deleteLoop: [backendMethods.loopDelete, namedOptional('loopId', 'location')],
+  createAutomation: [backendMethods.automationCreate, namedOptional('input', 'location')],
+  updateAutomation: [backendMethods.automationUpdate, namedOptional('input', 'location')],
+  runAutomation: [backendMethods.automationRun, namedOptional('automationId', 'location')],
+  clearAutomationHistory: [backendMethods.automationHistoryClear, namedOptional('automationId', 'location')],
+  deleteAutomationExecution: [backendMethods.automationExecutionDelete, namedOptional('automationId', 'executionId', 'location')],
+  deleteAutomation: [backendMethods.automationDelete, namedOptional('automationId', 'location')],
   listAgentConversations: [backendMethods.agentConversationsList, named('agentId')],
   resumeAgentConversation: [backendMethods.agentConversationResume, named('agentId', 'ref')],
   readConversationMessages: [backendMethods.agentConversationMessagesGet, namedOptional('ref', 'agentId', 'location')],
@@ -134,8 +134,8 @@ export async function invokeClawWebOperation(
   if (operation === 'getBenchSnapshot') {
     return snapshotForLocation(backend, backendMethods.snapshotBenchGet, args[0]);
   }
-  if (operation === 'getLoopSnapshot') {
-    return snapshotForLocation(backend, backendMethods.snapshotLoopsGet, args[0]);
+  if (operation === 'getAutomationSnapshot') {
+    return snapshotForLocation(backend, backendMethods.snapshotAutomationsGet, args[0]);
   }
   if (desktopOnlyOperations.has(operation)) {
     throw new Error(`'${operation}' is not available in Claw Web.`);

@@ -1249,8 +1249,8 @@ describe('snapshot reducer', () => {
     const snapshot = createInitialSnapshot();
     const messages = snapshot.messages;
     const nextSnapshot = createInitialSnapshot();
-    nextSnapshot.loops = [{
-      id: 'loop-bugs',
+    nextSnapshot.automations = [{
+      id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
       source: {
@@ -1277,7 +1277,7 @@ describe('snapshot reducer', () => {
       occurredAt: '2026-06-09T10:00:00.000Z',
     });
 
-    expect(snapshot.loops).toStrictEqual(nextSnapshot.loops);
+    expect(snapshot.automations).toStrictEqual(nextSnapshot.automations);
     expect(snapshot.messages).toBe(messages);
 
     applyMainEventToSnapshot(snapshot, {

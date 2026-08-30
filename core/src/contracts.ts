@@ -251,8 +251,8 @@ export type WorkBacklogAssignment = {
   completedAt?: string;
   note?: string;
   updatedAt?: string;
-  loopId?: string;
-  loopExecutionId?: string;
+  automationId?: string;
+  automationExecutionId?: string;
   completionInstructionsDeliveredAt?: string;
 };
 
@@ -360,7 +360,7 @@ export type CreateWorkItemInput = {
   description: string;
 };
 
-export type LoopSourceConfiguration =
+export type AutomationSourceConfiguration =
   | {
     provider: 'github';
     repositoryId: string;
@@ -368,7 +368,7 @@ export type LoopSourceConfiguration =
     tagName?: string;
   };
 
-export type LoopTeamTarget =
+export type AutomationTeamTarget =
   | {
     mode: 'existing';
     teamId: string;
@@ -377,33 +377,33 @@ export type LoopTeamTarget =
     mode: 'dedicated';
   };
 
-export type LoopAction =
+export type AutomationAction =
   | {
     type: 'create-agent';
     sourceRepositoryPath: string;
     backend?: AgentBackend;
     backendDefaults?: BackendDefaults;
-    teamTarget: LoopTeamTarget;
-    cleanup?: LoopCleanup;
+    teamTarget: AutomationTeamTarget;
+    cleanup?: AutomationCleanup;
   }
   | {
     type: 'create-agent-from-bench';
     benchTemplateId: string;
-    teamTarget: LoopTeamTarget;
-    cleanup?: LoopCleanup;
+    teamTarget: AutomationTeamTarget;
+    cleanup?: AutomationCleanup;
   };
 
-export type LoopCleanup = {
+export type AutomationCleanup = {
   deleteAgent?: boolean;
   deleteTeam?: boolean;
 };
 
-export type LoopInstructions = {
+export type AutomationInstructions = {
   assignment?: string;
   beforeCompletion?: string;
 };
 
-export type LoopExecutionStatus = 'working' | 'completed' | 'failed';
+export type AutomationExecutionStatus = 'working' | 'completed' | 'failed';
 
 export type BackendConversationRef =
   | {
@@ -517,7 +517,7 @@ export type AgentSubagentTree = {
   activities: Record<string, SubagentActivity>;
 };
 
-export type LoopExecutionCreatedAgent = {
+export type AutomationExecutionCreatedAgent = {
   agentId: string;
   agentName: string;
   workItemId: string;
@@ -526,25 +526,25 @@ export type LoopExecutionCreatedAgent = {
   conversationRef?: BackendConversationRef;
 };
 
-export type LoopExecutionLogEntry = {
+export type AutomationExecutionLogEntry = {
   id: string;
-  loopId: string;
+  automationId: string;
   startedAt: string;
   completedAt?: string;
-  status: LoopExecutionStatus;
+  status: AutomationExecutionStatus;
   createdCount: number;
-  createdAgents: LoopExecutionCreatedAgent[];
+  createdAgents: AutomationExecutionCreatedAgent[];
   error?: string;
 };
 
-export type Loop = {
+export type Automation = {
   id: string;
   name: string;
   enabled: boolean;
-  source: LoopSourceConfiguration;
-  action: LoopAction;
-  instructions: LoopInstructions;
-  executionLog: LoopExecutionLogEntry[];
+  source: AutomationSourceConfiguration;
+  action: AutomationAction;
+  instructions: AutomationInstructions;
+  executionLog: AutomationExecutionLogEntry[];
   createdAt: string;
   updatedAt: string;
   lastRunAt?: string;
@@ -552,7 +552,7 @@ export type Loop = {
   lastCreatedCount?: number;
 };
 
-export type LoopLocation =
+export type AutomationLocation =
   | {
     kind: 'local';
   }
@@ -561,17 +561,17 @@ export type LoopLocation =
     remoteConnectionId: string;
   };
 
-export type BenchLocation = LoopLocation;
+export type BenchLocation = AutomationLocation;
 
-export type CreateLoopInput = {
+export type CreateAutomationInput = {
   name?: string;
   enabled?: boolean;
-  source: LoopSourceConfiguration;
-  action: LoopAction;
-  instructions?: LoopInstructions;
+  source: AutomationSourceConfiguration;
+  action: AutomationAction;
+  instructions?: AutomationInstructions;
 };
 
-export type UpdateLoopInput = CreateLoopInput & {
+export type UpdateAutomationInput = CreateAutomationInput & {
   id: string;
 };
 
@@ -1262,7 +1262,7 @@ export type AppSnapshot = {
   teams: Team[];
   agents: Agent[];
   bench: BenchTemplate[];
-  loops: Loop[];
+  automations: Automation[];
   activeTeamId: string | null;
   activeAgentId: string | null;
   messages: RendererMessage[];
@@ -1585,11 +1585,11 @@ export type CodexClawApi = {
   openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
   completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot>;
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
-  listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]>;
-  configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot>;
-  listGlobalWorkItems(provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
-  listAssignedWorkItems?(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]>;
-  listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
+  listWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]>;
+  configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<AppSnapshot>;
+  listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
+  listAssignedWorkItems?(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]>;
+  listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
   createWorkItem(input: CreateWorkItemInput): Promise<WorkItem>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
@@ -1625,16 +1625,16 @@ export type CodexClawApi = {
   disconnectTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
   getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot>;
-  getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot>;
-  createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
-  updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot>;
-  runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot>;
-  deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot>;
+  getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot>;
+  createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot>;
+  updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot>;
+  runAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot>;
+  deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
   listAgentConversations(agentId: string): Promise<ConversationSummary[]>;
   resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>;
-  readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]>;
+  readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;

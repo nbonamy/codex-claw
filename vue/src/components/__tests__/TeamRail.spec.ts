@@ -49,7 +49,7 @@ describe('TeamRail', () => {
     expect((wrapper.get('[aria-label="Skwad"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(70, 168, 87)');
     expect(wrapper.find('.team-rail__window-controls').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Create team"]').exists()).toBe(true);
-    expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.find('.team-rail__header').exists()).toBe(true);
     expect(wrapper.get('.team-rail__body').find('[aria-label="Cockpit"]').exists()).toBe(true);
@@ -175,20 +175,20 @@ describe('TeamRail', () => {
     ]);
   });
 
-  it('emits loops selection and marks it active', async () => {
+  it('emits automations selection and marks it active', async () => {
     const wrapper = mountRail({
       teams,
       activeTeamId: 'team-sk',
-      loopsActive: true,
+      automationsActive: true,
     });
 
-    await wrapper.get('[aria-label="Loops"]').trigger('click');
+    await wrapper.get('[aria-label="Automations"]').trigger('click');
 
-    expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.get('[aria-label="Loops"]').classes()).toContain('team-rail__loops--active');
+    expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Automations"]').classes()).toContain('team-rail__automations--active');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
-    expect(wrapper.emitted('select-loops')).toStrictEqual([[]]);
+    expect(wrapper.emitted('select-automations')).toStrictEqual([[]]);
   });
 
   it('marks settings active without keeping a team focused', () => {
@@ -215,9 +215,9 @@ describe('TeamRail', () => {
     expect(teamRailSource()).toContain('.team-rail__cockpit:not(.team-rail__cockpit--active)');
     expect(teamRailSource()).toContain('.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging)');
     expect(teamRailSource()).toMatch(/\.team-rail__team:not\(\.team-rail__team--active, \.list-reorder-drag--dragging\) \{\s+opacity: 0\.\d+;/);
-    expect(teamRailSource()).toContain('InfinityIcon');
-    expect(teamRailSource()).toContain('stroke-width: 1.35px;');
-    expect(teamRailSource()).toContain('transform: scaleX(1.2) scaleY(1.48);');
+    expect(teamRailSource()).toContain('AutomationIcon');
+    expect(teamRailSource()).not.toContain('InfinityIcon');
+    expect(teamRailSource()).not.toContain('transform: scaleX(1.2) scaleY(1.48);');
     expect(teamRailSource()).not.toContain('CompassIcon');
     expect(teamRailSource()).not.toContain('RepeatIcon');
     expect(settingsMenuSource()).not.toContain('width: var(--icon-xl);');
@@ -452,7 +452,7 @@ function mountRail(props: {
   teams: Team[];
   activeTeamId: string | null;
   cockpitActive?: boolean;
-  loopsActive?: boolean;
+  automationsActive?: boolean;
   rateLimits?: AccountRateLimits;
   settingsActive?: boolean;
   agentSidebarExpanded?: boolean;

@@ -2,33 +2,33 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendConversationRef, CreateLoopInput, Loop, LoopLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import LoopsView from '../LoopsView.vue';
+import type { AppSnapshot, BackendConversationRef, CreateAutomationInput, Automation, AutomationLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import AutomationsView from '../AutomationsView.vue';
 
 afterEach(() => {
   vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
 
-describe('LoopsView', () => {
+describe('AutomationsView', () => {
   it('shows the welcome state and opens the editor', async () => {
     const wrapper = mountView();
 
-    expect(wrapper.text()).toContain('Loops');
-    expect(wrapper.text()).not.toContain('Automations');
-    expect(wrapper.text()).toContain('A loop is an automation that just works for you.');
+    expect(wrapper.text()).toContain('Automations');
+    expect(wrapper.text()).not.toContain('Loops');
+    expect(wrapper.text()).toContain('Automations watch for matching work and start the right agent automatically.');
 
-    await wrapper.find('.loop-welcome__button').trigger('click');
+    await wrapper.find('.automation-welcome__button').trigger('click');
 
-    expect(wrapper.find('.loop-editor').exists()).toBe(true);
+    expect(wrapper.find('.automation-editor').exists()).toBe(true);
   });
 
-  it('creates a loop from the editor submit payload', async () => {
-    const createLoop = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountView({ createLoop });
+  it('creates a automation from the editor submit payload', async () => {
+    const createAutomation = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountView({ createAutomation });
 
-    await wrapper.find('.loop-welcome__button').trigger('click');
-    wrapper.findComponent({ name: 'LoopEditor' }).vm.$emit('submit', {
+    await wrapper.find('.automation-welcome__button').trigger('click');
+    wrapper.findComponent({ name: 'AutomationEditor' }).vm.$emit('submit', {
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -44,7 +44,7 @@ describe('LoopsView', () => {
     });
     await flushPromises();
 
-    expect(createLoop).toHaveBeenCalledWith({
+    expect(createAutomation).toHaveBeenCalledWith({
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
@@ -60,9 +60,9 @@ describe('LoopsView', () => {
     });
   });
 
-  it('loads remote loop data and creates remote loops from the selected connection', async () => {
+  it('loads remote automation data and creates remote automations from the selected connection', async () => {
     const localSnapshot = createInitialSnapshot();
-    localSnapshot.loops = [loop({ name: 'Local bugs' })];
+    localSnapshot.automations = [automation({ name: 'Local bugs' })];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.teams = [{
       id: 'team-remote',
@@ -83,8 +83,8 @@ describe('LoopsView', () => {
       status: 'connected',
       accountLabel: 'mnmt',
     }];
-    remoteSnapshot.loops = [loop({
-      id: 'loop-remote',
+    remoteSnapshot.automations = [automation({
+      id: 'automation-remote',
       name: 'Remote bugs',
       action: {
         type: 'create-agent-from-bench',
@@ -95,10 +95,10 @@ describe('LoopsView', () => {
         },
       },
     })];
-    const location: LoopLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
-    const getLoopSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
-    const createLoop = vi.fn().mockResolvedValue(remoteSnapshot);
-    const deleteLoop = vi.fn().mockResolvedValue(remoteSnapshot);
+    const location: AutomationLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    const getAutomationSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
+    const createAutomation = vi.fn().mockResolvedValue(remoteSnapshot);
+    const deleteAutomation = vi.fn().mockResolvedValue(remoteSnapshot);
     const listSourceRepositories = vi.fn().mockResolvedValue([remoteSourceRepository()]);
     const listSourceFolders = vi.fn().mockResolvedValue({
       path: '/home/nicolas/src',
@@ -110,24 +110,24 @@ describe('LoopsView', () => {
       fullName: 'nbonamy/remote',
       name: 'remote',
     })]);
-    const runLoop = vi.fn().mockResolvedValue(remoteSnapshot);
+    const runAutomation = vi.fn().mockResolvedValue(remoteSnapshot);
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
-      createLoop,
-      deleteLoop,
-      getLoopSnapshot,
+      createAutomation,
+      deleteAutomation,
+      getAutomationSnapshot,
       listSourceFolders,
       listSourceRepositories,
       loadWorkRepositories,
       remoteConnections: [readyRemoteConnection()],
-      runLoop,
+      runAutomation,
       snapshot: localSnapshot,
     });
 
     wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox');
     await flushPromises();
 
-    expect(getLoopSnapshot).toHaveBeenCalledWith(location);
+    expect(getAutomationSnapshot).toHaveBeenCalledWith(location);
     expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
     expect(loadWorkRepositories).toHaveBeenCalledWith('github', location);
     expect(wrapper.text()).toContain('Remote bugs');
@@ -135,14 +135,14 @@ describe('LoopsView', () => {
 
     await wrapper.get('[aria-label="Run Remote bugs"]').trigger('click');
     await flushPromises();
-    expect(runLoop).toHaveBeenCalledWith('loop-remote', location);
+    expect(runAutomation).toHaveBeenCalledWith('automation-remote', location);
 
-    const newLoopButton = wrapper.findAll('button').find((button) => button.text() === 'New Loop');
-    expect(newLoopButton).toBeDefined();
-    await newLoopButton!.trigger('click');
+    const newAutomationButton = wrapper.findAll('button').find((button) => button.text() === 'New Automation');
+    expect(newAutomationButton).toBeDefined();
+    await newAutomationButton!.trigger('click');
     await flushPromises();
 
-    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    const editor = wrapper.findComponent({ name: 'AutomationEditor' });
     expect(editor.props('teams')).toStrictEqual(remoteSnapshot.teams);
     expect(editor.props('benchTemplates')).toStrictEqual(remoteSnapshot.bench);
     expect(editor.props('sourceRepositories')).toStrictEqual([remoteSourceRepository()]);
@@ -172,7 +172,7 @@ describe('LoopsView', () => {
     });
     await flushPromises();
 
-    expect(createLoop).toHaveBeenCalledWith(expect.objectContaining({
+    expect(createAutomation).toHaveBeenCalledWith(expect.objectContaining({
       source: {
         provider: 'github',
         repositoryId: 'nbonamy/remote',
@@ -184,15 +184,15 @@ describe('LoopsView', () => {
     bodyButton('Delete').click();
     await flushPromises();
 
-    expect(deleteLoop).toHaveBeenCalledWith('loop-remote', location);
+    expect(deleteAutomation).toHaveBeenCalledWith('automation-remote', location);
   });
 
-  it('confirms before deleting a loop', async () => {
-    const deleteLoop = vi.fn().mockResolvedValue(undefined);
+  it('confirms before deleting a automation', async () => {
+    const deleteAutomation = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
-      deleteLoop,
-      loops: [loop()],
+      deleteAutomation,
+      automations: [automation()],
     });
 
     await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
@@ -202,22 +202,22 @@ describe('LoopsView', () => {
     await flushPromises();
 
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      'Loop "GitHub bugs" will stop creating agents.',
-      'Delete loop?',
+      'Automation "GitHub bugs" will stop creating agents.',
+      'Delete automation?',
       {
         cancelButtonText: 'Cancel',
-        confirmButtonText: 'Delete Loop',
+        confirmButtonText: 'Delete Automation',
         type: 'warning',
       },
     );
-    expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
+    expect(deleteAutomation).toHaveBeenCalledWith('automation-bugs');
   });
 
-  it('edits an existing loop from its action menu', async () => {
-    const updateLoop = vi.fn().mockResolvedValue(undefined);
+  it('edits an existing automation from its action menu', async () => {
+    const updateAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountView({
-      loops: [loop()],
-      updateLoop,
+      automations: [automation()],
+      updateAutomation,
     });
 
     await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
@@ -225,9 +225,9 @@ describe('LoopsView', () => {
     bodyButton('Edit').click();
     await flushPromises();
 
-    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    const editor = wrapper.findComponent({ name: 'AutomationEditor' });
     expect(editor.props('mode')).toBe('edit');
-    expect(editor.props('loop')).toMatchObject({ id: 'loop-bugs' });
+    expect(editor.props('automation')).toMatchObject({ id: 'automation-bugs' });
     editor.vm.$emit('submit', {
       source: {
         provider: 'github',
@@ -242,22 +242,22 @@ describe('LoopsView', () => {
     });
     await flushPromises();
 
-    expect(updateLoop).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'loop-bugs',
+    expect(updateAutomation).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'automation-bugs',
       action: expect.objectContaining({ type: 'create-agent' }),
     }));
-    expect(wrapper.findComponent({ name: 'LoopEditor' }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'AutomationEditor' }).exists()).toBe(false);
   });
 
-  it('keeps loop data when destructive confirmations are cancelled', async () => {
-    const clearLoopHistory = vi.fn();
-    const deleteLoop = vi.fn();
-    const deleteLoopExecution = vi.fn();
+  it('keeps automation data when destructive confirmations are cancelled', async () => {
+    const clearAutomationHistory = vi.fn();
+    const deleteAutomation = vi.fn();
+    const deleteAutomationExecution = vi.fn();
     vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancelled'));
-    const populatedLoop = loop({
+    const populatedAutomation = automation({
       executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-1',
+        automationId: 'automation-bugs',
         startedAt: '2026-06-09T10:00:00.000Z',
         completedAt: '2026-06-09T10:01:00.000Z',
         status: 'completed',
@@ -265,7 +265,7 @@ describe('LoopsView', () => {
         createdAgents: [],
       }],
     });
-    const wrapper = mountView({ clearLoopHistory, deleteLoop, deleteLoopExecution, loops: [populatedLoop] });
+    const wrapper = mountView({ clearAutomationHistory, deleteAutomation, deleteAutomationExecution, automations: [populatedAutomation] });
 
     await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
     await flushPromises();
@@ -278,18 +278,18 @@ describe('LoopsView', () => {
     await wrapper.get('[aria-label="Delete execution for execution"]').trigger('click');
     await flushPromises();
 
-    expect(deleteLoop).not.toHaveBeenCalled();
-    expect(clearLoopHistory).not.toHaveBeenCalled();
-    expect(deleteLoopExecution).not.toHaveBeenCalled();
+    expect(deleteAutomation).not.toHaveBeenCalled();
+    expect(clearAutomationHistory).not.toHaveBeenCalled();
+    expect(deleteAutomationExecution).not.toHaveBeenCalled();
   });
 
-  it('renders compact loop rows and runs a loop from the row action', async () => {
-    const runLoop = vi.fn().mockResolvedValue(undefined);
+  it('renders compact automation rows and runs a automation from the row action', async () => {
+    const runAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountView({
-      loops: [loop({
+      automations: [automation({
         executionLog: [{
-          id: 'loop-exec-1',
-          loopId: 'loop-bugs',
+          id: 'automation-exec-1',
+          automationId: 'automation-bugs',
           startedAt: '2026-06-09T10:00:00.000Z',
           completedAt: '2026-06-09T10:01:00.000Z',
           status: 'completed',
@@ -298,7 +298,7 @@ describe('LoopsView', () => {
         }],
         lastRunAt: '2026-06-09T10:00:00.000Z',
       })],
-      runLoop,
+      runAutomation,
     });
 
     expect(wrapper.text()).toContain('GitHub bugs');
@@ -310,10 +310,10 @@ describe('LoopsView', () => {
     await wrapper.get('[aria-label="Run GitHub bugs"]').trigger('click');
     await flushPromises();
 
-    expect(runLoop).toHaveBeenCalledWith('loop-bugs');
+    expect(runAutomation).toHaveBeenCalledWith('automation-bugs');
   });
 
-  it('shows execution logs from the loop row action', async () => {
+  it('shows execution logs from the automation row action', async () => {
     const conversationMessages: RendererMessage[] = [{
       id: 'message-dina-user',
       agentId: 'agent-dina',
@@ -331,10 +331,10 @@ describe('LoopsView', () => {
     }];
     const readConversationMessages = vi.fn().mockResolvedValue(conversationMessages);
     const wrapper = mountView({
-      loops: [loop({
+      automations: [automation({
         executionLog: [{
-          id: 'loop-exec-1',
-          loopId: 'loop-bugs',
+          id: 'automation-exec-1',
+          automationId: 'automation-bugs',
           startedAt: '2026-06-09T10:00:00.000Z',
           completedAt: '2026-06-09T10:01:00.000Z',
           status: 'completed',
@@ -348,8 +348,8 @@ describe('LoopsView', () => {
             conversationRef: { backend: 'codex', threadId: 'thread-dina' },
           }],
         }, {
-          id: 'loop-exec-0',
-          loopId: 'loop-bugs',
+          id: 'automation-exec-0',
+          automationId: 'automation-bugs',
           startedAt: '2026-06-09T09:00:00.000Z',
           completedAt: '2026-06-09T09:00:03.000Z',
           status: 'failed',
@@ -361,7 +361,7 @@ describe('LoopsView', () => {
       readConversationMessages,
     });
 
-    expect(wrapper.find('[aria-label="Loops"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Automations"]').exists()).toBe(true);
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
 
     expect(wrapper.text()).toContain('2 executions');
@@ -377,7 +377,7 @@ describe('LoopsView', () => {
     await flushPromises();
 
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
-    expect(wrapper.find('.loop-execution-conversation-overlay').exists()).toBe(true);
+    expect(wrapper.find('.automation-execution-conversation-overlay').exists()).toBe(true);
     expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Please fix the cockpit issue.');
@@ -385,18 +385,18 @@ describe('LoopsView', () => {
 
     await wrapper.get('[aria-label="Close conversation preview"]').trigger('click');
 
-    expect(wrapper.find('.loop-execution-conversation-overlay').exists()).toBe(false);
+    expect(wrapper.find('.automation-execution-conversation-overlay').exists()).toBe(false);
   });
 
   it('confirms before deleting one execution row', async () => {
-    const deleteLoopExecution = vi.fn().mockResolvedValue(undefined);
+    const deleteAutomationExecution = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
-      deleteLoopExecution,
-      loops: [loop({
+      deleteAutomationExecution,
+      automations: [automation({
         executionLog: [{
-          id: 'loop-exec-1',
-          loopId: 'loop-bugs',
+          id: 'automation-exec-1',
+          automationId: 'automation-bugs',
           startedAt: '2026-06-09T10:00:00.000Z',
           completedAt: '2026-06-09T10:01:00.000Z',
           status: 'completed',
@@ -418,7 +418,7 @@ describe('LoopsView', () => {
     await flushPromises();
 
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      'This execution will be removed from the loop history.',
+      'This execution will be removed from the automation history.',
       'Delete execution?',
       {
         cancelButtonText: 'Cancel',
@@ -426,18 +426,18 @@ describe('LoopsView', () => {
         type: 'warning',
       },
     );
-    expect(deleteLoopExecution).toHaveBeenCalledWith('loop-bugs', 'loop-exec-1');
+    expect(deleteAutomationExecution).toHaveBeenCalledWith('automation-bugs', 'automation-exec-1');
   });
 
   it('confirms before clearing execution history', async () => {
-    const clearLoopHistory = vi.fn().mockResolvedValue(undefined);
+    const clearAutomationHistory = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
-      clearLoopHistory,
-      loops: [loop({
+      clearAutomationHistory,
+      automations: [automation({
         executionLog: [{
-          id: 'loop-exec-1',
-          loopId: 'loop-bugs',
+          id: 'automation-exec-1',
+          automationId: 'automation-bugs',
           startedAt: '2026-06-09T10:00:00.000Z',
           completedAt: '2026-06-09T10:01:00.000Z',
           status: 'completed',
@@ -462,7 +462,7 @@ describe('LoopsView', () => {
         type: 'warning',
       },
     );
-    expect(clearLoopHistory).toHaveBeenCalledWith('loop-bugs');
+    expect(clearAutomationHistory).toHaveBeenCalledWith('automation-bugs');
   });
 
   it('loads local repositories and delegates local agent-folder selection', async () => {
@@ -476,17 +476,17 @@ describe('LoopsView', () => {
     await flushPromises();
 
     expect(loadWorkRepositories).toHaveBeenCalledWith('github');
-    await wrapper.find('.loop-welcome__button').trigger('click');
-    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    await wrapper.find('.automation-welcome__button').trigger('click');
+    const editor = wrapper.findComponent({ name: 'AutomationEditor' });
     await expect((editor.props('chooseAgentFolder') as () => Promise<string | null>)()).resolves.toBe('/Users/nbonamy/src/new-agent');
     expect(chooseAgentFolder).toHaveBeenCalledOnce();
   });
 
   it('shows remote loading errors and returns to local when the connection disappears', async () => {
-    const getLoopSnapshot = vi.fn().mockRejectedValue('remote unavailable');
+    const getAutomationSnapshot = vi.fn().mockRejectedValue('remote unavailable');
     const wrapper = mountView({
-      getLoopSnapshot,
-      loops: [loop({ name: 'Local bugs' })],
+      getAutomationSnapshot,
+      automations: [automation({ name: 'Local bugs' })],
       remoteConnections: [readyRemoteConnection()],
     });
 
@@ -501,11 +501,11 @@ describe('LoopsView', () => {
 
   it('cancels the remote folder picker and loads remote work items', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.loops = [loop({ name: 'Remote bugs' })];
+    remoteSnapshot.automations = [automation({ name: 'Remote bugs' })];
     remoteSnapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }];
     const loadWorkItems = vi.fn().mockResolvedValue([workItem()]);
     const wrapper = mountView({
-      getLoopSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+      getAutomationSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
       listSourceRepositories: vi.fn().mockResolvedValue([]),
       loadWorkItems,
       loadWorkRepositories: vi.fn().mockResolvedValue([repository()]),
@@ -514,9 +514,9 @@ describe('LoopsView', () => {
 
     wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox');
     await flushPromises();
-    const newLoopButton = wrapper.findAll('button').find((button) => button.text() === 'New Loop');
-    await newLoopButton!.trigger('click');
-    const editor = wrapper.findComponent({ name: 'LoopEditor' });
+    const newAutomationButton = wrapper.findAll('button').find((button) => button.text() === 'New Automation');
+    await newAutomationButton!.trigger('click');
+    const editor = wrapper.findComponent({ name: 'AutomationEditor' });
     editor.vm.$emit('load-items', 'nbonamy/codex-claw');
     const folderPromise = (editor.props('chooseAgentFolder') as () => Promise<string | null>)();
     await flushPromises();
@@ -531,9 +531,9 @@ describe('LoopsView', () => {
     );
   });
 
-  it('labels non-GitHub and direct-agent loops without assuming valid dates', () => {
+  it('labels non-GitHub and direct-agent automations without assuming valid dates', () => {
     const wrapper = mountView({
-      loops: [loop({
+      automations: [automation({
         lastRunAt: 'not-a-date',
         source: { provider: 'linear' as never, repositoryId: 'workspace' },
         action: {
@@ -552,22 +552,22 @@ describe('LoopsView', () => {
 
 function mountView(overrides: Partial<{
   chooseAgentFolder: () => Promise<string | null>;
-  clearLoopHistory: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  createLoop: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  deleteLoopExecution: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  deleteLoop: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
+  clearAutomationHistory: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  createAutomation: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  deleteAutomationExecution: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  deleteAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-  loadWorkItems: (provider: 'github', repositoryId: string, location?: LoopLocation) => Promise<WorkItem[] | void>;
-  loadWorkRepositories: (provider: 'github', location?: LoopLocation) => Promise<WorkRepository[] | void>;
-  loops: Loop[];
+  loadWorkItems: (provider: 'github', repositoryId: string, location?: AutomationLocation) => Promise<WorkItem[] | void>;
+  loadWorkRepositories: (provider: 'github', location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+  automations: Automation[];
   messages: RendererMessage[];
-  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => Promise<RendererMessage[]>;
+  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
   remoteConnections: RemoteConnection[];
-  runLoop: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  runAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   snapshot: AppSnapshot;
-  updateLoop: (input: Parameters<NonNullable<InstanceType<typeof LoopsView>['$props']['updateLoop']>>[0], location?: LoopLocation) => Promise<AppSnapshot | void>;
+  updateAutomation: (input: Parameters<NonNullable<InstanceType<typeof AutomationsView>['$props']['updateAutomation']>>[0], location?: AutomationLocation) => Promise<AppSnapshot | void>;
   workRepositoriesByProvider: Partial<Record<'github', WorkRepository[]>>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
@@ -585,27 +585,27 @@ function mountView(overrides: Partial<{
     status: 'connected',
   }];
 
-  return mount(LoopsView, {
+  return mount(AutomationsView, {
     props: {
       agents: snapshot.agents,
       bench: snapshot.bench,
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
-      clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
-      createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
-      deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
-      deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
-      getLoopSnapshot: overrides.getLoopSnapshot ?? vi.fn().mockResolvedValue(snapshot),
+      clearAutomationHistory: overrides.clearAutomationHistory ?? vi.fn().mockResolvedValue(undefined),
+      createAutomation: overrides.createAutomation ?? vi.fn().mockResolvedValue(undefined),
+      deleteAutomationExecution: overrides.deleteAutomationExecution ?? vi.fn().mockResolvedValue(undefined),
+      deleteAutomation: overrides.deleteAutomation ?? vi.fn().mockResolvedValue(undefined),
+      getAutomationSnapshot: overrides.getAutomationSnapshot ?? vi.fn().mockResolvedValue(snapshot),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
-      loops: overrides.loops ?? [],
+      automations: overrides.automations ?? [],
       messages: overrides.messages ?? snapshot.messages,
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
       remoteConnections: overrides.remoteConnections ?? [],
-      runLoop: overrides.runLoop ?? vi.fn().mockResolvedValue(undefined),
+      runAutomation: overrides.runAutomation ?? vi.fn().mockResolvedValue(undefined),
       teams: snapshot.teams,
-      updateLoop: overrides.updateLoop ?? vi.fn().mockResolvedValue(undefined),
+      updateAutomation: overrides.updateAutomation ?? vi.fn().mockResolvedValue(undefined),
       workBacklog: snapshot.workBacklog,
       workItemsByRepository: {
         'github:nbonamy/codex-claw': [workItem()],
@@ -627,9 +627,9 @@ function bodyButton(label: string): HTMLButtonElement {
   return button as HTMLButtonElement;
 }
 
-function loop(overrides: Partial<Loop> = {}): Loop {
+function automation(overrides: Partial<Automation> = {}): Automation {
   return {
-    id: 'loop-bugs',
+    id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
     source: {

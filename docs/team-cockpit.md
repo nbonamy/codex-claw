@@ -93,7 +93,7 @@ plain global cockpit flag. A future shape could be:
 type AppSurface =
   | { kind: 'agent' }
   | { kind: 'cockpit'; scope: CockpitScope }
-  | { kind: 'loops' }
+  | { kind: 'automations' }
   | { kind: 'settings' };
 ```
 

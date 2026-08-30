@@ -1,7 +1,7 @@
-import type { Agent, AppSnapshot, Loop, LoopExecutionLogEntry, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, Automation, AutomationExecutionLogEntry, WorkItem, WorkProviderKind } from '@codex-claw/core/contracts';
 import { assignWorkItemToAgentInSnapshot, deployBenchTemplateInSnapshot } from '@codex-claw/core/agent-manager';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { recordLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
+import { recordAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { createEntityId, type IdGenerator } from '@codex-claw/core/ids';
 import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -15,70 +15,70 @@ type WorkItemLister = {
   listItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
 };
 
-type LoopPromptContext = {
-  loopId: string;
+type AutomationPromptContext = {
+  automationId: string;
   executionId: string;
   workItemId: string;
 };
 
-export type LoopRunnerOptions = {
+export type AutomationRunnerOptions = {
   getSnapshot: () => AppSnapshot;
   listWorkItems: WorkItemLister;
   notifySnapshotUpdated: () => void;
   saveSnapshot: () => Promise<void>;
-  sendPrompt: (agentId: string, prompt: string, context: LoopPromptContext) => Promise<unknown>;
+  sendPrompt: (agentId: string, prompt: string, context: AutomationPromptContext) => Promise<unknown>;
   createExecutionId?: IdGenerator;
   now?: () => Date;
 };
 
-type CreatedLoopAssignment = {
+type CreatedAutomationAssignment = {
   agent: Agent;
   item: WorkItem;
 };
 
-export class LoopRunner {
-  constructor(private readonly options: LoopRunnerOptions) {}
+export class AutomationRunner {
+  constructor(private readonly options: AutomationRunnerOptions) {}
 
   async runAll(): Promise<void> {
-    const loops = [...this.snapshot().loops].filter((loop) => loop.enabled);
-    for (const loop of loops) {
-      await this.runLoop(loop.id);
+    const automations = [...this.snapshot().automations].filter((automation) => automation.enabled);
+    for (const automation of automations) {
+      await this.runAutomation(automation.id);
     }
   }
 
-  async runLoop(loopId: string): Promise<void> {
-    const loop = this.snapshot().loops.find((candidate) => candidate.id === loopId);
-    if (!loop || !loop.enabled) {
-      logMain('loop-runner', 'skipped', {
-        loopId,
-        reason: loop ? 'disabled' : 'missing',
+  async runAutomation(automationId: string): Promise<void> {
+    const automation = this.snapshot().automations.find((candidate) => candidate.id === automationId);
+    if (!automation || !automation.enabled) {
+      logMain('automation-runner', 'skipped', {
+        automationId,
+        reason: automation ? 'disabled' : 'missing',
       });
       return;
     }
 
     const executionId = this.createExecutionId();
     const startedAt = this.now().toISOString();
-    const createdAssignments: CreatedLoopAssignment[] = [];
-    logMain('loop-runner', 'started', {
-      loopId: loop.id,
+    const createdAssignments: CreatedAutomationAssignment[] = [];
+    logMain('automation-runner', 'started', {
+      automationId: automation.id,
       executionId,
-      provider: loop.source.provider,
-      repositoryId: loop.source.repositoryId,
+      provider: automation.source.provider,
+      repositoryId: automation.source.repositoryId,
     });
     try {
-      await this.createAssignmentsForLoop(loop, executionId, startedAt, createdAssignments);
+      await this.createAssignmentsForAutomation(automation, executionId, startedAt, createdAssignments);
       if (createdAssignments.length === 0) {
-        logMain('loop-runner', 'completed without assignments', {
-          loopId: loop.id,
+        logMain('automation-runner', 'completed without assignments', {
+          automationId: automation.id,
           executionId,
         });
         return;
       }
-      const entry = createLoopExecutionEntry(loop.id, executionId, startedAt, 'working', createdAssignments);
-      recordLoopExecutionInSnapshot(this.snapshot(), loop.id, entry);
+      const entry = createAutomationExecutionEntry(automation.id, executionId, startedAt, 'working', createdAssignments);
+      recordAutomationExecutionInSnapshot(this.snapshot(), automation.id, entry);
       await this.publishSnapshotUpdate();
-      logMain('loop-runner', 'recorded assignments', {
-        loopId: loop.id,
+      logMain('automation-runner', 'recorded assignments', {
+        automationId: automation.id,
         executionId,
         createdCount: createdAssignments.length,
       });
@@ -87,24 +87,24 @@ export class LoopRunner {
       for (const assignment of createdAssignments) {
         const workItemId = workItemAssignmentKey(assignment.item);
         try {
-          logMain('loop-runner', 'dispatching prompt', {
-            loopId: loop.id,
+          logMain('automation-runner', 'dispatching prompt', {
+            automationId: automation.id,
             executionId,
             agentId: assignment.agent.id,
             workItemId,
           });
           await this.options.sendPrompt(assignment.agent.id, workItemAssignmentPrompt(assignment.item, {
-            ...loop.instructions,
+            ...automation.instructions,
             completionPolicy: 'complete',
           }), {
-            loopId: loop.id,
+            automationId: automation.id,
             executionId,
             workItemId,
           });
         } catch (error) {
           promptError = error instanceof Error ? error.message : String(error);
-          warnMain('loop-runner', 'prompt dispatch failed', {
-            loopId: loop.id,
+          warnMain('automation-runner', 'prompt dispatch failed', {
+            automationId: automation.id,
             executionId,
             agentId: assignment.agent.id,
             workItemId,
@@ -114,15 +114,15 @@ export class LoopRunner {
       }
 
       if (promptError) {
-        recordLoopExecutionInSnapshot(this.snapshot(), loop.id, {
+        recordAutomationExecutionInSnapshot(this.snapshot(), automation.id, {
           ...entry,
           completedAt: this.now().toISOString(),
           status: 'failed',
           error: promptError,
         });
         await this.publishSnapshotUpdate();
-        warnMain('loop-runner', 'failed', {
-          loopId: loop.id,
+        warnMain('automation-runner', 'failed', {
+          automationId: automation.id,
           executionId,
           createdCount: createdAssignments.length,
           message: promptError,
@@ -130,8 +130,8 @@ export class LoopRunner {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      recordLoopExecutionInSnapshot(this.snapshot(), loop.id, createLoopExecutionEntry(
-        loop.id,
+      recordAutomationExecutionInSnapshot(this.snapshot(), automation.id, createAutomationExecutionEntry(
+        automation.id,
         executionId,
         startedAt,
         'failed',
@@ -140,8 +140,8 @@ export class LoopRunner {
         this.now().toISOString(),
       ));
       await this.publishSnapshotUpdate();
-      warnMain('loop-runner', 'failed', {
-        loopId: loop.id,
+      warnMain('automation-runner', 'failed', {
+        automationId: automation.id,
         executionId,
         createdCount: createdAssignments.length,
         message,
@@ -149,11 +149,11 @@ export class LoopRunner {
     }
   }
 
-  private async createAssignmentsForLoop(loop: Loop, executionId: string, createdAt: string, createdAssignments: CreatedLoopAssignment[]): Promise<void> {
-    const items = await this.options.listWorkItems.listItems(loop.source.provider, loop.source.repositoryId);
-    const matchingItems = matchingLoopItems(items, loop);
-    logMain('loop-runner', 'listed work items', {
-      loopId: loop.id,
+  private async createAssignmentsForAutomation(automation: Automation, executionId: string, createdAt: string, createdAssignments: CreatedAutomationAssignment[]): Promise<void> {
+    const items = await this.options.listWorkItems.listItems(automation.source.provider, automation.source.repositoryId);
+    const matchingItems = matchingAutomationItems(items, automation);
+    logMain('automation-runner', 'listed work items', {
+      automationId: automation.id,
       executionId,
       itemCount: items.length,
       matchingCount: matchingItems.length,
@@ -163,28 +163,28 @@ export class LoopRunner {
       const assignmentKey = workItemAssignmentKey(item);
       const existingAssignment = this.snapshot().workBacklog.assignments[assignmentKey];
       if (existingAssignment && existingAssignment.status !== 'completed') {
-        logMain('loop-runner', 'skipped already assigned item', {
-          loopId: loop.id,
+        logMain('automation-runner', 'skipped already assigned item', {
+          automationId: automation.id,
           executionId,
           workItemId: assignmentKey,
         });
         continue;
       }
 
-      const teamId = this.resolveTargetTeamId(loop, item, createdAt);
-      const agent = this.createAgentForLoop(loop, item, teamId, createdAt);
+      const teamId = this.resolveTargetTeamId(automation, item, createdAt);
+      const agent = this.createAgentForAutomation(automation, item, teamId, createdAt);
       if (!agent) {
-        throw new Error(`Agent configuration is no longer available for loop "${loop.name}".`);
+        throw new Error(`Agent configuration is no longer available for automation "${automation.name}".`);
       }
 
       assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
-        loopExecutionId: executionId,
-        loopId: loop.id,
+        automationExecutionId: executionId,
+        automationId: automation.id,
         policy: 'complete',
       });
       createdAssignments.push({ agent, item });
-      logMain('loop-runner', 'created assignment', {
-        loopId: loop.id,
+      logMain('automation-runner', 'created assignment', {
+        automationId: automation.id,
         executionId,
         agentId: agent.id,
         workItemId: assignmentKey,
@@ -192,11 +192,11 @@ export class LoopRunner {
     }
   }
 
-  private createAgentForLoop(loop: Loop, item: WorkItem, teamId: string, createdAt: string): Agent | null {
-    if (loop.action.type === 'create-agent-from-bench') {
+  private createAgentForAutomation(automation: Automation, item: WorkItem, teamId: string, createdAt: string): Agent | null {
+    if (automation.action.type === 'create-agent-from-bench') {
       return deployBenchTemplateInSnapshot(
         this.snapshot(),
-        loop.action.benchTemplateId,
+        automation.action.benchTemplateId,
         teamId,
         createdAt,
         undefined,
@@ -207,20 +207,20 @@ export class LoopRunner {
     const previousAgentIds = new Set(this.snapshot().agents.map((agent) => agent.id));
     createAgentInSnapshot(this.snapshot(), {
       name: dedicatedTeamName(item),
-      folder: loop.action.sourceRepositoryPath,
-      backend: loop.action.backend ?? 'codex',
-      backendDefaults: loop.action.backendDefaults,
+      folder: automation.action.sourceRepositoryPath,
+      backend: automation.action.backend ?? 'codex',
+      backendDefaults: automation.action.backendDefaults,
       teamId,
     }, createdAt, undefined, { select: false });
     return this.snapshot().agents.find((agent) => !previousAgentIds.has(agent.id)) ?? null;
   }
 
-  private resolveTargetTeamId(loop: Loop, item: WorkItem, createdAt: string): string {
-    const teamTarget = loop.action.teamTarget;
+  private resolveTargetTeamId(automation: Automation, item: WorkItem, createdAt: string): string {
+    const teamTarget = automation.action.teamTarget;
     if (teamTarget.mode === 'existing') {
       const team = this.snapshot().teams.find((candidate) => candidate.id === teamTarget.teamId);
       if (!team) {
-        throw new Error(`Team is no longer available for loop "${loop.name}".`);
+        throw new Error(`Team is no longer available for automation "${automation.name}".`);
       }
       return team.id;
     }
@@ -246,15 +246,15 @@ export class LoopRunner {
   }
 
   private createExecutionId(): string {
-    return this.options.createExecutionId?.() ?? createEntityId('loop-exec');
+    return this.options.createExecutionId?.() ?? createEntityId('automation-exec');
   }
 }
 
-export function matchingLoopItems(items: WorkItem[], loop: Loop): WorkItem[] {
-  const selectedAssigneeLogin = loop.source.assigneeLogin;
-  const selectedTagName = loop.source.tagName;
+export function matchingAutomationItems(items: WorkItem[], automation: Automation): WorkItem[] {
+  const selectedAssigneeLogin = automation.source.assigneeLogin;
+  const selectedTagName = automation.source.tagName;
   return items.filter((item) => {
-    if (item.provider !== loop.source.provider || item.repositoryId !== loop.source.repositoryId || item.state !== 'open') {
+    if (item.provider !== automation.source.provider || item.repositoryId !== automation.source.repositoryId || item.state !== 'open') {
       return false;
     }
 
@@ -274,18 +274,18 @@ function dedicatedTeamName(item: WorkItem): string {
   return `${workProviderLabel(item.provider)} #${item.number}`;
 }
 
-function createLoopExecutionEntry(
-  loopId: string,
+function createAutomationExecutionEntry(
+  automationId: string,
   executionId: string,
   startedAt: string,
-  status: LoopExecutionLogEntry['status'],
-  assignments: CreatedLoopAssignment[],
+  status: AutomationExecutionLogEntry['status'],
+  assignments: CreatedAutomationAssignment[],
   error?: string,
   completedAt?: string,
-): LoopExecutionLogEntry {
+): AutomationExecutionLogEntry {
   return {
     id: executionId,
-    loopId,
+    automationId,
     startedAt,
     status,
     createdCount: assignments.length,

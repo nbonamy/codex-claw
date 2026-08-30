@@ -1,25 +1,25 @@
 <template>
   <div
-    class="loop-execution-conversation-overlay"
+    class="automation-execution-conversation-overlay"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="loop-execution-conversation-title"
+    aria-labelledby="automation-execution-conversation-title"
   >
     <div
-      class="loop-execution-conversation-overlay__scrim"
+      class="automation-execution-conversation-overlay__scrim"
       aria-hidden="true"
     />
-    <div class="loop-execution-conversation-overlay__card">
-      <header class="loop-execution-conversation-overlay__header">
+    <div class="automation-execution-conversation-overlay__card">
+      <header class="automation-execution-conversation-overlay__header">
         <div>
-          <h4 id="loop-execution-conversation-title">
+          <h4 id="automation-execution-conversation-title">
             {{ ticket }}
           </h4>
           <span>{{ agentName }}</span>
         </div>
         <button
           type="button"
-          :aria-label="$t('surface.loopExecutionConversationOverlay.closeConversationPreview')"
+          :aria-label="$t('surface.automationExecutionConversationOverlay.closeConversationPreview')"
           @click="emit('close')"
         >
           <X aria-hidden="true" />
@@ -28,17 +28,17 @@
 
       <div
         v-if="loading"
-        class="loop-execution-conversation-overlay__empty"
-      > {{ $t('surface.loopExecutionConversationOverlay.loadingConversation') }} </div>
+        class="automation-execution-conversation-overlay__empty"
+      > {{ $t('surface.automationExecutionConversationOverlay.loadingConversation') }} </div>
       <div
         v-else-if="error"
-        class="loop-execution-conversation-overlay__empty"
+        class="automation-execution-conversation-overlay__empty"
       >
         {{ error }}
       </div>
       <CodexMessageList
         v-else-if="messages.length > 0"
-        class="loop-execution-conversation-overlay__messages"
+        class="automation-execution-conversation-overlay__messages"
         actions-disabled
         :can-delete-message="false"
         :can-edit-message="false"
@@ -48,8 +48,8 @@
       />
       <div
         v-else
-        class="loop-execution-conversation-overlay__empty"
-      > {{ $t('surface.loopExecutionConversationOverlay.noMessagesForThisExecution') }} </div>
+        class="automation-execution-conversation-overlay__empty"
+      > {{ $t('surface.automationExecutionConversationOverlay.noMessagesForThisExecution') }} </div>
     </div>
   </div>
 </template>
@@ -79,7 +79,7 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-.loop-execution-conversation-overlay {
+.automation-execution-conversation-overlay {
   position: fixed;
   inset: var(--space-32);
   z-index: 20;
@@ -90,14 +90,14 @@ const emit = defineEmits<{
   background: transparent;
 }
 
-.loop-execution-conversation-overlay__scrim {
+.automation-execution-conversation-overlay__scrim {
   position: absolute;
   inset: 0;
   background: var(--color-overlay);
   backdrop-filter: blur(8px);
 }
 
-.loop-execution-conversation-overlay__card {
+.automation-execution-conversation-overlay__card {
   position: relative;
   z-index: 1;
   width: min(960px, 100%);
@@ -111,7 +111,7 @@ const emit = defineEmits<{
   box-shadow: var(--shadow-lg);
 }
 
-.loop-execution-conversation-overlay__header {
+.automation-execution-conversation-overlay__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -121,32 +121,32 @@ const emit = defineEmits<{
   background: var(--color-shell-main);
 }
 
-.loop-execution-conversation-overlay__header div {
+.automation-execution-conversation-overlay__header div {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-.loop-execution-conversation-overlay__header h4,
-.loop-execution-conversation-overlay__header span {
+.automation-execution-conversation-overlay__header h4,
+.automation-execution-conversation-overlay__header span {
   margin: 0;
 }
 
-.loop-execution-conversation-overlay__header h4 {
+.automation-execution-conversation-overlay__header h4 {
   color: var(--color-text);
   font-size: var(--font-size-15);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-20);
 }
 
-.loop-execution-conversation-overlay__header span {
+.automation-execution-conversation-overlay__header span {
   display: block;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
 }
 
-.loop-execution-conversation-overlay__header button {
+.automation-execution-conversation-overlay__header button {
   width: 32px;
   height: 32px;
   display: grid;
@@ -160,24 +160,24 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.loop-execution-conversation-overlay__header button:hover,
-.loop-execution-conversation-overlay__header button:focus-visible {
+.automation-execution-conversation-overlay__header button:hover,
+.automation-execution-conversation-overlay__header button:focus-visible {
   color: var(--color-text);
   background: var(--color-surface);
 }
 
-.loop-execution-conversation-overlay__header svg {
+.automation-execution-conversation-overlay__header svg {
   width: var(--icon-md);
   height: var(--icon-md);
 }
 
-.loop-execution-conversation-overlay__messages {
+.automation-execution-conversation-overlay__messages {
   min-height: 0;
   background: var(--color-shell-main);
   --message-list-content-width: 780px;
 }
 
-.loop-execution-conversation-overlay__empty {
+.automation-execution-conversation-overlay__empty {
   flex: 1 1 auto;
   display: grid;
   place-items: center;

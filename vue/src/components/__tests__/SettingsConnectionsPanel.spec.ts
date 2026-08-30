@@ -144,7 +144,7 @@ describe('SettingsConnectionsPanel', () => {
     expect(updateRemoteConnection).toHaveBeenCalledWith('connection-devbox', { sourceFolderPath: '/home/nicolas/src' });
     expect(checkRemoteConnection).toHaveBeenCalledWith('connection-devbox');
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      'devbox will be removed. This will also remove 1 connected team from this app: Remote Team. Remote agents, messages, and loops will keep running on the SSH host.',
+      'devbox will be removed. This will also remove 1 connected team from this app: Remote Team. Remote agents, messages, and automations will keep running on the SSH host.',
       'Delete devbox?',
       {
         cancelButtonText: 'Cancel',

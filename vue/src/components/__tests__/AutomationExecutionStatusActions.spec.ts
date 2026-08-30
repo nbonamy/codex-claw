@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import LoopExecutionStatusActions from '../LoopExecutionStatusActions.vue';
+import AutomationExecutionStatusActions from '../AutomationExecutionStatusActions.vue';
 
-describe('LoopExecutionStatusActions', () => {
+describe('AutomationExecutionStatusActions', () => {
   it('renders status text and emits row actions', async () => {
-    const wrapper = mount(LoopExecutionStatusActions, {
+    const wrapper = mount(AutomationExecutionStatusActions, {
       props: {
         status: 'completed',
         statusLabel: 'Completed',

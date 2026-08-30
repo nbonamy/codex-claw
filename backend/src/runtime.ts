@@ -3,14 +3,14 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/core/loop-manager';
+import { updateAutomationExecutionAgentConversationInSnapshot } from '@codex-claw/core/automation-manager';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
-import { LoopRunner } from './loops/runner';
-import { LoopScheduler } from './loops/scheduler';
+import { AutomationRunner } from './automations/runner';
+import { AutomationScheduler } from './automations/scheduler';
 import { ClawMcpService } from './mcp/service';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
@@ -81,7 +81,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
   });
   await workIntegrations.hydrateConnections();
-  const loopRunner = new LoopRunner({
+  const automationRunner = new AutomationRunner({
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,
     notifySnapshotUpdated: () => server.emitEvent({
@@ -98,11 +98,11 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, (event) => server.emitEvent(event), {
         onBackendSessionUpdated: (result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
         onPromptStarted: async (result) => {
-          const loop = updateLoopExecutionAgentConversationInSnapshot(snapshot, context.loopId, context.executionId, agentId, {
+          const automation = updateAutomationExecutionAgentConversationInSnapshot(snapshot, context.automationId, context.executionId, agentId, {
             conversationRef: conversationRefFromSendResult(agent, result),
             updatedAt: new Date().toISOString(),
           });
-          if (loop) {
+          if (automation) {
             await saveBackendSnapshot(snapshot);
             server.emitEvent({
               type: 'snapshot.updated',
@@ -114,10 +114,10 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       return Promise.resolve(snapshot);
     },
   });
-  const loopScheduler = new LoopScheduler({
-    runLoops: () => loopRunner.runAll(),
+  const automationScheduler = new AutomationScheduler({
+    runAutomations: () => automationRunner.runAll(),
     onError: (error) => {
-      warnMain('loop-scheduler', 'check failed', { message: error instanceof Error ? error.message : String(error) });
+      warnMain('automation-scheduler', 'check failed', { message: error instanceof Error ? error.message : String(error) });
     },
   });
   server = new ClawBackendServer({
@@ -134,7 +134,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
     workRouting: mcpService,
     workIntegrations,
-    loopRunner,
+    automationRunner,
     remoteClients: new RemoteClawdClientManager({
       requestHandlers: {
         [backendMethods.clientExternalOpen]: (params) => options.requestClient(backendMethods.clientExternalOpen, params),
@@ -158,12 +158,12 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   });
   mcpService.setDriverRpc(driverRpc);
   mcpService.setEventSink((event) => server.emitEvent(event));
-  loopScheduler.start();
+  automationScheduler.start();
 
   return {
     server,
     async stop() {
-      loopScheduler.stop();
+      automationScheduler.stop();
       await server.close();
       await mcpService.stop();
     },

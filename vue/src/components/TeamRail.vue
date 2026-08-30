@@ -60,15 +60,15 @@
 
       <div class="team-rail__bottom">
         <button
-          class="team-rail__loops"
-          :class="{ 'team-rail__loops--active': loopsActive }"
+          class="team-rail__automations"
+          :class="{ 'team-rail__automations--active': automationsActive }"
           type="button"
-          :aria-label="$t('surface.teamRail.loops')"
-          :aria-pressed="loopsActive"
-          @click="emit('select-loops')"
+          :aria-label="$t('surface.teamRail.automations')"
+          :aria-pressed="automationsActive"
+          @click="emit('select-automations')"
         >
-          <InfinityIcon
-            class="team-rail__loops-icon"
+          <AutomationIcon
+            class="team-rail__automations-icon"
             aria-hidden="true"
           />
         </button>
@@ -104,7 +104,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { teamInitials } from '@codex-claw/core/team-manager';
-import { InfinityIcon, PlusIcon } from '../shared/icons/app-icons';
+import { AutomationIcon, PlusIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
@@ -115,7 +115,7 @@ const props = defineProps<{
   teams: Team[];
   activeTeamId: string | null;
   cockpitActive?: boolean;
-  loopsActive?: boolean;
+  automationsActive?: boolean;
   rateLimits?: AccountRateLimits;
   account?: CodexAccount | null;
   settingsActive?: boolean;
@@ -134,7 +134,7 @@ const emit = defineEmits<{
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];
   'select-cockpit': [];
-  'select-loops': [];
+  'select-automations': [];
   'select-team': [teamId: string];
 }>();
 
@@ -171,7 +171,7 @@ function selectEditTeam(teamId: string): void {
 }
 
 function isTeamActive(teamId: string): boolean {
-  return !props.cockpitActive && !props.loopsActive && !props.settingsActive && teamId === props.activeTeamId;
+  return !props.cockpitActive && !props.automationsActive && !props.settingsActive && teamId === props.activeTeamId;
 }
 
 function isTeamUnread(teamId: string): boolean {
@@ -326,7 +326,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit,
-.team-rail__loops {
+.team-rail__automations {
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   display: grid;
@@ -344,14 +344,14 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
-.team-rail__loops:hover,
-.team-rail__loops:focus-visible {
+.team-rail__automations:hover,
+.team-rail__automations:focus-visible {
   color: var(--team-rail-icon-hover-color);
   outline: none;
 }
 
 .team-rail__cockpit--active,
-.team-rail__loops--active {
+.team-rail__automations--active {
   color: var(--team-rail-icon-active-color);
   opacity: 1;
 }
@@ -361,18 +361,13 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   opacity: 1;
 }
 
-.team-rail__loops svg,
+.team-rail__automations svg,
 .team-rail__new svg,
 :deep() .settings-menu__trigger svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
   stroke-width: 1.25px;
   transform: scale(1.15);
-}
-
-.team-rail__loops svg {
-  stroke-width: 1.35px;
-  transform: scaleX(1.2) scaleY(1.48);
 }
 
 .team-rail__team::before,

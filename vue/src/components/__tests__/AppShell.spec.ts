@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateTeamInput, DeployBenchTemplateInput, LoopLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateLoopInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppCommand, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, CodexClawApi, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, DeployBenchTemplateInput, AutomationLocation, RendererMessage, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 import { i18n } from '../../i18n';
@@ -2257,24 +2257,24 @@ describe('AppShell', () => {
     expect(wrapper.emitted('select-agent')).toBeUndefined();
   });
 
-  it('opens loops from the rail without keeping a team active', async () => {
+  it('opens automations from the rail without keeping a team active', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
 
-    await wrapper.get('[aria-label="Loops"]').trigger('click');
+    await wrapper.get('[aria-label="Automations"]').trigger('click');
 
-    expect(wrapper.find('.loops-view').exists()).toBe(true);
+    expect(wrapper.find('.automations-view').exists()).toBe(true);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
-    expect(wrapper.get('[aria-label="Loops"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
-    expect(wrapper.text()).toContain('A loop is an automation that just works for you.');
+    expect(wrapper.text()).toContain('Automations watch for matching work and start the right agent automatically.');
   });
 
-  it('opens a loop execution conversation from the logs view', async () => {
+  it('opens a automation execution conversation from the logs view', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.loops = [{
-      id: 'loop-bugs',
+    snapshot.automations = [{
+      id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
       source: {
@@ -2291,8 +2291,8 @@ describe('AppShell', () => {
       },
       instructions: {},
       executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-1',
+        automationId: 'automation-bugs',
         startedAt: '2026-06-09T10:00:00.000Z',
         completedAt: '2026-06-09T10:01:00.000Z',
         status: 'completed',
@@ -2315,29 +2315,29 @@ describe('AppShell', () => {
       role: 'user',
       status: 'complete',
       createdAt: '2026-06-09T10:00:02.000Z',
-      parts: [{ type: 'text', text: 'Please fix cockpit from the loop.' }],
+      parts: [{ type: 'text', text: 'Please fix cockpit from the automation.' }],
     }, {
       id: 'message-jesse-assistant',
       agentId: 'agent-jesse',
       role: 'assistant',
       status: 'complete',
       createdAt: '2026-06-09T10:00:45.000Z',
-      parts: [{ type: 'text', text: 'Loop work is ready.' }],
+      parts: [{ type: 'text', text: 'Automation work is ready.' }],
     }];
     const readConversationMessages = vi.fn().mockResolvedValue(snapshot.messages);
     const wrapper = mountShell({ snapshot, readConversationMessages });
 
-    await wrapper.get('[aria-label="Loops"]').trigger('click');
+    await wrapper.get('[aria-label="Automations"]').trigger('click');
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
     await wrapper.get('[aria-label="View conversation for github:nbonamy/codex-claw#12"]').trigger('click');
     await flushPromises();
 
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-jesse' }, 'agent-jesse');
     expect(wrapper.emitted('select-agent')).toBeUndefined();
-    expect(wrapper.find('.loops-view').exists()).toBe(true);
-    expect(wrapper.find('.loop-execution-conversation-overlay').exists()).toBe(true);
-    expect(wrapper.text()).toContain('Please fix cockpit from the loop.');
-    expect(wrapper.text()).toContain('Loop work is ready.');
+    expect(wrapper.find('.automations-view').exists()).toBe(true);
+    expect(wrapper.find('.automation-execution-conversation-overlay').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Please fix cockpit from the automation.');
+    expect(wrapper.text()).toContain('Automation work is ready.');
   });
 
   it('forwards cockpit work item assignments', async () => {
@@ -3482,13 +3482,13 @@ describe('AppShell', () => {
       color: '#277da1',
       agentIds: [],
     }];
-    const getLoopSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
-    const wrapper = mountShell({ snapshot, getLoopSnapshot });
+    const getAutomationSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
+    const wrapper = mountShell({ snapshot, getAutomationSnapshot });
 
     const loadRemoteTeams = wrapper.findComponent({ name: 'TeamDialog' }).props('loadRemoteTeams') as (connectionId: string) => Promise<Team[]>;
     await expect(loadRemoteTeams('connection-devbox')).resolves.toStrictEqual(remoteSnapshot.teams);
 
-    expect(getLoopSnapshot).toHaveBeenCalledWith({
+    expect(getAutomationSnapshot).toHaveBeenCalledWith({
       kind: 'remote',
       remoteConnectionId: 'connection-devbox',
     });
@@ -4112,26 +4112,26 @@ function mountShell(overrides: Partial<{
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   updateSettings: (input: UpdateSettingsInput) => Promise<void>;
-  createLoop: (input: CreateLoopInput) => Promise<void>;
-  updateLoop: (input: UpdateLoopInput) => Promise<void>;
-  clearLoopHistory: (loopId: string) => Promise<void>;
-  deleteLoopExecution: (loopId: string, executionId: string) => Promise<void>;
-  deleteLoop: (loopId: string) => Promise<void>;
+  createAutomation: (input: CreateAutomationInput) => Promise<void>;
+  updateAutomation: (input: UpdateAutomationInput) => Promise<void>;
+  clearAutomationHistory: (automationId: string) => Promise<void>;
+  deleteAutomationExecution: (automationId: string, executionId: string) => Promise<void>;
+  deleteAutomation: (automationId: string) => Promise<void>;
   listAgentConversations: (agentId: string) => Promise<ConversationSummary[]>;
   resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => Promise<void>;
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   openAgentGitDiff: (agentId: string) => Promise<void>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<WorkRepository[] | void>;
-  loadAssignedWorkItems: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkItem[] | void>;
-  loadGlobalWorkItems: (provider: WorkProviderKind, location?: LoopLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
-  loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
+  loadAssignedWorkItems: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
+  loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
+  loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createWorkItem: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadBench: (location?: BenchLocation) => Promise<void>;
-  getLoopSnapshot: (location?: LoopLocation) => Promise<AppSnapshot>;
+  getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
   remoteBenchByConnectionId: Record<string, BenchTemplate[]>;
   remoteBenchStatusByConnectionId: Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>;
   quit: () => Promise<void>;
@@ -4165,11 +4165,11 @@ function mountShell(overrides: Partial<{
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
       updateSettings: overrides.updateSettings ?? vi.fn().mockResolvedValue(undefined),
-      createLoop: overrides.createLoop ?? vi.fn().mockResolvedValue(undefined),
-      updateLoop: overrides.updateLoop ?? vi.fn().mockResolvedValue(undefined),
-      clearLoopHistory: overrides.clearLoopHistory ?? vi.fn().mockResolvedValue(undefined),
-      deleteLoopExecution: overrides.deleteLoopExecution ?? vi.fn().mockResolvedValue(undefined),
-      deleteLoop: overrides.deleteLoop ?? vi.fn().mockResolvedValue(undefined),
+      createAutomation: overrides.createAutomation ?? vi.fn().mockResolvedValue(undefined),
+      updateAutomation: overrides.updateAutomation ?? vi.fn().mockResolvedValue(undefined),
+      clearAutomationHistory: overrides.clearAutomationHistory ?? vi.fn().mockResolvedValue(undefined),
+      deleteAutomationExecution: overrides.deleteAutomationExecution ?? vi.fn().mockResolvedValue(undefined),
+      deleteAutomation: overrides.deleteAutomation ?? vi.fn().mockResolvedValue(undefined),
       listAgentConversations: overrides.listAgentConversations ?? vi.fn().mockResolvedValue([]),
       resumeAgentConversation: overrides.resumeAgentConversation ?? vi.fn().mockResolvedValue(undefined),
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
@@ -4185,7 +4185,7 @@ function mountShell(overrides: Partial<{
       duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
       assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),
       loadBench: overrides.loadBench ?? vi.fn().mockResolvedValue(undefined),
-      getLoopSnapshot: overrides.getLoopSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),
+      getAutomationSnapshot: overrides.getAutomationSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),
       remoteBenchByConnectionId: overrides.remoteBenchByConnectionId ?? {},
       remoteBenchStatusByConnectionId: overrides.remoteBenchStatusByConnectionId ?? {},
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},

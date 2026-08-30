@@ -3,7 +3,7 @@ import { translate } from './i18n';
 import { localizedText } from './i18n/errors';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -800,117 +800,117 @@ export function useAppState() {
     }
   }
 
-  async function getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {
-    if (!codexClawApi?.getLoopSnapshot || !isRemoteLoopLocation(location)) {
+  async function getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot> {
+    if (!codexClawApi?.getAutomationSnapshot || !isRemoteAutomationLocation(location)) {
       return snapshot.value;
     }
 
-    return codexClawApi.getLoopSnapshot(location);
+    return codexClawApi.getAutomationSnapshot(location);
   }
 
-  async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
-    if (!codexClawApi?.createLoop) {
+  async function createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
+    if (!codexClawApi?.createAutomation) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.createLoop(input, location)
-      : await codexClawApi.createLoop(input);
-    if (!isRemoteLoopLocation(location)) {
+      ? await codexClawApi.createAutomation(input, location)
+      : await codexClawApi.createAutomation(input);
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
 
-  async function updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
+  async function updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.updateLoop ||
-      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === input.id))
+      !codexClawApi?.updateAutomation ||
+      (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === input.id))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.updateLoop(input, location)
-      : await codexClawApi.updateLoop(input);
-    if (!isRemoteLoopLocation(location)) {
+      ? await codexClawApi.updateAutomation(input, location)
+      : await codexClawApi.updateAutomation(input);
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
 
-  async function runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  async function runAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.runLoop ||
-      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === loopId))
+      !codexClawApi?.runAutomation ||
+      (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === automationId))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.runLoop(loopId, location)
-      : await codexClawApi.runLoop(loopId);
-    if (!isRemoteLoopLocation(location)) {
+      ? await codexClawApi.runAutomation(automationId, location)
+      : await codexClawApi.runAutomation(automationId);
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
 
-  async function deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  async function deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.deleteLoop ||
-      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === loopId))
+      !codexClawApi?.deleteAutomation ||
+      (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === automationId))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.deleteLoop(loopId, location)
-      : await codexClawApi.deleteLoop(loopId);
-    if (!isRemoteLoopLocation(location)) {
+      ? await codexClawApi.deleteAutomation(automationId, location)
+      : await codexClawApi.deleteAutomation(automationId);
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
 
-  async function clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  async function clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.clearLoopHistory ||
-      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => loop.id === loopId))
+      !codexClawApi?.clearAutomationHistory ||
+      (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === automationId))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.clearLoopHistory(loopId, location)
-      : await codexClawApi.clearLoopHistory(loopId);
-    if (!isRemoteLoopLocation(location)) {
+      ? await codexClawApi.clearAutomationHistory(automationId, location)
+      : await codexClawApi.clearAutomationHistory(automationId);
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
 
-  async function deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
+  async function deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.deleteLoopExecution ||
-      (!isRemoteLoopLocation(location) && !snapshot.value.loops.some((loop) => (
-        loop.id === loopId &&
-        loop.executionLog.some((entry) => entry.id === executionId)
+      !codexClawApi?.deleteAutomationExecution ||
+      (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => (
+        automation.id === automationId &&
+        automation.executionLog.some((entry) => entry.id === executionId)
       )))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.deleteLoopExecution(loopId, executionId, location)
-      : await codexClawApi.deleteLoopExecution(loopId, executionId);
-    if (!isRemoteLoopLocation(location)) {
+      ? await codexClawApi.deleteAutomationExecution(automationId, executionId, location)
+      : await codexClawApi.deleteAutomationExecution(automationId, executionId);
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
     return nextSnapshot;
   }
 
-  async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
+  async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]> {
     if (!codexClawApi?.readConversationMessages) {
       return [];
     }
@@ -1237,8 +1237,8 @@ export function useAppState() {
     workProviderAuthorizationPollTimers.set(provider, timer);
   }
 
-  async function loadWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]> {
-    if (isRemoteLoopLocation(location)) {
+  async function loadWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
+    if (isRemoteAutomationLocation(location)) {
       return await codexClawApi?.listWorkRepositories?.(provider, location) ?? [];
     }
 
@@ -1288,7 +1288,7 @@ export function useAppState() {
     }
   }
 
-  async function configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<void> {
+  async function configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<void> {
     if (!codexClawApi?.configureWorkBacklog) {
       return;
     }
@@ -1296,17 +1296,17 @@ export function useAppState() {
     const nextSnapshot = location
       ? await codexClawApi.configureWorkBacklog(input, location)
       : await codexClawApi.configureWorkBacklog(input);
-    if (!isRemoteLoopLocation(location)) {
+    if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
   }
 
-  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery): Promise<WorkItem[] | undefined> {
+  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery): Promise<WorkItem[] | undefined> {
     if (!codexClawApi?.listWorkItems || !repositoryId) {
       return [];
     }
 
-    if (isRemoteLoopLocation(location)) {
+    if (isRemoteAutomationLocation(location)) {
       return await codexClawApi.listWorkItems(provider, repositoryId, location, query);
     }
 
@@ -1331,12 +1331,12 @@ export function useAppState() {
     }
   }
 
-  async function loadGlobalWorkItems(provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage> {
+  async function loadGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage> {
     if (!codexClawApi?.listGlobalWorkItems) return { items: [], page: 1, pageSize: query?.pageSize ?? 50, totalItems: 0 };
     return codexClawApi.listGlobalWorkItems(provider, location, query);
   }
 
-  async function loadAssignedWorkItems(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]> {
+  async function loadAssignedWorkItems(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]> {
     if (!codexClawApi?.listAssignedWorkItems) return [];
     workBacklogStatus.value = 'loading';
     workBacklogError.value = null;
@@ -1807,13 +1807,13 @@ export function useAppState() {
     configureWorkBacklog,
     getBenchSnapshot,
     loadBench,
-    getLoopSnapshot,
-    createLoop,
-    updateLoop,
-    runLoop,
-    clearLoopHistory,
-    deleteLoopExecution,
-    deleteLoop,
+    getAutomationSnapshot,
+    createAutomation,
+    updateAutomation,
+    runAutomation,
+    clearAutomationHistory,
+    deleteAutomationExecution,
+    deleteAutomation,
     listAgentConversations,
     resumeAgentConversation,
     readConversationMessages,
@@ -3095,7 +3095,7 @@ function workProviderConnection(provider: WorkProviderKind) {
   return snapshot.value.workBacklog.connections.find((connection) => connection.provider === provider) ?? null;
 }
 
-function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {
+function isRemoteAutomationLocation(location: AutomationLocation | undefined): location is Extract<AutomationLocation, { kind: 'remote' }> {
   return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
 }
 

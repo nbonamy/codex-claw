@@ -5,13 +5,13 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { AppError } from '@codex-claw/core/app-error';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/core/agent-manager';
-import { clearLoopExecutionHistoryInSnapshot, createLoopInSnapshot, deleteLoopExecutionFromSnapshot, deleteLoopFromSnapshot, updateLoopInSnapshot } from '@codex-claw/core/loop-manager';
+import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/core/team-manager';
@@ -25,7 +25,7 @@ import { createEntityId } from '@codex-claw/core/ids';
 import { BackendDriverRpc } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
-import type { LoopRunner } from './loops/runner';
+import type { AutomationRunner } from './automations/runner';
 import type { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
 import { AgentTranscriptRetention, type AgentTranscriptRetentionOptions } from './agent-transcript-retention';
@@ -42,7 +42,7 @@ export type ClawBackendServerOptions = {
   onBackendEventApplied?: (event: MainToRendererEvent) => void;
   saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   workIntegrations?: WorkIntegrationManager;
-  loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
+  automationRunner?: Pick<AutomationRunner, 'runAll' | 'runAutomation'>;
   systemPermissions?: SystemPermissionsPort;
   sshConnections?: SshConnectionService;
   remoteClients?: RemoteClawdClientManager;
@@ -95,7 +95,7 @@ export class ClawBackendServer {
   private readonly onBackendEventApplied?: (event: MainToRendererEvent) => void;
   private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private readonly workIntegrations?: WorkIntegrationManager;
-  private readonly loopRunner?: Pick<LoopRunner, 'runAll' | 'runLoop'>;
+  private readonly automationRunner?: Pick<AutomationRunner, 'runAll' | 'runAutomation'>;
   private readonly systemPermissions: SystemPermissionsPort;
   private readonly sshConnections: SshConnectionService;
   private readonly remoteClients: RemoteClawdClientManager;
@@ -127,7 +127,7 @@ export class ClawBackendServer {
     this.onBackendEventApplied = options.onBackendEventApplied;
     this.saveSnapshot = options.saveSnapshot;
     this.workIntegrations = options.workIntegrations;
-    this.loopRunner = options.loopRunner;
+    this.automationRunner = options.automationRunner;
     this.systemPermissions = options.systemPermissions ?? createUnsupportedSystemPermissionsPort();
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
@@ -687,7 +687,7 @@ export class ClawBackendServer {
         if (!isBackendConversationRef(ref)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
         }
-        const remoteConnectionId = loopLocationRemoteConnectionId(params);
+        const remoteConnectionId = automationLocationRemoteConnectionId(params);
         if (remoteConnectionId) {
           return createClawRpcResult(message.id, await this.remoteRequest(remoteConnectionId, backendMethods.agentConversationMessagesGet, { ref, agentId }));
         }
@@ -1585,7 +1585,7 @@ export class ClawBackendServer {
       case backendMethods.workProviderRepositoriesList: {
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
+          this.automationLocationFromParams(message.params),
           backendMethods.workProviderRepositoriesList,
           {
             provider: requireWorkProvider(message.params),
@@ -1598,7 +1598,7 @@ export class ClawBackendServer {
         const input = requireBacklogConfiguration(params);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(params),
+          this.automationLocationFromParams(params),
           backendMethods.workProviderBacklogConfigure,
           { input },
           () => this.requireWorkIntegrations().configureBacklog(input),
@@ -1609,7 +1609,7 @@ export class ClawBackendServer {
         const query = workItemQuery(params.query);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(params),
+          this.automationLocationFromParams(params),
           backendMethods.workProviderItemsList,
           {
             provider: requireWorkProvider(params),
@@ -1626,7 +1626,7 @@ export class ClawBackendServer {
         const query = globalWorkItemQuery(params.query);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(params),
+          this.automationLocationFromParams(params),
           backendMethods.workProviderGlobalItemsList,
           {
             provider: requireWorkProvider(params),
@@ -1640,7 +1640,7 @@ export class ClawBackendServer {
       case backendMethods.workProviderAssignedItemsList: {
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
+          this.automationLocationFromParams(message.params),
           backendMethods.workProviderAssignedItemsList,
           { provider: requireWorkProvider(message.params) },
           () => this.requireWorkIntegrations().listAssignedItems(requireWorkProvider(message.params)),
@@ -1666,114 +1666,114 @@ export class ClawBackendServer {
           return this.requireWorkIntegrations().createItem(provider, repositoryId, parseGeneratedWorkItemDraft(generated));
         });
       }
-      case backendMethods.snapshotLoopsGet: {
-        const location = this.loopLocationFromParams(message.params);
+      case backendMethods.snapshotAutomationsGet: {
+        const location = this.automationLocationFromParams(message.params);
         if (location.kind === 'local') {
           return createClawRpcResult(message.id, this.snapshot);
         }
         const remoteSnapshotResult = await this.remoteRequest(location.connectionId, backendMethods.snapshotGet);
         if (!isClawSnapshotGetResult(remoteSnapshotResult)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Remote loop snapshot is invalid.');
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Remote automation snapshot is invalid.');
         }
         return createClawRpcResult(message.id, remoteSnapshotResult.snapshot);
       }
-      case backendMethods.loopCreate: {
-        const input = requireLoopCreateInput(message.params);
+      case backendMethods.automationCreate: {
+        const input = requireAutomationCreateInput(message.params);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
-          backendMethods.loopCreate,
+          this.automationLocationFromParams(message.params),
+          backendMethods.automationCreate,
           { input },
           async () => {
-            const loop = createLoopInSnapshot(this.snapshot, input);
-            if (!loop) {
-              throw new Error('Invalid loop configuration.');
+            const automation = createAutomationInSnapshot(this.snapshot, input);
+            if (!automation) {
+              throw new Error('Invalid automation configuration.');
             }
             return this.persistAndEmitSnapshot();
           },
         );
       }
-      case backendMethods.loopUpdate: {
-        const input = requireLoopUpdateInput(message.params);
+      case backendMethods.automationUpdate: {
+        const input = requireAutomationUpdateInput(message.params);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
-          backendMethods.loopUpdate,
+          this.automationLocationFromParams(message.params),
+          backendMethods.automationUpdate,
           { input },
           async () => {
-            const loop = updateLoopInSnapshot(this.snapshot, input);
-            if (!loop) {
-              throw new Error(`Loop not found or invalid: ${input.id}`);
+            const automation = updateAutomationInSnapshot(this.snapshot, input);
+            if (!automation) {
+              throw new Error(`Automation not found or invalid: ${input.id}`);
             }
             return this.persistAndEmitSnapshot();
           },
         );
       }
-      case backendMethods.loopRun: {
-        const loopId = requireLoopId(message.params);
+      case backendMethods.automationRun: {
+        const automationId = requireAutomationId(message.params);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
-          backendMethods.loopRun,
-          { loopId },
+          this.automationLocationFromParams(message.params),
+          backendMethods.automationRun,
+          { automationId },
           async () => {
-            if (!this.snapshot.loops.some((loop) => loop.id === loopId)) {
-              throw new Error(`Loop not found: ${loopId}`);
+            if (!this.snapshot.automations.some((automation) => automation.id === automationId)) {
+              throw new Error(`Automation not found: ${automationId}`);
             }
-            await this.requireLoopRunner().runLoop(loopId);
+            await this.requireAutomationRunner().runAutomation(automationId);
             return this.snapshot;
           },
         );
       }
-      case backendMethods.loopDueRun: {
-        await this.requireLoopRunner().runAll();
+      case backendMethods.automationDueRun: {
+        await this.requireAutomationRunner().runAll();
         return createClawRpcResult(message.id, this.snapshot);
       }
-      case backendMethods.loopHistoryClear: {
-        const loopId = requireLoopId(message.params);
+      case backendMethods.automationHistoryClear: {
+        const automationId = requireAutomationId(message.params);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
-          backendMethods.loopHistoryClear,
-          { loopId },
+          this.automationLocationFromParams(message.params),
+          backendMethods.automationHistoryClear,
+          { automationId },
           async () => {
-            const loop = clearLoopExecutionHistoryInSnapshot(this.snapshot, loopId);
-            if (!loop) {
-              throw new Error(`Loop not found: ${loopId}`);
+            const automation = clearAutomationExecutionHistoryInSnapshot(this.snapshot, automationId);
+            if (!automation) {
+              throw new Error(`Automation not found: ${automationId}`);
             }
             return this.persistAndEmitSnapshot();
           },
         );
       }
-      case backendMethods.loopExecutionDelete: {
+      case backendMethods.automationExecutionDelete: {
         const params = requireRecord(message.params);
-        const loopId = requireString(params.loopId, 'loopId');
+        const automationId = requireString(params.automationId, 'automationId');
         const executionId = requireString(params.executionId, 'executionId');
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(params),
-          backendMethods.loopExecutionDelete,
-          { loopId, executionId },
+          this.automationLocationFromParams(params),
+          backendMethods.automationExecutionDelete,
+          { automationId, executionId },
           async () => {
-            const loop = deleteLoopExecutionFromSnapshot(this.snapshot, loopId, executionId);
-            if (!loop) {
-              throw new Error(`Loop execution not found: ${loopId}/${executionId}`);
+            const automation = deleteAutomationExecutionFromSnapshot(this.snapshot, automationId, executionId);
+            if (!automation) {
+              throw new Error(`Automation execution not found: ${automationId}/${executionId}`);
             }
             return this.persistAndEmitSnapshot();
           },
         );
       }
-      case backendMethods.loopDelete: {
-        const loopId = requireLoopId(message.params);
+      case backendMethods.automationDelete: {
+        const automationId = requireAutomationId(message.params);
         return this.respondInLocation(
           message.id,
-          this.loopLocationFromParams(message.params),
-          backendMethods.loopDelete,
-          { loopId },
+          this.automationLocationFromParams(message.params),
+          backendMethods.automationDelete,
+          { automationId },
           async () => {
-            const loop = deleteLoopFromSnapshot(this.snapshot, loopId);
-            if (!loop) {
-              throw new Error(`Loop not found: ${loopId}`);
+            const automation = deleteAutomationFromSnapshot(this.snapshot, automationId);
+            if (!automation) {
+              throw new Error(`Automation not found: ${automationId}`);
             }
             return this.persistAndEmitSnapshot();
           },
@@ -1814,11 +1814,11 @@ export class ClawBackendServer {
     return this.workIntegrations;
   }
 
-  private requireLoopRunner(): Pick<LoopRunner, 'runAll' | 'runLoop'> {
-    if (!this.loopRunner) {
-      throw new Error('Loop runner is not configured.');
+  private requireAutomationRunner(): Pick<AutomationRunner, 'runAll' | 'runAutomation'> {
+    if (!this.automationRunner) {
+      throw new Error('Automation runner is not configured.');
     }
-    return this.loopRunner;
+    return this.automationRunner;
   }
 
   private requireDriverRpc(): BackendDriverRpc {
@@ -2099,8 +2099,8 @@ export class ClawBackendServer {
       : this.backendHandleForLocation({ kind: 'local' });
   }
 
-  private loopLocationFromParams(params: unknown): BackendLocation {
-    return this.locationFromRemoteConnectionId(loopLocationRemoteConnectionId(params));
+  private automationLocationFromParams(params: unknown): BackendLocation {
+    return this.locationFromRemoteConnectionId(automationLocationRemoteConnectionId(params));
   }
 
   private benchLocationFromParams(params: unknown): BackendLocation {
@@ -2580,13 +2580,13 @@ export class ClawBackendServer {
   }
 
   private isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
-    const storedLoopConversation = this.snapshot.loops.some((loop) => loop.executionLog.some((entry) => (
+    const storedAutomationConversation = this.snapshot.automations.some((automation) => automation.executionLog.some((entry) => (
       entry.createdAgents.some((createdAgent) => (
         createdAgent.agentId === agentId &&
         (createdAgent.conversationRef ? sameConversationRef(createdAgent.conversationRef, ref) : false)
       ))
     )));
-    if (storedLoopConversation) return true;
+    if (storedAutomationConversation) return true;
 
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     const tree = this.snapshot.subagentTrees[agentId];
@@ -3469,19 +3469,19 @@ function requireReorderAgentsInput(params: unknown): ReorderAgentsInput {
   return requireRecord(record.input) as ReorderAgentsInput;
 }
 
-function requireLoopCreateInput(params: unknown): CreateLoopInput {
+function requireAutomationCreateInput(params: unknown): CreateAutomationInput {
   const record = requireRecord(params);
-  return requireRecord(record.input) as CreateLoopInput;
+  return requireRecord(record.input) as CreateAutomationInput;
 }
 
-function requireLoopUpdateInput(params: unknown): UpdateLoopInput {
+function requireAutomationUpdateInput(params: unknown): UpdateAutomationInput {
   const record = requireRecord(params);
-  return requireRecord(record.input) as UpdateLoopInput;
+  return requireRecord(record.input) as UpdateAutomationInput;
 }
 
-function requireLoopId(params: unknown): string {
+function requireAutomationId(params: unknown): string {
   const record = requireRecord(params);
-  return requireString(record.loopId, 'loopId');
+  return requireString(record.automationId, 'automationId');
 }
 
 function requireTeamCreateInput(params: unknown): CreateTeamInput {
@@ -3689,7 +3689,7 @@ function requireOptionalConnectionId(params: unknown): string | null {
   return optionalTrimmedString(record.remoteConnectionId);
 }
 
-function loopLocationRemoteConnectionId(params: unknown): string | null {
+function automationLocationRemoteConnectionId(params: unknown): string | null {
   if (params === undefined) {
     return null;
   }
@@ -3703,7 +3703,7 @@ function loopLocationRemoteConnectionId(params: unknown): string | null {
     return null;
   }
   if (locationRecord.kind !== 'remote') {
-    throw new Error('Invalid loop location.');
+    throw new Error('Invalid automation location.');
   }
   return requireString(locationRecord.remoteConnectionId, 'remoteConnectionId');
 }

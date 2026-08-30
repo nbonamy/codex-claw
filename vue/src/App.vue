@@ -99,13 +99,13 @@
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
     :load-bench="loadBench"
-    :get-loop-snapshot="getLoopSnapshot"
-    :create-loop="createLoop"
-    :update-loop="updateLoop"
-    :run-loop="runLoop"
-    :clear-loop-history="clearLoopHistory"
-    :delete-loop-execution="deleteLoopExecution"
-    :delete-loop="deleteLoop"
+    :get-automation-snapshot="getAutomationSnapshot"
+    :create-automation="createAutomation"
+    :update-automation="updateAutomation"
+    :run-automation="runAutomation"
+    :clear-automation-history="clearAutomationHistory"
+    :delete-automation-execution="deleteAutomationExecution"
+    :delete-automation="deleteAutomation"
     :list-agent-conversations="listAgentConversations"
     :resume-agent-conversation="resumeAgentConversation"
     :read-conversation-messages="readConversationMessages"
@@ -326,13 +326,13 @@ const {
   completeWorkProviderConnection,
   disconnectWorkProvider,
   loadBench,
-  getLoopSnapshot,
-  createLoop,
-  updateLoop,
-  runLoop,
-  clearLoopHistory,
-  deleteLoopExecution,
-  deleteLoop,
+  getAutomationSnapshot,
+  createAutomation,
+  updateAutomation,
+  runAutomation,
+  clearAutomationHistory,
+  deleteAutomationExecution,
+  deleteAutomation,
   listAgentConversations,
   resumeAgentConversation,
   readConversationMessages,

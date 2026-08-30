@@ -529,8 +529,8 @@ describe('AppStatePersistence', () => {
           policy: 'complete',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
-          loopId: 'loop-bugs',
-          loopExecutionId: 'loop-exec-1',
+          automationId: 'automation-bugs',
+          automationExecutionId: 'automation-exec-1',
           completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
@@ -566,8 +566,8 @@ describe('AppStatePersistence', () => {
           policy: 'complete',
           status: 'completed',
           completedAt: '2026-06-09T13:30:00.000Z',
-          loopId: 'loop-bugs',
-          loopExecutionId: 'loop-exec-1',
+          automationId: 'automation-bugs',
+          automationExecutionId: 'automation-exec-1',
           completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
@@ -577,6 +577,23 @@ describe('AppStatePersistence', () => {
 
     const restored = snapshotFromPersistedState(persisted);
     expect(restored.workBacklog).toStrictEqual(snapshot.workBacklog);
+
+    const assignment = persisted.workBacklog!.assignments['github:nbonamy/codex-claw#12']!;
+    const { automationId, automationExecutionId, ...legacyAssignment } = assignment;
+    const restoredLegacy = snapshotFromPersistedState({
+      ...persisted,
+      workBacklog: {
+        ...persisted.workBacklog,
+        assignments: {
+          'github:nbonamy/codex-claw#12': {
+            ...legacyAssignment,
+            loopId: automationId,
+            loopExecutionId: automationExecutionId,
+          },
+        },
+      },
+    });
+    expect(restoredLegacy.workBacklog).toStrictEqual(snapshot.workBacklog);
   });
 
   it('persists remote backend connections', () => {
@@ -645,10 +662,10 @@ describe('AppStatePersistence', () => {
     expect(restored.workBacklog.assignments).toStrictEqual({});
   });
 
-  it('persists and restores loops', () => {
+  it('persists and restores automations', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.loops = [{
-      id: 'loop-bugs',
+    snapshot.automations = [{
+      id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
       source: {
@@ -684,8 +701,8 @@ describe('AppStatePersistence', () => {
         beforeCompletion: 'Remove the bug tag before completing.',
       },
       executionLog: [{
-        id: 'loop-exec-1',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-1',
+        automationId: 'automation-bugs',
         startedAt: '2026-06-09T10:02:00.000Z',
         completedAt: '2026-06-09T10:03:00.000Z',
         status: 'completed',
@@ -699,8 +716,8 @@ describe('AppStatePersistence', () => {
           conversationRef: { backend: 'codex', threadId: 'thread-dina' },
         }],
       }, {
-        id: 'loop-exec-2',
-        loopId: 'loop-bugs',
+        id: 'automation-exec-2',
+        automationId: 'automation-bugs',
         startedAt: '2026-06-09T10:04:00.000Z',
         status: 'working',
         createdCount: 1,
@@ -708,7 +725,7 @@ describe('AppStatePersistence', () => {
           agentId: 'agent-jesse',
           agentName: 'Jesse',
           workItemId: 'github:nbonamy/codex-claw#13',
-          workItemTitle: 'Fix loop timestamps',
+          workItemTitle: 'Fix automation timestamps',
           workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/13',
         }],
       }],
@@ -717,15 +734,23 @@ describe('AppStatePersistence', () => {
     const persisted = persistedStateFromSnapshot(snapshot);
     const restored = snapshotFromPersistedState(persisted);
 
-    expect(persisted.loops).toStrictEqual(snapshot.loops);
-    expect(restored.loops).toStrictEqual(snapshot.loops);
+    expect(persisted.automations).toStrictEqual(snapshot.automations);
+    expect(persisted).not.toHaveProperty('loops');
+    expect(restored.automations).toStrictEqual(snapshot.automations);
 
     const legacyPersisted = JSON.parse(JSON.stringify(persisted)) as Record<string, unknown>;
     legacyPersisted.loops = [{
-      ...snapshot.loops[0],
+      ...snapshot.automations[0],
       processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
+      executionLog: snapshot.automations[0]!.executionLog.map(({ automationId, ...entry }) => ({
+        ...entry,
+        loopId: automationId,
+      })),
     }];
-    expect(snapshotFromPersistedState(legacyPersisted).loops[0]).not.toHaveProperty('processedWorkItemIds');
+    delete legacyPersisted.automations;
+    const restoredLegacy = snapshotFromPersistedState(legacyPersisted);
+    expect(restoredLegacy.automations).toStrictEqual(snapshot.automations);
+    expect(restoredLegacy.automations[0]).not.toHaveProperty('processedWorkItemIds');
   });
 
   it('sanitizes invalid work integration metadata', () => {

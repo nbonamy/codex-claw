@@ -14,8 +14,8 @@ import type {
   CelebrationKind,
   CreateAgentInput,
   CreateSourceWorktreeInput,
-  LoopAction,
-  LoopExecutionLogEntry,
+  AutomationAction,
+  AutomationExecutionLogEntry,
   MainToRendererEvent,
   SendPromptOptions,
   SourceRepository,
@@ -25,7 +25,7 @@ import type {
   WorkRoutingRequest,
 } from '@codex-claw/core/contracts';
 import { closeAgentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
-import { completeLoopExecutionInSnapshot } from '@codex-claw/core/loop-manager';
+import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
@@ -311,7 +311,7 @@ export class ClawMcpService {
       throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent ? agentDisplayName(assignedAgent) : assignment.agentId}, not ${agentDisplayName(agent)}.`);
     }
 
-    const completionInstructions = status === 'completed' ? this.loopCompletionInstructionsForAssignment(assignment.loopId) : '';
+    const completionInstructions = status === 'completed' ? this.automationCompletionInstructionsForAssignment(assignment.automationId) : '';
     if (completionInstructions) {
       if (!assignment.completionInstructionsDeliveredAt) {
         const deliveredAssignment = markWorkItemCompletionInstructionsDeliveredInSnapshot(this.snapshot, agent.id, workItemId, this.now().toISOString());
@@ -331,7 +331,7 @@ export class ClawMcpService {
 
     this.emitWorkAssignmentUpdated(agent.id, updatedAssignment);
     if (status === 'completed') {
-      this.completeOwningLoopExecutionIfReady(agent.id, updatedAssignment, updatedAt);
+      this.completeOwningAutomationExecutionIfReady(agent.id, updatedAssignment, updatedAt);
     }
     return {
       success: true,
@@ -342,14 +342,14 @@ export class ClawMcpService {
     };
   }
 
-  private completeOwningLoopExecutionIfReady(agentId: string, assignment: WorkBacklogAssignment, completedAt: string): void {
-    if (!assignment.loopId || !assignment.loopExecutionId) {
+  private completeOwningAutomationExecutionIfReady(agentId: string, assignment: WorkBacklogAssignment, completedAt: string): void {
+    if (!assignment.automationId || !assignment.automationExecutionId) {
       return;
     }
 
-    const loop = this.snapshot.loops.find((candidate) => candidate.id === assignment.loopId);
-    const execution = loop?.executionLog.find((candidate) => candidate.id === assignment.loopExecutionId);
-    if (!loop || !execution || execution.status !== 'working') {
+    const automation = this.snapshot.automations.find((candidate) => candidate.id === assignment.automationId);
+    const execution = automation?.executionLog.find((candidate) => candidate.id === assignment.automationExecutionId);
+    if (!automation || !execution || execution.status !== 'working') {
       return;
     }
 
@@ -360,17 +360,17 @@ export class ClawMcpService {
       return;
     }
 
-    this.preserveLoopExecutionConversationRefs(execution);
-    const completedLoop = completeLoopExecutionInSnapshot(this.snapshot, loop.id, execution.id, completedAt);
-    if (!completedLoop) {
+    this.preserveAutomationExecutionConversationRefs(execution);
+    const completedAutomation = completeAutomationExecutionInSnapshot(this.snapshot, automation.id, execution.id, completedAt);
+    if (!completedAutomation) {
       return;
     }
 
-    this.applyCompletedLoopCleanup(completedLoop.action, execution);
+    this.applyCompletedAutomationCleanup(completedAutomation.action, execution);
     this.emitSnapshotUpdated(agentId);
   }
 
-  private preserveLoopExecutionConversationRefs(execution: LoopExecutionLogEntry): void {
+  private preserveAutomationExecutionConversationRefs(execution: AutomationExecutionLogEntry): void {
     for (const createdAgent of execution.createdAgents) {
       if (createdAgent.conversationRef) {
         continue;
@@ -383,7 +383,7 @@ export class ClawMcpService {
     }
   }
 
-  private applyCompletedLoopCleanup(action: LoopAction, execution: LoopExecutionLogEntry): void {
+  private applyCompletedAutomationCleanup(action: AutomationAction, execution: AutomationExecutionLogEntry): void {
     if (action.teamTarget.mode === 'dedicated') {
       if (action.cleanup?.deleteTeam === false) {
         return;
@@ -509,13 +509,13 @@ export class ClawMcpService {
     });
   }
 
-  private loopCompletionInstructionsForAssignment(loopId?: string): string {
-    if (!loopId) {
+  private automationCompletionInstructionsForAssignment(automationId?: string): string {
+    if (!automationId) {
       return '';
     }
 
-    const loop = this.snapshot.loops.find((candidate) => candidate.id === loopId);
-    return loop?.instructions.beforeCompletion?.trim() ?? '';
+    const automation = this.snapshot.automations.find((candidate) => candidate.id === automationId);
+    return automation?.instructions.beforeCompletion?.trim() ?? '';
   }
 
   private emitWorkAssignmentUpdated(agentId: string, assignment: WorkBacklogAssignment): void {

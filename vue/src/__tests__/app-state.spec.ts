@@ -3227,13 +3227,13 @@ describe('useAppState', () => {
     await state.restartAgent('agent-dina');
     await state.closeAgent('agent-dina');
     await state.disconnectTeam('team-codex-claw');
-    await expect(state.getLoopSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(before);
-    await expect(state.createLoop({} as never)).resolves.toBeUndefined();
-    await expect(state.updateLoop({ id: 'missing' } as never)).resolves.toBeUndefined();
-    await expect(state.runLoop('missing')).resolves.toBeUndefined();
-    await expect(state.clearLoopHistory('missing')).resolves.toBeUndefined();
-    await expect(state.deleteLoopExecution('missing', 'execution')).resolves.toBeUndefined();
-    await expect(state.deleteLoop('missing')).resolves.toBeUndefined();
+    await expect(state.getAutomationSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(before);
+    await expect(state.createAutomation({} as never)).resolves.toBeUndefined();
+    await expect(state.updateAutomation({ id: 'missing' } as never)).resolves.toBeUndefined();
+    await expect(state.runAutomation('missing')).resolves.toBeUndefined();
+    await expect(state.clearAutomationHistory('missing')).resolves.toBeUndefined();
+    await expect(state.deleteAutomationExecution('missing', 'execution')).resolves.toBeUndefined();
+    await expect(state.deleteAutomation('missing')).resolves.toBeUndefined();
     await expect(state.readConversationMessages({ backend: 'codex', threadId: 'thread' }, 'agent-dina')).resolves.toStrictEqual([]);
     await expect(state.listAgentConversations('agent-dina')).resolves.toStrictEqual([]);
     await state.resumeAgentConversation('agent-dina', { backend: 'codex', threadId: 'thread' });
@@ -3347,7 +3347,7 @@ describe('useAppState', () => {
       previewAgentFile: vi.fn().mockResolvedValue({ path: 'README.md', content: '# Claw' }),
       openAgentGitDiff: vi.fn().mockResolvedValue(undefined),
       disconnectTeam: vi.fn().mockResolvedValue(initialSnapshot),
-      getLoopSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+      getAutomationSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
       updateSettings: vi.fn().mockResolvedValue(updatedSnapshot),
       listSshHosts: vi.fn().mockResolvedValue([{ host: 'devbox' }]),
       addSshConnection: vi.fn().mockResolvedValue(initialSnapshot),
@@ -3375,7 +3375,7 @@ describe('useAppState', () => {
     await expect(state.previewAgentFile('agent-dina', 'README.md')).resolves.toStrictEqual({ path: 'README.md', content: '# Claw' });
     await state.openAgentGitDiff('agent-dina');
     await state.disconnectTeam('team-other');
-    await expect(state.getLoopSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
+    await expect(state.getAutomationSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
     await state.updateSettings({ sourceFolder: { path: '/Users/nbonamy/projects' } });
     await expect(state.listSshHosts()).resolves.toStrictEqual([{ host: 'devbox' }]);
     await state.addSshConnection({ host: 'devbox' });
@@ -3461,7 +3461,7 @@ describe('useAppState', () => {
     expect(state.activeHistoryHasOlder.value).toBe(true);
   });
 
-  it('creates, updates, and deletes loops through the preload bridge', async () => {
+  it('creates, updates, and deletes automations through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.bench.push({
       id: 'bench-dina',
@@ -3471,7 +3471,7 @@ describe('useAppState', () => {
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:00:00.000Z',
     });
-    const loopInput = {
+    const automationInput = {
       name: 'GitHub bugs',
       source: {
         provider: 'github' as const,
@@ -3488,39 +3488,39 @@ describe('useAppState', () => {
     };
     const createdSnapshot = {
       ...remoteSnapshot,
-      loops: [{
-        id: 'loop-bugs',
+      automations: [{
+        id: 'automation-bugs',
         enabled: true,
         instructions: {},
         executionLog: [],
         createdAt: '2026-06-09T10:01:00.000Z',
         updatedAt: '2026-06-09T10:01:00.000Z',
-        ...loopInput,
+        ...automationInput,
       }],
     };
     const updatedSnapshot = {
       ...createdSnapshot,
-      loops: [{
-        ...createdSnapshot.loops[0],
+      automations: [{
+        ...createdSnapshot.automations[0],
         enabled: false,
         name: 'Paused bugs',
       }],
     };
     const historyClearedSnapshot = {
       ...updatedSnapshot,
-      loops: [{
-        ...updatedSnapshot.loops[0],
+      automations: [{
+        ...updatedSnapshot.automations[0],
         executionLog: [],
       }],
     };
     const runSnapshot = {
       ...updatedSnapshot,
-      loops: [{
-        ...updatedSnapshot.loops[0],
+      automations: [{
+        ...updatedSnapshot.automations[0],
         lastRunAt: '2026-06-09T10:02:00.000Z',
         executionLog: [{
-          id: 'loop-exec-1',
-          loopId: 'loop-bugs',
+          id: 'automation-exec-1',
+          automationId: 'automation-bugs',
           startedAt: '2026-06-09T10:02:00.000Z',
           status: 'working' as const,
           createdCount: 1,
@@ -3530,21 +3530,21 @@ describe('useAppState', () => {
     };
     const executionDeletedSnapshot = {
       ...runSnapshot,
-      loops: [{
-        ...runSnapshot.loops[0],
+      automations: [{
+        ...runSnapshot.automations[0],
         executionLog: [],
       }],
     };
     const deletedSnapshot = {
       ...historyClearedSnapshot,
-      loops: [],
+      automations: [],
     };
-    const createLoop = vi.fn().mockResolvedValue(createdSnapshot);
-    const updateLoop = vi.fn().mockResolvedValue(updatedSnapshot);
-    const runLoop = vi.fn().mockResolvedValue(runSnapshot);
-    const clearLoopHistory = vi.fn().mockResolvedValue(historyClearedSnapshot);
-    const deleteLoopExecution = vi.fn().mockResolvedValue(executionDeletedSnapshot);
-    const deleteLoop = vi.fn().mockResolvedValue(deletedSnapshot);
+    const createAutomation = vi.fn().mockResolvedValue(createdSnapshot);
+    const updateAutomation = vi.fn().mockResolvedValue(updatedSnapshot);
+    const runAutomation = vi.fn().mockResolvedValue(runSnapshot);
+    const clearAutomationHistory = vi.fn().mockResolvedValue(historyClearedSnapshot);
+    const deleteAutomationExecution = vi.fn().mockResolvedValue(executionDeletedSnapshot);
+    const deleteAutomation = vi.fn().mockResolvedValue(deletedSnapshot);
     const conversationMessages: RendererMessage[] = [{
       id: 'message-dina-user',
       agentId: 'agent-dina',
@@ -3559,29 +3559,29 @@ describe('useAppState', () => {
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
-        createLoop,
-        updateLoop,
-        runLoop,
-        clearLoopHistory,
-        deleteLoopExecution,
-        deleteLoop,
+        createAutomation,
+        updateAutomation,
+        runAutomation,
+        clearAutomationHistory,
+        deleteAutomationExecution,
+        deleteAutomation,
         readConversationMessages,
       } satisfies Partial<CodexClawApi>,
     });
 
     const state = useAppState();
     await state.loadSnapshot();
-    await state.createLoop(loopInput);
-    await state.updateLoop({
-      ...loopInput,
-      id: 'loop-bugs',
+    await state.createAutomation(automationInput);
+    await state.updateAutomation({
+      ...automationInput,
+      id: 'automation-bugs',
       enabled: false,
       name: 'Paused bugs',
     });
-    await state.runLoop('loop-bugs');
-    await state.deleteLoopExecution('loop-bugs', 'loop-exec-1');
-    await state.clearLoopHistory('loop-bugs');
-    await state.deleteLoop('loop-bugs');
+    await state.runAutomation('automation-bugs');
+    await state.deleteAutomationExecution('automation-bugs', 'automation-exec-1');
+    await state.clearAutomationHistory('automation-bugs');
+    await state.deleteAutomation('automation-bugs');
     await expect(state.readConversationMessages({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(conversationMessages);
     const reactiveConversationRef = reactive({
       backend: 'claude' as const,
@@ -3590,17 +3590,17 @@ describe('useAppState', () => {
     });
     await expect(state.readConversationMessages(reactiveConversationRef as BackendConversationRef, 'agent-dina')).resolves.toStrictEqual(conversationMessages);
 
-    expect(createLoop).toHaveBeenCalledWith(loopInput);
-    expect(updateLoop).toHaveBeenCalledWith({
-      ...loopInput,
-      id: 'loop-bugs',
+    expect(createAutomation).toHaveBeenCalledWith(automationInput);
+    expect(updateAutomation).toHaveBeenCalledWith({
+      ...automationInput,
+      id: 'automation-bugs',
       enabled: false,
       name: 'Paused bugs',
     });
-    expect(runLoop).toHaveBeenCalledWith('loop-bugs');
-    expect(deleteLoopExecution).toHaveBeenCalledWith('loop-bugs', 'loop-exec-1');
-    expect(clearLoopHistory).toHaveBeenCalledWith('loop-bugs');
-    expect(deleteLoop).toHaveBeenCalledWith('loop-bugs');
+    expect(runAutomation).toHaveBeenCalledWith('automation-bugs');
+    expect(deleteAutomationExecution).toHaveBeenCalledWith('automation-bugs', 'automation-exec-1');
+    expect(clearAutomationHistory).toHaveBeenCalledWith('automation-bugs');
+    expect(deleteAutomation).toHaveBeenCalledWith('automation-bugs');
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
     expect(readConversationMessages).toHaveBeenLastCalledWith({
       backend: 'claude',

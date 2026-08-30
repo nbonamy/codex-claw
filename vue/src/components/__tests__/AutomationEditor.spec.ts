@@ -2,11 +2,11 @@ import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { BackendModelOption, BenchTemplate, Loop, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import LoopEditor from '../LoopEditor.vue';
+import type { BackendModelOption, BenchTemplate, Automation, SourceRepository, Team, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import AutomationEditor from '../AutomationEditor.vue';
 
-describe('LoopEditor', () => {
-  it('emits a loop configuration with repo, assignee, tag, new agent, and team target', async () => {
+describe('AutomationEditor', () => {
+  it('emits a automation configuration with repo, assignee, tag, new agent, and team target', async () => {
     const wrapper = mountEditor();
 
     await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', 'nbonamy');
@@ -81,19 +81,19 @@ describe('LoopEditor', () => {
     });
   });
 
-  it('keeps Claude unavailable in the loop backend selector', () => {
+  it('keeps Claude unavailable in the automation backend selector', () => {
     const wrapper = mountEditor();
     const backendSelect = wrapper.findAllComponents({ name: 'ElSelect' })
-      .find((select) => select.find('[aria-label="Loop backend"]').exists());
+      .find((select) => select.find('[aria-label="Automation backend"]').exists());
 
     expect(backendSelect).toBeDefined();
     expect(backendSelect?.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
       .toStrictEqual(['Codex']);
   });
 
-  it('normalizes a legacy Claude loop to the only available Codex backend', async () => {
+  it('normalizes a legacy Claude automation to the only available Codex backend', async () => {
     const wrapper = mountEditor({
-      loop: loop({
+      automation: automation({
         action: {
           type: 'create-agent',
           sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
@@ -165,7 +165,7 @@ describe('LoopEditor', () => {
     });
   });
 
-  it('allows disabling cleanup for existing-team loops', async () => {
+  it('allows disabling cleanup for existing-team automations', async () => {
     const wrapper = mountEditor();
 
     await wrapper.findComponent({ name: 'ElCheckbox' }).vm.$emit('update:modelValue', false);
@@ -199,7 +199,7 @@ describe('LoopEditor', () => {
 
   it('preserves saved assignment and completion instructions', async () => {
     const wrapper = mountEditor({
-      loop: loop({
+      automation: automation({
         instructions: {
           assignment: 'Start with a failing test.',
           beforeCompletion: 'Remove the triage label manually.',
@@ -219,13 +219,13 @@ describe('LoopEditor', () => {
 
   it('keeps the header and actions outside the scrollable form body', () => {
     const wrapper = mountEditor();
-    const form = wrapper.get('.loop-editor');
+    const form = wrapper.get('.automation-editor');
     const children = form.element.children;
 
-    expect(children[0]).toBe(wrapper.get('.loop-editor__header').element);
-    expect(children[1]).toBe(wrapper.get('.loop-editor__body').element);
-    expect(children[2]).toBe(wrapper.get('.loop-editor__footer').element);
-    expect(wrapper.get('.loop-editor__body').find('.loop-editor__footer').exists()).toBe(false);
+    expect(children[0]).toBe(wrapper.get('.automation-editor__header').element);
+    expect(children[1]).toBe(wrapper.get('.automation-editor__body').element);
+    expect(children[2]).toBe(wrapper.get('.automation-editor__footer').element);
+    expect(wrapper.get('.automation-editor__body').find('.automation-editor__footer').exists()).toBe(false);
   });
 });
 
@@ -235,12 +235,12 @@ function mountEditor(overrides: Partial<{
   chooseAgentFolder: () => Promise<string | null>;
   connection: WorkIntegrationConnection;
   itemsByRepository: Record<string, WorkItem[]>;
-  loop: Loop;
+  automation: Automation;
   repositories: WorkRepository[];
   sourceRepositories: SourceRepository[];
   teams: Team[];
 }> = {}) {
-  return mount(LoopEditor, {
+  return mount(AutomationEditor, {
     props: {
       mode: 'create',
       backendModels: overrides.backendModels ?? [],
@@ -254,7 +254,7 @@ function mountEditor(overrides: Partial<{
       itemsByRepository: overrides.itemsByRepository ?? {
         'github:nbonamy/codex-claw': [workItem()],
       },
-      loop: overrides.loop,
+      automation: overrides.automation,
       repositories: overrides.repositories ?? [{
         provider: 'github',
         id: 'nbonamy/codex-claw',
@@ -283,9 +283,9 @@ function mountEditor(overrides: Partial<{
   });
 }
 
-function loop(overrides: Partial<Loop> = {}): Loop {
+function automation(overrides: Partial<Automation> = {}): Automation {
   return {
-    id: 'loop-bugs',
+    id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
     source: {

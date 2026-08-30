@@ -21,12 +21,12 @@ const mocks = vi.hoisted(() => ({
   drivers: new Map<string, unknown>(),
   mcpOptions: [] as unknown[],
   serverOptions: [] as unknown[],
-  loopRunnerOptions: [] as unknown[],
+  automationRunnerOptions: [] as unknown[],
   schedulerOptions: [] as unknown[],
   remoteOptions: [] as unknown[],
   workIntegrationOptions: [] as unknown[],
   sendAgentPrompt: vi.fn(),
-  updateLoopConversation: vi.fn(),
+  updateAutomationConversation: vi.fn(),
   loadBackendSnapshot: vi.fn(),
   ensureBackendCodexHome: vi.fn(),
   initializeCodexResourceSharing: vi.fn(),
@@ -42,7 +42,7 @@ const mocks = vi.hoisted(() => ({
   hydrateConnections: vi.fn(),
   schedulerStart: vi.fn(),
   schedulerStop: vi.fn(),
-  loopRunAll: vi.fn(),
+  automationRunAll: vi.fn(),
   serverEmitEvent: vi.fn(),
   serverClose: vi.fn(),
   createDefaultBackendDrivers: vi.fn(),
@@ -54,8 +54,8 @@ vi.mock('@codex-claw/core/agent-chat-service', () => ({
   sendAgentPrompt: mocks.sendAgentPrompt,
 }));
 
-vi.mock('@codex-claw/core/loop-manager', () => ({
-  updateLoopExecutionAgentConversationInSnapshot: mocks.updateLoopConversation,
+vi.mock('@codex-claw/core/automation-manager', () => ({
+  updateAutomationExecutionAgentConversationInSnapshot: mocks.updateAutomationConversation,
 }));
 
 vi.mock('../state', () => ({
@@ -111,15 +111,15 @@ vi.mock('../work-integrations/file-token-store', () => ({
   },
 }));
 
-vi.mock('../loops/runner', () => ({
-  LoopRunner: class {
-    constructor(options: unknown) { mocks.loopRunnerOptions.push(options); }
-    runAll = mocks.loopRunAll;
+vi.mock('../automations/runner', () => ({
+  AutomationRunner: class {
+    constructor(options: unknown) { mocks.automationRunnerOptions.push(options); }
+    runAll = mocks.automationRunAll;
   },
 }));
 
-vi.mock('../loops/scheduler', () => ({
-  LoopScheduler: class {
+vi.mock('../automations/scheduler', () => ({
+  AutomationScheduler: class {
     constructor(options: unknown) { mocks.schedulerOptions.push(options); }
     start = mocks.schedulerStart;
     stop = mocks.schedulerStop;
@@ -179,13 +179,13 @@ type ServerOptions = {
   };
 };
 
-type LoopRunnerOptions = {
+type AutomationRunnerOptions = {
   notifySnapshotUpdated(): void;
   saveSnapshot(): Promise<unknown>;
-  sendPrompt(agentId: string, prompt: string, context: { loopId: string; executionId: string }): Promise<unknown>;
+  sendPrompt(agentId: string, prompt: string, context: { automationId: string; executionId: string }): Promise<unknown>;
 };
 
-type SchedulerOptions = { runLoops(): Promise<unknown>; onError(error: unknown): void };
+type SchedulerOptions = { runAutomations(): Promise<unknown>; onError(error: unknown): void };
 
 type WorkIntegrationOptions = {
   drivers: Array<{ getClientId(): string }>;
@@ -209,7 +209,7 @@ describe('clawd runtime', () => {
     vi.clearAllMocks();
     mocks.mcpOptions.length = 0;
     mocks.serverOptions.length = 0;
-    mocks.loopRunnerOptions.length = 0;
+    mocks.automationRunnerOptions.length = 0;
     mocks.schedulerOptions.length = 0;
     mocks.remoteOptions.length = 0;
     mocks.workIntegrationOptions.length = 0;
@@ -229,7 +229,7 @@ describe('clawd runtime', () => {
     mocks.createDefaultBackendDrivers.mockReturnValue(mocks.drivers);
     mocks.runtimeGitHubOAuthClientId.mockReturnValue('github-client');
     requestClient.mockImplementation(async (method: string, params?: unknown) => ({ method, params }));
-    mocks.loopRunAll.mockResolvedValue(undefined);
+    mocks.automationRunAll.mockResolvedValue(undefined);
   });
 
   it('constructs the runtime services and forwards client-owned operations', async () => {
@@ -304,8 +304,8 @@ describe('clawd runtime', () => {
     expect(mocks.serverEmitEvent).toHaveBeenCalledWith({ type: 'sink-event' });
 
     const scheduler = mocks.schedulerOptions[0] as SchedulerOptions;
-    await scheduler.runLoops();
-    expect(mocks.loopRunAll).toHaveBeenCalledOnce();
+    await scheduler.runAutomations();
+    expect(mocks.automationRunAll).toHaveBeenCalledOnce();
   });
 
   it('removes desktop-owned tools from a web-hosted runtime', async () => {
@@ -361,8 +361,8 @@ describe('clawd runtime', () => {
     });
   });
 
-  it('runs loop prompts, records new conversations, and emits snapshot updates', async () => {
-    mocks.updateLoopConversation.mockReturnValue({ agentId: 'agent-dina' });
+  it('runs automation prompts, records new conversations, and emits snapshot updates', async () => {
+    mocks.updateAutomationConversation.mockReturnValue({ agentId: 'agent-dina' });
     let titlePromise: Promise<void> | undefined;
     let startedPromise: Promise<void> | undefined;
     mocks.sendAgentPrompt.mockImplementation((_snapshot, _driver, _agentId, _prompt, _options, emit, hooks) => {
@@ -376,12 +376,12 @@ describe('clawd runtime', () => {
     });
 
     await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
-    const loops = mocks.loopRunnerOptions[0] as LoopRunnerOptions;
-    await expect(loops.sendPrompt('missing', 'ignore', { loopId: 'loop-1', executionId: 'run-1' }))
+    const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
+    await expect(automations.sendPrompt('missing', 'ignore', { automationId: 'automation-1', executionId: 'run-1' }))
       .resolves.toBe(mocks.snapshot);
     expect(mocks.sendAgentPrompt).not.toHaveBeenCalled();
 
-    await expect(loops.sendPrompt('agent-dina', 'run tests', { loopId: 'loop-1', executionId: 'run-1' }))
+    await expect(automations.sendPrompt('agent-dina', 'run tests', { automationId: 'automation-1', executionId: 'run-1' }))
       .resolves.toBe(mocks.snapshot);
     await titlePromise;
     await startedPromise;
@@ -398,9 +398,9 @@ describe('clawd runtime', () => {
       mocks.snapshot.agents[0],
       'Dina',
     );
-    expect(mocks.updateLoopConversation).toHaveBeenCalledWith(
+    expect(mocks.updateAutomationConversation).toHaveBeenCalledWith(
       mocks.snapshot,
-      'loop-1',
+      'automation-1',
       'run-1',
       'agent-dina',
       expect.objectContaining({
@@ -412,8 +412,8 @@ describe('clawd runtime', () => {
       payload: mocks.snapshot,
     });
 
-    loops.notifySnapshotUpdated();
-    await loops.saveSnapshot();
+    automations.notifySnapshotUpdated();
+    await automations.saveSnapshot();
     expect(mocks.serverEmitEvent).toHaveBeenLastCalledWith({
       type: 'snapshot.updated',
       payload: mocks.snapshot,
@@ -427,8 +427,8 @@ describe('clawd runtime', () => {
     });
     driver.setConversationTitle.mockRejectedValue('rename failed');
     const runtime = await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
-    const loops = mocks.loopRunnerOptions[0] as LoopRunnerOptions;
-    await loops.sendPrompt('agent-dina', 'run', { loopId: 'loop-1', executionId: 'run-1' });
+    const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
+    await automations.sendPrompt('agent-dina', 'run', { automationId: 'automation-1', executionId: 'run-1' });
     await hooks?.onBackendSessionUpdated({ backendSession: { kind: 'codex', threadId: 'thread' } }, false);
     await hooks?.onBackendSessionUpdated({ backendSession: { kind: 'codex', threadId: 'thread' } }, true);
     expect(mocks.warnMain).toHaveBeenCalledWith('conversation-title', 'failed', {
@@ -437,10 +437,10 @@ describe('clawd runtime', () => {
     });
 
     const scheduler = mocks.schedulerOptions[0] as SchedulerOptions;
-    scheduler.onError(new Error('loop failed'));
-    scheduler.onError('loop string failure');
-    expect(mocks.warnMain).toHaveBeenCalledWith('loop-scheduler', 'check failed', { message: 'loop failed' });
-    expect(mocks.warnMain).toHaveBeenCalledWith('loop-scheduler', 'check failed', { message: 'loop string failure' });
+    scheduler.onError(new Error('automation failed'));
+    scheduler.onError('automation string failure');
+    expect(mocks.warnMain).toHaveBeenCalledWith('automation-scheduler', 'check failed', { message: 'automation failed' });
+    expect(mocks.warnMain).toHaveBeenCalledWith('automation-scheduler', 'check failed', { message: 'automation string failure' });
 
     await runtime.stop();
     expect(mocks.schedulerStop).toHaveBeenCalledOnce();
@@ -448,12 +448,12 @@ describe('clawd runtime', () => {
     expect(mocks.mcpStop).toHaveBeenCalledOnce();
   });
 
-  it('rejects loop prompts when a backend driver is not configured', async () => {
+  it('rejects automation prompts when a backend driver is not configured', async () => {
     const runtime = await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
     mocks.drivers.clear();
-    const loops = mocks.loopRunnerOptions[0] as LoopRunnerOptions;
+    const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
 
-    expect(() => loops.sendPrompt('agent-dina', 'run', { loopId: 'loop-1', executionId: 'run-1' }))
+    expect(() => automations.sendPrompt('agent-dina', 'run', { automationId: 'automation-1', executionId: 'run-1' }))
       .toThrowError('Backend driver is not configured: codex');
     await runtime.stop();
   });

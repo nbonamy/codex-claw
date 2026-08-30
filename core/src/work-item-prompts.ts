@@ -1,9 +1,9 @@
-import type { LoopInstructions, WorkBacklogAssignmentPolicy, WorkItem } from './contracts';
+import type { AutomationInstructions, WorkBacklogAssignmentPolicy, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
 
 export type WorkItemAssignmentAction = 'addressFeedback' | 'fix' | 'investigate' | 'review';
 
-type WorkItemPromptOptions = Pick<LoopInstructions, 'assignment'> & {
+type WorkItemPromptOptions = Pick<AutomationInstructions, 'assignment'> & {
   action?: WorkItemAssignmentAction;
   completionPolicy?: WorkBacklogAssignmentPolicy;
 };

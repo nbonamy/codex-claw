@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { Agent, AppSnapshot, Loop } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, Automation } from '@codex-claw/core/contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { ClawMcpService } from '../service';
@@ -520,8 +520,8 @@ describe('ClawMcpService', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
   });
 
-  it('requires loop completion instructions before confirming work completion', async () => {
-    const snapshot = createLoopSnapshot({
+  it('requires automation completion instructions before confirming work completion', async () => {
+    const snapshot = createAutomationSnapshot({
       teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
       createdAgents: [{
         agentId: 'agent-one',
@@ -531,7 +531,7 @@ describe('ClawMcpService', () => {
         workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
       }],
     });
-    snapshot.loops[0]!.instructions.beforeCompletion = 'Remove the bug label first.';
+    snapshot.automations[0]!.instructions.beforeCompletion = 'Remove the bug label first.';
     const events: any[] = [];
     service = new ClawMcpService({
       snapshot,
@@ -608,8 +608,8 @@ describe('ClawMcpService', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'workBacklog.assignmentUpdated' }));
   });
 
-  it('completes existing-team loop executions only after every created assignment is done and deletes the created agents', async () => {
-    const snapshot = createLoopSnapshot({
+  it('completes existing-team automation executions only after every created assignment is done and deletes the created agents', async () => {
+    const snapshot = createAutomationSnapshot({
       teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
       createdAgents: [{
         agentId: 'agent-one',
@@ -634,11 +634,11 @@ describe('ClawMcpService', () => {
     await markWorkItemCompleted(url, 'agent-one', 'github:nbonamy/codex-claw#5');
 
     expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({ status: 'working' });
+    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({ status: 'working' });
 
     await markWorkItemCompleted(url, 'agent-two', 'github:nbonamy/codex-claw#6');
 
-    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({
       status: 'completed',
       completedAt: '2026-06-15T01:30:48.802Z',
       createdAgents: [
@@ -657,8 +657,8 @@ describe('ClawMcpService', () => {
     expect(snapshot.teams.map((team) => team.id)).toContain('team-codex-claw');
   });
 
-  it('deletes the dedicated team when a dedicated-team loop execution completes', async () => {
-    const snapshot = createLoopSnapshot({
+  it('deletes the dedicated team when a dedicated-team automation execution completes', async () => {
+    const snapshot = createAutomationSnapshot({
       teamTarget: { mode: 'dedicated' },
       dedicatedTeamId: 'team-github-5',
       createdAgents: [{
@@ -677,7 +677,7 @@ describe('ClawMcpService', () => {
 
     await markWorkItemCompleted(url, 'agent-work-item', 'github:nbonamy/codex-claw#5');
 
-    expect(snapshot.loops[0]?.executionLog[0]).toMatchObject({
+    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({
       status: 'completed',
       completedAt: '2026-06-15T01:30:48.802Z',
       createdAgents: [{
@@ -764,10 +764,10 @@ function callTool(url: string, agentId: string, name: string, arguments_: Record
   });
 }
 
-function createLoopSnapshot(input: {
-  createdAgents: Loop['executionLog'][number]['createdAgents'];
+function createAutomationSnapshot(input: {
+  createdAgents: Automation['executionLog'][number]['createdAgents'];
   dedicatedTeamId?: string;
-  teamTarget: Loop['action']['teamTarget'];
+  teamTarget: Automation['action']['teamTarget'];
 }): AppSnapshot {
   const snapshot = createEmptySnapshot();
   const targetTeamId = input.teamTarget.mode === 'dedicated'
@@ -790,9 +790,9 @@ function createLoopSnapshot(input: {
   snapshot.agents = input.createdAgents.map((createdAgent) => createTestAgent(createdAgent.agentId, targetTeamId, createdAgent.agentName));
   snapshot.activeTeamId = targetTeamId;
   snapshot.activeAgentId = createdAgentIds[0] ?? null;
-  snapshot.loops = [{
-    id: 'loop-bugs',
-    name: 'Bug loop',
+  snapshot.automations = [{
+    id: 'automation-bugs',
+    name: 'Bug automation',
     enabled: true,
     createdAt: '2026-06-15T01:00:00.000Z',
     updatedAt: '2026-06-15T01:00:00.000Z',
@@ -804,8 +804,8 @@ function createLoopSnapshot(input: {
     },
     instructions: {},
     executionLog: [{
-      id: 'loop-exec-1',
-      loopId: 'loop-bugs',
+      id: 'automation-exec-1',
+      automationId: 'automation-bugs',
       startedAt: '2026-06-15T01:00:00.000Z',
       status: 'working',
       createdCount: input.createdAgents.length,
@@ -821,8 +821,8 @@ function createLoopSnapshot(input: {
       assignedAt: '2026-06-15T01:00:00.000Z',
       policy: 'complete',
       status: 'inProgress',
-      loopId: 'loop-bugs',
-      loopExecutionId: 'loop-exec-1',
+      automationId: 'automation-bugs',
+      automationExecutionId: 'automation-exec-1',
     };
   }
 

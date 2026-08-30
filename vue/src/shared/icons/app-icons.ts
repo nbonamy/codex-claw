@@ -3,6 +3,7 @@ export { default as BacklogIcon } from './BacklogIcon.vue';
 
 export {
   IconAffiliate as AffiliateIcon,
+  IconAutomation as AutomationIcon,
   IconArrowBackUp as ArrowBackUpIcon,
   IconArrowRight as ArrowRightIcon,
   IconArrowUpRight as ArrowUpRightIcon,

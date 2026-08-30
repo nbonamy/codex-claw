@@ -15,9 +15,9 @@
     <TeamRail
       :teams="snapshot.teams"
       :unread-team-ids="unreadTeamIds"
-      :active-team-id="cockpitVisible || loopsVisible || settingsVisible ? null : activeTeam?.id ?? null"
+      :active-team-id="cockpitVisible || automationsVisible || settingsVisible ? null : activeTeam?.id ?? null"
       :cockpit-active="cockpitVisible"
-      :loops-active="loopsVisible"
+      :automations-active="automationsVisible"
       :settings-active="settingsVisible"
       :agent-sidebar-expanded="showAgentSidebar"
       :rate-limits="snapshot.accountRateLimits"
@@ -33,7 +33,7 @@
       @quit="quit"
       @reorder-teams="$emit('reorder-teams', $event)"
       @select-cockpit="openCockpit"
-      @select-loops="openLoops"
+      @select-automations="openAutomations"
       @select-team="selectTeamFromRail"
     />
     <Transition name="agent-sidebar">
@@ -133,28 +133,28 @@
         :restart-app="restartApp"
         @select-tab="settingsActiveTab = $event"
       />
-      <LoopsView
-        v-else-if="loopsVisible"
+      <AutomationsView
+        v-else-if="automationsVisible"
         :backend-models="backendModels"
         :bench="snapshot.bench"
         :choose-agent-folder="chooseAgentFolder"
-        :clear-loop-history="clearLoopHistory"
-        :create-loop="createLoop"
-        :delete-loop-execution="deleteLoopExecution"
-        :delete-loop="deleteLoop"
-        :get-loop-snapshot="getLoopSnapshot"
+        :clear-automation-history="clearAutomationHistory"
+        :create-automation="createAutomation"
+        :delete-automation-execution="deleteAutomationExecution"
+        :delete-automation="deleteAutomation"
+        :get-automation-snapshot="getAutomationSnapshot"
         :load-work-items="loadWorkItems"
         :load-work-repositories="loadWorkRepositories"
         :list-source-folders="listSourceFolders"
         :list-source-repositories="listSourceRepositories"
-        :loops="snapshot.loops"
+        :automations="snapshot.automations"
         :messages="snapshot.messages"
         :read-conversation-messages="readConversationMessages"
         :remote-connections="snapshot.remoteConnections.connections"
-        :run-loop="runLoop"
+        :run-automation="runAutomation"
         :source-repositories="sourceRepositories"
         :teams="snapshot.teams"
-        :update-loop="updateLoop"
+        :update-automation="updateAutomation"
         :work-backlog="snapshot.workBacklog"
         :work-backlog-error="workBacklogError"
         :work-backlog-status="workBacklogStatus"
@@ -444,7 +444,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -468,7 +468,7 @@ import ConversationPane from './ConversationPane.vue';
 import ImageAnnotationDialog, { type ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
 import { centeredImageCropDataUrl, formatImageAnnotationPrompt, type SavedImageAnnotations } from './image-annotation';
-import LoopsView from './LoopsView.vue';
+import AutomationsView from './AutomationsView.vue';
 import TeamDialog from './TeamDialog.vue';
 import TeamRail from './TeamRail.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
@@ -615,26 +615,26 @@ const props = withDefaults(defineProps<{
   revokePairedDevice?: (environmentId: string, clientId: string) => Promise<void>;
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
-  getLoopSnapshot?: (location?: LoopLocation) => Promise<AppSnapshot>;
-  createLoop?: (input: CreateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  updateLoop?: (input: UpdateLoopInput, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  runLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  clearLoopHistory?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  deleteLoopExecution?: (loopId: string, executionId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
-  deleteLoop?: (loopId: string, location?: LoopLocation) => Promise<AppSnapshot | void>;
+  getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
+  createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  clearAutomationHistory?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  deleteAutomationExecution?: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+  deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   listAgentConversations?: (agentId: string) => Promise<ConversationSummary[]>;
   resumeAgentConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
-  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: LoopLocation) => Promise<RendererMessage[]>;
+  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
-  loadWorkRepositories?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkRepository[] | void>;
-  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
-  loadGlobalWorkItems?: (provider: WorkProviderKind, location?: LoopLocation, query?: GlobalWorkItemQuery) => Promise<WorkItemPage>;
-  loadAssignedWorkItems?: (provider: WorkProviderKind, location?: LoopLocation) => Promise<WorkItem[] | void>;
+  loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
+  loadGlobalWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery) => Promise<WorkItemPage>;
+  loadAssignedWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
   createWorkItem?: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
@@ -729,13 +729,13 @@ const props = withDefaults(defineProps<{
   revokePairedDevice: async () => undefined,
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
-  getLoopSnapshot: async () => createEmptySnapshot(),
-  createLoop: async () => undefined,
-  updateLoop: async () => undefined,
-  runLoop: async () => undefined,
-  clearLoopHistory: async () => undefined,
-  deleteLoopExecution: async () => undefined,
-  deleteLoop: async () => undefined,
+  getAutomationSnapshot: async () => createEmptySnapshot(),
+  createAutomation: async () => undefined,
+  updateAutomation: async () => undefined,
+  runAutomation: async () => undefined,
+  clearAutomationHistory: async () => undefined,
+  deleteAutomationExecution: async () => undefined,
+  deleteAutomation: async () => undefined,
   listAgentConversations: async () => [],
   resumeAgentConversation: async () => undefined,
   readConversationMessages: async () => [],
@@ -816,7 +816,7 @@ type AttachmentAnnotationTarget = {
   attachment: CodexNativeAttachment;
 };
 
-type AppSurface = 'agent' | 'cockpit' | 'loops' | 'settings';
+type AppSurface = 'agent' | 'cockpit' | 'automations' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 type AgentRightWorkspaceState = {
   activeTab: RightWorkspaceTab | null;
@@ -1352,7 +1352,7 @@ const pendingNewAgentWorktreeBranchName = computed(() => {
 const pendingBenchAgentTeamName = computed(() => pendingBenchAgentWorkItem.value ? workItemTeamName(pendingBenchAgentWorkItem.value) : '');
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
-const loopsVisible = computed(() => activeSurface.value === 'loops');
+const automationsVisible = computed(() => activeSurface.value === 'automations');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const imageAnnotationVisible = computed(() => (
@@ -2364,7 +2364,7 @@ function openEditTeam(teamId: string): void {
 }
 
 async function loadRemoteTeams(connectionId: string): Promise<Team[]> {
-  const remoteSnapshot = await props.getLoopSnapshot?.({ kind: 'remote', remoteConnectionId: connectionId });
+  const remoteSnapshot = await props.getAutomationSnapshot?.({ kind: 'remote', remoteConnectionId: connectionId });
   return remoteSnapshot?.teams ?? [];
 }
 
@@ -2460,8 +2460,8 @@ async function openCockpit(): Promise<void> {
   await ensureGlobalWorkItems(scope);
 }
 
-function openLoops(): void {
-  activeSurface.value = 'loops';
+function openAutomations(): void {
+  activeSurface.value = 'automations';
 }
 
 function openSettings(): void {
@@ -2568,31 +2568,31 @@ function imageDataUrlArrayBuffer(dataUrl: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-async function createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
-  return props.createLoop(input, location);
+async function createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
+  return props.createAutomation(input, location);
 }
 
-async function updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot | void> {
-  return props.updateLoop(input, location);
+async function updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
+  return props.updateAutomation(input, location);
 }
 
-async function runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
-  return props.runLoop(loopId, location);
+async function runAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
+  return props.runAutomation(automationId, location);
 }
 
-async function clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
-  return props.clearLoopHistory(loopId, location);
+async function clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
+  return props.clearAutomationHistory(automationId, location);
 }
 
-async function deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
-  return props.deleteLoopExecution(loopId, executionId, location);
+async function deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
+  return props.deleteAutomationExecution(automationId, executionId, location);
 }
 
-async function deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot | void> {
-  return props.deleteLoop(loopId, location);
+async function deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
+  return props.deleteAutomation(automationId, location);
 }
 
-async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
+async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]> {
   return location
     ? props.readConversationMessages(ref, agentId, location)
     : props.readConversationMessages(ref, agentId);

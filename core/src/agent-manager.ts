@@ -172,8 +172,8 @@ export function removeBenchTemplateFromSnapshot(snapshot: AppSnapshot, templateI
 }
 
 export type AssignWorkItemOptions = {
-  loopExecutionId?: string;
-  loopId?: string;
+  automationExecutionId?: string;
+  automationId?: string;
   policy?: WorkBacklogAssignment['policy'];
 };
 

@@ -1,18 +1,18 @@
 <template>
-  <section class="loop-welcome" :aria-label="$t('surface.loopWelcome.loopsWelcome')">
-    <div class="loop-welcome__icon" aria-hidden="true">
+  <section class="automation-welcome" :aria-label="$t('surface.automationWelcome.automationsWelcome')">
+    <div class="automation-welcome__icon" aria-hidden="true">
       <InfinityIcon />
     </div>
-    <div class="loop-welcome__copy">
-      <h3>{{ $t('surface.loopWelcome.noLoopsYet') }}</h3>
-      <p>{{ $t('surface.loopWelcome.aLoopIsAnAutomationThatJustWorksForYou') }}</p>
-      <p>{{ $t('surface.loopWelcome.startWithGitHubIssuesPickABenchAgentAndLetSkwadCreateThe') }}</p>
+    <div class="automation-welcome__copy">
+      <h3>{{ $t('surface.automationWelcome.noAutomationsYet') }}</h3>
+      <p>{{ $t('surface.automationWelcome.automationsWatchForMatchingWork') }}</p>
+      <p>{{ $t('surface.automationWelcome.startWithGitHubIssuesPickABenchAgentAndLetSkwadCreateThe') }}</p>
     </div>
     <el-button
       type="primary"
-      class="loop-welcome__button"
+      class="automation-welcome__button"
       @click="emit('create')"
-    > {{ $t('surface.loopWelcome.createLoop') }} </el-button>
+    > {{ $t('surface.automationWelcome.createAutomation') }} </el-button>
   </section>
 </template>
 
@@ -25,7 +25,7 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-.loop-welcome {
+.automation-welcome {
   min-height: 360px;
   display: flex;
   flex-direction: column;
@@ -39,7 +39,7 @@ const emit = defineEmits<{
   text-align: center;
 }
 
-.loop-welcome__icon {
+.automation-welcome__icon {
   width: 56px;
   height: 56px;
   display: grid;
@@ -49,38 +49,38 @@ const emit = defineEmits<{
   background: var(--color-surface-low);
 }
 
-.loop-welcome__icon svg {
+.automation-welcome__icon svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
   stroke-width: 1.4;
 }
 
-.loop-welcome__copy {
+.automation-welcome__copy {
   max-width: 440px;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
 }
 
-.loop-welcome__copy h3,
-.loop-welcome__copy p {
+.automation-welcome__copy h3,
+.automation-welcome__copy p {
   margin: 0;
 }
 
-.loop-welcome__copy h3 {
+.automation-welcome__copy h3 {
   color: var(--color-text);
   font-size: var(--font-size-20);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-28);
 }
 
-.loop-welcome__copy p {
+.automation-welcome__copy p {
   color: var(--color-text-muted);
   font-size: var(--font-size-14);
   line-height: var(--line-height-20);
 }
 
-.loop-welcome__button {
+.automation-welcome__button {
   min-width: 128px;
 }
 </style>

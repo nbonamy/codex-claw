@@ -2,7 +2,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { encodedAppError } from '@codex-claw/core/app-error';
 import { mainT } from './i18n';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, powerMonitor, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, powerMonitor, protocol, shell } from 'electron';
 import path from 'node:path';
 import { CodexElectronAttachmentRegistry, registerCodexNativeIpc, TypedIpcMain } from '@codex-app-sdk/electron';
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
@@ -14,7 +14,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -26,6 +26,7 @@ import { ManualUpdateCheckController } from './manual-update-check';
 import { AppshotsKeyMonitor } from './appshots-key-monitor';
 import { captureAppshot as captureFrontmostAppshot } from './appshots';
 import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from './open-in';
+import { installLocalMediaProtocol as installLocalMediaProtocolHandler, LocalMediaRegistry, withRendererMediaUrls } from './local-media';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
@@ -47,6 +48,7 @@ export class AppController {
   private backendClientConnectionUnsubscribe: (() => void) | null = null;
   private nativeIpcUnregister: (() => void) | null = null;
   private readonly nativeAttachmentRegistry = new CodexElectronAttachmentRegistry();
+  private readonly localMediaRegistry = new LocalMediaRegistry();
   private lastBackendEventSeq = 0;
   private clientEventSeq = 0;
   private backendEventBuffer: ClawBackendEvent[] | null = null;
@@ -107,6 +109,10 @@ export class AppController {
     this.syncAppshotsKeyMonitor();
     this.syncPowerSaveBlocker();
     logMain('startup', 'application initialized');
+  }
+
+  installLocalMediaProtocol(): void {
+    installLocalMediaProtocolHandler(this.localMediaRegistry, protocol, (url) => net.fetch(url));
   }
 
   setAutoUpdateService(service: DesktopAutoUpdateService): void {
@@ -185,23 +191,23 @@ export class AppController {
       return this.disconnectWorkProvider(provider);
     });
 
-    ipc.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind, location?: AutomationLocation) => {
       return this.listWorkRepositories(provider, location);
     });
 
-    ipc.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput, location?: AutomationLocation) => {
       return this.configureWorkBacklog(input, location);
     });
 
-    ipc.handle(ipcChannels.listGlobalWorkItems, async (_event, provider: WorkProviderKind, location?: LoopLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => {
+    ipc.handle(ipcChannels.listGlobalWorkItems, async (_event, provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => {
       return this.listGlobalWorkItems(provider, location, query);
     });
 
-    ipc.handle(ipcChannels.listAssignedWorkItems, async (_event, provider: WorkProviderKind, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.listAssignedWorkItems, async (_event, provider: WorkProviderKind, location?: AutomationLocation) => {
       return this.listAssignedWorkItems(provider, location);
     });
 
-    ipc.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => {
+    ipc.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => {
       return this.listWorkItems(provider, repositoryId, location, query);
     });
 
@@ -322,32 +328,32 @@ export class AppController {
       return this.getBenchSnapshot(location);
     });
 
-    ipc.handle(ipcChannels.getLoopSnapshot, async (_event, location?: LoopLocation) => {
-      return this.getLoopSnapshot(location);
+    ipc.handle(ipcChannels.getAutomationSnapshot, async (_event, location?: AutomationLocation) => {
+      return this.getAutomationSnapshot(location);
     });
 
-    ipc.handle(ipcChannels.createLoop, async (_event, input: CreateLoopInput, location?: LoopLocation) => {
-      return this.createLoop(input, location);
+    ipc.handle(ipcChannels.createAutomation, async (_event, input: CreateAutomationInput, location?: AutomationLocation) => {
+      return this.createAutomation(input, location);
     });
 
-    ipc.handle(ipcChannels.updateLoop, async (_event, input: UpdateLoopInput, location?: LoopLocation) => {
-      return this.updateLoop(input, location);
+    ipc.handle(ipcChannels.updateAutomation, async (_event, input: UpdateAutomationInput, location?: AutomationLocation) => {
+      return this.updateAutomation(input, location);
     });
 
-    ipc.handle(ipcChannels.runLoop, async (_event, loopId: string, location?: LoopLocation) => {
-      return this.runLoop(loopId, location);
+    ipc.handle(ipcChannels.runAutomation, async (_event, automationId: string, location?: AutomationLocation) => {
+      return this.runAutomation(automationId, location);
     });
 
-    ipc.handle(ipcChannels.clearLoopHistory, async (_event, loopId: string, location?: LoopLocation) => {
-      return this.clearLoopHistory(loopId, location);
+    ipc.handle(ipcChannels.clearAutomationHistory, async (_event, automationId: string, location?: AutomationLocation) => {
+      return this.clearAutomationHistory(automationId, location);
     });
 
-    ipc.handle(ipcChannels.deleteLoopExecution, async (_event, loopId: string, executionId: string, location?: LoopLocation) => {
-      return this.deleteLoopExecution(loopId, executionId, location);
+    ipc.handle(ipcChannels.deleteAutomationExecution, async (_event, automationId: string, executionId: string, location?: AutomationLocation) => {
+      return this.deleteAutomationExecution(automationId, executionId, location);
     });
 
-    ipc.handle(ipcChannels.deleteLoop, async (_event, loopId: string, location?: LoopLocation) => {
-      return this.deleteLoop(loopId, location);
+    ipc.handle(ipcChannels.deleteAutomation, async (_event, automationId: string, location?: AutomationLocation) => {
+      return this.deleteAutomation(automationId, location);
     });
 
     ipc.handle(ipcChannels.listAgentConversations, async (_event, agentId: string) => {
@@ -358,7 +364,7 @@ export class AppController {
       return this.resumeAgentConversation(agentId, ref);
     });
 
-    ipc.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string, location?: LoopLocation) => {
+    ipc.handle(ipcChannels.readConversationMessages, async (_event, ref: unknown, agentId: string, location?: AutomationLocation) => {
       return this.readConversationMessages(ref, agentId, location);
     });
 
@@ -696,14 +702,14 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderDisconnect, { provider }));
   }
 
-  private async listWorkRepositories(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkRepository[]> {
+  private async listWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
     return this.requireBackendClient().request(backendMethods.workProviderRepositoriesList, {
       provider,
       ...(location ? { location } : {}),
     });
   }
 
-  private async configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: LoopLocation): Promise<AppSnapshot> {
+  private async configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<AppSnapshot> {
     const snapshot = await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderBacklogConfigure, {
       input,
       ...(location ? { location } : {}),
@@ -711,7 +717,7 @@ export class AppController {
     return location?.kind === 'remote' ? snapshot : this.adoptBackendSnapshot(snapshot);
   }
 
-  private async listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: LoopLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
+  private async listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
     return this.requireBackendClient().request(backendMethods.workProviderItemsList, {
       provider,
       repositoryId,
@@ -720,7 +726,7 @@ export class AppController {
     });
   }
 
-  private async listGlobalWorkItems(provider: WorkProviderKind, location?: LoopLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage> {
+  private async listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage> {
     return this.requireBackendClient().request(backendMethods.workProviderGlobalItemsList, {
       provider,
       ...(location ? { location } : {}),
@@ -728,7 +734,7 @@ export class AppController {
     });
   }
 
-  private async listAssignedWorkItems(provider: WorkProviderKind, location?: LoopLocation): Promise<WorkItem[]> {
+  private async listAssignedWorkItems(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]> {
     return this.requireBackendClient().request(backendMethods.workProviderAssignedItemsList, {
       provider,
       ...(location ? { location } : {}),
@@ -983,58 +989,58 @@ export class AppController {
     await this.initializeBackendClient();
   }
 
-  private async getLoopSnapshot(location?: LoopLocation): Promise<AppSnapshot> {
-    if (isRemoteLoopLocation(location)) {
-      return this.requireBackendClient().request<AppSnapshot>(backendMethods.snapshotLoopsGet, { location });
+  private async getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot> {
+    if (isRemoteAutomationLocation(location)) {
+      return this.requireBackendClient().request<AppSnapshot>(backendMethods.snapshotAutomationsGet, { location });
     }
     return this.getSnapshot();
   }
 
-  private async createLoop(input: CreateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopCreate, {
+  private async createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot> {
+    return this.adoptAutomationSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.automationCreate, {
       input,
       ...(location ? { location } : {}),
     }));
   }
 
-  private async updateLoop(input: UpdateLoopInput, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopUpdate, {
+  private async updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot> {
+    return this.adoptAutomationSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.automationUpdate, {
       input,
       ...(location ? { location } : {}),
     }));
   }
 
-  private async runLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopRun, {
-      loopId,
+  private async runAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot> {
+    return this.adoptAutomationSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.automationRun, {
+      automationId,
       ...(location ? { location } : {}),
     }));
   }
 
-  private async clearLoopHistory(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopHistoryClear, {
-      loopId,
+  private async clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot> {
+    return this.adoptAutomationSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.automationHistoryClear, {
+      automationId,
       ...(location ? { location } : {}),
     }));
   }
 
-  private async deleteLoopExecution(loopId: string, executionId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopExecutionDelete, {
-      loopId,
+  private async deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot> {
+    return this.adoptAutomationSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.automationExecutionDelete, {
+      automationId,
       executionId,
       ...(location ? { location } : {}),
     }));
   }
 
-  private async deleteLoop(loopId: string, location?: LoopLocation): Promise<AppSnapshot> {
-    return this.adoptLoopSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.loopDelete, {
-      loopId,
+  private async deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot> {
+    return this.adoptAutomationSnapshot(location, await this.requireBackendClient().request<AppSnapshot>(backendMethods.automationDelete, {
+      automationId,
       ...(location ? { location } : {}),
     }));
   }
 
-  private async adoptLoopSnapshot(location: LoopLocation | undefined, snapshot: AppSnapshot): Promise<AppSnapshot> {
-    if (isRemoteLoopLocation(location)) {
+  private async adoptAutomationSnapshot(location: AutomationLocation | undefined, snapshot: AppSnapshot): Promise<AppSnapshot> {
+    if (isRemoteAutomationLocation(location)) {
       return snapshot;
     }
     return this.adoptBackendSnapshot(snapshot);
@@ -1045,7 +1051,7 @@ export class AppController {
     this.transientSnapshots.add(snapshot);
     try {
       await this.refreshClientStateFromBackend();
-      return snapshot;
+      return withRendererMediaUrls(snapshot, this.localMediaRegistry);
     } finally {
       this.transientSnapshots.delete(snapshot);
     }
@@ -1060,9 +1066,9 @@ export class AppController {
 
   private async getSnapshot(): Promise<AppSnapshot> {
     if (this.backendClient && this.connectionState.status === 'connected') {
-      return this.synchronizeBackendState();
+      return withRendererMediaUrls(await this.synchronizeBackendState(), this.localMediaRegistry);
     }
-    if (this.snapshot) return this.snapshot;
+    if (this.snapshot) return withRendererMediaUrls(this.snapshot, this.localMediaRegistry);
     throw new Error('clawd snapshot is not available.');
   }
 
@@ -1195,12 +1201,13 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentConversationResume, { agentId, ref }));
   }
 
-  private async readConversationMessages(ref: unknown, agentId: string, location?: LoopLocation): Promise<RendererMessage[]> {
-    return this.requireBackendClient().request(backendMethods.agentConversationMessagesGet, {
+  private async readConversationMessages(ref: unknown, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]> {
+    const messages = await this.requireBackendClient().request<RendererMessage[]>(backendMethods.agentConversationMessagesGet, {
       ref,
       agentId,
       ...(location ? { location } : {}),
     });
+    return withRendererMediaUrls(messages, this.localMediaRegistry);
   }
 
   private async setAgentGoal(agentId: string, objective: string): Promise<AppSnapshot> {
@@ -1589,7 +1596,7 @@ export class AppController {
     this.lastBackendEventSeq = event.seq;
     this.syncPowerSaveBlocker();
     if (notifyRenderer && this.mainWindow && !this.mainWindow.isDestroyed()) {
-      sendRendererEvent(this.mainWindow.webContents, rendererEvent);
+      sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls(rendererEvent, this.localMediaRegistry));
     }
   }
 
@@ -1650,14 +1657,14 @@ export class AppController {
   private emitClientEvent(type: MainToRendererEvent['type'], payload: unknown, snapshot?: AppSnapshot): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
     this.clientEventSeq += 1;
-    sendRendererEvent(this.mainWindow.webContents, {
+    sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls({
       seq: this.clientEventSeq,
       source: 'client',
       type,
       payload,
       occurredAt: new Date().toISOString(),
       ...(snapshot ? { snapshot } : {}),
-    });
+    }, this.localMediaRegistry));
   }
 
   private syncPowerSaveBlocker(): void {
@@ -1765,6 +1772,7 @@ export function startMainApp(): void {
   controller.registerIpcHandlers();
 
   void app.whenReady().then(async () => {
+    controller.installLocalMediaProtocol();
     if (app.isPackaged) {
       app.setAsDefaultProtocolClient(codexClawDeepLinkScheme);
     } else if (process.argv[1]) {
@@ -1835,7 +1843,7 @@ function overwriteAppSnapshot(target: AppSnapshot, source: AppSnapshot): void {
   Object.assign(target, source);
 }
 
-function isRemoteLoopLocation(location: LoopLocation | undefined): location is Extract<LoopLocation, { kind: 'remote' }> {
+function isRemoteAutomationLocation(location: AutomationLocation | undefined): location is Extract<AutomationLocation, { kind: 'remote' }> {
   return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
 }
 
