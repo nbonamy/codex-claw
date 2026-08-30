@@ -76,6 +76,7 @@ describe('agent prompts', () => {
     expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
     expect(instructions).toContain('absolute macOS logical screen points');
     expect(instructions).toContain('Use a screen screenshot when interacting with the menu bar');
+    expect(instructions).toContain('computer-use-move only for hover behavior');
     expect(instructions).toContain('chrome:control-chrome');
   });
 

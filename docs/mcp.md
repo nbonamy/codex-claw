@@ -175,6 +175,11 @@ mouse input, or after an `AXPress` reports success but refreshed state shows no
 change. Physical clicks require the target app to remain frontmost and the
 target position to remain unobstructed.
 
+`computer-use-move` is the explicit physical hover primitive. It moves the
+user's real pointer and leaves it at the target so native menu tracking and
+other hover-only behavior can work. Physical clicks, by contrast, restore the
+pointer to its prior location after posting the click.
+
 The helper reports its own Accessibility trust. Agents must check status or
 request permission before inspection/actions and refresh app state before
 acting on an indexed element. Normal MCP approval applies to each call.

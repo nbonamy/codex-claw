@@ -68,10 +68,11 @@ export function codexClawDeveloperInstructions(agent: Agent, settings: AppPlugin
   ];
   if (settings.computerUseEnabled) {
     instructions.push(
-      'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-request-screen-recording, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-screenshot, computer-use-click, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
+      'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools: computer-use-status, computer-use-request-accessibility, computer-use-request-screen-recording, computer-use-list-apps, computer-use-find-apps, computer-use-launch-app, computer-use-focus-app, computer-use-get-app-state, computer-use-screenshot, computer-use-click, computer-use-move, computer-use-type-text, computer-use-set-value, and computer-use-scroll.',
       'Do not load or use the built-in computer-use skill or sky.* methods: those control Codex-provided Computer Use instead of the Computer Use helper bundled with Codex Claw. Start with computer-use-status; request permission if needed; refresh app state before acting on an indexed element.',
       'Coordinate actions use absolute macOS logical screen points from the top-left of the main display, not window-relative positions or screenshot pixels. Read the screenshot result\'s absolute bounds and scale factor before converting an image point. Use a screen screenshot when interacting with the menu bar.',
       'Computer Use clicks default to AXPress. Use physical=true only for a visible Electron/web control known to require real mouse input, or after AXPress reports success but refreshed state confirms the UI did not change. A physical click requires the target app to be frontmost and unobstructed.',
+      'Use computer-use-move only for hover behavior or native menu tracking. It intentionally moves the user\'s real pointer; physical clicks restore the pointer after clicking.',
     );
   } else {
     instructions.push('Computer Use is disabled for this Codex Claw session. Do not attempt macOS GUI automation or use computer-use tools.');

@@ -96,6 +96,20 @@ process.stdin.on('data', (chunk) => {
     });
   });
 
+  it('routes physical mouse movement through the helper', async () => {
+    await expect(executeComputerUseCommand({
+      command: 'move',
+      arguments: { x: 179, y: 16 },
+      options: options(),
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        arguments: { x: 179, y: 16 },
+        command: 'move',
+      },
+    });
+  });
+
   it('keeps one lazy helper session alive across Computer Use commands', async () => {
     const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
     const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });

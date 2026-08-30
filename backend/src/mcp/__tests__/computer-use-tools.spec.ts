@@ -40,6 +40,11 @@ describe('Computer Use MCP tools', () => {
     expect(definitions.get('computer-use-click')?.description).toContain('frontmost and unobstructed');
   });
 
+  it('documents mouse movement as an intentional physical hover', () => {
+    expect(definitions.get('computer-use-move')?.description).toContain('hover');
+    expect(definitions.get('computer-use-move')?.description).toContain("moves the user's real pointer");
+  });
+
   it('documents the virtual cursor session lifetime', () => {
     expect(definitions.get('computer-use-stop')?.description).toContain('30 seconds');
     expect(definitions.get('computer-use-stop')?.description).toContain('including screenshots');
@@ -58,6 +63,7 @@ describe('Computer Use MCP tools', () => {
       'computer-use-get-app-state',
       'computer-use-screenshot',
       'computer-use-click',
+      'computer-use-move',
       'computer-use-type-text',
       'computer-use-set-value',
       'computer-use-scroll',
@@ -87,6 +93,7 @@ describe('Computer Use MCP tools', () => {
     ['computer-use-focus-app', { pid: 42 }, 'focus_app'],
     ['computer-use-get-app-state', { app: 'Claw', maxDepth: 12 }, 'get_app_state'],
     ['computer-use-click', { element_index: 7, physical: true }, 'click'],
+    ['computer-use-move', { x: 179, y: 16 }, 'move'],
     ['computer-use-type-text', { app: 'Claw', text: 'hello' }, 'type_text'],
     ['computer-use-set-value', { element_index: 7, value: 'hello' }, 'set_value'],
     ['computer-use-scroll', { x: 10, y: 20, deltaY: 400 }, 'scroll'],

@@ -19,6 +19,7 @@ export const computerUseCommands = [
   'focus_app',
   'get_app_state',
   'click',
+  'move',
   'type_text',
   'set_value',
   'scroll',
@@ -63,7 +64,7 @@ export type ComputerUseOptions = {
   platform: NodeJS.Platform;
   resourcesPath: string;
   pilotPath?: string;
-  /** Testable override; production keeps the visual session alive for ten seconds after its last action. */
+  /** Testable override; production keeps the visual session alive for thirty seconds after its last action. */
   idleTtlMs?: number;
 };
 
@@ -203,7 +204,7 @@ function argumentsWithAppStateContext(
   arguments_: Record<string, unknown>,
   pilotPath: string,
 ): Record<string, unknown> {
-  if (!['click', 'scroll', 'set_value'].includes(command) || !Number.isInteger(arguments_.element_index)) {
+  if (!['click', 'move', 'scroll', 'set_value'].includes(command) || !Number.isInteger(arguments_.element_index)) {
     return arguments_;
   }
 
