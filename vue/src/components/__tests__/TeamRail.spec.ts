@@ -71,7 +71,7 @@ describe('TeamRail', () => {
     expect(collapsed.classes()).not.toContain('team-rail--agent-sidebar-expanded');
   });
 
-  it('shows an orbital marker on teams containing unread agents', () => {
+  it('shows a corner indicator on teams containing unread agents', () => {
     const wrapper = mountRail({
       teams,
       activeTeamId: 'team-claw',
@@ -80,8 +80,16 @@ describe('TeamRail', () => {
 
     const unreadTeam = wrapper.get('[aria-label="Skwad, unread activity"]');
     expect(unreadTeam.classes()).toContain('team-rail__team--unread');
-    expect(unreadTeam.get('.team-rail__unread-orbit').attributes('aria-hidden')).toBe('true');
-    expect(wrapper.get('[aria-label="Codex Claw"]').find('.team-rail__unread-orbit').exists()).toBe(false);
+    expect(unreadTeam.get('.team-rail__unread-indicator').attributes('aria-hidden')).toBe('true');
+    expect(wrapper.get('[aria-label="Codex Claw"]').find('.team-rail__unread-indicator').exists()).toBe(false);
+  });
+
+  it('renders team identities and the create action as rounded squares', () => {
+    expect(teamRailSource()).toMatch(/\.team-rail__team \{[\s\S]*?border-radius: var\(--radius-lg\);/);
+    expect(teamRailSource()).toMatch(/\.team-rail__new \{[\s\S]*?border-radius: var\(--radius-lg\);/);
+    expect(teamRailSource()).toMatch(/\.team-rail__team--active \{[\s\S]*?outline-offset: 2px;/);
+    const unreadIndicatorStyles = teamRailSource().match(/\.team-rail__unread-indicator \{([^}]*)\}/)?.[1];
+    expect(unreadIndicatorStyles).not.toContain('border:');
   });
 
   it('falls back to team initials when no avatar is set', () => {

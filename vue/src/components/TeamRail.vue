@@ -44,13 +44,9 @@
         {{ team.avatar ?? teamInitials(team.name) }}
         <span
           v-if="isTeamUnread(team.id)"
-          class="team-rail__unread-orbit"
+          class="team-rail__unread-indicator"
           aria-hidden="true"
-        >
-          <svg viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="46.875" pathLength="360" />
-          </svg>
-        </span>
+        />
       </button>
 
       <button
@@ -299,7 +295,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   color: var(--team-text-color);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-semibold);
@@ -417,34 +413,20 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 
 .team-rail__team--active {
   color: var(--team-text-color);
-  box-shadow:
-    0 0 0 2px var(--color-shell-rail),
-    0 0 0 3px var(--color-primary);
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
-.team-rail__unread-orbit {
+.team-rail__unread-indicator {
   position: absolute;
   z-index: 2;
-  inset: -4px;
-  color: var(--color-error);
+  top: -3px;
+  right: -3px;
+  width: 11px;
+  height: 11px;
+  border-radius: var(--radius-full);
+  background: var(--color-error);
   pointer-events: none;
-}
-
-.team-rail__unread-orbit svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.team-rail__unread-orbit circle {
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 6.25;
-  stroke-linecap: round;
-  stroke-dasharray: 64 296;
-  transform: rotate(-82deg);
-  transform-origin: center;
 }
 
 .team-rail__new {
@@ -454,7 +436,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   place-items: center;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   color: var(--color-text-muted);
   background: var(--color-surface-low);
   cursor: pointer;
