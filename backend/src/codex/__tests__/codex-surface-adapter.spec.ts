@@ -15,6 +15,7 @@ class FakeTransport implements RpcTransport {
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
+  resumedServiceTier: string | null = 'fast';
   turnsListDelayMs = 0;
   readonly fullHistoryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
   readonly summaryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
@@ -151,6 +152,7 @@ class FakeTransport implements RpcTransport {
           thread(threadId, cwd),
           initialPage.slice(0, 5),
           initialPage.length > 5 ? 'cursor-5' : null,
+          this.resumedServiceTier,
         );
       }
       case 'thread/fork': {
@@ -992,6 +994,45 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
+  it('restores the persisted service tier after cold conversation hydration', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    const persistedAgent: Agent = {
+      ...agentA,
+      backendDefaults: {
+        kind: 'codex',
+        ...(agentA.backendDefaults?.kind === 'codex' ? agentA.backendDefaults : {}),
+        serviceTier: 'fast',
+      },
+    };
+    transport.resumedServiceTier = 'default';
+    adapter.onEvent((event) => {
+      events.push(event);
+      if (event.type !== 'thread.settingsUpdated') return;
+      const threadSettings = (event.payload as { threadSettings?: { serviceTier?: string | null } }).threadSettings;
+      if (!threadSettings || threadSettings.serviceTier === undefined) return;
+      persistedAgent.backendDefaults = {
+        kind: 'codex',
+        ...(persistedAgent.backendDefaults?.kind === 'codex' ? persistedAgent.backendDefaults : {}),
+        serviceTier: threadSettings.serviceTier,
+      };
+    });
+
+    await adapter.hydrateAgent(persistedAgent);
+
+    expect(lastRequest(transport, 'thread/settings/update')).toMatchObject({
+      params: { threadId: 'thread-a', serviceTier: 'fast' },
+    });
+    const settingsEvents = events.filter((event) => event.type === 'thread.settingsUpdated');
+    expect(settingsEvents.at(-1)).toMatchObject({
+      agentId: 'agent-a',
+      threadId: 'thread-a',
+      payload: {
+        threadSettings: expect.objectContaining({ serviceTier: 'fast' }),
+      },
+    });
+  });
+
   it('projects completed generated images into renderer media parts', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
@@ -1631,6 +1672,7 @@ function resumeResponse(
   value: Record<string, unknown>,
   turns: Record<string, unknown>[] = [],
   nextCursor: string | null = null,
+  serviceTier: string | null = 'fast',
 ): Record<string, unknown> {
   return {
     thread: value,
@@ -1644,7 +1686,7 @@ function resumeResponse(
     },
     activePermissionProfile: { id: ':workspace', extends: null },
     reasoningEffort: 'medium',
-    serviceTier: 'fast',
+    serviceTier,
     initialTurnsPage: { data: turns, nextCursor, backwardsCursor: null },
   };
 }

@@ -190,6 +190,29 @@ describe('agent chat service', () => {
     );
   });
 
+  it('persists an explicitly selected service tier before prompt submission returns', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendDefaults = { kind: 'codex', serviceTier: 'default' };
+    const backendDriver = createFakeBackendDriver(Promise.resolve({
+      backendSession: { kind: 'codex', threadId: 'thread-1' },
+      turnId: 'turn-1',
+    }));
+
+    sendAgentPrompt(
+      snapshot,
+      backendDriver,
+      'agent-dina',
+      'run fast',
+      { model: 'gpt-5.6-sol', serviceTier: 'fast' },
+      vi.fn(),
+    );
+
+    expect(snapshot.agents[0].backendDefaults).toStrictEqual({
+      kind: 'codex',
+      serviceTier: 'fast',
+    });
+  });
+
   it('passes explicit disabled plan mode to the session manager', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));

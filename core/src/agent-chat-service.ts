@@ -52,6 +52,12 @@ export function sendAgentPrompt(
     capabilities: backendDriver.getCapabilities(agent),
   }, emit, snapshot);
 
+  if (agent.backend === 'codex' && options?.serviceTier !== undefined) {
+    const defaults = agent.backendDefaults?.kind === 'codex'
+      ? agent.backendDefaults
+      : { kind: 'codex' as const };
+    agent.backendDefaults = { ...defaults, serviceTier: options.serviceTier };
+  }
   const preparedOptions = backendDriver.preparePromptOptions?.(agent, options) ?? options;
   const sendResult = promptResult
     ?? (hasPromptOptions(preparedOptions)

@@ -549,6 +549,9 @@ export class CodexSurfaceAgentAdapter {
     }
 
     await this.start();
+    const requestedServiceTier = agent.backendDefaults?.kind === 'codex'
+      ? agent.backendDefaults.serviceTier
+      : undefined;
     const session = this.bindRuntime(agent, threadId, false, true);
     try {
       let snapshot = await session.handle.load({ ...agentCwd(agent), extensionContext: agent });
@@ -572,6 +575,9 @@ export class CodexSurfaceAgentAdapter {
       const effectivePreset = effectiveApprovalPreset(requestedPreset, snapshot.approvalPresets);
       if (effectivePreset && snapshot.approvalPreset !== effectivePreset) {
         await session.handle.updateSettings({ approvalPreset: effectivePreset });
+      }
+      if (requestedServiceTier !== undefined && snapshot.selectedServiceTier !== requestedServiceTier) {
+        await session.handle.updateSettings({ serviceTier: requestedServiceTier });
       }
       if (emitHistory) {
         if (interruptedTurnId) {
