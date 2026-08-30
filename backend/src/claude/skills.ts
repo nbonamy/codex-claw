@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { Agent, BackendSkillSummary } from '@codex-claw/core/contracts';
+import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 
 type ClaudeSkillScope = 'project' | 'user';
 
@@ -19,13 +20,14 @@ type DirectoryEntry = {
 };
 
 export async function listClaudeSkills(agent: Agent, options: ClaudeSkillCatalogOptions = {}): Promise<BackendSkillSummary[]> {
+  const folder = requireAgentFolder(agent);
   const sources: ClaudeSkillSource[] = [
     {
       root: path.join(options.homeDir ?? homedir(), '.claude', 'skills'),
       scope: 'user',
     },
     {
-      root: path.join(agent.folder, '.claude', 'skills'),
+      root: path.join(folder, '.claude', 'skills'),
       scope: 'project',
     },
   ];

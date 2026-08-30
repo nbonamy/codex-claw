@@ -3718,7 +3718,7 @@ describe('useAppState', () => {
 
     await state.resumeAgentConversation('agent-dina', {
       backend: 'claude',
-      folder: remoteSnapshot.agents[0].folder,
+      folder: remoteSnapshot.agents[0].folder!,
       sessionId: 'claude-session-sonnet',
     });
 
@@ -4125,6 +4125,30 @@ describe('useAppState', () => {
       { name: 'README.md', path: 'README.md' },
       { name: 'research.md', path: 'docs/research.md' },
     ]);
+  });
+
+  it('does not request a file catalog for a workspace-free quick chat', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const activeAgent = remoteSnapshot.agents.find((agent) => agent.id === remoteSnapshot.activeAgentId)!;
+    activeAgent.folder = null;
+    activeAgent.sessionKind = 'quickChat';
+    const listAgentFiles = vi.fn();
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listAgentFiles,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    expect(listAgentFiles).not.toHaveBeenCalledWith(activeAgent.id);
+    expect(listAgentFiles).toHaveBeenCalledWith('agent-jesse');
+    expect(state.fileCatalogStatus.value).toBe('loaded');
+    expect(state.agentFiles.value).toStrictEqual([]);
   });
 
   it('refreshes active agent skills after a skills changed event', async () => {

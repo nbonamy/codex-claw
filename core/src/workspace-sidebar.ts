@@ -8,7 +8,7 @@ export type WorkspaceSidebarSession = {
   conversationTitle: string | null;
   displayTitle: string;
   branch: string | null;
-  folder: string;
+  folder: string | null;
   isLinkedWorktree: boolean;
   kind: 'main' | 'branch' | 'worktree' | 'detached' | 'folder';
   isActive: boolean;
@@ -62,7 +62,8 @@ export function projectWorkspaceSidebar(input: {
 
   input.agents.forEach((agent, quickSwitchIndex) => {
     const workspace = agent.workspace;
-    const isGit = workspace?.kind === 'git';
+    const isQuickChat = agent.sessionKind === 'quickChat';
+    const isGit = !isQuickChat && workspace?.kind === 'git';
     const id = isGit ? `git:${workspace.primaryWorktreeRoot}` : 'quick-chats';
     let group = groups.get(id);
     if (!group) {
@@ -87,7 +88,9 @@ export function projectWorkspaceSidebar(input: {
 
     const customName = agent.name?.trim() || null;
     const conversationTitle = agent.conversationTitle?.trim() || null;
-    const sessionLabel = customName ? conversationTitle ?? customName : agentDisplayName(agent);
+    const sessionLabel = isQuickChat
+      ? customName ?? conversationTitle ?? agentDisplayName(agent)
+      : customName ? conversationTitle ?? customName : agentDisplayName(agent);
     group.sessions.push({
       agentId: agent.id,
       customName,
@@ -167,6 +170,7 @@ function normalizedLabel(label: string): string {
 }
 
 function workspaceSessionKind(agent: Agent): WorkspaceSidebarSession['kind'] {
+  if (agent.sessionKind === 'quickChat') return 'folder';
   const workspace = agent.workspace;
   if (workspace?.kind !== 'git') return 'folder';
   if (!workspace.branch) return 'detached';

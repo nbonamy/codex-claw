@@ -17,6 +17,7 @@ import type {
 } from '@codex-claw/core/contracts';
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
+import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
@@ -152,6 +153,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
     }
+    const folder = requireAgentFolder(agent);
     const turnId = this.nextTurnId();
     const existingSessionId = claudeSessionId(agent);
     const liveSessionId = this.liveSessionIdsByAgentId.get(agent.id);
@@ -184,7 +186,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       );
       activeTurn = {
         agentId: agent.id,
-        cwd: agent.folder,
+        cwd: folder,
         turnId,
         sessionId: existingSessionId,
         model: turnParams.model ?? null,
@@ -1064,7 +1066,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
       await this.modelCatalogDiscovery;
       return;
     }
-    const discovery = this.transport.discoverModels({ cwd: agent.folder })
+    const discovery = this.transport.discoverModels({ cwd: requireAgentFolder(agent) })
       .then((availableModels) => {
         if (availableModels?.length) this.applyModelCatalog(availableModels);
       })
@@ -1112,7 +1114,7 @@ function claudeTurnParams(
   const mcpServerUrl = clawMcpServerUrl ? agentScopedMcpUrl(clawMcpServerUrl, agent.id) : null;
   return {
     ownerId: agent.id,
-    cwd: agent.folder,
+    cwd: requireAgentFolder(agent),
     prompt,
     sessionId: existingSessionId ?? undefined,
     model: options.model ?? defaults?.model ?? null,

@@ -13,6 +13,7 @@ import type {
   AppSnapshotMetadata,
   ClientRequest,
   CreateAgentInput,
+  CreateQuickChatInput,
   MainToRendererEvent,
   PromptAttachment,
   RendererMessage,
@@ -155,9 +156,25 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
 
 export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString(), id = createEntityId('agent'), options: { select?: boolean } = {}): AppSnapshot {
   const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
+  return insertAgentInSnapshot(snapshot, agent, options.select);
+}
+
+export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQuickChatInput, createdAt = new Date().toISOString(), id = createEntityId('agent')): AppSnapshot {
+  const agent = createAgentFromInput({
+    name: null,
+    folder: '',
+    backend: 'codex',
+    ...(input.teamId ? { teamId: input.teamId } : {}),
+  }, createdAt, targetTeamId(snapshot, input.teamId), id);
+  agent.folder = null;
+  agent.sessionKind = 'quickChat';
+  return insertAgentInSnapshot(snapshot, agent);
+}
+
+function insertAgentInSnapshot(snapshot: AppSnapshot, agent: Agent, select = true): AppSnapshot {
   snapshot.agents.push(agent);
   attachAgentToTeam(snapshot, agent);
-  if (options.select !== false) {
+  if (select) {
     snapshot.activeTeamId = agent.teamId ?? snapshot.activeTeamId;
     snapshot.activeAgentId = agent.id;
   }

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -260,7 +261,7 @@ export class ClawMcpService {
   }
 
   private async displayMarkdownForAgent(agent: Agent, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
-    const resolvedPath = input.path ? resolveAgentFilePath(agent.folder, input.path) : null;
+    const resolvedPath = input.path ? resolveAgentFilePath(requireAgentFolder(agent), input.path) : null;
     const content = input.markdown ?? (resolvedPath ? await readAgentMarkdownFile(resolvedPath.absolutePath) : '');
     const title = input.title ?? (resolvedPath ? fileBasename(resolvedPath.relativePath) : 'Markdown');
 
@@ -563,7 +564,7 @@ function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {
   if (agent.backendSession?.kind === 'claude') {
     return {
       backend: 'claude',
-      folder: agent.folder,
+      folder: requireAgentFolder(agent),
       sessionId: agent.backendSession.transcriptSessionId ?? agent.backendSession.sessionId,
     };
   }

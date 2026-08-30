@@ -3,7 +3,7 @@ import { translate } from './i18n';
 import { localizedText } from './i18n/errors';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -727,6 +727,15 @@ export function useAppState() {
 
     const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
     adoptNavigationSnapshot(await codexClawApi.createAgent(input));
+    await loadActiveAgentCatalogs();
+    return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
+  }
+
+  async function createQuickChat(input: CreateQuickChatInput): Promise<Agent | null> {
+    if (!codexClawApi?.createQuickChat) return null;
+
+    const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
+    adoptNavigationSnapshot(await codexClawApi.createQuickChat(input));
     await loadActiveAgentCatalogs();
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
@@ -1768,6 +1777,7 @@ export function useAppState() {
     loadOpenInApplications,
     openAgentPath,
     createAgent,
+    createQuickChat,
     createTeam,
     updateTeam,
     reorderTeams,
@@ -2831,10 +2841,10 @@ async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgent
   const source = codexClawApi;
   const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
   const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
-  if (!agent || !source?.listAgentFiles) {
+  if (!agent || !agent.folder || !source?.listAgentFiles) {
     if (initialConfiguration) {
       initialConfiguration.files = [];
-      initialConfiguration.fileStatus = 'notLoaded';
+      initialConfiguration.fileStatus = agent && !agent.folder ? 'loaded' : 'notLoaded';
       if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
     }
     return;

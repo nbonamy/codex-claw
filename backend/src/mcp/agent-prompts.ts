@@ -50,15 +50,21 @@ export function agentMessagesPrompt(messages: MessageInfo[]): string {
 }
 
 export function codexClawDeveloperInstructions(agent: Agent, settings: AppPluginSettings = defaultPluginSettings): string {
+  const workspaceIdentity = agent.folder
+    ? `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`
+    : `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)}. This is a workspace-free Quick chat and has no project folder.`;
+  const browserInstructions = agent.folder
+    ? 'Use browser-open with an HTTP, HTTPS, or workspace-local file URL to open the Codex Claw in-app browser for your agent. File URLs must resolve inside your agent folder. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.'
+    : 'Use browser-open with an HTTP or HTTPS URL to open the Codex Claw in-app browser for your agent. Workspace-local file URLs are unavailable in this Quick chat. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.';
   const instructions = [
     'You are part of a team of agents collaborating in Codex Claw.',
-    `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`,
+    workspaceIdentity,
     'Use the codex_claw MCP server for agent collaboration.',
     'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
     'MANDATORY: before starting substantive work, changing direction, or finishing substantive work, call set-status with a short status. Use an empty status to clear it. Do not change status for informational teammate messages or coordination closure.',
     `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
     'Use display-markdown to show Markdown files or generated Markdown in the Codex Claw side panel when the user should inspect structured content.',
-    'Use browser-open with an HTTP, HTTPS, or workspace-local file URL to open the Codex Claw in-app browser for your agent. File URLs must resolve inside your agent folder. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.',
+    browserInstructions,
   ];
   if (settings.computerUseEnabled) {
     instructions.push(

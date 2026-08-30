@@ -21,7 +21,7 @@
       />
       <div class="cockpit-view__agent-title">
         <strong>{{ displayName }}</strong>
-        <span>{{ folderBasename(agent.folder) }}</span>
+        <span v-if="agent.folder">{{ folderBasename(agent.folder) }}</span>
       </div>
       <span
         class="cockpit-view__agent-state"

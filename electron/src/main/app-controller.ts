@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { encodedAppError } from '@codex-claw/core/app-error';
 import { mainT } from './i18n';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, powerMonitor, shell } from 'electron';
@@ -13,7 +14,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, LoopLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -363,6 +364,10 @@ export class AppController {
 
     ipc.handle(ipcChannels.createAgent, async (_event, input: CreateAgentInput) => {
       return this.createAgent(input);
+    });
+
+    ipc.handle(ipcChannels.createQuickChat, async (_event, input: CreateQuickChatInput) => {
+      return this.createQuickChat(input);
     });
 
     ipc.handle(ipcChannels.updateAgent, async (_event, input: UpdateAgentInput) => {
@@ -738,6 +743,10 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCreate, { input }));
   }
 
+  private async createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentQuickChatCreate, { input }));
+  }
+
   private async updateAgent(input: UpdateAgentInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentUpdate, { input }));
   }
@@ -760,7 +769,7 @@ export class AppController {
       throw new Error('Open In is only available for local agents.');
     }
 
-    const targetPath = await resolveProjectPath(agent.folder, filePath);
+    const targetPath = await resolveProjectPath(requireAgentFolder(agent), filePath);
     await this.openInProvider.open(application, targetPath);
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(
       backendMethods.agentOpenInApplicationUpdate,
@@ -1087,7 +1096,7 @@ export class AppController {
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
       }
-      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url, agent.folder);
+      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url, agent.folder ?? '');
       this.resolvePendingBrowserOpen(agentId, browserId, state);
       return state;
     } catch (error) {

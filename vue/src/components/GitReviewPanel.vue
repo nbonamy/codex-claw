@@ -84,7 +84,7 @@ const visibleScopes = ref<Record<AgentGitDiffScope, boolean>>({
   unstaged: true,
   untracked: true,
 });
-const repositoryName = computed(() => fileBasename(props.gitStatus?.folder ?? props.agent.folder));
+const repositoryName = computed(() => fileBasename(props.gitStatus?.folder ?? props.agent.folder ?? ''));
 const visibleDiff = computed(() => {
   if (!props.panel.sections) return props.panel.diff;
   return props.panel.sections

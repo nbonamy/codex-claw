@@ -2705,6 +2705,17 @@ describe('AppShell', () => {
     });
   });
 
+  it('creates quick chats inside the active team', async () => {
+    const snapshot = createInitialSnapshot();
+    const createQuickChat = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, createQuickChat });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('create-quick-chat');
+    await flushPromises();
+
+    expect(createQuickChat).toHaveBeenCalledWith({ teamId: 'team-codex-claw' });
+  });
+
   it('clones a GitHub repository before opening its contextual session picker', async () => {
     const snapshot = createInitialSnapshot();
     const githubRepository: WorkRepository = {
@@ -4094,6 +4105,7 @@ function mountShell(overrides: Partial<{
   chooseAgentFolder: () => Promise<string | null>;
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createQuickChat: (input: import('@codex-claw/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
@@ -4152,6 +4164,7 @@ function mountShell(overrides: Partial<{
       sourceRepositories: overrides.sourceRepositories ?? [],
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
+      createQuickChat: overrides.createQuickChat ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
       deployBenchTemplateAction: overrides.deployBenchTemplateAction ?? vi.fn().mockResolvedValue(undefined),
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),

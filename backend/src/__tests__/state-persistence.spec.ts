@@ -71,6 +71,21 @@ describe('AppStatePersistence', () => {
     expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBeUndefined();
   });
 
+  it('round-trips durable quick-chat identity', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].sessionKind = 'quickChat';
+    snapshot.agents[0].name = null;
+    snapshot.agents[0].folder = null;
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.agents[0]).toMatchObject({
+      sessionKind: 'quickChat',
+      name: null,
+      folder: null,
+    });
+  });
+
   it('round-trips workspace identity and ignores invalid legacy metadata', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].name = null;

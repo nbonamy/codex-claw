@@ -72,6 +72,7 @@
         @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-agent="selectAgentFromShell"
         @start-work="handleStartWorkAction"
+        @create-quick-chat="createQuickChat"
         @update-repository-icon="updateRepositoryIcon"
         @update-collapsed-repositories="updateCollapsedRepositories"
       />
@@ -443,7 +444,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateLoopInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type LoopLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateLoopInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -592,6 +593,7 @@ const props = withDefaults(defineProps<{
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   deployBenchTemplateAction?: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
@@ -705,6 +707,7 @@ const props = withDefaults(defineProps<{
     throw new Error(translate('surface.appShell.openInIsNotAvailable'));
   },
   createAgent: async () => undefined,
+  createQuickChat: async () => undefined,
   createTeam: async () => undefined,
   deployBenchTemplateAction: async () => undefined,
   updateTeam: async () => undefined,
@@ -1564,7 +1567,7 @@ function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {
   return rightWorkspaceFor(agent.id).gitReviewPanel ?? {
     kind: 'gitDiff',
     title: translate('surface.appShell.review'),
-    subtitle: agent.folder,
+    ...(agent.folder ? { subtitle: agent.folder } : {}),
     diff: '',
     state: 'loading',
     error: null,
@@ -2081,6 +2084,15 @@ async function createRepositorySession(source: RepositorySessionSource, branch: 
 
 function repositorySessionContext(source?: Pick<RepositorySessionSource, 'agentId' | 'teamId'> | null) {
   return resolveRepositorySessionContext(props.snapshot, source, activeTeam.value?.id);
+}
+
+async function createQuickChat(): Promise<void> {
+  const { teamId } = repositorySessionContext(null);
+  try {
+    await props.createQuickChat(teamId ? { teamId } : {});
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promise<void> {
@@ -3006,7 +3018,7 @@ async function openAgentIn(
 
 async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {
   const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (!agent) {
+  if (!agent?.folder) {
     return;
   }
 
@@ -3238,7 +3250,7 @@ function handleAppCommand(command: AppCommand): void {
         title: translate('surface.appShell.allowDebugCommand'),
         description: translate('surface.appShell.aDeterministicApprovalRequestFromTheDebugMenu'),
         command: 'npm test -- --run debug-fixture',
-        cwd: agent.folder,
+        cwd: agent.folder ?? undefined,
         allowedScopes: ['once', 'session'],
         canDeny: true,
       },
@@ -3678,7 +3690,7 @@ function isMarkdownPath(filePath: string): boolean {
   return /\.(md|markdown|mdown|mkdn)$/u.test(normalizedPath);
 }
 
-function normalizePreviewFilePath(filePath: string, agentFolder?: string): string {
+function normalizePreviewFilePath(filePath: string, agentFolder?: string | null): string {
   const trimmedPath = filePath.trim();
   if (!trimmedPath.startsWith('file://')) {
     return toBackendPreviewPath(stripPreviewLineSuffix(trimmedPath), agentFolder);
@@ -3695,7 +3707,7 @@ function stripPreviewLineSuffix(filePath: string): string {
   return filePath.replace(/:(?:\d+)(?::\d+)?$/u, '');
 }
 
-function toBackendPreviewPath(filePath: string, agentFolder?: string): string {
+function toBackendPreviewPath(filePath: string, agentFolder?: string | null): string {
   const normalizedPath = normalizePathSeparators(filePath);
   if (!isAbsolutePreviewPath(normalizedPath)) {
     return normalizedPath;

@@ -73,6 +73,7 @@
     :open-in-applications="openInApplications"
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
+    :create-quick-chat="createQuickChat"
     :create-team="createTeam"
     :deploy-bench-template-action="deployBenchTemplate"
     :update-team="updateTeam"
@@ -288,6 +289,7 @@ const {
   loadOpenInApplications,
   openAgentPath,
   createAgent,
+  createQuickChat,
   createTeam,
   updateTeam,
   reorderTeams,

@@ -128,7 +128,18 @@ watch(conversationKey, () => {
   collaborationMessagePresentations.clear();
   transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 });
-const heroHeadline = computed(() => (props.agent ? `Chat with ${agentDisplayName(props.agent)}` : translate('surface.conversationPane.selectAnAgent')));
+const heroHeadline = computed(() => {
+  if (!props.agent) return translate('surface.conversationPane.selectAnAgent');
+  const displayName = agentDisplayName(props.agent);
+  if (
+    props.agent.sessionKind === 'quickChat'
+    && !props.agent.name?.trim()
+    && displayName === 'Untitled conversation'
+  ) {
+    return t('chat.quickChatHeadline');
+  }
+  return `Chat with ${displayName}`;
+});
 const heroSubhead = computed(() => {
   if (!props.agent) return translate('surface.conversationPane.chooseAnAgentFromTheLeftToStartANativeBackendSession');
   return props.agent.folder;

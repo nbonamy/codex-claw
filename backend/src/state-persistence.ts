@@ -26,6 +26,7 @@ type PersistedState = {
 };
 
 type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
+  sessionKind?: Agent['sessionKind'];
   conversationTitle?: string;
   avatar?: string;
   backend: AgentBackend;
@@ -144,6 +145,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
   return {
     id: agent.id,
     teamId: agent.teamId,
+    ...(agent.sessionKind ? { sessionKind: agent.sessionKind } : {}),
     name: agent.name,
     ...(agent.conversationTitle ? { conversationTitle: agent.conversationTitle } : {}),
     avatar: agent.avatar,
@@ -356,9 +358,15 @@ function isSubagentActivityKind(value: unknown): value is SubagentActivity['kind
 }
 
 function sanitizeAgent(value: unknown): Agent | null {
-  if (!isRecord(value) || typeof value.id !== 'string' || (value.name !== null && typeof value.name !== 'string') || typeof value.folder !== 'string') {
+  if (!isRecord(value) || typeof value.id !== 'string' || (value.name !== null && typeof value.name !== 'string')) {
     return null;
   }
+
+  const sessionKind = value.sessionKind === 'quickChat' ? value.sessionKind : undefined;
+  const folder = typeof value.folder === 'string'
+    ? value.folder
+    : sessionKind && value.folder === null ? null : undefined;
+  if (folder === undefined) return null;
 
   const createdAt = typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString();
   const updatedAt = typeof value.updatedAt === 'string' ? value.updatedAt : createdAt;
@@ -373,12 +381,13 @@ function sanitizeAgent(value: unknown): Agent | null {
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
+    ...(sessionKind ? { sessionKind } : {}),
     name: typeof value.name === 'string' ? value.name : null,
     ...(typeof value.conversationTitle === 'string' && value.conversationTitle.trim()
       ? { conversationTitle: value.conversationTitle.trim() }
       : {}),
     avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
-    folder: value.folder,
+    folder,
     ...(workspace ? { workspace } : {}),
     backend,
     ...(backendSession ? { backendSession } : {}),

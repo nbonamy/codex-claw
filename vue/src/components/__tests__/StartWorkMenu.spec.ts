@@ -16,6 +16,7 @@ describe('StartWorkMenu', () => {
 
     expect(wrapper.getComponent({ name: 'ElPopover' }).props('width')).toBe(240);
     expect(wrapper.get('[aria-label="Add project"]').text()).toBe('Add project');
+    expect(wrapper.get('[aria-label="Add project"]').find('[data-icon="folders"]').exists()).toBe(true);
     await wrapper.get('[aria-label="Add project"]').trigger('click');
 
     expect(document.body.textContent).toContain('Add project from');

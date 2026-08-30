@@ -85,6 +85,19 @@ describe('agent prompts', () => {
     expect(instructions).not.toContain('computer-use-status');
     expect(instructions).not.toContain('chrome:control-chrome');
   });
+
+  it('describes workspace-free Quick chats without inventing a folder', () => {
+    const quickChat = agent();
+    quickChat.folder = null;
+    quickChat.sessionKind = 'quickChat';
+
+    const instructions = codexClawDeveloperInstructions(quickChat);
+
+    expect(instructions).toContain('This is a workspace-free Quick chat and has no project folder.');
+    expect(instructions).toContain('Workspace-local file URLs are unavailable in this Quick chat.');
+    expect(instructions).not.toContain('folder is null');
+    expect(instructions).not.toContain('inside your agent folder');
+  });
 });
 
 function agent(): Agent {

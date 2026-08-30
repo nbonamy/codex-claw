@@ -19,6 +19,15 @@
 
     <div class="agent-sidebar__start-work">
       <StartWorkMenu @select="emit('start-work', $event)" />
+      <button
+        v-if="!quickChatGroup"
+        class="agent-sidebar__quick-chat-action"
+        type="button"
+        @click="emit('create-quick-chat')"
+      >
+        <MessageIcon data-icon="message" aria-hidden="true" />
+        <span>{{ t('sidebar.quickChat') }}</span>
+      </button>
     </div>
 
     <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
@@ -29,9 +38,10 @@
         :data-group-kind="group.kind"
       >
         <header class="agent-sidebar__workspace-header">
-          <MessageCircleIcon
+          <MessageIcon
             v-if="group.kind === 'quickChats'"
             class="agent-sidebar__workspace-icon"
+            data-icon="message"
             aria-hidden="true"
           />
           <RepositoryIconPicker
@@ -44,13 +54,26 @@
           <button
             class="agent-sidebar__workspace-label"
             type="button"
-            :aria-label="t(isWorkspaceCollapsed(group) ? 'sidebar.expandRepository' : 'sidebar.collapseRepository', { repository: group.label })"
+            :aria-label="workspaceToggleLabel(group)"
             :aria-expanded="!isWorkspaceCollapsed(group)"
             @click="toggleWorkspace(group)"
           >
             <strong>{{ group.label }}</strong>
           </button>
-          <span v-if="group.kind === 'repository'" class="agent-sidebar__workspace-actions">
+          <span
+            v-if="group.kind === 'quickChats'"
+            class="agent-sidebar__workspace-actions agent-sidebar__workspace-actions--persistent"
+          >
+            <button
+              type="button"
+              :aria-label="t('sidebar.newQuickChat')"
+              :title="t('sidebar.newQuickChat')"
+              @click.stop="emit('create-quick-chat')"
+            >
+              <PlusIcon aria-hidden="true" />
+            </button>
+          </span>
+          <span v-else class="agent-sidebar__workspace-actions">
             <button
               type="button"
               :aria-label="t('sidebar.createFromRepository')"
@@ -112,11 +135,15 @@
           @dragend="agentReorder.onDragEnd"
         >
           <GitForkIcon
-            v-if="session.kind === 'worktree'"
+            v-if="group.kind !== 'quickChats' && session.kind === 'worktree'"
             class="agent-sidebar__session-icon"
             aria-hidden="true"
           />
-          <GitBranchIcon v-else class="agent-sidebar__session-icon" aria-hidden="true" />
+          <GitBranchIcon
+            v-else-if="group.kind !== 'quickChats'"
+            class="agent-sidebar__session-icon"
+            aria-hidden="true"
+          />
           <span class="agent-sidebar__meta">
             <strong>{{ session.displayTitle }}</strong>
           </span>
@@ -177,7 +204,7 @@ import { projectWorkspaceSidebar, type WorkspaceSidebarGroup } from '@codex-claw
 import {
   GitBranchIcon,
   GitForkIcon,
-  MessageCircleIcon,
+  MessageIcon,
   PanelLeftCloseIcon,
   PlusIcon,
 } from '../shared/icons/app-icons';
@@ -230,6 +257,7 @@ const emit = defineEmits<{
   'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'start-work': [action: 'github' | 'local' | 'url'];
+  'create-quick-chat': [];
   'update-repository-icon': [payload: { repositoryKey: string; repositoryRoot: string; icon: string | undefined }];
 }>();
 
@@ -244,9 +272,10 @@ const resolvedOpenInCatalog = computed<OpenInApplicationCatalog>(() => props.ope
 const workspaceGroups = computed(() => projectWorkspaceSidebar({
   agents: props.agents,
   activeAgentId: props.activeAgentId,
-  quickChatsLabel: t('sidebar.quickChats'),
+  quickChatsLabel: t('sidebar.chats'),
   unreadAgentIds: props.unreadAgentIds,
-}));
+}).sort((left, right) => Number(right.kind === 'quickChats') - Number(left.kind === 'quickChats')));
+const quickChatGroup = computed(() => workspaceGroups.value.find((group) => group.kind === 'quickChats') ?? null);
 const contextMenuAgentId = ref<string | null>(null);
 const repositorySessionMenu = useRepositorySessionMenu(() => props.listRepositoryBranches, t);
 const repositorySessionMenuId = repositorySessionMenu.visibleGroupId;
@@ -317,6 +346,13 @@ function workspaceCollapseKey(group: WorkspaceSidebarGroup): string {
 
 function isWorkspaceCollapsed(group: WorkspaceSidebarGroup): boolean {
   return collapsedRepositoryKeys.value.has(workspaceCollapseKey(group));
+}
+
+function workspaceToggleLabel(group: WorkspaceSidebarGroup): string {
+  if (group.kind === 'quickChats') {
+    return t(isWorkspaceCollapsed(group) ? 'sidebar.expandChats' : 'sidebar.collapseChats');
+  }
+  return t(isWorkspaceCollapsed(group) ? 'sidebar.expandRepository' : 'sidebar.collapseRepository', { repository: group.label });
 }
 
 function toggleWorkspace(group: WorkspaceSidebarGroup): void {
@@ -600,12 +636,42 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__start-work {
   flex: 0 0 auto;
+  display: grid;
+  gap: var(--space-1);
   padding: var(--space-6) var(--space-8) var(--space-4);
 }
 
 .agent-sidebar__start-work:deep() button {
   padding-left: 0;
   padding-right: 0;
+}
+
+.agent-sidebar__quick-chat-action {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-sidebar__quick-chat-action:hover,
+.agent-sidebar__quick-chat-action:focus-visible {
+  color: var(--color-text);
+  outline: 0;
+}
+
+.agent-sidebar__quick-chat-action svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .agent-sidebar__workspace-group + .agent-sidebar__workspace-group {
@@ -665,6 +731,10 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__workspace-header:hover .agent-sidebar__workspace-actions {
+  opacity: 1;
+}
+
+.agent-sidebar__workspace-actions--persistent {
   opacity: 1;
 }
 
@@ -732,6 +802,14 @@ function onResizePointerEnd(event: PointerEvent): void {
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.agent-sidebar__workspace-group[data-group-kind="quickChats"]
+  .agent-sidebar__agent {
+  grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-status-column-width);
+  padding-left: calc(
+    var(--agent-sidebar-workspace-inline-padding) + var(--space-10)
+  );
 }
 
 .agent-sidebar__agent::before,

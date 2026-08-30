@@ -107,6 +107,22 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).toContain('Looking now.');
   });
 
+  it('welcomes an empty unnamed quick chat without repeating its placeholder title', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([]),
+      agent: {
+        ...agent,
+        name: null,
+        folder: null,
+        sessionKind: 'quickChat',
+        conversationTitle: 'Untitled conversation',
+      },
+    });
+
+    expect(wrapper.text()).toContain('What can I help with?');
+    expect(wrapper.text()).not.toContain('Chat with Untitled conversation');
+  });
+
   it('renders persisted agent mentions with the app-owned bot treatment', () => {
     const mentionGroup = {
       id: 'agents',

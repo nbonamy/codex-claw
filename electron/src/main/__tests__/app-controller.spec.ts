@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Loop, LoopCleanup, LoopLocation, LoopTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -937,6 +937,18 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(8, 'agent/select', { agentId: 'agent-dina' });
     expect(request).toHaveBeenNthCalledWith(9, 'agent/delete', { agentId: 'agent-dina' });
     expect(request).not.toHaveBeenCalledWith('agent/folder/validate', expect.anything());
+  });
+
+  it('routes quick-chat creation through clawd', async () => {
+    const snapshot = createInitialSnapshot();
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const input: CreateQuickChatInput = { teamId: 'team-codex-claw' };
+
+    await controller.initialize();
+    await expect(createQuickChat(controller, input)).resolves.toBe(snapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/quickChat/create', { input });
   });
 
   it('routes bench mutations through clawd', async () => {
@@ -2423,6 +2435,12 @@ async function createAgent(controller: AppController, input: CreateAgentInput): 
   return (controller as unknown as {
     createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   }).createAgent(input);
+}
+
+async function createQuickChat(controller: AppController, input: CreateQuickChatInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;
+  }).createQuickChat(input);
 }
 
 async function updateAgent(controller: AppController, input: UpdateAgentInput): Promise<AppSnapshot> {

@@ -172,10 +172,11 @@ export type AgentWorkspaceIdentity =
 export type Agent = {
   id: string;
   teamId?: string;
+  sessionKind?: 'quickChat';
   name: string | null;
   conversationTitle?: string;
   avatar?: string;
-  folder: string;
+  folder: string | null;
   workspace?: AgentWorkspaceIdentity;
   backend: AgentBackend;
   backendSession?: BackendSession;
@@ -1418,6 +1419,10 @@ export type CreateAgentInput = {
   teamId?: string;
 };
 
+export type CreateQuickChatInput = {
+  teamId?: string;
+};
+
 export type CreateTeamInput = {
   name: string;
   color: string;
@@ -1632,6 +1637,7 @@ export type CodexClawApi = {
   resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>;
   readConversationMessages(ref: BackendConversationRef, agentId: string, location?: LoopLocation): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
+  createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
   removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;

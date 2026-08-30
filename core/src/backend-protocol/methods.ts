@@ -4,6 +4,7 @@ export const backendMethods = {
   agentConversationResume: 'agent/conversation/resume',
   agentConversationsList: 'agent/conversations/list',
   agentCreate: 'agent/create',
+  agentQuickChatCreate: 'agent/quickChat/create',
   agentDelete: 'agent/delete',
   agentDuplicate: 'agent/duplicate',
   agentFork: 'agent/fork',

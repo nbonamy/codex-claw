@@ -127,7 +127,12 @@ export const messages = {
       newSessionIn: 'New session in {repository}',
       newWorktree: 'New worktree…',
       noAgents: 'No agents',
+      chats: 'Chats',
+      collapseChats: 'Collapse chats',
+      expandChats: 'Expand chats',
+      quickChat: 'Quick chat',
       quickChats: 'Quick chats',
+      newQuickChat: 'New quick chat',
       resize: 'Resize agent sidebar',
       sessions: 'Sessions',
       switchShortcut: 'Switch to {session} with Command {number}',
@@ -420,6 +425,7 @@ export const messages = {
       cancel: 'Cancel sign-in',
     },
     chat: {
+      quickChatHeadline: 'What can I help with?',
       subagents: {
         label: 'Subagents',
         triggerActive: 'Subagents ({count} active)',

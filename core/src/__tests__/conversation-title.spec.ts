@@ -1,10 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../contracts';
-import { formatConversationTitle } from '../conversation-title';
+import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '../conversation-title';
 
 describe('conversation titles', () => {
   it('uses the Claw agent name', () => {
     expect(formatConversationTitle(agent())).toBe('Dina');
+  });
+
+  it('names workspace-free quick chats without exposing implementation details', () => {
+    expect(formatConversationTitle({
+      ...agent(),
+      name: null,
+      sessionKind: 'quickChat',
+      folder: null,
+    })).toBe('Untitled conversation');
+  });
+
+  it('uses the generated conversation title for an unnamed quick chat', () => {
+    expect(formatConversationTitle({
+      ...agent(),
+      name: null,
+      conversationTitle: 'Plan a summer trip',
+      sessionKind: 'quickChat',
+      folder: null,
+    })).toBe('Plan a summer trip');
+  });
+
+  it('leaves unnamed quick-chat titles under backend control', () => {
+    expect(shouldSyncConversationTitleFromAgent({
+      ...agent(),
+      name: null,
+      sessionKind: 'quickChat',
+      folder: null,
+    })).toBe(false);
+
+    expect(shouldSyncConversationTitleFromAgent({
+      ...agent(),
+      name: 'Trip planner',
+      sessionKind: 'quickChat',
+      folder: null,
+    })).toBe(true);
+    expect(shouldSyncConversationTitleFromAgent(agent())).toBe(true);
   });
 });
 

@@ -27,8 +27,9 @@
       <div class="agent-header__agent-line">
         <strong>{{ displayName }}</strong>
         <span
+          v-if="agentLocationLabel"
           class="agent-header__folder"
-          :title="agent.folder"
+          :title="agent.folder ?? undefined"
         >
           {{ agentLocationLabel }}
         </span>
@@ -89,7 +90,7 @@
         :merge-branch="mergeGitBranch"
       />
       <OpenInControl
-        v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
+        v-if="agent?.folder && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
         :application="effectiveOpenInApplication(agent, openInCatalog)"
         :catalog="openInCatalog"
         @open="emit('open-in', $event)"

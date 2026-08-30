@@ -31,6 +31,8 @@ import type { BackendEvent, BackendTextGenerationInput, BackendTextGenerationRes
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { agentFolder } from '@codex-claw/core/agent-folder';
+import { shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type {
   CodexConversationEvent,
@@ -198,7 +200,7 @@ export class CodexSurfaceAgentAdapter {
   }
 
   async listSkills(agent: Agent, forceReload = false): Promise<BackendSkillSummary[]> {
-    const skills = await this.surface.listSkills({ cwd: expandHome(agent.folder), forceReload });
+    const skills = await this.surface.listSkills({ ...agentCwd(agent), forceReload });
     return skills.map((skill) => ({ id: skill.path, ...skill }));
   }
 
@@ -376,7 +378,7 @@ export class CodexSurfaceAgentAdapter {
   }
 
   async listConversations(agent: Agent): Promise<ConversationSummary[]> {
-    const conversations = await this.surface.listConversations({ cwd: expandHome(agent.folder), limit: 30 });
+    const conversations = await this.surface.listConversations({ ...agentCwd(agent), limit: 30 });
     for (const conversation of conversations) {
       this.conversationSummaries.set(conversation.id, conversation);
       const owner = this.subagentOwners.get(conversation.id);
@@ -399,11 +401,11 @@ export class CodexSurfaceAgentAdapter {
   async forkConversation(agent: Agent, targetAgent: Agent, messageIndex?: number) {
     const source = await this.ensureSession(agent);
     const result = await (messageIndex === undefined ? source.handle.fork(
-      { cwd: expandHome(agent.folder) },
+      agentCwd(agent),
       { extensionContext: targetAgent },
     ) : source.handle.forkMessage(
       messageIndex,
-      { cwd: expandHome(agent.folder) },
+      agentCwd(agent),
       { extensionContext: targetAgent },
     ));
     this.bindRuntime(targetAgent, result.conversationId, false);
@@ -433,7 +435,7 @@ export class CodexSurfaceAgentAdapter {
       const wasSuppressingEvents = existing.suppressEvents;
       existing.suppressEvents = true;
       try {
-        await existing.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+        await existing.handle.load({ ...agentCwd(agent), extensionContext: agent });
         this.historyHydratedAtByAgentId.set(agent.id, Date.now());
         const snapshot = existing.handle.getSnapshot();
         // Publish load's full initial page now. Older messages remain behind
@@ -505,7 +507,7 @@ export class CodexSurfaceAgentAdapter {
     const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
     const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
     const snapshot = await this.surface.createConversation({
-      cwd: expandHome(agent.folder),
+      ...agentCwd(agent),
       threadSource: 'user',
       ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
     }, { extensionContext: agent });
@@ -513,7 +515,9 @@ export class CodexSurfaceAgentAdapter {
     if (!threadId) throw new Error('Codex did not create a conversation.');
     const session = this.bindRuntime(agent, threadId, true, false);
     try {
-      await this.renameSessionIfNeeded(session, agentDisplayName(agent));
+      if (shouldSyncConversationTitleFromAgent(agent)) {
+        await this.renameSessionIfNeeded(session, agentDisplayName(agent));
+      }
     } catch {
       // Naming is best effort and must not prevent the first prompt. clawd
       // retries through its normal post-session title synchronization.
@@ -547,7 +551,7 @@ export class CodexSurfaceAgentAdapter {
     await this.start();
     const session = this.bindRuntime(agent, threadId, false, true);
     try {
-      let snapshot = await session.handle.load({ cwd: expandHome(agent.folder), extensionContext: agent });
+      let snapshot = await session.handle.load({ ...agentCwd(agent), extensionContext: agent });
       const interruptedTurnId = snapshot.activeTurnId;
       if (interruptedTurnId) {
         // A newly created Claw backend has no ownership of an old in-progress
@@ -557,6 +561,9 @@ export class CodexSurfaceAgentAdapter {
         snapshot = await session.handle.interrupt();
       }
       snapshot = session.handle.getSnapshot();
+      this.publishQuickChatConversationTitle(session, snapshot.conversations.find(
+        (conversation) => conversation.id === threadId,
+      ));
       if (emitHistory) this.publishInitial(session, snapshot, true);
       else this.rememberPending(session, snapshot);
       session.suppressEvents = false;
@@ -655,6 +662,11 @@ export class CodexSurfaceAgentAdapter {
   private handleSurfaceEvent(event: CodexSurfaceEvent): void {
     if (event.type === 'conversation.summaryUpserted') {
       this.conversationSummaries.set(event.conversationId, event.payload.summary);
+      const rootAgentId = this.agentIdsByThreadId.get(event.conversationId);
+      const rootSession = rootAgentId ? this.sessionsByAgentId.get(rootAgentId) : undefined;
+      if (rootSession?.handle.id === event.conversationId) {
+        this.publishQuickChatConversationTitle(rootSession, event.payload.summary);
+      }
       const owner = this.subagentOwners.get(event.conversationId);
       const session = owner ? this.sessionsByAgentId.get(owner.agentId) : undefined;
       if (session && session.handle.id === owner?.rootConversationId) {
@@ -813,6 +825,7 @@ export class CodexSurfaceAgentAdapter {
           type: 'turn.completed', turnId: event.turnId,
           payload: { ...event.payload }, ...metadata,
         });
+        void this.refreshQuickChatConversationTitle(session);
         return;
       case 'turn.error':
         this.emitThread(session, {
@@ -1227,6 +1240,40 @@ export class CodexSurfaceAgentAdapter {
     });
   }
 
+  private publishQuickChatConversationTitle(
+    session: AgentConversation,
+    summary: CodexConversationSummary | undefined,
+  ): void {
+    if (!summary || shouldSyncConversationTitleFromAgent(session.agent)) return;
+    const conversationTitle = summary.title.trim();
+    if (
+      !conversationTitle ||
+      conversationTitle === summary.id ||
+      conversationTitle === session.agent.conversationTitle
+    ) return;
+
+    session.agent.conversationTitle = conversationTitle;
+    this.emit({
+      backend: 'codex',
+      agentId: session.agent.id,
+      threadId: session.handle.id,
+      type: 'agent.updated',
+      payload: {
+        id: session.agent.id,
+        conversationTitle,
+      },
+      occurredAt: summary.updatedAt,
+    });
+  }
+
+  private async refreshQuickChatConversationTitle(session: AgentConversation): Promise<void> {
+    if (shouldSyncConversationTitleFromAgent(session.agent)) return;
+    const summary = await this.surface.readConversationSummary(session.handle.id).catch(() => undefined);
+    if (!summary) return;
+    this.conversationSummaries.set(summary.id, summary);
+    this.publishQuickChatConversationTitle(session, summary);
+  }
+
   private emitSubagentStatus(
     session: AgentConversation,
     conversationId: string,
@@ -1625,6 +1672,11 @@ function effectiveApprovalPreset(
 
 function codexThreadId(agent: Agent): string | null {
   return agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : null;
+}
+
+function agentCwd(agent: Pick<Agent, 'folder'>): { cwd?: string } {
+  const folder = agentFolder(agent);
+  return folder ? { cwd: expandHome(folder) } : {};
 }
 
 function expandHome(folder: string): string {

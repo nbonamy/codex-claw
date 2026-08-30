@@ -1,7 +1,8 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
-import { formatConversationTitle } from '@codex-claw/core/conversation-title';
+import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
+import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { updateLoopExecutionAgentConversationInSnapshot } from '@codex-claw/core/loop-manager';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
@@ -178,7 +179,7 @@ function requireBackendDriver(drivers: Map<Agent['backend'], AgentBackendDriver>
 }
 
 function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNewSession: boolean): void {
-  if (!wasNewSession || !driver.setConversationTitle) {
+  if (!wasNewSession || !driver.setConversationTitle || !shouldSyncConversationTitleFromAgent(agent)) {
     return;
   }
 
@@ -194,5 +195,5 @@ function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNe
 function conversationRefFromSendResult(agent: Agent, result: BackendSendResult): BackendConversationRef {
   return result.backendSession.kind === 'codex'
     ? { backend: 'codex', threadId: result.backendSession.threadId }
-    : { backend: 'claude', folder: agent.folder, sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
+    : { backend: 'claude', folder: requireAgentFolder(agent), sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
 }

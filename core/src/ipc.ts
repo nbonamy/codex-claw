@@ -70,6 +70,7 @@ export const ipcChannels = {
   resumeAgentConversation: 'conversation:resume',
   readConversationMessages: 'conversation:messages:read',
   createAgent: 'agent:create',
+  createQuickChat: 'agent:quick-chat:create',
   updateAgent: 'agent:update',
   assignWorkItemToAgent: 'agent:work-item:assign',
   removeWorkItemAssignment: 'agent:work-item:unassign',

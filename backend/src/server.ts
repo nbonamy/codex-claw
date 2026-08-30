@@ -3,9 +3,9 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { AppError } from '@codex-claw/core/app-error';
-import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
+import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateLoopInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateLoopInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -18,8 +18,9 @@ import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selec
 import { teamColors } from '@codex-claw/core/team-colors';
 import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/core/approval-presets';
-import { formatConversationTitle } from '@codex-claw/core/conversation-title';
+import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { agentFolder, requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { createEntityId } from '@codex-claw/core/ids';
 import { BackendDriverRpc } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
@@ -427,6 +428,22 @@ export class ClawBackendServer {
         }
         return createClawRpcResult(message.id, snapshot);
       }
+      case backendMethods.agentQuickChatCreate: {
+        const input = requireQuickChatCreateInput(message.params);
+        const remoteTeamPointer = this.remoteTeamPointerForAgentInput(input);
+        if (remoteTeamPointer) {
+          const remoteSnapshot = await this.remoteRequest<AppSnapshot>(remoteTeamPointer.connectionId, backendMethods.agentQuickChatCreate, {
+            input: { teamId: remoteTeamPointer.remoteTeamId },
+          });
+          this.remoteSnapshots.set(remoteTeamPointer.connectionId, remoteSnapshot);
+          this.snapshot.activeTeamId = remoteTeamPointer.localTeamId;
+          const remoteTeam = remoteSnapshot.teams.find((team) => team.id === remoteTeamPointer.remoteTeamId);
+          this.snapshot.activeAgentId = remoteSnapshot.activeAgentId ?? remoteTeam?.activeAgentId ?? remoteTeam?.agentIds[0] ?? null;
+          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        }
+        createQuickChatInSnapshot(this.snapshot, input);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.agentUpdate: {
         const input = requireAgentUpdateInput(message.params);
         return this.routeAgentSnapshotRequest(message.id, input.id, backendMethods.agentUpdate, { input }, async (existingAgent) => {
@@ -597,9 +614,10 @@ export class ClawBackendServer {
           ...(input ? { input } : {}),
         }, async (existingAgent) => {
           if (input?.deleteWorktree) {
-            const sharedAgent = this.snapshot.agents.find((agent) => agent.id !== agentId && agent.folder === existingAgent.folder);
+            const folder = requireAgentFolder(existingAgent);
+            const sharedAgent = this.snapshot.agents.find((agent) => agent.id !== agentId && agent.folder === folder);
             if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
-            await this.agentGitService.validateLinkedWorktreeDeletion(existingAgent.folder, input.deleteRemoteBranch === true);
+            await this.agentGitService.validateLinkedWorktreeDeletion(folder, input.deleteRemoteBranch === true);
           }
           if (existingAgent.backendSession) {
             await this.driverRpc?.handle(backendMethods.driverSessionForget, {
@@ -608,7 +626,7 @@ export class ClawBackendServer {
             });
           }
           if (input?.deleteWorktree) {
-            await this.agentGitService.deleteLinkedWorktree(existingAgent.folder, input.deleteRemoteBranch === true);
+            await this.agentGitService.deleteLinkedWorktree(requireAgentFolder(existingAgent), input.deleteRemoteBranch === true);
           }
           const agent = closeAgentInSnapshot(this.snapshot, agentId);
           if (!agent) {
@@ -632,7 +650,7 @@ export class ClawBackendServer {
       case backendMethods.agentFilesList: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentFilesList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverFilesList, {
-          folder: agent.folder,
+          folder: requireAgentFolder(agent),
         }));
       }
       case backendMethods.agentFilePreview: {
@@ -642,7 +660,7 @@ export class ClawBackendServer {
           agentId,
           filePath: requireString(params.filePath, 'filePath'),
         }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverFilePreview, {
-          folder: agent.folder,
+          folder: requireAgentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
         }));
       }
@@ -705,16 +723,17 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitMessageGenerate, params, async (agent) => {
+          const folder = requireAgentFolder(agent);
           const input = requireRecord(params.input);
           const kind = requireString(input.kind, 'kind');
           if (kind === 'commit') {
-            const source = await this.agentGitService.commitMessageContext(agent.folder, {
+            const source = await this.agentGitService.commitMessageContext(folder, {
               includeUnstaged: input.includeUnstaged === true,
               includeUntracked: input.includeUntracked === true,
             });
             const generated = await this.handleAgentDriverRequest(agent, backendMethods.driverTextGenerate, {
               agent,
-              cwd: agent.folder,
+              cwd: folder,
               prompt: `Write a commit message for these selected changes.\n\n${source.context}`,
               developerInstructions: 'Return one concise, imperative git commit subject. Follow the repository convention when it is evident. Do not add Markdown or explanations.',
               outputSchema: commitMessageOutputSchema,
@@ -722,10 +741,10 @@ export class ClawBackendServer {
             return parseGeneratedGitMessage(generated, 'commit');
           }
           if (kind === 'pullRequest') {
-            const source = await this.agentGitService.pullRequestMessageContext(agent.folder);
+            const source = await this.agentGitService.pullRequestMessageContext(folder);
             const generated = await this.handleAgentDriverRequest(agent, backendMethods.driverTextGenerate, {
               agent,
-              cwd: agent.folder,
+              cwd: folder,
               prompt: `Draft a pull request title and body for the changes from ${source.baseRef ?? 'the base branch'} to the current branch.\n\n${source.context}`,
               developerInstructions: 'Return a concise pull request title and a useful Markdown body describing the outcome, important implementation details, and testing when supported by the supplied context. Do not invent facts.',
               outputSchema: pullRequestMessageOutputSchema,
@@ -742,7 +761,7 @@ export class ClawBackendServer {
           requireConfirmed(params.input, 'Staging files');
           const input = requireRecord(params.input);
           const paths = requireStringArray(input.paths, 'paths');
-          await this.agentGitService.stage(agent.folder, paths);
+          await this.agentGitService.stage(requireAgentFolder(agent), paths);
           return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
@@ -750,15 +769,16 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitCommit, params, async (agent) => {
+          const folder = requireAgentFolder(agent);
           const input = requireConfirmed(params.input, 'Creating a commit');
-          const workflow = await this.agentGitService.workflow(agent.folder);
+          const workflow = await this.agentGitService.workflow(folder);
           const pathsToStage = workflow.files
             .filter((file) => (file.indexStatus === '?' ? input.includeUntracked === true : input.includeUnstaged === true))
             .map((file) => file.path);
           if (pathsToStage.length > 0) {
-            await this.agentGitService.stage(agent.folder, pathsToStage);
+            await this.agentGitService.stage(folder, pathsToStage);
           }
-          await this.agentGitService.commit(agent.folder, requireString(input.message, 'message'));
+          await this.agentGitService.commit(folder, requireString(input.message, 'message'));
           return this.gitWorkflow(agent, { refreshStatus: true });
         });
       }
@@ -766,12 +786,13 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitPush, params, async (agent) => {
+          const folder = requireAgentFolder(agent);
           const input = requireConfirmed(params.input, 'Pushing a branch');
-          const currentWorkflow = await this.agentGitService.workflow(agent.folder);
+          const currentWorkflow = await this.agentGitService.workflow(folder);
           const pushFolder = input.target === 'mergeTarget' && !isIntegrationBranchName(currentWorkflow.branch)
-            ? await this.agentGitService.mergeTarget(agent.folder)
-            : agent.folder;
-          const workflow = pushFolder === agent.folder ? currentWorkflow : await this.agentGitService.workflow(pushFolder);
+            ? await this.agentGitService.mergeTarget(folder)
+            : folder;
+          const workflow = pushFolder === folder ? currentWorkflow : await this.agentGitService.workflow(pushFolder);
           if (workflow.detached || !workflow.branch) throw new Error('Create or check out a branch before pushing.');
           if (!workflow.remote) throw new Error('Add a Git remote before pushing.');
           await this.agentGitService.push(pushFolder, workflow.remote, workflow.branch, !workflow.upstream);
@@ -782,6 +803,7 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitBranchCreate, params, async (agent) => {
+          const folder = requireAgentFolder(agent);
           const input = requireConfirmed(params.input, 'Creating a branch');
           const pullRequestNumber = input.pullRequestNumber;
           if (pullRequestNumber !== undefined && (!Number.isInteger(pullRequestNumber) || (pullRequestNumber as number) <= 0)) {
@@ -789,8 +811,8 @@ export class ClawBackendServer {
           }
           const branchName = requireString(input.name, 'name');
           const targetFolder = pullRequestNumber === undefined
-            ? await this.agentGitService.createBranch(agent.folder, branchName, input.createWorktree === true)
-            : await this.agentGitService.createBranch(agent.folder, branchName, input.createWorktree === true, pullRequestNumber as number);
+            ? await this.agentGitService.createBranch(folder, branchName, input.createWorktree === true)
+            : await this.agentGitService.createBranch(folder, branchName, input.createWorktree === true, pullRequestNumber as number);
           if (input.createWorktree === true) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
@@ -823,11 +845,12 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitMerge, params, async (agent) => {
+          const folder = requireAgentFolder(agent);
           const input = requireConfirmed(params.input, 'Merging a branch');
           const strategy = input.strategy === 'squash' ? 'squash' : 'merge';
           const commitMessage = strategy === 'squash' ? requireString(input.commitMessage, 'commitMessage') : undefined;
           const deleteWorktree = input.deleteWorktree === true;
-          const targetFolder = await this.agentGitService.merge(agent.folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
+          const targetFolder = await this.agentGitService.merge(folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
           if (deleteWorktree) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
@@ -2626,7 +2649,7 @@ export class ClawBackendServer {
   }
 
   private async gitWorkflow(agent: Agent, options: { includePullRequest?: boolean; refreshStatus?: boolean } = {}): Promise<AgentGitWorkflow> {
-    const workflow = await this.agentGitService.workflow(agent.folder);
+    const workflow = await this.agentGitService.workflow(requireAgentFolder(agent));
     if (options.refreshStatus) {
       await this.refreshAgentGitStatus(agent.id);
     }
@@ -2758,9 +2781,10 @@ export class ClawBackendServer {
 
   private async refreshAgentWorkspaceIdentity(agentId: string): Promise<boolean> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || typeof this.agentGitService.identity !== 'function') return false;
+    const folder = agent ? agentFolder(agent) : undefined;
+    if (!agent || !folder || typeof this.agentGitService.identity !== 'function') return false;
 
-    const identity = await this.agentGitService.identity(agent.folder);
+    const identity = await this.agentGitService.identity(folder);
     if (sameWorkspaceIdentity(agent.workspace, identity)) return false;
     updateAgentWorkspace(this.snapshot, agentId, identity, identity.updatedAt);
     return true;
@@ -2783,6 +2807,10 @@ export class ClawBackendServer {
   private async performAgentGitStatusRefresh(agentId: string): Promise<boolean> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) {
+      return false;
+    }
+    if (!agentFolder(agent)) {
+      delete this.snapshot.agentGitStatuses[agentId];
       return false;
     }
 
@@ -2869,7 +2897,7 @@ export class ClawBackendServer {
 
   private setConversationTitle(agentId: string): void {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
+    if (!agent || !shouldSyncConversationTitleFromAgent(agent)) {
       return;
     }
     agent.conversationTitle = formatConversationTitle(agent);
@@ -3102,9 +3130,10 @@ export class ClawBackendServer {
     if (!agent) {
       throw new Error(`Agent not found: ${request.payload.request.agentId}`);
     }
+    const folder = requireAgentFolder(agent);
 
     if (selection.mode === 'current') {
-      this.resolveWorkRouting(request.id, { mode: 'current', folder: agent.folder });
+      this.resolveWorkRouting(request.id, { mode: 'current', folder });
       return;
     }
 
@@ -3122,7 +3151,7 @@ export class ClawBackendServer {
           { agents },
         );
       }
-      const gitStatus = await this.agentGitService.status(agent.folder);
+      const gitStatus = await this.agentGitService.status(folder);
       if (gitStatus.state === 'dirty') {
         throw new AppError(
           'workRouting.dirtyCheckout',
@@ -3135,14 +3164,14 @@ export class ClawBackendServer {
           'Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.',
         );
       }
-      const folder = await this.agentGitService.createBranch(agent.folder, branchName, false);
+      const branchFolder = await this.agentGitService.createBranch(folder, branchName, false);
       await this.refreshAgentWorkspaceIdentity(agent.id);
       await this.persistAndEmitSnapshot();
-      this.resolveWorkRouting(request.id, { mode: 'branch', branchName, folder });
+      this.resolveWorkRouting(request.id, { mode: 'branch', branchName, folder: branchFolder });
       return;
     }
 
-    const folder = await this.agentGitService.createBranch(agent.folder, branchName, true);
+    const delegatedFolder = await this.agentGitService.createBranch(folder, branchName, true);
     const delegated = duplicateAgentInSnapshot(this.snapshot, agent.id, undefined, undefined, {
       name: delegatedAgentName(agentDisplayName(agent), branchName),
       select: false,
@@ -3150,7 +3179,7 @@ export class ClawBackendServer {
     if (!delegated) {
       throw new Error(`Agent not found: ${agent.id}`);
     }
-    updateAgentFolder(this.snapshot, delegated.id, folder);
+    updateAgentFolder(this.snapshot, delegated.id, delegatedFolder);
     await this.refreshAgentWorkspaceIdentity(delegated.id);
     await this.persistAndEmitSnapshot();
     this.sendAgentPrompt(delegated.id, request.payload.request.task);
@@ -3159,7 +3188,7 @@ export class ClawBackendServer {
       agentId: delegated.id,
       agentName: agentDisplayName(delegated),
       branchName,
-      folder,
+      folder: delegatedFolder,
     });
   }
 
@@ -3387,6 +3416,12 @@ function requireAgentCreateInput(params: unknown): CreateAgentInput {
     ...input,
     name: input.name === null ? null : requireString(input.name, 'agent name'),
   } as CreateAgentInput;
+}
+
+function requireQuickChatCreateInput(params: unknown): CreateQuickChatInput {
+  const record = requireRecord(params);
+  const input = requireRecord(record.input);
+  return input.teamId === undefined ? {} : { teamId: requireString(input.teamId, 'team id') };
 }
 
 function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
@@ -3743,7 +3778,7 @@ function benchTemplateInputFromAgent(agent: Agent): CreateBenchTemplateInput {
   return {
     name: agentDisplayName(agent),
     ...(agent.avatar ? { avatar: agent.avatar } : {}),
-    folder: agent.folder,
+    folder: requireAgentFolder(agent),
     backend: agent.backend,
     ...(agent.backendDefaults ? { backendDefaults: { ...agent.backendDefaults } } : {}),
   };

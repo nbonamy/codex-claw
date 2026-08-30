@@ -76,7 +76,7 @@ export function attachForkedAgentInSnapshot(
 
 export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString()): BenchTemplate | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (!agent) {
+  if (!agent?.folder) {
     return null;
   }
 

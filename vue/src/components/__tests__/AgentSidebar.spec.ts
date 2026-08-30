@@ -558,10 +558,11 @@ describe('AgentSidebar', () => {
     expect(wrapper.get('.agent-sidebar__status').attributes('aria-label')).toBe('Idle');
   });
 
-  it('places agents without workspace identity under Quick chats', () => {
+  it('places agents without workspace identity under Chats with a create action', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
+          agents[0]!,
           { ...agents[0], folder: '', workspace: undefined },
         ],
         activeAgentId: 'agent-dina',
@@ -572,8 +573,32 @@ describe('AgentSidebar', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__workspace-header').text()).toBe('Quick chats');
-    expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
+    expect(wrapper.findAll('.agent-sidebar__workspace-header').map((header) => header.text()))
+      .toStrictEqual(['Chats', 'id8']);
+    const chatsGroup = wrapper.findAll('.agent-sidebar__workspace-group')[0]!;
+    expect(chatsGroup.find('.agent-sidebar__branch').exists()).toBe(false);
+    expect(chatsGroup.get('.agent-sidebar__workspace-header').find('[data-icon="message"]').exists()).toBe(true);
+    expect(chatsGroup.get('.agent-sidebar__agent').find('.agent-sidebar__session-icon').exists()).toBe(false);
+
+    await wrapper.get('[aria-label="New quick chat"]').trigger('click');
+    expect(wrapper.emitted('create-quick-chat')).toStrictEqual([[]]);
+  });
+
+  it('offers Quick chat beneath Add project until the team has chats', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    const action = wrapper.get('.agent-sidebar__quick-chat-action');
+    expect(action.text()).toBe('Quick chat');
+    expect(action.find('[data-icon="message"]').exists()).toBe(true);
+    await action.trigger('click');
+    expect(wrapper.emitted('create-quick-chat')).toStrictEqual([[]]);
   });
 
   it('renders the new session action at the top instead of a footer action', () => {

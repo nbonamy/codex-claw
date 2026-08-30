@@ -247,7 +247,7 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await expect(adapter.generateText(generationAgent, {
       prompt: 'Describe the change',
-      cwd: generationAgent.folder,
+      cwd: generationAgent.folder!,
       developerInstructions: 'Return JSON.',
       outputSchema: { type: 'object' },
     })).resolves.toStrictEqual({ text: '{"message":"feat: generated"}' });
@@ -431,6 +431,103 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/name/set'
     ))).toHaveLength(1);
+  });
+
+  it('creates and restores workspace-free quick chats without sending a cwd', async () => {
+    const { adapter, surface, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    const quickChat: Agent = {
+      ...createAgent('agent-chat', 'thread-new', '/unused'),
+      folder: null,
+      name: null,
+      sessionKind: 'quickChat',
+    };
+    delete quickChat.backendSession;
+
+    await adapter.sendPrompt(quickChat, 'Hello');
+
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: { threadSource: 'user' },
+    });
+    expect(lastRequest(transport, 'thread/start')).not.toMatchObject({
+      params: { cwd: expect.anything() },
+    });
+    expect(transport.sent).not.toContainEqual(expect.objectContaining({ method: 'thread/name/set' }));
+
+    const emitSurfaceEvent = (surface as unknown as {
+      emitEvent(origin: 'notification', event: unknown): void;
+    }).emitEvent.bind(surface);
+    emitSurfaceEvent('notification', {
+      type: 'conversation.summaryUpserted',
+      conversationId: 'thread-new',
+      payload: {
+        reason: 'updated',
+        summary: {
+          id: 'thread-new',
+          title: 'Plan a summer trip',
+          preview: 'Plan a summer trip',
+          cwd: '',
+          status: 'idle',
+          turnCount: 1,
+          createdAt: '2026-08-30T00:00:00.000Z',
+          updatedAt: '2026-08-30T00:00:01.000Z',
+        },
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-chat',
+      type: 'agent.updated',
+      payload: expect.objectContaining({ conversationTitle: 'Plan a summer trip' }),
+    }));
+
+    adapter.forgetAgentSession(quickChat.id);
+    quickChat.backendSession = { kind: 'codex', threadId: 'thread-new' };
+    await adapter.hydrateAgent(quickChat);
+
+    expect(lastRequest(transport, 'thread/resume')).not.toMatchObject({
+      params: { cwd: expect.anything() },
+    });
+  });
+
+  it('refreshes an unnamed quick chat title after app-server generates it', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    const quickChat: Agent = {
+      ...createAgent('agent-chat', 'thread-new', '/unused'),
+      folder: null,
+      name: null,
+      conversationTitle: 'Untitled conversation',
+      sessionKind: 'quickChat',
+    };
+    delete quickChat.backendSession;
+
+    await adapter.sendPrompt(quickChat, 'Hello');
+    events.length = 0;
+    transport.sent.length = 0;
+    transport.threadMetadataByThreadId.set('thread-new', {
+      name: 'hello',
+      preview: 'hello',
+      updatedAt: 1_700_000_002,
+    });
+
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-new', turn: turn('turn-thread-new', 'completed') },
+    });
+
+    await vi.waitFor(() => {
+      expect(events).toContainEqual(expect.objectContaining({
+        agentId: 'agent-chat',
+        type: 'agent.updated',
+        payload: expect.objectContaining({ conversationTitle: 'hello' }),
+      }));
+    });
+    expect(lastRequest(transport, 'thread/read')).toMatchObject({
+      params: { threadId: 'thread-new', includeTurns: false },
+    });
   });
 
   it('routes simultaneous semantic conversation events without transcript replacement or cross-routing', async () => {

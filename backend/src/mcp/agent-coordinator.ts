@@ -5,7 +5,7 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 export type McpAgentInfo = {
   id: string;
   name: string;
-  folder: string;
+  folder: string | null;
   status: string;
 };
 

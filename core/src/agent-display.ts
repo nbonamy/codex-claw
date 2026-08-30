@@ -1,14 +1,20 @@
 import type { Agent, AgentWorkspaceIdentity } from './contracts';
 
-export function agentDisplayName(agent: Pick<Agent, 'name' | 'folder' | 'workspace'>): string {
+export function agentDisplayName(
+  agent: Pick<Agent, 'name' | 'folder' | 'workspace' | 'sessionKind' | 'conversationTitle'>,
+): string {
   const customName = agent.name?.trim();
   if (customName) return customName;
+
+  if (agent.sessionKind === 'quickChat') {
+    return agent.conversationTitle?.trim() || 'Untitled conversation';
+  }
 
   if (agent.workspace?.kind === 'git') {
     return gitWorkspaceDisplayName(agent.workspace);
   }
 
-  return folderBasename(agent.folder) || 'Codex';
+  return folderBasename(agent.folder ?? '') || 'Codex';
 }
 
 function gitWorkspaceDisplayName(workspace: Extract<AgentWorkspaceIdentity, { kind: 'git' }>): string {

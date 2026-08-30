@@ -91,6 +91,21 @@ describe('workspace sidebar projection', () => {
       }]);
   });
 
+  it('keeps durable quick chats out of repositories and uses their conversation title', () => {
+    const quickChat: Agent = {
+      ...baseAgent('agent-chat', null, '/unused'),
+      folder: null,
+      sessionKind: 'quickChat',
+    };
+    quickChat.conversationTitle = 'Release planning';
+
+    expect(projectSidebar({ agents: [quickChat], activeAgentId: quickChat.id }))
+      .toMatchObject([{
+        kind: 'quickChats',
+        sessions: [{ displayTitle: 'Release planning', branch: null, folder: null, kind: 'folder' }],
+      }]);
+  });
+
   it('uses agent names without mixing them with branch names', () => {
     const first = gitAgent('agent-one', 'Fix tests', '/src/repo-one', 'feat/one', true);
     const second = gitAgent('agent-two', 'Review tests', '/src/repo-two', 'feat/one', true);

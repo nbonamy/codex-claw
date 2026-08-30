@@ -7,8 +7,8 @@ import GitWorkflowControl from '../GitWorkflowControl.vue';
 import type { Agent, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
 
 const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktree', backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'idle' }, createdAt: '', updatedAt: '' } as Agent;
-const status: AgentGitStatus = { folder: agent.folder, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
-const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder, isLinkedWorktree: true, branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
+const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
+const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
 const componentSource = readFileSync(resolve(process.cwd(), 'src/components/GitWorkflowControl.vue'), 'utf8');
 
 function mountControl(overrides: Partial<Record<string, unknown>> = {}) {

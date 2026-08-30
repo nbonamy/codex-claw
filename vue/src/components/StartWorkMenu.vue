@@ -12,7 +12,7 @@
         type="button"
         :aria-label="t('startWork.addProject')"
       >
-        <PlusCircleIcon aria-hidden="true" />
+        <FoldersIcon data-icon="folders" aria-hidden="true" />
         <span>{{ t('startWork.addProject') }}</span>
       </button>
     </template>
@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { PlusCircleIcon } from '../shared/icons/app-icons';
+import { FoldersIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import { isStartWorkAction, startWorkMenuItems, type StartWorkAction } from './start-work-actions';
 

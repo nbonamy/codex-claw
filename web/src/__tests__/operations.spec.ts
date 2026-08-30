@@ -11,6 +11,12 @@ describe('Claw web operations', () => {
     expect(request).toHaveBeenCalledWith(backendMethods.agentCreate, {
       input: { name: 'Dina' },
     });
+
+    await expect(invokeClawWebOperation({ request }, 'createQuickChat', [{ teamId: 'team-one' }]))
+      .resolves.toEqual({ ok: true });
+    expect(request).toHaveBeenLastCalledWith(backendMethods.agentQuickChatCreate, {
+      input: { teamId: 'team-one' },
+    });
   });
 
   it('adapts the backend snapshot envelope for the Vue client', async () => {

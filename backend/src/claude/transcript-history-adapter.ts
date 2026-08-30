@@ -3,6 +3,7 @@ import { access, readFile, readdir, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
+import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 
@@ -44,7 +45,7 @@ export async function loadClaudeTranscriptHistory(
   }
 
   const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
-  const transcriptPath = await findClaudeTranscriptPath(projectsRoot, agent.folder, sessionId);
+  const transcriptPath = await findClaudeTranscriptPath(projectsRoot, requireAgentFolder(agent), sessionId);
   if (!transcriptPath) {
     return {
       backendSession: agent.backendSession,
@@ -106,7 +107,8 @@ export async function listClaudeTranscriptSummaries(
   options: ClaudeTranscriptHistoryOptions = {},
 ): Promise<ConversationSummary[]> {
   const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
-  const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(expandHome(agent.folder)));
+  const folder = requireAgentFolder(agent);
+  const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(expandHome(folder)));
   const files: Array<{ filePath: string; sessionId: string; updatedAt: string; updatedAtMs: number }> = [];
 
   let entries: Dirent[];
@@ -158,7 +160,7 @@ export async function listClaudeTranscriptSummaries(
       messageCount: transcriptSummary.messageCount,
       ref: {
         backend: 'claude',
-        folder: agent.folder,
+        folder,
         sessionId: file.sessionId,
       },
     });

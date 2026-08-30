@@ -111,6 +111,7 @@ the synchronization barrier bounded even for very long threads.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Creates the agent in the owning team's backend location. For remote-team pointers, local `clawd` forwards creation to the remote `clawd` with the remote team id and does not persist a local proxy agent. |
+| `agent/quickChat/create` | `{ input: CreateQuickChatInput }` | `AppSnapshot` | Creates a team-scoped quick chat in a private backend-managed scratch workspace and persists its non-project identity across restarts. |
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
 | `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent configuration directly below the source agent. |

@@ -436,7 +436,7 @@ describe('ClawBackendServer', () => {
     const merge = vi.fn().mockResolvedValue('/repo');
     const forgetAgentSession = vi.fn();
     const getGitStatus = vi.fn(async (agent: Agent) => ({
-      folder: agent.folder, ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
+      folder: agent.folder!, ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
       hasUntracked: false, state: 'clean' as const, updatedAt: '2026-08-11T00:00:00.000Z',
     }));
     const saveSnapshot = vi.fn();
@@ -1255,6 +1255,46 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
+  it('creates team-scoped quick chats without a workspace', async () => {
+    const snapshot = createTestSnapshot();
+    const driverRpc = new BackendDriverRpc(new Map());
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc,
+      saveSnapshot,
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'create-quick-chat',
+      method: 'agent/quickChat/create',
+      params: { input: { teamId: 'team-test' } },
+    });
+
+    expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+    expect(response).toMatchObject({
+      result: {
+        activeTeamId: 'team-test',
+        agents: [expect.objectContaining({
+          teamId: 'team-test',
+          sessionKind: 'quickChat',
+          name: null,
+          folder: null,
+          backend: 'codex',
+        })],
+      },
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'list-quick-chat-files',
+      method: 'agent/files/list',
+      params: { agentId: snapshot.activeAgentId },
+    })).rejects.toThrow('This session does not have a project workspace.');
+  });
+
   it('routes remote agent prompts to the owning remote clawd', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
@@ -1666,7 +1706,7 @@ describe('ClawBackendServer', () => {
     ];
     remoteSnapshot.agentGitStatuses = {
       [remoteAgent.id]: {
-        folder: remoteAgent.folder,
+        folder: remoteAgent.folder!,
         branch: 'main',
         ahead: 0,
         behind: 0,
@@ -1678,7 +1718,7 @@ describe('ClawBackendServer', () => {
         updatedAt: '2026-06-13T00:00:00.000Z',
       },
       [otherRemoteAgent.id]: {
-        folder: otherRemoteAgent.folder,
+        folder: otherRemoteAgent.folder!,
         branch: 'other',
         ahead: 0,
         behind: 0,

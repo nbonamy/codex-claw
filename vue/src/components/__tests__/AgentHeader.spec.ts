@@ -192,6 +192,27 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('open-in')).toStrictEqual([['xcode']]);
   });
 
+  it('omits workspace identity and Open In for a workspace-free quick chat', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: { ...agent, name: null, folder: null, sessionKind: 'quickChat' },
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        openInAvailable: true,
+        openInCatalog: {
+          defaultApplication: 'vscode',
+          applications: [{ id: 'vscode', label: 'VS Code' }],
+        },
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.text()).toContain('Untitled conversation');
+    expect(wrapper.find('.agent-header__folder').exists()).toBe(false);
+    expect(wrapper.find('.open-in-control').exists()).toBe(false);
+  });
+
   it('shows the execution-plan toggle only when a plan is available', async () => {
     const wrapper = mount(AgentHeader, {
       props: {
