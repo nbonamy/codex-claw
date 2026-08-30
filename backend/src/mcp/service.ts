@@ -430,7 +430,6 @@ export class ClawMcpService {
   private async createAgentFromMcp(
     caller: Agent,
     input: {
-      avatar?: string;
       backend?: Agent['backend'];
       branchName?: string;
       createWorktree?: boolean;
@@ -461,7 +460,6 @@ export class ClawMcpService {
     const createInput: CreateAgentInput = {
       name: input.name?.trim() || null,
       folder,
-      ...(input.avatar ? { avatar: input.avatar } : {}),
       backend: input.backend ?? 'codex',
       teamId: input.teamId ?? caller.teamId,
     };

@@ -84,7 +84,6 @@ export type UpdateWorkItemResponse =
   };
 
 export type McpCreateAgentInput = {
-  avatar?: string;
   backend?: AgentBackend;
   branchName?: string;
   createWorktree?: boolean;
@@ -330,7 +329,6 @@ export class ClawMcpAgentCoordinator {
 
     return this.onCreateAgent(agent, {
       name: input.name?.trim(),
-      avatar: input.avatar?.trim() || undefined,
       backend: input.backend ?? 'codex',
       repoPath: input.repoPath.trim(),
       createWorktree: input.createWorktree,

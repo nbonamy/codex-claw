@@ -101,6 +101,21 @@ describe('Codex Claw MCP tool registration', () => {
     expect(mocks.registerInAppBrowserTools).not.toHaveBeenCalled();
   });
 
+  it('does not expose agent avatars in the create-agent contract', () => {
+    createServer();
+
+    const registration = mocks.registerTool.mock.calls.find(([name]) => name === 'create-agent');
+    const definition = registration?.[1] as { inputSchema: Record<string, unknown> } | undefined;
+    expect(Object.keys(definition?.inputSchema ?? {})).toStrictEqual([
+      'name',
+      'backend',
+      'repoPath',
+      'createWorktree',
+      'branchName',
+      'destinationPath',
+    ]);
+  });
+
   it.each([
     ['list-agents', {}, 'listAgents', ['agent-dina']],
     ['send-message', { to: 'agent-jesse', content: 'hello' }, 'sendMessage', ['agent-dina', 'agent-jesse', 'hello']],
@@ -156,7 +171,6 @@ describe('Codex Claw MCP tool registration', () => {
 
     const agentInput = {
       name: 'Tester',
-      avatar: 'TE',
       backend: 'codex',
       repoPath: '/src/claw',
       createWorktree: true,

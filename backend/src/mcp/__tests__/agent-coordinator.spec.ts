@@ -278,7 +278,6 @@ describe('ClawMcpAgentCoordinator', () => {
     await coordinator.createAgent('agent-dina', {
       repoPath: ' /src/claw ',
       name: ' New Agent ',
-      avatar: '   ',
       createWorktree: true,
       branchName: ' coverage ',
       destinationPath: ' /src/claw-coverage ',
@@ -286,7 +285,6 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(onCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
       repoPath: '/src/claw',
       name: 'New Agent',
-      avatar: undefined,
       backend: 'codex',
       createWorktree: true,
       branchName: 'coverage',

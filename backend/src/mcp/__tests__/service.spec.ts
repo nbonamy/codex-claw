@@ -451,13 +451,12 @@ describe('ClawMcpService', () => {
       jsonrpc: '2.0', id: 3, method: 'tools/call',
       params: {
         name: 'create-agent',
-        arguments: { repoPath: '/tmp/new-agent', name: 'New Agent', avatar: 'NA', backend: 'claude' },
+        arguments: { repoPath: '/tmp/new-agent', name: 'New Agent', backend: 'claude' },
       },
     });
     expect(createResponse.result.structuredContent).toMatchObject({ success: true, agentId: expect.any(String) });
     expect(snapshot.agents).toContainEqual(expect.objectContaining({
       name: 'New Agent',
-      avatar: 'NA',
       backend: 'claude',
       folder: '/tmp/new-agent',
       teamId: 'team-codex-claw',
