@@ -17,7 +17,6 @@ type ComputerUseCommand =
   | 'get_app_state'
   | 'launch_app'
   | 'list_apps'
-  | 'move'
   | 'request_screen_capture'
   | 'scroll'
   | 'set_value'
@@ -102,11 +101,6 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       physical: z.boolean().optional().describe('Send a real foreground mouse click instead of AXPress. Use for visible Electron/web controls or after verifying AXPress did not change the UI.'),
     },
   }, (arguments_) => execute(computerUse, 'click', arguments_));
-
-  server.registerTool('computer-use-move', {
-    description: 'Move the real macOS pointer to hover over a fresh Accessibility element or absolute logical screen coordinates. Use this only when hover or native menu tracking is required: unlike AXPress and physical click, this intentionally moves the user\'s real pointer and leaves it at the target.',
-    inputSchema: actionTargetSchema,
-  }, (arguments_) => execute(computerUse, 'move', arguments_));
 
   server.registerTool('computer-use-type-text', {
     description: 'Type literal text into the focused macOS Accessibility element. Use newline for Return and tab for Tab.',

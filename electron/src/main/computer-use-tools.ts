@@ -19,7 +19,6 @@ export const computerUseCommands = [
   'focus_app',
   'get_app_state',
   'click',
-  'move',
   'type_text',
   'set_value',
   'scroll',
@@ -204,7 +203,7 @@ function argumentsWithAppStateContext(
   arguments_: Record<string, unknown>,
   pilotPath: string,
 ): Record<string, unknown> {
-  if (!['click', 'move', 'scroll', 'set_value'].includes(command) || !Number.isInteger(arguments_.element_index)) {
+  if (!['click', 'scroll', 'set_value'].includes(command) || !Number.isInteger(arguments_.element_index)) {
     return arguments_;
   }
 
