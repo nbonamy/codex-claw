@@ -2686,6 +2686,11 @@ describe('AppShell', () => {
     await flushPromises();
     const worktreeDialog = wrapper.getComponent({ name: 'NewSourceWorktreeDialog' });
     expect(worktreeDialog.props('visible')).toBe(true);
+    expect(worktreeDialog.props('branches')).toStrictEqual([
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+      { name: 'feat/work-routing', isDefault: false },
+    ]);
+    expect(listSourceBranches).toHaveBeenLastCalledWith('/Users/nbonamy/src/codex-claw', undefined);
     await worktreeDialog.vm.$emit('created', {
       name: 'feature-session',
       path: '/Users/nbonamy/src/codex-claw-feature-session',

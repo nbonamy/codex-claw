@@ -3641,6 +3641,7 @@ function sourceWorktreeInputWithoutRemoteConnection(input: CreateSourceWorktreeI
   return {
     repoPath: input.repoPath,
     branchName: input.branchName,
+    ...(input.baseBranch ? { baseBranch: input.baseBranch } : {}),
     ...(input.destinationPath ? { destinationPath: input.destinationPath } : {}),
   };
 }

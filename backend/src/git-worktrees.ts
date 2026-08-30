@@ -36,9 +36,20 @@ export async function createSourceWorktree(
     await runner.run('git', ['worktree', 'add', worktreePath, branchName], { cwd: repoPath });
   } else {
     const remoteBranch = await findRemoteBranch(runner, repoPath, branchName);
+    const baseBranch = input.baseBranch?.trim();
+    const startPoint = remoteBranch ?? (baseBranch
+      ? await resolveBranchStartPoint(runner, repoPath, baseBranch)
+      : undefined);
     await runner.run('git', remoteBranch
       ? ['worktree', 'add', '-b', branchName, worktreePath, remoteBranch]
-      : ['worktree', 'add', '-b', branchName, worktreePath], { cwd: repoPath });
+      : [
+          'worktree',
+          'add',
+          '-b',
+          branchName,
+          worktreePath,
+          ...(startPoint ? [startPoint] : []),
+        ], { cwd: repoPath });
   }
 
   return {
@@ -161,4 +172,17 @@ async function findRemoteBranch(runner: CommandRunner, repoPath: string, branchN
     .split(/\r?\n/u)
     .map((value) => value.trim())
     .find((value) => value.endsWith(`/${branchName}`) && !value.endsWith('/HEAD'));
+}
+
+async function resolveBranchStartPoint(runner: CommandRunner, repoPath: string, branchName: string): Promise<string> {
+  if (await branchExists(runner, repoPath, `refs/heads/${branchName}`)) {
+    return branchName;
+  }
+
+  const remoteBranch = await findRemoteBranch(runner, repoPath, branchName);
+  if (remoteBranch) {
+    return remoteBranch;
+  }
+
+  throw new Error(`Base branch not found: ${branchName}`);
 }

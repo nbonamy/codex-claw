@@ -21,7 +21,7 @@ export const surfaceMessages = {
   "agentDialog": {
     "name": "Name",
     "agentName": "Agent name",
-    "nameThisAgent": "Name this agent",
+    "nameThisAgent": "Optional",
     "repository": "Repository",
     "workIn": "Work in...",
     "newWorktree": "New Worktree...",
@@ -33,6 +33,7 @@ export const surfaceMessages = {
     "codex": "Codex",
     "claudeCode": "Claude Code",
     "cancel": "Cancel",
+    "clear": "Clear",
     "sourceWorktreeCreationIsNotAvailable": "Source worktree creation is not available.",
     "noAgentSelectedForEditing": "No agent selected for editing.",
     "editAgent": "Edit agent",
@@ -497,7 +498,9 @@ export const surfaceMessages = {
   },
   "newSourceWorktreeDialog": {
     "newWorktree": "New Worktree",
-    "branch": "Branch",
+    "startFrom": "Start from",
+    "chooseBaseBranch": "Choose a branch",
+    "branch": "New branch",
     "folder": "Folder",
     "enterABranchName": "Enter a branch name",
     "chooseWorktreeFolder": "Choose worktree folder",

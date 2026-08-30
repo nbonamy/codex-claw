@@ -53,6 +53,36 @@ describe('git worktree operations', () => {
     ], { cwd: '/repo' });
   });
 
+  it('creates new worktree branches from the selected local or remote base branch', async () => {
+    const localRun = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args[0] === 'show-ref' && args.at(-1) === 'refs/heads/feature/new') throw new Error('missing');
+      if (args[0] === 'for-each-ref') return { stdout: '' };
+      return { stdout: '' };
+    });
+    await createSourceWorktree({
+      repoPath: '/repo',
+      branchName: 'feature/new',
+      baseBranch: 'main',
+    }, { run: localRun });
+    expect(localRun).toHaveBeenLastCalledWith('git', [
+      'worktree', 'add', '-b', 'feature/new', '/repo-feature-new', 'main',
+    ], { cwd: '/repo' });
+
+    const remoteRun = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args[0] === 'show-ref') throw new Error('missing');
+      if (args[0] === 'for-each-ref') return { stdout: 'origin/main\n' };
+      return { stdout: '' };
+    });
+    await createSourceWorktree({
+      repoPath: '/repo',
+      branchName: 'feature/from-remote',
+      baseBranch: 'main',
+    }, { run: remoteRun });
+    expect(remoteRun).toHaveBeenLastCalledWith('git', [
+      'worktree', 'add', '-b', 'feature/from-remote', '/repo-feature-from-remote', 'origin/main',
+    ], { cwd: '/repo' });
+  });
+
   it('rejects missing branch names before invoking git', async () => {
     const run = vi.fn();
 

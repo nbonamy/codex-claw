@@ -12,6 +12,39 @@ describe('NewSourceWorktreeDialog', () => {
     expect(wrapper.find('.new-source-worktree-dialog__folder-input').exists()).toBe(false);
   });
 
+  it('starts new branches from the selected repository branch with the default first', async () => {
+    const createWorktree = vi.fn().mockResolvedValue({
+      name: 'feature-session',
+      path: '/Users/nbonamy/src/codex-claw-feature-session',
+    });
+    const wrapper = mountDialog({
+      branches: [
+        { name: 'release', isDefault: false },
+        { name: 'main', isDefault: true },
+        { name: 'develop', isDefault: false },
+      ],
+      createWorktree,
+    });
+
+    expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('value'))).toStrictEqual([
+      'main',
+      'develop',
+      'release',
+    ]);
+    expect(wrapper.getComponent({ name: 'ElSelect' }).props('modelValue')).toBe('main');
+
+    wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'release');
+    await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/session');
+    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await flushPromises();
+
+    expect(createWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/session',
+      baseBranch: 'release',
+    });
+  });
+
   it('resolves the destination from the repo root and normalized branch name', async () => {
     const chooseDestination = vi.fn();
     const createWorktree = vi.fn().mockResolvedValue({
@@ -153,6 +186,7 @@ describe('NewSourceWorktreeDialog', () => {
 function mountDialog(overrides: Partial<{
   chooseDestination: (defaultPath: string) => Promise<string | null>;
   createWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<{ name: string; path: string }>;
+  branches: Array<{ name: string; isDefault: boolean; worktreePath?: string }>;
   repo: SourceRepository | null;
   suggestDestination: (input: { branchName: string; repoPath: string }) => Promise<string>;
   visible: boolean;

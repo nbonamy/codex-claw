@@ -35,7 +35,7 @@
                   class="claw-form-dialog__text-input agent-dialog__text-input"
                   type="text"
                   :aria-label="$t('surface.agentDialog.agentName')"
-                  :placeholder="$t('surface.agentDialog.nameThisAgent')"
+                  :placeholder="namePlaceholder"
                 />
               </div>
             </div>
@@ -169,7 +169,7 @@
                   class="claw-form-dialog__text-input agent-dialog__text-input"
                   type="text"
                   :aria-label="$t('surface.agentDialog.agentName')"
-                  :placeholder="$t('surface.agentDialog.nameThisAgent')"
+                  :placeholder="namePlaceholder"
                 />
               </div>
             </div>
@@ -232,6 +232,14 @@
       <div class="claw-dialog__footer">
         <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
         <button
+          v-if="isEditing"
+          class="claw-button claw-button--secondary"
+          type="button"
+          :aria-busy="submitting"
+          :disabled="submitting"
+          @click="clearAgentName"
+        >{{ $t('surface.agentDialog.clear') }}</button>
+        <button
           class="claw-button claw-button--primary"
           type="button"
           :aria-busy="submitting"
@@ -248,6 +256,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
@@ -364,6 +373,36 @@ const selectedSourceWorktrees = computed(() => {
   return [...pendingWorktree, ...worktrees, created];
 });
 const showSourceWorktreeControl = computed(() => selectedSourceRepository.value !== null);
+const selectedSourceWorktree = computed(() => selectedSourceWorktrees.value.find((worktree) => worktree.path === selectedSourceWorktreePath.value) ?? null);
+const namePlaceholder = computed(() => {
+  if (isEditing.value && props.agent) {
+    return agentDisplayName({ ...props.agent, name: null });
+  }
+
+  const repository = selectedSourceRepository.value;
+  const worktree = selectedSourceWorktree.value;
+  if (repository && worktree) {
+    const branch = worktree.path === pendingInitialWorktreeOptionValue
+      ? props.initialNewWorktreeBranchName.trim()
+      : worktree.name;
+    return agentDisplayName({
+      name: null,
+      folder: worktree.path,
+      workspace: {
+        kind: 'git',
+        folder: worktree.path,
+        repositoryName: repository.name,
+        repositoryRoot: repository.path,
+        branch: branch || null,
+        isLinkedWorktree: worktree.path !== repository.path,
+        primaryWorktreeRoot: repository.path,
+        updatedAt: '',
+      },
+    });
+  }
+
+  return folderName.value || translate('surface.agentDialog.nameThisAgent');
+});
 const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? translate('surface.agentDialog.customFolder') : translate('surface.agentDialog.chooseFolder'));
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
@@ -578,6 +617,7 @@ async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<S
   return props.createSourceWorktree({
     repoPath: input.repoPath,
     branchName: input.branchName,
+    ...(input.baseBranch ? { baseBranch: input.baseBranch } : {}),
     destinationPath: input.destinationPath,
     ...(selectedRemoteConnectionId.value ? { remoteConnectionId: selectedRemoteConnectionId.value } : {}),
   });
@@ -627,6 +667,26 @@ async function submit(): Promise<void> {
 
       await props.createAgent(createInput);
     }
+    close();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    submitting.value = false;
+  }
+}
+
+async function clearAgentName(): Promise<void> {
+  if (!isEditing.value || !props.agent || submitting.value) {
+    return;
+  }
+
+  submitting.value = true;
+  errorMessage.value = null;
+  try {
+    await props.updateAgent({
+      id: props.agent.id,
+      name: null,
+    });
     close();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);

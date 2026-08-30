@@ -14,10 +14,34 @@
       </div>
     </template>
 
-    <form
-      class="claw-form-dialog new-source-worktree-dialog__form"
-      @submit.prevent="create"
-    >
+    <form class="claw-form-dialog" @submit.prevent="create">
+      <section v-if="orderedBranches.length || branchesLoading" class="claw-form-dialog__field">
+        <div class="claw-form-dialog__field-heading">
+          <label
+            class="claw-form-dialog__label"
+            for="new-source-worktree-base-branch"
+          > {{ $t('surface.newSourceWorktreeDialog.startFrom') }} </label>
+        </div>
+        <div class="claw-form-dialog__control">
+          <el-select
+            id="new-source-worktree-base-branch"
+            v-model="baseBranch"
+            class="new-source-worktree-dialog__base-select"
+            :aria-label="$t('surface.newSourceWorktreeDialog.startFrom')"
+            :disabled="branchesLoading"
+            :loading="branchesLoading"
+            :placeholder="$t('surface.newSourceWorktreeDialog.chooseBaseBranch')"
+          >
+            <el-option
+              v-for="branch in orderedBranches"
+              :key="branch.name"
+              :label="branch.name"
+              :value="branch.name"
+            />
+          </el-select>
+        </div>
+      </section>
+
       <section class="claw-form-dialog__field">
         <div class="claw-form-dialog__field-heading">
           <label
@@ -91,11 +115,13 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { CreateSourceWorktreeInput, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
+import type { CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   allowDestinationOverride?: boolean;
+  branches?: SourceBranch[];
+  branchesLoading?: boolean;
   chooseDestination: (defaultPath: string) => Promise<string | null>;
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   repo: SourceRepository | null;
@@ -103,6 +129,8 @@ const props = withDefaults(defineProps<{
   visible: boolean;
 }>(), {
   allowDestinationOverride: true,
+  branches: () => [],
+  branchesLoading: false,
   repo: null,
 });
 
@@ -112,24 +140,42 @@ const emit = defineEmits<{
 }>();
 
 const branchName = ref('');
+const baseBranch = ref('');
 const customDestinationPath = ref('');
 const suggestedDestinationPath = ref('');
 const creating = ref(false);
 const errorMessage = ref<string | null>(null);
 let suggestionRequestId = 0;
 
-const canCreate = computed(() => Boolean(props.repo && branchName.value.trim() && !creating.value));
+const orderedBranches = computed(() => [...props.branches].sort((left, right) => (
+  Number(right.isDefault) - Number(left.isDefault) || left.name.localeCompare(right.name)
+)));
+const canCreate = computed(() => Boolean(
+  props.repo
+  && branchName.value.trim()
+  && (!orderedBranches.value.length || baseBranch.value)
+  && !props.branchesLoading
+  && !creating.value,
+));
 const destinationPath = computed(() => customDestinationPath.value || suggestedDestinationPath.value);
 
 watch(() => props.visible, (visible) => {
   if (visible) {
     branchName.value = '';
+    baseBranch.value = orderedBranches.value[0]?.name ?? '';
     customDestinationPath.value = '';
     suggestedDestinationPath.value = '';
     errorMessage.value = null;
     creating.value = false;
   }
 });
+
+watch(orderedBranches, (branches) => {
+  if (!props.visible) return;
+  if (!branches.some((branch) => branch.name === baseBranch.value)) {
+    baseBranch.value = branches[0]?.name ?? '';
+  }
+}, { immediate: true });
 
 watch([
   () => props.repo?.path ?? '',
@@ -164,6 +210,7 @@ async function create(): Promise<void> {
     const worktree = await props.createWorktree({
       repoPath: props.repo.path,
       branchName: branchName.value,
+      ...(baseBranch.value ? { baseBranch: baseBranch.value } : {}),
       ...(customDestinationPath.value ? { destinationPath: customDestinationPath.value } : {}),
     });
     emit('created', worktree);
@@ -210,8 +257,8 @@ async function refreshSuggestedDestinationPath(): Promise<void> {
 </script>
 
 <style scoped>
-.new-source-worktree-dialog__form {
-  gap: var(--space-16);
+.new-source-worktree-dialog__base-select {
+  width: 100%;
 }
 
 .new-source-worktree-dialog__folder-control {

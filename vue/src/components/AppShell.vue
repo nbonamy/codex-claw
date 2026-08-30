@@ -326,12 +326,14 @@
     />
     <NewSourceWorktreeDialog
       :allow-destination-override="false"
+      :branches="repositorySessionWorktreeBranches"
+      :branches-loading="repositorySessionWorktreeBranchesLoading"
       :visible="repositorySessionWorktreeSource !== null"
       :repo="repositorySessionWorktreeRepository"
       :choose-destination="chooseSourceWorktreeDestination"
       :create-worktree="createRepositorySessionWorktree"
       :suggest-destination="suggestRepositorySessionWorktreePath"
-      @close="repositorySessionWorktreeSource = null"
+      @close="closeRepositorySessionWorktree"
       @created="createRepositorySessionFromWorktree"
     />
     <RepositoryAcquireDialog
@@ -898,6 +900,8 @@ const repositorySessionAssignmentSessions = computed<WorkItemAssignmentSession[]
     }));
 });
 const repositorySessionWorktreeSource = ref<RepositorySessionSource | null>(null);
+const repositorySessionWorktreeBranches = ref<SourceBranch[]>([]);
+const repositorySessionWorktreeBranchesLoading = ref(false);
 const repositorySessionWorktreeRepository = computed<SourceRepository | null>(() => {
   const source = repositorySessionWorktreeSource.value;
   return source ? { name: source.repositoryName, path: source.repositoryRoot, worktrees: [] } : null;
@@ -1928,8 +1932,36 @@ function createRepositorySessionOnBranch(payload: RepositorySessionSource & { br
   void createRepositorySession(source, branch, teamId);
 }
 
-function openRepositorySessionWorktree(source: RepositorySessionSource): void {
+let repositorySessionWorktreeBranchesRequestId = 0;
+
+async function openRepositorySessionWorktree(source: RepositorySessionSource): Promise<void> {
+  const requestId = ++repositorySessionWorktreeBranchesRequestId;
   repositorySessionWorktreeSource.value = source;
+  repositorySessionWorktreeBranches.value = [];
+  repositorySessionWorktreeBranchesLoading.value = true;
+  const { remoteConnectionId } = repositorySessionContext(source);
+  try {
+    const branches = await props.listSourceBranches(source.repositoryRoot, remoteConnectionId || undefined);
+    if (requestId === repositorySessionWorktreeBranchesRequestId) {
+      repositorySessionWorktreeBranches.value = branches;
+    }
+  } catch (error) {
+    if (requestId === repositorySessionWorktreeBranchesRequestId) {
+      ElMessage.error(error instanceof Error ? error.message : String(error));
+      repositorySessionWorktreeSource.value = null;
+    }
+  } finally {
+    if (requestId === repositorySessionWorktreeBranchesRequestId) {
+      repositorySessionWorktreeBranchesLoading.value = false;
+    }
+  }
+}
+
+function closeRepositorySessionWorktree(): void {
+  repositorySessionWorktreeBranchesRequestId += 1;
+  repositorySessionWorktreeSource.value = null;
+  repositorySessionWorktreeBranches.value = [];
+  repositorySessionWorktreeBranchesLoading.value = false;
 }
 
 async function createRepositorySessionWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
@@ -1952,7 +1984,7 @@ async function suggestRepositorySessionWorktreePath(input: Pick<CreateSourceWork
 
 async function createRepositorySessionFromWorktree(worktree: SourceWorktree): Promise<void> {
   const source = repositorySessionWorktreeSource.value;
-  repositorySessionWorktreeSource.value = null;
+  closeRepositorySessionWorktree();
   if (!source) return;
   const { teamId } = repositorySessionContext(source);
   try {

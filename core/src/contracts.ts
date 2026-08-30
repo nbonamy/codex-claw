@@ -1050,6 +1050,7 @@ export type SourceFolderState = {
 export type CreateSourceWorktreeInput = {
   repoPath: string;
   branchName: string;
+  baseBranch?: string;
   destinationPath?: string;
   remoteConnectionId?: string;
 };

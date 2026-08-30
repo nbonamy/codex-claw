@@ -38,7 +38,7 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Resolved path');
     expect(wrapper.text()).not.toContain('Coding agent');
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
-    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Name this agent');
+    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Optional');
     expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
     expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
       ['claw-button', 'claw-button--tertiary'],
@@ -143,6 +143,7 @@ describe('AgentDialog', () => {
     expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentAvatarPicker' }).exists()).toBe(false);
     expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
+    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('codex-claw');
     await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
 
@@ -167,13 +168,19 @@ describe('AgentDialog', () => {
 
     expect(wrapper.text()).not.toContain('Backend');
     expect(wrapper.text()).not.toContain('Claude Code');
-    await wrapper.get('.agent-dialog__text-input').setValue('');
-    await saveButton(wrapper).trigger('click');
+    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
+      ['claw-button', 'claw-button--tertiary'],
+      ['claw-button', 'claw-button--secondary'],
+      ['claw-button', 'claw-button--primary'],
+    ]);
+    await wrapper.get('.claw-dialog__footer .claw-button--secondary').trigger('click');
+    await flushPromises();
 
     expect(updateAgent).toHaveBeenCalledWith({
       id: 'agent-dina',
       name: null,
     });
+    expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 
   it('creates ticket-driven agents in a selected or new team', async () => {
@@ -314,6 +321,7 @@ describe('AgentDialog', () => {
     await nextTick();
     await emitSelect(wrapper, 'agent-dialog-worktree', '/Users/nbonamy/src/codex-claw-source-folder');
     await nextTick();
+    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('source-folder');
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({
