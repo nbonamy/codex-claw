@@ -3,7 +3,13 @@
   "version": "0.12.0",
   "private": true,
   "devDependencies": {
-    "prettier": "^3.8.3"
+    "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",
+    "dotenv": "^17.4.2",
+    "knip": "6.33.0",
+    "postcss-html": "^1.8.1",
+    "prettier": "^3.8.3",
+    "stylelint-config-recommended": "^18.0.0",
+    "stylelint-config-recommended-vue": "^1.6.1"
   },
   "workspaces": [
     "core",
@@ -33,7 +39,8 @@
     "dev:web": "npm run build:sdk && npm run build -w @codex-claw/backend && npm run dev -w @codex-claw/web",
     "format:vue-styles": "node scripts/format-vue-styles.mjs",
     "format:vue-styles:check": "node scripts/format-vue-styles.mjs --check",
-    "lint": "npm run lint --workspaces",
+    "lint:dead-code": "knip",
+    "lint": "npm run lint --workspaces && npm run lint:dead-code",
     "lint:css": "npm run lint:css -w @codex-claw/vue",
     "lint:electron": "npm run lint -w @codex-claw/electron",
     "lint:web": "npm run lint -w @codex-claw/web",

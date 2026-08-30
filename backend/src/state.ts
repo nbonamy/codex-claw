@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { AppStatePersistence } from './state-persistence';
 
-export const CODEX_CLAW_HOME_ENV = 'CODEX_CLAW_HOME';
+const CODEX_CLAW_HOME_ENV = 'CODEX_CLAW_HOME';
 let persistence: AppStatePersistence | null = null;
 let persistencePath: string | null = null;
 
@@ -46,7 +46,7 @@ export async function saveBackendSnapshot(snapshot: AppSnapshot): Promise<void> 
   await backendStatePersistence().save(snapshot);
 }
 
-export function backendStatePersistence(): AppStatePersistence {
+function backendStatePersistence(): AppStatePersistence {
   const filePath = backendStateFilePath();
   if (!persistence || persistencePath !== filePath) {
     persistence = new AppStatePersistence(filePath);

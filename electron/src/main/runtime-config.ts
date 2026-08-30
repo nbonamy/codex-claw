@@ -76,7 +76,7 @@ export function runtimeClawdWatchFile(deps: RuntimeClawdConfigDeps = {}): string
   return env.CODEX_CLAW_BACKEND_WATCH_FILE?.trim() || null;
 }
 
-export function runtimeClawdAssetsPath(deps: RuntimeClawdConfigDeps = {}): string {
+function runtimeClawdAssetsPath(deps: RuntimeClawdConfigDeps = {}): string {
   const env = deps.env ?? process.env;
   const configured = env.CODEX_CLAW_ASSETS_PATH?.trim();
   if (configured) {

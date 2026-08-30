@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["lipo", "shasum"],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.mjs",
+        "website/script.js",
+        "vite.sdk-aliases.ts"
+      ],
+      "project": ["scripts/**/*.mjs", "website/**/*.{js,mjs}", "*.ts"],
+      "stylelint": {
+        "config": [".stylelintrc.json"]
+      }
+    },
+    "electron": {
+      "entry": [
+        "forge.config.ts",
+        "vite.*.config.ts",
+        "src/main.ts",
+        "src/preload.ts",
+        "src/preload/index.ts",
+        "src/renderer/main.ts"
+      ]
+    },
+    "web": {
+      "entry": ["src/server/index.ts"]
+    }
+  }
+}

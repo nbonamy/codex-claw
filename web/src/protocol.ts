@@ -2,7 +2,7 @@ import type { MainToRendererEvent } from '@codex-claw/core/contracts';
 
 export const clawWebProtocolVersion = 1 as const;
 
-export type ClawWebRequest = {
+type ClawWebRequest = {
   version: typeof clawWebProtocolVersion;
   type: 'request';
   id: string;
@@ -10,19 +10,19 @@ export type ClawWebRequest = {
   args: unknown[];
 };
 
-export type ClawWebReady = {
+type ClawWebReady = {
   version: typeof clawWebProtocolVersion;
   type: 'ready';
   userId: string;
 };
 
-export type ClawWebEvent = {
+type ClawWebEvent = {
   version: typeof clawWebProtocolVersion;
   type: 'event';
   event: MainToRendererEvent;
 };
 
-export type ClawWebResponse = {
+type ClawWebResponse = {
   version: typeof clawWebProtocolVersion;
   type: 'response';
   id: string;

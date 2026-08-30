@@ -11,7 +11,7 @@ export type CodexResourceSharingPaths = {
   userCodexHome: string;
 };
 
-export function defaultCodexResourceSharingPaths(): CodexResourceSharingPaths {
+function defaultCodexResourceSharingPaths(): CodexResourceSharingPaths {
   return {
     clawCodexHome: backendCodexHomeDir(),
     userCodexHome: path.join(homedir(), '.codex'),

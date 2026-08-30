@@ -2,9 +2,9 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/core/contracts';
 
-export const DEFAULT_AGENT_FILE_LIMIT = 1000;
-export const DEFAULT_AGENT_FILE_DEPTH = 8;
-export const DEFAULT_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
+const DEFAULT_AGENT_FILE_LIMIT = 1000;
+const DEFAULT_AGENT_FILE_DEPTH = 8;
+const DEFAULT_AGENT_FILE_READ_BYTES = 2 * 1024 * 1024;
 
 const skippedDirectoryNames = new Set([
   '.git',
@@ -122,7 +122,7 @@ export async function previewAgentFolderFile(
   };
 }
 
-export async function resolveAgentFilePath(folder: string, filePath: string): Promise<{ absolutePath: string; relativePath: string }> {
+async function resolveAgentFilePath(folder: string, filePath: string): Promise<{ absolutePath: string; relativePath: string }> {
   const root = path.resolve(folder);
   const target = path.resolve(root, filePath);
   const relativePath = path.relative(root, target);

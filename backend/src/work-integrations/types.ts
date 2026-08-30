@@ -6,17 +6,17 @@ export type WorkProviderDeviceAuthorization = WorkProviderAuthorization & {
   intervalSeconds: number;
 };
 
-export type WorkProviderDeviceTokenPending = {
+type WorkProviderDeviceTokenPending = {
   status: 'pending';
   intervalSeconds?: number;
 };
 
-export type WorkProviderDeviceTokenSuccess = {
+type WorkProviderDeviceTokenSuccess = {
   status: 'success';
   token: Omit<WorkProviderToken, 'accountLabel' | 'connectedAt' | 'provider'>;
 };
 
-export type WorkProviderDeviceTokenError = {
+type WorkProviderDeviceTokenError = {
   status: 'error';
   code: 'access_denied' | 'expired' | 'not_configured' | 'unavailable';
   message: string;

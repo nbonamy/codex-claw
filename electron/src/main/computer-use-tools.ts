@@ -8,7 +8,7 @@ const helperExecutableName = 'computer-use-pilot';
 const timeoutMs = 30_000;
 export const computerUseSessionTimeoutMs = 30_000;
 
-export const computerUseCommands = [
+const computerUseCommands = [
   'status',
   'request_accessibility',
   'request_screen_capture',
@@ -156,7 +156,7 @@ export function isComputerUseCommand(value: unknown): value is ComputerUseComman
   return typeof value === 'string' && (computerUseCommands as readonly string[]).includes(value);
 }
 
-export function resolveComputerUsePilotPath(options: ComputerUseOptions): string | null {
+function resolveComputerUsePilotPath(options: ComputerUseOptions): string | null {
   const candidates = [
     options.pilotPath,
     process.env.CODEX_CLAW_COMPUTER_USE_PILOT_PATH,

@@ -22,7 +22,7 @@ import { warnMain } from './log';
 import { initializeCodexResourceSharing } from './codex-resource-sharing';
 import { loadPluginStatus } from './plugin-status';
 
-export type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
+type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
 export type ClawdRuntimeOptions = {
   emitEvent(event: ClawBackendEvent): void;

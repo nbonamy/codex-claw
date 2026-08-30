@@ -108,7 +108,7 @@ export async function getResolvedClawdVersion(
   return parseClawdVersion(result.stdout);
 }
 
-export async function uninstallClawdDaemon(
+async function uninstallClawdDaemon(
   dependencies: DaemonLaunchAgentDependencies = {},
 ): Promise<ClawdDaemonStatus> {
   const resolved = resolveLaunchAgent(dependencies);

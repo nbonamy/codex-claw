@@ -28,7 +28,7 @@ export function debugMain(area: string, message: string, details?: Record<string
   writeLog('debug', area, message, details);
 }
 
-export function infoMain(area: string, message: string, details?: Record<string, unknown>): void {
+function infoMain(area: string, message: string, details?: Record<string, unknown>): void {
   writeLog('info', area, message, details);
 }
 

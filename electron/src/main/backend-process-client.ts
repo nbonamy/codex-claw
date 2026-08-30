@@ -1,6 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawBackendEvent, type ClawBackendHealth, type ClawRpcId, type ClawRpcRequest, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
@@ -332,5 +331,3 @@ export class ClawBackendProcessClient {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-export type FakeChildProcess = ChildProcessWithoutNullStreams & EventEmitter;

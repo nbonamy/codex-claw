@@ -15,7 +15,7 @@ type WorkItemLister = {
   listItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
 };
 
-export type LoopPromptContext = {
+type LoopPromptContext = {
   loopId: string;
   executionId: string;
   workItemId: string;

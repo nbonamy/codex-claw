@@ -37,7 +37,7 @@ export function logMain(area: string, message: string, details?: Record<string, 
   write('info', area, message, details);
 }
 
-export function debugMain(area: string, message: string, details?: Record<string, unknown>): void {
+function debugMain(area: string, message: string, details?: Record<string, unknown>): void {
   write('debug', area, message, details);
 }
 
@@ -45,7 +45,7 @@ export function warnMain(area: string, message: string, details?: Record<string,
   write('warn', area, message, details);
 }
 
-export function errorMain(area: string, message: string, details?: Record<string, unknown>): void {
+function errorMain(area: string, message: string, details?: Record<string, unknown>): void {
   write('error', area, message, details);
 }
 

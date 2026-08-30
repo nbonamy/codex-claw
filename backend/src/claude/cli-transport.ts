@@ -71,7 +71,7 @@ export type ClaudePermissionRequest = {
   questions?: AskUserQuestion[];
 };
 
-export type ClaudePermissionDecision = 'allow' | 'allow_conversation' | 'always_allow' | 'deny';
+type ClaudePermissionDecision = 'allow' | 'allow_conversation' | 'always_allow' | 'deny';
 
 export type ClaudePermissionResponse = {
   decision?: ClaudePermissionDecision | null;

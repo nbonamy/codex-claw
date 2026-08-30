@@ -188,8 +188,12 @@ Use the repo scripts for broad verification:
 npm test
 npm run test:coverage
 npm run lint
+npm run lint:dead-code
 npm run build
 ```
+
+`npm run lint` includes the Knip dead-code check. Run `lint:dead-code`
+directly when iterating on unused files, dependencies, exports, or types.
 
 For focused iteration, run the smallest relevant Vitest target first, then the
 full relevant gate before handoff.
