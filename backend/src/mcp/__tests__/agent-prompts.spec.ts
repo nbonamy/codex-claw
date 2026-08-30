@@ -74,8 +74,8 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Use browser-open with an HTTP, HTTPS, or workspace-local file URL');
     expect(instructions).toContain('File URLs must resolve inside your agent folder');
     expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
-    expect(instructions).toContain('absolute macOS logical screen points');
-    expect(instructions).toContain('Use a screen screenshot when interacting with the menu bar');
+    expect(instructions).toContain('call computer-use-guide and follow the returned instructions');
+    expect(instructions).toContain('built-in computer-use skill or sky.* methods');
     expect(instructions).toContain('chrome:control-chrome');
   });
 

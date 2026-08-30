@@ -19,6 +19,7 @@ export const computerUseCommands = [
   'focus_app',
   'get_app_state',
   'click',
+  'dismiss',
   'type_text',
   'set_value',
   'scroll',

@@ -17,6 +17,8 @@ describe('Claw tool presentation', () => {
   it.each([
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
     ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
+    ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],
+    ['computer-use-dismiss', DeviceDesktopIcon, 'Dismissed native menu'],
     ['computer-use-screenshot', DeviceDesktopIcon, 'Captured main display screenshot'],
     ['computer-use-request-screen-recording', DeviceDesktopIcon, 'Requested macOS Screen Recording access for Computer Use'],
     ['send-message', MessageIcon, 'Sent message to codex-app-sdk'],

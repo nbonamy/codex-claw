@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ZodType } from 'zod';
 import { registerComputerUseTools, type ComputerUseClient } from '../computer-use-tools';
 import { STRUCTURED_TOOL_RESULT_NOTICE } from '../tool-result';
 
@@ -7,9 +8,15 @@ type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 
 describe('Computer Use MCP tools', () => {
   const handlers = new Map<string, ToolHandler>();
-  const definitions = new Map<string, { description?: string }>();
+  const definitions = new Map<string, {
+    description?: string;
+    inputSchema?: Record<string, ZodType>;
+  }>();
   const server = {
-    registerTool: vi.fn((name: string, definition: { description?: string }, handler: ToolHandler) => {
+    registerTool: vi.fn((name: string, definition: {
+      description?: string;
+      inputSchema?: Record<string, ZodType>;
+    }, handler: ToolHandler) => {
       definitions.set(name, definition);
       handlers.set(name, handler);
     }),
@@ -29,15 +36,38 @@ describe('Computer Use MCP tools', () => {
   });
 
   it('defines coordinate clicks as absolute macOS logical screen points', () => {
-    expect(definitions.get('computer-use-click')?.description).toContain('absolute macOS logical screen coordinates');
-    expect(definitions.get('computer-use-click')?.description).toContain('never window-relative positions or screenshot pixels');
-    expect(definitions.get('computer-use-screenshot')?.description).toContain('Use screen scope to include the menu bar');
+    expect(definitions.get('computer-use-click')?.description).toContain('absolute logical screen coordinates');
+    expect(definitions.get('computer-use-screenshot')?.description).toContain('coordinate metadata');
   });
 
-  it('documents physical clicks as an explicit foreground fallback', () => {
-    expect(definitions.get('computer-use-click')?.description).toContain('Defaults to AXPress');
-    expect(definitions.get('computer-use-click')?.description).toContain('physical=true');
-    expect(definitions.get('computer-use-click')?.description).toContain('frontmost and unobstructed');
+  it('routes models through the progressive operating guide', () => {
+    expect(definitions.get('computer-use-guide')?.description).toContain('before using any other Computer Use tool');
+  });
+
+  it('returns the complete operating workflow from the guide tool', async () => {
+    const guideResult = await handlers.get('computer-use-guide')?.({});
+    expect(guideResult).toMatchObject({
+      content: [{
+        type: 'text',
+        text: expect.stringContaining('Native menus:'),
+      }],
+      structuredContent: { loaded: true },
+      isError: false,
+    });
+
+    const result = guideResult as { content: Array<{ text: string }> };
+    expect(result.content[0]?.text).toContain('Prefer a semantic selector');
+    expect(result.content[0]?.text).toContain('computer-use-dismiss');
+    expect(result.content[0]?.text).toContain('There is no mouse-move or hover tool');
+    expect(result.content[0]?.text).toContain('inspect after each state-changing action');
+  });
+
+  it('accepts semantic click selectors and constrains accessibility scope', () => {
+    const clickSchema = definitions.get('computer-use-click')?.inputSchema;
+    expect(clickSchema?.selector.safeParse({ role: 'AXButton', title: 'Cancel' }).success).toBe(true);
+    expect(clickSchema?.selector.safeParse({ occurrence: 2 }).success).toBe(false);
+    expect(clickSchema?.accessibilityScope.safeParse('menu_bar').success).toBe(true);
+    expect(clickSchema?.accessibilityScope.safeParse('window').success).toBe(false);
   });
 
   it('documents the virtual cursor session lifetime', () => {
@@ -47,6 +77,7 @@ describe('Computer Use MCP tools', () => {
 
   it('registers the complete Computer Use surface', () => {
     expect([...handlers.keys()]).toStrictEqual([
+      'computer-use-guide',
       'computer-use-status',
       'computer-use-request-accessibility',
       'computer-use-request-screen-recording',
@@ -58,6 +89,7 @@ describe('Computer Use MCP tools', () => {
       'computer-use-get-app-state',
       'computer-use-screenshot',
       'computer-use-click',
+      'computer-use-dismiss',
       'computer-use-type-text',
       'computer-use-set-value',
       'computer-use-scroll',
@@ -85,8 +117,9 @@ describe('Computer Use MCP tools', () => {
     ['computer-use-find-apps', { app: 'Claw' }, 'find_apps'],
     ['computer-use-launch-app', { path: '/Applications/Claw.app' }, 'launch_app'],
     ['computer-use-focus-app', { pid: 42 }, 'focus_app'],
-    ['computer-use-get-app-state', { app: 'Claw', maxDepth: 12 }, 'get_app_state'],
-    ['computer-use-click', { element_index: 7, physical: true }, 'click'],
+    ['computer-use-get-app-state', { app: 'Claw', accessibilityScope: 'menu_bar', maxDepth: 12 }, 'get_app_state'],
+    ['computer-use-click', { app: 'Claw', selector: { role: 'AXButton', title: 'Cancel' } }, 'click'],
+    ['computer-use-dismiss', { app: 'Claw', accessibilityScope: 'menu_bar' }, 'dismiss'],
     ['computer-use-type-text', { app: 'Claw', text: 'hello' }, 'type_text'],
     ['computer-use-set-value', { element_index: 7, value: 'hello' }, 'set_value'],
     ['computer-use-scroll', { x: 10, y: 20, deltaY: 400 }, 'scroll'],

@@ -150,13 +150,19 @@ user's global MCP configuration.
 agent -> codex_claw MCP -> clawd -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
 ```
 
-Tools are `computer-use-status`, `computer-use-request-accessibility`,
+Tools are `computer-use-guide`, `computer-use-status`, `computer-use-request-accessibility`,
 `computer-use-request-screen-recording`,
 `computer-use-list-apps`, `computer-use-find-apps`,
 `computer-use-launch-app`, `computer-use-focus-app`,
 `computer-use-get-app-state`, `computer-use-screenshot`, `computer-use-click`,
+`computer-use-dismiss`,
 `computer-use-type-text`, `computer-use-set-value`, and
 `computer-use-scroll`.
+
+The developer prompt tells agents to call `computer-use-guide` before their
+first Computer Use action. The guide returns the cross-tool workflow and
+fallback rules on demand, keeping individual MCP descriptions focused on their
+own contracts without permanently loading detailed operating instructions.
 
 `computer-use-screenshot` returns MCP image content rather than embedding PNG
 base64 in text. Its `window` scope targets the frontmost or explicitly selected
@@ -174,6 +180,15 @@ Screen Recording trust, surfaced in General -> System permissions.
 mouse input, or after an `AXPress` reports success but refreshed state shows no
 change. Physical clicks require the target app to remain frontmost and the
 target position to remain unobstructed.
+
+For dialogs and live interfaces, `computer-use-click` accepts a semantic AX
+selector (`role`, `title`, `description`, `value`, `subrole`, and optional
+occurrence). Prefer this to a numeric element index when the tree can change
+between inspection and action. `accessibilityScope: "menu_bar"` lets agents
+inspect and activate native application menus through AX without moving the
+user's pointer. After using a native menu, `computer-use-dismiss` applies its
+AX cancel action before the agent continues typing or acting in the app.
+Computer Use intentionally exposes no mouse-move/hover action.
 
 The helper reports its own Accessibility trust. Agents must check status or
 request permission before inspection/actions and refresh app state before

@@ -644,6 +644,11 @@ export const messages = {
               failed: 'Failed clicking {target}',
               running: 'Clicking {target}',
             },
+            computerUseDismiss: {
+              completed: 'Dismissed native menu',
+              failed: 'Failed dismissing native menu',
+              running: 'Dismissing native menu',
+            },
             computerUseFindApps: {
               completed: 'Found {target}',
               failed: 'Failed finding {target}',
@@ -658,6 +663,11 @@ export const messages = {
               completed: 'Inspected {target}',
               failed: 'Failed inspecting {target}',
               running: 'Inspecting {target}',
+            },
+            computerUseGuide: {
+              completed: 'Loaded Computer Use guide',
+              failed: 'Failed loading Computer Use guide',
+              running: 'Loading Computer Use guide',
             },
             computerUseLaunchApp: {
               completed: 'Launched {target}',

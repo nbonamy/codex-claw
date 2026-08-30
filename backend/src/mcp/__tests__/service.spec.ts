@@ -330,9 +330,11 @@ describe('ClawMcpService', () => {
       jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
     });
     expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
+      'computer-use-guide',
       'computer-use-status',
       'computer-use-get-app-state',
       'computer-use-click',
+      'computer-use-dismiss',
       'computer-use-stop',
     ]));
 

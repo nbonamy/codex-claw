@@ -45,9 +45,11 @@ const BROWSER_TOOLS = new Set([
 ]);
 const COMPUTER_USE_TOOLS = new Set([
   'computer-use-click',
+  'computer-use-dismiss',
   'computer-use-find-apps',
   'computer-use-focus-app',
   'computer-use-get-app-state',
+  'computer-use-guide',
   'computer-use-launch-app',
   'computer-use-list-apps',
   'computer-use-request-accessibility',
