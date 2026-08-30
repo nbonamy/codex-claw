@@ -3307,11 +3307,6 @@ function handleAppCommand(command: AppCommand): void {
     return;
   }
 
-  if (command.type === 'new-agent') {
-    openNewAgent();
-    return;
-  }
-
   if (command.type === 'close-active-agent') {
     if (!isAgentWorkspaceVisible.value) {
       return;

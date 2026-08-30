@@ -54,7 +54,7 @@ describe('appCommandFromInput', () => {
 
   it('maps file and edit menu command shortcuts', () => {
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'n' })).toStrictEqual({ type: 'new-team' });
-    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 't' })).toStrictEqual({ type: 'new-agent' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 't' })).toBeNull();
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'w' })).toStrictEqual({ type: 'close-active-agent' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'w' })).toStrictEqual({ type: 'close-active-team' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'q' })).toStrictEqual({ type: 'quit' });

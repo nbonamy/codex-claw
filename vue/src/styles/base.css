@@ -90,6 +90,7 @@ button {
   display: grid;
   gap: var(--space-2);
   justify-items: start;
+  margin-bottom: var(--space-4);
   text-align: left;
 }
 
@@ -177,7 +178,7 @@ button {
 
 .claw-button--tertiary:hover:not(:disabled) {
   color: var(--color-text);
-  background: var(--color-surface-low);
+  /* background: var(--color-surface-low); */
 }
 
 .claw-button:focus-visible {
@@ -223,9 +224,8 @@ button {
 }
 
 .claw-form-dialog__field-heading {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
+  display: grid;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -247,9 +247,21 @@ button {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.claw-form-dialog__footer {
+  justify-content: space-between;
+}
+
+.claw-form-dialog__footer-left,
+.claw-form-dialog__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.claw-form-dialog__footer-actions {
+  margin-left: auto;
 }
 
 .claw-form-dialog__control {

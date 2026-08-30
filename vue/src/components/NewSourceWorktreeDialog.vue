@@ -1,27 +1,16 @@
 <template>
-  <el-dialog
-    class="claw-dialog new-source-worktree-dialog"
+  <FormDialog
+    class="new-source-worktree-dialog"
     :model-value="visible"
-    :teleported="false"
-    width="520px"
-    :show-close="false"
-    destroy-on-close
+    :title="$t('surface.newSourceWorktreeDialog.newWorktree')"
     @update:model-value="onVisibilityChanged"
   >
-    <template #header>
-      <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">{{ $t('surface.newSourceWorktreeDialog.newWorktree') }}</h2>
-      </div>
-    </template>
-
     <form class="claw-form-dialog" @submit.prevent="create">
-      <section v-if="orderedBranches.length || branchesLoading" class="claw-form-dialog__field">
-        <div class="claw-form-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label"
-            for="new-source-worktree-base-branch"
-          > {{ $t('surface.newSourceWorktreeDialog.startFrom') }} </label>
-        </div>
+      <FormDialogField
+        v-if="orderedBranches.length || branchesLoading"
+        :label="$t('surface.newSourceWorktreeDialog.startFrom')"
+        label-for="new-source-worktree-base-branch"
+      >
         <div class="claw-form-dialog__control">
           <el-select
             id="new-source-worktree-base-branch"
@@ -40,15 +29,12 @@
             />
           </el-select>
         </div>
-      </section>
+      </FormDialogField>
 
-      <section class="claw-form-dialog__field">
-        <div class="claw-form-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label"
-            for="new-source-worktree-branch"
-          > {{ $t('surface.newSourceWorktreeDialog.branch') }} </label>
-        </div>
+      <FormDialogField
+        :label="$t('surface.newSourceWorktreeDialog.branch')"
+        label-for="new-source-worktree-branch"
+      >
         <div class="claw-form-dialog__control claw-form-dialog__input-control">
           <input
             id="new-source-worktree-branch"
@@ -58,15 +44,13 @@
             :placeholder="$t('repositories.worktree.branchPlaceholder')"
           />
         </div>
-      </section>
+      </FormDialogField>
 
-      <section v-if="allowDestinationOverride" class="claw-form-dialog__field">
-        <div class="claw-form-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label"
-            for="new-source-worktree-folder"
-          > {{ $t('surface.newSourceWorktreeDialog.folder') }} </label>
-        </div>
+      <FormDialogField
+        v-if="allowDestinationOverride"
+        :label="$t('surface.newSourceWorktreeDialog.folder')"
+        label-for="new-source-worktree-folder"
+      >
         <div class="claw-form-dialog__control claw-form-dialog__input-control new-source-worktree-dialog__folder-control">
           <input
             id="new-source-worktree-folder"
@@ -87,7 +71,7 @@
             <FolderIcon aria-hidden="true" />
           </button>
         </div>
-      </section>
+      </FormDialogField>
 
       <el-alert
         v-if="errorMessage"
@@ -99,24 +83,24 @@
     </form>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.newSourceWorktreeDialog.cancel') }}</button>
-        <button
-          class="claw-button claw-button--primary"
-          type="button"
-          :aria-busy="creating"
-          :disabled="creating || !canCreate"
-          @click="create"
-        > {{ $t('surface.newSourceWorktreeDialog.create') }} </button>
-      </div>
+      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.newSourceWorktreeDialog.cancel') }}</button>
+      <button
+        class="claw-button claw-button--primary"
+        type="button"
+        :aria-busy="creating"
+        :disabled="creating || !canCreate"
+        @click="create"
+      > {{ $t('surface.newSourceWorktreeDialog.create') }} </button>
     </template>
-  </el-dialog>
+  </FormDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
 
 const props = withDefaults(defineProps<{
   allowDestinationOverride?: boolean;

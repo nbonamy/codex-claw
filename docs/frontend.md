@@ -87,6 +87,7 @@ component is single-use.
 | Application launcher and icon catalog | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
 | Product glyphs, including GitHub | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
 | Dialog chrome and footer actions | `.claw-dialog`, `.claw-button` | `vue/src/styles/base.css` |
+| Form dialog structure and fields | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
 
 ### Reusable product components
 
@@ -116,8 +117,9 @@ follow [Custom MCP Tools](custom-tools.md).
 
 ### Dialogs and Pickers
 
-- Form dialogs use `.claw-dialog`: compact title header, one padded semantic
-  body, and a divided footer. Form content adds no second outer gutter.
+- Form dialogs compose `FormDialog` and `FormDialogField`: a title and optional
+  subtitle, one padded semantic body, labels above controls, and a divided
+  footer. Form content adds no second outer gutter.
 - Footer actions use `.claw-button`: dismiss is tertiary, alternatives are
   secondary, and at most one action is primary.
 - Searchable compact pickers use the filter as the complete top row. The body

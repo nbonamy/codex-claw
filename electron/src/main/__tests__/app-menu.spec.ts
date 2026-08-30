@@ -67,7 +67,6 @@ describe('app menu', () => {
 
     expect(menuLabels(submenu(menu, 'File'))).toStrictEqual([
       'New Team',
-      'New Agent',
       'Close Agent',
       'Close Team',
       'Quit',
@@ -111,7 +110,6 @@ describe('app menu', () => {
 
     [
       ['File', 'New Team'],
-      ['File', 'New Agent'],
       ['File', 'Close Agent'],
       ['File', 'Close Team'],
       ['File', 'Quit'],
@@ -124,29 +122,27 @@ describe('app menu', () => {
     ].forEach(([menuLabel, itemLabel]) => clickItem(menu, menuLabel, itemLabel));
 
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(1, { type: 'new-team' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'new-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'close-active-agent' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, { type: 'close-active-team' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, { type: 'quit' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, {
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'close-active-agent' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'close-active-team' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, { type: 'quit' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, {
       type: 'open-agent-composer',
       prompt: '/compact',
       submit: true,
     });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'open-review' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'open-browser' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-teams' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: 1 });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-agents', direction: -1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'open-review' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'open-browser' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'cycle-teams' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-agents', direction: 1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: -1 });
     clickItem(menu, 'Help', 'What’s New');
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'open-whats-new' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'open-whats-new' });
   });
 
   it('uses the expected file menu accelerators', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuItem(menu, 'File', 'New Team')?.accelerator).toBe('CommandOrControl+N');
-    expect(menuItem(menu, 'File', 'New Agent')?.accelerator).toBe('CommandOrControl+T');
     expect(menuItem(menu, 'File', 'Close Agent')?.accelerator).toBe('CommandOrControl+W');
     expect(menuItem(menu, 'File', 'Close Team')?.accelerator).toBe('CommandOrControl+Shift+W');
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');

@@ -1,204 +1,133 @@
 <template>
-  <el-dialog
-    class="claw-dialog agent-dialog"
+  <FormDialog
+    class="agent-dialog"
     :model-value="visible"
-    :teleported="false"
-    width="520px"
-    :show-close="false"
-    destroy-on-close
+    :title="title"
     @update:model-value="onVisibilityChanged"
   >
-    <template #header>
-      <div class="claw-form-dialog__header agent-dialog__header">
-        <h2 class="claw-dialog__title">{{ title }}</h2>
-      </div>
-    </template>
-
-    <el-form
-      class="claw-form-dialog agent-dialog__form"
-      @submit.prevent="submit"
-    >
-      <section
-        v-if="isEditing"
-        class="agent-dialog__identity-group"
-      >
-        <div class="agent-dialog__identity-rows">
-          <div class="agent-dialog__workspace-row agent-dialog__identity-row">
-            <div class="agent-dialog__row-copy">
-              <label class="agent-dialog__row-label" for="agent-dialog-name">{{ $t('surface.agentDialog.name') }}</label>
-            </div>
-            <div class="agent-dialog__row-control agent-dialog__identity-control">
-              <div class="agent-dialog__identity-input">
-                <input
-                  id="agent-dialog-name"
-                  v-model="name"
-                  class="claw-form-dialog__text-input agent-dialog__text-input"
-                  type="text"
-                  :aria-label="$t('surface.agentDialog.agentName')"
-                  :placeholder="namePlaceholder"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
+    <form class="claw-form-dialog" @submit.prevent="submit">
+      <FormDialogField
         v-if="!isEditing"
-        class="agent-dialog__workspace-group"
+        :label="$t('surface.agentDialog.repository')"
+        label-for="agent-dialog-repository"
       >
-        <div class="agent-dialog__workspace-rows">
-          <div class="agent-dialog__workspace-row">
-            <div class="agent-dialog__row-copy">
-              <label
-                class="agent-dialog__row-label"
-                for="agent-dialog-repository"
-              >{{ $t('surface.agentDialog.repository') }}</label>
-            </div>
-            <div class="agent-dialog__row-control">
-              <el-select
-                id="agent-dialog-repository"
-                v-model="repositoryControlValue"
-                class="agent-dialog__workspace-select"
-                :disabled="choosingFolder"
-                @update:model-value="selectRepositoryControl"
-              >
-                <el-option
-                  class="agent-dialog__source-custom-option"
-                  :label="customFolderOptionLabel"
-                  :value="customFolderOptionValue"
-                />
-                <el-option
-                  v-for="repository in sourceRepositories"
-                  :key="repository.path"
-                  :label="repository.name"
-                  :value="repository.path"
-                />
-              </el-select>
-            </div>
-          </div>
-
-          <div
-            v-if="showSourceWorktreeControl"
-            class="agent-dialog__workspace-row"
+        <div class="claw-form-dialog__control">
+          <el-select
+            id="agent-dialog-repository"
+            v-model="repositoryControlValue"
+            :disabled="choosingFolder"
+            @update:model-value="selectRepositoryControl"
           >
-            <div class="agent-dialog__row-copy">
-              <label
-                class="agent-dialog__row-label"
-                for="agent-dialog-worktree"
-              >{{ $t('surface.agentDialog.workIn') }}</label>
-            </div>
-            <div class="agent-dialog__row-control">
-              <el-select
-                id="agent-dialog-worktree"
-                v-model="selectedSourceWorktreePath"
-                class="agent-dialog__workspace-select"
-                :disabled="Boolean(initialNewWorktreeBranchName.trim())"
-                @update:model-value="selectWorktreeControl"
-              >
-                <el-option
-                  v-for="worktree in selectedSourceWorktrees"
-                  :key="worktree.path"
-                  :label="worktree.name"
-                  :value="worktree.path"
-                />
-                <el-option
-                  class="agent-dialog__source-custom-option"
-                  :label="$t('surface.agentDialog.newWorktree')"
-                  :value="newWorktreeOptionValue"
-                />
-              </el-select>
-            </div>
-          </div>
+            <el-option
+              class="agent-dialog__source-custom-option"
+              :label="customFolderOptionLabel"
+              :value="customFolderOptionValue"
+            />
+            <el-option
+              v-for="repository in sourceRepositories"
+              :key="repository.path"
+              :label="repository.name"
+              :value="repository.path"
+            />
+          </el-select>
+        </div>
+      </FormDialogField>
 
-          <div
-            v-if="showTeamSelector"
-            class="agent-dialog__workspace-row"
+      <FormDialogField
+        v-if="!isEditing && showSourceWorktreeControl"
+        :label="$t('surface.agentDialog.workIn')"
+        label-for="agent-dialog-worktree"
+      >
+        <div class="claw-form-dialog__control">
+          <el-select
+            id="agent-dialog-worktree"
+            v-model="selectedSourceWorktreePath"
+            :disabled="Boolean(initialNewWorktreeBranchName.trim())"
+            @update:model-value="selectWorktreeControl"
           >
-            <div class="agent-dialog__row-copy">
-              <label
-                class="agent-dialog__row-label"
-                for="agent-dialog-team"
-              >{{ $t('surface.agentDialog.team') }}</label>
-            </div>
-            <div class="agent-dialog__row-control agent-dialog__row-control--stacked">
-              <el-select
-                id="agent-dialog-team"
-                v-model="teamSelection"
-                class="agent-dialog__workspace-select"
-              >
-                <el-option
-                  v-for="team in teams"
-                  :key="team.id"
-                  :label="team.name"
-                  :value="team.id"
-                />
-                <el-option
-                  :label="$t('surface.agentDialog.newTeam')"
-                  :value="newTeamOptionId"
-                />
-              </el-select>
-              <input
-                v-if="teamSelection === newTeamOptionId"
-                id="agent-dialog-new-team"
-                v-model="newTeamName"
-                class="claw-form-dialog__text-input agent-dialog__new-team-input"
-                type="text"
-                :aria-label="$t('surface.agentDialog.newTeamName')"
-                :placeholder="$t('surface.agentDialog.enterTeamName')"
+            <el-option
+              v-for="worktree in selectedSourceWorktrees"
+              :key="worktree.path"
+              :label="worktree.name"
+              :value="worktree.path"
+            />
+            <el-option
+              class="agent-dialog__source-custom-option"
+              :label="$t('surface.agentDialog.newWorktree')"
+              :value="newWorktreeOptionValue"
+            />
+          </el-select>
+        </div>
+      </FormDialogField>
+
+      <FormDialogField
+        v-if="!isEditing && showTeamSelector"
+        :label="$t('surface.agentDialog.team')"
+        label-for="agent-dialog-team"
+      >
+        <div class="agent-dialog__stacked-controls">
+          <div class="claw-form-dialog__control">
+            <el-select id="agent-dialog-team" v-model="teamSelection">
+              <el-option
+                v-for="team in teams"
+                :key="team.id"
+                :label="team.name"
+                :value="team.id"
               />
-            </div>
+              <el-option
+                :label="$t('surface.agentDialog.newTeam')"
+                :value="newTeamOptionId"
+              />
+            </el-select>
           </div>
-        </div>
-      </section>
-
-      <section v-if="!isEditing" class="agent-dialog__identity-group">
-        <div class="agent-dialog__identity-rows">
-          <div class="agent-dialog__workspace-row agent-dialog__identity-row">
-            <div class="agent-dialog__row-copy">
-              <label
-                class="agent-dialog__row-label"
-                for="agent-dialog-name"
-              >{{ $t('surface.agentDialog.name') }}</label>
-            </div>
-            <div class="agent-dialog__row-control agent-dialog__identity-control">
-              <div class="agent-dialog__identity-input">
-                <input
-                  id="agent-dialog-name"
-                  v-model="name"
-                  class="claw-form-dialog__text-input agent-dialog__text-input"
-                  type="text"
-                  :aria-label="$t('surface.agentDialog.agentName')"
-                  :placeholder="namePlaceholder"
-                />
-              </div>
-            </div>
-          </div>
-
           <div
-            v-if="claudeCodeEnabled"
-            class="agent-dialog__workspace-row"
+            v-if="teamSelection === newTeamOptionId"
+            class="claw-form-dialog__control claw-form-dialog__input-control"
           >
-            <div class="agent-dialog__row-copy">
-              <label
-                class="agent-dialog__row-label"
-                for="agent-dialog-backend"
-              >{{ $t('surface.agentDialog.codingAgent') }}</label>
-            </div>
-            <div class="agent-dialog__row-control">
-              <el-select
-                id="agent-dialog-backend"
-                v-model="backend"
-                class="agent-dialog__workspace-select"
-                :aria-label="$t('surface.agentDialog.codingAgent')"
-              >
-                <el-option :label="$t('surface.agentDialog.codex')" value="codex" />
-                <el-option :label="$t('surface.agentDialog.claudeCode')" value="claude" />
-              </el-select>
-            </div>
+            <input
+              id="agent-dialog-new-team"
+              v-model="newTeamName"
+              class="claw-form-dialog__text-input"
+              type="text"
+              :aria-label="$t('surface.agentDialog.newTeamName')"
+              :placeholder="$t('surface.agentDialog.enterTeamName')"
+            />
           </div>
         </div>
-      </section>
+      </FormDialogField>
+
+      <FormDialogField
+        :label="$t('surface.agentDialog.name')"
+        label-for="agent-dialog-name"
+      >
+        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+          <input
+            id="agent-dialog-name"
+            v-model="name"
+            class="claw-form-dialog__text-input"
+            type="text"
+            :aria-label="$t('surface.agentDialog.agentName')"
+            :placeholder="namePlaceholder"
+          />
+        </div>
+      </FormDialogField>
+
+      <FormDialogField
+        v-if="!isEditing && claudeCodeEnabled"
+        :label="$t('surface.agentDialog.codingAgent')"
+        label-for="agent-dialog-backend"
+      >
+        <div class="claw-form-dialog__control">
+          <el-select
+            id="agent-dialog-backend"
+            v-model="backend"
+            :aria-label="$t('surface.agentDialog.codingAgent')"
+          >
+            <el-option :label="$t('surface.agentDialog.codex')" value="codex" />
+            <el-option :label="$t('surface.agentDialog.claudeCode')" value="claude" />
+          </el-select>
+        </div>
+      </FormDialogField>
 
       <el-alert
         v-if="errorMessage"
@@ -207,7 +136,7 @@
         :closable="false"
         show-icon
       />
-    </el-form>
+    </form>
 
     <NewSourceWorktreeDialog
       :choose-destination="chooseSourceWorktreeDestination"
@@ -229,28 +158,26 @@
     />
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
-        <button
-          v-if="isEditing"
-          class="claw-button claw-button--secondary"
-          type="button"
-          :aria-busy="submitting"
-          :disabled="submitting"
-          @click="clearAgentName"
-        >{{ $t('surface.agentDialog.clear') }}</button>
-        <button
-          class="claw-button claw-button--primary"
-          type="button"
-          :aria-busy="submitting"
-          :disabled="submitting || !canSave"
-          @click="submit"
-        >
-          {{ submitLabel }}
-        </button>
-      </div>
+      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
+      <button
+        v-if="isEditing"
+        class="claw-button claw-button--secondary"
+        type="button"
+        :aria-busy="submitting"
+        :disabled="submitting"
+        @click="clearAgentName"
+      >{{ $t('surface.agentDialog.clear') }}</button>
+      <button
+        class="claw-button claw-button--primary"
+        type="button"
+        :aria-busy="submitting"
+        :disabled="submitting || !canSave"
+        @click="submit"
+      >
+        {{ submitLabel }}
+      </button>
     </template>
-  </el-dialog>
+  </FormDialog>
 </template>
 
 <script setup lang="ts">
@@ -258,6 +185,8 @@ import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 
@@ -791,120 +720,9 @@ function syncRepositoryControlValue(): void {
 </script>
 
 <style scoped>
-.agent-dialog__form {
-  gap: var(--space-4);
-}
-
-.agent-dialog__workspace-group,
-.agent-dialog__identity-group {
-  display: block;
-}
-
-.agent-dialog__workspace-rows,
-.agent-dialog__identity-rows {
-  background: transparent;
-}
-
-.agent-dialog__workspace-rows {
-  overflow: hidden;
-}
-
-.agent-dialog__identity-rows {
-  overflow: visible;
-}
-
-.agent-dialog__row-label {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-20);
-}
-
-.agent-dialog__workspace-row {
-  display: grid;
-  grid-template-columns: minmax(104px, 0.72fr) minmax(200px, 1.28fr);
-  align-items: center;
-  gap: var(--space-8);
-  min-height: calc(var(--space-20) + var(--space-8));
-  padding: 0 var(--space-2);
-}
-
-.agent-dialog__row-copy {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-1);
-}
-
-.agent-dialog__row-control {
-  min-width: 0;
-}
-
-.agent-dialog__row-control--stacked {
+.agent-dialog__stacked-controls {
   display: grid;
   gap: var(--space-3);
-}
-
-.agent-dialog__workspace-select {
-  width: 100%;
-}
-
-.agent-dialog__workspace-select :deep(.el-select__wrapper) {
-  min-height: var(--space-20);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-lowest);
-  box-shadow: none;
-}
-
-.agent-dialog__workspace-select :deep(.el-select__wrapper:hover),
-.agent-dialog__workspace-select :deep(.el-select__wrapper.is-focused) {
-  border-color: var(--color-primary);
-  background: var(--color-surface-low);
-  box-shadow: none;
-}
-
-.agent-dialog__workspace-select :deep(.el-select__selected-item),
-.agent-dialog__workspace-select :deep(.el-select__placeholder) {
-  color: var(--color-text);
-  font-size: var(--font-size-15);
-}
-
-.agent-dialog__new-team-input {
-  min-height: var(--space-16);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-lowest);
-}
-
-.agent-dialog__identity-control {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.agent-dialog__identity-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: var(--space-20);
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-lowest);
-}
-
-.agent-dialog__identity-input:focus-within {
-  border-color: var(--color-primary);
-  background: var(--color-surface-low);
-}
-
-.agent-dialog__text-input {
-  height: var(--space-20);
-  padding: 0 var(--space-4);
-  line-height: var(--line-height-20);
 }
 
 .agent-dialog__source-custom-option {

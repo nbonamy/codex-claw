@@ -207,11 +207,6 @@ function buildFileMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions 
         accelerator: 'CommandOrControl+N',
         click: () => callbacks.sendAppCommand({ type: 'new-team' }),
       },
-      {
-        label: mainT('menu.newAgent'),
-        accelerator: 'CommandOrControl+T',
-        click: () => callbacks.sendAppCommand({ type: 'new-agent' }),
-      },
       { type: 'separator' },
       {
         label: mainT('menu.closeAgent'),

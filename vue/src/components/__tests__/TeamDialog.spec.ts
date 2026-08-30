@@ -11,14 +11,18 @@ describe('TeamDialog', () => {
 
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Team');
     expect(wrapper.find('.claw-dialog__subtitle').exists()).toBe(false);
-    expect(wrapper.findAll('.team-dialog__field')).toHaveLength(3);
+    expect(wrapper.findAll('.claw-form-dialog__field')).toHaveLength(3);
     expect(wrapper.text()).toContain('Name');
     expect(wrapper.text()).toContain('Connection');
     expect(wrapper.text()).toContain('Color');
     expect(wrapper.text()).not.toContain("Choose where this team's agents run.");
     expect(wrapper.text()).not.toContain('Give this team a name for the sidebar.');
-    expect(wrapper.findAll('.team-dialog__group')).toHaveLength(2);
-    expect(wrapper.get('.team-dialog__text-input').attributes('placeholder')).toBe('Enter team name');
+    expect(wrapper.findAll('.claw-form-dialog__label').map((label) => label.text())).toStrictEqual([
+      'Connection',
+      'Name',
+      'Color',
+    ]);
+    expect(wrapper.get('#team-dialog-name').attributes('placeholder')).toBe('Enter team name');
     expect(wrapper.findAll('.team-dialog__color')).toHaveLength(teamColors.length);
     expect(wrapper.find('.team-dialog__preview').exists()).toBe(false);
     expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
@@ -32,7 +36,7 @@ describe('TeamDialog', () => {
     const createTeam = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountDialog({ createTeam });
 
-    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.get('#team-dialog-name').setValue('Skwad Core');
     await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
     await saveButton(wrapper).trigger('click');
 
@@ -50,7 +54,7 @@ describe('TeamDialog', () => {
       remoteConnections: [readyConnection()],
     });
 
-    await wrapper.get('.team-dialog__text-input').setValue('Remote Team');
+    await wrapper.get('#team-dialog-name').setValue('Remote Team');
     await wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'connection-devbox');
     await saveButton(wrapper).trigger('click');
 
@@ -105,9 +109,9 @@ describe('TeamDialog', () => {
     });
 
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Edit Team');
-    expect((wrapper.get('.team-dialog__text-input').element as HTMLInputElement).value).toBe('Codex Claw');
+    expect((wrapper.get('#team-dialog-name').element as HTMLInputElement).value).toBe('Codex Claw');
 
-    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.get('#team-dialog-name').setValue('Skwad Core');
     await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
     await saveButton(wrapper, 'Save').trigger('click');
 
@@ -179,7 +183,7 @@ describe('TeamDialog', () => {
     const createTeam = vi.fn().mockRejectedValue(new Error('Team color is invalid.'));
     const wrapper = mountDialog({ createTeam });
 
-    await wrapper.get('.team-dialog__text-input').setValue('Broken Team');
+    await wrapper.get('#team-dialog-name').setValue('Broken Team');
     await saveButton(wrapper).trigger('click');
 
     expect(wrapper.text()).toContain('Team color is invalid.');

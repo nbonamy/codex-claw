@@ -12,7 +12,6 @@ const messages = {
     'menu.file': 'File',
     'menu.help': 'Help',
     'menu.installUpdate': 'Install Update and Relaunch',
-    'menu.newAgent': 'New Agent',
     'menu.newTeam': 'New Team',
     'menu.nextAgent': 'Next Agent',
     'menu.nextTeam': 'Next Team',

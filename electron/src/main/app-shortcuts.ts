@@ -39,10 +39,6 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
         return { type: 'new-team' };
       }
 
-      if (key === 't') {
-        return { type: 'new-agent' };
-      }
-
       if (key === 'w') {
         return { type: 'close-active-agent' };
       }

@@ -3277,7 +3277,7 @@ describe('AppShell', () => {
     await wrapper.get('[aria-label="Create team"]').trigger('click');
 
     expect(wrapper.text()).toContain('Create Team');
-    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.get('#team-dialog-name').setValue('Skwad Core');
     await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
     await wrapper.findAll('button').find((button) => button.text() === 'Create Team')?.trigger('click');
 
@@ -3355,7 +3355,7 @@ describe('AppShell', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
 
     expect(wrapper.text()).toContain('Edit Team');
-    await wrapper.get('.team-dialog__text-input').setValue('Skwad Core');
+    await wrapper.get('#team-dialog-name').setValue('Skwad Core');
     await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
     await wrapper.findAll('button').find((button) => button.text() === 'Save')?.trigger('click');
 
@@ -3428,7 +3428,7 @@ describe('AppShell', () => {
     await clickPortaledMenuItem('Edit Agent');
 
     expect(wrapper.text()).toContain('Edit agent');
-    await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
+    await wrapper.get('#agent-dialog-name').setValue('Dina Prime');
     await wrapper.findAll('button').find((button) => button.text() === 'Save')?.trigger('click');
 
     expect(updateAgent).toHaveBeenCalledWith({
@@ -3685,11 +3685,6 @@ describe('AppShell', () => {
     listener({ type: 'new-team' });
     await nextTick();
     expect(wrapper.text()).toContain('Create Team');
-    await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
-    await nextTick();
-    listener({ type: 'new-agent' });
-    await nextTick();
-    expect(wrapper.text()).toContain('New agent');
     await wrapper.findAll('button').find((button) => button.text() === 'Cancel')?.trigger('click');
     await nextTick();
     listener({ type: 'close-active-agent' });

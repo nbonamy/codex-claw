@@ -1,0 +1,91 @@
+import { mount } from '@vue/test-utils';
+import ElementPlus from 'element-plus';
+import { describe, expect, it } from 'vitest';
+import FormDialog from '../FormDialog.vue';
+import FormDialogField from '../FormDialogField.vue';
+
+describe('FormDialog', () => {
+  it('renders canonical header, body, and split footer regions', () => {
+    const wrapper = mount(FormDialog, {
+      props: {
+        modelValue: true,
+        title: 'Create team',
+        subtitle: 'Choose how this team should work.',
+      },
+      slots: {
+        default: '<form><input aria-label="Name" /></form>',
+        'footer-left': '<span>Advanced</span>',
+        footer: '<button>Cancel</button><button>Create</button>',
+      },
+      global: {
+        plugins: [ElementPlus],
+        stubs: { ElDialog: dialogStub() },
+      },
+    });
+
+    expect(wrapper.get('.claw-dialog__title').text()).toBe('Create team');
+    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Choose how this team should work.');
+    expect(wrapper.get('input').attributes('aria-label')).toBe('Name');
+    expect(wrapper.get('.claw-form-dialog__footer-left').text()).toBe('Advanced');
+    expect(wrapper.findAll('.claw-form-dialog__footer-actions button').map((button) => button.text())).toStrictEqual([
+      'Cancel',
+      'Create',
+    ]);
+  });
+
+  it('relays visibility changes', async () => {
+    const wrapper = mount(FormDialog, {
+      props: {
+        modelValue: true,
+        title: 'Edit agent',
+      },
+      global: {
+        plugins: [ElementPlus],
+        stubs: { ElDialog: dialogStub() },
+      },
+    });
+
+    wrapper.getComponent({ name: 'ElDialog' }).vm.$emit('update:modelValue', false);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('update:modelValue')).toStrictEqual([[false]]);
+  });
+});
+
+function dialogStub() {
+  return {
+    name: 'ElDialog',
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: `
+      <section v-if="modelValue">
+        <slot name="header" />
+        <slot />
+        <slot name="footer" />
+      </section>
+    `,
+  };
+}
+
+describe('FormDialogField', () => {
+  it('renders a label and help above its control', () => {
+    const wrapper = mount(FormDialogField, {
+      props: {
+        label: 'Repository',
+        labelFor: 'repository',
+        help: 'Choose where this session should work.',
+      },
+      slots: {
+        default: '<input id="repository" />',
+      },
+    });
+
+    expect(wrapper.get('label').attributes('for')).toBe('repository');
+    expect(wrapper.get('label').text()).toBe('Repository');
+    expect(wrapper.get('.claw-form-dialog__help').text()).toBe('Choose where this session should work.');
+    expect(wrapper.findAll('.claw-form-dialog__field > *').map((node) => node.element.tagName)).toStrictEqual([
+      'DIV',
+      'INPUT',
+    ]);
+  });
+});

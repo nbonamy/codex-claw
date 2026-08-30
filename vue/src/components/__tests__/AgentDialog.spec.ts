@@ -21,12 +21,13 @@ describe('AgentDialog', () => {
   it('leads with repository selection and hides coding-agent selection by default', () => {
     const wrapper = mountDialog();
 
-    expect(wrapper.get('.agent-dialog__header').text()).toContain('New agent');
+    expect(wrapper.get('.claw-form-dialog__header').text()).toContain('New agent');
     expect(wrapper.get('.claw-dialog__title').text()).toBe('New agent');
     expect(wrapper.find('.claw-dialog__subtitle').exists()).toBe(false);
-    expect(wrapper.get('.agent-dialog__identity-group').text()).toContain('Name');
-    expect(wrapper.get('.agent-dialog__workspace-group').text()).toContain('Repository');
-    expect(wrapper.html().indexOf('agent-dialog__workspace-group')).toBeLessThan(wrapper.html().indexOf('agent-dialog__identity-group'));
+    expect(wrapper.findAll('.claw-form-dialog__label').map((label) => label.text())).toStrictEqual([
+      'Repository',
+      'Name',
+    ]);
     expect(wrapper.text()).not.toContain('Workspace');
     expect(wrapper.text()).not.toContain('Identity');
     expect(wrapper.text()).not.toContain('Workspace folder');
@@ -38,7 +39,7 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Resolved path');
     expect(wrapper.text()).not.toContain('Coding agent');
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
-    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('Optional');
+    expect(wrapper.get('#agent-dialog-name').attributes('placeholder')).toBe('Optional');
     expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
     expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
       ['claw-button', 'claw-button--tertiary'],
@@ -80,7 +81,7 @@ describe('AgentDialog', () => {
       createAgent,
     });
 
-    await wrapper.get('.agent-dialog__text-input').setValue('Custom Agent');
+    await wrapper.get('#agent-dialog-name').setValue('Custom Agent');
     await chooseCustomFolder(wrapper);
     await saveButton(wrapper).trigger('click');
 
@@ -115,7 +116,7 @@ describe('AgentDialog', () => {
       chooseAgentFolder: vi.fn().mockResolvedValue(null),
     });
 
-    await wrapper.get('.agent-dialog__text-input').setValue('Waiting');
+    await wrapper.get('#agent-dialog-name').setValue('Waiting');
     await chooseCustomFolder(wrapper);
 
     expect(wrapper.get<HTMLInputElement>('[aria-label="Agent name"]').element.value).toBe('Waiting');
@@ -137,14 +138,14 @@ describe('AgentDialog', () => {
       updateAgent,
     });
 
-    expect(wrapper.get('.agent-dialog__header').text()).toContain('Edit agent');
+    expect(wrapper.get('.claw-form-dialog__header').text()).toContain('Edit agent');
     expect(wrapper.text()).not.toContain('Repository');
     expect(wrapper.text()).not.toContain('Work in...');
     expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentAvatarPicker' }).exists()).toBe(false);
-    expect((wrapper.get('.agent-dialog__text-input').element as HTMLInputElement).value).toBe('Dina');
-    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('codex-claw');
-    await wrapper.get('.agent-dialog__text-input').setValue('Dina Prime');
+    expect((wrapper.get('#agent-dialog-name').element as HTMLInputElement).value).toBe('Dina');
+    expect(wrapper.get('#agent-dialog-name').attributes('placeholder')).toBe('codex-claw');
+    await wrapper.get('#agent-dialog-name').setValue('Dina Prime');
     await saveButton(wrapper).trigger('click');
 
     expect(chooseAgentFolder).not.toHaveBeenCalled();
@@ -262,7 +263,7 @@ describe('AgentDialog', () => {
     });
 
     expect(wrapper.text()).not.toContain('Agent must be idle before editing.');
-    await wrapper.get('.agent-dialog__text-input').setValue('Dina Live');
+    await wrapper.get('#agent-dialog-name').setValue('Dina Live');
     await saveButton(wrapper).trigger('click');
 
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-dina', name: 'Dina Live' });
@@ -276,7 +277,7 @@ describe('AgentDialog', () => {
     });
 
     await chooseCustomFolder(wrapper);
-    await wrapper.get('.agent-dialog__text-input').setValue('Broken');
+    await wrapper.get('#agent-dialog-name').setValue('Broken');
     await saveButton(wrapper).trigger('click');
 
     expect(wrapper.text()).toContain('Agent folder must be a directory.');
@@ -321,7 +322,7 @@ describe('AgentDialog', () => {
     await nextTick();
     await emitSelect(wrapper, 'agent-dialog-worktree', '/Users/nbonamy/src/codex-claw-source-folder');
     await nextTick();
-    expect(wrapper.get('.agent-dialog__text-input').attributes('placeholder')).toBe('source-folder');
+    expect(wrapper.get('#agent-dialog-name').attributes('placeholder')).toBe('source-folder');
     await saveButton(wrapper).trigger('click');
 
     expect(createAgent).toHaveBeenCalledWith({

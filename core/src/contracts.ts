@@ -1399,7 +1399,6 @@ export type AppCommand =
   | { type: 'debug-mark-unread' }
   | { type: 'debug-open-markdown' }
   | { type: 'edit-active-agent' }
-  | { type: 'new-agent' }
   | { type: 'new-team' }
   | { type: 'open-agent-composer'; agentId?: string; prompt?: string; submit?: boolean }
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }

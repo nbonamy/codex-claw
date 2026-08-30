@@ -87,50 +87,52 @@
       :revoke-device="revokePairedDevice"
     />
 
-    <el-dialog
+    <FormDialog
       v-model="settingsDialogVisible"
       :title="settingsDialogTitle"
       width="520"
+      :teleported="true"
       append-to-body
-      class="claw-dialog"
     >
-      <el-form
-        class="settings-connections-panel__settings"
-        label-position="top"
-      >
-        <el-form-item :label="$t('surface.settingsConnectionsPanel.sourceFolder')">
-          <el-input
-            v-model="settingsSourceFolderPath"
-            :placeholder="$t('surface.settingsConnectionsPanel.src')"
-          >
-            <template #append>
-              <el-button
-                :disabled="!settingsConnection"
-                @click="openSettingsFolderPicker"
-              > {{ $t('surface.settingsConnectionsPanel.browse') }} </el-button>
-            </template>
-          </el-input>
-        </el-form-item>
+      <form class="claw-form-dialog" @submit.prevent="saveConnectionSettings">
+        <FormDialogField
+          :label="$t('surface.settingsConnectionsPanel.sourceFolder')"
+          label-for="settings-connection-source-folder"
+        >
+          <div class="claw-form-dialog__control claw-form-dialog__input-control settings-connections-panel__source-folder-control">
+            <input
+              id="settings-connection-source-folder"
+              v-model="settingsSourceFolderPath"
+              class="claw-form-dialog__text-input"
+              type="text"
+              :placeholder="$t('surface.settingsConnectionsPanel.src')"
+            />
+            <button
+              class="claw-form-dialog__button-control settings-connections-panel__browse"
+              type="button"
+              :disabled="!settingsConnection"
+              @click="openSettingsFolderPicker"
+            > {{ $t('surface.settingsConnectionsPanel.browse') }} </button>
+          </div>
+        </FormDialogField>
         <p
           v-if="settingsError"
           class="settings-connections-panel__error"
         >
           {{ settingsError }}
         </p>
-      </el-form>
+      </form>
       <template #footer>
-        <div class="claw-dialog__footer">
-          <button class="claw-button claw-button--tertiary" type="button" @click="closeConnectionSettings"> {{ $t('surface.settingsConnectionsPanel.cancel') }} </button>
-          <button
-            class="claw-button claw-button--primary"
-            type="button"
-            :aria-busy="savingConnectionSettings"
-            :disabled="savingConnectionSettings"
-            @click="saveConnectionSettings"
-          > {{ $t('surface.settingsConnectionsPanel.save') }} </button>
-        </div>
+        <button class="claw-button claw-button--tertiary" type="button" @click="closeConnectionSettings"> {{ $t('surface.settingsConnectionsPanel.cancel') }} </button>
+        <button
+          class="claw-button claw-button--primary"
+          type="button"
+          :aria-busy="savingConnectionSettings"
+          :disabled="savingConnectionSettings"
+          @click="saveConnectionSettings"
+        > {{ $t('surface.settingsConnectionsPanel.save') }} </button>
       </template>
-    </el-dialog>
+    </FormDialog>
 
     <RemoteFolderPickerDialog
       v-if="settingsConnection"
@@ -195,6 +197,8 @@ import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, 
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
@@ -572,9 +576,11 @@ function statusLabel(status: RemoteConnection['status']): string {
   overflow: auto;
 }
 
-.settings-connections-panel__settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
+.settings-connections-panel__browse {
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0;
+  background: var(--color-surface-low);
 }
 </style>

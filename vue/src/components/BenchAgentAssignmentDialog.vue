@@ -1,36 +1,18 @@
 <template>
-  <el-dialog
-    class="claw-dialog bench-agent-assignment-dialog"
+  <FormDialog
+    class="bench-agent-assignment-dialog"
     :model-value="visible"
-    :teleported="false"
-    width="520px"
-    :show-close="false"
-    destroy-on-close
+    :title="title"
     @update:model-value="onVisibilityChanged"
   >
-    <template #header>
-      <div class="claw-form-dialog__header bench-agent-assignment-dialog__header">
-        <h2 class="claw-dialog__title">{{ title }}</h2>
-      </div>
-    </template>
-
-    <form
-      class="claw-form-dialog bench-agent-assignment-dialog__form"
-      @submit.prevent="submit"
-    >
-      <section
+    <form class="claw-form-dialog" @submit.prevent="submit">
+      <FormDialogField
         v-if="benchTemplates.length > 0"
-        class="claw-form-dialog__field bench-agent-assignment-dialog__field"
+        :label="$t('surface.benchAgentAssignmentDialog.bench')"
+        :help="$t('surface.benchAgentAssignmentDialog.chooseTheSavedAgentToDeploy')"
+        label-for="bench-agent-assignment-dialog-bench"
       >
-        <div class="claw-form-dialog__field-heading bench-agent-assignment-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label bench-agent-assignment-dialog__label"
-            for="bench-agent-assignment-dialog-bench"
-          > {{ $t('surface.benchAgentAssignmentDialog.bench') }} </label>
-          <span class="claw-form-dialog__heading-separator bench-agent-assignment-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help bench-agent-assignment-dialog__help">{{ $t('surface.benchAgentAssignmentDialog.chooseTheSavedAgentToDeploy') }}</p>
-        </div>
-        <div class="claw-form-dialog__control bench-agent-assignment-dialog__input-shell bench-agent-assignment-dialog__input-shell--select">
+        <div class="claw-form-dialog__control">
           <el-select
             id="bench-agent-assignment-dialog-bench"
             v-model="benchTemplateId"
@@ -52,18 +34,14 @@
             </el-option>
           </el-select>
         </div>
-      </section>
+      </FormDialogField>
 
-      <section class="claw-form-dialog__field bench-agent-assignment-dialog__field">
-        <div class="claw-form-dialog__field-heading bench-agent-assignment-dialog__field-heading">
-          <label
-            class="claw-form-dialog__label bench-agent-assignment-dialog__label"
-            for="bench-agent-assignment-dialog-team"
-          > {{ $t('surface.benchAgentAssignmentDialog.team') }} </label>
-          <span class="claw-form-dialog__heading-separator bench-agent-assignment-dialog__heading-separator">•</span>
-          <p class="claw-form-dialog__help bench-agent-assignment-dialog__help">{{ $t('surface.benchAgentAssignmentDialog.chooseWhereTheAgentShouldBeCreated') }}</p>
-        </div>
-        <div class="claw-form-dialog__control bench-agent-assignment-dialog__input-shell bench-agent-assignment-dialog__input-shell--select">
+      <FormDialogField
+        :label="$t('surface.benchAgentAssignmentDialog.team')"
+        :help="$t('surface.benchAgentAssignmentDialog.chooseWhereTheAgentShouldBeCreated')"
+        label-for="bench-agent-assignment-dialog-team"
+      >
+        <div class="claw-form-dialog__control">
           <el-select
             id="bench-agent-assignment-dialog-team"
             v-model="teamSelection"
@@ -94,23 +72,21 @@
             :placeholder="$t('surface.benchAgentAssignmentDialog.enterTeamName')"
           />
         </div>
-      </section>
+      </FormDialogField>
     </form>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.benchAgentAssignmentDialog.cancel') }}</button>
-        <button
-          class="claw-button claw-button--primary"
-          type="button"
-          :disabled="!canSave"
-          @click="submit"
-        >
-          {{ confirmLabel }}
-        </button>
-      </div>
+      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.benchAgentAssignmentDialog.cancel') }}</button>
+      <button
+        class="claw-button claw-button--primary"
+        type="button"
+        :disabled="!canSave"
+        @click="submit"
+      >
+        {{ confirmLabel }}
+      </button>
     </template>
-  </el-dialog>
+  </FormDialog>
 </template>
 
 <script setup lang="ts">
@@ -118,6 +94,8 @@ import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { BenchTemplate, Team } from '@codex-claw/core/contracts';
 import { folderBasename } from '../shared/agent-display';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
 
 export type BenchAgentAssignmentDialogSubmit = {
   benchTemplateId?: string;

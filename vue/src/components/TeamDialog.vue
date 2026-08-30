@@ -1,128 +1,102 @@
 <template>
-  <el-dialog
-    class="claw-dialog team-dialog"
+  <FormDialog
+    class="team-dialog"
     :model-value="visible"
-    :teleported="false"
-    width="520px"
-    :show-close="false"
-    destroy-on-close
+    :title="dialogTitle"
     @update:model-value="onVisibilityChanged"
   >
-    <template #header>
-      <div class="claw-form-dialog__header team-dialog__header">
-        <h2 class="claw-dialog__title">{{ dialogTitle }}</h2>
-      </div>
-    </template>
-
-    <form
-      class="claw-form-dialog team-dialog__form"
-      @submit.prevent="submit"
-    >
-      <div class="team-dialog__group">
-        <section class="team-dialog__row team-dialog__field">
-          <label
-            class="team-dialog__row-label"
-            for="team-dialog-connection"
-          >{{ $t('surface.teamDialog.connection') }}</label>
-          <div class="team-dialog__row-control">
-            <el-select
-              id="team-dialog-connection"
-              v-model="connectionSelection"
-              class="team-dialog__select"
-              :disabled="connectionLocked"
-            >
-              <el-option
-                :label="$t('surface.teamDialog.local')"
-                :value="localConnectionValue"
-              />
-              <el-option
-                v-for="connection in readyRemoteConnections"
-                :key="connection.id"
-                :label="connection.name"
-                :value="connection.id"
-              />
-            </el-select>
-          </div>
-        </section>
-
-        <section
-          v-if="showRemoteTeamSelection"
-          class="team-dialog__row team-dialog__field"
-        >
-          <label
-            class="team-dialog__row-label"
-            for="team-dialog-remote-team"
-          >{{ $t('surface.teamDialog.remoteTeam') }}</label>
-          <div class="team-dialog__row-control">
-            <el-select
-              id="team-dialog-remote-team"
-              v-model="remoteTeamSelection"
-              class="team-dialog__select"
-              :loading="remoteTeamsLoading"
-            >
-              <el-option
-                :label="$t('surface.teamDialog.createNewRemoteTeam')"
-                :value="newRemoteTeamValue"
-              />
-              <el-option
-                v-for="teamOption in remoteTeamOptions"
-                :key="teamOption.id"
-                :label="teamOption.name"
-                :value="teamOption.id"
-              />
-            </el-select>
-          </div>
-        </section>
-      </div>
-
-      <div class="team-dialog__group">
-        <section
-          v-if="showTeamNameInput"
-          class="team-dialog__row team-dialog__field"
-        >
-          <label
-            class="team-dialog__row-label"
-            for="team-dialog-name"
-          >{{ $t('surface.teamDialog.name') }}</label>
-          <div class="team-dialog__row-control team-dialog__name-control">
-            <input
-              id="team-dialog-name"
-              v-model="name"
-              class="claw-form-dialog__text-input team-dialog__text-input"
-              type="text"
-              :placeholder="$t('surface.teamDialog.enterTeamName')"
-              autofocus
-            />
-          </div>
-        </section>
-
-        <section class="team-dialog__row team-dialog__field team-dialog__color-row">
-          <span class="team-dialog__row-label">{{ $t('surface.teamDialog.color') }}</span>
-          <div
-            class="team-dialog__row-control team-dialog__colors"
-            role="radiogroup"
-            :aria-label="$t('surface.teamDialog.teamColor')"
+    <form class="claw-form-dialog" @submit.prevent="submit">
+      <FormDialogField
+        :label="$t('surface.teamDialog.connection')"
+        label-for="team-dialog-connection"
+      >
+        <div class="claw-form-dialog__control">
+          <el-select
+            id="team-dialog-connection"
+            v-model="connectionSelection"
+            :disabled="connectionLocked"
           >
-            <button
-              v-for="color in teamColors"
-              :key="color"
-              class="team-dialog__color"
-              :class="{ 'team-dialog__color--selected': color === selectedColor }"
-              :style="{ '--team-color': color }"
-              type="button"
-              role="radio"
-              :aria-label="$t('dynamic.teamColor', { color })"
-              :aria-checked="color === selectedColor"
-              @click="selectedColor = color"
-            >
-              <CheckIcon
-                v-if="color === selectedColor"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
-        </section>
-      </div>
+            <el-option
+              :label="$t('surface.teamDialog.local')"
+              :value="localConnectionValue"
+            />
+            <el-option
+              v-for="connection in readyRemoteConnections"
+              :key="connection.id"
+              :label="connection.name"
+              :value="connection.id"
+            />
+          </el-select>
+        </div>
+      </FormDialogField>
+
+      <FormDialogField
+        v-if="showRemoteTeamSelection"
+        :label="$t('surface.teamDialog.remoteTeam')"
+        label-for="team-dialog-remote-team"
+      >
+        <div class="claw-form-dialog__control">
+          <el-select
+            id="team-dialog-remote-team"
+            v-model="remoteTeamSelection"
+            :loading="remoteTeamsLoading"
+          >
+            <el-option
+              :label="$t('surface.teamDialog.createNewRemoteTeam')"
+              :value="newRemoteTeamValue"
+            />
+            <el-option
+              v-for="teamOption in remoteTeamOptions"
+              :key="teamOption.id"
+              :label="teamOption.name"
+              :value="teamOption.id"
+            />
+          </el-select>
+        </div>
+      </FormDialogField>
+
+      <FormDialogField
+        v-if="showTeamNameInput"
+        :label="$t('surface.teamDialog.name')"
+        label-for="team-dialog-name"
+      >
+        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+          <input
+            id="team-dialog-name"
+            v-model="name"
+            class="claw-form-dialog__text-input"
+            type="text"
+            :placeholder="$t('surface.teamDialog.enterTeamName')"
+            autofocus
+          />
+        </div>
+      </FormDialogField>
+
+      <FormDialogField :label="$t('surface.teamDialog.color')">
+        <div
+          class="team-dialog__colors"
+          role="radiogroup"
+          :aria-label="$t('surface.teamDialog.teamColor')"
+        >
+          <button
+            v-for="color in teamColors"
+            :key="color"
+            class="team-dialog__color"
+            :class="{ 'team-dialog__color--selected': color === selectedColor }"
+            :style="{ '--team-color': color }"
+            type="button"
+            role="radio"
+            :aria-label="$t('dynamic.teamColor', { color })"
+            :aria-checked="color === selectedColor"
+            @click="selectedColor = color"
+          >
+            <CheckIcon
+              v-if="color === selectedColor"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+      </FormDialogField>
 
       <el-alert
         v-if="errorMessage"
@@ -134,20 +108,18 @@
     </form>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.teamDialog.cancel') }}</button>
-        <button
-          class="claw-button claw-button--primary"
-          type="button"
-          :aria-busy="submitting"
-          :disabled="submitting || !canSave"
-          @click="submit"
-        >
-          {{ submitLabel }}
-        </button>
-      </div>
+      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.teamDialog.cancel') }}</button>
+      <button
+        class="claw-button claw-button--primary"
+        type="button"
+        :aria-busy="submitting"
+        :disabled="submitting || !canSave"
+        @click="submit"
+      >
+        {{ submitLabel }}
+      </button>
     </template>
-  </el-dialog>
+  </FormDialog>
 </template>
 
 <script setup lang="ts">
@@ -155,6 +127,8 @@ import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/core/contracts';
 import { defaultTeamColor, teamColors } from '@codex-claw/core/team-colors';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import { CheckIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
@@ -314,104 +288,12 @@ function shouldLoadRemoteTeamOptions(connectionId: string): boolean {
 </script>
 
 <style scoped>
-.team-dialog__form {
-  gap: var(--space-4);
-}
-
-.team-dialog__group + .team-dialog__group {
-  margin-top: var(--space-4);
-}
-
-.team-dialog__group {
-  overflow: hidden;
-  background: transparent;
-}
-
-.team-dialog__row {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-8);
-  min-height: calc(var(--space-20) + var(--space-8));
-  padding: 0 var(--space-2);
-}
-
-.team-dialog__row + .team-dialog__row {
-  border-top: 1px solid var(--color-border);
-}
-
-.team-dialog__row-label {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-20);
-}
-
-.team-dialog__row-control {
-  min-width: 0;
-}
-
-.team-dialog__select {
-  width: 100%;
-}
-
-.team-dialog__select :deep(.el-select__wrapper) {
-  min-height: var(--space-20);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-lowest);
-  box-shadow: none;
-}
-
-.team-dialog__select :deep(.el-select__wrapper:hover),
-.team-dialog__select :deep(.el-select__wrapper.is-focused) {
-  border-color: var(--color-primary);
-  background: var(--color-surface-low);
-  box-shadow: none;
-}
-
-.team-dialog__select :deep(.el-select__selected-item),
-.team-dialog__select :deep(.el-select__placeholder) {
-  color: var(--color-text);
-  font-size: var(--font-size-15);
-}
-
-.team-dialog__name-control {
-  min-height: var(--space-16);
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-lowest);
-}
-
-.team-dialog__name-control:focus-within {
-  border-color: var(--color-primary);
-  background: var(--color-surface-low);
-}
-
-.team-dialog__text-input {
-  height: var(--space-20);
-  padding: 0 var(--space-4);
-  line-height: var(--line-height-20);
-}
-
-.team-dialog__color-row {
-  align-items: start;
-  padding-top: var(--space-8);
-  padding-bottom: var(--space-8);
-}
-
-.team-dialog__color-row .team-dialog__row-label {
-  padding-top: var(--space-3);
-}
-
 .team-dialog__colors {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   justify-items: center;
   gap: var(--space-4);
+  margin: var(--space-8) 0;
 }
 
 .team-dialog__color {
