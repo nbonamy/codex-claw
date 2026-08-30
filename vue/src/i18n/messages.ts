@@ -4,6 +4,7 @@ export const messages = {
   en: {
     surface: surfaceMessages,
     common: {
+      back: 'Back',
       cancel: 'Cancel',
       close: 'Close',
       continue: 'Continue',
@@ -368,6 +369,15 @@ export const messages = {
       useCurrentAgentDetail: 'Continue this conversation',
       duplicateAgent: 'Duplicate agent',
       duplicateAgentDetail: 'Keep this conversation and work in isolation',
+      useExistingSession: 'Existing session',
+      useExistingSessionDetail: 'Continue this session on the work branch',
+      existingSessionBranchWarning: 'This switches the selected session’s current folder to this branch. No worktree is created.',
+      noExistingSessions: 'No sessions are available in this repository',
+      newIsolatedSession: 'New isolated session',
+      newIsolatedSessionDetail: 'Create a session and dedicated worktree',
+      session: 'Session',
+      existingSession: 'Existing session',
+      chooseSession: 'Choose a session',
       workspace: 'Workspace',
       currentWorkspace: 'Current workspace',
       pullRequestCurrentFolder: 'PR branch in current folder',

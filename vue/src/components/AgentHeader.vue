@@ -88,16 +88,6 @@
         :create-pull-request="createGitPullRequest"
         :merge-branch="mergeGitBranch"
       />
-      <button
-        v-if="githubBacklogAvailable"
-        class="agent-header__repository-backlog"
-        type="button"
-        :aria-label="$t('surface.agentHeader.openRepositoryBacklog')"
-        :title="$t('surface.agentHeader.openRepositoryBacklog')"
-        @click="emit('open-backlog')"
-      >
-        <BacklogIcon aria-hidden="true" />
-      </button>
       <OpenInControl
         v-if="agent && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
         :application="effectiveOpenInApplication(agent, openInCatalog)"
@@ -146,7 +136,7 @@ import { localizedText } from '../i18n/errors';
 import { computed } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { BacklogIcon, ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
@@ -171,7 +161,6 @@ const props = defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   selectedSubagentConversationId?: string | null;
-  githubBacklogAvailable?: boolean;
   getGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   generateGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
   commitGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
@@ -185,7 +174,6 @@ const emit = defineEmits<{
   'toggle-workspace': [];
   'toggle-execution-plan': [];
   'open-git-diff': [];
-  'open-backlog': [];
   'install-update': [];
   'open-in': [application: OpenInApplication];
   'select-subagent': [conversationId: string];
@@ -349,30 +337,6 @@ const gitReviewAvailable = computed(() => {
   width: 32px;
   height: 32px;
   padding: 0;
-}
-
-.agent-header__repository-backlog {
-  -webkit-app-region: no-drag;
-  width: 34px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-text-muted);
-  background: var(--color-surface-lowest);
-  cursor: pointer;
-}
-
-.agent-header__repository-backlog:hover {
-  color: var(--color-text);
-  background: var(--color-surface-high);
-}
-
-.agent-header__repository-backlog :deep(svg) {
-  width: var(--icon-md);
-  height: var(--icon-md);
 }
 
 .agent-header__execution-plan {

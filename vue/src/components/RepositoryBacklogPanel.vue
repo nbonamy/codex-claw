@@ -219,78 +219,14 @@
             <button type="button" :aria-label="$t('surface.repositoryBacklogPanel.close')" @click="closeStartWork"><IconX aria-hidden="true" /></button>
           </header>
 
-          <div class="repository-backlog__target-options">
-            <button
-              type="button"
-              :class="{ 'repository-backlog__choice--selected': target === 'current' }"
-              @click="target = 'current'"
-            >
-              <IconRobotFace aria-hidden="true" />
-              <strong>{{ t('repositoryBacklog.useCurrentAgent') }}</strong>
-              <span>{{ t('repositoryBacklog.useCurrentAgentDetail') }}</span>
-            </button>
-            <button
-              type="button"
-              :class="{ 'repository-backlog__choice--selected': target === 'duplicate' }"
-              @click="target = 'duplicate'"
-            >
-              <IconCopy aria-hidden="true" />
-              <strong>{{ t('repositoryBacklog.duplicateAgent') }}</strong>
-              <span>{{ t('repositoryBacklog.duplicateAgentDetail') }}</span>
-            </button>
-          </div>
-
-          <div class="repository-backlog__isolation">
-            <span>{{ t('repositoryBacklog.workspace') }}</span>
-            <label :class="{ 'repository-backlog__isolation-option--disabled': target === 'duplicate' }">
-              <input v-model="workspaceMode" type="radio" value="current" :disabled="target === 'duplicate'">
-              <IconFolder aria-hidden="true" />
-              <span>
-                <strong>{{ selectedItem.kind === 'pullRequest' ? t('repositoryBacklog.pullRequestCurrentFolder') : t('repositoryBacklog.currentWorkspace') }}</strong>
-              </span>
-            </label>
-            <label>
-              <input v-model="workspaceMode" type="radio" value="worktree">
-              <IconGitBranch aria-hidden="true" />
-              <span>
-                <strong>{{ t('repositoryBacklog.newWorktree') }}</strong>
-              </span>
-            </label>
-            <div
-              v-if="selectedItem.kind !== 'pullRequest'"
-              class="repository-backlog__branch repository-backlog__branch--editable"
-              :class="{ 'repository-backlog__branch--disabled': workspaceMode === 'current' }"
-            >
-              <IconGitBranch aria-hidden="true" />
-              <input
-                v-model="branchName"
-                :disabled="workspaceMode === 'current'"
-                :aria-label="t('repositoryBacklog.branchName')"
-              >
-            </div>
-            <div
-              v-else-if="selectedItem.kind === 'pullRequest'"
-              class="repository-backlog__branch repository-backlog__branch--fixed"
-              :aria-label="t('repositoryBacklog.branchName')"
-            >
-              <IconGitPullRequest aria-hidden="true" />
-              {{ branchName }}
-            </div>
-          </div>
-
-          <p v-if="operationError" class="repository-backlog__operation-error">{{ operationError }}</p>
-
-          <footer>
-            <button class="claw-button claw-button--tertiary" type="button" @click="prefillCustomPrompt">
-              {{ t('repositoryBacklog.custom') }}
-            </button>
-            <button class="claw-button claw-button--secondary" type="button" :disabled="workActionDisabled" @click="startWork(secondaryAction)">
-              {{ selectedItem.kind === 'pullRequest' ? t('repositoryBacklog.addressFeedback') : t('repositoryBacklog.investigate') }}
-            </button>
-            <button class="claw-button claw-button--primary" type="button" :disabled="workActionDisabled" @click="startWork(primaryAction)">
-              {{ selectedItem.kind === 'pullRequest' ? t('repositoryBacklog.review') : t('repositoryBacklog.fix') }}
-            </button>
-          </footer>
+          <WorkItemAssignmentPicker
+            :item="selectedItem"
+            :branch-name="branchName"
+            :sessions="currentSessionOptions"
+            :error="operationError"
+            @custom="prefillCustomPrompt"
+            @submit="startWork"
+          />
         </template>
 
         <div v-else class="repository-backlog__operation-state" :data-state="operationState">
@@ -340,11 +276,9 @@ import {
   IconAlertCircle,
   IconCircleCheck,
   IconCircleDot,
-  IconCopy,
   IconDeviceFloppy,
   IconDots,
   IconFilter,
-  IconFolder,
   IconGitBranch,
   IconGitPullRequest,
   IconRefresh,
@@ -354,11 +288,13 @@ import {
 } from '@tabler/icons-vue';
 import { GitHubIcon } from '../shared/icons/app-icons';
 import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
-import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import type { RepositoryWorkStartInput } from './right-workspace';
+import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
+import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 
 defineOptions({ name: 'RepositoryBacklogPanel' });
 
@@ -398,22 +334,17 @@ const defaultsSaved = ref(false);
 const selectedItem = ref<WorkItem | null>(null);
 const openItemId = ref<string | null>(null);
 const startWorkVisible = ref(false);
-const target = ref<'current' | 'duplicate'>('duplicate');
-const workspaceMode = ref<'current' | 'worktree'>('worktree');
 const branchName = ref('');
 const operationState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
 const operationError = ref<string | null>(null);
 const pendingClearAssignment = ref<{ agent: Agent; item: WorkItem } | null>(null);
 const virtualReference = ref({ getBoundingClientRect: () => new DOMRect() });
 
-const secondaryAction = computed<WorkItemAssignmentAction>(() => selectedItem.value?.kind === 'pullRequest' ? 'addressFeedback' : 'investigate');
-const primaryAction = computed<WorkItemAssignmentAction>(() => selectedItem.value?.kind === 'pullRequest' ? 'review' : 'fix');
-const workActionDisabled = computed(() => selectedItem.value?.kind !== 'pullRequest'
-  && workspaceMode.value === 'worktree'
-  && !branchName.value.trim());
-const operationWorkspaceLabel = computed(() => selectedItem.value?.kind === 'pullRequest' || workspaceMode.value === 'worktree'
-  ? branchName.value
-  : props.branch || t('repositoryBacklog.currentWorkspace'));
+const currentSessionOptions = computed<WorkItemAssignmentSession[]>(() => [{
+  agentId: props.agent.id,
+  label: props.branch ? `${agentDisplayName(props.agent)} · ${props.branch}` : agentDisplayName(props.agent),
+}]);
+const operationWorkspaceLabel = computed(() => branchName.value || props.branch || t('repositoryBacklog.currentWorkspace'));
 
 const accountLabel = computed(() => props.connection?.accountLabel?.trim() ?? '');
 const repositoryName = computed(() => props.repositoryId.split('/').at(-1) ?? props.repositoryId);
@@ -460,10 +391,6 @@ const assignmentMenuItems = computed<AppMenuItem[]>(() => {
       icon: IconX,
     },
   ];
-});
-
-watch(target, (value) => {
-  if (value === 'duplicate') workspaceMode.value = 'worktree';
 });
 
 watch(() => props.visible, (visible) => {
@@ -602,9 +529,7 @@ function openItem(item: WorkItem, element?: HTMLElement): void {
   selectedItem.value = item;
   openItemId.value = item.id;
   startWorkVisible.value = true;
-  target.value = 'duplicate';
-  workspaceMode.value = 'worktree';
-  branchName.value = item.kind === 'pullRequest' ? item.branchName?.trim() ?? '' : suggestedBranch(item);
+  branchName.value = item.kind === 'pullRequest' ? item.branchName?.trim() || suggestedBranch(item) : suggestedBranch(item);
   operationState.value = 'idle';
   operationError.value = null;
 }
@@ -681,15 +606,15 @@ function prefillCustomPrompt(): void {
   closeStartWork();
 }
 
-async function startWork(action: WorkItemAssignmentAction): Promise<void> {
+async function startWork(selection: WorkItemAssignmentSelection): Promise<void> {
   const item = selectedItem.value;
-  if (!item || workActionDisabled.value || operationState.value === 'running') return;
+  if (!item || operationState.value === 'running') return;
   operationState.value = 'running';
   operationError.value = null;
   try {
-    const input: RepositoryWorkStartInput = workspaceMode.value === 'worktree'
-      ? { action, item, target: target.value, workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
-      : { action, item, target: target.value, workspace: { kind: 'current' } };
+    const input: RepositoryWorkStartInput = selection.destination === 'new'
+      ? { action: selection.action, item, target: 'duplicate', workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
+      : { action: selection.action, item, target: 'current', workspace: { kind: 'current' } };
     await props.startWorkAction(input);
     operationState.value = 'success';
     globalThis.setTimeout(closeStartWork, 1_200);
@@ -1344,155 +1269,6 @@ function relativeLuminance(rgb: number[]): number {
 .repository-backlog__start-work > header > button svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
-}
-
-.repository-backlog__target-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.repository-backlog__target-options > button {
-  min-height: 86px;
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 3px;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-}
-
-.repository-backlog__target-options strong {
-  font-size: var(--font-size-12);
-}
-
-.repository-backlog__target-options > button:hover {
-  border-color: var(--color-outline);
-  background: var(--color-surface-low);
-}
-
-.repository-backlog__target-options > .repository-backlog__choice--selected {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-primary-container);
-}
-
-.repository-backlog__target-options svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.repository-backlog__target-options span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-  line-height: 1.25;
-}
-
-.repository-backlog__isolation {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.repository-backlog__isolation > span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-}
-
-.repository-backlog__isolation label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  cursor: pointer;
-  font-size: var(--font-size-12);
-}
-
-.repository-backlog__isolation label > span {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.repository-backlog__isolation label small {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-  font-weight: var(--font-weight-regular);
-}
-
-.repository-backlog__isolation label svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--color-text-muted);
-}
-
-.repository-backlog__isolation-option--disabled {
-  opacity: 0.45;
-  cursor: default !important;
-}
-
-.repository-backlog__branch {
-  height: 28px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-left: 27px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface-lowest);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-11);
-}
-
-.repository-backlog__branch--editable:focus-within {
-  border-color: var(--color-primary);
-}
-
-.repository-backlog__branch--editable input {
-  min-width: 0;
-  height: 100%;
-  flex: 1 1 auto;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  color: inherit;
-  background: transparent;
-  font: inherit;
-}
-
-.repository-backlog__branch--disabled {
-  color: var(--color-text-muted);
-  background: var(--color-surface-low);
-  cursor: default;
-}
-
-.repository-backlog__branch svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--color-text-muted);
-}
-
-.repository-backlog__operation-error {
-  margin: 0;
-  color: var(--color-error);
-  font-size: var(--font-size-12);
-}
-
-.repository-backlog__start-work footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: 0;
 }
 
 .repository-backlog__operation-state {

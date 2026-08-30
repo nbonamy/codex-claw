@@ -997,7 +997,12 @@ describe('AppShell', () => {
     const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountShell({ snapshot, loadWorkItems, createWorkItem, createAgentGitBranch, assignWorkItemAction });
 
-    await wrapper.get('[aria-label="Open repository backlog"]').trigger('click');
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await nextTick();
+    const backlogLauncher = wrapper.findAll('.right-workspace-panel__launcher button')
+      .find((candidate) => candidate.text().includes('Backlog'));
+    expect(backlogLauncher).toBeDefined();
+    await backlogLauncher!.trigger('click');
     await flushPromises();
 
     expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, { kind: 'all', state: 'all' });
@@ -2586,6 +2591,8 @@ describe('AppShell', () => {
       path: '/Users/nbonamy/src/codex-claw-work-routing',
     });
     const createAgent = vi.fn().mockResolvedValue(undefined);
+    const createAgentGitBranch = vi.fn().mockResolvedValue({});
+    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountShell({
       snapshot,
       sourceRepositories: [sourceRepository],
@@ -2593,6 +2600,8 @@ describe('AppShell', () => {
       loadWorkItems,
       createSourceWorktree,
       createAgent,
+      createAgentGitBranch,
+      assignWorkItemAction,
       workRepositoriesByProvider: { github: [githubRepository] },
     });
     const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
@@ -2631,6 +2640,27 @@ describe('AppShell', () => {
     });
     expect(sourceDialog.props('branches')).toHaveLength(2);
     expect(sourceDialog.props('workItems')).toStrictEqual([issue]);
+    expect(sourceDialog.props('sessions')).toStrictEqual([
+      { agentId: 'agent-dina', label: 'Dina · main' },
+      { agentId: 'agent-jesse', label: 'Jesse · main' },
+    ]);
+
+    sourceDialog.vm.$emit('start-work-item', {
+      action: 'investigate',
+      agentId: 'agent-dina',
+      destination: 'existing',
+      item: issue,
+    });
+    await flushPromises();
+    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
+      name: 'fix/gh-24',
+      createWorktree: false,
+      confirmed: true,
+    });
+    expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: 'agent-dina',
+      item: issue,
+    }));
 
     sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
     await flushPromises();

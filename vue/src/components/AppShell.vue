@@ -212,7 +212,6 @@
           :open-in-catalog="openInApplications"
           :subagent-tree="currentSubagentTree"
           :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
-          :github-backlog-available="Boolean(currentAgentGitStatus?.githubRepository)"
           :get-git-workflow="props.getAgentGitWorkflow"
           :generate-git-message="props.generateAgentGitMessage"
           :commit-git-changes="props.commitAgentGitChanges"
@@ -223,7 +222,6 @@
           @toggle-execution-plan="toggleExecutionPlan"
           @toggle-workspace="toggleRightWorkspace"
           @open-git-diff="openAgentGitDiffPreview"
-          @open-backlog="openRepositoryBacklog(currentAgent.id)"
           @open-in="openAgentIn(currentAgent.id, $event)"
           @select-subagent="openSubagent(currentAgent.id, $event)"
           @install-update="emit('install-update')"
@@ -318,9 +316,13 @@
       :work-items="repositorySessionSourceWorkItems"
       :loading="repositorySessionSourceLoading"
       :error="repositorySessionSourceError"
+      :sessions="repositorySessionAssignmentSessions"
+      :assignment-state="repositorySessionAssignmentState"
+      :assignment-error="repositorySessionAssignmentError"
       @close="closeRepositorySessionSource"
       @select-branch="openNewAgentForSourceBranch"
-      @select-work-item="openNewAgentForSourceWorkItem"
+      @custom-work-item="customizeRepositorySessionWork"
+      @start-work-item="startRepositorySessionWork"
     />
     <NewSourceWorktreeDialog
       :allow-destination-override="false"
@@ -453,6 +455,7 @@ import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import AgentSidebar from './AgentSidebar.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
+import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
@@ -877,6 +880,23 @@ const repositorySessionSourceBranches = ref<SourceBranch[]>([]);
 const repositorySessionSourceWorkItems = ref<WorkItem[]>([]);
 const repositorySessionSourceLoading = ref(false);
 const repositorySessionSourceError = ref<string | null>(null);
+const repositorySessionAssignmentState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
+const repositorySessionAssignmentError = ref<string | null>(null);
+const repositorySessionAssignmentSessions = computed<WorkItemAssignmentSession[]>(() => {
+  const source = repositorySessionSource.value;
+  if (!source) return [];
+  const { teamId } = repositorySessionContext(source);
+  return props.snapshot.agents
+    .filter((agent) => (!teamId || agent.teamId === teamId)
+      && agent.workspace?.kind === 'git'
+      && agent.workspace.primaryWorktreeRoot === source.repositoryRoot)
+    .map((agent) => ({
+      agentId: agent.id,
+      label: agent.workspace?.kind === 'git' && agent.workspace.branch
+        ? `${agentDisplayName(agent)} · ${agent.workspace.branch}`
+        : agentDisplayName(agent),
+    }));
+});
 const repositorySessionWorktreeSource = ref<RepositorySessionSource | null>(null);
 const repositorySessionWorktreeRepository = computed<SourceRepository | null>(() => {
   const source = repositorySessionWorktreeSource.value;
@@ -1731,8 +1751,12 @@ async function startRepositoryWork(agentId: string, input: RepositoryWorkStartIn
 }
 
 function prefillRepositoryWork(agentId: string, item: WorkItem): void {
+  prefillWorkItemForAgent(agentId, item);
+}
+
+function prefillWorkItemForAgent(agentId: string, item: WorkItem): void {
   const prompt = workItemComposerPrompt(item);
-  const existingText = props.composerState.text.trimEnd();
+  const existingText = currentAgent.value?.id === agentId ? props.composerState.text.trimEnd() : '';
   const text = existingText ? `${existingText}\n\n${prompt}` : prompt;
   emit('update:composerState', {
     agentId,
@@ -1742,6 +1766,7 @@ function prefillRepositoryWork(agentId: string, item: WorkItem): void {
       selectionEnd: text.length,
     },
   });
+  selectAgentFromShell(agentId);
   void nextTick(() => conversationPane.value?.focusComposer());
 }
 
@@ -1838,6 +1863,8 @@ async function openRepositorySessionSource(source: RepositorySessionSource): Pro
   repositorySessionSourceBranches.value = [];
   repositorySessionSourceWorkItems.value = [];
   repositorySessionSourceError.value = null;
+  repositorySessionAssignmentState.value = 'idle';
+  repositorySessionAssignmentError.value = null;
   repositorySessionSourceLoading.value = true;
 
   const { remoteConnectionId, location } = repositorySessionContext(source);
@@ -1886,6 +1913,8 @@ function closeRepositorySessionSource(): void {
   repositorySessionSource.value = null;
   repositorySessionSourceLoading.value = false;
   repositorySessionSourceError.value = null;
+  repositorySessionAssignmentState.value = 'idle';
+  repositorySessionAssignmentError.value = null;
 }
 
 async function listRepositorySessionBranches(input: { agentId: string; repositoryRoot: string }): Promise<SourceBranch[]> {
@@ -1946,20 +1975,53 @@ function openNewAgentForSourceBranch(branch: SourceBranch): void {
   void createRepositorySession(source, branch, teamId);
 }
 
-function openNewAgentForSourceWorkItem(item: WorkItem): void {
+async function startRepositorySessionWork(selection: WorkItemAssignmentSelection): Promise<void> {
   const source = repositorySessionSource.value;
   if (!source) return;
   const { teamId } = repositorySessionContext(source);
-  closeRepositorySessionSource();
-  if (!teamId) {
-    ElMessage.error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-    return;
+  repositorySessionAssignmentState.value = 'running';
+  repositorySessionAssignmentError.value = null;
+  try {
+    if (selection.destination === 'existing') {
+      if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
+      await startWorkItemInExistingSession(selection.agentId, selection.item, selection.action);
+    } else {
+      if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
+      const { agent, item } = await createIsolatedWorkItemAgent(selection.item, teamId);
+      await props.assignWorkItemAction({
+        agentId: agent.id,
+        item,
+        prompt: workItemAssignmentPrompt(item, { action: selection.action }),
+      });
+    }
+    repositorySessionAssignmentState.value = 'success';
+    globalThis.setTimeout(closeRepositorySessionSource, 1_200);
+  } catch (error) {
+    repositorySessionAssignmentState.value = 'error';
+    repositorySessionAssignmentError.value = error instanceof Error ? error.message : String(error);
   }
-  void startCockpitWorkItems({
-    action: item.kind === 'pullRequest' ? 'review' : 'fix',
-    items: [item],
-    teamId,
-  }).catch((error) => ElMessage.error(error instanceof Error ? error.message : String(error)));
+}
+
+async function customizeRepositorySessionWork(selection: Omit<WorkItemAssignmentSelection, 'action'>): Promise<void> {
+  const source = repositorySessionSource.value;
+  if (!source) return;
+  const { teamId } = repositorySessionContext(source);
+  repositorySessionAssignmentState.value = 'running';
+  repositorySessionAssignmentError.value = null;
+  try {
+    if (selection.destination === 'existing') {
+      if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
+      prefillWorkItemForAgent(selection.agentId, selection.item);
+    } else {
+      if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
+      const { agent, item } = await createIsolatedWorkItemAgent(selection.item, teamId);
+      prefillWorkItemForAgent(agent.id, item);
+    }
+    closeRepositorySessionSource();
+  } catch (error) {
+    repositorySessionAssignmentState.value = 'error';
+    repositorySessionAssignmentError.value = error instanceof Error ? error.message : String(error);
+  }
 }
 
 async function createRepositorySession(source: RepositorySessionSource, branch: SourceBranch, teamId?: string): Promise<void> {
@@ -2107,42 +2169,75 @@ async function startCockpitWorkItems(input: {
   items: WorkItem[];
   teamId: string;
 }): Promise<void> {
-  const team = props.snapshot.teams.find((candidate) => candidate.id === input.teamId);
-  if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
-
   await Promise.all(input.items.map(async (listedItem) => {
-    const item = await resolvePullRequestBranch(listedItem);
-    const repositoryName = workItemRepositoryName(item);
-    const repository = props.sourceRepositories.find((candidate) => candidate.name === repositoryName);
-    if (!repository) {
-      throw new Error(`${item.repositoryFullName} is not available in the source folder.`);
-    }
-
-    const branchName = item.kind === 'pullRequest'
-      ? item.branchName?.trim()
-      : `fix/gh-${item.number}`;
-    if (!branchName) throw new Error(`GitHub did not return the branch for ${item.repositoryFullName} #${item.number}.`);
-    const remoteConnectionId = team.remoteConnectionId?.trim();
-    const worktree = await props.createSourceWorktree({
-      repoPath: repository.path,
-      branchName,
-      ...(remoteConnectionId ? { remoteConnectionId } : {}),
-    });
-    const agent = await props.createAgent({
-      name: null,
-      folder: worktree.path,
-      backend: 'codex',
-      sourceRepositoryName: repository.name,
-      teamId: team.id,
-    });
-    if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} #${item.number}.`);
-
+    const { agent, item } = await createIsolatedWorkItemAgent(listedItem, input.teamId);
     await props.assignWorkItemAction({
       agentId: agent.id,
       item,
       prompt: workItemAssignmentPrompt(item, { action: input.action }),
     });
   }));
+}
+
+async function createIsolatedWorkItemAgent(listedItem: WorkItem, teamId: string): Promise<{ agent: Agent; item: WorkItem }> {
+  const team = props.snapshot.teams.find((candidate) => candidate.id === teamId);
+  if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
+
+  const item = await resolvePullRequestBranch(listedItem);
+  const repositoryName = workItemRepositoryName(item);
+  const repository = props.sourceRepositories.find((candidate) => candidate.name === repositoryName);
+  if (!repository) throw new Error(`${item.repositoryFullName} is not available in the source folder.`);
+
+  const branchName = workItemBranchName(item);
+  const remoteConnectionId = team.remoteConnectionId?.trim();
+  const worktree = await props.createSourceWorktree({
+    repoPath: repository.path,
+    branchName,
+    ...(remoteConnectionId ? { remoteConnectionId } : {}),
+  });
+  const agent = await props.createAgent({
+    name: null,
+    folder: worktree.path,
+    backend: 'codex',
+    sourceRepositoryName: repository.name,
+    teamId: team.id,
+  });
+  if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} #${item.number}.`);
+  return { agent, item };
+}
+
+async function startWorkItemInExistingSession(
+  agentId: string,
+  listedItem: WorkItem,
+  action: WorkItemAssignmentAction,
+): Promise<void> {
+  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (!agent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
+  const item = await resolvePullRequestBranch(listedItem);
+  if (!await confirmAssignedWorkItemOverride(item, agentDisplayName(agent), agent.id)) {
+    throw new Error(translate('surface.appShell.assignmentCancelled'));
+  }
+
+  const branchName = workItemBranchName(item);
+  if (agent.workspace?.kind !== 'git' || agent.workspace.branch !== branchName) {
+    await props.createAgentGitBranch(agent.id, {
+      name: branchName,
+      createWorktree: false,
+      ...(item.kind === 'pullRequest' ? { pullRequestNumber: item.number } : {}),
+      confirmed: true,
+    });
+  }
+  await props.assignWorkItemAction({
+    agentId: agent.id,
+    item,
+    prompt: workItemAssignmentPrompt(item, { action }),
+  });
+}
+
+function workItemBranchName(item: WorkItem): string {
+  const branchName = item.kind === 'pullRequest' ? item.branchName?.trim() : `fix/gh-${item.number}`;
+  if (!branchName) throw new Error(`GitHub did not return the branch for ${item.repositoryFullName} #${item.number}.`);
+  return branchName;
 }
 
 async function resolvePullRequestBranch(item: WorkItem): Promise<WorkItem> {
