@@ -7,8 +7,10 @@ type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 
 describe('Computer Use MCP tools', () => {
   const handlers = new Map<string, ToolHandler>();
+  const definitions = new Map<string, { description?: string }>();
   const server = {
-    registerTool: vi.fn((name: string, _definition: unknown, handler: ToolHandler) => {
+    registerTool: vi.fn((name: string, definition: { description?: string }, handler: ToolHandler) => {
+      definitions.set(name, definition);
       handlers.set(name, handler);
     }),
   };
@@ -21,8 +23,26 @@ describe('Computer Use MCP tools', () => {
 
   beforeEach(() => {
     handlers.clear();
+    definitions.clear();
     vi.clearAllMocks();
     registerComputerUseTools(server as unknown as McpServer, computerUse);
+  });
+
+  it('defines coordinate clicks as absolute macOS logical screen points', () => {
+    expect(definitions.get('computer-use-click')?.description).toContain('absolute macOS logical screen coordinates');
+    expect(definitions.get('computer-use-click')?.description).toContain('never window-relative positions or screenshot pixels');
+    expect(definitions.get('computer-use-screenshot')?.description).toContain('Use screen scope to include the menu bar');
+  });
+
+  it('documents physical clicks as an explicit foreground fallback', () => {
+    expect(definitions.get('computer-use-click')?.description).toContain('Defaults to AXPress');
+    expect(definitions.get('computer-use-click')?.description).toContain('physical=true');
+    expect(definitions.get('computer-use-click')?.description).toContain('frontmost and unobstructed');
+  });
+
+  it('documents the virtual cursor session lifetime', () => {
+    expect(definitions.get('computer-use-stop')?.description).toContain('30 seconds');
+    expect(definitions.get('computer-use-stop')?.description).toContain('including screenshots');
   });
 
   it('registers the complete Computer Use surface', () => {
@@ -66,7 +86,7 @@ describe('Computer Use MCP tools', () => {
     ['computer-use-launch-app', { path: '/Applications/Claw.app' }, 'launch_app'],
     ['computer-use-focus-app', { pid: 42 }, 'focus_app'],
     ['computer-use-get-app-state', { app: 'Claw', maxDepth: 12 }, 'get_app_state'],
-    ['computer-use-click', { element_index: 7 }, 'click'],
+    ['computer-use-click', { element_index: 7, physical: true }, 'click'],
     ['computer-use-type-text', { app: 'Claw', text: 'hello' }, 'type_text'],
     ['computer-use-set-value', { element_index: 7, value: 'hello' }, 'set_value'],
     ['computer-use-scroll', { x: 10, y: 20, deltaY: 400 }, 'scroll'],
@@ -83,7 +103,11 @@ describe('Computer Use MCP tools', () => {
       ok: true,
       result: {
         scope: 'screen',
-        screen: { id: 42, isMain: true },
+        screen: {
+          bounds: { x: 0, y: 0, width: 1512, height: 982 },
+          id: 42,
+          isMain: true,
+        },
         image: {
           dataBase64: 'cG5n',
           width: 3024,
@@ -95,15 +119,39 @@ describe('Computer Use MCP tools', () => {
     });
 
     await expect(handlers.get('computer-use-screenshot')?.({ scope: 'screen', displayId: 42 })).resolves.toStrictEqual({
-      content: [{ type: 'image', data: 'cG5n', mimeType: 'image/png' }],
+      content: [
+        {
+          type: 'text',
+          text: [
+            'Click coordinates are absolute macOS logical screen points: (0,0) is the top-left of the main display and y increases downward.',
+            'Use screen scope to capture and click the menu bar. Displays left of or above the main display can have negative origins.',
+            'Captured absolute bounds: x=0, y=0, width=1512, height=982.',
+            'Convert an original-image pixel (px, py) to a click with x=0+px/2, y=0+py/2. Do not use rendered preview pixels.',
+          ].join('\n'),
+        },
+        { type: 'image', data: 'cG5n', mimeType: 'image/png' },
+      ],
       structuredContent: {
         scope: 'screen',
-        screen: { id: 42, isMain: true },
+        screen: {
+          bounds: { x: 0, y: 0, width: 1512, height: 982 },
+          id: 42,
+          isMain: true,
+        },
         image: {
           width: 3024,
           height: 1964,
           mimeType: 'image/png',
           scaleFactor: 2,
+        },
+        coordinateSystem: {
+          bounds: { x: 0, y: 0, width: 1512, height: 982 },
+          imageScaleFactor: 2,
+          origin: 'top-left-main-display',
+          type: 'macos-global-logical-points',
+          units: 'logical-points',
+          xDirection: 'right',
+          yDirection: 'down',
         },
       },
       isError: false,

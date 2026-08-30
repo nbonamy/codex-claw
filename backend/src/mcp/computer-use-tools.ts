@@ -40,7 +40,7 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
   }, () => execute(computerUse, 'request_screen_capture', {}));
 
   server.registerTool('computer-use-stop', {
-    description: 'Optionally end the live local Computer Use session and hide its virtual cursor immediately. A later Computer Use action starts a new session automatically.',
+    description: 'End the live local Computer Use session and hide its virtual cursor immediately. Otherwise the session closes 30 seconds after the last Computer Use call; every call, including screenshots, resets that timeout.',
     inputSchema: {},
   }, () => computerUseResult(() => computerUse.stop()));
 
@@ -84,19 +84,22 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
   }, (arguments_) => execute(computerUse, 'get_app_state', arguments_));
 
   server.registerTool('computer-use-screenshot', {
-    description: 'Capture a target application window or an entire macOS display as a PNG image. Window capture defaults to the frontmost application; screen capture defaults to the main display.',
+    description: 'Capture a target application window or an entire macOS display as a PNG image. The result identifies the captured region in absolute macOS logical screen coordinates and explains how image pixels map to click coordinates. Use screen scope to include the menu bar or anything outside an app window. Window capture defaults to the frontmost application; screen capture defaults to the main display.',
     inputSchema: {
       ...optionalAppSchema,
       displayId: z.number().int().positive().optional(),
-      scope: z.enum(['window', 'screen']).optional(),
+      scope: z.enum(['window', 'screen']).optional().describe('Capture one app window, or an entire display including its menu bar. Defaults to window.'),
     },
   }, (arguments_) => computerUseScreenshotResult(
     () => computerUse.execute({ command: 'screenshot', arguments: arguments_ }),
   ));
 
   server.registerTool('computer-use-click', {
-    description: 'Click a fresh Accessibility element by element_index, or click at x/y coordinates.',
-    inputSchema: actionTargetSchema,
+    description: 'Click a fresh Accessibility element by element_index, or click at absolute macOS logical screen coordinates. Defaults to AXPress, which does not require a physical foreground click. Set physical=true only for a visible Electron/web control known to require mouse input, or after AXPress reports success but refreshed state shows no UI change; physical clicks require the target app to be frontmost and unobstructed. Coordinate origin (0,0) is the top-left of the main display, y increases downward, and displays left of or above the main display can use negative coordinates. x/y are never window-relative positions or screenshot pixels.',
+    inputSchema: {
+      ...actionTargetSchema,
+      physical: z.boolean().optional().describe('Send a real foreground mouse click instead of AXPress. Use for visible Electron/web controls or after verifying AXPress did not change the UI.'),
+    },
   }, (arguments_) => execute(computerUse, 'click', arguments_));
 
   server.registerTool('computer-use-type-text', {
@@ -135,8 +138,8 @@ const optionalAppSchema = {
 const actionTargetSchema = {
   ...optionalAppSchema,
   element_index: z.number().int().nonnegative().optional(),
-  x: z.number().finite().optional(),
-  y: z.number().finite().optional(),
+  x: z.number().finite().optional().describe('Absolute macOS logical screen x-coordinate, measured rightward from the main display origin. Not a screenshot pixel or window-relative coordinate.'),
+  y: z.number().finite().optional().describe('Absolute macOS logical screen y-coordinate, measured downward from the main display origin. Not a screenshot pixel or window-relative coordinate.'),
 };
 
 function execute(computerUse: ComputerUseClient, command: ComputerUseCommand, arguments_: Record<string, unknown>) {
@@ -169,17 +172,84 @@ async function computerUseScreenshotResult(run: () => Promise<unknown>): Promise
     const mimeType = typeof image?.mimeType === 'string' ? image.mimeType : 'image/png';
     if (!payload || !image || !data) return errorToolResult('Computer Use returned an invalid screenshot.');
     const { dataBase64: _dataBase64, ...imageMetadata } = image;
+    const coordinateSystem = screenshotCoordinateSystem(payload, imageMetadata);
     return {
-      content: [{ type: 'image', data, mimeType }],
+      content: [
+        { type: 'text', text: screenshotCoordinateGuide(coordinateSystem) },
+        { type: 'image', data, mimeType },
+      ],
       structuredContent: {
         ...payload,
         image: imageMetadata,
+        coordinateSystem,
       },
       isError: false,
     };
   } catch (error) {
     return errorToolResult(error instanceof Error ? error.message : String(error));
   }
+}
+
+type ScreenshotCoordinateSystem = {
+  bounds?: { height: number; width: number; x: number; y: number };
+  imageScaleFactor?: number;
+  origin: 'top-left-main-display';
+  type: 'macos-global-logical-points';
+  units: 'logical-points';
+  xDirection: 'right';
+  yDirection: 'down';
+};
+
+function screenshotCoordinateSystem(
+  payload: Record<string, unknown>,
+  image: Record<string, unknown>,
+): ScreenshotCoordinateSystem {
+  const target = record(payload.scope === 'screen' ? payload.screen : payload.window);
+  const bounds = rectangle(record(target?.bounds));
+  const scaleFactor = positiveNumber(image.scaleFactor);
+  return {
+    type: 'macos-global-logical-points',
+    origin: 'top-left-main-display',
+    units: 'logical-points',
+    xDirection: 'right',
+    yDirection: 'down',
+    ...(bounds ? { bounds } : {}),
+    ...(scaleFactor ? { imageScaleFactor: scaleFactor } : {}),
+  };
+}
+
+function screenshotCoordinateGuide(coordinateSystem: ScreenshotCoordinateSystem): string {
+  const lines = [
+    'Click coordinates are absolute macOS logical screen points: (0,0) is the top-left of the main display and y increases downward.',
+    'Use screen scope to capture and click the menu bar. Displays left of or above the main display can have negative origins.',
+  ];
+  const { bounds, imageScaleFactor } = coordinateSystem;
+  if (bounds) {
+    lines.push(`Captured absolute bounds: x=${bounds.x}, y=${bounds.y}, width=${bounds.width}, height=${bounds.height}.`);
+  }
+  if (bounds && imageScaleFactor) {
+    lines.push(`Convert an original-image pixel (px, py) to a click with x=${bounds.x}+px/${imageScaleFactor}, y=${bounds.y}+py/${imageScaleFactor}. Do not use rendered preview pixels.`);
+  }
+  return lines.join('\n');
+}
+
+function rectangle(value: Record<string, unknown> | null): ScreenshotCoordinateSystem['bounds'] | undefined {
+  if (!value) return undefined;
+  const x = finiteNumber(value.x);
+  const y = finiteNumber(value.y);
+  const width = positiveNumber(value.width);
+  const height = positiveNumber(value.height);
+  return x === undefined || y === undefined || width === undefined || height === undefined
+    ? undefined
+    : { x, y, width, height };
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function positiveNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 function isSuccess(value: unknown): value is { ok: true; result: unknown } {

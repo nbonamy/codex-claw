@@ -161,12 +161,29 @@ Tools are `computer-use-status`, `computer-use-request-accessibility`,
 `computer-use-screenshot` returns MCP image content rather than embedding PNG
 base64 in text. Its `window` scope targets the frontmost or explicitly selected
 application; its `screen` scope captures the main or explicitly selected
-display. Screenshot capture is gated by the helper's separately reported
+display, including the menu bar. Screenshot results state the captured region's
+absolute macOS logical bounds, the image scale factor, and the pixel-to-screen
+conversion next to the image. Coordinate actions always use absolute logical
+screen points from the top-left of the main display; they never use
+window-relative positions or screenshot pixels. Displays left of or above the
+main display can have negative origins. Screenshot capture is gated by the helper's separately reported
 Screen Recording trust, surfaced in General -> System permissions.
+
+`computer-use-click` uses Accessibility `AXPress` by default. Agents may set
+`physical: true` for a visible Electron/web control known to require actual
+mouse input, or after an `AXPress` reports success but refreshed state shows no
+change. Physical clicks require the target app to remain frontmost and the
+target position to remain unobstructed.
 
 The helper reports its own Accessibility trust. Agents must check status or
 request permission before inspection/actions and refresh app state before
 acting on an indexed element. Normal MCP approval applies to each call.
+
+The native virtual cursor keeps its existing show trigger, then remains visible
+for the Computer Use session. Every Computer Use call, including a screenshot,
+resets the 30-second inactivity timeout. Screenshots temporarily hide the
+cursor while capturing and restore it afterward. `computer-use-stop` closes
+the session immediately; inactivity closes it automatically.
 
 For Claude, `clawd` passes the same request-scoped agent URL through the Claude
 CLI instead of mutating global Claude Code config:

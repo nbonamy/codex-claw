@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { executeComputerUseCommand, getComputerUseStatus, resolveComputerUseHelperAppPath, stopComputerUseHelper } from '../computer-use-tools';
+import { computerUseSessionTimeoutMs, executeComputerUseCommand, getComputerUseStatus, resolveComputerUseHelperAppPath, stopComputerUseHelper } from '../computer-use-tools';
 
 describe('Computer Use desktop helper', () => {
   let tempDir: string;
@@ -31,6 +31,10 @@ process.stdin.on('data', (chunk) => {
   afterEach(() => {
     stopComputerUseHelper();
     fs.rmSync(tempDir, { force: true, recursive: true });
+  });
+
+  it('keeps the Computer Use session alive for thirty seconds by default', () => {
+    expect(computerUseSessionTimeoutMs).toBe(30_000);
   });
 
   it('runs the product-neutral pilot through a narrow command contract', async () => {
@@ -181,6 +185,26 @@ process.stdin.on('data', (chunk) => {
     const first = await executeComputerUseCommand({ command: 'list_apps', arguments: {}, options: shortTtlOptions() });
     await new Promise((resolve) => setTimeout(resolve, 50));
     const second = await executeComputerUseCommand({ command: 'list_apps', arguments: {}, options: shortTtlOptions() });
+
+    expect((first as { result: { pid: number } }).result.pid).not.toBe((second as { result: { pid: number } }).result.pid);
+  });
+
+  it('resets the idle TTL after a screenshot', async () => {
+    const shortTtlOptions = () => ({ ...options(), idleTtlMs: 200 });
+    const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: shortTtlOptions() });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const screenshot = await executeComputerUseCommand({ command: 'screenshot', arguments: {}, options: shortTtlOptions() });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const last = await executeComputerUseCommand({ command: 'status', arguments: {}, options: shortTtlOptions() });
+
+    expect((screenshot as { result: { pid: number } }).result.pid).toBe((first as { result: { pid: number } }).result.pid);
+    expect((last as { result: { pid: number } }).result.pid).toBe((first as { result: { pid: number } }).result.pid);
+  });
+
+  it('starts a new session after an explicit stop', async () => {
+    const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
+    stopComputerUseHelper();
+    const second = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
 
     expect((first as { result: { pid: number } }).result.pid).not.toBe((second as { result: { pid: number } }).result.pid);
   });

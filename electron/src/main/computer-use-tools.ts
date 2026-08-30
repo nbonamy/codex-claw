@@ -6,7 +6,7 @@ import path from 'node:path';
 const helperAppName = 'Codex Claw Computer Use.app';
 const helperExecutableName = 'computer-use-pilot';
 const timeoutMs = 30_000;
-const defaultIdleTtlMs = 10_000;
+export const computerUseSessionTimeoutMs = 30_000;
 
 export const computerUseCommands = [
   'status',
@@ -137,7 +137,7 @@ export async function executeComputerUseCommand(input: {
     arguments: arguments_,
     command: input.command,
     id: crypto.randomUUID(),
-  }, input.options.idleTtlMs ?? defaultIdleTtlMs);
+  }, input.options.idleTtlMs ?? computerUseSessionTimeoutMs);
   if (response.ok && input.command === 'get_app_state') {
     lastAppStateContext = appStateContext(pilotPath, input.arguments, response.result);
   }
