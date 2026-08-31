@@ -44,8 +44,8 @@ describe('codex-config', () => {
       chromeEnabled: true,
     });
 
-    expect(config.developerInstructions).toContain('computer-use-status');
-    expect(config.developerInstructions).toContain('Do not load or use the built-in computer-use skill or sky.* methods');
+    expect(config.developerInstructions).toContain('computer-use-guide');
+    expect(config.developerInstructions).toContain("Do not load or use Codex's built-in computer-use skill or sky.* methods");
     expect(config.config?.['mcp_servers.node_repl.enabled']).toBe(true);
   });
 
