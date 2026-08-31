@@ -21,9 +21,6 @@ describe('agent prompts', () => {
         content: 'The facade is ready.',
       }],
     });
-    expect(prompt).toContain('<<<CODEX_CLAW_DELIVERY_INSTRUCTIONS>>>');
-    expect(prompt).toContain('Reply only if the sender needs information, a decision, coordination, or action.');
-    expect(prompt).not.toContain('Do not proactively message other agents.');
   });
 
   it('numbers and attributes batches of teammate messages', () => {
@@ -53,10 +50,9 @@ describe('agent prompts', () => {
         content: 'Second',
       },
     ]);
-    expect(prompt).toContain('Reply only to senders who need information, a decision, coordination, or action.');
   });
 
-  it('embeds the active agent identity and collaboration constraints', () => {
+  it('embeds the active agent identity and enabled host capabilities', () => {
     const instructions = codexClawDeveloperInstructions(agent(), {
       computerUseEnabled: true,
       chromeEnabled: true,
@@ -65,25 +61,13 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Your Codex Claw agent ID is agent-dina.');
     expect(instructions).toContain('Your agent name is Dina');
     expect(instructions).toContain('your folder is /src/codex-claw');
-    expect(instructions).toContain('before starting substantive work, changing direction, or finishing substantive work');
-    expect(instructions).toContain('Do not change status for informational teammate messages');
-    expect(instructions).toContain('Reply to teammate messages only when the sender needs information');
-    expect(instructions).toContain('Never acknowledge an acknowledgment');
-    expect(instructions).toContain('Do not proactively message other agents');
-    expect(instructions).toContain('Never send FYIs, progress reports, acknowledgments, commit/hash notices');
-    expect(instructions).toContain('Use browser-open with an HTTP, HTTPS, or workspace-local file URL');
-    expect(instructions).toContain('File URLs must resolve inside your agent folder');
-    expect(instructions).toContain('use only the codex_claw MCP Computer Use tools');
-    expect(instructions).toContain('call computer-use-guide and follow the returned instructions');
-    expect(instructions).toContain('built-in computer-use skill or sky.* methods');
+    expect(instructions).toContain('computer-use-guide');
     expect(instructions).toContain('chrome:control-chrome');
   });
 
   it('does not advertise disabled host plugins by default', () => {
     const instructions = codexClawDeveloperInstructions(agent());
 
-    expect(instructions).toContain('Computer Use is disabled');
-    expect(instructions).toContain('Chrome integration is disabled');
     expect(instructions).not.toContain('computer-use-status');
     expect(instructions).not.toContain('chrome:control-chrome');
   });
@@ -95,8 +79,7 @@ describe('agent prompts', () => {
 
     const instructions = codexClawDeveloperInstructions(quickChat);
 
-    expect(instructions).toContain('This is a workspace-free Quick chat and has no project folder.');
-    expect(instructions).toContain('Workspace-local file URLs are unavailable in this Quick chat.');
+    expect(instructions).toContain('workspace-free Quick chat');
     expect(instructions).not.toContain('folder is null');
     expect(instructions).not.toContain('inside your agent folder');
   });

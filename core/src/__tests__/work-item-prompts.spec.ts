@@ -3,18 +3,15 @@ import type { WorkItem } from '../contracts';
 import { workItemAssignmentPrompt, workItemComposerPrompt, workProviderLabel } from '../work-item-prompts';
 
 describe('work item prompts', () => {
-  it('includes completion instructions and all available issue context', () => {
+  it('includes routing identifiers and available issue context', () => {
     const prompt = workItemAssignmentPrompt(workItem({
       labels: [{ name: 'bug', color: 'red' }],
       authorName: 'nicolas',
       body: '  Reproduce, fix, and verify.  ',
     }), { assignment: '  Add a regression test.  ' });
 
-    expect(prompt).toContain('Please take this GitHub issue and drive it to completion.');
     expect(prompt).toContain('Work item ID: github:nbonamy/codex-claw#42');
-    expect(prompt).toContain('`update-work-item`');
     expect(prompt).toContain('status `readyForReview`');
-    expect(prompt).toContain('status `blocked`');
     expect(prompt).toContain('Labels: bug');
     expect(prompt).toContain('Author: nicolas');
     expect(prompt).toContain('Assignment instructions:\nAdd a regression test.');

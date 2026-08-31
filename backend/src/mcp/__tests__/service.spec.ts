@@ -326,27 +326,15 @@ describe('ClawMcpService', () => {
     });
     const url = await service.start();
 
-    const toolsResponse = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
-    });
-    expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
-      'computer-use-guide',
-      'computer-use-status',
-      'computer-use-get-app-state',
-      'computer-use-click',
-      'computer-use-dismiss',
-      'computer-use-stop',
-    ]));
-
     const statusResponse = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'computer-use-status', arguments: {} },
+      jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'computer-use-status', arguments: {} },
     });
     expect(statusResponse.result.isError).toBe(false);
     expect(status).toHaveBeenCalledOnce();
 
     const stateResponse = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0',
-      id: 3,
+      id: 2,
       method: 'tools/call',
       params: { name: 'computer-use-get-app-state', arguments: { app: 'TextEdit', maxNodes: 200 } },
     });
@@ -357,7 +345,7 @@ describe('ClawMcpService', () => {
     expect(stateResponse.result.content[0].text).toBe('{"apps":[]}');
 
     const stopResponse = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'computer-use-stop', arguments: {} },
+      jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'computer-use-stop', arguments: {} },
     });
     expect(stopResponse.result.structuredContent).toStrictEqual({ stopped: true });
     expect(stop).toHaveBeenCalledOnce();
@@ -393,19 +381,13 @@ describe('ClawMcpService', () => {
       browser: { open, execute },
     });
     const url = await service.start();
-    const toolsResponse = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
-    });
-    expect(toolsResponse.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
-      'browser-open', 'browser-get-dom', 'browser-screenshot', 'browser-click', 'browser-type', 'browser-scroll', 'browser-console-logs',
-    ]));
     const openResponse = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'browser-open', arguments: { url: 'https://example.com' } },
+      jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'browser-open', arguments: { url: 'https://example.com' } },
     });
     expect(openResponse.result.structuredContent).toStrictEqual({ url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false });
     expect(open).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', url: 'https://example.com' });
     const response = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'browser-get-dom', arguments: { selector: '#save' } },
+      jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'browser-get-dom', arguments: { selector: '#save' } },
     });
     expect(response.result.structuredContent).toStrictEqual({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
     expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', command: 'dom', arguments: { selector: '#save' } });

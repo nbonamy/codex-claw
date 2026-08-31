@@ -50,6 +50,37 @@ Use the same core testing principles as id8, adapted to a desktop app:
   `finally`.
 - Mock external boundaries, not the logic under test.
 
+## Test Value
+
+Coverage is a guardrail, not a reason to preserve assertions that add no useful
+confidence. Each test should protect at least one of these things:
+
+- a user-visible outcome or interaction;
+- an app-owned or external contract;
+- a meaningful state transition or persistence guarantee;
+- an error, security, or architecture boundary with realistic regression risk.
+
+Avoid tests that freeze incidental implementation details:
+
+- Do not assert every sentence or phrase in tool descriptions, model prompts,
+  help text, or developer instructions. Test dynamic interpolation, conditional
+  sections, schemas, and the behavior those instructions enable. If exact copy
+  is itself the product contract, keep one focused assertion at its owning
+  layer.
+- Do not scan source text to pin function names, statement counts, exact file
+  inventories, or a particular implementation spelling. Prefer public behavior
+  and dependency-boundary tooling. Reserve source scans for narrow negative
+  security or process-boundary guarantees that cannot be enforced structurally.
+- Do not repeat the same contract at every layer. Give the detailed assertion
+  to the owning unit, then keep only one representative integration smoke test
+  at the next boundary.
+- A table-driven test is valuable when its rows represent distinct mappings or
+  behaviors. Do not multiply cases merely to increase the test count.
+
+When a test would survive replacing the implementation with a constant string,
+or would fail after a harmless rewording or refactor, reconsider what risk it is
+actually protecting.
+
 ## Main Process Tests
 
 Main-process tests should cover desktop backend behavior without depending on a
