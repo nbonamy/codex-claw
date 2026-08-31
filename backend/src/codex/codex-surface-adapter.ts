@@ -324,7 +324,7 @@ export class CodexSurfaceAgentAdapter {
     const snapshot = await session.handle.rollbackToTurn(turnId);
     return {
       threadId: session.handle.id,
-      messages: surfaceMessages(snapshot.messages, agent.id),
+      messages: historicalSurfaceMessages(snapshot.messages, agent.id),
     };
   }
 
@@ -332,10 +332,10 @@ export class CodexSurfaceAgentAdapter {
     await this.start();
     const owner = this.subagentOwners.get(threadId);
     if (owner?.agentId === agentId && this.liveSubagentConversationIds.has(threadId)) {
-      return surfaceMessages(this.surface.conversation(threadId).getSnapshot().messages, agentId);
+      return historicalSurfaceMessages(this.surface.conversation(threadId).getSnapshot().messages, agentId);
     }
     const history = await this.surface.conversation(threadId).readHistory();
-    const messages = surfaceMessages(history.messages, agentId);
+    const messages = historicalSurfaceMessages(history.messages, agentId);
     const session = this.sessionsByAgentId.get(agentId);
     if (session && session.handle.id !== threadId) {
       const status = subagentStatusFromHistory(history.threadStatus, messages);
@@ -394,7 +394,7 @@ export class CodexSurfaceAgentAdapter {
     const session = await this.bindAndLoad(agent, threadId, false);
     return {
       threadId,
-      messages: surfaceMessages(session.handle.getSnapshot().messages, agent.id),
+      messages: historicalSurfaceMessages(session.handle.getSnapshot().messages, agent.id),
     };
   }
 
@@ -411,7 +411,7 @@ export class CodexSurfaceAgentAdapter {
     this.bindRuntime(targetAgent, result.conversationId, false);
     return {
       threadId: result.conversationId,
-      messages: surfaceMessages(result.snapshot.messages, targetAgent.id),
+      messages: historicalSurfaceMessages(result.snapshot.messages, targetAgent.id),
       activeTurnId: result.snapshot.activeTurnId,
     };
   }
@@ -1029,7 +1029,7 @@ export class CodexSurfaceAgentAdapter {
     this.emitThread(session, {
       type: 'thread.historyLoaded',
       payload: {
-        messages: surfaceMessages(messages, session.agent.id, options.completeStreaming),
+        messages: historicalSurfaceMessages(messages, session.agent.id, options.completeStreaming),
         replace: !preserveHistory,
         ...(typeof historyState?.hasOlder === 'boolean' ? { hasOlderMessages: historyState.hasOlder } : {}),
         ...(options.preserveKnownTurns ? { preserveKnownTurns: true } : {}),
@@ -1435,6 +1435,7 @@ function surfaceMessages(
   messages: readonly SurfaceMessage[],
   agentId: string,
   completeStreaming = false,
+  omitToolPayloads = false,
 ): RendererMessage[] {
   return messages.map((message) => ({
     id: message.id,
@@ -1443,16 +1444,24 @@ function surfaceMessages(
     role: message.role,
     status: completeStreaming && message.status === 'streaming' ? 'complete' : message.status,
     ...(message.turnId ? { turnId: message.turnId } : {}),
-    parts: rendererParts(message.parts),
+    parts: rendererParts(message.parts, omitToolPayloads),
     createdAt: message.createdAt ?? new Date(0).toISOString(),
   }));
+}
+
+function historicalSurfaceMessages(
+  messages: readonly SurfaceMessage[],
+  agentId: string,
+  completeStreaming = false,
+): RendererMessage[] {
+  return surfaceMessages(messages, agentId, completeStreaming, true);
 }
 
 const MAX_TOOL_LABEL_BYTES = 4 * 1024;
 const MAX_TOOL_METADATA_BYTES = 32 * 1024;
 const MAX_TOOL_STATUS_BYTES = 64 * 1024;
 
-function rendererParts(parts: readonly SurfaceMessagePart[]): RendererMessagePart[] {
+function rendererParts(parts: readonly SurfaceMessagePart[], omitToolPayloads = false): RendererMessagePart[] {
   const generatedImagePaths = new Map<string, string>();
   for (const part of parts) {
     if (part.type !== 'tool') continue;
@@ -1463,7 +1472,7 @@ function rendererParts(parts: readonly SurfaceMessagePart[]): RendererMessagePar
   }
 
   return parts.map((part) => {
-    const rendered = rendererPart(part);
+    const rendered = rendererPart(part, omitToolPayloads);
     if (
       rendered.type === 'media' &&
       rendered.itemId &&
@@ -1481,8 +1490,8 @@ function rendererParts(parts: readonly SurfaceMessagePart[]): RendererMessagePar
   });
 }
 
-function rendererPart(part: SurfaceMessagePart): RendererMessagePart {
-  if (part.type === 'tool') return rendererToolPart(part);
+function rendererPart(part: SurfaceMessagePart, omitToolPayloads = false): RendererMessagePart {
+  if (part.type === 'tool') return rendererToolPart(part, omitToolPayloads);
   if (part.type === 'attachment') return { type: 'attachment', attachment: { ...part.attachment } };
   return { ...part };
 }
@@ -1499,10 +1508,10 @@ function skillsChangedPayload(
   };
 }
 
-function rendererToolPart(part: SurfaceMessageToolPart): RendererToolPart {
-  const metadata = boundedToolMetadata(part.metadata);
-  const input = toolInputProjection(part.input);
-  const output = toolOutputProjection(part.output);
+function rendererToolPart(part: SurfaceMessageToolPart, omitPayloads = false): RendererToolPart {
+  const metadata = omitPayloads ? undefined : boundedToolMetadata(part.metadata);
+  const input = omitPayloads ? undefined : toolInputProjection(part.input);
+  const output = omitPayloads ? undefined : toolOutputProjection(part.output);
   return {
     type: 'tool',
     id: part.id,

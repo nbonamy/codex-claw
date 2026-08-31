@@ -52,6 +52,7 @@ class FakeTransport implements RpcTransport {
   private response(method: string, params: unknown): unknown {
     switch (method) {
       case 'initialize': return { userAgent: 'adapter-test' };
+      case 'experimentalFeature/list': return { data: [], nextCursor: null };
       case 'model/list': return {
         data: [{
           id: `gpt-${this.modelVersion}`, model: `gpt-${this.modelVersion}`,
@@ -1259,6 +1260,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         messageId: 'message-future',
         toolPart: {
           type: 'tool', id: 'future-tool', kind: 'futureSdkTool', title: 'Future tool', status: 'completed',
+          input: { path: '/tmp/input.txt' }, output: { result: 'done' }, metadata: { cwd: '/workspace' },
         },
       },
     });
@@ -1267,7 +1269,10 @@ describe('CodexSurfaceAgentAdapter', () => {
       type: 'item.completed',
       payload: expect.objectContaining({
         messageId: 'message-future',
-        toolPart: expect.objectContaining({ id: 'future-tool', kind: 'futureSdkTool' }),
+        toolPart: expect.objectContaining({
+          id: 'future-tool', kind: 'futureSdkTool',
+          input: { path: '/tmp/input.txt' }, output: { result: 'done' }, metadata: { cwd: '/workspace' },
+        }),
       }),
     }));
   });
@@ -1366,6 +1371,10 @@ describe('CodexSurfaceAgentAdapter', () => {
         },
         error: null,
         durationMs: 10,
+      }, {
+        type: 'imageGeneration', id: 'history-image', status: 'completed',
+        revisedPrompt: 'Draw a historical route map', result: generatedPngBase64,
+        savedPath: '/tmp/historical route.png',
       }]),
     ]);
     adapter.onEvent((event) => events.push(event));
@@ -1380,12 +1389,20 @@ describe('CodexSurfaceAgentAdapter', () => {
       kind: 'mcp',
     });
     expect(toolPart).not.toHaveProperty('body');
-    expect(toolPart).toMatchObject({
-      input: { kind: 'schoolPride', path: '/tmp/data', to: 'agent-target' },
-      output: { structuredContent: { kind: 'schoolPride', recipientName: 'Target agent' } },
+    expect(toolPart).not.toHaveProperty('input');
+    expect(toolPart).not.toHaveProperty('output');
+    expect(toolPart).not.toHaveProperty('metadata');
+    expect((history?.payload as { messages: RendererMessage[] }).messages[0]?.parts).toContainEqual({
+      type: 'media',
+      itemId: 'history-image',
+      media: {
+        url: 'file:///tmp/historical%20route.png',
+        alt: 'Generated image',
+        mimeType: 'image/png',
+        prompt: 'Draw a historical route map',
+        title: 'Generated image',
+      },
     });
-    expect(toolPart).not.toHaveProperty('input.prompt');
-    expect(toolPart).not.toHaveProperty('output.content');
     expect(Buffer.byteLength(JSON.stringify(history))).toBeLessThan(64 * 1024);
   });
 

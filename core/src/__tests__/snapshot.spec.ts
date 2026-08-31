@@ -396,6 +396,36 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('never lets an older history page evict the genuine conversation tail', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.messages.push({
+      id: 'genuine-tail', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+      turnId: 'turn-tail', createdAt: '2026-06-05T00:00:05.000Z',
+      parts: [{ type: 'text', text: 'Actual latest response' }],
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.historyLoaded',
+      payload: {
+        direction: 'older',
+        evictedTurnIds: ['turn-tail'],
+        preserveKnownMessages: true,
+        replace: false,
+        messages: [{
+          id: 'older-page', agentId: 'agent-dina', role: 'assistant', status: 'complete',
+          turnId: 'turn-older', createdAt: '2026-06-05T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Older response' }],
+        }],
+      },
+      occurredAt: '2026-06-05T00:00:06.000Z',
+    });
+
+    expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['older-page', 'genuine-tail']);
+  });
+
   it('repositions an updated historical message when its canonical page arrives', () => {
     const snapshot = createInitialSnapshot();
     snapshot.messages.push({
