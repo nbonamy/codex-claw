@@ -1,5 +1,6 @@
 import type { AppshotHotkey } from '@codex-claw/core/contracts';
-import autolib, { type Autolib, type KeyMonitorEvent } from 'autolib';
+import type { Autolib, KeyMonitorEvent } from 'autolib';
+import { loadNativeAutomation } from './native-automation';
 
 const modifierPairs: Record<Exclude<AppshotHotkey, 'none'>, readonly [number, number]> = {
   command: [55, 54],
@@ -8,12 +9,14 @@ const modifierPairs: Record<Exclude<AppshotHotkey, 'none'>, readonly [number, nu
 };
 
 export type AppshotsKeyMonitorOptions = {
+  loadNativeMonitor?: () => Pick<Autolib, 'startKeyMonitor' | 'stopKeyMonitor'>;
   nativeMonitor?: Pick<Autolib, 'startKeyMonitor' | 'stopKeyMonitor'>;
   platform?: NodeJS.Platform;
 };
 
 export class AppshotsKeyMonitor {
-  private readonly nativeMonitor: Pick<Autolib, 'startKeyMonitor' | 'stopKeyMonitor'>;
+  private readonly loadNativeMonitor: () => Pick<Autolib, 'startKeyMonitor' | 'stopKeyMonitor'>;
+  private nativeMonitor?: Pick<Autolib, 'startKeyMonitor' | 'stopKeyMonitor'>;
   private readonly platform: NodeJS.Platform;
   private hotkey: AppshotHotkey = 'none';
   private onTrigger: (() => void) | null = null;
@@ -22,7 +25,8 @@ export class AppshotsKeyMonitor {
   private triggered = false;
 
   constructor(options: AppshotsKeyMonitorOptions = {}) {
-    this.nativeMonitor = options.nativeMonitor ?? autolib;
+    this.nativeMonitor = options.nativeMonitor;
+    this.loadNativeMonitor = options.loadNativeMonitor ?? loadNativeAutomation;
     this.platform = options.platform ?? process.platform;
   }
 
@@ -32,13 +36,14 @@ export class AppshotsKeyMonitor {
     this.onTrigger = onTrigger;
     if (this.platform !== 'darwin' || hotkey === 'none') return true;
 
+    this.nativeMonitor ??= this.loadNativeMonitor();
     const result = this.nativeMonitor.startKeyMonitor((event) => this.handleEvent(event));
     this.running = result === 0;
     return this.running;
   }
 
   stop(): void {
-    if (this.running) this.nativeMonitor.stopKeyMonitor();
+    if (this.running) this.nativeMonitor?.stopKeyMonitor();
     this.running = false;
     this.hotkey = 'none';
     this.onTrigger = null;

@@ -22,6 +22,12 @@ const appleSpeechHelperPath = path.resolve(
   __dirname,
   '../node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli',
 );
+const extraResource = [
+  appleSpeechHelperPath,
+  'resources/clawd',
+  'resources/codex',
+  ...(process.platform === 'darwin' ? ['.computer-use/Codex Claw Computer Use.app'] : []),
+];
 
 // osx special configuration
 let osxPackagerConfig = {}
@@ -65,12 +71,7 @@ const config: ForgeConfig = {
     icon: 'assets/icon',
     appBundleId: 'com.nabocorp.codex-claw',
     executableName: 'codex-claw',
-    extraResource: [
-      appleSpeechHelperPath,
-      'resources/clawd',
-      'resources/codex',
-      '.computer-use/Codex Claw Computer Use.app',
-    ],
+    extraResource,
     extendInfo: 'build/Info.plist',
     ...osxPackagerConfig,
     afterCopyExtraResources: [
@@ -86,9 +87,9 @@ const config: ForgeConfig = {
       },
     ],
     afterPrune: [
-      (buildPath: string, _electronVersion: string, _platform: string, _arch: string, callback: (error?: Error) => void) => {
+      (buildPath: string, _electronVersion: string, platform: string, _arch: string, callback: (error?: Error) => void) => {
         try {
-          copyPackagedNativeDependencies(buildPath);
+          copyPackagedNativeDependencies(buildPath, undefined, platform as NodeJS.Platform);
           callback();
         } catch (error) {
           callback(error instanceof Error ? error : new Error(String(error)));

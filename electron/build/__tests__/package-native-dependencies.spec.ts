@@ -15,7 +15,7 @@ describe('copyPackagedNativeDependencies', () => {
       writeFileSync(path.join(source, 'package.json'), JSON.stringify({ name: dependency }));
     }
 
-    copyPackagedNativeDependencies(buildPath, sourceNodeModules);
+    copyPackagedNativeDependencies(buildPath, sourceNodeModules, 'darwin');
 
     expect(JSON.parse(readFileSync(
       path.join(buildPath, 'node_modules/autolib/package.json'),
@@ -33,6 +33,19 @@ describe('copyPackagedNativeDependencies', () => {
     expect(() => copyPackagedNativeDependencies(
       path.join(fixture, 'build'),
       path.join(fixture, 'source'),
+      'darwin',
     )).toThrow('Required packaged dependency is missing: autolib');
+  });
+
+  it('does not package macOS automation dependencies on Linux', () => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'codex-claw-native-dependencies-'));
+    const buildPath = path.join(fixture, 'build');
+
+    copyPackagedNativeDependencies(buildPath, path.join(fixture, 'missing'), 'linux');
+
+    expect(() => readFileSync(
+      path.join(buildPath, 'node_modules/autolib/package.json'),
+      'utf8',
+    )).toThrow();
   });
 });

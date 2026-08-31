@@ -51,14 +51,14 @@ describe('AppshotsKeyMonitor', () => {
   });
 
   it('does not load the native monitor when disabled or unsupported', () => {
-    const native = nativeMonitor();
+    const loadNativeMonitor = vi.fn(nativeMonitor);
     const trigger = vi.fn();
-    const monitor = new AppshotsKeyMonitor({ nativeMonitor: native, platform: 'linux' });
+    const monitor = new AppshotsKeyMonitor({ loadNativeMonitor, platform: 'linux' });
 
     expect(monitor.start('command', trigger)).toBe(true);
-    expect(native.startKeyMonitor).not.toHaveBeenCalled();
+    expect(loadNativeMonitor).not.toHaveBeenCalled();
     monitor.start('none', trigger);
-    expect(native.startKeyMonitor).not.toHaveBeenCalled();
+    expect(loadNativeMonitor).not.toHaveBeenCalled();
   });
 
   it('reports native monitor startup failures', () => {

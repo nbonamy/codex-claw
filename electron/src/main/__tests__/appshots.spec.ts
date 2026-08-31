@@ -10,6 +10,15 @@ const helperOptions: ComputerUseOptions = {
 };
 
 describe('captureAppshot', () => {
+  it('does not load native automation when Appshots are unsupported', async () => {
+    const loadNativeAutomation = vi.fn();
+
+    await expect(captureAppshot({ loadNativeAutomation })).rejects.toThrow(
+      'Appshots are currently available only on macOS.',
+    );
+    expect(loadNativeAutomation).not.toHaveBeenCalled();
+  });
+
   it('captures the identified frontmost app and includes accessibility text', async () => {
     const execute = vi.fn(async ({ command }: { command: string }) => command === 'screenshot'
       ? {

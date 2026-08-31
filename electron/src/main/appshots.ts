@@ -1,6 +1,7 @@
 import { app } from 'electron';
-import autolib, { type Autolib } from 'autolib';
+import type { Autolib } from 'autolib';
 import { executeComputerUseCommand, type ComputerUseOptions } from './computer-use-tools';
+import { loadNativeAutomation } from './native-automation';
 
 export type AppshotCapture = {
   accessibilityText?: string;
@@ -12,6 +13,7 @@ export type AppshotCapture = {
 export type CaptureAppshotOptions = {
   computerUseOptions?: ComputerUseOptions;
   execute?: typeof executeComputerUseCommand;
+  loadNativeAutomation?: typeof loadNativeAutomation;
   nativeAutomation?: Pick<Autolib, 'getForemostProcessId'>;
 };
 
@@ -19,7 +21,8 @@ export async function captureAppshot(options: CaptureAppshotOptions = {}): Promi
   if (process.platform !== 'darwin' && !options.computerUseOptions) {
     throw new Error('Appshots are currently available only on macOS.');
   }
-  const nativeAutomation = options.nativeAutomation ?? autolib;
+  const nativeAutomation = options.nativeAutomation
+    ?? (options.loadNativeAutomation ?? loadNativeAutomation)();
   const pid = nativeAutomation.getForemostProcessId();
   if (!pid) throw new Error('The frontmost application could not be identified.');
 

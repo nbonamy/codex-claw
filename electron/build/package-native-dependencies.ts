@@ -6,7 +6,10 @@ const packagedNativeDependencies = ['autolib', 'node-gyp-build'] as const;
 export function copyPackagedNativeDependencies(
   buildPath: string,
   sourceNodeModules = path.resolve(__dirname, '../../node_modules'),
+  platform: NodeJS.Platform = process.platform,
 ): void {
+  if (platform !== 'darwin') return;
+
   const destinationNodeModules = path.join(buildPath, 'node_modules');
   mkdirSync(destinationNodeModules, { recursive: true });
 

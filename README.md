@@ -79,8 +79,8 @@ the same isolated Codex home from Settings.
 
 Requirements:
 
-- macOS with a current Node.js toolchain;
-- access to a Codex app-server binary;
+- macOS arm64, or experimental Linux x64, with a current Node.js toolchain;
+- network access to download the pinned Codex app-server on the first build;
 - a sibling `codex-app-sdk` checkout while the SDK dependency remains local.
 
 ```bash
@@ -101,6 +101,9 @@ Builds consume the pinned Computer Use artifact and verify its checksum. Set
 `COMPUTER_USE_LOCAL=1` in `.env` to build the helper from a sibling
 `computer-use` checkout instead. While `codex-app-sdk` is linked through a local
 `file:` dependency, build and package entrypoints rebuild its `dist` first.
+Linux support is experimental. Computer Use and Appshots are currently
+macOS-only; Linux builds skip the Computer Use helper and do not package its
+native automation dependency.
 
 macOS release packaging signs and notarizes by default. For local packaging
 checks that do not need signing:

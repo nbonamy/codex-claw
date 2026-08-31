@@ -3,6 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import {
+  hasExpectedExecutableArchitecture,
+  resolveInstalledExecutable,
+  selectCodexReleaseTarget,
+} from './runtime-artifacts.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = path.join(rootDir, 'codex-app-server-release.json');
@@ -12,15 +17,7 @@ const codeModeHostOutputPath = path.join(outputDir, 'codex-code-mode-host');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 const installerUrl = 'https://releases.openai.com/codex/install.sh';
 
-validateConfig(config);
-
-if (process.platform !== config.platform || process.arch !== config.arch) {
-  throw new Error(
-    `Bundled Codex ${config.version} targets ${config.platform}/${config.arch}; `
-      + `this build is ${process.platform}/${process.arch}.`,
-  );
-}
-
+const target = selectCodexReleaseTarget(config, process.platform, process.arch);
 if (hasExpectedRelease(outputPath, codeModeHostOutputPath)) {
   console.log(
     `[prepare-codex-app-server] Codex ${config.version} is already hosted at ${path.relative(rootDir, outputPath)}`,
@@ -68,9 +65,11 @@ async function installRelease() {
       SHELL: '/bin/sh',
     });
 
-    const installedPath = fs.realpathSync(path.join(installBinDir, 'codex'));
-    const installedCodeModeHostPath = fs.realpathSync(
-      path.join(installBinDir, 'codex-code-mode-host'),
+    const installedPath = resolveInstalledExecutable('codex', installBinDir, installHomeDir);
+    const installedCodeModeHostPath = resolveInstalledExecutable(
+      'codex-code-mode-host',
+      installBinDir,
+      installHomeDir,
     );
     if (!hasExpectedRelease(installedPath, installedCodeModeHostPath)) {
       throw new Error(`OpenAI's installer did not provide Codex ${config.version}.`);
@@ -93,18 +92,6 @@ async function installRelease() {
   }
 }
 
-function validateConfig(value) {
-  if (!value || typeof value !== 'object') {
-    throw new Error('Invalid bundled Codex release configuration.');
-  }
-  if (!/^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/.test(value.version)) {
-    throw new Error('Bundled Codex version must be a semantic version.');
-  }
-  if (value.platform !== 'darwin' || value.arch !== 'arm64') {
-    throw new Error('Bundled Codex release must currently target darwin/arm64.');
-  }
-}
-
 function verifyDarwinSignature(filePath) {
   execFileSync('codesign', ['--verify', '--strict', '--verbose=2', filePath], {
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -121,18 +108,16 @@ function hasExpectedRelease(filePath, codeModeHostPath) {
       return false;
     }
     for (const executablePath of [filePath, codeModeHostPath]) {
-      const architectures = execFileSync('lipo', ['-archs', executablePath], { encoding: 'utf8' })
-        .trim()
-        .split(/\s+/);
-      if (!architectures.includes(config.arch)) {
-        return false;
-      }
-      verifyDarwinSignature(executablePath);
+      if (!hasExpectedArchitecture(executablePath)) return false;
     }
     return true;
   } catch {
     return false;
   }
+}
+
+function hasExpectedArchitecture(executablePath) {
+  return hasExpectedExecutableArchitecture(executablePath, target, { verifyDarwinSignature });
 }
 
 function run(command, args, env = process.env) {

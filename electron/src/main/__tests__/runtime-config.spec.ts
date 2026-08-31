@@ -217,17 +217,6 @@ describe('runtime config', () => {
     expect(prepareScript).toContain('process.argv.includes(\'--release\')');
   });
 
-  it('packages the externalized native automation dependency from the workspace root', () => {
-    const repositoryRoot = path.resolve(__dirname, '../../../..');
-    const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
-    const mainViteConfig = readFileSync(path.join(repositoryRoot, 'electron/vite.main.config.ts'), 'utf8');
-
-    expect(mainViteConfig).toContain("external: ['autolib']");
-    expect(forgeConfig).toContain("import { copyPackagedNativeDependencies }");
-    expect(forgeConfig).toContain('afterPrune: [');
-    expect(forgeConfig).toContain('copyPackagedNativeDependencies(buildPath)');
-  });
-
   it('loads Electron build environment variables from the workspace root', () => {
     const repositoryRoot = path.resolve(__dirname, '../../../..');
     const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
@@ -242,28 +231,16 @@ describe('runtime config', () => {
     const repositoryRoot = path.resolve(__dirname, '../../../..');
     const releaseConfig = JSON.parse(
       readFileSync(path.join(repositoryRoot, 'codex-app-server-release.json'), 'utf8'),
-    ) as { version: string; platform: string; arch: string };
-    const prepareScript = readFileSync(
-      path.join(repositoryRoot, 'scripts/prepare-codex-app-server.mjs'),
-      'utf8',
-    );
+    ) as { version: string; targets: Array<{ platform: string; arch: string }> };
     const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
 
     expect(releaseConfig.version).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(releaseConfig.platform).toBe('darwin');
-    expect(releaseConfig.arch).toBe('arm64');
-    expect(prepareScript).toContain('https://releases.openai.com/codex/install.sh');
-    expect(prepareScript).toContain("CODEX_INSTALL_DIR: installBinDir");
-    expect(prepareScript).toContain("CODEX_NON_INTERACTIVE: '1'");
-    expect(prepareScript).toContain('CODEX_RELEASE: config.version');
-    expect(prepareScript).toContain('HOME: installerUserHome');
-    expect(prepareScript).toContain("SHELL: '/bin/sh'");
-    expect(prepareScript).toContain("for (const executablePath of [filePath, codeModeHostPath])");
-    expect(prepareScript).toContain("execFileSync('lipo', ['-archs', executablePath]");
-    expect(prepareScript).toContain("execFileSync('codesign', ['--verify', '--strict', '--verbose=2'");
-    expect(prepareScript).toContain("path.join(installBinDir, 'codex-code-mode-host')");
-    expect(prepareScript).toContain("path.join(outputDir, 'codex-code-mode-host')");
+    expect(releaseConfig.targets).toStrictEqual([
+      { platform: 'darwin', arch: 'arm64' },
+      { platform: 'linux', arch: 'x64' },
+    ]);
     expect(forgeConfig).toContain("'resources/codex'");
+    expect(forgeConfig).toContain("process.platform === 'darwin'");
     expect(forgeConfig).toContain('ignore: shouldPreserveUpstreamCodexSignature');
   });
 

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { shouldPrepareComputerUse } from './runtime-artifacts.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(rootDir, '.env'), quiet: true });
@@ -11,6 +12,11 @@ const electronDir = path.join(rootDir, 'electron');
 const iconPath = path.join(electronDir, 'assets', 'icon.icns');
 const outputDir = path.join(electronDir, '.computer-use');
 const sourceBuildScript = path.resolve(rootDir, '..', 'computer-use', 'macos', 'scripts', 'build-app.sh');
+
+if (!shouldPrepareComputerUse(process.platform)) {
+  console.log(`[prepare-computer-use] skipping macOS-only helper on ${process.platform}/${process.arch}`);
+  process.exit(0);
+}
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: rootDir, stdio: 'inherit' });
