@@ -15,10 +15,12 @@ export type CaptureAppshotOptions = {
   execute?: typeof executeComputerUseCommand;
   loadNativeAutomation?: typeof loadNativeAutomation;
   nativeAutomation?: Pick<Autolib, 'getForemostProcessId'>;
+  platform?: NodeJS.Platform;
 };
 
 export async function captureAppshot(options: CaptureAppshotOptions = {}): Promise<AppshotCapture> {
-  if (process.platform !== 'darwin' && !options.computerUseOptions) {
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'darwin' && !options.computerUseOptions) {
     throw new Error('Appshots are currently available only on macOS.');
   }
   const nativeAutomation = options.nativeAutomation
@@ -30,7 +32,7 @@ export async function captureAppshot(options: CaptureAppshotOptions = {}): Promi
   const helperOptions = options.computerUseOptions ?? {
     appPath: app.getAppPath(),
     isPackaged: app.isPackaged,
-    platform: process.platform,
+    platform,
     resourcesPath: process.resourcesPath,
   };
   const [screenshot, accessibility] = await Promise.all([

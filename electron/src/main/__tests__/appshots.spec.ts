@@ -13,7 +13,7 @@ describe('captureAppshot', () => {
   it('does not load native automation when Appshots are unsupported', async () => {
     const loadNativeAutomation = vi.fn();
 
-    await expect(captureAppshot({ loadNativeAutomation })).rejects.toThrow(
+    await expect(captureAppshot({ loadNativeAutomation, platform: 'linux' })).rejects.toThrow(
       'Appshots are currently available only on macOS.',
     );
     expect(loadNativeAutomation).not.toHaveBeenCalled();
