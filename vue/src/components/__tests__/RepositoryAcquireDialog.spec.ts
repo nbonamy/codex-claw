@@ -40,7 +40,8 @@ describe('RepositoryAcquireDialog', () => {
     await flushPromises();
 
     expect(wrapper.get('.el-dialog').classes()).toContain('claw-dialog--compact');
-    expect(wrapper.get('.repository-acquire-dialog__body').classes()).toContain('repository-acquire-dialog__scroll-region');
+    const resultsRegion = wrapper.get('.repository-acquire-dialog__body');
+    expect(resultsRegion.classes()).toContain('repository-acquire-dialog__scroll-region');
     expect(wrapper.text()).toContain('On this machine');
     expect(wrapper.text()).toContain('Open');
     expect(wrapper.text()).toContain('Clone');
@@ -57,7 +58,14 @@ describe('RepositoryAcquireDialog', () => {
     await wrapper.get('input').setValue('missing');
     expect(wrapper.text()).toContain('No matching repositories.');
     expect(wrapper.find('.repository-acquire-dialog__body--state').exists()).toBe(true);
+    expect(wrapper.get('.repository-acquire-dialog__body').element).toBe(resultsRegion.element);
+    expect(wrapper.get('.repository-acquire-dialog__body').classes()).toContain('repository-acquire-dialog__scroll-region');
     expect(wrapper.find('.repository-acquire-dialog__body h3').exists()).toBe(false);
+
+    await wrapper.setProps({ loading: true });
+    expect(wrapper.text()).toContain('Loading repositories…');
+    expect(wrapper.get('.repository-acquire-dialog__body').element).toBe(resultsRegion.element);
+    expect(wrapper.get('.repository-acquire-dialog__body').classes()).toContain('repository-acquire-dialog__scroll-region');
   });
 
   it('does not treat a same-named repository from another owner as local', async () => {

@@ -237,8 +237,8 @@ function repositoryKindLabel(repository: WorkRepository): string {
 }
 
 .repository-acquire-dialog__scroll-region {
+  height: min(60vh, 520px);
   min-height: 400px;
-  max-height: min(60vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -330,7 +330,6 @@ function repositoryKindLabel(repository: WorkRepository): string {
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
   white-space: nowrap;
   clip-path: inset(50%);
 }
