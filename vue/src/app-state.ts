@@ -17,6 +17,7 @@ import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
 import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
+import { isFirstRunOnboardingActive } from './onboarding-session';
 import { clawHostCapabilities, clawPlatformActions, codexClawApi } from './platform-api';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
@@ -1189,7 +1190,7 @@ export function useAppState() {
       if (connection?.status === 'connected') {
         clearWorkProviderAuthorizationPoll(provider);
         workProviderAuthorization.value = null;
-        useConfetti().celebrate();
+        if (!isFirstRunOnboardingActive()) useConfetti().celebrate();
         await loadWorkRepositories(provider);
         return;
       }

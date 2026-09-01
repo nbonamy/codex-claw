@@ -15,14 +15,17 @@
     />
     <GitHubOnboardingLanding
       v-else-if="githubOnboardingVisible"
-      :connection="githubConnection"
       :authorization="workProviderAuthorization"
       :busy="repositoryAcquireBusy"
       :error="repositoryAcquireError ?? workBacklogError"
       @connect="connectGitHub"
-      @continue="finishGitHubOnboarding"
       @open-authorization="openGitHubAuthorization"
-      @skip="finishGitHubOnboarding"
+      @skip="completeGitHubOnboardingStep"
+    />
+    <OnboardingCompleteLanding
+      v-else-if="onboardingCompleteVisible"
+      :celebrate="snapshot.general.celebrationsEnabled !== false"
+      @complete="finishFirstRunOnboarding"
     />
     <TeamRail
       :teams="snapshot.teams"
@@ -493,6 +496,7 @@ import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import SettingsView from './SettingsView.vue';
 import CodexLoginLanding from './CodexLoginLanding.vue';
 import GitHubOnboardingLanding from './GitHubOnboardingLanding.vue';
+import OnboardingCompleteLanding from './OnboardingCompleteLanding.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -516,6 +520,11 @@ import {
 } from '@codex-app-sdk/vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 import { useConfetti } from '../shared/confetti/use-confetti';
+import {
+  clearFirstRunOnboardingStage,
+  getFirstRunOnboardingStage,
+  setFirstRunOnboardingStage,
+} from '../onboarding-session';
 import { workItemAssignmentPrompt, workItemComposerPrompt, type WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
@@ -889,6 +898,7 @@ const authenticationCancelling = ref(false);
 const authenticationError = ref<string | null>(null);
 const offerGitHubAfterChatGptLogin = ref(false);
 const githubOnboardingVisible = ref(false);
+const onboardingCompleteVisible = ref(false);
 let authenticationPoll: ReturnType<typeof setInterval> | null = null;
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
@@ -992,7 +1002,6 @@ let quickAgentShortcutTimer: ReturnType<typeof setTimeout> | null = null;
 let cockpitInitialized = false;
 let commandKeyHeld = false;
 const quickAgentShortcutDelayMs = 350;
-const githubOnboardingPendingKey = 'codexClaw:githubOnboardingPending';
 const activeTeam = computed<Team | null>(() => {
   const selectedTeam = props.snapshot.activeTeamId
     ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
@@ -1439,7 +1448,11 @@ const showLoginLanding = computed(() => (
   initialAuthenticationLoading.value ||
   (authentication.value?.account === null && authentication.value.requiresOpenaiAuth)
 ));
-const showOnboardingGate = computed(() => showLoginLanding.value || githubOnboardingVisible.value);
+const showOnboardingGate = computed(() => (
+  showLoginLanding.value
+  || githubOnboardingVisible.value
+  || onboardingCompleteVisible.value
+));
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -1506,12 +1519,9 @@ async function loadAuthentication(): Promise<void> {
       && authentication.value.requiresOpenaiAuth
     );
     if (offerGitHubAfterChatGptLogin.value) {
-      window.sessionStorage.setItem(githubOnboardingPendingKey, 'true');
-    } else if (
-      authentication.value.account
-      && window.sessionStorage.getItem(githubOnboardingPendingKey) === 'true'
-    ) {
-      githubOnboardingVisible.value = true;
+      setFirstRunOnboardingStage('github');
+    } else if (authentication.value.account) {
+      restoreFirstRunOnboarding();
     }
   } catch (error) {
     authenticationError.value = error instanceof Error ? error.message : String(error);
@@ -1526,7 +1536,7 @@ async function startChatGptLogin(): Promise<void> {
   try {
     const api = codexClawApi;
     if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
-    window.sessionStorage.setItem(githubOnboardingPendingKey, 'true');
+    setFirstRunOnboardingStage('github');
     await api.startCodexChatGptLogin();
     authentication.value = {
       account: null,
@@ -1563,7 +1573,8 @@ async function logoutCodex(): Promise<void> {
   authentication.value = await api.logoutCodex();
   offerGitHubAfterChatGptLogin.value = false;
   githubOnboardingVisible.value = false;
-  window.sessionStorage.removeItem(githubOnboardingPendingKey);
+  onboardingCompleteVisible.value = false;
+  clearFirstRunOnboardingStage();
 }
 
 function startAuthenticationPolling(): void {
@@ -1574,10 +1585,10 @@ function startAuthenticationPolling(): void {
     void api.getCodexAuthentication().then((next) => {
       authentication.value = next;
       if (next.account) {
-        githubOnboardingVisible.value = (
-          offerGitHubAfterChatGptLogin.value
-          || window.sessionStorage.getItem(githubOnboardingPendingKey) === 'true'
-        );
+        if (offerGitHubAfterChatGptLogin.value && !getFirstRunOnboardingStage()) {
+          setFirstRunOnboardingStage('github');
+        }
+        restoreFirstRunOnboarding();
         offerGitHubAfterChatGptLogin.value = false;
         stopAuthenticationPolling();
       } else if (next.login.status === 'error') {
@@ -2245,12 +2256,37 @@ function closeRepositoryAcquire(): void {
   repositoryAcquireError.value = null;
 }
 
-function finishGitHubOnboarding(): void {
+function completeGitHubOnboardingStep(): void {
   githubOnboardingVisible.value = false;
   repositoryAcquireBusy.value = false;
   repositoryAcquireError.value = null;
-  window.sessionStorage.removeItem(githubOnboardingPendingKey);
+  onboardingCompleteVisible.value = true;
+  setFirstRunOnboardingStage('complete');
 }
+
+function finishFirstRunOnboarding(): void {
+  onboardingCompleteVisible.value = false;
+  clearFirstRunOnboardingStage();
+}
+
+function restoreFirstRunOnboarding(): void {
+  const stage = getFirstRunOnboardingStage();
+  if (!stage) return;
+
+  if (stage === 'complete' || githubConnection.value.status === 'connected') {
+    completeGitHubOnboardingStep();
+    return;
+  }
+
+  githubOnboardingVisible.value = true;
+  onboardingCompleteVisible.value = false;
+}
+
+watch(() => githubConnection.value.status, (status) => {
+  if (githubOnboardingVisible.value && status === 'connected') {
+    completeGitHubOnboardingStep();
+  }
+});
 
 watch(() => props.workRepositoriesByProvider.github, (repositories) => {
   if (
@@ -4036,7 +4072,7 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   background: var(--color-shell-window);
 }
 
-.app-shell--auth-gated > :not(.codex-login):not(.github-onboarding) {
+.app-shell--auth-gated > :not(.codex-login):not(.github-onboarding):not(.onboarding-complete) {
   visibility: hidden;
 }
 

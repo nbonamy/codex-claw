@@ -135,20 +135,19 @@ async function copyAuthorizationCode(): Promise<void> {
   align-items: center;
   justify-content: center;
   gap: var(--space-6);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  padding: var(--space-3) 0;
+  border: 0;
   color: var(--color-text);
-  background: var(--color-surface-low);
+  background: transparent;
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-13);
+  font-size: var(--font-size-16);
   font-weight: var(--font-weight-semibold);
   text-align: center;
   cursor: pointer;
 }
 
 .github-authorization-steps__code:hover {
-  background: var(--color-surface-high);
+  color: var(--color-primary);
 }
 
 .github-authorization-steps__waiting {

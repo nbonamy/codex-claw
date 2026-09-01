@@ -18,6 +18,7 @@ import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/co
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 import { useConfetti } from '../../shared/confetti/use-confetti';
+import { setFirstRunOnboardingStage } from '../../onboarding-session';
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -46,6 +47,7 @@ async function clickPortaledMenuItem(label: string): Promise<void> {
 }
 
 afterEach(() => {
+  useConfetti().clear();
   vi.useRealTimers();
   vi.restoreAllMocks();
   window.localStorage.removeItem('cockpitGlobalScope:github');
@@ -131,13 +133,37 @@ describe('AppShell', () => {
       },
     });
 
-    expect(wrapper.find('.github-onboarding').exists()).toBe(true);
-    expect(wrapper.get('.github-onboarding').text()).toContain('GitHub is connected.');
-
-    await wrapper.get('.github-onboarding .el-button').trigger('click');
+    await nextTick();
 
     expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    expect(wrapper.get('.onboarding-complete').text()).toContain("You're all set.");
+    expect(useConfetti().bursts.value).toHaveLength(1);
+
+    await wrapper.get('.onboarding-complete .el-button').trigger('click');
+
+    expect(wrapper.find('.onboarding-complete').exists()).toBe(false);
     expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
+    wrapper.unmount();
+  });
+
+  it('shows the same celebrated completion after GitHub is skipped', async () => {
+    setFirstRunOnboardingStage('github');
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockResolvedValue({
+        account: { type: 'chatgpt' },
+        requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+
+    const wrapper = mountShell();
+    await flushPromises();
+    const buttons = wrapper.findAll('.github-onboarding .el-button');
+    await buttons[1]!.trigger('click');
+
+    expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    expect(wrapper.get('.onboarding-complete').text()).toContain("You're all set.");
+    expect(useConfetti().bursts.value).toHaveLength(1);
     wrapper.unmount();
   });
 

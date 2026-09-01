@@ -10,43 +10,29 @@
         aria-hidden="true"
       />
 
-      <template v-if="connection.status === 'connected'">
-        <h1 class="github-onboarding__title">
-          <span>{{ t('auth.githubConnectedTitle') }}</span>
-          <span class="github-onboarding__title-detail">{{ t('auth.githubConnectedDetail') }}</span>
-        </h1>
-        <div class="github-onboarding__actions">
-          <el-button
-            type="primary"
-            size="large"
-            @click="emit('continue')"
-          >{{ t('auth.githubContinue') }}</el-button>
-        </div>
-        <p v-if="connection.accountLabel" class="github-onboarding__account">
-          {{ t('auth.githubConnectedAs', { account: connection.accountLabel }) }}
-        </p>
-      </template>
-
-      <template v-else-if="authorization">
-        <h1 class="github-onboarding__title">{{ t('auth.githubAuthorizationTitle') }}</h1>
-        <p class="github-onboarding__description">{{ t('auth.githubAuthorizationDescription') }}</p>
+      <template v-if="authorization">
+        <h1 class="onboarding-landing-title github-onboarding__title">{{ t('auth.githubAuthorizationTitle') }}</h1>
         <GitHubAuthorizationSteps
           class="github-onboarding__steps"
           :authorization="authorization"
           @open="emit('openAuthorization')"
         />
         <div class="github-onboarding__actions">
-          <el-button
-            size="large"
+          <el-link
+            class="github-onboarding__skip-link"
+            :underline="false"
             @click="emit('skip')"
-          >{{ t('auth.githubSkip') }}</el-button>
+          >{{ t('auth.githubSkip') }}</el-link>
         </div>
       </template>
 
       <template v-else>
-        <h1 class="github-onboarding__title">
-          <span>{{ t('auth.githubTitle') }}</span>
-          <span class="github-onboarding__title-detail">{{ t('auth.githubTitleDetail') }}</span>
+        <h1 class="onboarding-landing-title github-onboarding__title">
+          <span class="onboarding-landing-title__line">{{ t('auth.githubTitle') }}</span>
+          <span class="onboarding-landing-title__line onboarding-landing-title__detail">
+            {{ t('auth.githubTitleDetailFirst') }}<br>
+            {{ t('auth.githubTitleDetailSecond') }}
+          </span>
         </h1>
         <div class="github-onboarding__actions">
           <el-button
@@ -67,14 +53,13 @@
 </template>
 
 <script setup lang="ts">
-import type { WorkIntegrationConnection, WorkProviderAuthorization } from '@codex-claw/core/contracts';
+import type { WorkProviderAuthorization } from '@codex-claw/core/contracts';
 import { useI18n } from 'vue-i18n';
 import { GitHubIcon } from '../shared/icons/app-icons';
 import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 import OnboardingLandingFrame from './OnboardingLandingFrame.vue';
 
 withDefaults(defineProps<{
-  connection: WorkIntegrationConnection;
   authorization?: WorkProviderAuthorization | null;
   busy?: boolean;
   error?: string | null;
@@ -86,7 +71,6 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{
   connect: [];
-  continue: [];
   openAuthorization: [];
   skip: [];
 }>();
@@ -108,27 +92,6 @@ const { t } = useI18n();
 
 .github-onboarding__title {
   max-width: 720px;
-  margin: var(--space-12) 0 0;
-  font-size: clamp(48px, 5vw, 72px);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-
-.github-onboarding__title span {
-  display: block;
-}
-
-.github-onboarding__title-detail {
-  color: var(--color-text-muted);
-}
-
-.github-onboarding__description {
-  max-width: 620px;
-  margin: var(--space-8) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-18);
-  line-height: var(--line-height-24);
 }
 
 .github-onboarding__actions {
@@ -139,17 +102,19 @@ const { t } = useI18n();
   -webkit-app-region: no-drag;
 }
 
+.github-onboarding__skip-link {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
+.github-onboarding__skip-link:hover {
+  color: var(--color-text);
+}
+
 .github-onboarding__steps {
   width: min(620px, 100%);
   margin-top: var(--space-16);
   -webkit-app-region: no-drag;
-}
-
-.github-onboarding__account {
-  margin: var(--space-4) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
 }
 
 .github-onboarding__error {

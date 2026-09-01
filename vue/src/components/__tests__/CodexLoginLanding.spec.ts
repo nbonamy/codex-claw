@@ -22,9 +22,9 @@ describe('CodexLoginLanding', () => {
     const wrapper = mountLanding();
 
     expect(wrapper.classes()).toContain('codex-login--sign-in');
-    expect(wrapper.get('.codex-login__title-product').text()).toBe('Codex Claw,');
-    expect(wrapper.get('.codex-login__title-detail').text()).toBe('a home for your coding agents.');
-    expect(wrapper.get('.codex-login__title-detail').find('br').exists()).toBe(true);
+    expect(wrapper.get('h1').text()).toContain('Codex Claw,');
+    expect(wrapper.get('h1').text()).toContain('a home for your coding agents.');
+    expect(wrapper.get('h1').find('br').exists()).toBe(true);
     expect(wrapper.text()).toContain('Sign in to start your first session.');
     expect(wrapper.get('.codex-login__mark img').attributes('alt')).toBe('Codex Claw');
     await wrapper.get('.el-button').trigger('click');

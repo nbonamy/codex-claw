@@ -8,10 +8,12 @@ import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
 import { configureClawClient } from '../platform-api';
+import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 
 describe('useAppState', () => {
   afterEach(() => {
     clearConfetti();
+    clearFirstRunOnboardingStage();
     vi.useRealTimers();
   });
 
@@ -1053,6 +1055,27 @@ describe('useAppState', () => {
     expect(state.workProviderAuthorization.value).toBeNull();
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
     expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
+  });
+
+  it('leaves first-run onboarding to own the GitHub connection celebration', async () => {
+    const connectedSnapshot = createInitialSnapshot();
+    connectedSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    stubElectronTestWindow({
+      codexClaw: {
+        completeWorkProviderConnection: vi.fn().mockResolvedValue(connectedSnapshot),
+        listWorkRepositories: vi.fn().mockResolvedValue([]),
+      } satisfies Partial<CodexClawApi>,
+    });
+    setFirstRunOnboardingStage('github');
+    const state = useAppState();
+
+    await state.completeWorkProviderConnection('github');
+
+    expect(useConfetti().bursts.value).toHaveLength(0);
   });
 
   it('opens provider authorization in the browser for the web platform', async () => {

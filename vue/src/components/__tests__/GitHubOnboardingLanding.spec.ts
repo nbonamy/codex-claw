@@ -6,15 +6,8 @@ import { messages } from '../../i18n/messages';
 import GitHubOnboardingLanding from '../GitHubOnboardingLanding.vue';
 
 function mountLanding(props: Partial<InstanceType<typeof GitHubOnboardingLanding>['$props']> = {}) {
-  const {
-    connection = { provider: 'github', status: 'disconnected' },
-    ...optionalProps
-  } = props;
   return mount(GitHubOnboardingLanding, {
-    props: {
-      ...optionalProps,
-      connection,
-    },
+    props,
     global: {
       plugins: [
         ElementPlus,
@@ -54,22 +47,5 @@ describe('GitHubOnboardingLanding', () => {
     expect(wrapper.text()).toContain('ABCD-1234');
     await wrapper.getComponent({ name: 'GitHubAuthorizationSteps' }).vm.$emit('open');
     expect(wrapper.emitted('openAuthorization')).toStrictEqual([[]]);
-  });
-
-  it('waits for the user to continue after GitHub connects', async () => {
-    const wrapper = mountLanding({
-      connection: {
-        provider: 'github',
-        status: 'connected',
-        accountLabel: 'nbonamy',
-        connectedAt: '2026-09-01T12:00:00.000Z',
-      },
-    });
-
-    expect(wrapper.text()).toContain('GitHub is connected.');
-    expect(wrapper.text()).toContain('Connected as nbonamy.');
-    expect(wrapper.text()).not.toContain('Skip for now');
-    await wrapper.get('.el-button').trigger('click');
-    expect(wrapper.emitted('continue')).toStrictEqual([[]]);
   });
 });

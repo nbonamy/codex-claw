@@ -38,4 +38,21 @@ withDefaults(defineProps<{
   justify-content: center;
   padding: var(--space-20);
 }
+
+.onboarding-landing-frame :deep(.onboarding-landing-title) {
+  margin: var(--space-12) 0 0;
+  color: var(--color-text);
+  font-size: 64px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.onboarding-landing-frame :deep(.onboarding-landing-title__line) {
+  display: block;
+}
+
+.onboarding-landing-frame :deep(.onboarding-landing-title__detail) {
+  color: var(--color-text-muted);
+}
 </style>

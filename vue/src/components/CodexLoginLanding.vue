@@ -18,7 +18,7 @@
         >
       </div>
       <template v-if="variant === 'connecting'">
-        <h1 class="codex-login__connecting-title">{{ t('auth.connectingTitle') }}</h1>
+        <h1 class="onboarding-landing-title codex-login__connecting-title">{{ t('auth.connectingTitle') }}</h1>
         <div
           class="codex-login__progress"
           role="progressbar"
@@ -32,9 +32,9 @@
         </div>
       </template>
       <template v-else>
-        <h1 class="codex-login__sign-in-title">
-          <span class="codex-login__title-product">{{ t('auth.signInTitleProduct') }}</span>
-          <span class="codex-login__title-detail">
+        <h1 class="onboarding-landing-title codex-login__sign-in-title">
+          <span class="onboarding-landing-title__line">{{ t('auth.signInTitleProduct') }}</span>
+          <span class="onboarding-landing-title__line onboarding-landing-title__detail">
             {{ t('auth.signInTitleDetailFirst') }}<br>
             {{ t('auth.signInTitleDetailSecond') }}
           </span>
@@ -122,28 +122,6 @@ const { t } = useI18n();
 
 .codex-login__sign-in-title {
   max-width: 700px;
-  margin: var(--space-12) 0 0;
-  color: var(--color-text-muted);
-  font-size: clamp(52px, 5.4vw, 80px);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-
-.codex-login__sign-in-title span {
-  display: block;
-}
-
-.codex-login__title-product {
-  color: var(--color-text);
-}
-
-.codex-login__connecting-title {
-  margin: var(--space-16) 0 0;
-  font-size: clamp(36px, 4vw, 56px);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.035em;
-  line-height: 1.05;
 }
 
 .codex-login .el-button {

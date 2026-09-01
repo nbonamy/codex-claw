@@ -242,6 +242,9 @@ export const surfaceMessages = {
   "githubOnboardingLanding": {
     "connectGitHub": "Connect GitHub"
   },
+  "onboardingCompleteLanding": {
+    "codexClawIsReady": "Codex Claw is ready"
+  },
   "codexResourceSharingMigrationDialog": {
     "shareSkillsAndPluginsWithChatGPT": "Share skills and plugins with ChatGPT?",
     "codexClawCanUseTheSkillsAndPluginsInstalledInChatGPTMigr": "Codex Claw can use the skills and plugins installed in ChatGPT. Migrating replaces the existing Claw folders with links to",
