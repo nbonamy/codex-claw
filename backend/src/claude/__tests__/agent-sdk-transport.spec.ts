@@ -16,6 +16,14 @@ import {
 import type { ClaudePermissionRequest } from '../cli-transport';
 import type { ClaudeSdkMessage } from '../protocol';
 
+vi.mock('@codex-claw/core/runtime-discovery', () => ({
+  // Runtime discovery owns its shell integration tests; this suite tests the transport boundary.
+  withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({
+    ...process.env,
+    ...env,
+  }),
+}));
+
 describe('ClaudeAgentSdkTransport', () => {
   it('opts into the SDK safety gate for bypass-permissions sessions', async () => {
     const harness = createQueryHarness();

@@ -103,14 +103,19 @@ For docs-only changes:
 git diff --check
 ```
 
-For ordinary code changes once scripts exist:
+For an ordinary change, run the affected workspace's package-local Vitest
+command with its file or pattern filter:
 
 ```bash
-npm test -- <focused-file-or-pattern>
+npm run test -w <affected-workspace> -- <focused-file-or-pattern>
 ```
 
-If the repository script cannot filter tests, run the package-local Vitest
-command with its file/pattern filter instead of the full suite.
+For a cross-cutting change, or when no focused gate can prove it, run the
+concise full suite:
+
+```bash
+npm run test:ai
+```
 
 For coverage-sensitive work:
 

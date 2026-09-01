@@ -1,0 +1,626 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import ElementPlus, { ElMessageBox } from 'element-plus';
+import type {
+  CodexNativeRendererApi,
+} from '@codex-app-sdk/vue';
+import { nextTick } from 'vue';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import AppShell from '../AppShell.vue';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, WorkRepository } from '@codex-claw/core/contracts';
+import { useConfetti } from '../../shared/confetti/use-confetti';
+
+import {
+  mountShell,
+  pointerEvent,
+  workItem,
+} from './app-shell-test-harness';
+
+vi.mock('../image-annotation', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../image-annotation')>(),
+  centeredImageCropDataUrl: vi.fn().mockResolvedValue('data:image/png;base64,centered-fallback'),
+}));
+
+vi.mock('../../shared/confetti/canvas-celebration', () => ({
+  launchCanvasCelebration: vi.fn(),
+}));
+
+afterEach(() => {
+  useConfetti().clear();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  window.localStorage.removeItem('cockpitGlobalScope:github');
+  window.sessionStorage.clear();
+  document.body.innerHTML = '';
+  delete window.codexClaw;
+  delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
+});
+
+describe('AppShell navigation and teams', () => {
+  it('forwards interrupts from the composer stop button', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: true,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.get('.chat-composer__send').trigger('click');
+
+    expect(wrapper.emitted('interrupt-agent')).toStrictEqual([[]]);
+  });
+
+  it('forwards agent selection from the sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[1]?.trigger('click');
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
+  });
+
+  it('collapses the agent sidebar while keeping the team rail', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('.team-rail').classes()).toContain('team-rail--agent-sidebar-expanded');
+    await wrapper.get('[aria-label="Hide agent sidebar"]').trigger('click');
+
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.team-rail').exists()).toBe(true);
+    expect(wrapper.get('.team-rail').classes()).not.toContain('team-rail--agent-sidebar-expanded');
+    expect(wrapper.get('[aria-label="Show agent sidebar"]').attributes('aria-label')).toBe('Show agent sidebar');
+  });
+
+  it('keeps agent sidebar resize state in the shell', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    const sidebar = () => wrapper.get('.agent-sidebar');
+    expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 260px');
+
+    const resizeHandle = wrapper.get('[aria-label="Resize agent sidebar"]');
+    resizeHandle.element.dispatchEvent(pointerEvent('pointerdown', 260));
+    resizeHandle.element.dispatchEvent(pointerEvent('pointermove', 320));
+    await nextTick();
+
+    expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 320px');
+  });
+
+  it('resolves the active team from legacy agent membership when teamId is missing', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.activeTeamId = null;
+    const activeAgent: Agent = {
+      ...snapshot.agents[0],
+      teamId: undefined,
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('resolves the active team from the active agent team id when no team is selected', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      avatar: 'SK',
+      color: '#46A857',
+      agentIds: ['agent-dina'],
+      activeAgentId: 'agent-dina',
+    });
+    snapshot.activeTeamId = null;
+    const activeAgent: Agent = {
+      ...snapshot.agents[0],
+      teamId: 'team-skwad',
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Skwad');
+  });
+
+  it('falls back to the first team when active agent team references are stale', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.activeTeamId = null;
+    const activeAgent: Agent = {
+      ...snapshot.agents[0],
+      id: 'agent-stale',
+      teamId: 'team-missing',
+    };
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('falls back to the first team when no active agent is selected', () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: null,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
+    expect(wrapper.text()).toContain('Dina');
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('uses product fallback title when no teams exist', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.teams = [];
+    snapshot.activeTeamId = null;
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: null,
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+  });
+
+  it('falls back when backend runtime status is missing', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.backendRuntimes = [];
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        messages: [],
+        isLoading: false,
+        isSending: false,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    expect(wrapper.text()).toContain('Dina');
+    expect(wrapper.find('.agent-header').exists()).toBe(true);
+  });
+
+  it('forwards team selection and filters the sidebar to the active team', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-empty',
+      name: 'Empty Team',
+      avatar: 'ET',
+      color: '#46A857',
+      agentIds: [],
+    });
+    snapshot.activeTeamId = 'team-empty';
+    snapshot.activeAgentId = null;
+    const wrapper = mountShell({ snapshot });
+
+    expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
+    expect(wrapper.text()).toContain('Welcome to Codex Claw');
+
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
+
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
+  });
+
+  it('derives unread teams from their unread agents', () => {
+    const snapshot = createInitialSnapshot();
+    const otherAgent = {
+      ...snapshot.agents[0]!,
+      id: 'agent-other',
+      teamId: 'team-other',
+      name: 'Other Agent',
+    };
+    snapshot.agents.push(otherAgent);
+    snapshot.teams.push({
+      id: 'team-other',
+      name: 'Other Team',
+      avatar: 'OT',
+      color: '#46A857',
+      agentIds: [otherAgent.id],
+    });
+    const wrapper = mountShell({
+      snapshot,
+      unreadAgentIds: ['agent-jesse', otherAgent.id],
+    });
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds'))
+      .toStrictEqual(['team-other']);
+  });
+
+  it('shows unread activity for the previously selected team while cockpit is open', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({
+      snapshot,
+      unreadAgentIds: ['agent-jesse'],
+    });
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds')).toStrictEqual([]);
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds'))
+      .toStrictEqual(['team-codex-claw']);
+    expect(wrapper.get('[aria-label="Codex Claw, unread activity"]').classes())
+      .toContain('team-rail__team--unread');
+  });
+
+  it('opens cockpit from the first rail item and navigates back to an agent', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+
+    expect(wrapper.find('.cockpit-view').exists()).toBe(true);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
+
+    await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
+
+    expect(wrapper.find('.cockpit-view').exists()).toBe(false);
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
+  it('opens automations from the rail without keeping a team active', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.get('[aria-label="Automations"]').trigger('click');
+
+    expect(wrapper.find('.automations-view').exists()).toBe(true);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.conversation-pane').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.text()).toContain('Automations watch for matching work and start the right agent automatically.');
+  });
+
+  it('opens a automation execution conversation from the logs view', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.automations = [{
+      id: 'automation-bugs',
+      name: 'GitHub bugs',
+      enabled: true,
+      source: {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+      },
+      action: {
+        type: 'create-agent-from-bench',
+        benchTemplateId: 'bench-dina',
+        teamTarget: {
+          mode: 'existing',
+          teamId: 'team-codex-claw',
+        },
+      },
+      instructions: {},
+      executionLog: [{
+        id: 'automation-exec-1',
+        automationId: 'automation-bugs',
+        startedAt: '2026-06-09T10:00:00.000Z',
+        completedAt: '2026-06-09T10:01:00.000Z',
+        status: 'completed',
+        createdCount: 1,
+        createdAgents: [{
+          agentId: 'agent-jesse',
+          agentName: 'Jesse',
+          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemTitle: 'Fix cockpit',
+          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+          conversationRef: { backend: 'codex', threadId: 'thread-jesse' },
+        }],
+      }],
+      createdAt: '2026-06-09T09:59:00.000Z',
+      updatedAt: '2026-06-09T10:01:00.000Z',
+    }];
+    snapshot.messages = [{
+      id: 'message-jesse-user',
+      agentId: 'agent-jesse',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:02.000Z',
+      parts: [{ type: 'text', text: 'Please fix cockpit from the automation.' }],
+    }, {
+      id: 'message-jesse-assistant',
+      agentId: 'agent-jesse',
+      role: 'assistant',
+      status: 'complete',
+      createdAt: '2026-06-09T10:00:45.000Z',
+      parts: [{ type: 'text', text: 'Automation work is ready.' }],
+    }];
+    const readConversationMessages = vi.fn().mockResolvedValue(snapshot.messages);
+    const wrapper = mountShell({ snapshot, readConversationMessages });
+
+    await wrapper.get('[aria-label="Automations"]').trigger('click');
+    await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
+    await wrapper.get('[aria-label="View conversation for github:nbonamy/codex-claw#12"]').trigger('click');
+    await flushPromises();
+
+    expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-jesse' }, 'agent-jesse');
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(wrapper.find('.automations-view').exists()).toBe(true);
+    expect(wrapper.find('.automation-execution-conversation-overlay').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Please fix cockpit from the automation.');
+    expect(wrapper.text()).toContain('Automation work is ready.');
+  });
+
+  it('forwards cockpit work item assignments', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    snapshot.workBacklog.providerConfigurations.github = {
+      repositoryId: 'nbonamy/codex-claw',
+    };
+    const item = workItem();
+    const wrapper = mountShell({
+      snapshot,
+      workRepositoriesByProvider: {
+        github: [{
+          provider: 'github',
+          id: 'nbonamy/codex-claw',
+          owner: 'nbonamy',
+          name: 'codex-claw',
+          fullName: 'nbonamy/codex-claw',
+          url: 'https://github.com/nbonamy/codex-claw',
+          isPrivate: true,
+        }],
+      },
+      workItemsByRepository: {
+        'github:nbonamy/codex-claw': [item],
+      },
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+      agentId: 'agent-dina',
+      item,
+    });
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('remove-work-item-assignment', item);
+    await flushPromises();
+
+    expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
+      agentId: 'agent-dina',
+      item,
+    }]]);
+    expect(wrapper.emitted('remove-work-item-assignment')).toStrictEqual([[item]]);
+  });
+
+  it('loads one assigned-to-me page by default without fanning out by repository', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    const repositories: WorkRepository[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
+      provider: 'github',
+      id: `nbonamy/${name}`,
+      owner: 'nbonamy',
+      name,
+      fullName: `nbonamy/${name}`,
+      url: `https://github.com/nbonamy/${name}`,
+      isPrivate: true,
+    }));
+    const loadWorkRepositories = vi.fn().mockResolvedValue(repositories);
+    const loadWorkItems = vi.fn().mockResolvedValue([]);
+    const loadGlobalWorkItems = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 });
+    const wrapper = mountShell({ snapshot, loadWorkRepositories, loadWorkItems, loadGlobalWorkItems });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(loadWorkRepositories).toHaveBeenCalledWith('github');
+    expect(loadWorkItems).not.toHaveBeenCalled();
+    expect(loadGlobalWorkItems).toHaveBeenCalledWith('github', undefined, {
+      assignment: 'viewer', state: 'open', page: 1, pageSize: 25,
+    });
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('selectedAssigneeLogin')).toBe('nbonamy');
+  });
+
+  it('automatically loads one global page after the user remembers that scope', async () => {
+    window.localStorage.setItem('cockpitGlobalScope:github', 'all');
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const repositories: WorkRepository[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
+      provider: 'github', id: `nbonamy/${name}`, owner: 'nbonamy', name,
+      fullName: `nbonamy/${name}`, url: `https://github.com/nbonamy/${name}`, isPrivate: true,
+    }));
+    const loadWorkRepositories = vi.fn().mockResolvedValue(repositories);
+    const loadGlobalWorkItems = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 12 });
+    const confirm = vi.spyOn(ElMessageBox, 'confirm');
+    const wrapper = mountShell({ snapshot, loadWorkRepositories, loadGlobalWorkItems });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(loadGlobalWorkItems).toHaveBeenCalledTimes(1);
+    expect(loadGlobalWorkItems).toHaveBeenCalledWith('github', undefined, {
+      assignment: 'all', state: 'open', page: 1, pageSize: 25,
+    });
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('globalScope')).toBe('all');
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ page: 1, pageSize: 25, totalItems: 12 });
+  });
+
+  it('remembers the explicit load-everything confirmation', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const repository: WorkRepository = {
+      provider: 'github', id: 'nbonamy/codex-claw', owner: 'nbonamy', name: 'codex-claw',
+      fullName: 'nbonamy/codex-claw', url: 'https://github.com/nbonamy/codex-claw', isPrivate: true,
+    };
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const loadGlobalWorkItems = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 });
+    const wrapper = mountShell({
+      snapshot,
+      loadGlobalWorkItems,
+      workRepositoriesByProvider: { github: [repository] },
+    });
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('select-global-scope', 'all');
+    await flushPromises();
+
+    expect(window.localStorage.getItem('cockpitGlobalScope:github')).toBe('all');
+    expect(loadGlobalWorkItems).toHaveBeenLastCalledWith('github', undefined, {
+      assignment: 'all', state: 'open', page: 1, pageSize: 25,
+    });
+  });
+
+  it('navigates global pages and reuses cached pages when going back', async () => {
+    window.localStorage.setItem('cockpitGlobalScope:github', 'all');
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const first = workItem({ id: 'nbonamy/one#1', repositoryId: 'nbonamy/one', repositoryFullName: 'nbonamy/one', number: 1 });
+    const second = workItem({ id: 'nbonamy/two#2', repositoryId: 'nbonamy/two', repositoryFullName: 'nbonamy/two', number: 2 });
+    const loadGlobalWorkItems = vi.fn()
+      .mockResolvedValueOnce({ items: [first], page: 1, pageSize: 25, totalItems: 26 })
+      .mockResolvedValueOnce({ items: [second], page: 2, pageSize: 25, totalItems: 26 });
+    const wrapper = mountShell({
+      snapshot,
+      loadGlobalWorkItems,
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await flushPromises();
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('change-work-items-page', 2);
+    await flushPromises();
+
+    expect(loadGlobalWorkItems).toHaveBeenNthCalledWith(2, 'github', undefined, {
+      assignment: 'all', state: 'open', page: 2, pageSize: 25,
+    });
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [second], page: 2, totalItems: 26 });
+
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('change-work-items-page', 1);
+    await flushPromises();
+    expect(loadGlobalWorkItems).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [first], page: 1, totalItems: 26 });
+  });
+
+  it('opens agent creation with the repository selected from the Cockpit sidebar', async () => {
+    const snapshot = createInitialSnapshot();
+    const repository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/mediastation',
+      owner: 'nbonamy',
+      name: 'mediastation',
+      fullName: 'nbonamy/mediastation',
+      url: 'https://github.com/nbonamy/mediastation',
+      isPrivate: true,
+    };
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [{
+        name: 'mediastation',
+        path: '/Users/nbonamy/src/mediastation',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/mediastation' }],
+      }],
+      workRepositoriesByProvider: { github: [repository] },
+    });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('add-agent-for-repository', repository);
+    await flushPromises();
+
+    const dialog = wrapper.findComponent({ name: 'AgentDialog' });
+    expect(dialog.props('initialSourceRepositoryName')).toBe('mediastation');
+    expect(dialog.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
+  });
+});

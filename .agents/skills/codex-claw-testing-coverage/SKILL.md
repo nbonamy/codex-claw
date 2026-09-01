@@ -50,9 +50,13 @@ Prefer these commands once scripts exist:
 
 ```bash
 npm test
+npm run test:ai
 npm run test:coverage
 npm run lint
 npm run build
 ```
+
+Prefer `npm run test:ai` for an unfiltered agent-driven suite. It keeps Vitest
+summaries and failures while suppressing passing-test noise.
 
 If a command is not available yet, report that directly in the handoff.

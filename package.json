@@ -57,6 +57,7 @@
     "start:electron": "npm run start -w @codex-claw/electron",
     "start:web": "npm run start -w @codex-claw/web",
     "test": "npm run test --workspaces",
+    "test:ai": "npm run test --workspaces -- --silent --reporter=../scripts/vitest-ai-reporter.ts",
     "test:coverage": "npm run test:coverage --workspaces",
     "test:coverage:electron": "npm run test:coverage -w @codex-claw/electron",
     "test:coverage:web": "npm run test:coverage -w @codex-claw/web",

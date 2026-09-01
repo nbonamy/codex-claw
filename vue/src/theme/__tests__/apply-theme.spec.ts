@@ -108,14 +108,11 @@ describe('applyAppTheme', () => {
   it('reapplies system themes on appearance changes and removes the listener', async () => {
     const addEventListener = vi.fn();
     const removeEventListener = vi.fn();
-    vi.stubGlobal('window', {
-      ...window,
-      matchMedia: vi.fn().mockReturnValue({
-        matches: false,
-        addEventListener,
-        removeEventListener,
-      }),
-    });
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener,
+      removeEventListener,
+    }));
     vi.resetModules();
     const themeModule = await import('../apply-theme');
     themeModule.applyAppTheme({

@@ -1,9 +1,28 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import { ElButton, ElDialog, ElInput, ElMessageBox, ElOption, ElPopover, ElSelect } from 'element-plus';
+import { defineComponent } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, BackendConversationRef, CreateAutomationInput, Automation, AutomationLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import AutomationsView from '../AutomationsView.vue';
+
+const AutomationEditorStub = defineComponent({
+  name: 'AutomationEditor',
+  props: [
+    'automation',
+    'backendModels',
+    'benchTemplates',
+    'chooseAgentFolder',
+    'connection',
+    'itemsByRepository',
+    'mode',
+    'repositories',
+    'sourceRepositories',
+    'teams',
+  ],
+  emits: ['cancel', 'load-items', 'load-repositories', 'submit'],
+  template: '<section class="automation-editor" />',
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -12,7 +31,7 @@ afterEach(() => {
 
 describe('AutomationsView', () => {
   it('shows the welcome state and opens the editor', async () => {
-    const wrapper = mountView();
+    const wrapper = mountView({ realAutomationEditor: true });
 
     expect(wrapper.text()).toContain('Automations');
     expect(wrapper.text()).not.toContain('Loops');
@@ -569,6 +588,7 @@ function mountView(overrides: Partial<{
   snapshot: AppSnapshot;
   updateAutomation: (input: Parameters<NonNullable<InstanceType<typeof AutomationsView>['$props']['updateAutomation']>>[0], location?: AutomationLocation) => Promise<AppSnapshot | void>;
   workRepositoriesByProvider: Partial<Record<'github', WorkRepository[]>>;
+  realAutomationEditor: boolean;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   snapshot.bench = [{
@@ -615,7 +635,10 @@ function mountView(overrides: Partial<{
       },
     },
     global: {
-      plugins: [ElementPlus],
+      components: { ElButton, ElDialog, ElInput, ElOption, ElPopover, ElSelect },
+      stubs: {
+        AutomationEditor: overrides.realAutomationEditor ? false : AutomationEditorStub,
+      },
     },
   });
 }

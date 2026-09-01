@@ -151,6 +151,8 @@ Rules:
 - Prefer direct props and emitted events over booting the full app shell.
 - Use small store fakes only when the component contract actually depends on a
   store.
+- Vue Test Utils wrappers are auto-unmounted by the shared test setup. Clearing
+  `document.body` is cleanup for teleports, not a substitute for unmounting.
 - Stub IPC at the app boundary, not inside the component tree.
 - Do not pull in Codex app-server fixtures for visual components unless the
   component is specifically a protocol-adapter view.
@@ -163,6 +165,8 @@ Rules:
   brittle tests around the whole shell.
 - Keep shared SDK behavior in the SDK component's isolated spec and keep only
   Codex Claw wrapper, adapter, and product-policy assertions in this repo.
+- App-shell tests use contract-faithful product-child stubs by default and opt
+  into real child trees only for representative composition workflows.
 
 Use integration-style renderer tests only when testing composition between
 components, stores, router state, and IPC events.
@@ -217,11 +221,17 @@ Use the repo scripts for broad verification:
 
 ```bash
 npm test
+npm run test:ai
 npm run test:coverage
 npm run lint
 npm run lint:dead-code
 npm run build
 ```
+
+`npm run test:ai` runs the same workspace suites as `npm test`, but suppresses
+per-test output and prints `[TESTS:DONE]` after each workspace summary. Prefer
+it for agent-driven full-suite verification where concise, unambiguous output
+reduces context use. Keep `npm test` for normal human-readable output.
 
 `npm run lint` includes the Knip dead-code check. Run `lint:dead-code`
 directly when iterating on unused files, dependencies, exports, or types.

@@ -1,4 +1,3 @@
-import { vi } from 'vitest';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { configureClawClient } from '../platform-api';
 
@@ -28,6 +27,5 @@ export function setElectronTestClient(api?: Partial<CodexClawApi>): void {
 }
 
 export function stubElectronTestWindow(value: { codexClaw?: Partial<CodexClawApi> }): void {
-  vi.stubGlobal('window', value);
-  configureElectronTestClient(value.codexClaw);
+  setElectronTestClient(value.codexClaw);
 }
