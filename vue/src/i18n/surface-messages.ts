@@ -236,7 +236,11 @@ export const surfaceMessages = {
   },
   "codexLoginLanding": {
     "signInToCodexClaw": "Sign in to Codex Claw",
+    "connectingToCodexClaw": "Connecting Codex Claw",
     "codexClaw": "Codex Claw"
+  },
+  "githubOnboardingLanding": {
+    "connectGitHub": "Connect GitHub"
   },
   "codexResourceSharingMigrationDialog": {
     "shareSkillsAndPluginsWithChatGPT": "Share skills and plugins with ChatGPT?",

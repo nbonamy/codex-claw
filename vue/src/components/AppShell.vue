@@ -1,16 +1,28 @@
 <template>
   <main
     class="app-shell"
-    :class="{ 'app-shell--auth-gated': showLoginLanding }"
+    :class="{ 'app-shell--auth-gated': showOnboardingGate }"
   >
     <CodexLoginLanding
       v-if="showLoginLanding"
+      :variant="initialAuthenticationLoading ? 'connecting' : 'sign-in'"
       :loading="authenticationLoading || authentication?.login.status === 'pending'"
       :cancellable="authentication?.login.status === 'pending'"
       :cancelling="authenticationCancelling"
       :error="authenticationError ?? authentication?.login.error"
       @cancel="cancelChatGptLogin"
       @login="startChatGptLogin"
+    />
+    <GitHubOnboardingLanding
+      v-else-if="githubOnboardingVisible"
+      :connection="githubConnection"
+      :authorization="workProviderAuthorization"
+      :busy="repositoryAcquireBusy"
+      :error="repositoryAcquireError ?? workBacklogError"
+      @connect="connectGitHub"
+      @continue="finishGitHubOnboarding"
+      @open-authorization="openGitHubAuthorization"
+      @skip="finishGitHubOnboarding"
     />
     <TeamRail
       :teams="snapshot.teams"
@@ -349,8 +361,8 @@
       :error="repositoryAcquireDisplayError"
       @close="closeRepositoryAcquire"
       @clone-url="cloneRepositoryAndOpen"
-      @connect="connectRepositoryAcquireGithub"
-      @open-authorization="openRepositoryAcquireGithubAuthorization"
+      @connect="connectGitHub"
+      @open-authorization="openGitHubAuthorization"
       @select-repository="selectWorkRepository"
     />
     <ConversationHistoryDialog
@@ -480,6 +492,7 @@ import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import SettingsView from './SettingsView.vue';
 import CodexLoginLanding from './CodexLoginLanding.vue';
+import GitHubOnboardingLanding from './GitHubOnboardingLanding.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
 import type { SettingsTab } from './settings-tabs';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -874,6 +887,8 @@ const authentication = ref<CodexAuthentication | null>(null);
 const authenticationLoading = ref(true);
 const authenticationCancelling = ref(false);
 const authenticationError = ref<string | null>(null);
+const offerGitHubAfterChatGptLogin = ref(false);
+const githubOnboardingVisible = ref(false);
 let authenticationPoll: ReturnType<typeof setInterval> | null = null;
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
@@ -977,6 +992,7 @@ let quickAgentShortcutTimer: ReturnType<typeof setTimeout> | null = null;
 let cockpitInitialized = false;
 let commandKeyHeld = false;
 const quickAgentShortcutDelayMs = 350;
+const githubOnboardingPendingKey = 'codexClaw:githubOnboardingPending';
 const activeTeam = computed<Team | null>(() => {
   const selectedTeam = props.snapshot.activeTeamId
     ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
@@ -1418,10 +1434,12 @@ const isModalDialogVisible = computed(() => (
   || props.codexResourceSharingMigrationRequired
 ));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
+const initialAuthenticationLoading = computed(() => authentication.value === null && authenticationLoading.value);
 const showLoginLanding = computed(() => (
-  authenticationLoading.value ||
+  initialAuthenticationLoading.value ||
   (authentication.value?.account === null && authentication.value.requiresOpenaiAuth)
 ));
+const showOnboardingGate = computed(() => showLoginLanding.value || githubOnboardingVisible.value);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -1483,6 +1501,18 @@ async function loadAuthentication(): Promise<void> {
       return;
     }
     authentication.value = await codexClawApi.getCodexAuthentication();
+    offerGitHubAfterChatGptLogin.value = (
+      authentication.value.account === null
+      && authentication.value.requiresOpenaiAuth
+    );
+    if (offerGitHubAfterChatGptLogin.value) {
+      window.sessionStorage.setItem(githubOnboardingPendingKey, 'true');
+    } else if (
+      authentication.value.account
+      && window.sessionStorage.getItem(githubOnboardingPendingKey) === 'true'
+    ) {
+      githubOnboardingVisible.value = true;
+    }
   } catch (error) {
     authenticationError.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -1496,6 +1526,7 @@ async function startChatGptLogin(): Promise<void> {
   try {
     const api = codexClawApi;
     if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
+    window.sessionStorage.setItem(githubOnboardingPendingKey, 'true');
     await api.startCodexChatGptLogin();
     authentication.value = {
       account: null,
@@ -1530,6 +1561,9 @@ async function logoutCodex(): Promise<void> {
   const api = codexClawApi;
   if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
   authentication.value = await api.logoutCodex();
+  offerGitHubAfterChatGptLogin.value = false;
+  githubOnboardingVisible.value = false;
+  window.sessionStorage.removeItem(githubOnboardingPendingKey);
 }
 
 function startAuthenticationPolling(): void {
@@ -1539,7 +1573,16 @@ function startAuthenticationPolling(): void {
   authenticationPoll = setInterval(() => {
     void api.getCodexAuthentication().then((next) => {
       authentication.value = next;
-      if (next.account || next.login.status === 'error') stopAuthenticationPolling();
+      if (next.account) {
+        githubOnboardingVisible.value = (
+          offerGitHubAfterChatGptLogin.value
+          || window.sessionStorage.getItem(githubOnboardingPendingKey) === 'true'
+        );
+        offerGitHubAfterChatGptLogin.value = false;
+        stopAuthenticationPolling();
+      } else if (next.login.status === 'error') {
+        stopAuthenticationPolling();
+      }
     }).catch((error) => {
       authenticationError.value = error instanceof Error ? error.message : String(error);
       stopAuthenticationPolling();
@@ -2136,7 +2179,7 @@ async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promis
   }
 }
 
-async function connectRepositoryAcquireGithub(): Promise<void> {
+async function connectGitHub(): Promise<void> {
   repositoryAcquireBusy.value = true;
   repositoryAcquireError.value = null;
   try {
@@ -2148,7 +2191,7 @@ async function connectRepositoryAcquireGithub(): Promise<void> {
   }
 }
 
-async function openRepositoryAcquireGithubAuthorization(): Promise<void> {
+async function openGitHubAuthorization(): Promise<void> {
   repositoryAcquireError.value = null;
   try {
     await props.openWorkProviderAuthorization('github');
@@ -2200,6 +2243,13 @@ function closeRepositoryAcquire(): void {
   repositoryAcquireVisible.value = false;
   repositoryAcquireBusy.value = false;
   repositoryAcquireError.value = null;
+}
+
+function finishGitHubOnboarding(): void {
+  githubOnboardingVisible.value = false;
+  repositoryAcquireBusy.value = false;
+  repositoryAcquireError.value = null;
+  window.sessionStorage.removeItem(githubOnboardingPendingKey);
 }
 
 watch(() => props.workRepositoriesByProvider.github, (repositories) => {
@@ -3107,7 +3157,7 @@ async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promis
 }
 
 function handleShellShortcut(event: KeyboardEvent): void {
-  if (showLoginLanding.value) {
+  if (showOnboardingGate.value) {
     return;
   }
   if (isModalDialogVisible.value || !isAgentWorkspaceVisible.value) {
@@ -3186,7 +3236,7 @@ function startQuickAgentShortcutReveal(event: KeyboardEvent): void {
   }
   quickAgentShortcutTimer = setTimeout(() => {
     quickAgentShortcutTimer = null;
-    if (commandKeyHeld && !showLoginLanding.value && !isModalDialogVisible.value && isAgentWorkspaceVisible.value) {
+    if (commandKeyHeld && !showOnboardingGate.value && !isModalDialogVisible.value && isAgentWorkspaceVisible.value) {
       quickAgentShortcutsVisible.value = true;
     }
   }, quickAgentShortcutDelayMs);
@@ -3986,7 +4036,7 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   background: var(--color-shell-window);
 }
 
-.app-shell--auth-gated > :not(.codex-login) {
+.app-shell--auth-gated > :not(.codex-login):not(.github-onboarding) {
   visibility: hidden;
 }
 

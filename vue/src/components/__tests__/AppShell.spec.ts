@@ -46,14 +46,130 @@ async function clickPortaledMenuItem(label: string): Promise<void> {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   window.localStorage.removeItem('cockpitGlobalScope:github');
+  window.sessionStorage.clear();
   document.body.innerHTML = '';
   delete window.codexClaw;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
 
 describe('AppShell', () => {
+  it('shows passive connection progress while discovering existing ChatGPT credentials', async () => {
+    let resolveAuthentication!: (value: {
+      account: { type: 'apiKey' };
+      requiresOpenaiAuth: false;
+      login: { status: 'idle'; error: null };
+    }) => void;
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockReturnValue(new Promise((resolve) => {
+        resolveAuthentication = resolve;
+      })),
+    } as Partial<CodexClawApi> as CodexClawApi;
+
+    const wrapper = mountShell();
+    await nextTick();
+
+    expect(wrapper.get('[aria-label="Connecting Codex Claw"]').text()).toContain('Connecting to ChatGPT…');
+    expect(wrapper.find('[aria-label="Connecting Codex Claw"] button').exists()).toBe(false);
+
+    resolveAuthentication({
+      account: { type: 'apiKey' },
+      requiresOpenaiAuth: false,
+      login: { status: 'idle', error: null },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+    expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('offers skippable GitHub setup after the first ChatGPT sign-in', async () => {
+    vi.useFakeTimers();
+    const snapshot = createInitialSnapshot();
+    const getCodexAuthentication = vi.fn()
+      .mockResolvedValueOnce({
+        account: null,
+        requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      })
+      .mockResolvedValueOnce({
+        account: { type: 'chatgpt' },
+        requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      });
+    window.codexClaw = {
+      getCodexAuthentication,
+      startCodexChatGptLogin: vi.fn().mockResolvedValue(undefined),
+    } as Partial<CodexClawApi> as CodexClawApi;
+
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    await wrapper.get('.codex-login .el-button').trigger('click');
+    await flushPromises();
+    vi.advanceTimersByTime(1000);
+    await flushPromises();
+
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+    expect(wrapper.get('.github-onboarding').text()).toContain('Connect GitHub.');
+    expect(wrapper.get('.app-shell').classes()).toContain('app-shell--auth-gated');
+
+    await wrapper.setProps({
+      snapshot: {
+        ...snapshot,
+        workBacklog: {
+          ...snapshot.workBacklog,
+          connections: [{
+            provider: 'github',
+            status: 'connected',
+            accountLabel: 'nbonamy',
+            connectedAt: '2026-09-01T12:00:00.000Z',
+          }],
+        },
+      },
+    });
+
+    expect(wrapper.find('.github-onboarding').exists()).toBe(true);
+    expect(wrapper.get('.github-onboarding').text()).toContain('GitHub is connected.');
+
+    await wrapper.get('.github-onboarding .el-button').trigger('click');
+
+    expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
+    wrapper.unmount();
+  });
+
+  it('keeps first-run GitHub setup pending across a renderer reload', async () => {
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockResolvedValue({
+        account: null,
+        requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+
+    const signedOutShell = mountShell();
+    await flushPromises();
+    signedOutShell.unmount();
+
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockResolvedValue({
+        account: { type: 'chatgpt' },
+        requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+
+    const reloadedShell = mountShell();
+    await flushPromises();
+
+    expect(reloadedShell.find('.codex-login').exists()).toBe(false);
+    expect(reloadedShell.find('.github-onboarding').exists()).toBe(true);
+    reloadedShell.unmount();
+  });
+
   it('keeps the workspace visible while reporting automatic clawd reconnection', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
@@ -85,7 +201,7 @@ describe('AppShell', () => {
     await flushPromises();
 
     expect(wrapper.get('.app-shell').classes()).toContain('app-shell--auth-gated');
-    expect(wrapper.get('[aria-label="Sign in to Codex Claw"]').text()).toContain('Continue with ChatGPT');
+    expect(wrapper.get('[aria-label="Sign in to Codex Claw"]').text()).toContain('Sign in to ChatGPT');
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
     expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
 
@@ -115,7 +231,8 @@ describe('AppShell', () => {
     await flushPromises();
 
     expect(cancelCodexChatGptLogin).toHaveBeenCalledOnce();
-    expect(wrapper.get('.codex-login__cancel').classes()).toContain('codex-login__cancel--hidden');
+    expect(wrapper.find('.codex-login__cancel').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Sign in to start your first session.');
 
     wrapper.unmount();
   });
