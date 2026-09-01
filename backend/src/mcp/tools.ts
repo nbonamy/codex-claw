@@ -143,17 +143,22 @@ export function createCodexClawMcpServer(
     destinationPath,
   })));
 
-  server.registerTool('prepare-work', {
-    description: 'Ask the user how substantial implementation work should proceed: in the current checkout, on a branch in the current checkout, or delegated to a new agent in an isolated worktree. Use this before starting substantial code changes when the user has not already chosen an execution mode.',
-    inputSchema: {
-      task: z.string().describe('Self-contained description of the work. This becomes the delegated agent prompt when delegation is chosen.'),
-      branchName: z.string().optional().describe('Suggested git branch name. The user can edit it before choosing a branch or worktree.'),
-    },
-  }, ({ task, branchName }) => toolResult('prepare-work', {
-    agentId: callerAgentId,
-    taskLength: task.length,
-    hasBranchName: Boolean(branchName),
-  }, () => coordinator.prepareWork(callerAgentId, { task, branchName })));
+  // Work routing is intentionally parked while its triggering and preference
+  // policy is redesigned. Keep the registration here so it can be restored
+  // without reconstructing the model-facing contract, but do not expose it in
+  // the live MCP tool catalog.
+  //
+  // server.registerTool('prepare-work', {
+  //   description: 'Ask the user how substantial implementation work should proceed: in the current checkout, on a branch in the current checkout, or delegated to a new agent in an isolated worktree. Use this before starting substantial code changes when the user has not already chosen an execution mode.',
+  //   inputSchema: {
+  //     task: z.string().describe('Self-contained description of the work. This becomes the delegated agent prompt when delegation is chosen.'),
+  //     branchName: z.string().optional().describe('Suggested git branch name. The user can edit it before choosing a branch or worktree.'),
+  //   },
+  // }, ({ task, branchName }) => toolResult('prepare-work', {
+  //   agentId: callerAgentId,
+  //   taskLength: task.length,
+  //   hasBranchName: Boolean(branchName),
+  // }, () => coordinator.prepareWork(callerAgentId, { task, branchName })));
 
   server.registerTool('display-markdown', {
     description: 'Display Markdown in the Codex Claw side panel. Provide exactly one of path or markdown. Use path for Markdown files in your agent folder; use markdown for inline generated content.',

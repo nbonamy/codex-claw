@@ -36,12 +36,13 @@ Renderer responsibilities:
 - never import MCP SDK types;
 - never call MCP tools directly.
 
-## Work Routing
+## Dormant Work Routing
 
-The `prepare-work` tool lets an agent pause before substantial implementation
-and ask the user where the work should continue. The tool accepts a
-self-contained `task` plus an optional branch suggestion and blocks until the
-user chooses one of three app-owned outcomes:
+The work-routing implementation is retained for further product design, but
+`prepare-work` is not registered in the model-facing MCP tool catalog. Its
+existing request lifecycle accepts a self-contained `task` plus an optional
+branch suggestion and blocks until the user chooses one of three app-owned
+outcomes:
 
 - continue in the current conversation and checkout;
 - create or switch to a branch in the same checkout and continue;
