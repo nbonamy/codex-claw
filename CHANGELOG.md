@@ -4,6 +4,29 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.14.0] - 2026-09-01
+
+### New features
+
+- Loops are now Automations throughout Codex Claw, with existing saved loops,
+  execution history, and work assignments migrated automatically.
+- GitHub can now be connected directly from first-run onboarding or the
+  repository picker through a secure browser authorization flow.
+- Experimental Linux x64 builds now bundle the matching Codex runtime while
+  keeping macOS-only Computer Use and Appshots features disabled.
+
+### Improvements and fixes
+
+- First-run setup now provides a consistent ChatGPT and optional GitHub
+  onboarding experience, ending with a single celebratory completion screen.
+- Generated images now render through an app-scoped local-media protocol,
+  restoring image previews without exposing arbitrary local files.
+- Long and restored conversations now omit unnecessary historical tool
+  payloads, reducing synchronization size while preserving the genuine latest
+  messages when older history loads.
+- The GitHub repository picker now keeps a stable height across loading, empty,
+  filtered, and populated states.
+
 ## [0.13.0] - 2026-08-30
 
 ### New features

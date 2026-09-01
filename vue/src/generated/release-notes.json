@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.13.0",
+  "currentVersion": "0.14.0",
   "releases": [
+    {
+      "version": "0.14.0",
+      "releasedAt": "2026-09-01",
+      "sourceSha256": "1496c708b3ae2d3a251968d46b611c9f82dae75b759deac941c73a07efe0aae6",
+      "markdown": "### New features\n\n- Loops are now Automations throughout Codex Claw, with existing saved loops,\n  execution history, and work assignments migrated automatically.\n- GitHub can now be connected directly from first-run onboarding or the\n  repository picker through a secure browser authorization flow.\n- Experimental Linux x64 builds now bundle the matching Codex runtime while\n  keeping macOS-only Computer Use and Appshots features disabled.\n\n### Improvements and fixes\n\n- First-run setup now provides a consistent ChatGPT and optional GitHub\n  onboarding experience, ending with a single celebratory completion screen.\n- Generated images now render through an app-scoped local-media protocol,\n  restoring image previews without exposing arbitrary local files.\n- Long and restored conversations now omit unnecessary historical tool\n  payloads, reducing synchronization size while preserving the genuine latest\n  messages when older history loads.\n- The GitHub repository picker now keeps a stable height across loading, empty,\n  filtered, and populated states."
+    },
     {
       "version": "0.13.0",
       "releasedAt": "2026-08-30",
