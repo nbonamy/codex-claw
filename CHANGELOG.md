@@ -4,6 +4,13 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.14.1] - 2026-09-01
+
+### Improvements and fixes
+
+- Update checks now show live checking and downloading progress in the header
+  before an update is ready to install.
+
 ## [0.14.0] - 2026-09-01
 
 ### New features

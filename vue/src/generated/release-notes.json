@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.14.0",
+  "currentVersion": "0.14.1",
   "releases": [
+    {
+      "version": "0.14.1",
+      "releasedAt": "2026-09-01",
+      "sourceSha256": "e2cb3eef82aa4ced1a28a78ec48c051c2880acf81d5c891f608c5ddc727f8c2f",
+      "markdown": "### Improvements and fixes\n\n- Update checks now show live checking and downloading progress in the header\n  before an update is ready to install."
+    },
     {
       "version": "0.14.0",
       "releasedAt": "2026-09-01",
