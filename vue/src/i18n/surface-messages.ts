@@ -807,6 +807,8 @@ export const surfaceMessages = {
     "automations": "Automations"
   },
   "updateAvailableBadge": {
+    "checkingForUpdates": "Checking…",
+    "downloadingUpdate": "Downloading…",
     "updateAvailable": "Update available",
     "updateAvailableRestartCodexClawToInstall": "Update available. Restart Codex Claw to install."
   },

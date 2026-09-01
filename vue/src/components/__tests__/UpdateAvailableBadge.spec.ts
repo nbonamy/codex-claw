@@ -12,6 +12,21 @@ describe('UpdateAvailableBadge', () => {
     });
 
     expect(wrapper.find('button').exists()).toBe(false);
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
+  });
+
+  it.each([
+    ['checking', 'Checking…'],
+    ['downloading', 'Downloading…'],
+  ] as const)('shows %s progress as a blue status badge', (state, label) => {
+    const wrapper = mount(UpdateAvailableBadge, {
+      props: { status: { state } },
+    });
+
+    const badge = wrapper.get('[role="status"]');
+    expect(badge.text()).toBe(label);
+    expect(badge.classes()).toContain('update-status-badge--busy');
+    expect(wrapper.find('button').exists()).toBe(false);
   });
 
   it('shows downloaded updates and emits install', async () => {
