@@ -2718,6 +2718,7 @@ describe('AppShell', () => {
 
   it('clones a GitHub repository before opening its contextual session picker', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
     const githubRepository: WorkRepository = {
       provider: 'github',
       id: 'nbonamy/new-project',
@@ -2763,6 +2764,7 @@ describe('AppShell', () => {
 
   it('opens an existing checkout only when its remote matches the selected GitHub repository', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
     const githubRepository: WorkRepository = {
       provider: 'github',
       id: 'nbonamy/existing-project',
@@ -2911,6 +2913,7 @@ describe('AppShell', () => {
 
   it('shows the empty agent page when the active team has no agents', async () => {
     const snapshot = createEmptySnapshot();
+    const connectWorkProvider = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
@@ -2918,6 +2921,7 @@ describe('AppShell', () => {
         messages: [],
         isLoading: false,
         isSending: false,
+        connectWorkProvider,
       },
       global: {
         plugins: [ElementPlus],
@@ -2939,6 +2943,25 @@ describe('AppShell', () => {
     const acquireDialog = wrapper.getComponent({ name: 'RepositoryAcquireDialog' });
     expect(acquireDialog.props('visible')).toBe(true);
     expect(acquireDialog.props('mode')).toBe('github');
+    expect(acquireDialog.props('connection')).toStrictEqual({ provider: 'github', status: 'disconnected' });
+    expect(acquireDialog.text()).toContain('Connect GitHub');
+
+    acquireDialog.vm.$emit('connect');
+    await flushPromises();
+    expect(connectWorkProvider).toHaveBeenCalledWith('github');
+
+    const connectedSnapshot = structuredClone(snapshot);
+    connectedSnapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+    }];
+    await wrapper.setProps({ snapshot: connectedSnapshot });
+    await flushPromises();
+
+    expect(acquireDialog.props('loading')).toBe(true);
+    expect(acquireDialog.text()).toContain('Loading repositories…');
+    expect(acquireDialog.text()).not.toContain('No matching repositories.');
   });
 
   it('assigns a ticket to a new agent and can create a ticket-named team', async () => {

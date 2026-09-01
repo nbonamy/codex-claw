@@ -69,49 +69,10 @@
         v-if="authorization?.provider === 'github' && githubConnection.status === 'connecting'"
         class="settings-integrations-panel__authorization"
       >
-        <ol class="settings-integrations-panel__authorization-steps">
-        <li class="settings-integrations-panel__authorization-step">
-          <div class="settings-integrations-panel__authorization-step-copy">
-            <div class="settings-integrations-panel__authorization-step-text">
-              <strong>{{ $t('surface.settingsIntegrationsPanel.step1CopyTheCode') }}</strong>
-              <span>{{ $t('surface.settingsIntegrationsPanel.clickTheCodeToCopyIt') }}</span>
-            </div>
-            <button
-              class="settings-integrations-panel__code"
-              type="button"
-              :aria-label="$t('dynamic.settings.copyGithubCode', { code: authorization.userCode })"
-              @click="copyAuthorizationCode"
-            >
-              <span>{{ authorization.userCode }}</span>
-              <component
-                :is="copyIconConfirmed ? CheckIcon : CopyIcon"
-                aria-hidden="true"
-                size="16"
-              />
-            </button>
-          </div>
-        </li>
-        <li class="settings-integrations-panel__authorization-step">
-          <div class="settings-integrations-panel__authorization-step-text">
-            <strong>{{ $t('surface.settingsIntegrationsPanel.step2OpenGitHub') }}</strong>
-            <span>{{ $t('surface.settingsIntegrationsPanel.gitHubWillAskForTheCodePasteItThereAuthorizeCodexClawThe') }}</span>
-          </div>
-          <el-button
-            :type="codeCopied ? 'primary' : undefined"
-            @click="emit('open-authorization', 'github')"
-          > {{ $t('surface.settingsIntegrationsPanel.openGitHub') }} </el-button>
-        </li>
-        <li class="settings-integrations-panel__authorization-step">
-          <div class="settings-integrations-panel__authorization-step-text">
-            <strong>{{ $t('surface.settingsIntegrationsPanel.step3ComeBackHere') }}</strong>
-            <span>{{ $t('surface.settingsIntegrationsPanel.codexClawWillFinishTheConnectionAutomaticallyOnceGitHubA') }}</span>
-          </div>
-          <span
-            class="settings-integrations-panel__waiting"
-            :aria-label="$t('surface.settingsIntegrationsPanel.waitingForGitHubAuthorization')"
-          > {{ $t('surface.settingsIntegrationsPanel.waiting') }} </span>
-        </li>
-        </ol>
+        <GitHubAuthorizationSteps
+          :authorization="authorization"
+          @open="emit('open-authorization', 'github')"
+        />
       </div>
     </SettingsSection>
 
@@ -128,7 +89,8 @@
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
-import { CheckIcon, CopyIcon, GitHubIcon } from '../shared/icons/app-icons';
+import { GitHubIcon } from '../shared/icons/app-icons';
+import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsSection from './SettingsSection.vue';
@@ -157,8 +119,6 @@ const emit = defineEmits<{
 
 const clientIdInput = ref('');
 const configurationError = ref<string | null>(null);
-const copyIconConfirmed = ref(false);
-const codeCopied = ref(false);
 const savingClientId = ref(false);
 
 const githubConnection = computed<WorkIntegrationConnection>(() => (
@@ -190,11 +150,6 @@ watch(savedClientId, (value) => {
   clientIdInput.value = value;
 }, { immediate: true });
 
-watch(() => props.authorization?.userCode, () => {
-  copyIconConfirmed.value = false;
-  codeCopied.value = false;
-});
-
 async function saveClientId(): Promise<void> {
   savingClientId.value = true;
   configurationError.value = null;
@@ -221,23 +176,6 @@ async function connectGithub(): Promise<void> {
   emit('connect', 'github');
 }
 
-async function copyAuthorizationCode(): Promise<void> {
-  if (!props.authorization) {
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(props.authorization.userCode);
-    copyIconConfirmed.value = true;
-    codeCopied.value = true;
-    window.setTimeout(() => {
-      copyIconConfirmed.value = false;
-    }, 1400);
-  } catch {
-    copyIconConfirmed.value = false;
-    codeCopied.value = false;
-  }
-}
 </script>
 
 <style scoped>
@@ -317,90 +255,6 @@ async function copyAuthorizationCode(): Promise<void> {
 
 .settings-integrations-panel__authorization {
   padding: var(--space-16) var(--space-8) 0;
-}
-
-.settings-integrations-panel__authorization-steps {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.settings-integrations-panel__authorization-step {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-16);
-  min-height: 68px;
-  border-top: 1px solid var(--color-border);
-  padding: var(--space-12) 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.settings-integrations-panel__authorization-step:first-child {
-  border-top: 0;
-}
-
-.settings-integrations-panel__authorization-step-text {
-  min-width: 0;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.settings-integrations-panel__authorization-step-text strong {
-  color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
-}
-
-.settings-integrations-panel__authorization-step-text span {
-  color: var(--color-text-muted);
-}
-
-.settings-integrations-panel__authorization-step-copy {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-16);
-}
-
-.settings-integrations-panel__authorization-expiry {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  line-height: var(--line-height-18);
-  margin: var(--space-10) 0 0;
-}
-
-.settings-integrations-panel__code {
-  min-width: 128px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  color: var(--color-text);
-  background: var(--color-surface-low);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
-  text-align: center;
-  cursor: pointer;
-}
-
-.settings-integrations-panel__code:hover {
-  background: var(--color-surface-high);
-}
-
-.settings-integrations-panel__waiting {
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
 }
 
 .settings-integrations-panel__detail {

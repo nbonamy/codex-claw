@@ -228,6 +228,15 @@ export const messages = {
       repositoryUrl: 'Repository URL…',
     },
     repositories: {
+      githubOnboarding: {
+        authorizeDetail: 'Copy the one-time code, authorize Codex Claw on GitHub, then return here.',
+        authorizeTitle: 'Authorize Codex Claw',
+        connect: 'Connect GitHub',
+        connecting: 'Connecting…',
+        detail: 'Connect your account to browse and clone repositories available to you, including private repositories.',
+        deviceFlow: 'Connect securely with your GitHub credentials.',
+        title: 'Connect GitHub',
+      },
       acquire: {
         clone: 'Clone',
         cloneRepository: 'Clone repository',

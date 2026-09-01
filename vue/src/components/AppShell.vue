@@ -340,13 +340,17 @@
     <RepositoryAcquireDialog
       :visible="repositoryAcquireVisible"
       :mode="repositoryAcquireMode"
+      :connection="githubConnection"
+      :authorization="workProviderAuthorization"
       :repositories="repositoryAcquireRepositories"
       :local-repository-identities="sourceRepositories.flatMap((repository) => repository.remoteIdentity ? [repository.remoteIdentity] : [])"
-      :loading="repositoryAcquireLoading"
+      :loading="repositoryAcquireCatalogLoading"
       :busy="repositoryAcquireBusy"
-      :error="repositoryAcquireError"
+      :error="repositoryAcquireDisplayError"
       @close="closeRepositoryAcquire"
       @clone-url="cloneRepositoryAndOpen"
+      @connect="connectRepositoryAcquireGithub"
+      @open-authorization="openRepositoryAcquireGithubAuthorization"
       @select-repository="selectWorkRepository"
     />
     <ConversationHistoryDialog
@@ -444,7 +448,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkIntegrationConnection, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -915,6 +919,28 @@ const repositoryAcquireRepositories = ref<WorkRepository[]>([]);
 const repositoryAcquireLoading = ref(false);
 const repositoryAcquireBusy = ref(false);
 const repositoryAcquireError = ref<string | null>(null);
+const githubConnection = computed<WorkIntegrationConnection>(() => (
+  props.snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? {
+    provider: 'github',
+    status: 'disconnected',
+  }
+));
+const repositoryAcquireDisplayError = computed(() => (
+  repositoryAcquireError.value
+  ?? (repositoryAcquireMode.value === 'github' ? props.workBacklogError : null)
+));
+const repositoryAcquireCatalogLoading = computed(() => (
+  repositoryAcquireLoading.value
+  || (
+    repositoryAcquireMode.value === 'github'
+    && githubConnection.value.status === 'connected'
+    && props.workBacklogStatus !== 'error'
+    && (
+      props.workBacklogStatus === 'loading'
+      || props.workRepositoriesByProvider.github === undefined
+    )
+  )
+));
 const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentTeamId = ref<string | null>(null);
@@ -2105,7 +2131,30 @@ async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promis
   repositoryAcquireVisible.value = true;
   repositoryAcquireError.value = null;
   repositoryAcquireRepositories.value = [];
-  if (action === 'github') await loadRepositoryAcquireCatalog();
+  if (action === 'github' && githubConnection.value.status === 'connected') {
+    await loadRepositoryAcquireCatalog();
+  }
+}
+
+async function connectRepositoryAcquireGithub(): Promise<void> {
+  repositoryAcquireBusy.value = true;
+  repositoryAcquireError.value = null;
+  try {
+    await props.connectWorkProvider('github');
+  } catch (error) {
+    repositoryAcquireError.value = localizedErrorMessage(error, t);
+  } finally {
+    repositoryAcquireBusy.value = false;
+  }
+}
+
+async function openRepositoryAcquireGithubAuthorization(): Promise<void> {
+  repositoryAcquireError.value = null;
+  try {
+    await props.openWorkProviderAuthorization('github');
+  } catch (error) {
+    repositoryAcquireError.value = localizedErrorMessage(error, t);
+  }
 }
 
 async function openLocalRepositorySession(): Promise<void> {
@@ -2152,6 +2201,17 @@ function closeRepositoryAcquire(): void {
   repositoryAcquireBusy.value = false;
   repositoryAcquireError.value = null;
 }
+
+watch(() => props.workRepositoriesByProvider.github, (repositories) => {
+  if (
+    repositoryAcquireVisible.value
+    && repositoryAcquireMode.value === 'github'
+    && githubConnection.value.status === 'connected'
+    && repositories
+  ) {
+    repositoryAcquireRepositories.value = repositories;
+  }
+});
 
 async function selectWorkRepository(repository: WorkRepository): Promise<void> {
   const selectedRemoteIdentity = canonicalGitRemoteIdentity(repository.url);

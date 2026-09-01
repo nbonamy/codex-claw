@@ -4,11 +4,11 @@
     :class="{ 'claw-dialog--compact': mode === 'github' }"
     :model-value="visible"
     :teleported="false"
-    :width="mode === 'url' ? '520px' : '680px'"
+    :width="mode === 'url' ? '520px' : githubConnected ? '680px' : '560px'"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
-    <template v-if="mode === 'github'" #header>
+    <template v-if="mode === 'github' && githubConnected" #header>
       <div class="repository-acquire-dialog__search">
         <SearchIcon aria-hidden="true" />
         <input
@@ -21,13 +21,22 @@
         >
       </div>
     </template>
-    <template v-else #header>
+    <template v-else-if="mode === 'url'" #header>
       <div class="claw-form-dialog__header">
         <h2 class="claw-dialog__title">{{ t('repositories.acquire.cloneRepository') }}</h2>
       </div>
     </template>
+    <template v-else #header>
+      <span class="repository-acquire-dialog__accessible-title">{{ t('repositories.githubOnboarding.title') }}</span>
+    </template>
 
-    <section class="repository-acquire-dialog__body repository-acquire-dialog__scroll-region">
+    <section
+      class="repository-acquire-dialog__body"
+      :class="{
+        'repository-acquire-dialog__body--state': githubConnected && githubStateOnly,
+        'repository-acquire-dialog__scroll-region': mode === 'github' && githubConnected,
+      }"
+    >
       <template v-if="mode === 'url'">
         <form class="claw-form-dialog repository-acquire-dialog__url-form" @submit.prevent="submitUrl">
           <label class="claw-form-dialog__label" for="repository-acquire-url">{{ t('repositories.acquire.url') }}</label>
@@ -47,11 +56,11 @@
           <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
         </form>
       </template>
-      <template v-else>
+      <template v-else-if="githubConnected">
         <p v-if="loading" class="repository-acquire-dialog__state">{{ t('repositories.acquire.loading') }}</p>
         <p v-else-if="error" class="repository-acquire-dialog__state repository-acquire-dialog__state--error">{{ error }}</p>
         <template v-else>
-          <h3>{{ t('repositories.acquire.repositories') }}</h3>
+          <h3 v-if="filteredRepositories.length > 0">{{ t('repositories.acquire.repositories') }}</h3>
           <button
             v-for="repository in filteredRepositories"
             :key="repository.id"
@@ -69,6 +78,37 @@
           <p v-if="filteredRepositories.length === 0" class="repository-acquire-dialog__state">{{ t('repositories.acquire.noMatch') }}</p>
         </template>
       </template>
+      <section
+        v-else
+        class="repository-acquire-dialog__onboarding"
+        :class="{ 'repository-acquire-dialog__onboarding--initial': !authorization }"
+      >
+        <div class="repository-acquire-dialog__onboarding-heading">
+          <GitHubIcon class="repository-acquire-dialog__github-mark" aria-hidden="true" />
+          <h2>{{ t(authorization ? 'repositories.githubOnboarding.authorizeTitle' : 'repositories.githubOnboarding.title') }}</h2>
+          <p>{{ t(authorization ? 'repositories.githubOnboarding.authorizeDetail' : 'repositories.githubOnboarding.detail') }}</p>
+        </div>
+
+        <GitHubAuthorizationSteps
+          v-if="authorization"
+          :authorization="authorization"
+          @open="emit('open-authorization')"
+        />
+        <div v-else class="repository-acquire-dialog__connect">
+          <button
+            class="claw-button claw-button--primary"
+            type="button"
+            :disabled="busy"
+            @click="emit('connect')"
+          >{{ busy ? t('repositories.githubOnboarding.connecting') : t('repositories.githubOnboarding.connect') }}</button>
+          <p>
+            <ShieldCheckIcon aria-hidden="true" />
+            <span>{{ t('repositories.githubOnboarding.deviceFlow') }}</span>
+          </p>
+        </div>
+
+        <p v-if="error" class="repository-acquire-dialog__onboarding-error" role="alert">{{ error }}</p>
+      </section>
     </section>
 
     <template v-if="mode === 'url'" #footer>
@@ -84,12 +124,15 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
-import type { WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkRepository } from '@codex-claw/core/contracts';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
-import { GitHubIcon } from '../shared/icons/app-icons';
+import { GitHubIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
+import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
+  authorization?: WorkProviderAuthorization | null;
+  connection?: WorkIntegrationConnection | null;
   error?: string | null;
   loading?: boolean;
   localRepositoryIdentities?: string[];
@@ -98,6 +141,8 @@ const props = withDefaults(defineProps<{
   visible: boolean;
 }>(), {
   busy: false,
+  authorization: null,
+  connection: null,
   error: null,
   loading: false,
   localRepositoryIdentities: () => [],
@@ -107,6 +152,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   close: [];
   'clone-url': [url: string];
+  connect: [];
+  'open-authorization': [];
   'select-repository': [repository: WorkRepository];
 }>();
 
@@ -117,10 +164,12 @@ const urlInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const url = ref('');
 const localRepositoryIdentities = computed(() => new Set(props.localRepositoryIdentities));
+const githubConnected = computed(() => props.connection?.provider === 'github' && props.connection.status === 'connected');
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredRepositories = computed(() => props.repositories.filter((repository) => (
   `${repository.fullName} ${repository.name}`.toLocaleLowerCase().includes(normalizedQuery.value)
 )));
+const githubStateOnly = computed(() => props.loading || Boolean(props.error) || filteredRepositories.value.length === 0);
 const canSubmitUrl = computed(() => /^(?:https?:\/\/|ssh:\/\/|git@|[^\s]+@[^\s]+:)[^\s]+/iu.test(url.value.trim()));
 
 watch(() => [props.visible, props.mode] as const, async ([visible, mode]) => {
@@ -182,7 +231,13 @@ function repositoryKindLabel(repository: WorkRepository): string {
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
+.repository-acquire-dialog__body--state {
+  display: grid;
+  place-items: center;
+}
+
 .repository-acquire-dialog__scroll-region {
+  min-height: 400px;
   max-height: min(60vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -191,6 +246,93 @@ function repositoryKindLabel(repository: WorkRepository): string {
 .repository-acquire-dialog__body h3 {
   margin: 0 0 var(--space-4);
   font-size: var(--font-size-13);
+}
+
+.repository-acquire-dialog__onboarding {
+  display: grid;
+  align-content: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16) var(--space-12);
+}
+
+.repository-acquire-dialog__onboarding--initial {
+  gap: var(--space-12);
+}
+
+.repository-acquire-dialog__onboarding--initial .repository-acquire-dialog__onboarding-heading {
+  gap: var(--space-6);
+}
+
+.repository-acquire-dialog__onboarding-heading {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.repository-acquire-dialog__github-mark {
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+}
+
+.repository-acquire-dialog__onboarding-heading h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-20);
+  line-height: var(--line-height-28);
+}
+
+.repository-acquire-dialog__onboarding-heading p,
+.repository-acquire-dialog__connect p,
+.repository-acquire-dialog__onboarding-error {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.repository-acquire-dialog__onboarding-heading p {
+  max-width: 420px;
+}
+
+.repository-acquire-dialog__connect {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-8);
+}
+
+.repository-acquire-dialog__connect .claw-button {
+  min-width: 176px;
+}
+
+.repository-acquire-dialog__connect p {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.repository-acquire-dialog__connect p svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+}
+
+.repository-acquire-dialog__onboarding-error {
+  color: var(--color-error);
+  text-align: center;
+}
+
+.repository-acquire-dialog__accessible-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .repository-acquire-dialog__row {
@@ -274,7 +416,7 @@ function repositoryKindLabel(repository: WorkRepository): string {
 }
 
 .repository-acquire-dialog__state {
-  margin: var(--space-8) 0;
+  margin: 0;
   text-align: center;
 }
 
