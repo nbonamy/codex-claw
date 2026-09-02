@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.14.1",
+  "currentVersion": "0.14.2",
   "releases": [
+    {
+      "version": "0.14.2",
+      "releasedAt": "2026-09-01",
+      "sourceSha256": "6f41376a62d90e680e92554830365cd760f34fac3741c958fae3b5f4895518f5",
+      "markdown": "### New features\n\n- Starting work from an issue or pull request now shows a staged preparation\n  view while Codex Claw creates the branch or isolated worktree, starts the\n  session, and hands over the work context.\n- Inline conversation images now open or focus a reusable image workspace tab,\n  while the explicit maximize control opens the stock fullscreen viewer.\n\n### Improvements and fixes\n\n- Older conversation history now prefetches as the transcript reaches the top,\n  avoids duplicate requests, and preserves the visible scroll position as\n  earlier messages arrive.\n- Initial ChatGPT connection now uses a smooth edge-to-edge progress indicator."
+    },
     {
       "version": "0.14.1",
       "releasedAt": "2026-09-01",

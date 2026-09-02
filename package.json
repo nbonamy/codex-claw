@@ -1,6 +1,6 @@
 {
   "name": "codex-claw",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "private": true,
   "devDependencies": {
     "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",

@@ -4,6 +4,23 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.14.2] - 2026-09-01
+
+### New features
+
+- Starting work from an issue or pull request now shows a staged preparation
+  view while Codex Claw creates the branch or isolated worktree, starts the
+  session, and hands over the work context.
+- Inline conversation images now open or focus a reusable image workspace tab,
+  while the explicit maximize control opens the stock fullscreen viewer.
+
+### Improvements and fixes
+
+- Older conversation history now prefetches as the transcript reaches the top,
+  avoids duplicate requests, and preserves the visible scroll position as
+  earlier messages arrive.
+- Initial ChatGPT connection now uses a smooth edge-to-edge progress indicator.
+
 ## [0.14.1] - 2026-09-01
 
 ### Improvements and fixes
