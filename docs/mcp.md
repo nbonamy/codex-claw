@@ -273,11 +273,12 @@ Input:
 - `kind`: optional `confetti`, `stars`, `shapes`, or `schoolPride`; defaults to
   `confetti`.
 
-The tool description deliberately tells agents to use it sparingly—normally
-once after a real accomplishment and never for routine progress. The request
-emits `celebration.requested`; it is not stored in conversation history or app
-state. Users can disable agent celebrations in General settings. The setting
-is enabled by default, and `clawd` suppresses the event when it is off.
+The tool description explicitly prompts agents to celebrate releases, hard
+fixes, major features, migrations, and genuine breakthroughs once the
+accomplishment is complete. The request emits `celebration.requested`; it is
+not stored in conversation history or app state. Users can disable agent
+celebrations in General settings. The setting is enabled by default, and
+`clawd` suppresses the event when it is off.
 
 ### `send-message`
 
