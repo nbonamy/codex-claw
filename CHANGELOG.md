@@ -4,6 +4,14 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.14.3] - 2026-09-02
+
+### Improvements and fixes
+
+- Agents are now explicitly prompted to celebrate releases, hard fixes, major
+  features, migrations, and genuine breakthroughs, making configured visual
+  celebrations more reliable after meaningful accomplishments.
+
 ## [0.14.2] - 2026-09-01
 
 ### New features

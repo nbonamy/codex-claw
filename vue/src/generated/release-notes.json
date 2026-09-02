@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.14.2",
+  "currentVersion": "0.14.3",
   "releases": [
+    {
+      "version": "0.14.3",
+      "releasedAt": "2026-09-02",
+      "sourceSha256": "a74df4a74315df7e466fb808b07ea36958fd9a8c340c959c7d7bb2f025526373",
+      "markdown": "### Improvements and fixes\n\n- Agents are now explicitly prompted to celebrate releases, hard fixes, major\n  features, migrations, and genuine breakthroughs, making configured visual\n  celebrations more reliable after meaningful accomplishments."
+    },
     {
       "version": "0.14.2",
       "releasedAt": "2026-09-01",
