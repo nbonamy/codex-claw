@@ -37,40 +37,15 @@
 
     <section class="repository-session-source-dialog__results" aria-live="polite">
       <template v-if="selectedWorkItem">
-        <div
+        <StagedOperationProgress
           v-if="preparationVisible && assignmentState !== 'error'"
-          class="repository-session-source-dialog__operation-state"
-          :data-state="assignmentState"
-          role="status"
-        >
-          <header class="repository-session-source-dialog__operation-heading">
-            <span class="repository-session-source-dialog__operation-icon">
-              <CircleCheckIcon v-if="preparationStep === preparationSteps.length" aria-hidden="true" />
-              <SparklesIcon v-else aria-hidden="true" />
-            </span>
-            <div>
-              <span>{{ t('repositoryBacklog.launchingFrom', { number: selectedWorkItem.number }) }}</span>
-              <strong>{{ preparationTitle }}</strong>
-            </div>
-          </header>
-          <ol>
-            <li
-              v-for="(step, index) in preparationSteps"
-              :key="step.title"
-              :class="preparationStepClass(index)"
-            >
-              <span class="repository-session-source-dialog__step-marker">
-                <CheckIcon v-if="preparationStep > index" aria-hidden="true" />
-                <LoaderIcon v-else-if="preparationStep === index" aria-hidden="true" />
-                <span v-else aria-hidden="true" />
-              </span>
-              <div>
-                <strong>{{ step.title }}</strong>
-                <small>{{ step.detail }}</small>
-              </div>
-            </li>
-          </ol>
-        </div>
+          :state="assignmentState === 'success' ? 'success' : 'running'"
+          :eyebrow="t('repositoryBacklog.launchingFrom', { number: selectedWorkItem.number })"
+          :title="preparationTitle"
+          :complete-title="t('repositoryBacklog.workReady', { number: selectedWorkItem.number })"
+          :steps="preparationSteps"
+          @complete="emit('preparation-complete')"
+        />
         <WorkItemAssignmentPicker
           v-else
           :item="selectedWorkItem"
@@ -121,21 +96,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IconArrowLeft as ArrowLeftIcon,
-  IconCheck as CheckIcon,
-  IconCircleCheck as CircleCheckIcon,
   IconCircleDot as IssueIcon,
   IconGitPullRequest as GitPullRequestIcon,
-  IconLoader2 as LoaderIcon,
   IconSearch as SearchIcon,
-  IconSparkles as SparklesIcon,
 } from '@tabler/icons-vue';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
+import StagedOperationProgress from './StagedOperationProgress.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 
 type SourceTab = 'branches' | 'pullRequests' | 'issues';
@@ -175,10 +147,6 @@ const query = ref('');
 const selectedWorkItem = ref<WorkItem | null>(null);
 const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
 const preparationVisible = ref(false);
-const preparationStep = ref(0);
-let preparationStartedAt: number | null = null;
-let preparationCompletionScheduled = false;
-const preparationTimers: Array<ReturnType<typeof globalThis.setTimeout>> = [];
 const tab = ref<SourceTab>('branches');
 const tabs = computed<ReadonlyArray<{ id: SourceTab; label: string }>>(() => [
   { id: 'branches', label: t('repositories.sessionSource.branches') },
@@ -219,9 +187,6 @@ const preparationSteps = computed(() => {
 });
 const preparationTitle = computed(() => {
   const number = selectedWorkItem.value?.number ?? '';
-  if (preparationStep.value === preparationSteps.value.length) {
-    return t('repositoryBacklog.workReady', { number });
-  }
   return t(
     preparationSelection.value?.destination === 'existing'
       ? 'repositoryBacklog.prepareExistingSession'
@@ -242,11 +207,7 @@ watch(() => props.visible, async (visible) => {
 
 watch(() => props.assignmentState, (state) => {
   if (state === 'running' && preparationSelection.value && !preparationVisible.value) {
-    startPreparation();
-    return;
-  }
-  if (state === 'success' && preparationSelection.value) {
-    finishPreparation();
+    preparationVisible.value = true;
     return;
   }
   if (state === 'error') {
@@ -254,60 +215,19 @@ watch(() => props.assignmentState, (state) => {
   }
 });
 
-onBeforeUnmount(resetPreparation);
-
 function onVisibilityChanged(visible: boolean): void {
   if (!visible) emit('close');
 }
 
 function startWorkItem(selection: WorkItemAssignmentSelection): void {
   preparationSelection.value = selection;
-  startPreparation();
+  preparationVisible.value = true;
   emit('start-work-item', selection);
 }
 
-function startPreparation(): void {
-  clearPreparationTimers();
-  preparationVisible.value = true;
-  preparationStep.value = 0;
-  preparationStartedAt = Date.now();
-  preparationCompletionScheduled = false;
-  preparationTimers.push(globalThis.setTimeout(() => {
-    preparationStep.value = 1;
-  }, 1_100));
-  preparationTimers.push(globalThis.setTimeout(() => {
-    preparationStep.value = 2;
-  }, 2_800));
-}
-
-function finishPreparation(): void {
-  if (!preparationVisible.value) startPreparation();
-  if (preparationCompletionScheduled) return;
-  preparationCompletionScheduled = true;
-  const elapsed = preparationStartedAt === null ? 0 : Date.now() - preparationStartedAt;
-  preparationTimers.push(globalThis.setTimeout(() => {
-    preparationStep.value = preparationSteps.value.length;
-    preparationTimers.push(globalThis.setTimeout(() => emit('preparation-complete'), 600));
-  }, Math.max(0, 3_800 - elapsed)));
-}
-
-function preparationStepClass(index: number): string {
-  if (preparationStep.value > index) return 'is-complete';
-  if (preparationStep.value === index) return 'is-active';
-  return 'is-pending';
-}
-
 function resetPreparation(clearSelection = true): void {
-  clearPreparationTimers();
   preparationVisible.value = false;
-  preparationStep.value = 0;
-  preparationStartedAt = null;
-  preparationCompletionScheduled = false;
   if (clearSelection) preparationSelection.value = null;
-}
-
-function clearPreparationTimers(): void {
-  preparationTimers.splice(0).forEach((timer) => globalThis.clearTimeout(timer));
 }
 </script>
 
@@ -322,16 +242,6 @@ function clearPreparationTimers(): void {
   :global(.repository-session-source-dialog.el-dialog) {
     transition-duration: 1ms;
   }
-
-  .repository-session-source-dialog__operation-state li {
-    transition-duration: 1ms;
-  }
-
-  .repository-session-source-dialog__operation-state li.is-active
-    .repository-session-source-dialog__step-marker svg {
-    animation-duration: 1ms;
-  }
-
 }
 
 .repository-session-source-dialog__search-row {
@@ -477,140 +387,6 @@ function clearPreparationTimers(): void {
   .repository-session-source-dialog__results {
   min-height: 0;
   padding: var(--space-6);
-}
-
-.repository-session-source-dialog__operation-state {
-  min-height: 280px;
-  display: grid;
-  align-content: center;
-  gap: var(--space-8);
-  padding: var(--space-8);
-}
-
-.repository-session-source-dialog__operation-heading {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-}
-
-.repository-session-source-dialog__operation-heading > div {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-1);
-}
-
-.repository-session-source-dialog__operation-heading > div > span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.repository-session-source-dialog__operation-heading strong {
-  font-size: var(--font-size-16);
-  line-height: var(--line-height-22);
-}
-
-.repository-session-source-dialog__operation-icon {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-xl);
-  color: var(--color-primary);
-  background: var(--color-primary-container);
-}
-
-.repository-session-source-dialog__operation-icon svg {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
-.repository-session-source-dialog__operation-state[data-state='success']
-  .repository-session-source-dialog__operation-icon {
-  color: var(--color-success);
-  background: var(--color-success-container);
-}
-
-.repository-session-source-dialog__operation-state ol {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.repository-session-source-dialog__operation-state li {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-4);
-  min-height: 52px;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  transition: opacity 180ms ease, background-color 180ms ease;
-}
-
-.repository-session-source-dialog__operation-state li.is-active {
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-}
-
-.repository-session-source-dialog__operation-state li.is-pending {
-  opacity: 0.42;
-}
-
-.repository-session-source-dialog__operation-state li > div {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-1);
-}
-
-.repository-session-source-dialog__operation-state li strong,
-.repository-session-source-dialog__operation-state li small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.repository-session-source-dialog__operation-state li strong {
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
-}
-
-.repository-session-source-dialog__operation-state li small {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-}
-
-.repository-session-source-dialog__step-marker {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  color: var(--color-primary);
-}
-
-.repository-session-source-dialog__step-marker svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.repository-session-source-dialog__step-marker > span {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-text-muted);
-}
-
-.repository-session-source-dialog__operation-state li.is-active
-  .repository-session-source-dialog__step-marker svg {
-  animation: repository-session-source-dialog-spin 0.9s linear infinite;
-}
-
-@keyframes repository-session-source-dialog-spin {
-  to { transform: rotate(360deg); }
 }
 
 .repository-session-source-dialog__results h3 {

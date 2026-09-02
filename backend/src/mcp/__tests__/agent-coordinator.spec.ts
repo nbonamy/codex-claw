@@ -281,6 +281,7 @@ describe('ClawMcpAgentCoordinator', () => {
       createWorktree: true,
       branchName: ' coverage ',
       destinationPath: ' /src/claw-coverage ',
+      prompt: ' Fix the flaky test. ',
     });
     expect(onCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
       repoPath: '/src/claw',
@@ -289,6 +290,7 @@ describe('ClawMcpAgentCoordinator', () => {
       createWorktree: true,
       branchName: 'coverage',
       destinationPath: '/src/claw-coverage',
+      prompt: 'Fix the flaky test.',
       teamId: 'team-codex-claw',
     });
   });

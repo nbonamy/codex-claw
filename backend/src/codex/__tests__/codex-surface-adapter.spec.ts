@@ -1260,7 +1260,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         messageId: 'message-future',
         toolPart: {
           type: 'tool', id: 'future-tool', kind: 'futureSdkTool', title: 'Future tool', status: 'completed',
-          input: { path: '/tmp/input.txt' }, output: { result: 'done' }, metadata: { cwd: '/workspace' },
+          input: { path: '/tmp/input.txt' }, output: { result: 'done', agentName: 'feature/contracts', private: 'omit' }, metadata: { cwd: '/workspace' },
         },
       },
     });
@@ -1271,7 +1271,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         messageId: 'message-future',
         toolPart: expect.objectContaining({
           id: 'future-tool', kind: 'futureSdkTool',
-          input: { path: '/tmp/input.txt' }, output: { result: 'done' }, metadata: { cwd: '/workspace' },
+          input: { path: '/tmp/input.txt' }, output: { result: 'done', agentName: 'feature/contracts' }, metadata: { cwd: '/workspace' },
         }),
       }),
     }));

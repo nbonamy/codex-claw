@@ -3,6 +3,7 @@ import { translate } from './i18n';
 import { localizedText } from './i18n/errors';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { AgentCreationProgress } from '@codex-claw/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -63,6 +64,7 @@ const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
+const agentCreationProgress = ref<AgentCreationProgress | null>(null);
 const unreadAgentIdSet = ref(new Set<string>());
 const rendererWindowFocused = ref(true);
 const hydratingAgentHistoryIds = ref(new Set<string>());
@@ -248,6 +250,7 @@ export function useAppState() {
 
     resetCatalogStateIfSourceChanged(codexClawApi);
     unreadAgentIdSet.value = new Set();
+    agentCreationProgress.value = null;
     syncDockBadge();
 
     isLoading.value = true;
@@ -1742,6 +1745,7 @@ export function useAppState() {
     daemonStatusError,
     codexResourceSharingStatus,
     backendRestartInProgress,
+    agentCreationProgress,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendPlugins: loadBackendPluginsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
@@ -1848,6 +1852,7 @@ export function useAppState() {
     sendPrompt,
     sendAgentPrompt,
     steerPrompt,
+    clearAgentCreationProgress,
     interruptActiveAgent,
     deleteMessage,
     editMessage,
@@ -1858,6 +1863,10 @@ export function useAppState() {
     quit,
     restartApp,
   };
+}
+
+function clearAgentCreationProgress(id: string): void {
+  if (agentCreationProgress.value?.id === id) agentCreationProgress.value = null;
 }
 
 function emptyComposerState(): CodexComposerState {
@@ -2270,6 +2279,7 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   syncComposerModeFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
   syncCelebrationFromMainEvent(event);
+  syncAgentCreationProgressFromMainEvent(event);
   syncFileActivityFromMainEvent(event);
   syncHistoryPageStateFromMainEvent(event);
   if (event.type === 'skills.changed') {
@@ -2286,6 +2296,15 @@ function syncCelebrationFromMainEvent(event: MainToRendererEvent): void {
   const kind = event.payload.kind;
   if (kind !== 'confetti' && kind !== 'stars' && kind !== 'shapes' && kind !== 'schoolPride') return;
   useConfetti().celebrate({ kind });
+}
+
+function syncAgentCreationProgressFromMainEvent(event: MainToRendererEvent): void {
+  if (event.type !== 'agentCreation.progress' || !isAgentCreationProgress(event.payload)) return;
+  if (event.payload.state === 'running') {
+    if (event.agentId === snapshot.value.activeAgentId) agentCreationProgress.value = event.payload;
+    return;
+  }
+  if (agentCreationProgress.value?.id === event.payload.id) agentCreationProgress.value = event.payload;
 }
 
 function recoverRendererAfterBackendConnection(): Promise<void> {
@@ -3090,6 +3109,20 @@ function markClientRequestAnswered(requestId: string): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isAgentCreationProgress(value: unknown): value is AgentCreationProgress {
+  if (!isRecord(value)) return false;
+  return typeof value.id === 'string' &&
+    (value.state === 'running' || value.state === 'success' || value.state === 'error') &&
+    (value.backend === 'codex' || value.backend === 'claude') &&
+    typeof value.repositoryName === 'string' &&
+    typeof value.createWorktree === 'boolean' &&
+    typeof value.hasPrompt === 'boolean' &&
+    (value.branchName === undefined || typeof value.branchName === 'string') &&
+    (value.agentId === undefined || typeof value.agentId === 'string') &&
+    (value.agentName === undefined || typeof value.agentName === 'string') &&
+    (value.error === undefined || typeof value.error === 'string');
 }
 
 function workProviderConnection(provider: WorkProviderKind) {

@@ -21,6 +21,7 @@ import { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
 import { initializeCodexResourceSharing } from './codex-resource-sharing';
 import { loadPluginStatus } from './plugin-status';
+import { AgentGitService } from './git/agent-git-service';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -51,6 +52,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     computerUseEnabled: computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
     chromeEnabled: pluginStatus.chromeEnabled,
   });
+  const agentGitService = new AgentGitService();
   const mcpService = new ClawMcpService({
     snapshot,
     computerUse: computerUseAvailable ? {
@@ -64,6 +66,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       open: (input) => options.requestClient(backendMethods.clientBrowserOpen, input),
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
     } : undefined,
+    resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
   });
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
@@ -123,6 +126,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   server = new ClawBackendServer({
     version: options.version,
     snapshot,
+    agentGitService,
     driverRpc,
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),

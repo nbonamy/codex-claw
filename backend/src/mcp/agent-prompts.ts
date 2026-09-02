@@ -63,6 +63,7 @@ export function codexClawDeveloperInstructions(agent: Agent, settings: AppPlugin
     'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
     'MANDATORY: before starting substantive work, changing direction, or finishing substantive work, call set-status with a short status. Use an empty status to clear it. Do not change status for informational teammate messages or coordination closure.',
     `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
+    'When the user asks you to delegate work into an isolated checkout, call create-agent with the repository path, createWorktree, a branch name, and a self-contained initial prompt. Use your folder for the current repository or list-repos for another configured repository. Do not create a worktree separately first.',
     'Use display-markdown to show Markdown files or generated Markdown in the Codex Claw side panel when the user should inspect structured content.',
     browserInstructions,
   ];

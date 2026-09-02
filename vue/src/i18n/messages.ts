@@ -332,6 +332,17 @@ export const messages = {
         sharedFolder: 'This folder is also used by {agents}. Delegate to a worktree instead.',
       },
     },
+    agentCreationProgress: {
+      eyebrow: 'Delegating work',
+      buildingIsolatedHome: 'Building an isolated home in {repository}…',
+      creatingAgent: 'Creating an agent in {repository}…',
+      ready: '{agent} is ready',
+      failed: 'Couldn’t create the agent',
+      useRepository: 'Using repository',
+      newSession: 'New {backend} session',
+      handOverInstructions: 'Handing over initial instructions',
+      finishSetup: 'Finishing agent setup',
+    },
     identityPicker: {
       change: 'Change identity',
       chooseImage: 'Choose identity image',

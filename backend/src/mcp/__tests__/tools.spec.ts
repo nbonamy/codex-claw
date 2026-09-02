@@ -111,6 +111,7 @@ describe('Codex Claw MCP tool registration', () => {
       'createWorktree',
       'branchName',
       'destinationPath',
+      'prompt',
     ]);
   });
 
@@ -173,6 +174,7 @@ describe('Codex Claw MCP tool registration', () => {
       createWorktree: true,
       branchName: 'tests',
       destinationPath: '/src/claw-tests',
+      prompt: 'Run the focused tests and fix the failure.',
     };
     await handlers.get('create-agent')?.(agentInput);
     expect(coordinator.createAgent).toHaveBeenCalledWith('agent-dina', agentInput);

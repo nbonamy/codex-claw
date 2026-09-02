@@ -1560,7 +1560,7 @@ const toolInputPresentationKeys = new Set([
 ]);
 
 const toolOutputPresentationKeys = new Set([
-  'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'prompt',
+  'agentName', 'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'prompt',
   'recipientName', 'result', 'structuredContent', 'url',
 ]);
 

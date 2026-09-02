@@ -9,6 +9,7 @@ import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
   Agent,
+  AgentWorkspaceIdentity,
   AppSnapshot,
   BackendConversationRef,
   CelebrationKind,
@@ -26,12 +27,12 @@ import type {
 } from '@codex-claw/core/contracts';
 import { closeAgentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
-import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
+import { createAgentInSnapshot, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -46,6 +47,7 @@ export type ClawMcpServiceOptions = {
   computerUse?: ComputerUseClient;
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
+  resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
 };
 
 export class ClawMcpService {
@@ -54,6 +56,7 @@ export class ClawMcpService {
   private readonly server: ClawMcpHttpServer;
   private readonly computerUseEnabled: () => boolean;
   private readonly now: () => Date;
+  private readonly resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
@@ -63,6 +66,7 @@ export class ClawMcpService {
     this.snapshot = options.snapshot;
     this.now = options.now ?? (() => new Date());
     this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
+    this.resolveWorkspaceIdentity = options.resolveWorkspaceIdentity;
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => this.snapshot.agents,
@@ -429,57 +433,115 @@ export class ClawMcpService {
 
   private async createAgentFromMcp(
     caller: Agent,
-    input: {
-      backend?: Agent['backend'];
-      branchName?: string;
-      createWorktree?: boolean;
-      destinationPath?: string;
-      name?: string;
-      repoPath: string;
-      teamId?: string;
-    },
-  ): Promise<{ success: boolean; agentId?: string; message: string }> {
+    input: McpCreateAgentInput & { teamId?: string },
+  ): Promise<McpCreateAgentResponse> {
     const repoPath = input.repoPath.trim();
     if (!repoPath) {
       return { success: false, message: 'repoPath is required' };
     }
-
-    let folder = repoPath;
-    if (input.createWorktree) {
-      const branchName = input.branchName?.trim();
-      if (!branchName) {
-        return { success: false, message: 'branchName is required when createWorktree is true' };
-      }
-      folder = (await this.createSourceWorktree({
-        repoPath,
-        branchName,
-        ...(input.destinationPath?.trim() ? { destinationPath: input.destinationPath.trim() } : {}),
-      })).path;
+    const branchName = input.branchName?.trim();
+    if (input.createWorktree && !branchName) {
+      return { success: false, message: 'branchName is required when createWorktree is true' };
     }
 
-    const createInput: CreateAgentInput = {
-      name: input.name?.trim() || null,
-      folder,
+    const prompt = input.prompt?.trim() ?? '';
+    const progressId = `agent-creation-${randomUUID()}`;
+    const progress = {
+      id: progressId,
       backend: input.backend ?? 'codex',
-      teamId: input.teamId ?? caller.teamId,
+      repositoryName: fileBasename(repoPath),
+      createWorktree: input.createWorktree === true,
+      ...(branchName ? { branchName } : {}),
+      hasPrompt: Boolean(prompt),
     };
-    const previousAgentIds = new Set(this.snapshot.agents.map((agent) => agent.id));
-    createAgentInSnapshot(this.snapshot, createInput);
-    const createdAgent = this.snapshot.agents.find((agent) => !previousAgentIds.has(agent.id));
-    if (!createdAgent) {
-      return { success: false, message: 'Agent could not be created.' };
-    }
-
     this.emit({
-      agentId: createdAgent.id,
-      type: 'snapshot.updated',
-      payload: this.snapshot,
+      agentId: caller.id,
+      type: 'agentCreation.progress',
+      payload: { ...progress, state: 'running' },
     });
-    return {
-      success: true,
-      agentId: createdAgent.id,
-      message: `Created agent ${agentDisplayName(createdAgent)}.`,
-    };
+
+    try {
+      let folder = repoPath;
+      if (input.createWorktree) {
+        folder = (await this.createSourceWorktree({
+          repoPath,
+          branchName: branchName!,
+          ...(input.destinationPath?.trim() ? { destinationPath: input.destinationPath.trim() } : {}),
+        })).path;
+      }
+
+      const createInput: CreateAgentInput = {
+        name: input.name?.trim() || null,
+        folder,
+        backend: input.backend ?? 'codex',
+        teamId: input.teamId ?? caller.teamId,
+      };
+      const previousAgentIds = new Set(this.snapshot.agents.map((agent) => agent.id));
+      createAgentInSnapshot(this.snapshot, createInput, undefined, undefined, { select: false });
+      const createdAgent = this.snapshot.agents.find((agent) => !previousAgentIds.has(agent.id));
+      if (!createdAgent) {
+        throw new Error('Agent could not be created.');
+      }
+      if (this.resolveWorkspaceIdentity) {
+        const workspace = await this.resolveWorkspaceIdentity(folder);
+        updateAgentWorkspace(this.snapshot, createdAgent.id, workspace, workspace.updatedAt);
+      }
+
+      this.emitSnapshotUpdated(createdAgent.id);
+      if (prompt) {
+        await this.startAgentWithPrompt(createdAgent, prompt);
+      }
+
+      const createdAgentName = agentDisplayName(createdAgent);
+      this.emit({
+        agentId: caller.id,
+        type: 'agentCreation.progress',
+        payload: {
+          ...progress,
+          state: 'success',
+          agentId: createdAgent.id,
+          agentName: createdAgentName,
+        },
+      });
+      return {
+        success: true,
+        agentId: createdAgent.id,
+        agentName: createdAgentName,
+        folder,
+        ...(branchName ? { branchName } : {}),
+        promptSubmitted: Boolean(prompt),
+        message: prompt
+          ? `Created agent ${createdAgentName} and started its initial prompt.`
+          : `Created agent ${createdAgentName}.`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.emit({
+        agentId: caller.id,
+        type: 'agentCreation.progress',
+        payload: { ...progress, state: 'error', error: message },
+      });
+      throw error;
+    }
+  }
+
+  private startAgentWithPrompt(agent: Agent, prompt: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      sendAgentPrompt(
+        this.snapshot,
+        this.backendDriverForAgent(agent),
+        agent.id,
+        prompt,
+        undefined,
+        (event) => this.emit(event),
+        {
+          onBackendSessionUpdated: () => this.emitSnapshotUpdated(agent.id),
+          onPromptFailed: reject,
+          onPromptStarted: () => resolve(),
+        },
+      );
+      this.emitSnapshotUpdated(agent.id);
+    });
   }
 
   private prepareWorkForAgent(agent: Agent, input: PrepareWorkInput): Promise<PrepareWorkResponse> {

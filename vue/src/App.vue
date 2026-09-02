@@ -178,6 +178,10 @@
     @cancel="cancelWorkRouting"
     @respond="respondToWorkRouting"
   />
+  <AgentCreationProgressDialog
+    :progress="agentCreationProgress"
+    @close="clearAgentCreationProgress"
+  />
   <ConfettiOverlay />
   <Transition name="backend-restart-overlay">
     <div
@@ -205,6 +209,7 @@ import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, WorkRoutingMode } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
+import AgentCreationProgressDialog from './components/AgentCreationProgressDialog.vue';
 import WorkRoutingDialog from './components/WorkRoutingDialog.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
@@ -260,6 +265,7 @@ const {
   daemonStatusError,
   codexResourceSharingStatus,
   backendRestartInProgress,
+  agentCreationProgress,
   sourceRepositories,
   openInApplications,
   loadBackendModels,
@@ -289,6 +295,7 @@ const {
   loadOpenInApplications,
   openAgentPath,
   createAgent,
+  clearAgentCreationProgress,
   createQuickChat,
   createTeam,
   updateTeam,

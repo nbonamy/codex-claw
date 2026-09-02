@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   schedulerOptions: [] as unknown[],
   remoteOptions: [] as unknown[],
   workIntegrationOptions: [] as unknown[],
+  agentGitServices: [] as Array<{ identity: ReturnType<typeof vi.fn> }>,
   sendAgentPrompt: vi.fn(),
   updateAutomationConversation: vi.fn(),
   loadBackendSnapshot: vi.fn(),
@@ -150,9 +151,20 @@ vi.mock('../runtime-config', () => ({
 
 vi.mock('../log', () => ({ warnMain: mocks.warnMain }));
 
+vi.mock('../git/agent-git-service', () => ({
+  AgentGitService: class {
+    identity = vi.fn().mockResolvedValue({ kind: 'folder', folder: '/src/claw', label: 'claw', updatedAt: '2026-09-02T00:00:00.000Z' });
+
+    constructor() {
+      mocks.agentGitServices.push(this);
+    }
+  },
+}));
+
 import { createClawdRuntime } from '../runtime';
 
 type McpOptions = {
+  resolveWorkspaceIdentity(folder: string): Promise<unknown>;
   computerUse?: {
     execute(input: unknown): Promise<unknown>;
     requestAccessibility(): Promise<unknown>;
@@ -166,6 +178,7 @@ type McpOptions = {
 };
 
 type ServerOptions = {
+  agentGitService: unknown;
   version: string;
   inspectPluginStatus(): Promise<{ chromeEnabled: boolean }>;
   onEvent(event: unknown): void;
@@ -213,6 +226,7 @@ describe('clawd runtime', () => {
     mocks.schedulerOptions.length = 0;
     mocks.remoteOptions.length = 0;
     mocks.workIntegrationOptions.length = 0;
+    mocks.agentGitServices.length = 0;
     mocks.snapshot.general = {};
     mocks.drivers.clear();
     mocks.drivers.set('codex', driver);
@@ -250,6 +264,8 @@ describe('clawd runtime', () => {
     expect(mocks.mcpSetEventSink).toHaveBeenCalledOnce();
 
     const mcp = mocks.mcpOptions[0] as McpOptions;
+    await mcp.resolveWorkspaceIdentity('/src/claw');
+    expect(mocks.agentGitServices[0]?.identity).toHaveBeenCalledWith('/src/claw');
     await mcp.computerUse!.execute({ command: 'click' });
     await mcp.computerUse!.requestAccessibility();
     await mcp.computerUse!.status();
@@ -266,6 +282,7 @@ describe('clawd runtime', () => {
     ]);
 
     const server = mocks.serverOptions[0] as ServerOptions;
+    expect(server.agentGitService).toBe(mocks.agentGitServices[0]);
     expect(server.version).toBe('1.2.3');
     server.onEvent({ type: 'test' });
     expect(emitEvent).toHaveBeenCalledWith({ type: 'test' });

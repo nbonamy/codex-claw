@@ -331,6 +331,27 @@ Input:
 Effects are the same as `send-message`, repeated for each connected recipient.
 Visible agents without an active MCP session are skipped internally.
 
+### `create-agent`
+
+Creates an agent in the caller's team without selecting it. The tool can also
+create an isolated worktree and start the agent with initial instructions as
+one backend-owned operation.
+
+Input:
+
+- `repoPath`: repository or existing worktree folder;
+- `createWorktree`: optionally create an isolated worktree from `repoPath`;
+- `branchName`: required when creating a worktree;
+- `destinationPath`: optional worktree destination;
+- `backend` and `name`: optional agent configuration;
+- `prompt`: optional self-contained initial instructions. The tool stays
+  pending until the new agent accepts this prompt.
+
+`clawd` emits transient `agentCreation.progress` events around worktree
+creation, agent creation, and initial-prompt handoff. The renderer shows the
+staged preparation dialog only when the calling agent is still active, so
+background delegation never interrupts an unrelated conversation.
+
 ### `display-markdown`
 
 Displays Markdown in Codex Claw's right side panel.

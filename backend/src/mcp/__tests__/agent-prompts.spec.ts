@@ -63,6 +63,7 @@ describe('agent prompts', () => {
     expect(instructions).toContain('your folder is /src/codex-claw');
     expect(instructions).toContain('computer-use-guide');
     expect(instructions).toContain('chrome:control-chrome');
+    expect(instructions).toContain('call create-agent with the repository path, createWorktree, a branch name, and a self-contained initial prompt');
   });
 
   it('does not advertise disabled host plugins by default', () => {

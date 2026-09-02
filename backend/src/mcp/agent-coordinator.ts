@@ -89,12 +89,17 @@ export type McpCreateAgentInput = {
   createWorktree?: boolean;
   destinationPath?: string;
   name?: string;
+  prompt?: string;
   repoPath: string;
 };
 
 export type McpCreateAgentResponse = {
   success: boolean;
   agentId?: string;
+  agentName?: string;
+  branchName?: string;
+  folder?: string;
+  promptSubmitted?: boolean;
   message: string;
 };
 
@@ -329,6 +334,7 @@ export class ClawMcpAgentCoordinator {
 
     return this.onCreateAgent(agent, {
       name: input.name?.trim(),
+      prompt: input.prompt?.trim() || undefined,
       backend: input.backend ?? 'codex',
       repoPath: input.repoPath.trim(),
       createWorktree: input.createWorktree,

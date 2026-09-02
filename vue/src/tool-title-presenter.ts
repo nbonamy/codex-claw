@@ -122,7 +122,7 @@ function toolTarget(
         : tool === 'celebrate'
           ? [celebrationKind(args.kind), celebrationKind(resultString(result, 'kind'))]
           : tool === 'create-agent'
-            ? [args.name, args.repoPath]
+            ? [phase === 'completed' ? resultString(result, 'agentName') : undefined, args.name, args.branchName, args.repoPath]
             : tool === 'create-worktree'
               ? [args.branchName, args.destinationPath]
               : tool === 'list-worktrees'

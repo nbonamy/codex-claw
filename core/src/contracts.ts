@@ -1356,6 +1356,7 @@ export type MainToRendererEvent = {
     | 'sidePanel.markdownRequested'
     | 'sidePanel.gitDiffRequested'
     | 'celebration.requested'
+    | 'agentCreation.progress'
     | 'message.delta'
     | 'message.updated'
     | 'item.started'
@@ -1378,6 +1379,19 @@ export type MainToRendererEvent = {
 };
 
 export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
+
+export type AgentCreationProgress = {
+  id: string;
+  state: 'running' | 'success' | 'error';
+  backend: AgentBackend;
+  repositoryName: string;
+  createWorktree: boolean;
+  branchName?: string;
+  hasPrompt: boolean;
+  agentId?: string;
+  agentName?: string;
+  error?: string;
+};
 
 export type AppCommand =
   | {

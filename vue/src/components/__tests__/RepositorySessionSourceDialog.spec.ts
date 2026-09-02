@@ -139,26 +139,26 @@ describe('RepositorySessionSourceDialog', () => {
     await wrapper.get('.claw-button--primary').trigger('click');
     await wrapper.setProps({ assignmentState: 'running' });
 
-    expect(wrapper.get('.repository-session-source-dialog__operation-heading').text())
+    expect(wrapper.get('.staged-operation-progress__heading').text())
       .toContain('Building an isolated home for #24');
-    const firstStep = wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text();
+    const firstStep = wrapper.get('.staged-operation-progress li.is-active').text();
     expect(firstStep).toContain('Creating isolated worktree');
     expect(firstStep).toContain('fix/gh-24');
 
     vi.advanceTimersByTime(1_200);
     await nextTick();
-    expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
+    expect(wrapper.get('.staged-operation-progress li.is-active').text())
       .toContain('Starting agent session');
 
     await wrapper.setProps({ assignmentState: 'success' });
     vi.advanceTimersByTime(1_600);
     await nextTick();
-    expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
+    expect(wrapper.get('.staged-operation-progress li.is-active').text())
       .toContain('Handing over work context');
 
     vi.advanceTimersByTime(1_600);
     await nextTick();
-    expect(wrapper.get('.repository-session-source-dialog__operation-heading').text())
+    expect(wrapper.get('.staged-operation-progress__heading').text())
       .toContain('Work on #24 is ready');
     expect(wrapper.emitted('preparation-complete')).toHaveLength(1);
   });

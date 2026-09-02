@@ -3,6 +3,7 @@ import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { Agent, AppSnapshot, Automation } from '@codex-claw/core/contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { ClawMcpService } from '../service';
 
@@ -446,6 +447,77 @@ describe('ClawMcpService', () => {
       message: 'Created agent branch-agent.',
     });
     expect(snapshot.agents.at(-1)).toMatchObject({ name: null, folder: '/tmp/branch-agent' });
+  });
+
+  it('creates a background agent and starts its initial prompt as one MCP operation', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: any[] = [];
+    const sendPrompt = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-delegated' },
+      turnId: 'turn-delegated',
+    });
+    const resolveWorkspaceIdentity = vi.fn().mockResolvedValue({
+      kind: 'git',
+      folder: '/tmp/codex-sdk-feature',
+      repositoryName: 'codex-sdk',
+      repositoryRoot: '/tmp/codex-sdk-feature',
+      branch: 'feature/delegated-work',
+      isLinkedWorktree: true,
+      primaryWorktreeRoot: '/tmp/codex-sdk',
+      updatedAt: '2026-09-02T14:00:00.000Z',
+    });
+    service = new ClawMcpService({
+      snapshot,
+      onEvent: (event) => events.push(event),
+      resolveWorkspaceIdentity,
+    });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
+    const url = await service.start();
+
+    const response = await callTool(url, 'agent-dina', 'create-agent', {
+      repoPath: '/tmp/codex-sdk-feature',
+      name: 'SDK worker',
+      prompt: 'Implement the SDK contract and run focused tests.',
+    });
+
+    const createdAgent = snapshot.agents.find((agent) => agent.name === 'SDK worker');
+    expect(createdAgent).toBeDefined();
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+    expect(sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: createdAgent!.id }),
+      'Implement the SDK contract and run focused tests.',
+      undefined,
+    );
+    expect(response.result.structuredContent).toMatchObject({
+      success: true,
+      agentId: createdAgent!.id,
+      agentName: 'SDK worker',
+      folder: '/tmp/codex-sdk-feature',
+      promptSubmitted: true,
+      message: 'Created agent SDK worker and started its initial prompt.',
+    });
+    expect(events.filter((event) => event.type === 'agentCreation.progress')).toEqual([
+      expect.objectContaining({
+        agentId: 'agent-dina',
+        payload: expect.objectContaining({ state: 'running', repositoryName: 'codex-sdk-feature', hasPrompt: true }),
+      }),
+      expect.objectContaining({
+        agentId: 'agent-dina',
+        payload: expect.objectContaining({ state: 'success', agentId: createdAgent!.id, agentName: 'SDK worker' }),
+      }),
+    ]);
+    expect(resolveWorkspaceIdentity).toHaveBeenCalledWith('/tmp/codex-sdk-feature');
+    const sidebar = projectWorkspaceSidebar({
+      agents: snapshot.agents,
+      activeAgentId: snapshot.activeAgentId,
+      quickChatsLabel: 'Chats',
+    });
+    expect(sidebar.find((group) => group.id === 'git:/tmp/codex-sdk')?.sessions).toContainEqual(
+      expect.objectContaining({ agentId: createdAgent!.id }),
+    );
+    expect(sidebar.find((group) => group.kind === 'quickChats')?.sessions).not.toContainEqual(
+      expect.objectContaining({ agentId: createdAgent!.id }),
+    );
   });
 
   it('does not emit celebration events when the user disabled them', async () => {

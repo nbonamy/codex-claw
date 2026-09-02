@@ -167,12 +167,11 @@ different explanatory copy, or offer isolation as part of the action itself.
 
 ### Model-created agents
 
-The `create-agent` MCP tool can create an agent in an existing folder. A
-renderer-only warning would leave this path inconsistent. Options include an
-app-owned confirmation request, a structured result requiring explicit retry,
-or requiring the model to create a worktree when the target checkout is in
-use. A model must not be able to bypass a user safety preference merely because
-creation began through MCP.
+The `create-agent` MCP tool can atomically create an isolated worktree, create
+an unselected agent, and start it with a self-contained initial prompt. It can
+also create an agent in an existing folder, so a renderer-only shared-checkout
+warning would still leave this path inconsistent. A model must not be able to
+bypass a user safety preference merely because creation began through MCP.
 
 ### Automations
 

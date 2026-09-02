@@ -4456,6 +4456,61 @@ describe('useAppState', () => {
     expect(state.visibleMessages.value).toHaveLength(messageCount);
   });
 
+  it('shows MCP agent creation progress only for the active caller until dismissed', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    const progress = {
+      id: 'agent-creation-1',
+      state: 'running' as const,
+      backend: 'codex' as const,
+      repositoryName: 'codex-app-sdk',
+      createWorktree: true,
+      branchName: 'feature/contracts',
+      hasPrompt: true,
+    };
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-jesse',
+      type: 'agentCreation.progress',
+      payload: { ...progress, id: 'ignored' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    expect(state.agentCreationProgress.value).toBeNull();
+
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'agentCreation.progress',
+      payload: progress,
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    expect(state.agentCreationProgress.value).toStrictEqual(progress);
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'agentCreation.progress',
+      payload: { ...progress, state: 'success', agentId: 'agent-worker', agentName: 'feature/contracts' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    expect(state.agentCreationProgress.value).toMatchObject({ state: 'success', agentName: 'feature/contracts' });
+
+    state.clearAgentCreationProgress('agent-creation-1');
+    expect(state.agentCreationProgress.value).toBeNull();
+  });
+
   it('ignores celebration events when the user disabled them', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();

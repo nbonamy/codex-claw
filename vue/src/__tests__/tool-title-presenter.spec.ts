@@ -41,6 +41,19 @@ describe('Claw tool title presenter', () => {
     })).toBe('Sent message to Computer Use');
   });
 
+  it('uses the created agent name after delegation completes', () => {
+    const creation = context('codex_claw.create-agent', {
+      repoPath: '/src/codex-app-sdk',
+      branchName: 'feature/contracts',
+    }, 'completed');
+    creation.toolCall = {
+      ...creation.toolCall,
+      result: { agentName: 'feature/contracts' },
+    };
+
+    expect(presentClawToolTitle(creation)).toBe('Created agent feature/contracts');
+  });
+
   it('uses the loaded agent name while sending by agent id', () => {
     expect(presentClawToolTitle(
       context('codex_claw.send-message', { to: 'agent-uuid' }, 'running'),
