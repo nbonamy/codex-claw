@@ -593,34 +593,4 @@ describe('AppShell navigation and teams', () => {
     expect(loadGlobalWorkItems).toHaveBeenCalledTimes(2);
     expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [first], page: 1, totalItems: 26 });
   });
-
-  it('opens agent creation with the repository selected from the Cockpit sidebar', async () => {
-    const snapshot = createInitialSnapshot();
-    const repository: WorkRepository = {
-      provider: 'github',
-      id: 'nbonamy/mediastation',
-      owner: 'nbonamy',
-      name: 'mediastation',
-      fullName: 'nbonamy/mediastation',
-      url: 'https://github.com/nbonamy/mediastation',
-      isPrivate: true,
-    };
-    const wrapper = mountShell({
-      snapshot,
-      sourceRepositories: [{
-        name: 'mediastation',
-        path: '/Users/nbonamy/src/mediastation',
-        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/mediastation' }],
-      }],
-      workRepositoriesByProvider: { github: [repository] },
-    });
-
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('add-agent-for-repository', repository);
-    await flushPromises();
-
-    const dialog = wrapper.findComponent({ name: 'AgentDialog' });
-    expect(dialog.props('initialSourceRepositoryName')).toBe('mediastation');
-    expect(dialog.findAllComponents({ name: 'ElSelect' })[0]?.props('modelValue')).toBe('/Users/nbonamy/src/mediastation');
-  });
 });

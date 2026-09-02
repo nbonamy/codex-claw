@@ -45,7 +45,7 @@ describe('CockpitView', () => {
     expect(wrapper.findComponent(CockpitWorkInbox).props('searchQuery')).toBe('operator');
   });
 
-  it('sorts repositories by recent activity or name, filters the backlog, and launches an agent', async () => {
+  it('sorts repositories by recent activity or name, filters the backlog, and links to GitHub', async () => {
     const snapshot = createInitialSnapshot();
     const repositories = [
       repository('older', '2026-08-14T00:00:00.000Z', '2026-08-10T00:00:00.000Z'),
@@ -73,12 +73,16 @@ describe('CockpitView', () => {
 
     await wrapper.findAll('.cockpit-view__repositories > div')[1]!.findAll('button')[0]!.trigger('click');
 
-    const launchButton = wrapper.findAll('.cockpit-view__repositories > div')[1]!.findAll('button')[1]!;
-    expect(launchButton.attributes('aria-label')).toBe('Start agent in recent');
-    await launchButton.trigger('click');
+    const repositoryLink = wrapper.findAll('.cockpit-view__repositories > div')[1]!.get('a');
+    expect(repositoryLink.attributes()).toMatchObject({
+      'aria-label': 'Open recent on GitHub',
+      href: 'https://github.com/nbonamy/recent',
+      rel: 'noreferrer',
+      target: '_blank',
+    });
 
     expect(wrapper.emitted('select-work-repository')).toStrictEqual([['nbonamy/recent']]);
-    expect(wrapper.emitted('add-agent-for-repository')).toStrictEqual([[repositories[1]]]);
+    expect(wrapper.findAll('.cockpit-view__repositories > div')[1]!.findAll('button')).toHaveLength(1);
   });
 
   it('shows every repository instead of truncating the navigation list', () => {

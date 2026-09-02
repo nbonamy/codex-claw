@@ -67,15 +67,17 @@
               <IconFolder aria-hidden="true" />
               <span>{{ repository.name }}</span>
             </button>
-            <button
-              class="cockpit-view__repository-launch"
-              type="button"
-              :aria-label="$t('dynamic.cockpit.startAgent', { repository: repository.name })"
-              :title="$t('dynamic.cockpit.startAgent', { repository: repository.name })"
-              @click="emit('add-agent-for-repository', repository)"
+            <a
+              class="cockpit-view__repository-link"
+              :href="repository.url"
+              target="_blank"
+              rel="noreferrer"
+              :aria-label="$t('dynamic.cockpit.openRepository', { repository: repository.name })"
+              :title="$t('dynamic.cockpit.openRepository', { repository: repository.name })"
+              @click.stop
             >
-              <PlayerPlayIcon aria-hidden="true" />
-            </button>
+              <ExternalLinkIcon aria-hidden="true" />
+            </a>
           </div>
         </div>
 
@@ -172,7 +174,7 @@ import { computed, ref } from 'vue';
 import { IconChevronDown, IconFolder, IconSearch, IconUser } from '@tabler/icons-vue';
 import type { Agent, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { BacklogIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
+import { BacklogIcon, ExternalLinkIcon } from '../shared/icons/app-icons';
 import CockpitAgentsView from './CockpitAgentsView.vue';
 import CockpitWorkInbox from './CockpitWorkInbox.vue';
 
@@ -218,7 +220,6 @@ const startWorkItemsAction = props.startWorkItemsAction;
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];
-  'add-agent-for-repository': [repository: WorkRepository];
   'assign-work-item-to-bench-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
@@ -559,38 +560,29 @@ function selectWorkView(view: InboxView): void {
   color: var(--color-primary);
 }
 
-.cockpit-view__repository-launch {
+.cockpit-view__repository-link {
   width: 26px;
   height: 26px;
   flex: 0 0 26px;
   display: grid;
   place-items: center;
   margin-right: var(--space-3);
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0;
   color: var(--color-text-muted);
-  background: var(--color-surface);
-  cursor: pointer;
   opacity: 0;
 }
 
-.cockpit-view__repositories > div:hover .cockpit-view__repository-launch,
-.cockpit-view__repository-launch:focus-visible {
+.cockpit-view__repositories > div:hover .cockpit-view__repository-link,
+.cockpit-view__repository-link:focus-visible {
   opacity: 1;
 }
 
-.cockpit-view__repository-launch:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--color-primary) 45%,
-    var(--color-border)
-  );
+.cockpit-view__repository-link:hover {
   color: var(--color-primary);
   background: var(--color-primary-container);
 }
 
-.cockpit-view__repository-launch svg {
+.cockpit-view__repository-link svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
 }

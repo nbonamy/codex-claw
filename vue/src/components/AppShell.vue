@@ -187,7 +187,6 @@
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
         @add-agent="openNewAgent"
-        @add-agent-for-repository="openNewAgentForRepository"
         @assign-work-item-to-bench-agent="openBenchAgentAssignmentDialog"
         @assign-work-item-to-new-agent="openNewAgentForWorkItem"
         @assign-work-item="assignExistingAgentWorkItem"
@@ -2340,10 +2339,6 @@ async function cloneRepositoryAndOpen(url: string): Promise<void> {
   } finally {
     repositoryAcquireBusy.value = false;
   }
-}
-
-function openNewAgentForRepository(repository: WorkRepository): void {
-  openNewAgent(activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined, repository.name);
 }
 
 async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promise<void> {
