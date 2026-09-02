@@ -1,164 +1,65 @@
 ---
 name: codex-claw-dod
-description: Use before handing off, committing, pushing, or calling Codex Claw work done. Apply a risk-based, bounded Definition of Done checklist and run only the smallest verification gates that prove the requested change.
+description: Use before handoff, commit, push, or declaring Codex Claw work ready. Verify scope, tests, typecheck/lint, documentation, and worktree hygiene with proportional evidence.
 ---
 
 # Codex Claw Definition Of Done
 
-Use this skill before saying Codex Claw work is done, before committing, before
-pushing, or whenever Nicolas asks whether something is ready.
+Gather the smallest evidence that proves the change is ready. Add broader gates
+only when the change crosses a boundary.
 
-## Efficiency rule
-
-Verification is evidence gathering, not a ritual. Start with the narrowest
-test that proves the changed behavior and expand only when the change crosses
-a boundary or the focused gate exposes a related failure. The Definition of
-Done skill never runs builds or packaging. Release artifacts are a separate
-workflow, even when the task is otherwise complete.
-
-Before running a command, state what uncertainty it resolves. If it resolves
-none, do not run it. Do not repeat a passing command unless the relevant source,
-fixture, generated artifact, or dependency changed afterward.
-
-## Core Rule
-
-Do not call work done just because it compiles. Walk the checklist, verify each
-applicable gate, and explicitly call out anything skipped or not applicable.
-
-Do not edit `CHANGELOG.md` during ordinary implementation, review, handoff,
-commit, or push work. Changelog curation belongs exclusively to an explicit
-`update-changelog` or `prepare-release` workflow.
-
-## Risk classification
-
-Classify the change before choosing commands:
-
-- **Docs/config only:** no runtime behavior; run `git diff --check`.
-- **Pure backend or shared logic:** focused unit/contract tests for changed
-  files, then the affected workspace typecheck when contracts changed.
-- **Renderer/UI:** focused component/store test, then renderer typecheck; use
-  one proportional runtime/screenshot check only for visible behavior.
-- **IPC/protocol/persistence/lifecycle:** focused boundary tests plus the
-  affected workspace typecheck; run a broader suite only if the change spans
-  workspaces or the focused tests cannot cover the contract.
-- **Release/package request:** outside this skill. Stop the DoD checklist and
-  use the explicit release workflow instead of starting a build here.
-
-When several failures come from one command, collect and classify all of them,
-fix them in one pass, and rerun that same command. Do not use a fix-test-fix
-loop for each individual failure. After two unsuccessful iterations, stop and
-reassess the root cause instead of blindly rerunning.
-
-## Checklist
-
-Before handoff or commit, check every applicable item:
-
-- [ ] **Latest request:** The implementation matches the newest user request,
-  including follow-up corrections made during the turn.
-- [ ] **Scope control:** No unrelated cleanup, formatting churn, or drive-by
-  refactors are included.
-- [ ] **Architecture:** Main/preload/renderer boundaries are preserved. Codex
-  protocol details stay in the main-process driver/adapter.
-- [ ] **Contracts:** IPC events, app event types, `RendererMessage`, persisted
-  JSON, generated protocol types, and theme tokens stay compatible or have
-  migration/regression tests.
-- [ ] **Codex integration:** App-server lifecycle, approval requests, user-input
-  requests, turn events, interruption, steering, and error states are handled at
-  the right layer.
-- [ ] **Electron security:** Renderer does not gain direct Node, filesystem,
-  shell, Codex process, or broad Electron access.
-- [ ] **Filesystem safety:** Folder, file, git, and Codex-home behavior cannot
-  modify unrelated user data without an explicit user action.
-- [ ] **Privacy/logging:** Logs, errors, and debug output avoid leaking prompts,
-  file contents, secrets, tokens, or unnecessary local paths.
-- [ ] **UX acceptance:** The workflow works, avoids layout jumps, and handles
-  empty, loading, working, awaiting-input, error, and interrupted states.
-- [ ] **Frontend standards:** Components stay small, typed, testable, and token
-  themed. Element Plus is used for standard controls when practical.
-- [ ] **Tests:** Every changed behavior has focused tests at the right level:
-  main process, preload/IPC, renderer component, store/reducer, contract
-  fixture, or desktop smoke.
-- [ ] **Coverage:** Run coverage only when coverage-sensitive code changed,
-  coverage is explicitly requested, or the focused tests reveal an uncovered
-  branch. Do not pay the cost of a repository-wide coverage run by default.
-  Never lower configured thresholds.
-- [ ] **Relevant gates:** The relevant test/lint commands pass.
-- [ ] **Visual verification:** Visible UI changes are checked in the running app
-  or with screenshots when tooling exists.
-- [ ] **Docs:** `AGENTS.md`, `docs/*.md`, and plans are updated when behavior,
-  architecture, or workflow expectations change.
-- [ ] **Worktree hygiene:** `git status --short` is reviewed; unrelated user
-  changes are not staged.
-- [ ] **Commit readiness:** The staged diff contains only intended files and
-  uses the repo commit format.
-
-## Minimal verification matrix
-
-Choose exactly the smallest applicable row. Add a gate only when its boundary
-is touched or the user requests it.
-
-For docs-only changes:
+## Inspect
 
 ```bash
+git status --short
 git diff --check
 ```
 
-For an ordinary change, run the affected workspace's package-local Vitest
-command with its file or pattern filter:
+Review the diff against the latest request. Account for every changed file and
+preserve unrelated user changes.
+
+## Verify
+
+Run every applicable row:
+
+| Change | Evidence |
+| --- | --- |
+| Docs/config only | `git diff --check` |
+| Scoped code | Focused workspace test and affected workspace typecheck |
+| Visible frontend | Scoped-code gates plus one targeted runtime, DOM, or screenshot check |
+| Imports, exports, dependencies, CSS, or shared config | Relevant lint command |
+| Cross-cutting | `npm run test:ai` and affected workspace typechecks |
+| Coverage-sensitive | Focused coverage; use `npm run test:coverage` only when repository-wide evidence is needed |
+
+Use package-local Vitest for focused tests:
 
 ```bash
 npm run test -w <affected-workspace> -- <focused-file-or-pattern>
 ```
 
-For a cross-cutting change, or when no focused gate can prove it, run the
-concise full suite:
+A passing gate remains valid until relevant inputs change. Stop rather than
+commit or push when a required gate fails. Builds, packaging, signing, and
+notarization belong to release workflows.
 
-```bash
-npm run test:ai
+## Decide Documentation
+
+Report either **Docs updated** when durable architecture, process, convention,
+contract, or operator guidance changed, or **Docs not needed** when tests fully
+specify a local behavior change. Update `CHANGELOG.md` only through an explicit
+`update-changelog` or `prepare-release` flow.
+
+## Audit And Report
+
+Review the final diff and, when committing, the staged diff. Confirm it contains
+only intended files, tests cover changed behavior, and no secrets, local data,
+generated noise, or accidental changelog edits are included.
+
+```text
+DoD
+- Scope: <change and boundary>
+- Tests: <command and result>
+- Typecheck/lint: <result or not applicable>
+- Visual: <result or not applicable>
+- Docs: <updated and why, or not needed>
+- Worktree: <intended files only, or unrelated files preserved>
 ```
-
-For coverage-sensitive work:
-
-```bash
-npm run test:coverage
-```
-
-For lint-sensitive work:
-
-```bash
-npm run lint
-```
-
-For visible frontend changes, run the app locally only when a DOM/layout/runtime
-property is part of the request. A single targeted screenshot or DOM check is
-enough; do not launch a release build.
-
-Never run `npm run build`, `npm run package`, Forge, signing, or notarization
-from this skill. If a user asks for a release artifact, hand off to the
-explicit release workflow rather than starting it as part of DoD. Avoid an
-unfiltered repository-wide suite unless the change is genuinely cross-cutting
-and no focused gate can prove it.
-
-If a script does not exist yet, say so clearly in the handoff instead of
-pretending the gate passed.
-
-## Stop Conditions
-
-Stop and report clearly instead of committing when:
-
-- a required test, lint, or coverage gate fails;
-- the chosen command has been run twice without a new root-cause hypothesis;
-- the worktree contains ambiguous unrelated changes in files you need to stage;
-- an Electron security, filesystem, Codex-home, or privacy boundary is
-  uncertain;
-- the implementation no longer matches the latest user request;
-- protocol behavior cannot be inferred safely from fixtures or local smoke
-  tests.
-
-## Handoff Checklist
-
-- [ ] Summarize what changed in one or two concrete sentences.
-- [ ] Report exact verification commands and whether they passed.
-- [ ] Mention remaining risks, skipped checks, or unrelated dirty files.
-- [ ] If committing, stage only relevant files and use `feat:`, `fix:`,
-  `test:`, or `chore:`.
