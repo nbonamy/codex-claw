@@ -140,6 +140,36 @@ describe('AgentSidebar sessions', () => {
     expect(wrapper.find('.agent-sidebar__branch').exists()).toBe(false);
   });
 
+  it('keeps a pending handoff row measurable while concealing it', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        pendingHandoffAgentId: 'agent-jesse',
+        teamName: 'Codex Claw',
+      },
+      global: { components: { ElPopover } },
+    });
+    const pendingRow = wrapper.findAll('.agent-sidebar__agent')[1]!;
+    const label = pendingRow.get('.agent-sidebar__meta strong');
+    vi.spyOn(label.element, 'getBoundingClientRect').mockReturnValue({
+      bottom: 204,
+      height: 18,
+      left: 112,
+      right: 194,
+      top: 186,
+      width: 82,
+      x: 112,
+      y: 186,
+      toJSON: () => ({}),
+    });
+
+    expect(pendingRow.classes()).toContain('agent-sidebar__agent--handoff-pending');
+    expect((wrapper.vm as unknown as { agentLabelRect: (agentId: string) => unknown })
+      .agentLabelRect('agent-jesse'))
+      .toStrictEqual({ height: 18, left: 112, top: 186, width: 82 });
+  });
+
   it('renders and updates repository-specific icons', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

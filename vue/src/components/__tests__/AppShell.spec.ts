@@ -499,14 +499,25 @@ describe('AppShell authentication and conversation', () => {
       model: 'sdk-selection-does-not-cross-host-boundary',
     });
     await actions.openLink?.({ kind: 'external', href: 'https://example.com/docs' });
-    const imageHandled = await actions.openImage?.({
+    const conversationImage = {
       alt: 'Architecture diagram',
       kind: 'attachment',
       mimeType: 'image/png',
       name: 'diagram.png',
       path: '/repo/diagram.png',
       src: 'data:image/png;base64,aW1hZ2U=',
-    }, {
+    } as const;
+    const fullscreenHandled = await actions.openImage?.(conversationImage, {
+      intent: 'fullscreen',
+      index: 2,
+      message: { id: 'message-with-image', role: 'assistant', content: '' },
+    });
+    const imageWorkspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+    expect(fullscreenHandled).toBe(false);
+    expect((imageWorkspace.props('tabs') as string[]).some((tab) => tab.startsWith('image:'))).toBe(false);
+
+    const imageHandled = await actions.openImage?.(conversationImage, {
+      intent: 'open',
       index: 2,
       message: { id: 'message-with-image', role: 'assistant', content: '' },
     });
@@ -531,7 +542,6 @@ describe('AppShell authentication and conversation', () => {
       'noopener,noreferrer',
     );
     expect(imageHandled).toBe(true);
-    const imageWorkspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
     const imageTab = (imageWorkspace.props('tabs') as string[]).find((tab) => tab.startsWith('image:'));
     expect(imageTab).toBeDefined();
     expect(imageWorkspace.props('activeTab')).toBe(imageTab);
@@ -546,6 +556,12 @@ describe('AppShell authentication and conversation', () => {
       state: 'idle',
       error: null,
     });
+    await actions.openImage?.(conversationImage, {
+      intent: 'open',
+      index: 2,
+      message: { id: 'message-with-image', role: 'assistant', content: '' },
+    });
+    expect((imageWorkspace.props('tabs') as string[]).filter((tab) => tab === imageTab)).toHaveLength(1);
 
     imageWorkspace.vm.$emit('closeTab', imageTab);
     await nextTick();

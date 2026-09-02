@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { nextTick } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
 
@@ -30,6 +31,10 @@ const issue: WorkItem = {
 };
 
 describe('RepositorySessionSourceDialog', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('keeps branch metadata compact and gives branch states distinct semantics', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
       props: {
@@ -113,5 +118,51 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.emitted('start-work-item')).toStrictEqual([[
       { action: 'fix', destination: 'new', item: issue },
     ]]);
+  });
+
+  it('paces isolated-session preparation before revealing the agent and completing', async () => {
+    const wrapper = mount(RepositorySessionSourceDialog, {
+      props: {
+        visible: true,
+        repositoryName: 'codex-claw',
+        branches,
+        workItems: [issue],
+      },
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+    await wrapper.findAll('[role="tab"]')[2]!.trigger('click');
+    await flushPromises();
+    await wrapper.get('.repository-session-source-dialog__result').trigger('click');
+
+    vi.useFakeTimers();
+    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.setProps({ assignmentState: 'running' });
+
+    expect(wrapper.get('.repository-session-source-dialog__operation-heading').text())
+      .toContain('Building an isolated home for #24');
+    expect(wrapper.get('.agent-handoff-flight--origin').text()).toBe('fix/gh-24');
+    expect(wrapper.find('.repository-session-source-dialog__flight-token').exists()).toBe(false);
+    expect(wrapper.emitted('preparation-flight-ready')).toHaveLength(1);
+    expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
+      .toContain('Creating isolated worktree');
+
+    vi.advanceTimersByTime(1_200);
+    await nextTick();
+    expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
+      .toContain('Starting agent session');
+
+    await wrapper.setProps({ assignmentState: 'success' });
+    vi.advanceTimersByTime(1_600);
+    await nextTick();
+    expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
+      .toContain('Handing over work context');
+    expect(wrapper.emitted('preparation-agent-flight')).toHaveLength(1);
+
+    vi.advanceTimersByTime(1_600);
+    await nextTick();
+    expect(wrapper.get('.repository-session-source-dialog__operation-heading').text())
+      .toContain('Work on #24 is ready');
+    expect(wrapper.emitted('preparation-complete')).toHaveLength(1);
   });
 });

@@ -93,6 +93,20 @@ describe('AppShell work routing', () => {
       number: 24,
       title: 'Repository-first sessions',
     });
+    const preparedAgent: Agent = {
+      id: 'agent-prepared-issue',
+      teamId: 'team-codex-claw',
+      name: 'prepared-issue',
+      avatar: '🤖',
+      folder: '/Users/nbonamy/src/codex-claw-fix-gh-24',
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
+      status: { type: 'idle' },
+      createdAt: '2026-08-28T00:00:00.000Z',
+      updatedAt: '2026-08-28T00:00:00.000Z',
+    };
+    snapshot.agents.push(preparedAgent);
+    snapshot.teams[0]!.agentIds.push(preparedAgent.id);
     const listSourceBranches = vi.fn().mockResolvedValue([
       { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
       { name: 'feat/work-routing', isDefault: false },
@@ -102,7 +116,7 @@ describe('AppShell work routing', () => {
       name: 'work-routing',
       path: '/Users/nbonamy/src/codex-claw-work-routing',
     });
-    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const createAgent = vi.fn().mockResolvedValue(preparedAgent);
     const createAgentGitBranch = vi.fn().mockResolvedValue({});
     const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountShell({
@@ -173,6 +187,33 @@ describe('AppShell work routing', () => {
       agentId: 'agent-dina',
       item: issue,
     }));
+    expect(sourceDialog.props('assignmentState')).toBe('success');
+    expect(sourceDialog.props('visible')).toBe(true);
+
+    sourceDialog.vm.$emit('start-work-item', {
+      action: 'fix',
+      destination: 'new',
+      item: issue,
+    });
+    await flushPromises();
+    expect((sidebar.props('agents') as Agent[]).some((agent) => agent.id === preparedAgent.id)).toBe(true);
+    expect(sidebar.props('pendingHandoffAgentId')).toBe(preparedAgent.id);
+
+    const source = {
+      contentHeight: 18,
+      contentOffsetLeft: 20,
+      contentOffsetTop: 2,
+      frame: { height: 22, left: 760, top: 420, width: 96 },
+    };
+    sourceDialog.vm.$emit('preparation-flight-ready', { branchName: 'fix/gh-24', source });
+    sourceDialog.vm.$emit('preparation-agent-flight');
+    await flushPromises();
+    const flight = wrapper.getComponent({ name: 'AgentHandoffFlight' });
+    expect(flight.props('source')).toStrictEqual(source);
+    expect(flight.props('target')).toStrictEqual({ height: 18, left: 112, top: 186, width: 82 });
+    flight.vm.$emit('arrived');
+    await nextTick();
+    expect(sidebar.props('pendingHandoffAgentId')).toBeNull();
 
     sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
     await flushPromises();

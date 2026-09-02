@@ -148,10 +148,11 @@ const { t } = useI18n();
 .codex-login__progress-segment {
   position: absolute;
   inset-block: 0;
-  width: 72px;
+  inset-inline-start: 0;
+  width: 25%;
   border-radius: inherit;
   background: var(--color-primary);
-  animation: codex-login-progress 1.4s ease-in-out infinite;
+  animation: codex-login-progress 1.4s ease-in-out infinite alternate;
 }
 
 .codex-login__status {
@@ -199,11 +200,11 @@ const { t } = useI18n();
 
 @keyframes codex-login-progress {
   from {
-    transform: translateX(-72px);
+    transform: translateX(0);
   }
 
   to {
-    transform: translateX(280px);
+    transform: translateX(300%);
   }
 }
 
@@ -226,8 +227,8 @@ const { t } = useI18n();
 
 @media (prefers-reduced-motion: reduce) {
   .codex-login__progress-segment {
-    left: calc(50% - 36px);
     animation: none;
+    transform: translateX(150%);
   }
 
   .codex-login__status-dot {

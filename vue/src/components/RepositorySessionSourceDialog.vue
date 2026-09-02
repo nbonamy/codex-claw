@@ -21,7 +21,7 @@
         >
       </div>
       <div v-else class="repository-session-source-dialog__assignment-header">
-        <button type="button" :aria-label="t('common.back')" @click="selectedWorkItem = null">
+        <button type="button" :aria-label="t('common.back')" :disabled="preparationVisible" @click="selectedWorkItem = null">
           <ArrowLeftIcon aria-hidden="true" />
         </button>
         <strong>{{ t('repositoryBacklog.startWork', { number: selectedWorkItem.number }) }}</strong>
@@ -37,11 +37,45 @@
 
     <section class="repository-session-source-dialog__results" aria-live="polite">
       <template v-if="selectedWorkItem">
-        <div v-if="assignmentState === 'running' || assignmentState === 'success'" class="repository-session-source-dialog__operation-state" :data-state="assignmentState">
-          <span v-if="assignmentState === 'running'" class="repository-session-source-dialog__operation-spinner" aria-hidden="true" />
-          <CircleCheckIcon v-else aria-hidden="true" />
-          <strong>{{ assignmentState === 'running' ? t('repositoryBacklog.starting') : t('repositoryBacklog.started') }}</strong>
-          <span>{{ assignmentBranchName }}</span>
+        <div
+          v-if="preparationVisible && assignmentState !== 'error'"
+          class="repository-session-source-dialog__operation-state"
+          :data-state="assignmentState"
+          role="status"
+        >
+          <header class="repository-session-source-dialog__operation-heading">
+            <span class="repository-session-source-dialog__operation-icon">
+              <CircleCheckIcon v-if="preparationStep === preparationSteps.length" aria-hidden="true" />
+              <SparklesIcon v-else aria-hidden="true" />
+            </span>
+            <div>
+              <span>{{ t('repositoryBacklog.launchingFrom', { number: selectedWorkItem.number }) }}</span>
+              <strong>{{ preparationTitle }}</strong>
+            </div>
+          </header>
+          <ol>
+            <li
+              v-for="(step, index) in preparationSteps"
+              :key="step.title"
+              :class="preparationStepClass(index)"
+            >
+              <span class="repository-session-source-dialog__step-marker">
+                <CheckIcon v-if="preparationStep > index" aria-hidden="true" />
+                <LoaderIcon v-else-if="preparationStep === index" aria-hidden="true" />
+                <span v-else aria-hidden="true" />
+              </span>
+              <div>
+                <strong>{{ step.title }}</strong>
+                <AgentHandoffFlight
+                  v-if="index === 0 && preparationSelection?.destination === 'new'"
+                  :ref="setFlightOrigin"
+                  :branch-name="step.detail"
+                  :concealed="agentFlightActive"
+                />
+                <small v-else>{{ step.detail }}</small>
+              </div>
+            </li>
+          </ol>
         </div>
         <WorkItemAssignmentPicker
           v-else
@@ -50,7 +84,7 @@
           :sessions="sessions"
           :error="assignmentError"
           @custom="emit('custom-work-item', $event)"
-          @submit="emit('start-work-item', $event)"
+          @submit="startWorkItem"
         />
       </template>
       <p v-else-if="loading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
@@ -89,15 +123,27 @@
         <p v-if="filteredWorkItems.length === 0" class="repository-session-source-dialog__state">{{ tab === 'pullRequests' ? t('repositories.sessionSource.noPullRequests') : t('repositories.sessionSource.noIssues') }}</p>
       </template>
     </section>
+
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconArrowLeft as ArrowLeftIcon, IconCircleCheck as CircleCheckIcon, IconCircleDot as IssueIcon, IconGitPullRequest as GitPullRequestIcon, IconSearch as SearchIcon } from '@tabler/icons-vue';
+import {
+  IconArrowLeft as ArrowLeftIcon,
+  IconCheck as CheckIcon,
+  IconCircleCheck as CircleCheckIcon,
+  IconCircleDot as IssueIcon,
+  IconGitPullRequest as GitPullRequestIcon,
+  IconLoader2 as LoaderIcon,
+  IconSearch as SearchIcon,
+  IconSparkles as SparklesIcon,
+} from '@tabler/icons-vue';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
+import AgentHandoffFlight from './AgentHandoffFlight.vue';
+import type { AgentHandoffOrigin } from './agent-handoff';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 
@@ -106,6 +152,7 @@ type SourceTab = 'branches' | 'pullRequests' | 'issues';
 const props = withDefaults(defineProps<{
   branches?: SourceBranch[];
   assignmentError?: string | null;
+  agentFlightActive?: boolean;
   assignmentState?: 'idle' | 'running' | 'success' | 'error';
   error?: string | null;
   loading?: boolean;
@@ -116,6 +163,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   branches: () => [],
   assignmentError: null,
+  agentFlightActive: false,
   assignmentState: 'idle',
   error: null,
   loading: false,
@@ -126,6 +174,9 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   close: [];
   'custom-work-item': [selection: Omit<WorkItemAssignmentSelection, 'action'>];
+  'preparation-agent-flight': [];
+  'preparation-complete': [];
+  'preparation-flight-ready': [payload: { branchName: string; source: AgentHandoffOrigin }];
   'select-branch': [branch: SourceBranch];
   'start-work-item': [selection: WorkItemAssignmentSelection];
 }>();
@@ -135,6 +186,13 @@ const { t } = useI18n();
 const searchInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const selectedWorkItem = ref<WorkItem | null>(null);
+const flightOrigin = ref<InstanceType<typeof AgentHandoffFlight> | null>(null);
+const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
+const preparationVisible = ref(false);
+const preparationStep = ref(0);
+let preparationStartedAt: number | null = null;
+let preparationCompletionScheduled = false;
+const preparationTimers: Array<ReturnType<typeof globalThis.setTimeout>> = [];
 const tab = ref<SourceTab>('branches');
 const tabs = computed<ReadonlyArray<{ id: SourceTab; label: string }>>(() => [
   { id: 'branches', label: t('repositories.sessionSource.branches') },
@@ -158,18 +216,128 @@ const assignmentBranchName = computed(() => {
   if (item.kind === 'pullRequest') return item.branchName?.trim() || `review/gh-${item.number}`;
   return `fix/gh-${item.number}`;
 });
+const preparationSteps = computed(() => {
+  if (preparationSelection.value?.destination === 'existing') {
+    const session = props.sessions.find((candidate) => candidate.agentId === preparationSelection.value?.agentId);
+    return [
+      { title: t('repositoryBacklog.prepareWorkBranch'), detail: assignmentBranchName.value },
+      { title: t('repositoryBacklog.switchExistingSession'), detail: session?.label ?? t('repositoryBacklog.existingSession') },
+      { title: t('repositoryBacklog.handOverWorkContext'), detail: props.repositoryName },
+    ];
+  }
+  return [
+    { title: t('repositoryBacklog.createIsolatedWorktree'), detail: assignmentBranchName.value },
+    { title: t('repositoryBacklog.startAgentSession'), detail: t('repositoryBacklog.newCodexSession') },
+    { title: t('repositoryBacklog.handOverWorkContext'), detail: props.repositoryName },
+  ];
+});
+const preparationTitle = computed(() => {
+  const number = selectedWorkItem.value?.number ?? '';
+  if (preparationStep.value === preparationSteps.value.length) {
+    return t('repositoryBacklog.workReady', { number });
+  }
+  return t(
+    preparationSelection.value?.destination === 'existing'
+      ? 'repositoryBacklog.prepareExistingSession'
+      : 'repositoryBacklog.buildIsolatedHome',
+    { number },
+  );
+});
 
 watch(() => props.visible, async (visible) => {
   if (!visible) return;
   query.value = '';
   tab.value = 'branches';
   selectedWorkItem.value = null;
+  resetPreparation();
   await nextTick();
   searchInput.value?.focus();
 });
 
+watch(() => props.assignmentState, (state) => {
+  if (state === 'running' && preparationSelection.value && !preparationVisible.value) {
+    startPreparation();
+    return;
+  }
+  if (state === 'success' && preparationSelection.value) {
+    finishPreparation();
+    return;
+  }
+  if (state === 'error') {
+    resetPreparation(false);
+  }
+});
+
+onBeforeUnmount(resetPreparation);
+
 function onVisibilityChanged(visible: boolean): void {
   if (!visible) emit('close');
+}
+
+function setFlightOrigin(instance: unknown): void {
+  flightOrigin.value = instance as InstanceType<typeof AgentHandoffFlight> | null;
+}
+
+function startWorkItem(selection: WorkItemAssignmentSelection): void {
+  preparationSelection.value = selection;
+  startPreparation();
+  emit('start-work-item', selection);
+}
+
+function startPreparation(): void {
+  clearPreparationTimers();
+  preparationVisible.value = true;
+  preparationStep.value = 0;
+  preparationStartedAt = Date.now();
+  preparationCompletionScheduled = false;
+  void nextTick(() => {
+    const source = flightOrigin.value?.origin() ?? null;
+    if (source) emit('preparation-flight-ready', {
+      branchName: assignmentBranchName.value,
+      source,
+    });
+  });
+  preparationTimers.push(globalThis.setTimeout(() => {
+    preparationStep.value = 1;
+  }, 1_100));
+  preparationTimers.push(globalThis.setTimeout(() => {
+    if (preparationSelection.value?.destination === 'new') {
+      emit('preparation-agent-flight');
+    }
+  }, 1_400));
+  preparationTimers.push(globalThis.setTimeout(() => {
+    preparationStep.value = 2;
+  }, 2_800));
+}
+
+function finishPreparation(): void {
+  if (!preparationVisible.value) startPreparation();
+  if (preparationCompletionScheduled) return;
+  preparationCompletionScheduled = true;
+  const elapsed = preparationStartedAt === null ? 0 : Date.now() - preparationStartedAt;
+  preparationTimers.push(globalThis.setTimeout(() => {
+    preparationStep.value = preparationSteps.value.length;
+    preparationTimers.push(globalThis.setTimeout(() => emit('preparation-complete'), 600));
+  }, Math.max(0, 3_800 - elapsed)));
+}
+
+function preparationStepClass(index: number): string {
+  if (preparationStep.value > index) return 'is-complete';
+  if (preparationStep.value === index) return 'is-active';
+  return 'is-pending';
+}
+
+function resetPreparation(clearSelection = true): void {
+  clearPreparationTimers();
+  preparationVisible.value = false;
+  preparationStep.value = 0;
+  preparationStartedAt = null;
+  preparationCompletionScheduled = false;
+  if (clearSelection) preparationSelection.value = null;
+}
+
+function clearPreparationTimers(): void {
+  preparationTimers.splice(0).forEach((timer) => globalThis.clearTimeout(timer));
 }
 </script>
 
@@ -184,6 +352,16 @@ function onVisibilityChanged(visible: boolean): void {
   :global(.repository-session-source-dialog.el-dialog) {
     transition-duration: 1ms;
   }
+
+  .repository-session-source-dialog__operation-state li {
+    transition-duration: 1ms;
+  }
+
+  .repository-session-source-dialog__operation-state li.is-active
+    .repository-session-source-dialog__step-marker svg {
+    animation-duration: 1ms;
+  }
+
 }
 
 .repository-session-source-dialog__search-row {
@@ -234,6 +412,11 @@ function onVisibilityChanged(visible: boolean): void {
 .repository-session-source-dialog__assignment-header button:hover {
   color: var(--color-text);
   background: var(--color-surface-base);
+}
+
+.repository-session-source-dialog__assignment-header button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .repository-session-source-dialog__assignment-header svg {
@@ -327,39 +510,137 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 .repository-session-source-dialog__operation-state {
-  min-height: 250px;
+  min-height: 280px;
   display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--space-4);
-  text-align: center;
+  align-content: center;
+  gap: var(--space-8);
+  padding: var(--space-8);
 }
 
-.repository-session-source-dialog__operation-state svg {
-  width: 32px;
-  height: 32px;
-  color: var(--color-success);
+.repository-session-source-dialog__operation-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
 }
 
-.repository-session-source-dialog__operation-state > span:last-child {
+.repository-session-source-dialog__operation-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.repository-session-source-dialog__operation-heading > div > span {
   color: var(--color-text-muted);
-  font-family: var(--font-family-mono);
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.repository-session-source-dialog__operation-heading strong {
+  font-size: var(--font-size-16);
+  line-height: var(--line-height-22);
+}
+
+.repository-session-source-dialog__operation-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-xl);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.repository-session-source-dialog__operation-icon svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+.repository-session-source-dialog__operation-state[data-state='success']
+  .repository-session-source-dialog__operation-icon {
+  color: var(--color-success);
+  background: var(--color-success-container);
+}
+
+.repository-session-source-dialog__operation-state ol {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repository-session-source-dialog__operation-state li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  transition: opacity 180ms ease, background-color 180ms ease;
+}
+
+.repository-session-source-dialog__operation-state li.is-active {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.repository-session-source-dialog__operation-state li.is-pending {
+  opacity: 0.42;
+}
+
+.repository-session-source-dialog__operation-state li > div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.repository-session-source-dialog__operation-state li strong,
+.repository-session-source-dialog__operation-state li small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-session-source-dialog__operation-state li strong {
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-semibold);
+}
+
+.repository-session-source-dialog__operation-state li small {
+  color: var(--color-text-muted);
   font-size: var(--font-size-11);
 }
 
-.repository-session-source-dialog__operation-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: repository-session-source-dialog-spin 0.8s linear infinite;
+.repository-session-source-dialog__step-marker {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+}
+
+.repository-session-source-dialog__step-marker svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.repository-session-source-dialog__step-marker > span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+}
+
+.repository-session-source-dialog__operation-state li.is-active
+  .repository-session-source-dialog__step-marker svg {
+  animation: repository-session-source-dialog-spin 0.9s linear infinite;
 }
 
 @keyframes repository-session-source-dialog-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .repository-session-source-dialog__results h3 {

@@ -30,6 +30,7 @@ const AgentSidebarStub = defineComponent({
     'collapsedRepositoryKeys',
     'compact',
     'forkableAgentIds',
+    'pendingHandoffAgentId',
     'maxWidth',
     'minWidth',
     'openInCatalog',
@@ -63,6 +64,11 @@ const AgentSidebarStub = defineComponent({
     'update-collapsed-repositories',
     'update-repository-icon',
   ],
+  setup(_props, { expose }) {
+    expose({
+      agentLabelRect: () => ({ height: 18, left: 112, top: 186, width: 82 }),
+    });
+  },
   template: '<aside class="agent-sidebar" />',
 });
 
