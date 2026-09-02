@@ -1,6 +1,5 @@
 <template>
   <aside
-    ref="sidebarElement"
     class="agent-sidebar"
     :class="{ 'agent-sidebar--compact': compact }"
     :style="sidebarStyle"
@@ -121,13 +120,11 @@
           class="agent-sidebar__agent"
           :class="[
             { 'agent-sidebar__agent--active': session.isActive },
-            { 'agent-sidebar__agent--handoff-pending': session.agentId === pendingHandoffAgentId },
             agentReorder.dropTargetClass(session.agentId),
           ]"
           type="button"
           v-bind="agentReorder.dragItemAttributes(session.agentId)"
           :data-session-kind="session.kind"
-          :data-agent-id="session.agentId"
           :aria-pressed="session.isActive"
           @click="selectAgent(session.agentId)"
           @contextmenu.prevent="openAgentMenu(session.agentId, $event)"
@@ -219,14 +216,12 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import { useRepositorySessionMenu } from './use-repository-session-menu';
-import { snapshotAgentHandoffRect, type AgentHandoffRect } from './agent-handoff';
 
 const props = defineProps<{
   agents: Agent[];
   activeAgentId: string | null;
   unreadAgentIds?: string[];
   forkableAgentIds?: string[];
-  pendingHandoffAgentId?: string | null;
   compact?: boolean;
   collapsedRepositoryKeys?: string[];
   teams?: Team[];
@@ -242,7 +237,6 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const sidebarElement = ref<HTMLElement | null>(null);
 
 const emit = defineEmits<{
   'collapse-sidebar': [];
@@ -333,15 +327,6 @@ const sidebarStyle = computed<Record<string, string>>(() => ({
   '--agent-sidebar-max-width': `${maxWidth.value}px`,
 }));
 let resizeStart: { pointerId: number; clientX: number; width: number } | null = null;
-
-function agentLabelRect(agentId: string): AgentHandoffRect | null {
-  const rows = sidebarElement.value?.querySelectorAll<HTMLElement>('.agent-sidebar__agent') ?? [];
-  const row = Array.from(rows).find((candidate) => candidate.dataset.agentId === agentId);
-  const label = row?.querySelector<HTMLElement>('.agent-sidebar__meta strong');
-  return label ? snapshotAgentHandoffRect(label.getBoundingClientRect()) : null;
-}
-
-defineExpose({ agentLabelRect });
 
 function clampWidth(width: number): number {
   return Math.min(Math.max(Math.round(width), minWidth.value), maxWidth.value);
@@ -865,10 +850,6 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__agent--active {
   background: var(--color-surface-base);
-}
-
-.agent-sidebar__agent--handoff-pending {
-  visibility: hidden;
 }
 
 .agent-sidebar__session-icon {

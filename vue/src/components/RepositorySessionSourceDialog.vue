@@ -66,13 +66,7 @@
               </span>
               <div>
                 <strong>{{ step.title }}</strong>
-                <AgentHandoffFlight
-                  v-if="index === 0 && preparationSelection?.destination === 'new'"
-                  :ref="setFlightOrigin"
-                  :branch-name="step.detail"
-                  :concealed="agentFlightActive"
-                />
-                <small v-else>{{ step.detail }}</small>
+                <small>{{ step.detail }}</small>
               </div>
             </li>
           </ol>
@@ -123,7 +117,6 @@
         <p v-if="filteredWorkItems.length === 0" class="repository-session-source-dialog__state">{{ tab === 'pullRequests' ? t('repositories.sessionSource.noPullRequests') : t('repositories.sessionSource.noIssues') }}</p>
       </template>
     </section>
-
   </el-dialog>
 </template>
 
@@ -142,8 +135,6 @@ import {
 } from '@tabler/icons-vue';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
-import AgentHandoffFlight from './AgentHandoffFlight.vue';
-import type { AgentHandoffOrigin } from './agent-handoff';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 
@@ -152,7 +143,6 @@ type SourceTab = 'branches' | 'pullRequests' | 'issues';
 const props = withDefaults(defineProps<{
   branches?: SourceBranch[];
   assignmentError?: string | null;
-  agentFlightActive?: boolean;
   assignmentState?: 'idle' | 'running' | 'success' | 'error';
   error?: string | null;
   loading?: boolean;
@@ -163,7 +153,6 @@ const props = withDefaults(defineProps<{
 }>(), {
   branches: () => [],
   assignmentError: null,
-  agentFlightActive: false,
   assignmentState: 'idle',
   error: null,
   loading: false,
@@ -174,9 +163,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   close: [];
   'custom-work-item': [selection: Omit<WorkItemAssignmentSelection, 'action'>];
-  'preparation-agent-flight': [];
   'preparation-complete': [];
-  'preparation-flight-ready': [payload: { branchName: string; source: AgentHandoffOrigin }];
   'select-branch': [branch: SourceBranch];
   'start-work-item': [selection: WorkItemAssignmentSelection];
 }>();
@@ -186,7 +173,6 @@ const { t } = useI18n();
 const searchInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const selectedWorkItem = ref<WorkItem | null>(null);
-const flightOrigin = ref<InstanceType<typeof AgentHandoffFlight> | null>(null);
 const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
 const preparationVisible = ref(false);
 const preparationStep = ref(0);
@@ -274,10 +260,6 @@ function onVisibilityChanged(visible: boolean): void {
   if (!visible) emit('close');
 }
 
-function setFlightOrigin(instance: unknown): void {
-  flightOrigin.value = instance as InstanceType<typeof AgentHandoffFlight> | null;
-}
-
 function startWorkItem(selection: WorkItemAssignmentSelection): void {
   preparationSelection.value = selection;
   startPreparation();
@@ -290,21 +272,9 @@ function startPreparation(): void {
   preparationStep.value = 0;
   preparationStartedAt = Date.now();
   preparationCompletionScheduled = false;
-  void nextTick(() => {
-    const source = flightOrigin.value?.origin() ?? null;
-    if (source) emit('preparation-flight-ready', {
-      branchName: assignmentBranchName.value,
-      source,
-    });
-  });
   preparationTimers.push(globalThis.setTimeout(() => {
     preparationStep.value = 1;
   }, 1_100));
-  preparationTimers.push(globalThis.setTimeout(() => {
-    if (preparationSelection.value?.destination === 'new') {
-      emit('preparation-agent-flight');
-    }
-  }, 1_400));
   preparationTimers.push(globalThis.setTimeout(() => {
     preparationStep.value = 2;
   }, 2_800));

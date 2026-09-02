@@ -53,10 +53,8 @@
     />
     <Transition name="agent-sidebar">
       <AgentSidebar
-        ref="agentSidebar"
         v-if="showAgentSidebar"
         :agents="activeTeamAgents"
-        :pending-handoff-agent-id="repositorySessionAgentRevealReady ? null : repositorySessionPendingAgentId"
         :forkable-agent-ids="forkableAgentIds"
         :active-agent-id="currentAgent?.id ?? null"
         :unread-agent-ids="unreadAgentIds"
@@ -94,13 +92,6 @@
         @update-collapsed-repositories="updateCollapsedRepositories"
       />
     </Transition>
-    <AgentHandoffFlight
-      v-if="repositorySessionFlightSource && repositorySessionFlightBranch"
-      :branch-name="repositorySessionFlightBranch"
-      :source="repositorySessionFlightSource"
-      :target="repositorySessionFlightTarget"
-      @arrived="finishPreparedRepositorySessionAgentHandoff"
-    />
     <section class="app-shell__content">
       <div
         v-if="connectionState.status !== 'connected'"
@@ -344,13 +335,10 @@
       :sessions="repositorySessionAssignmentSessions"
       :assignment-state="repositorySessionAssignmentState"
       :assignment-error="repositorySessionAssignmentError"
-      :agent-flight-active="Boolean(repositorySessionFlightSource)"
       @close="closeRepositorySessionSource"
       @select-branch="openNewAgentForSourceBranch"
       @custom-work-item="customizeRepositorySessionWork"
-      @preparation-agent-flight="requestPreparedRepositorySessionAgentHandoff"
       @preparation-complete="completePreparedRepositorySession"
-      @preparation-flight-ready="prepareRepositorySessionAgentHandoff"
       @start-work-item="startRepositorySessionWork"
     />
     <NewSourceWorktreeDialog
@@ -488,9 +476,7 @@ import { clawHostCapabilities, codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
-import AgentHandoffFlight from './AgentHandoffFlight.vue';
 import AgentSidebar from './AgentSidebar.vue';
-import type { AgentHandoffOrigin, AgentHandoffRect } from './agent-handoff';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
@@ -931,14 +917,6 @@ const repositorySessionSourceLoading = ref(false);
 const repositorySessionSourceError = ref<string | null>(null);
 const repositorySessionAssignmentState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
 const repositorySessionAssignmentError = ref<string | null>(null);
-const repositorySessionPendingAgentId = ref<string | null>(null);
-const repositorySessionAgentRevealReady = ref(false);
-const repositorySessionFlightBranch = ref('');
-const repositorySessionFlightRequested = ref(false);
-const repositorySessionFlightSource = ref<AgentHandoffOrigin | null>(null);
-const repositorySessionFlightTarget = ref<AgentHandoffRect | null>(null);
-const repositorySessionCloseRequested = ref(false);
-const agentSidebar = ref<{ agentLabelRect: (agentId: string) => AgentHandoffRect | null } | null>(null);
 const repositorySessionAssignmentSessions = computed<WorkItemAssignmentSession[]>(() => {
   const source = repositorySessionSource.value;
   if (!source) return [];
@@ -1052,9 +1030,6 @@ const activeTeamAgents = computed(() => {
   return team.agentIds
     .map((agentId) => props.snapshot.agents.find((agent) => agent.id === agentId))
     .filter((agent): agent is Agent => Boolean(agent));
-});
-watch(activeTeamAgents, () => {
-  void startPreparedRepositorySessionAgentHandoffIfReady();
 });
 const agentMentionGroups = computed<readonly CodexComposerMentionGroup[]>(() => {
   if (activeTeamAgents.value.length === 0) return [];
@@ -1978,9 +1953,6 @@ async function openRepositorySessionSource(source: RepositorySessionSource): Pro
   repositorySessionSourceError.value = null;
   repositorySessionAssignmentState.value = 'idle';
   repositorySessionAssignmentError.value = null;
-  repositorySessionPendingAgentId.value = null;
-  repositorySessionAgentRevealReady.value = false;
-  resetRepositorySessionAgentHandoff();
   repositorySessionSourceLoading.value = true;
 
   const { remoteConnectionId, location } = repositorySessionContext(source);
@@ -2031,65 +2003,10 @@ function closeRepositorySessionSource(): void {
   repositorySessionSourceError.value = null;
   repositorySessionAssignmentState.value = 'idle';
   repositorySessionAssignmentError.value = null;
-  repositorySessionPendingAgentId.value = null;
-  repositorySessionAgentRevealReady.value = false;
-  resetRepositorySessionAgentHandoff();
-}
-
-function prepareRepositorySessionAgentHandoff(payload: { branchName: string; source: AgentHandoffOrigin }): void {
-  repositorySessionFlightBranch.value = payload.branchName;
-  repositorySessionFlightSource.value = payload.source;
-  repositorySessionFlightTarget.value = null;
-  void startPreparedRepositorySessionAgentHandoffIfReady();
-}
-
-function requestPreparedRepositorySessionAgentHandoff(): void {
-  repositorySessionFlightRequested.value = true;
-  void startPreparedRepositorySessionAgentHandoffIfReady();
-}
-
-async function startPreparedRepositorySessionAgentHandoffIfReady(): Promise<void> {
-  if (
-    !repositorySessionFlightRequested.value
-    || !repositorySessionFlightSource.value
-    || repositorySessionFlightTarget.value
-    || !repositorySessionPendingAgentId.value
-    || !activeTeamAgents.value.some((agent) => agent.id === repositorySessionPendingAgentId.value)
-  ) return;
-
-  await nextTick();
-  const target = agentSidebar.value?.agentLabelRect(repositorySessionPendingAgentId.value) ?? null;
-  if (!target) return;
-  if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-    finishPreparedRepositorySessionAgentHandoff();
-    return;
-  }
-  repositorySessionFlightTarget.value = target;
-}
-
-function finishPreparedRepositorySessionAgentHandoff(): void {
-  repositorySessionAgentRevealReady.value = true;
-  repositorySessionFlightSource.value = null;
-  repositorySessionFlightTarget.value = null;
-  repositorySessionFlightBranch.value = '';
-  if (repositorySessionCloseRequested.value) closeRepositorySessionSource();
 }
 
 function completePreparedRepositorySession(): void {
-  if (repositorySessionFlightTarget.value && !repositorySessionAgentRevealReady.value) {
-    repositorySessionCloseRequested.value = true;
-    return;
-  }
-  repositorySessionAgentRevealReady.value = true;
   closeRepositorySessionSource();
-}
-
-function resetRepositorySessionAgentHandoff(): void {
-  repositorySessionFlightBranch.value = '';
-  repositorySessionFlightRequested.value = false;
-  repositorySessionFlightSource.value = null;
-  repositorySessionFlightTarget.value = null;
-  repositorySessionCloseRequested.value = false;
 }
 
 async function listRepositorySessionBranches(input: { agentId: string; repositoryRoot: string }): Promise<SourceBranch[]> {
@@ -2182,9 +2099,6 @@ async function startRepositorySessionWork(selection: WorkItemAssignmentSelection
   const source = repositorySessionSource.value;
   if (!source) return;
   const { teamId } = repositorySessionContext(source);
-  repositorySessionPendingAgentId.value = null;
-  repositorySessionAgentRevealReady.value = selection.destination === 'existing';
-  resetRepositorySessionAgentHandoff();
   repositorySessionAssignmentState.value = 'running';
   repositorySessionAssignmentError.value = null;
   try {
@@ -2194,8 +2108,6 @@ async function startRepositorySessionWork(selection: WorkItemAssignmentSelection
     } else {
       if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
       const { agent, item } = await createIsolatedWorkItemAgent(selection.item, teamId);
-      repositorySessionPendingAgentId.value = agent.id;
-      void startPreparedRepositorySessionAgentHandoffIfReady();
       await props.assignWorkItemAction({
         agentId: agent.id,
         item,
@@ -2204,8 +2116,6 @@ async function startRepositorySessionWork(selection: WorkItemAssignmentSelection
     }
     repositorySessionAssignmentState.value = 'success';
   } catch (error) {
-    repositorySessionAgentRevealReady.value = true;
-    resetRepositorySessionAgentHandoff();
     repositorySessionAssignmentState.value = 'error';
     repositorySessionAssignmentError.value = error instanceof Error ? error.message : String(error);
   }

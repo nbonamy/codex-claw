@@ -105,8 +105,6 @@ describe('AppShell work routing', () => {
       createdAt: '2026-08-28T00:00:00.000Z',
       updatedAt: '2026-08-28T00:00:00.000Z',
     };
-    snapshot.agents.push(preparedAgent);
-    snapshot.teams[0]!.agentIds.push(preparedAgent.id);
     const listSourceBranches = vi.fn().mockResolvedValue([
       { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
       { name: 'feat/work-routing', isDefault: false },
@@ -196,24 +194,16 @@ describe('AppShell work routing', () => {
       item: issue,
     });
     await flushPromises();
-    expect((sidebar.props('agents') as Agent[]).some((agent) => agent.id === preparedAgent.id)).toBe(true);
-    expect(sidebar.props('pendingHandoffAgentId')).toBe(preparedAgent.id);
-
-    const source = {
-      contentHeight: 18,
-      contentOffsetLeft: 20,
-      contentOffsetTop: 2,
-      frame: { height: 22, left: 760, top: 420, width: 96 },
-    };
-    sourceDialog.vm.$emit('preparation-flight-ready', { branchName: 'fix/gh-24', source });
-    sourceDialog.vm.$emit('preparation-agent-flight');
-    await flushPromises();
-    const flight = wrapper.getComponent({ name: 'AgentHandoffFlight' });
-    expect(flight.props('source')).toStrictEqual(source);
-    expect(flight.props('target')).toStrictEqual({ height: 18, left: 112, top: 186, width: 82 });
-    flight.vm.$emit('arrived');
-    await nextTick();
-    expect(sidebar.props('pendingHandoffAgentId')).toBeNull();
+    expect(createSourceWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'fix/gh-24',
+    });
+    expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: preparedAgent.id,
+      item: issue,
+    }));
+    expect(sourceDialog.props('assignmentState')).toBe('success');
+    expect(sourceDialog.props('visible')).toBe(true);
 
     sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
     await flushPromises();

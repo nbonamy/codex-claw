@@ -120,7 +120,7 @@ describe('RepositorySessionSourceDialog', () => {
     ]]);
   });
 
-  it('paces isolated-session preparation before revealing the agent and completing', async () => {
+  it('paces isolated-session preparation before completing', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
       props: {
         visible: true,
@@ -141,11 +141,9 @@ describe('RepositorySessionSourceDialog', () => {
 
     expect(wrapper.get('.repository-session-source-dialog__operation-heading').text())
       .toContain('Building an isolated home for #24');
-    expect(wrapper.get('.agent-handoff-flight--origin').text()).toBe('fix/gh-24');
-    expect(wrapper.find('.repository-session-source-dialog__flight-token').exists()).toBe(false);
-    expect(wrapper.emitted('preparation-flight-ready')).toHaveLength(1);
-    expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
-      .toContain('Creating isolated worktree');
+    const firstStep = wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text();
+    expect(firstStep).toContain('Creating isolated worktree');
+    expect(firstStep).toContain('fix/gh-24');
 
     vi.advanceTimersByTime(1_200);
     await nextTick();
@@ -157,7 +155,6 @@ describe('RepositorySessionSourceDialog', () => {
     await nextTick();
     expect(wrapper.get('.repository-session-source-dialog__operation-state li.is-active').text())
       .toContain('Handing over work context');
-    expect(wrapper.emitted('preparation-agent-flight')).toHaveLength(1);
 
     vi.advanceTimersByTime(1_600);
     await nextTick();
