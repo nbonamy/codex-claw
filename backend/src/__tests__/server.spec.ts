@@ -6978,6 +6978,7 @@ function createTestSnapshot(): AppSnapshot {
       agentListCompact: false,
       collapsedRepositoryKeys: [],
       shareCodexSkillsAndPlugins: true,
+      worktreeInitializationMode: 'automatic',
       repositoryIcons: {},
       appshots: {
         hotkey: 'command',

@@ -983,6 +983,7 @@ describe('AppStatePersistence', () => {
       agentListCompact: true,
       collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
       shareCodexSkillsAndPlugins: false,
+      worktreeInitializationMode: 'repository',
       repositoryIcons: { '/src/codex-claw': '🦞' },
       appshots: {
         hotkey: 'option',

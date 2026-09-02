@@ -21,6 +21,7 @@ describe('settings contracts', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
       shareCodexSkillsAndPlugins: true,
+      worktreeInitializationMode: 'automatic',
       repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
@@ -92,6 +93,7 @@ describe('settings contracts', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
       shareCodexSkillsAndPlugins: true,
+      worktreeInitializationMode: 'automatic',
       repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
@@ -129,6 +131,12 @@ describe('settings contracts', () => {
     expect(normalizeGeneralSettings({
       collapsedRepositoryKeys: [' remote:github.com/openai/codex ', '', 'remote:github.com/openai/codex'],
     }).collapsedRepositoryKeys).toStrictEqual(['remote:github.com/openai/codex']);
+  });
+
+  it('normalizes worktree initialization policy', () => {
+    expect(normalizeGeneralSettings({ worktreeInitializationMode: 'repository' }).worktreeInitializationMode).toBe('repository');
+    expect(normalizeGeneralSettings({ worktreeInitializationMode: 'off' }).worktreeInitializationMode).toBe('off');
+    expect(normalizeGeneralSettings({ worktreeInitializationMode: 'invalid' }).worktreeInitializationMode).toBe('automatic');
   });
 
   it('updates source folder settings without replacing unrelated state', () => {

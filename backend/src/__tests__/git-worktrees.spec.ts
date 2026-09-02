@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { createSourceWorktree, listSourceBranches, listSourceWorktrees, parseGitWorktreeList, parseSourceBranches, suggestedSourceWorktreePath } from '../git-worktrees';
+import { createGitWorktree, createSourceWorktree, listSourceBranches, listSourceWorktrees, parseGitWorktreeList, parseSourceBranches, suggestedSourceWorktreePath } from '../git-worktrees';
 
 describe('git worktree operations', () => {
   it('suggests sibling worktree paths from repo and branch names', () => {
@@ -53,6 +53,31 @@ describe('git worktree operations', () => {
     ], { cwd: '/repo' });
   });
 
+  it('returns an existing checkout without creating or initializing it again', async () => {
+    const run = vi.fn().mockResolvedValue({
+      stdout: [
+        'worktree /repo',
+        'HEAD abc',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo-feature',
+        'HEAD def',
+        'branch refs/heads/feature/existing',
+      ].join('\n'),
+    });
+
+    await expect(createGitWorktree({
+      repoPath: '/repo',
+      branchName: 'feature/existing',
+      reuseExisting: true,
+    }, { run })).resolves.toStrictEqual({
+      worktree: { name: 'feature/existing', path: '/repo-feature' },
+      created: false,
+    });
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith('git', ['worktree', 'list', '--porcelain'], { cwd: '/repo' });
+  });
+
   it('creates new worktree branches from the selected local or remote base branch', async () => {
     const localRun = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
       if (args[0] === 'show-ref' && args.at(-1) === 'refs/heads/feature/new') throw new Error('missing');
@@ -81,6 +106,34 @@ describe('git worktree operations', () => {
     expect(remoteRun).toHaveBeenLastCalledWith('git', [
       'worktree', 'add', '-b', 'feature/from-remote', '/repo-feature-from-remote', 'origin/main',
     ], { cwd: '/repo' });
+  });
+
+  it('honors an explicit fetched start point for new and existing branches', async () => {
+    const newBranchRun = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args[0] === 'show-ref') throw new Error('missing');
+      return { stdout: '' };
+    });
+    await createSourceWorktree({
+      repoPath: '/repo',
+      branchName: 'review/pr-42',
+      startPoint: 'FETCH_HEAD',
+    }, { run: newBranchRun });
+    expect(newBranchRun).toHaveBeenLastCalledWith('git', [
+      'worktree', 'add', '-b', 'review/pr-42', '/repo-review-pr-42', 'FETCH_HEAD',
+    ], { cwd: '/repo' });
+    expect(newBranchRun.mock.calls.some(([, args]) => args[0] === 'for-each-ref')).toBe(false);
+
+    const existingBranchRun = vi.fn().mockResolvedValue({ stdout: '' });
+    await createSourceWorktree({
+      repoPath: '/repo',
+      branchName: 'review/pr-42',
+      startPoint: 'FETCH_HEAD',
+    }, { run: existingBranchRun });
+    expect(existingBranchRun).toHaveBeenLastCalledWith(
+      'git',
+      ['merge', '--ff-only', 'FETCH_HEAD'],
+      { cwd: '/repo-review-pr-42' },
+    );
   });
 
   it('rejects missing branch names before invoking git', async () => {

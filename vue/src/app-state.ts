@@ -3119,6 +3119,8 @@ function isAgentCreationProgress(value: unknown): value is AgentCreationProgress
     typeof value.repositoryName === 'string' &&
     typeof value.createWorktree === 'boolean' &&
     typeof value.hasPrompt === 'boolean' &&
+    (value.phase === undefined || value.phase === 'creatingWorktree' || value.phase === 'initializingWorktree' || value.phase === 'creatingAgent' || value.phase === 'startingPrompt') &&
+    (value.initializationDetail === undefined || typeof value.initializationDetail === 'string') &&
     (value.branchName === undefined || typeof value.branchName === 'string') &&
     (value.agentId === undefined || typeof value.agentId === 'string') &&
     (value.agentName === undefined || typeof value.agentName === 'string') &&

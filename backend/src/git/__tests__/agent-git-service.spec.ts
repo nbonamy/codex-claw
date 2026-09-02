@@ -379,62 +379,20 @@ describe('agent git service parsers', () => {
     ]);
   });
 
-  it('creates a branch in an adjacent worktree without switching the current checkout', async () => {
-    const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'show-ref') throw new Error('missing ref');
-      return { stdout: '' };
-    });
-    const service = new AgentGitService(() => new Date(), runGit);
+  it('delegates linked worktree creation through the shared worktree seam', async () => {
+    const runGit = vi.fn().mockResolvedValue({ stdout: '' });
+    const createWorktree = vi.fn().mockResolvedValue({ path: '/repo-feature-worktree' });
+    const service = new AgentGitService(() => new Date(), runGit, createWorktree);
 
     await expect(service.createBranch('/repo', 'feature/worktree', true)).resolves.toBe('/repo-feature-worktree');
 
-    expect(runGit.mock.calls).toStrictEqual([
-      ['/repo', ['check-ref-format', '--branch', 'feature/worktree']],
-      ['/repo', ['worktree', 'list', '--porcelain']],
-      ['/repo', ['show-ref', '--verify', '--quiet', 'refs/heads/feature/worktree']],
-      ['/repo', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes']],
-      ['/repo', ['worktree', 'add', '-b', 'feature/worktree', '/repo-feature-worktree']],
-    ]);
-  });
-
-  it('reuses an existing branch instead of trying to create it again', async () => {
-    const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'worktree' && args[1] === 'list') {
-        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n' };
-      }
-      return { stdout: '' };
+    expect(createWorktree).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      branchName: 'feature/worktree',
+      reuseExisting: true,
     });
-    const service = new AgentGitService(() => new Date(), runGit);
-
-    await expect(service.createBranch('/repo', 'fix/gh-22', true)).resolves.toBe('/repo-fix-gh-22');
-
-    expect(runGit).toHaveBeenCalledWith('/repo', ['worktree', 'add', '/repo-fix-gh-22', 'fix/gh-22']);
-    expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['-b']));
-  });
-
-  it('uses the worktree that already has the requested branch checked out', async () => {
-    const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'worktree' && args[1] === 'list') {
-        return {
-          stdout: [
-            'worktree /repo',
-            'HEAD abc',
-            'branch refs/heads/main',
-            '',
-            'worktree /repo-fix-gh-22',
-            'HEAD def',
-            'branch refs/heads/fix/gh-22',
-            '',
-          ].join('\n'),
-        };
-      }
-      return { stdout: '' };
-    });
-    const service = new AgentGitService(() => new Date(), runGit);
-
-    await expect(service.createBranch('/repo', 'fix/gh-22', true)).resolves.toBe('/repo-fix-gh-22');
-
-    expect(runGit).not.toHaveBeenCalledWith('/repo', expect.arrayContaining(['add']));
+    expect(runGit).toHaveBeenCalledTimes(1);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['check-ref-format', '--branch', 'feature/worktree']);
   });
 
   it('checks out the pull request head branch in either the current folder or a new worktree', async () => {
@@ -451,20 +409,19 @@ describe('agent git service parsers', () => {
       if (args[0] === 'show-ref') throw new Error('missing ref');
       return { stdout: '' };
     });
-    const service = new AgentGitService(() => new Date(), runGit);
+    const createWorktree = vi.fn().mockResolvedValue({ path: '/repo-feature-pull-request-42' });
+    const service = new AgentGitService(() => new Date(), runGit, createWorktree);
 
     await expect(service.createBranch('/repo', 'feature/pull-request-42', true, 42))
       .resolves.toBe('/repo-feature-pull-request-42');
 
     expect(runGit).toHaveBeenCalledWith('/repo', ['fetch', 'origin', 'pull/42/head']);
-    expect(runGit).toHaveBeenCalledWith('/repo', [
-      'worktree',
-      'add',
-      '-b',
-      'feature/pull-request-42',
-      '/repo-feature-pull-request-42',
-      'FETCH_HEAD',
-    ]);
+    expect(createWorktree).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      branchName: 'feature/pull-request-42',
+      reuseExisting: true,
+      startPoint: 'FETCH_HEAD',
+    });
 
     await expect(service.createBranch('/repo', 'feature/pull-request-43', false, 43)).resolves.toBe('/repo');
     expect(runGit).toHaveBeenCalledWith('/repo', ['fetch', 'origin', 'pull/43/head']);

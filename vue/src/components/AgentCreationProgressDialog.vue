@@ -14,6 +14,7 @@
       v-if="progress"
       :key="progress.id"
       :state="progress.state"
+      :active-step="activeStep"
       :eyebrow="t('agentCreationProgress.eyebrow')"
       :title="runningTitle"
       :complete-title="t('agentCreationProgress.ready', { agent: progress.agentName ?? progress.branchName ?? progress.repositoryName })"
@@ -52,13 +53,20 @@ const runningTitle = computed(() => props.progress?.createWorktree
 const steps = computed<StagedOperationStep[]>(() => {
   const progress = props.progress;
   if (!progress) return [];
+  const creationSteps: StagedOperationStep[] = [{
+    title: progress.createWorktree
+      ? t('repositoryBacklog.createIsolatedWorktree')
+      : t('agentCreationProgress.useRepository'),
+    detail: progress.branchName ?? progress.repositoryName,
+  }];
+  if (progress.createWorktree) {
+    creationSteps.push({
+      title: t('agentCreationProgress.initializeWorktree'),
+      detail: progress.initializationDetail ?? t('agentCreationProgress.checkProjectSetup'),
+    });
+  }
   return [
-    {
-      title: progress.createWorktree
-        ? t('repositoryBacklog.createIsolatedWorktree')
-        : t('agentCreationProgress.useRepository'),
-      detail: progress.branchName ?? progress.repositoryName,
-    },
+    ...creationSteps,
     {
       title: t('repositoryBacklog.startAgentSession'),
       detail: t('agentCreationProgress.newSession', {
@@ -72,6 +80,17 @@ const steps = computed<StagedOperationStep[]>(() => {
       detail: progress.repositoryName,
     },
   ];
+});
+const activeStep = computed(() => {
+  const progress = props.progress;
+  if (!progress?.phase) return undefined;
+  if (!progress.createWorktree) {
+    return progress.phase === 'startingPrompt' ? 2 : 1;
+  }
+  if (progress.phase === 'initializingWorktree') return 1;
+  if (progress.phase === 'creatingAgent') return 2;
+  if (progress.phase === 'startingPrompt') return 3;
+  return 0;
 });
 
 function onVisibilityChanged(visible: boolean): void {

@@ -9,6 +9,16 @@ type CommandRunner = {
   run: (command: string, args: string[], options: { cwd: string }) => Promise<{ stdout?: string }>;
 };
 
+export type GitWorktreeCreateInput = CreateSourceWorktreeInput & {
+  reuseExisting?: boolean;
+  startPoint?: string;
+};
+
+type GitWorktreeCreateResult = {
+  worktree: SourceWorktree;
+  created: boolean;
+};
+
 const defaultRunner: CommandRunner = {
   run: (command, args, options) => execFileAsync(command, args, options),
 };
@@ -21,23 +31,38 @@ export function suggestedSourceWorktreePath(repoPath: string, branchName: string
 }
 
 export async function createSourceWorktree(
-  input: CreateSourceWorktreeInput,
+  input: GitWorktreeCreateInput,
   runner: CommandRunner = defaultRunner,
 ): Promise<SourceWorktree> {
+  return (await createGitWorktree(input, runner)).worktree;
+}
+
+export async function createGitWorktree(
+  input: GitWorktreeCreateInput,
+  runner: CommandRunner = defaultRunner,
+): Promise<GitWorktreeCreateResult> {
   const repoPath = input.repoPath.trim();
   const branchName = input.branchName.trim();
   if (!branchName) {
     throw new Error('Branch name is required.');
   }
 
+  if (input.reuseExisting) {
+    const existing = (await listSourceWorktrees(repoPath, runner)).find((worktree) => worktree.name === branchName);
+    if (existing) return { worktree: existing, created: false };
+  }
+
   const worktreePath = input.destinationPath?.trim() || suggestedSourceWorktreePath(repoPath, branchName);
   const localBranch = await branchExists(runner, repoPath, `refs/heads/${branchName}`);
   if (localBranch) {
     await runner.run('git', ['worktree', 'add', worktreePath, branchName], { cwd: repoPath });
+    if (input.startPoint) {
+      await runner.run('git', ['merge', '--ff-only', input.startPoint], { cwd: worktreePath });
+    }
   } else {
-    const remoteBranch = await findRemoteBranch(runner, repoPath, branchName);
+    const remoteBranch = input.startPoint ? undefined : await findRemoteBranch(runner, repoPath, branchName);
     const baseBranch = input.baseBranch?.trim();
-    const startPoint = remoteBranch ?? (baseBranch
+    const startPoint = input.startPoint ?? remoteBranch ?? (baseBranch
       ? await resolveBranchStartPoint(runner, repoPath, baseBranch)
       : undefined);
     await runner.run('git', remoteBranch
@@ -53,8 +78,11 @@ export async function createSourceWorktree(
   }
 
   return {
-    name: slug(path.basename(branchName)),
-    path: worktreePath,
+    worktree: {
+      name: slug(path.basename(branchName)),
+      path: worktreePath,
+    },
+    created: true,
   };
 }
 

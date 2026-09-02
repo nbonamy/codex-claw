@@ -339,6 +339,8 @@ export const messages = {
       ready: '{agent} is ready',
       failed: 'Couldn’t create the agent',
       useRepository: 'Using repository',
+      initializeWorktree: 'Initializing worktree',
+      checkProjectSetup: 'Checking project setup',
       newSession: 'New {backend} session',
       handOverInstructions: 'Handing over initial instructions',
       finishSetup: 'Finishing agent setup',

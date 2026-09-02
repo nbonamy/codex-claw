@@ -40,6 +40,21 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
+  it('updates the worktree initialization policy', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+    await flushPromises();
+
+    const row = wrapper.findAllComponents({ name: 'SettingsRow' })
+      .find((candidate) => candidate.text().includes('Worktree initialization'));
+    expect(row).toBeDefined();
+    await row!.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'repository');
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { worktreeInitializationMode: 'repository' },
+    });
+  });
+
   it('toggles the background service through Settings', async () => {
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
     let resolveInstall: () => void = () => undefined;

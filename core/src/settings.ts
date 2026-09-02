@@ -21,6 +21,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   agentListCompact: false,
   collapsedRepositoryKeys: [],
   shareCodexSkillsAndPlugins: true,
+  worktreeInitializationMode: 'automatic',
   repositoryIcons: {},
   appshots: { ...defaultAppshotSettings },
   plugins: { ...defaultPluginSettings },
@@ -101,10 +102,15 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     agentListCompact: value.agentListCompact === true,
     collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
     shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
+    worktreeInitializationMode: normalizeWorktreeInitializationMode(value.worktreeInitializationMode),
     repositoryIcons: normalizeRepositoryIcons(value.repositoryIcons),
     appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
   };
+}
+
+function normalizeWorktreeInitializationMode(value: unknown): AppGeneralSettings['worktreeInitializationMode'] {
+  return value === 'repository' || value === 'off' ? value : 'automatic';
 }
 
 function normalizeRepositoryIcons(value: unknown): Record<string, string> {

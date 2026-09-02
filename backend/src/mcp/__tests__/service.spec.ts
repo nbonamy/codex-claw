@@ -5,6 +5,7 @@ import type { Agent, AppSnapshot, Automation } from '@codex-claw/core/contracts'
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
+import { WorktreeManager } from '../../worktrees/worktree-manager';
 import { ClawMcpService } from '../service';
 
 describe('ClawMcpService', () => {
@@ -470,12 +471,21 @@ describe('ClawMcpService', () => {
       snapshot,
       onEvent: (event) => events.push(event),
       resolveWorkspaceIdentity,
+      worktreeManager: new WorktreeManager({
+        createGitWorktree: vi.fn().mockResolvedValue({
+          worktree: { name: 'delegated-work', path: '/tmp/codex-sdk-feature' },
+          created: true,
+        }),
+        getInitializationMode: () => 'repository',
+      }),
     });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
     const url = await service.start();
 
     const response = await callTool(url, 'agent-dina', 'create-agent', {
-      repoPath: '/tmp/codex-sdk-feature',
+      repoPath: '/tmp/codex-sdk',
+      createWorktree: true,
+      branchName: 'feature/delegated-work',
       name: 'SDK worker',
       prompt: 'Implement the SDK contract and run focused tests.',
     });
@@ -496,16 +506,19 @@ describe('ClawMcpService', () => {
       promptSubmitted: true,
       message: 'Created agent SDK worker and started its initial prompt.',
     });
-    expect(events.filter((event) => event.type === 'agentCreation.progress')).toEqual([
-      expect.objectContaining({
-        agentId: 'agent-dina',
-        payload: expect.objectContaining({ state: 'running', repositoryName: 'codex-sdk-feature', hasPrompt: true }),
-      }),
-      expect.objectContaining({
-        agentId: 'agent-dina',
-        payload: expect.objectContaining({ state: 'success', agentId: createdAgent!.id, agentName: 'SDK worker' }),
-      }),
+    const creationProgress = events.filter((event) => event.type === 'agentCreation.progress');
+    expect(creationProgress.map((event) => event.payload.phase ?? event.payload.state)).toStrictEqual([
+      'creatingWorktree',
+      'initializingWorktree',
+      'initializingWorktree',
+      'creatingAgent',
+      'startingPrompt',
+      'success',
     ]);
+    expect(creationProgress.at(-1)).toEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      payload: expect.objectContaining({ state: 'success', agentId: createdAgent!.id, agentName: 'SDK worker' }),
+    }));
     expect(resolveWorkspaceIdentity).toHaveBeenCalledWith('/tmp/codex-sdk-feature');
     const sidebar = projectWorkspaceSidebar({
       agents: snapshot.agents,

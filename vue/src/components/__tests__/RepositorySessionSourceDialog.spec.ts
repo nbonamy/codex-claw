@@ -148,15 +148,20 @@ describe('RepositorySessionSourceDialog', () => {
     vi.advanceTimersByTime(1_200);
     await nextTick();
     expect(wrapper.get('.staged-operation-progress li.is-active').text())
+      .toContain('Initializing worktree');
+
+    vi.advanceTimersByTime(1_700);
+    await nextTick();
+    expect(wrapper.get('.staged-operation-progress li.is-active').text())
       .toContain('Starting agent session');
 
     await wrapper.setProps({ assignmentState: 'success' });
-    vi.advanceTimersByTime(1_600);
+    vi.advanceTimersByTime(1_700);
     await nextTick();
     expect(wrapper.get('.staged-operation-progress li.is-active').text())
       .toContain('Handing over work context');
 
-    vi.advanceTimersByTime(1_600);
+    vi.advanceTimersByTime(1_500);
     await nextTick();
     expect(wrapper.get('.staged-operation-progress__heading').text())
       .toContain('Work on #24 is ready');

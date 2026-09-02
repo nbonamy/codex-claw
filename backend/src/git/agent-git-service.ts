@@ -4,12 +4,13 @@ import { promisify } from 'node:util';
 import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
-import { suggestedSourceWorktreePath } from '../git-worktrees';
+import type { GitWorktreeCreateInput } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
 
 export type AgentGitServiceClock = () => Date;
 export type AgentGitRunner = (cwd: string, args: string[]) => Promise<{ stdout: string }>;
+type AgentGitWorktreeCreator = (input: GitWorktreeCreateInput) => Promise<{ path: string }>;
 
 export type AgentGitGenerationContext = {
   context: string;
@@ -20,6 +21,7 @@ export class AgentGitService {
   constructor(
     private readonly now: AgentGitServiceClock = () => new Date(),
     private readonly runGit: AgentGitRunner = git,
+    private readonly createWorktree?: AgentGitWorktreeCreator,
   ) {}
 
   async identity(folder: string): Promise<AgentWorkspaceIdentity> {
@@ -276,18 +278,13 @@ export class AgentGitService {
       startPoint = 'FETCH_HEAD';
     }
     if (createWorktree) {
-      const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
-      const existingWorktree = worktrees.find((worktree) => worktree.branch === normalized);
-      if (existingWorktree) return existingWorktree.path;
-
-      const worktreePath = suggestedSourceWorktreePath(folder, normalized);
-      const branchExists = await this.localBranchExists(folder, normalized);
-      const remoteBranch = branchExists || startPoint ? undefined : await this.remoteBranch(folder, normalized);
-      await this.runGit(folder, branchExists
-        ? ['worktree', 'add', worktreePath, normalized]
-        : ['worktree', 'add', '-b', normalized, worktreePath, startPoint ?? remoteBranch].filter((value): value is string => Boolean(value)));
-      if (branchExists && startPoint) await this.runGit(worktreePath, ['merge', '--ff-only', startPoint]);
-      return worktreePath;
+      if (!this.createWorktree) throw new Error('Worktree creation is not configured.');
+      return (await this.createWorktree({
+        repoPath: folder,
+        branchName: normalized,
+        reuseExisting: true,
+        ...(startPoint ? { startPoint } : {}),
+      })).path;
     }
     const branchExists = await this.localBranchExists(folder, normalized);
     if (branchExists) {

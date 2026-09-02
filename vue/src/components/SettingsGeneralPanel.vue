@@ -71,6 +71,31 @@
           />
         </template>
       </SettingsRow>
+      <SettingsRow
+        :title="$t('surface.settingsGeneralPanel.worktreeInitialization')"
+        :description="$t('surface.settingsGeneralPanel.prepareNewWorktreesBeforeAgentsStart')"
+      >
+        <template #control>
+          <el-select
+            :model-value="settings.worktreeInitializationMode"
+            :aria-label="$t('surface.settingsGeneralPanel.worktreeInitialization')"
+            @update:model-value="updateWorktreeInitializationMode"
+          >
+            <el-option
+              :label="$t('surface.settingsGeneralPanel.worktreeInitializationAutomatic')"
+              value="automatic"
+            />
+            <el-option
+              :label="$t('surface.settingsGeneralPanel.worktreeInitializationRepository')"
+              value="repository"
+            />
+            <el-option
+              :label="$t('surface.settingsGeneralPanel.off')"
+              value="off"
+            />
+          </el-select>
+        </template>
+      </SettingsRow>
     </SettingsSection>
 
     <SettingsSection
@@ -175,7 +200,7 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
 import { defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
@@ -373,6 +398,12 @@ function updateCelebrationsEnabled(value: boolean | string | number): void {
     general: {
       celebrationsEnabled: value === true,
     },
+  });
+}
+
+function updateWorktreeInitializationMode(value: WorktreeInitializationMode): void {
+  void props.updateSettings?.({
+    general: { worktreeInitializationMode: value },
   });
 }
 

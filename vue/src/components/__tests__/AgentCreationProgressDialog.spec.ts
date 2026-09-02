@@ -19,6 +19,7 @@ describe('AgentCreationProgressDialog', () => {
           createWorktree: true,
           branchName: 'feature/contracts',
           hasPrompt: true,
+          phase: 'creatingWorktree',
         },
       },
       global: { plugins: [ElementPlus] },
@@ -27,7 +28,17 @@ describe('AgentCreationProgressDialog', () => {
 
     expect(wrapper.text()).toContain('Building an isolated home in codex-app-sdk');
     expect(wrapper.text()).toContain('Creating isolated worktree');
+    expect(wrapper.text()).toContain('Initializing worktree');
     expect(wrapper.text()).toContain('Handing over initial instructions');
+
+    await wrapper.setProps({
+      progress: {
+        ...wrapper.props('progress')!,
+        phase: 'initializingWorktree',
+        initializationDetail: 'npm ci · uv sync',
+      },
+    });
+    expect(wrapper.text()).toContain('npm ci · uv sync');
 
     await wrapper.setProps({
       progress: {

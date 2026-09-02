@@ -22,6 +22,7 @@ import { warnMain } from './log';
 import { initializeCodexResourceSharing } from './codex-resource-sharing';
 import { loadPluginStatus } from './plugin-status';
 import { AgentGitService } from './git/agent-git-service';
+import { WorktreeManager } from './worktrees/worktree-manager';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -52,7 +53,14 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     computerUseEnabled: computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
     chromeEnabled: pluginStatus.chromeEnabled,
   });
-  const agentGitService = new AgentGitService();
+  const worktreeManager = new WorktreeManager({
+    getInitializationMode: () => snapshot.general.worktreeInitializationMode,
+  });
+  const agentGitService = new AgentGitService(
+    undefined,
+    undefined,
+    async (input) => (await worktreeManager.create(input)).worktree,
+  );
   const mcpService = new ClawMcpService({
     snapshot,
     computerUse: computerUseAvailable ? {
@@ -67,6 +75,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
     } : undefined,
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
+    worktreeManager,
   });
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
@@ -74,7 +83,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     generalSettings: snapshot.general,
     pluginSettings,
   });
-  const driverRpc = new BackendDriverRpc(backendDrivers);
+  const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
   let server: ClawBackendServer;
   const workIntegrations = new WorkIntegrationManager({
     drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],

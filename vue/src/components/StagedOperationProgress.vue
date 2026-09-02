@@ -44,6 +44,7 @@ export type StagedOperationStep = {
 };
 
 const props = defineProps<{
+  activeStep?: number;
   completeTitle: string;
   eyebrow: string;
   errorTitle?: string;
@@ -56,7 +57,7 @@ const emit = defineEmits<{
   complete: [];
 }>();
 
-const displayStep = ref(0);
+const displayStep = ref(props.activeStep ?? 0);
 const startedAt = Date.now();
 let completionScheduled = false;
 const timers: Array<ReturnType<typeof globalThis.setTimeout>> = [];
@@ -65,12 +66,19 @@ const displayTitle = computed(() => {
   return displayStep.value === props.steps.length ? props.completeTitle : props.title;
 });
 
-timers.push(globalThis.setTimeout(() => {
-  displayStep.value = Math.min(1, props.steps.length);
-}, 1_100));
-timers.push(globalThis.setTimeout(() => {
-  displayStep.value = Math.min(2, props.steps.length);
-}, 2_800));
+if (props.activeStep === undefined) {
+  for (let step = 1; step < props.steps.length; step += 1) {
+    timers.push(globalThis.setTimeout(() => {
+      displayStep.value = Math.min(step, props.steps.length);
+    }, 1_100 + ((step - 1) * 1_700)));
+  }
+}
+
+watch(() => props.activeStep, (activeStep) => {
+  if (activeStep !== undefined && props.state === 'running') {
+    displayStep.value = Math.min(activeStep, props.steps.length);
+  }
+});
 
 watch(() => props.state, (state) => {
   if (state === 'success') finish();
@@ -82,10 +90,11 @@ onBeforeUnmount(clearTimers);
 function finish(): void {
   if (completionScheduled) return;
   completionScheduled = true;
+  const minimumDuration = 3_800 + (Math.max(0, props.steps.length - 3) * 1_700);
   timers.push(globalThis.setTimeout(() => {
     displayStep.value = props.steps.length;
     timers.push(globalThis.setTimeout(() => emit('complete'), 600));
-  }, Math.max(0, 3_800 - (Date.now() - startedAt))));
+  }, props.activeStep === undefined ? Math.max(0, minimumDuration - (Date.now() - startedAt)) : 0));
 }
 
 function stepClass(index: number): string {

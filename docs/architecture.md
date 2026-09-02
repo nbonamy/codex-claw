@@ -144,9 +144,21 @@ or malformed git metadata.
 Listing and creating worktrees are backend operations. Discovery can show
 shallow worktree hints from source-folder metadata, but an explicit worktree
 list runs `git worktree list --porcelain` inside `clawd`. Creating a worktree
-runs `git worktree add -b <branch> <destination>` for the selected repository,
-then refreshes discovery. Renderer code and MCP tools request this through
-typed app APIs; they never scan arbitrary folders or spawn git directly.
+runs through the shared backend worktree manager, which creates the checkout,
+initializes it, and then refreshes discovery. Renderer code, Git workflows, and
+MCP tools request this through typed app interfaces; they never scan arbitrary
+folders, spawn Git, or run initialization independently.
+
+Repositories may provide deterministic setup under `.agents/worktree/`. On
+macOS, Claw selects `setup-macos.sh` and falls back to `setup`; Linux selects
+`setup-linux.sh` and falls back to `setup`; Windows selects `setup-win.ps1` and
+falls back to `setup`. Only the first applicable file runs. An empty applicable
+file is an intentional no-op. When no repository setup applies, the user's
+worktree-initialization setting may let `clawd` detect every supported ecosystem
+at the worktree root and restore their dependencies sequentially. Repository
+setup always takes precedence over detection, and existing worktrees are not
+initialized again. Local and remote worktrees follow the same contract on the
+`clawd` that owns their filesystem.
 
 The renderer uses source repositories only as creation affordances: Settings
 chooses or clears the source folder; **Add project** can open a discovered

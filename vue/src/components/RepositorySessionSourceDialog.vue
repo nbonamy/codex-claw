@@ -181,6 +181,7 @@ const preparationSteps = computed(() => {
   }
   return [
     { title: t('repositoryBacklog.createIsolatedWorktree'), detail: assignmentBranchName.value },
+    { title: t('agentCreationProgress.initializeWorktree'), detail: t('agentCreationProgress.checkProjectSetup') },
     { title: t('repositoryBacklog.startAgentSession'), detail: t('repositoryBacklog.newCodexSession') },
     { title: t('repositoryBacklog.handOverWorkContext'), detail: props.repositoryName },
   ];

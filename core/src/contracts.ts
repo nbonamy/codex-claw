@@ -663,6 +663,8 @@ export type AppshotSettings = {
   playSound: boolean;
 };
 
+export type WorktreeInitializationMode = 'automatic' | 'repository' | 'off';
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
@@ -672,6 +674,7 @@ export type AppGeneralSettings = {
   agentListCompact: boolean;
   collapsedRepositoryKeys: string[];
   shareCodexSkillsAndPlugins: boolean;
+  worktreeInitializationMode: WorktreeInitializationMode;
   repositoryIcons: Record<string, string>;
   appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
@@ -1388,6 +1391,8 @@ export type AgentCreationProgress = {
   createWorktree: boolean;
   branchName?: string;
   hasPrompt: boolean;
+  phase?: 'creatingWorktree' | 'initializingWorktree' | 'creatingAgent' | 'startingPrompt';
+  initializationDetail?: string;
   agentId?: string;
   agentName?: string;
   error?: string;

@@ -9,6 +9,7 @@ import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
   Agent,
+  AgentCreationProgress,
   AgentWorkspaceIdentity,
   AppSnapshot,
   BackendConversationRef,
@@ -29,8 +30,9 @@ import { closeAgentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnap
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { createAgentInSnapshot, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
-import { createSourceWorktree, listSourceWorktrees } from '../git-worktrees';
+import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
+import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
 import type { BackendDriverRpc } from '../driver-rpc';
 import { ClawMcpAgentCoordinator, McpToolError, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
@@ -48,6 +50,7 @@ export type ClawMcpServiceOptions = {
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
+  worktreeManager?: WorktreeManager;
 };
 
 export class ClawMcpService {
@@ -57,6 +60,7 @@ export class ClawMcpService {
   private readonly computerUseEnabled: () => boolean;
   private readonly now: () => Date;
   private readonly resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
+  private readonly worktreeManager: WorktreeManager;
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
@@ -67,6 +71,7 @@ export class ClawMcpService {
     this.now = options.now ?? (() => new Date());
     this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
     this.resolveWorkspaceIdentity = options.resolveWorkspaceIdentity;
+    this.worktreeManager = options.worktreeManager ?? new WorktreeManager();
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => this.snapshot.agents,
@@ -427,8 +432,11 @@ export class ClawMcpService {
     return listSourceWorktrees(repoPath);
   }
 
-  private async createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
-    return createSourceWorktree(input);
+  private async createSourceWorktree(
+    input: CreateSourceWorktreeInput,
+    onInitializationProgress?: (progress: WorktreeInitializationProgress) => void,
+  ): Promise<SourceWorktree> {
+    return (await this.worktreeManager.create(input, { onInitializationProgress })).worktree;
   }
 
   private async createAgentFromMcp(
@@ -457,7 +465,11 @@ export class ClawMcpService {
     this.emit({
       agentId: caller.id,
       type: 'agentCreation.progress',
-      payload: { ...progress, state: 'running' },
+      payload: {
+        ...progress,
+        state: 'running',
+        phase: input.createWorktree ? 'creatingWorktree' : 'creatingAgent',
+      },
     });
 
     try {
@@ -467,7 +479,19 @@ export class ClawMcpService {
           repoPath,
           branchName: branchName!,
           ...(input.destinationPath?.trim() ? { destinationPath: input.destinationPath.trim() } : {}),
-        })).path;
+        }, (initialization) => this.emitAgentCreationInitializationProgress(
+          caller.id,
+          progress,
+          initialization,
+        ))).path;
+      }
+
+      if (input.createWorktree) {
+        this.emit({
+          agentId: caller.id,
+          type: 'agentCreation.progress',
+          payload: { ...progress, state: 'running', phase: 'creatingAgent' },
+        });
       }
 
       const createInput: CreateAgentInput = {
@@ -489,6 +513,11 @@ export class ClawMcpService {
 
       this.emitSnapshotUpdated(createdAgent.id);
       if (prompt) {
+        this.emit({
+          agentId: caller.id,
+          type: 'agentCreation.progress',
+          payload: { ...progress, state: 'running', phase: 'startingPrompt' },
+        });
         await this.startAgentWithPrompt(createdAgent, prompt);
       }
 
@@ -523,6 +552,28 @@ export class ClawMcpService {
       });
       throw error;
     }
+  }
+
+  private emitAgentCreationInitializationProgress(
+    callerAgentId: string,
+    progress: Omit<AgentCreationProgress, 'state'>,
+    initialization: WorktreeInitializationProgress,
+  ): void {
+    const initializationDetail = initialization.phase === 'running'
+      ? initialization.command
+      : initialization.phase === 'complete' && initialization.commands.length > 0
+        ? initialization.commands.join(' · ')
+        : undefined;
+    this.emit({
+      agentId: callerAgentId,
+      type: 'agentCreation.progress',
+      payload: {
+        ...progress,
+        state: 'running',
+        phase: 'initializingWorktree',
+        ...(initializationDetail ? { initializationDetail } : {}),
+      },
+    });
   }
 
   private startAgentWithPrompt(agent: Agent, prompt: string): Promise<void> {

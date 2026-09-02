@@ -168,6 +168,9 @@ follow [Custom MCP Tools](custom-tools.md).
 - Use the native system sans stack and restrained weights.
 - Make reachable loading, working, awaiting-input, empty, offline, error, and
   interrupted states explicit near the action or content they affect.
+- Drive staged operation steps from semantic backend phases when real progress
+  is available. Timing may smooth completion, but it must not imply that a
+  backend phase has completed before it actually has.
 - Commit an async result only while its request identity still matches the
   active selection.
 

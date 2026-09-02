@@ -9,7 +9,8 @@ import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
 import { resolveCodexCommand } from './codex/codex-command';
 import { createCodexSurface } from '@codex-app-sdk/backend';
-import { createSourceWorktree, listSourceBranches, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
+import { listSourceBranches, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
+import { WorktreeManager } from './worktrees/worktree-manager';
 import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
 import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
@@ -79,7 +80,10 @@ export class BackendDriverRpc {
   private readonly listeners = new Set<(event: BackendEvent) => void>();
   private readonly unsubscribeDriverEvents: (() => void)[];
 
-  constructor(private readonly drivers: Map<AgentBackend, AgentBackendDriver>) {
+  constructor(
+    private readonly drivers: Map<AgentBackend, AgentBackendDriver>,
+    private readonly worktreeManager = new WorktreeManager(),
+  ) {
     this.unsubscribeDriverEvents = [...drivers.values()].map((driver) => driver.onEvent((event) => this.emit(event)));
   }
 
@@ -367,7 +371,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.sourceWorktreeCreate: {
         const record = requireRecord(params);
-        return createSourceWorktree(record.input as CreateSourceWorktreeInput);
+        return (await this.worktreeManager.create(record.input as CreateSourceWorktreeInput)).worktree;
       }
       default:
         return undefined;
