@@ -1,0 +1,168 @@
+import { PRIMARY_BROWSER_ID, type WorkItem } from '@codex-claw/core/contracts';
+import type { CodexConversationVisualization } from '@codex-app-sdk/vue';
+import { computed, reactive } from 'vue';
+import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
+import {
+  isRightWorkspaceDiffTab,
+  isRightWorkspaceFileTab,
+  isRightWorkspaceImageTab,
+  type RightWorkspaceDiffPanel,
+  type RightWorkspaceDiffTab,
+  type RightWorkspaceFilePanel,
+  type RightWorkspaceFileTab,
+  type RightWorkspaceImageTab,
+  type RightWorkspaceTab,
+} from './right-workspace';
+
+export type AgentRightWorkspaceState = {
+  activeTab: RightWorkspaceTab | null;
+  backlogError: string | null;
+  backlogItems: WorkItem[];
+  backlogStatus: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  browserId: string;
+  browserInitialUrl: string;
+  browserOpenRequestId: number;
+  browserVisualization: CodexConversationVisualization | null;
+  filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
+  filesPaneOpen: boolean;
+  filesPaneWidth: number;
+  filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
+  diffPanels: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
+  gitReviewPanel: SidePanelGitDiffState | null;
+  imagePanels: Partial<Record<RightWorkspaceImageTab, SidePanelImageState>>;
+  planPanel: SidePanelMarkdownState | null;
+  open: boolean;
+  tabs: RightWorkspaceTab[];
+  width: number;
+};
+
+export function useRightWorkspaceState(options: {
+  currentAgentId: () => string | undefined;
+  workspaceBody: () => HTMLElement | null;
+}) {
+  const workspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
+  const visible = computed(() => {
+    const agentId = options.currentAgentId();
+    return Boolean(agentId && workspaceFor(agentId).open);
+  });
+
+  function workspaceFor(agentId: string): AgentRightWorkspaceState {
+    const existing = workspaces[agentId];
+    if (existing) return existing;
+    const created: AgentRightWorkspaceState = {
+      activeTab: null,
+      backlogError: null,
+      backlogItems: [],
+      backlogStatus: 'notLoaded',
+      browserId: PRIMARY_BROWSER_ID,
+      browserInitialUrl: '',
+      browserOpenRequestId: 0,
+      browserVisualization: null,
+      filePanels: {},
+      filesPaneOpen: false,
+      filesPaneWidth: 280,
+      filePreviewRequestIds: {},
+      diffPanels: {},
+      gitReviewPanel: null,
+      imagePanels: {},
+      planPanel: null,
+      open: false,
+      tabs: [],
+      width: 420,
+    };
+    workspaces[agentId] = created;
+    return created;
+  }
+
+  function isVisible(agentId: string): boolean {
+    return options.currentAgentId() === agentId && workspaceFor(agentId).open;
+  }
+
+  function toggle(): void {
+    const agentId = options.currentAgentId();
+    if (!agentId) return;
+    const workspace = workspaceFor(agentId);
+    workspace.open = !visible.value;
+  }
+
+  function openTab(tab: RightWorkspaceTab, agentId = options.currentAgentId()): void {
+    if (!agentId) return;
+    const workspace = workspaceFor(agentId);
+    if (!workspace.tabs.includes(tab)) workspace.tabs = [...workspace.tabs, tab];
+    workspace.activeTab = tab;
+    workspace.open = true;
+  }
+
+  function selectTab(agentId: string, tab: RightWorkspaceTab): void {
+    const workspace = workspaceFor(agentId);
+    if (workspace.tabs.includes(tab)) workspace.activeTab = tab;
+  }
+
+  function closeTab(agentId: string, tab: RightWorkspaceTab): void {
+    const workspace = workspaceFor(agentId);
+    const tabIndex = workspace.tabs.indexOf(tab);
+    if (tabIndex === -1) return;
+    const nextTabs = workspace.tabs.filter((candidate) => candidate !== tab);
+    workspace.tabs = nextTabs;
+    if (tab === 'review') workspace.gitReviewPanel = null;
+    if (tab === 'plan') workspace.planPanel = null;
+    if (tab === 'files') workspace.filesPaneOpen = false;
+    if (isRightWorkspaceFileTab(tab)) {
+      const { [tab]: _closedPanel, ...filePanels } = workspace.filePanels;
+      const { [tab]: _closedRequest, ...requestIds } = workspace.filePreviewRequestIds;
+      workspace.filePanels = filePanels;
+      workspace.filePreviewRequestIds = requestIds;
+    }
+    if (isRightWorkspaceDiffTab(tab)) {
+      const { [tab]: _closedPanel, ...diffPanels } = workspace.diffPanels;
+      workspace.diffPanels = diffPanels;
+    }
+    if (isRightWorkspaceImageTab(tab)) {
+      const { [tab]: _closedPanel, ...imagePanels } = workspace.imagePanels;
+      workspace.imagePanels = imagePanels;
+    }
+    if (workspace.activeTab === tab) {
+      workspace.activeTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
+    }
+    if (nextTabs.length === 0) {
+      workspace.activeTab = null;
+      workspace.open = false;
+    }
+  }
+
+  function toggleFiles(agentId: string): void {
+    const workspace = workspaceFor(agentId);
+    workspace.filesPaneOpen = !workspace.filesPaneOpen;
+  }
+
+  function startResize(event: PointerEvent): void {
+    event.preventDefault();
+    const body = options.workspaceBody();
+    const agentId = options.currentAgentId();
+    if (!body || !agentId) return;
+    const updateWidth = (moveEvent: PointerEvent) => {
+      const bounds = body.getBoundingClientRect();
+      const availableWidth = Math.max(240, bounds.width - 240);
+      workspaceFor(agentId).width = Math.min(Math.max(bounds.right - moveEvent.clientX, 240), availableWidth);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', updateWidth);
+      window.removeEventListener('pointerup', stop);
+    };
+    window.addEventListener('pointermove', updateWidth);
+    window.addEventListener('pointerup', stop, { once: true });
+  }
+
+  return {
+    closeTab,
+    isVisible,
+    openTab,
+    rightWorkspaceVisible: visible,
+    selectTab,
+    startResize,
+    toggle,
+    toggleFiles,
+    workspaceFor,
+    workspaces,
+  };
+}

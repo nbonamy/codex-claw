@@ -38,7 +38,8 @@ weight, and predictable geometry over decorative cards or explanatory copy.
 - **Components** own ephemeral interaction and derived presentation state such
   as an open popover, active tab, local query, or filtered local rows.
 - **`vue/src/app-state.ts`** owns renderer state shared across surfaces and the
-  client replica of server-authored app state.
+  client replica of server-authored app state. It is the public renderer-state
+  facade and event router, not the owner of every async workflow.
 - **Colocated composables** own reusable stateful behavior such as async
   loading, caching, request lifecycle, and mutations used by a focused surface.
 - **Renderer view models** stay beside the surface when their projection exists
@@ -68,6 +69,24 @@ request deduplication, source invalidation, stale-result rejection, and pushed
 updates remain one policy instead of being repeated in renderer state. Keep
 reusable dialog workflows such as repository acquisition in composables so the
 shell only supplies product context and navigation callbacks.
+
+The renderer-state facade delegates provider catalogs and authorization,
+composer catalogs and selections, unread policy, history paging, remote Bench
+catalogs, and source-repository discovery to focused `*-state.ts` modules.
+`AppShell` similarly delegates first-run onboarding, repository acquisition and
+session creation, issue and pull-request routing, Cockpit backlog state,
+per-agent right-workspace state, workspace preview request races, and image
+annotation to `use-*.ts` composables. Work-item routing owns branch resolution,
+worktree-backed agent creation, reassignment protection, prompt generation, and
+the pending new/Bench-agent assignment lifecycle. New multi-step state belongs
+in the relevant module; keep simple navigation and one-step event forwarding in
+the facade or shell.
+
+The shell's rendered hierarchy follows the same ownership rule. First-run
+onboarding, team/agent navigation, backend connection status, and the active
+agent workspace are focused child components. The workspace owns plan,
+subagent, repository backlog, browser, link, and image routing; shell-level
+keyboard and native-menu commands live in a lifecycle-owning composable.
 
 ### Component Rules
 

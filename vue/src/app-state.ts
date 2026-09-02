@@ -1,26 +1,25 @@
 
 import { translate } from './i18n';
-import { localizedText } from './i18n/errors';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentFileActivity, AgentFilePreviewResult, AgentFileSearchItem, AgentHistoryLoadResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
-import {
-  promptSkillInputsFromText,
-  type CodexComposerState,
-  type CodexNativeAttachment,
-} from '@codex-app-sdk/vue';
+import { type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
 import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
-import { isFirstRunOnboardingActive } from './onboarding-session';
-import { clawHostCapabilities, clawPlatformActions, codexClawApi } from './platform-api';
-import { AsyncCatalogCache, type AsyncCatalogEntry, type AsyncCatalogStatus } from './async-catalog-cache';
+import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { createWorkProviderState, isRemoteAutomationLocation } from './work-provider-state';
+import { createAgentComposerState } from './agent-composer-state';
+import { createAgentUnreadState } from './agent-unread-state';
+import { createAgentHistoryState } from './agent-history-state';
+import { createRemoteBenchState } from './remote-bench-state';
+import { createSourceRepositoryState } from './source-repository-state';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -29,87 +28,135 @@ const sendingAgentIds = ref(new Set<string>());
 const composerStatesByAgentId = ref<Record<string, CodexComposerState>>({});
 const composerAttachmentsByAgentId = ref<Record<string, CodexNativeAttachment[]>>({});
 const answeredClientRequestIds = ref(new Set<string>());
-const backendModels = ref<BackendModelOption[]>([]);
-const modelCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
-const modelCatalogError = ref<string | null>(null);
-const backendSkills = ref<BackendSkillSummary[]>([]);
-const backendPlugins = ref<BackendPluginSummary[]>([]);
-const skillCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
-const skillCatalogError = ref<string | null>(null);
-const agentFiles = ref<AgentFileSearchItem[]>([]);
-const fileCatalogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
-const fileCatalogError = ref<string | null>(null);
-const selectedModelId = ref<string | null>(null);
-const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
-const selectedServiceTier = ref<string | null>(null);
-const planMode = ref(false);
 const sidePanelRequest = ref<SidePanelRequest | null>(null);
 const fileActivity = ref<AgentFileActivity | null>(null);
-const workProviderAuthorization = ref<WorkProviderAuthorization | null>(null);
-const workRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
-const workItemsByRepository = ref<Record<string, WorkItem[]>>({});
-const assignedWorkItemsByProvider = ref<Partial<Record<WorkProviderKind, WorkItem[]>>>({});
-const workBacklogStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
-const workBacklogError = ref<string | null>(null);
-const remoteBenchByConnectionId = ref<Record<string, BenchTemplate[]>>({});
-const remoteBenchStatusByConnectionId = ref<Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>>({});
-const remoteBenchErrorByConnectionId = ref<Record<string, string | null>>({});
-  const sourceRepositories = ref<SourceRepository[]>([]);
-  const openInApplications = ref<OpenInApplicationCatalog>({
-    defaultApplication: 'finder',
-    applications: [],
-  });
-const sourceRepositoryStatus = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
-const sourceRepositoryError = ref<string | null>(null);
+const openInApplications = ref<OpenInApplicationCatalog>({
+  defaultApplication: 'finder',
+  applications: [],
+});
 const daemonStatus = ref<ClawdDaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
 const agentCreationProgress = ref<AgentCreationProgress | null>(null);
-const unreadAgentIdSet = ref(new Set<string>());
-const rendererWindowFocused = ref(true);
-const hydratingAgentHistoryIds = ref(new Set<string>());
-const loadingOlderHistoryIds = ref(new Set<string>());
-const historyHasOlderByAgentId = ref<Record<string, boolean>>({});
-const catalogLoadsByAgentId = new Map<string, Promise<void>>();
-const modelCatalogCache = new AsyncCatalogCache<AgentBackend, BackendModelOption>((value) => ({ ...value }));
-const skillCatalogCache = new AsyncCatalogCache<string, BackendSkillSummary>((value) => ({ ...value }));
-const pluginCatalogCache = new AsyncCatalogCache<string, BackendPluginSummary>((value) => ({ ...value }));
-const fileCatalogCache = new AsyncCatalogCache<string, AgentFileSearchItem>((value) => ({ ...value }));
-type AgentComposerConfiguration = {
-  selectionSource: string;
-  models: BackendModelOption[];
-  modelStatus: AsyncCatalogStatus;
-  modelError: string | null;
-  skills: BackendSkillSummary[];
-  plugins: BackendPluginSummary[];
-  skillStatus: AsyncCatalogStatus;
-  skillError: string | null;
-  files: AgentFileSearchItem[];
-  fileStatus: AsyncCatalogStatus;
-  fileError: string | null;
-  selectedModelId: string | null;
-  selectedReasoningEffort: ReasoningEffort | null;
-  selectedServiceTier: string | null;
-  planMode: boolean;
-};
-const composerConfigurationByAgentId = new Map<string, AgentComposerConfiguration>();
 let agentSelectionRequestId = 0;
-let catalogSessionSource: unknown = null;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
 let lastBackendEventSeq = 0;
 let rendererSynchronization: Promise<void> | null = null;
 let synchronizeRendererSnapshotRequest: (() => Promise<void>) | null = null;
 let rendererConnectionRecovery: Promise<void> | null = null;
-const workProviderAuthorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
-const WORK_PROVIDER_AUTHORIZATION_POLL_MS = 5_000;
+const workProviders = createWorkProviderState({
+  adoptSnapshot: adoptBackgroundSnapshot,
+  getSnapshot: () => snapshot.value,
+});
+const {
+  assignedItemsByProvider: assignedWorkItemsByProvider,
+  authorization: workProviderAuthorization,
+  completeConnection: completeWorkProviderConnection,
+  configure: configureWorkBacklog,
+  connect: connectWorkProvider,
+  createItem: createWorkItem,
+  disconnect: disconnectWorkProvider,
+  error: workBacklogError,
+  itemsByRepository: workItemsByRepository,
+  loadAssignedItems: loadAssignedWorkItems,
+  loadConnected: loadConnectedWorkBacklogs,
+  loadGlobalItems: loadGlobalWorkItems,
+  loadItems: loadWorkItems,
+  loadRepositories: loadWorkRepositories,
+  openAuthorization: openWorkProviderAuthorization,
+  repositoriesByProvider: workRepositoriesByProvider,
+  status: workBacklogStatus,
+} = workProviders;
+const agentComposer = createAgentComposerState({ getSnapshot: () => snapshot.value });
+const {
+  agentFiles,
+  backendModels,
+  backendPlugins,
+  backendSkills,
+  clearActive: clearActiveComposerConfiguration,
+  fileCatalogError,
+  fileCatalogStatus,
+  handleMainEvent: syncComposerStateFromMainEvent,
+  loadActive: loadActiveAgentCatalogs,
+  loadAll: loadAllAgentCatalogs,
+  loadFiles: loadAgentFilesForActiveAgent,
+  loadModels: loadBackendModelsForActiveAgent,
+  loadPlugins: loadBackendPluginsForActiveAgent,
+  loadSkills: loadBackendSkillsForActiveAgent,
+  modelCatalogError,
+  modelCatalogStatus,
+  planMode,
+  rememberActive: rememberActiveComposerConfiguration,
+  resetIfSourceChanged: resetCatalogStateIfSourceChanged,
+  resolvePromptOptions: resolvedPromptOptions,
+  restore: restoreComposerConfiguration,
+  selectModel,
+  selectedModelId,
+  selectedReasoningEffort,
+  selectedServiceTier,
+  selectReasoningEffort,
+  selectServiceTier,
+  setPlanMode,
+  skillCatalogError,
+  skillCatalogStatus,
+  synchronizeAgentSelection: synchronizeComposerSelectionForAgent,
+} = agentComposer;
+const agentUnread = createAgentUnreadState({ getSnapshot: () => snapshot.value });
+const {
+  handleMainEvent: syncUnreadStateFromMainEvent,
+  markDebugAgentsUnread,
+  markRead: markAgentRead,
+  prune: pruneUnreadAgentIds,
+  reset: resetUnreadAgentIds,
+  setRendererWindowFocused,
+  unreadAgentIds,
+} = agentUnread;
+const agentHistory = createAgentHistoryState({
+  adoptSnapshotMetadata: adoptBackgroundSnapshotMetadata,
+  getSnapshot: () => snapshot.value,
+  synchronizeComposerSelection: synchronizeComposerSelectionForAgent,
+});
+const {
+  activeHistoryHasOlder,
+  handleMainEvent: syncHistoryPageStateFromMainEvent,
+  hydrateActive: hydrateActiveAgentHistory,
+  isHydratingActiveAgentHistory,
+  isLoadingOlderHistory,
+  loadOlder: loadOlderAgentHistory,
+  markHydrating: markAgentHistoryHydrating,
+} = agentHistory;
+const remoteBench = createRemoteBenchState({ getSnapshot: () => snapshot.value });
+const {
+  benchForLocation,
+  cacheSnapshot: cacheRemoteBenchSnapshot,
+  errorByConnectionId: remoteBenchErrorByConnectionId,
+  getSnapshot: getBenchSnapshot,
+  isRemote: isRemoteBenchLocation,
+  load: loadBench,
+  locationForAgent: benchLocationForAgent,
+  locationForTeamId: benchLocationForTeamId,
+  prune: pruneRemoteBenchCache,
+  remoteBenchByConnectionId,
+  statusByConnectionId: remoteBenchStatusByConnectionId,
+} = remoteBench;
+const sourceRepositoryState = createSourceRepositoryState({ getSnapshot: () => snapshot.value });
+const {
+  clone: cloneSourceRepository,
+  createWorktree: createSourceWorktree,
+  error: sourceRepositoryError,
+  list: listSourceRepositories,
+  listBranches: listSourceBranches,
+  listWorktrees: listSourceWorktrees,
+  load: loadSourceRepositories,
+  repositories: sourceRepositories,
+  status: sourceRepositoryStatus,
+} = sourceRepositoryState;
 
 export function useAppState() {
   let visibleMessageAgentId: string | null = null;
   let visibleMessageCache: RendererMessage[] = [];
-  const selectedModel = computed(() => selectedModelFromCatalog());
-  const unreadAgentIds = computed(() => [...unreadAgentIdSet.value]);
 
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
@@ -133,21 +180,6 @@ export function useAppState() {
     visibleMessageAgentId = agentId;
     visibleMessageCache = next;
     return visibleMessageCache;
-  });
-
-  const isHydratingActiveAgentHistory = computed(() => {
-    const agentId = activeAgent.value?.id;
-    return Boolean(agentId && hydratingAgentHistoryIds.value.has(agentId));
-  });
-
-  const activeHistoryHasOlder = computed(() => {
-    const agent = activeAgent.value;
-    if (!agent || agent.backend !== 'codex') return false;
-    return historyHasOlderByAgentId.value[agent.id] ?? true;
-  });
-  const isLoadingOlderHistory = computed(() => {
-    const agentId = activeAgent.value?.id;
-    return Boolean(agentId && loadingOlderHistoryIds.value.has(agentId));
   });
 
   const activeQueuedPrompts = computed(() => {
@@ -240,9 +272,8 @@ export function useAppState() {
     }
 
     resetCatalogStateIfSourceChanged(codexClawApi);
-    unreadAgentIdSet.value = new Set();
+    resetUnreadAgentIds();
     agentCreationProgress.value = null;
-    syncDockBadge();
 
     isLoading.value = true;
     bufferedMainEvents = [];
@@ -345,7 +376,7 @@ export function useAppState() {
 
     const parsedPlanCommand = parsePlanSlashCommand(prompt);
     if (parsedPlanCommand) {
-      planMode.value = true;
+      setPlanMode(true);
       if (!parsedPlanCommand.prompt) {
         return;
       }
@@ -530,37 +561,6 @@ export function useAppState() {
     void refreshAgentSelection(agentId, requestId, needsHistory);
   }
 
-  function setRendererWindowFocused(focused: boolean): void {
-    rendererWindowFocused.value = focused;
-    if (focused && snapshot.value.activeAgentId) {
-      markAgentRead(snapshot.value.activeAgentId);
-    } else if (focused) {
-      syncDockBadge();
-    }
-  }
-
-  function markDebugAgentsUnread(): void {
-    const activeAgent = snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
-    const currentTeam = snapshot.value.teams.find((team) => team.id === snapshot.value.activeTeamId) ??
-      snapshot.value.teams.find((team) => team.agentIds.includes(activeAgent?.id ?? '')) ?? null;
-    const agentsById = new Map(snapshot.value.agents.map((agent) => [agent.id, agent]));
-    const agentsForTeam = (agentIds: readonly string[]): Agent[] => agentIds
-      .map((agentId) => agentsById.get(agentId))
-      .filter((agent): agent is Agent => Boolean(agent));
-    const currentTeamCandidates = agentsForTeam(currentTeam?.agentIds ?? [])
-      .filter((agent) => agent.id !== activeAgent?.id);
-    const otherNonEmptyTeams = snapshot.value.teams.filter((team) => (
-      team.id !== currentTeam?.id && agentsForTeam(team.agentIds).length > 0
-    ));
-    const otherTeam = randomItem(otherNonEmptyTeams);
-    const targets = [
-      randomItem(currentTeamCandidates),
-      randomItem(agentsForTeam(otherTeam?.agentIds ?? [])),
-    ].filter((agent): agent is Agent => Boolean(agent));
-
-    markAgentsUnread(targets.map((agent) => agent.id));
-  }
-
   async function chooseAgentFolder(): Promise<string | null> {
     return await codexClawApi?.chooseAgentFolder?.() ?? null;
   }
@@ -583,64 +583,6 @@ export function useAppState() {
 
   async function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
     return await codexClawApi?.chooseSourceWorktreeDestination?.(defaultPath) ?? null;
-  }
-
-  async function createSourceWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
-    if (!codexClawApi?.createSourceWorktree) {
-      throw new Error(translate('surface.app-state.sourceWorktreeCreationIsNotAvailable'));
-    }
-
-    const worktree = await codexClawApi.createSourceWorktree(input);
-    await loadSourceRepositories();
-    return worktree;
-  }
-
-  async function loadSourceRepositories(): Promise<void> {
-    if (!codexClawApi?.listSourceRepositories || !snapshot.value.sourceFolder.path) {
-      sourceRepositories.value = [];
-      sourceRepositoryStatus.value = 'notLoaded';
-      sourceRepositoryError.value = null;
-      return;
-    }
-
-    sourceRepositoryStatus.value = 'loading';
-    sourceRepositoryError.value = null;
-    try {
-      sourceRepositories.value = await codexClawApi.listSourceRepositories();
-      sourceRepositoryStatus.value = 'loaded';
-    } catch (error) {
-      sourceRepositories.value = [];
-      sourceRepositoryStatus.value = 'error';
-      sourceRepositoryError.value = error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  async function listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]> {
-    if (!codexClawApi?.listSourceRepositories) {
-      return [];
-    }
-
-    return codexClawApi.listSourceRepositories(remoteConnectionId);
-  }
-
-  async function cloneSourceRepository(input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput): Promise<SourceRepository> {
-    if (!codexClawApi?.cloneSourceRepository) throw new Error(translate('surface.app-state.repositoryCloningIsNotAvailable'));
-    const repository = await codexClawApi.cloneSourceRepository(input);
-    await loadSourceRepositories();
-    return repository;
-  }
-
-  async function listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]> {
-    if (!codexClawApi?.listSourceBranches) return [];
-    return codexClawApi.listSourceBranches(repoPath, remoteConnectionId);
-  }
-
-  async function listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]> {
-    if (!codexClawApi?.listSourceWorktrees) {
-      return [];
-    }
-
-    return codexClawApi.listSourceWorktrees(repoPath, remoteConnectionId);
   }
 
   async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
@@ -1099,303 +1041,6 @@ export function useAppState() {
     if (clawHostCapabilities.appLifecycle) await codexClawApi?.restartApp?.();
   }
 
-  async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.connectWorkProvider) {
-      return;
-    }
-
-    workBacklogStatus.value = 'loading';
-    workBacklogError.value = null;
-    try {
-      const result = await codexClawApi.connectWorkProvider(provider);
-      adoptBackgroundSnapshot(result.snapshot);
-      workProviderAuthorization.value = result.authorization ?? null;
-      if (result.authorization) {
-        scheduleWorkProviderAuthorizationPoll(provider);
-      } else {
-        clearWorkProviderAuthorizationPoll(provider);
-      }
-      workBacklogStatus.value = 'loaded';
-    } catch (error) {
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      throw error;
-    }
-  }
-
-  async function openWorkProviderAuthorization(provider: WorkProviderKind): Promise<void> {
-    workBacklogStatus.value = 'loading';
-    workBacklogError.value = null;
-    try {
-      const authorization = workProviderAuthorization.value;
-      if (authorization?.provider === provider && clawPlatformActions.openExternal) {
-        await clawPlatformActions.openExternal(authorization.verificationUri);
-      } else if (codexClawApi?.openWorkProviderAuthorization) {
-        adoptBackgroundSnapshot(await codexClawApi.openWorkProviderAuthorization(provider));
-      } else {
-        return;
-      }
-      scheduleWorkProviderAuthorizationPoll(provider);
-      workBacklogStatus.value = 'loaded';
-    } catch (error) {
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      throw error;
-    }
-  }
-
-  async function completeWorkProviderConnection(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.completeWorkProviderConnection) {
-      return;
-    }
-
-    await pollWorkProviderConnection(provider, { userInitiated: true });
-  }
-
-  async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.disconnectWorkProvider) {
-      return;
-    }
-
-    adoptBackgroundSnapshot(await codexClawApi.disconnectWorkProvider(provider));
-    clearWorkProviderAuthorizationPoll(provider);
-    workProviderAuthorization.value = null;
-    workRepositoriesByProvider.value = {
-      ...workRepositoriesByProvider.value,
-      [provider]: [],
-    };
-    workItemsByRepository.value = {};
-    workBacklogStatus.value = 'notLoaded';
-    workBacklogError.value = null;
-  }
-
-  async function pollWorkProviderConnection(provider: WorkProviderKind, options: { userInitiated?: boolean } = {}): Promise<void> {
-    if (!codexClawApi?.completeWorkProviderConnection) {
-      return;
-    }
-
-    if (options.userInitiated) {
-      workBacklogStatus.value = 'loading';
-    }
-    workBacklogError.value = null;
-    try {
-      adoptBackgroundSnapshot(await codexClawApi.completeWorkProviderConnection(provider));
-      const connection = workProviderConnection(provider);
-      if (connection?.status === 'connected') {
-        clearWorkProviderAuthorizationPoll(provider);
-        workProviderAuthorization.value = null;
-        if (!isFirstRunOnboardingActive()) useConfetti().celebrate();
-        await loadWorkRepositories(provider);
-        return;
-      }
-
-      if (connection?.status === 'connecting' && workProviderAuthorization.value?.provider === provider) {
-        workBacklogStatus.value = 'loaded';
-        scheduleWorkProviderAuthorizationPoll(provider);
-        return;
-      }
-
-      clearWorkProviderAuthorizationPoll(provider);
-      workProviderAuthorization.value = null;
-      workBacklogStatus.value = connection?.status === 'error' ? 'error' : 'loaded';
-      workBacklogError.value = connection?.status === 'error' ? localizedText(connection.detail, translate) : null;
-    } catch (error) {
-      clearWorkProviderAuthorizationPoll(provider);
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      if (options.userInitiated) {
-        throw error;
-      }
-    }
-  }
-
-  function clearWorkProviderAuthorizationPoll(provider: WorkProviderKind): void {
-    const timer = workProviderAuthorizationPollTimers.get(provider);
-    if (timer === undefined) {
-      return;
-    }
-
-    globalThis.clearTimeout(timer);
-    workProviderAuthorizationPollTimers.delete(provider);
-  }
-
-  function scheduleWorkProviderAuthorizationPoll(provider: WorkProviderKind): void {
-    clearWorkProviderAuthorizationPoll(provider);
-    if (workProviderAuthorization.value?.provider !== provider || workProviderConnection(provider)?.status !== 'connecting') {
-      return;
-    }
-
-    const timer = globalThis.setTimeout(() => {
-      workProviderAuthorizationPollTimers.delete(provider);
-      void pollWorkProviderConnection(provider);
-    }, WORK_PROVIDER_AUTHORIZATION_POLL_MS);
-    workProviderAuthorizationPollTimers.set(provider, timer);
-  }
-
-  async function loadWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
-    if (isRemoteAutomationLocation(location)) {
-      return await codexClawApi?.listWorkRepositories?.(provider, location) ?? [];
-    }
-
-    if (!codexClawApi?.listWorkRepositories || workProviderConnection(provider)?.status !== 'connected') {
-      workRepositoriesByProvider.value = {
-        ...workRepositoriesByProvider.value,
-        [provider]: [],
-      };
-      workBacklogStatus.value = 'notLoaded';
-      return [];
-    }
-
-    workBacklogStatus.value = 'loading';
-    workBacklogError.value = null;
-    try {
-      const repositories = await codexClawApi.listWorkRepositories(provider);
-      workRepositoriesByProvider.value = {
-        ...workRepositoriesByProvider.value,
-        [provider]: repositories,
-      };
-      workBacklogStatus.value = 'loaded';
-
-      const configuredRepositoryId = snapshot.value.workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
-      const selectedRepositoryId = configuredRepositoryId ?? repositories[0]?.id ?? null;
-      if (selectedRepositoryId && !configuredRepositoryId) {
-        await configureWorkBacklog({
-          provider,
-          configuration: {
-            repositoryId: selectedRepositoryId,
-            assigneeLogin: null,
-            tagName: null,
-          },
-        });
-        await loadWorkItems(provider, selectedRepositoryId);
-      } else if (selectedRepositoryId) {
-        await loadWorkItems(provider, selectedRepositoryId);
-      }
-      return repositories;
-    } catch (error) {
-      workRepositoriesByProvider.value = {
-        ...workRepositoriesByProvider.value,
-        [provider]: [],
-      };
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      return [];
-    }
-  }
-
-  async function configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<void> {
-    if (!codexClawApi?.configureWorkBacklog) {
-      return;
-    }
-
-    const nextSnapshot = location
-      ? await codexClawApi.configureWorkBacklog(input, location)
-      : await codexClawApi.configureWorkBacklog(input);
-    if (!isRemoteAutomationLocation(location)) {
-      adoptBackgroundSnapshot(nextSnapshot);
-    }
-  }
-
-  async function loadWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery): Promise<WorkItem[] | undefined> {
-    if (!codexClawApi?.listWorkItems || !repositoryId) {
-      return [];
-    }
-
-    if (isRemoteAutomationLocation(location)) {
-      return await codexClawApi.listWorkItems(provider, repositoryId, location, query);
-    }
-
-    if (query) {
-      return await codexClawApi.listWorkItems(provider, repositoryId, undefined, query);
-    }
-
-    workBacklogStatus.value = 'loading';
-    workBacklogError.value = null;
-    try {
-      const items = await codexClawApi.listWorkItems(provider, repositoryId);
-      workItemsByRepository.value = {
-        ...workItemsByRepository.value,
-        [workItemsKey(provider, repositoryId)]: items,
-      };
-      workBacklogStatus.value = 'loaded';
-      return items;
-    } catch (error) {
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      return undefined;
-    }
-  }
-
-  async function loadGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage> {
-    if (!codexClawApi?.listGlobalWorkItems) return { items: [], page: 1, pageSize: query?.pageSize ?? 50, totalItems: 0 };
-    return codexClawApi.listGlobalWorkItems(provider, location, query);
-  }
-
-  async function loadAssignedWorkItems(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]> {
-    if (!codexClawApi?.listAssignedWorkItems) return [];
-    workBacklogStatus.value = 'loading';
-    workBacklogError.value = null;
-    try {
-      const items = await codexClawApi.listAssignedWorkItems(provider, location);
-      assignedWorkItemsByProvider.value = { ...assignedWorkItemsByProvider.value, [provider]: items };
-      workBacklogStatus.value = 'loaded';
-      return items;
-    } catch (error) {
-      workBacklogStatus.value = 'error';
-      workBacklogError.value = error instanceof Error ? error.message : String(error);
-      throw error;
-    }
-  }
-
-  async function createWorkItem(input: import('@codex-claw/core/contracts').CreateWorkItemInput): Promise<WorkItem> {
-    if (!codexClawApi?.createWorkItem) {
-      throw new Error(translate('surface.app-state.issueCreationIsNotAvailable'));
-    }
-    return codexClawApi.createWorkItem(input);
-  }
-
-  async function getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot> {
-    if (!codexClawApi?.getBenchSnapshot) {
-      return isRemoteBenchLocation(location) ? createEmptySnapshot() : snapshot.value;
-    }
-
-    if (isRemoteBenchLocation(location)) {
-      return codexClawApi.getBenchSnapshot(location);
-    }
-
-    return snapshot.value;
-  }
-
-  async function loadBench(location?: BenchLocation): Promise<BenchTemplate[]> {
-    if (!isRemoteBenchLocation(location)) {
-      return snapshot.value.bench;
-    }
-
-    const connectionId = location.remoteConnectionId.trim();
-    if (!codexClawApi?.getBenchSnapshot) {
-      setRemoteBenchState(connectionId, [], 'error', translate('surface.app-state.benchIsNotAvailable'));
-      return [];
-    }
-
-    remoteBenchStatusByConnectionId.value = {
-      ...remoteBenchStatusByConnectionId.value,
-      [connectionId]: 'loading',
-    };
-    remoteBenchErrorByConnectionId.value = {
-      ...remoteBenchErrorByConnectionId.value,
-      [connectionId]: null,
-    };
-
-    try {
-      const benchSnapshot = await codexClawApi.getBenchSnapshot(location);
-      cacheRemoteBenchSnapshot(location, benchSnapshot);
-      return benchSnapshot.bench;
-    } catch (error) {
-      setRemoteBenchState(connectionId, [], 'error', error instanceof Error ? error.message : String(error));
-      return [];
-    }
-  }
-
   async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem; prompt?: string }): Promise<void> {
     if (!codexClawApi?.assignWorkItemToAgent) {
       return;
@@ -1589,43 +1234,6 @@ export function useAppState() {
     });
   }
 
-  function selectModel(modelId: string): void {
-    const model = backendModels.value.find((candidate) => candidate.id === modelId);
-    if (!model) {
-      return;
-    }
-
-    selectedModelId.value = model.id;
-    selectedReasoningEffort.value = defaultReasoningEffort(model);
-    selectedServiceTier.value = defaultServiceTier(model);
-    rememberActiveComposerConfiguration();
-  }
-
-  function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
-    const model = selectedModel.value;
-    if (!model || !model.supportedReasoningEfforts?.some((option) => option.reasoningEffort === reasoningEffort)) {
-      return;
-    }
-
-    selectedReasoningEffort.value = reasoningEffort;
-    rememberActiveComposerConfiguration();
-  }
-
-  function selectServiceTier(serviceTier: string | null): void {
-    const model = selectedModel.value;
-    if (!model || (serviceTier !== null && !model.serviceTiers?.some((tier) => tier.id === serviceTier))) {
-      return;
-    }
-
-    selectedServiceTier.value = serviceTier;
-    rememberActiveComposerConfiguration();
-  }
-
-  function setPlanMode(enabled: boolean): void {
-    planMode.value = enabled;
-    rememberActiveComposerConfiguration();
-  }
-
   async function setApprovalPreset(preset: ApprovalPreset): Promise<void> {
     const agent = activeAgent.value;
     const capabilities = agent ? messageActionCapabilities(agent.id) : null;
@@ -1653,32 +1261,6 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.setAgentPermissionMode(agent.id, mode));
-  }
-
-  async function benchForLocation(location: BenchLocation): Promise<BenchTemplate[]> {
-    if (!isRemoteBenchLocation(location)) {
-      return snapshot.value.bench;
-    }
-
-    const cached = remoteBenchByConnectionId.value[location.remoteConnectionId];
-    if (cached) {
-      return cached;
-    }
-
-    return loadBench(location);
-  }
-
-  function benchLocationForAgent(agentId: string): BenchLocation {
-    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId) ?? null;
-    return benchLocationForTeamId(agent?.teamId);
-  }
-
-  function benchLocationForTeamId(teamId: string | null | undefined): BenchLocation {
-    const team = teamId
-      ? snapshot.value.teams.find((candidate) => candidate.id === teamId) ?? null
-      : snapshot.value.teams.find((candidate) => candidate.id === snapshot.value.activeTeamId) ?? snapshot.value.teams[0] ?? null;
-    const remoteConnectionId = team?.remoteConnectionId?.trim() ?? '';
-    return remoteConnectionId ? { kind: 'remote', remoteConnectionId } : { kind: 'local' };
   }
 
   return {
@@ -1919,227 +1501,6 @@ function messageActionCapabilities(agentId: string) {
   return backendCapabilitiesForAgent(agent ?? null);
 }
 
-function composerConfiguration(agentId: string): AgentComposerConfiguration {
-  const existing = composerConfigurationByAgentId.get(agentId);
-  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-  if (existing) {
-    if (agent) synchronizeComposerSelectionWithAgent(existing, agent);
-    return existing;
-  }
-  const selection = composerSelectionFromAgent(agent);
-  const configuration: AgentComposerConfiguration = {
-    selectionSource: selection.source,
-    models: [],
-    modelStatus: 'notLoaded',
-    modelError: null,
-    skills: [],
-    plugins: [],
-    skillStatus: 'notLoaded',
-    skillError: null,
-    files: [],
-    fileStatus: 'notLoaded',
-    fileError: null,
-    selectedModelId: selection.model,
-    selectedReasoningEffort: selection.reasoningEffort,
-    selectedServiceTier: selection.serviceTier,
-    planMode: false,
-  };
-  composerConfigurationByAgentId.set(agentId, configuration);
-  return configuration;
-}
-
-function rememberActiveComposerConfiguration(): void {
-  const agentId = snapshot.value.activeAgentId;
-  if (!agentId) return;
-  Object.assign(composerConfiguration(agentId), {
-    models: backendModels.value,
-    modelStatus: modelCatalogStatus.value,
-    modelError: modelCatalogError.value,
-    skills: backendSkills.value,
-    plugins: backendPlugins.value,
-    skillStatus: skillCatalogStatus.value,
-    skillError: skillCatalogError.value,
-    files: agentFiles.value,
-    fileStatus: fileCatalogStatus.value,
-    fileError: fileCatalogError.value,
-    selectedModelId: selectedModelId.value,
-    selectedReasoningEffort: selectedReasoningEffort.value,
-    selectedServiceTier: selectedServiceTier.value,
-    planMode: planMode.value,
-  });
-}
-
-function restoreComposerConfiguration(agentId: string): void {
-  const configuration = composerConfiguration(agentId);
-  backendModels.value = configuration.models;
-  modelCatalogStatus.value = configuration.modelStatus;
-  modelCatalogError.value = configuration.modelError;
-  backendSkills.value = configuration.skills;
-  backendPlugins.value = configuration.plugins;
-  skillCatalogStatus.value = configuration.skillStatus;
-  skillCatalogError.value = configuration.skillError;
-  agentFiles.value = configuration.files;
-  fileCatalogStatus.value = configuration.fileStatus;
-  fileCatalogError.value = configuration.fileError;
-  selectedModelId.value = configuration.selectedModelId;
-  selectedReasoningEffort.value = configuration.selectedReasoningEffort;
-  selectedServiceTier.value = configuration.selectedServiceTier;
-  planMode.value = configuration.planMode;
-}
-
-function clearActiveComposerConfiguration(): void {
-  backendModels.value = [];
-  modelCatalogStatus.value = 'notLoaded';
-  modelCatalogError.value = null;
-  backendSkills.value = [];
-  backendPlugins.value = [];
-  skillCatalogStatus.value = 'notLoaded';
-  skillCatalogError.value = null;
-  agentFiles.value = [];
-  fileCatalogStatus.value = 'notLoaded';
-  fileCatalogError.value = null;
-  selectedModelId.value = null;
-  selectedReasoningEffort.value = null;
-  selectedServiceTier.value = null;
-  planMode.value = false;
-}
-
-function selectDefaultModelForConfiguration(configuration: AgentComposerConfiguration): void {
-  const selectedModel = configuration.models.find((model) => modelMatchesSelection(model, configuration.selectedModelId));
-  if (selectedModel) {
-    configuration.selectedModelId = selectedModel.id;
-    if (
-      configuration.selectedReasoningEffort &&
-      !selectedModel.supportedReasoningEfforts?.some((option) => (
-        option.reasoningEffort === configuration.selectedReasoningEffort
-      ))
-    ) {
-      configuration.selectedReasoningEffort = defaultReasoningEffort(selectedModel);
-    }
-    return;
-  }
-  const defaultModel = configuration.models.find((model) => model.isDefault) ?? configuration.models[0] ?? null;
-  configuration.selectedModelId = defaultModel?.id ?? null;
-  configuration.selectedReasoningEffort = defaultModel ? defaultReasoningEffort(defaultModel) : null;
-  configuration.selectedServiceTier = defaultModel ? defaultServiceTier(defaultModel) : null;
-}
-
-function composerSelectionFromAgent(agent: Agent | undefined): {
-  source: string;
-  model: string | null;
-  reasoningEffort: ReasoningEffort | null;
-  serviceTier: string | null;
-} {
-  if (!agent) {
-    return { source: 'missing', model: null, reasoningEffort: null, serviceTier: null };
-  }
-  const defaults = agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : undefined;
-  const claudeSession = agent.backendSession?.kind === 'claude' ? agent.backendSession : undefined;
-  const model = claudeSession?.model ?? defaults?.model ?? null;
-  const reasoningEffort = claudeSession?.reasoningEffort ?? defaults?.reasoningEffort ?? null;
-  const serviceTier = defaults?.kind === 'codex' ? defaults.serviceTier ?? null : null;
-  const sessionId = agent.backendSession?.kind === 'codex'
-    ? agent.backendSession.threadId
-    : agent.backendSession?.sessionId ?? 'new';
-  return {
-    source: JSON.stringify([agent.backend, sessionId, model, reasoningEffort, serviceTier]),
-    model,
-    reasoningEffort,
-    serviceTier,
-  };
-}
-
-function synchronizeComposerSelectionWithAgent(configuration: AgentComposerConfiguration, agent: Agent): void {
-  const selection = composerSelectionFromAgent(agent);
-  if (configuration.selectionSource === selection.source) return;
-  configuration.selectionSource = selection.source;
-  configuration.selectedModelId = selection.model;
-  configuration.selectedReasoningEffort = selection.reasoningEffort;
-  configuration.selectedServiceTier = selection.serviceTier;
-  if (configuration.modelStatus === 'loaded') selectDefaultModelForConfiguration(configuration);
-}
-
-function synchronizeComposerSelectionForAgent(agentId: string | undefined): void {
-  if (!agentId || !composerConfigurationByAgentId.has(agentId)) return;
-  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-  if (!agent) return;
-  synchronizeComposerSelectionWithAgent(composerConfigurationByAgentId.get(agentId)!, agent);
-  if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-}
-
-function modelMatchesSelection(model: BackendModelOption, selection: string | null): boolean {
-  if (!selection) return false;
-  return model.id === selection ||
-    model.model === selection ||
-    model.providerMetadata?.resolvedModel === selection;
-}
-
-function selectedModelFromCatalog(): BackendModelOption | null {
-  return backendModels.value.find((model) => model.id === selectedModelId.value) ?? null;
-}
-
-function defaultReasoningEffort(model: BackendModelOption): ReasoningEffort | null {
-  return model.defaultReasoningEffort || (model.supportedReasoningEfforts?.[0]?.reasoningEffort ?? null);
-}
-
-function defaultServiceTier(model: BackendModelOption): string | null {
-  return model.defaultServiceTier ?? null;
-}
-
-function selectedPromptOptions(agentId: string, prompt: string): RendererSendPromptOptions | undefined {
-  const isActiveAgent = agentId === snapshot.value.activeAgentId;
-  const model = isActiveAgent ? selectedModelFromCatalog() : null;
-  const skills = isActiveAgent ? selectedPromptSkills(prompt) : [];
-  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-  const capabilities = backendCapabilitiesForAgent(agent ?? null);
-  const promptModel = capabilities.models ? model : null;
-  const selectedSkills = capabilities.skills ? skills : [];
-  const reasoningEffort = capabilities.reasoningEffort && promptModel
-    ? selectedReasoningEffort.value ?? defaultReasoningEffort(promptModel)
-    : null;
-  const serviceTier = capabilities.serviceTier && promptModel?.serviceTiers?.length
-    ? selectedServiceTier.value
-    : undefined;
-
-  if (
-    !promptModel &&
-    (capabilities.planMode === 'unsupported' || !isActiveAgent || !planMode.value) &&
-    !reasoningEffort &&
-    serviceTier === undefined &&
-    selectedSkills.length === 0
-  ) {
-    return undefined;
-  }
-
-  return {
-    ...(promptModel ? { model: promptModel.model } : {}),
-    ...(capabilities.planMode === 'native' && isActiveAgent ? { planMode: planMode.value } : {}),
-    ...(capabilities.planMode === 'prompted' && isActiveAgent && planMode.value ? { planMode: true } : {}),
-    ...(reasoningEffort ? { reasoningEffort } : {}),
-    ...(serviceTier !== undefined ? { serviceTier } : {}),
-    ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
-  };
-}
-
-function resolvedPromptOptions(
-  agentId: string,
-  prompt: string,
-  submissionOptions?: RendererSendPromptOptions,
-): RendererSendPromptOptions | undefined {
-  const selectedOptions = selectedPromptOptions(agentId, prompt);
-  const attachments = submissionOptions?.attachments?.length
-    ? [...submissionOptions.attachments]
-    : undefined;
-  if (!selectedOptions && !submissionOptions) {
-    return undefined;
-  }
-  return {
-    ...selectedOptions,
-    ...submissionOptions,
-    ...(attachments ? { attachments } : {}),
-  };
-}
-
 function backendCapabilitiesForAgent(agent: Agent | null): BackendCapabilities {
   const backend = agent?.backend ?? 'codex';
   const defaults = defaultBackendCapabilities(backend);
@@ -2148,10 +1509,6 @@ function backendCapabilitiesForAgent(agent: Agent | null): BackendCapabilities {
     ...defaults,
     ...runtime?.capabilities,
   };
-}
-
-function selectedPromptSkills(prompt: string) {
-  return promptSkillInputsFromText(prompt, backendSkills.value);
 }
 
 function parsePlanSlashCommand(prompt: string): { prompt: string | null } | null {
@@ -2267,18 +1624,12 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
   syncUnreadStateFromMainEvent(event);
   syncAnsweredClientRequestsFromMainEvent(event);
-  syncComposerModeFromMainEvent(event);
+  syncComposerStateFromMainEvent(event);
   syncSidePanelFromMainEvent(event);
   syncCelebrationFromMainEvent(event);
   syncAgentCreationProgressFromMainEvent(event);
   syncFileActivityFromMainEvent(event);
   syncHistoryPageStateFromMainEvent(event);
-  if (event.type === 'skills.changed') {
-    applySkillsChangedEvent(event);
-  }
-  if (event.type === 'models.changed') {
-    applyModelsChangedEvent(event);
-  }
 }
 
 function syncCelebrationFromMainEvent(event: MainToRendererEvent): void {
@@ -2320,155 +1671,6 @@ function recoverRendererAfterBackendConnection(): Promise<void> {
     rendererConnectionRecovery = null;
   });
   return rendererConnectionRecovery;
-}
-
-function syncUnreadStateFromMainEvent(event: MainToRendererEvent): void {
-  if (!event.agentId || !isUnreadWorthyEvent(event.type)) return;
-  if (!snapshot.value.agents.some((agent) => agent.id === event.agentId)) return;
-  if (rendererWindowFocused.value && snapshot.value.activeAgentId === event.agentId) {
-    markAgentRead(event.agentId);
-    return;
-  }
-  markAgentUnread(event.agentId);
-}
-
-function isUnreadWorthyEvent(type: MainToRendererEvent['type']): boolean {
-  return type === 'turn.completed' ||
-    type === 'approval.requested' ||
-    type === 'backendApproval.requested' ||
-    type === 'toolInput.requested' ||
-    type === 'error';
-}
-
-function markAgentUnread(agentId: string): void {
-  markAgentsUnread([agentId]);
-}
-
-function markAgentsUnread(agentIds: readonly string[]): void {
-  const next = new Set(unreadAgentIdSet.value);
-  for (const agentId of agentIds) next.add(agentId);
-  if (next.size === unreadAgentIdSet.value.size) return;
-  unreadAgentIdSet.value = next;
-  syncDockBadge();
-}
-
-function markAgentRead(agentId: string): void {
-  if (unreadAgentIdSet.value.has(agentId)) {
-    const next = new Set(unreadAgentIdSet.value);
-    next.delete(agentId);
-    unreadAgentIdSet.value = next;
-  }
-  syncDockBadge();
-}
-
-function pruneUnreadAgentIds(): void {
-  const agentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
-  const next = new Set([...unreadAgentIdSet.value].filter((agentId) => agentIds.has(agentId)));
-  if (next.size === unreadAgentIdSet.value.size) return;
-  unreadAgentIdSet.value = next;
-  syncDockBadge();
-}
-
-function syncDockBadge(): void {
-  if (clawHostCapabilities.dockBadge) {
-    void codexClawApi?.setDockBadgeCount?.(unreadAgentIdSet.value.size).catch(() => undefined);
-  }
-}
-
-function randomItem<T>(items: readonly T[]): T | undefined {
-  return items[Math.floor(Math.random() * items.length)];
-}
-
-function syncHistoryPageStateFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'thread.historyLoaded' || !event.agentId || !isRecord(event.payload)) return;
-  const hasOlder = event.payload.hasOlderMessages;
-  if (typeof hasOlder !== 'boolean') return;
-  historyHasOlderByAgentId.value = {
-    ...historyHasOlderByAgentId.value,
-    [event.agentId]: hasOlder,
-  };
-}
-
-function applySkillsChangedEvent(event: MainToRendererEvent): void {
-  if (!isRecord(event.payload) || !Array.isArray(event.payload.skills)) return;
-  const cwd = event.payload.cwd;
-  if (cwd !== null && typeof cwd !== 'string') return;
-  const skills = event.payload.skills
-    .filter(isBackendSkillSummary)
-    .map((skill) => ({ ...skill }));
-  const agents = snapshot.value.agents.filter((agent) => (
-    agent.backend === 'codex' &&
-    (event.agentId === agent.id || (
-      !event.agentId && (cwd === null || agent.folder === cwd)
-    ))
-  ));
-
-  for (const agent of agents) {
-    const key = catalogKey(agent);
-    const cache = skillCatalogCache.entry(key);
-    if (cache.status === 'loaded' && sameBackendSkills(cache.value, skills)) continue;
-    skillCatalogCache.replace(key, skills);
-    syncSkillCatalogToConfiguration(agent.id, cache);
-    if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
-  }
-}
-
-function applyModelsChangedEvent(event: MainToRendererEvent): void {
-  if (!event.backend || !isRecord(event.payload) || !Array.isArray(event.payload.models)) return;
-  const models = event.payload.models
-    .filter(isBackendModelOption)
-    .map((model) => ({ ...model }));
-  const cache = modelCatalogCache.entry(event.backend);
-  if (cache.status === 'loaded' && sameBackendModels(cache.value, models)) return;
-  modelCatalogCache.replace(event.backend, models);
-
-  for (const agent of snapshot.value.agents) {
-    if (agent.backend !== event.backend) continue;
-    syncModelCatalogToConfiguration(agent.id, cache);
-    if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
-  }
-}
-
-function isBackendModelOption(value: unknown): value is BackendModelOption {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.model !== 'string' || typeof value.displayName !== 'string') {
-    return false;
-  }
-  return value.supportedReasoningEfforts === undefined || (
-    Array.isArray(value.supportedReasoningEfforts) && value.supportedReasoningEfforts.every((option) => (
-      isRecord(option) && typeof option.reasoningEffort === 'string' && typeof option.description === 'string'
-    ))
-  );
-}
-
-function sameBackendModels(left: readonly BackendModelOption[], right: readonly BackendModelOption[]): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function isBackendSkillSummary(value: unknown): value is BackendSkillSummary {
-  return isRecord(value) &&
-    typeof value.name === 'string' &&
-    typeof value.path === 'string' &&
-    typeof value.enabled === 'boolean';
-}
-
-function sameBackendSkills(left: readonly BackendSkillSummary[], right: readonly BackendSkillSummary[]): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((skill, index) => {
-    const other = right[index];
-    return Boolean(other) &&
-      skill.id === other.id &&
-      skill.name === other.name &&
-      skill.description === other.description &&
-      skill.shortDescription === other.shortDescription &&
-      skill.displayName === other.displayName &&
-      skill.iconSmall === other.iconSmall &&
-      skill.iconLarge === other.iconLarge &&
-      skill.brandColor === other.brandColor &&
-      skill.defaultPrompt === other.defaultPrompt &&
-      skill.path === other.path &&
-      skill.scope === other.scope &&
-      skill.enabled === other.enabled;
-  });
 }
 
 function isBackendMainEvent(event: MainToRendererEvent): boolean {
@@ -2543,288 +1745,6 @@ function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
   } else if (!nextSnapshot.activeAgentId) {
     clearActiveComposerConfiguration();
   }
-}
-
-async function loadActiveAgentCatalogs(agentId = snapshot.value.activeAgentId): Promise<void> {
-  if (!agentId) return;
-  const existing = catalogLoadsByAgentId.get(agentId);
-  if (existing) {
-    await existing;
-    return;
-  }
-
-  const load = Promise.all([
-    loadBackendModelsForActiveAgent(agentId),
-    loadBackendPluginsForActiveAgent(agentId),
-    loadBackendSkillsForActiveAgent(agentId),
-    loadAgentFilesForActiveAgent(agentId),
-  ]).then(() => undefined).finally(() => {
-    if (catalogLoadsByAgentId.get(agentId) === load) {
-      catalogLoadsByAgentId.delete(agentId);
-    }
-  });
-  catalogLoadsByAgentId.set(agentId, load);
-  await load;
-}
-
-async function loadAllAgentCatalogs(): Promise<void> {
-  const agentIds = snapshot.value.agents.map((agent) => agent.id);
-  await Promise.all(agentIds.map((agentId) => loadActiveAgentCatalogs(agentId)));
-  const activeAgentId = snapshot.value.activeAgentId;
-  if (activeAgentId) restoreComposerConfiguration(activeAgentId);
-}
-
-function catalogKey(agent: Agent): string {
-  return `${agent.backend}:${agent.folder}`;
-}
-
-function resetCatalogStateIfSourceChanged(source: unknown): void {
-  if (catalogSessionSource === null || catalogSessionSource === source) {
-    catalogSessionSource = source;
-    return;
-  }
-  catalogSessionSource = source;
-  modelCatalogCache.clear();
-  skillCatalogCache.clear();
-  pluginCatalogCache.clear();
-  fileCatalogCache.clear();
-  composerConfigurationByAgentId.clear();
-  backendModels.value = [];
-  backendSkills.value = [];
-  backendPlugins.value = [];
-  agentFiles.value = [];
-  modelCatalogStatus.value = 'notLoaded';
-  skillCatalogStatus.value = 'notLoaded';
-  fileCatalogStatus.value = 'notLoaded';
-  modelCatalogError.value = null;
-  skillCatalogError.value = null;
-  fileCatalogError.value = null;
-}
-
-function syncModelCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<BackendModelOption>): void {
-  const configuration = composerConfiguration(agentId);
-  configuration.models = cache.value;
-  configuration.modelStatus = cache.status;
-  configuration.modelError = cache.error;
-  if (cache.status === 'loaded') selectDefaultModelForConfiguration(configuration);
-}
-
-function syncSkillCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<BackendSkillSummary>): void {
-  const configuration = composerConfiguration(agentId);
-  configuration.skills = cache.value;
-  configuration.skillStatus = cache.status;
-  configuration.skillError = cache.error;
-}
-
-function syncPluginCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<BackendPluginSummary>): void {
-  composerConfiguration(agentId).plugins = cache.value;
-}
-
-function syncFileCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<AgentFileSearchItem>): void {
-  const configuration = composerConfiguration(agentId);
-  configuration.files = cache.value;
-  configuration.fileStatus = cache.status;
-  configuration.fileError = cache.error;
-}
-
-async function loadConnectedWorkBacklogs(): Promise<void> {
-  const connectedProviders = snapshot.value.workBacklog.connections
-    .filter((connection) => connection.status === 'connected')
-    .map((connection) => connection.provider);
-
-  await Promise.all(connectedProviders.map((provider) => loadWorkRepositoriesForProvider(provider)));
-}
-
-async function loadWorkRepositoriesForProvider(provider: WorkProviderKind): Promise<void> {
-  if (!codexClawApi?.listWorkRepositories) {
-    return;
-  }
-
-  try {
-    const repositories = await codexClawApi.listWorkRepositories(provider);
-    workRepositoriesByProvider.value = {
-      ...workRepositoriesByProvider.value,
-      [provider]: repositories,
-    };
-    const configuredRepositoryId = snapshot.value.workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
-    const selectedRepositoryId = configuredRepositoryId ?? repositories[0]?.id ?? null;
-    if (selectedRepositoryId && !configuredRepositoryId && codexClawApi.configureWorkBacklog) {
-      adoptBackgroundSnapshot(await codexClawApi.configureWorkBacklog({
-        provider,
-        configuration: {
-          repositoryId: selectedRepositoryId,
-          assigneeLogin: null,
-          tagName: null,
-        },
-      }));
-    }
-    if (selectedRepositoryId) {
-      await loadWorkItemsForRepository(provider, selectedRepositoryId);
-    }
-    workBacklogStatus.value = 'loaded';
-  } catch (error) {
-    workBacklogStatus.value = 'error';
-    workBacklogError.value = error instanceof Error ? error.message : String(error);
-  }
-}
-
-async function loadWorkItemsForRepository(provider: WorkProviderKind, repositoryId: string): Promise<void> {
-  if (!codexClawApi?.listWorkItems) {
-    return;
-  }
-
-  const items = await codexClawApi.listWorkItems(provider, repositoryId);
-  workItemsByRepository.value = {
-    ...workItemsByRepository.value,
-    [workItemsKey(provider, repositoryId)]: items,
-  };
-}
-
-async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
-  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const source = codexClawApi;
-  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
-  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
-  if (!agent || !source?.listBackendModels) {
-    if (initialConfiguration) {
-      initialConfiguration.models = [];
-      initialConfiguration.modelStatus = 'notLoaded';
-      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
-    }
-    return;
-  }
-  const configuration = composerConfiguration(agent.id);
-  if (configuration.modelStatus === 'loading' || (agent.id === snapshot.value.activeAgentId && modelCatalogStatus.value === 'loading')) return;
-  await loadCatalogForAgent({
-    agentId: agent.id,
-    cache: modelCatalogCache,
-    key: agent.backend,
-    session: source,
-    source: source.listBackendModels,
-    load: () => source.listBackendModels!(agent.id),
-    sync: syncModelCatalogToConfiguration,
-  });
-}
-
-async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
-  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const source = codexClawApi;
-  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
-  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
-  if (!agent || !source?.listBackendSkills) {
-    if (initialConfiguration) {
-      initialConfiguration.skills = [];
-      initialConfiguration.skillStatus = 'notLoaded';
-      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
-    }
-    return;
-  }
-  if (composerConfiguration(agent.id).skillStatus === 'loading') return;
-  await loadCatalogForAgent({
-    agentId: agent.id,
-    cache: skillCatalogCache,
-    key: catalogKey(agent),
-    session: source,
-    source: source.listBackendSkills,
-    load: () => source.listBackendSkills!(agent.id),
-    sync: syncSkillCatalogToConfiguration,
-  });
-}
-
-async function loadBackendPluginsForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
-  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const source = codexClawApi;
-  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
-  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
-  if (!agent || !source?.listBackendPlugins) {
-    if (initialConfiguration) {
-      initialConfiguration.plugins = [];
-      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
-    }
-    return;
-  }
-  await loadCatalogForAgent({
-    agentId: agent.id,
-    cache: pluginCatalogCache,
-    key: catalogKey(agent),
-    session: source,
-    source: source.listBackendPlugins,
-    load: () => source.listBackendPlugins!(agent.id),
-    sync: syncPluginCatalogToConfiguration,
-  });
-}
-
-async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
-  if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
-  const source = codexClawApi;
-  const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
-  const initialConfiguration = agentId ? composerConfiguration(agentId) : null;
-  if (!agent || !agent.folder || !source?.listAgentFiles) {
-    if (initialConfiguration) {
-      initialConfiguration.files = [];
-      initialConfiguration.fileStatus = agent && !agent.folder ? 'loaded' : 'notLoaded';
-      if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId!);
-    }
-    return;
-  }
-  if (composerConfiguration(agent.id).fileStatus === 'loading') return;
-  await loadCatalogForAgent({
-    agentId: agent.id,
-    cache: fileCatalogCache,
-    key: agent.folder,
-    session: source,
-    source: source.listAgentFiles,
-    load: () => source.listAgentFiles!(agent.id),
-    sync: syncFileCatalogToConfiguration,
-  });
-}
-
-async function loadCatalogForAgent<Key, Value>(options: {
-  agentId: string;
-  cache: AsyncCatalogCache<Key, Value>;
-  key: Key;
-  session: unknown;
-  source: unknown;
-  load: () => Promise<Value[]>;
-  sync: (agentId: string, entry: AsyncCatalogEntry<Value>) => void;
-}): Promise<void> {
-  const entry = options.cache.load(options.key, options.source, options.load);
-  options.sync(options.agentId, entry);
-  if (options.agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(options.agentId);
-  await entry.promise;
-  if (options.session !== codexClawApi) return;
-  options.sync(options.agentId, entry);
-  if (options.agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(options.agentId);
-}
-
-function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type === 'thread.settingsUpdated' && isRecord(event.payload)) {
-    const agentId = event.agentId ?? snapshot.value.activeAgentId;
-    const threadSettings = isRecord(event.payload.threadSettings) ? event.payload.threadSettings : null;
-    if (!agentId || !threadSettings) return;
-    const configuration = composerConfiguration(agentId);
-    if (typeof threadSettings.model === 'string') {
-      configuration.selectedModelId = threadSettings.model;
-    }
-    if (typeof threadSettings.reasoningEffort === 'string') {
-      configuration.selectedReasoningEffort = threadSettings.reasoningEffort;
-    }
-    if ('serviceTier' in threadSettings && (typeof threadSettings.serviceTier === 'string' || threadSettings.serviceTier === null)) {
-      configuration.selectedServiceTier = threadSettings.serviceTier;
-    }
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-    return;
-  }
-
-  if (event.type === 'thread.modeUpdated' && isRecord(event.payload)) {
-    const mode = event.payload.mode;
-    const agentId = event.agentId ?? snapshot.value.activeAgentId;
-    if (!agentId || (mode !== 'plan' && mode !== 'default')) return;
-    composerConfiguration(agentId).planMode = mode === 'plan';
-    if (agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(agentId);
-    return;
-  }
-
 }
 
 function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
@@ -2905,57 +1825,6 @@ function syncFileActivityFromMainEvent(event: MainToRendererEvent): void {
   };
 }
 
-async function hydrateActiveAgentHistory(): Promise<void> {
-  const activeAgentId = snapshot.value.activeAgentId;
-  const activeAgent = activeAgentId
-    ? snapshot.value.agents.find((agent) => agent.id === activeAgentId)
-    : null;
-
-  if (!activeAgent?.backendSession || !codexClawApi?.hydrateAgentHistory) {
-    return;
-  }
-
-  if (hydratingAgentHistoryIds.value.has(activeAgent.id)) {
-    return;
-  }
-
-  markAgentHistoryHydrating(activeAgent.id, true);
-  try {
-    adoptBackgroundSnapshotMetadata(await codexClawApi.hydrateAgentHistory(activeAgent.id));
-    synchronizeComposerSelectionForAgent(activeAgent.id);
-  } finally {
-    markAgentHistoryHydrating(activeAgent.id, false);
-  }
-}
-
-async function loadOlderAgentHistory(agentId: string): Promise<void> {
-  if (!codexClawApi?.loadOlderAgentHistory || loadingOlderHistoryIds.value.has(agentId)) return;
-  const next = new Set(loadingOlderHistoryIds.value);
-  next.add(agentId);
-  loadingOlderHistoryIds.value = next;
-  try {
-    const result = await codexClawApi.loadOlderAgentHistory(agentId) as AgentHistoryLoadResult;
-    historyHasOlderByAgentId.value = {
-      ...historyHasOlderByAgentId.value,
-      [agentId]: result.hasOlder,
-    };
-  } finally {
-    const remaining = new Set(loadingOlderHistoryIds.value);
-    remaining.delete(agentId);
-    loadingOlderHistoryIds.value = remaining;
-  }
-}
-
-function markAgentHistoryHydrating(agentId: string, hydrating: boolean): void {
-  const next = new Set(hydratingAgentHistoryIds.value);
-  if (hydrating) {
-    next.add(agentId);
-  } else {
-    next.delete(agentId);
-  }
-  hydratingAgentHistoryIds.value = next;
-}
-
 async function selectSnapshotWithLoading(selectSnapshot: () => Promise<AppSnapshot>): Promise<void> {
   isLoading.value = true;
   try {
@@ -3022,61 +1891,4 @@ function isAgentCreationProgress(value: unknown): value is AgentCreationProgress
     (value.agentId === undefined || typeof value.agentId === 'string') &&
     (value.agentName === undefined || typeof value.agentName === 'string') &&
     (value.error === undefined || typeof value.error === 'string');
-}
-
-function workProviderConnection(provider: WorkProviderKind) {
-  return snapshot.value.workBacklog.connections.find((connection) => connection.provider === provider) ?? null;
-}
-
-function isRemoteAutomationLocation(location: AutomationLocation | undefined): location is Extract<AutomationLocation, { kind: 'remote' }> {
-  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
-}
-
-function isRemoteBenchLocation(location: BenchLocation | undefined): location is Extract<BenchLocation, { kind: 'remote' }> {
-  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
-}
-
-function cacheRemoteBenchSnapshot(location: Extract<BenchLocation, { kind: 'remote' }>, benchSnapshot: AppSnapshot): void {
-  setRemoteBenchState(location.remoteConnectionId.trim(), benchSnapshot.bench, 'loaded', null);
-}
-
-function setRemoteBenchState(
-  connectionId: string,
-  bench: BenchTemplate[],
-  status: 'notLoaded' | 'loading' | 'loaded' | 'error',
-  error: string | null,
-): void {
-  remoteBenchByConnectionId.value = {
-    ...remoteBenchByConnectionId.value,
-    [connectionId]: bench,
-  };
-  remoteBenchStatusByConnectionId.value = {
-    ...remoteBenchStatusByConnectionId.value,
-    [connectionId]: status,
-  };
-  remoteBenchErrorByConnectionId.value = {
-    ...remoteBenchErrorByConnectionId.value,
-    [connectionId]: error,
-  };
-}
-
-function pruneRemoteBenchCache(): void {
-  const connectionIds = new Set(snapshot.value.remoteConnections.connections.map((connection) => connection.id));
-  remoteBenchByConnectionId.value = filterRecordByKeys(remoteBenchByConnectionId.value, connectionIds);
-  remoteBenchStatusByConnectionId.value = filterRecordByKeys(remoteBenchStatusByConnectionId.value, connectionIds);
-  remoteBenchErrorByConnectionId.value = filterRecordByKeys(remoteBenchErrorByConnectionId.value, connectionIds);
-}
-
-function filterRecordByKeys<T>(record: Record<string, T>, keys: Set<string>): Record<string, T> {
-  const next: Record<string, T> = {};
-  for (const [key, value] of Object.entries(record)) {
-    if (keys.has(key)) {
-      next[key] = value;
-    }
-  }
-  return next;
-}
-
-function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
-  return `${provider}:${repositoryId}`;
 }

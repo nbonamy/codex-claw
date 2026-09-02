@@ -1,5 +1,7 @@
 
-import { translate } from '../i18n';export type ImageAnnotationTool =
+import { translate } from '../i18n';
+
+export type ImageAnnotationTool =
   | 'arrow'
   | 'oval'
   | 'rectangle'
@@ -112,6 +114,18 @@ export async function centeredImageCropDataUrl(source: string, scale = 0.72): Pr
     crop.height,
   );
   return output.toDataURL('image/png');
+}
+
+export function imageDataUrlArrayBuffer(dataUrl: string): ArrayBuffer {
+  const separator = dataUrl.indexOf(',');
+  const header = separator >= 0 ? dataUrl.slice(0, separator) : '';
+  if (!header.startsWith('data:image/png;') || !header.endsWith(';base64')) {
+    throw new TypeError('Annotated image must be a base64 PNG data URL.');
+  }
+  const binary = atob(dataUrl.slice(separator + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes.buffer;
 }
 
 async function loadImageElement(source: string): Promise<HTMLImageElement> {

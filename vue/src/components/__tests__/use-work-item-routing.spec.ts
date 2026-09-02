@@ -1,0 +1,215 @@
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, AppSnapshot, SourceRepository, WorkItem } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { describe, expect, it, vi } from 'vitest';
+import { useWorkItemRouting } from '../use-work-item-routing';
+
+describe('useWorkItemRouting', () => {
+  it('moves an existing session onto the issue branch before assigning prompted work', async () => {
+    const harness = createHarness();
+
+    await harness.routing.startInExistingSession(harness.agent.id, harness.item, 'fix');
+
+    expect(harness.createBranch).toHaveBeenCalledWith(harness.agent.id, {
+      name: 'fix/gh-12',
+      createWorktree: false,
+      confirmed: true,
+    });
+    expect(harness.assign).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: harness.agent.id,
+      item: harness.item,
+      prompt: expect.stringContaining('Fix this GitHub issue'),
+    }));
+  });
+
+  it('resolves a pull-request branch and creates an isolated agent in the team environment', async () => {
+    const listedItem = item({ kind: 'pullRequest', branchName: undefined });
+    const resolvedItem = { ...listedItem, branchName: 'feature/fix-routing' };
+    const harness = createHarness({ item: listedItem, loadItemsResult: [resolvedItem], remoteConnectionId: 'remote-dev' });
+
+    const result = await harness.routing.createIsolatedAgent(listedItem, harness.teamId);
+
+    expect(harness.loadItems).toHaveBeenCalledWith('github', listedItem.repositoryId, {
+      kind: 'pullRequest',
+      state: 'all',
+    });
+    expect(harness.createWorktree).toHaveBeenCalledWith({
+      repoPath: '/workspace/codex-claw',
+      branchName: 'feature/fix-routing',
+      remoteConnectionId: 'remote-dev',
+    });
+    expect(harness.createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/workspace/codex-claw-feature',
+      backend: 'codex',
+      sourceRepositoryName: 'codex-claw',
+      teamId: harness.teamId,
+    });
+    expect(result).toStrictEqual({ agent: harness.createdAgent, item: resolvedItem });
+  });
+
+  it('keeps a reassigned item out of the new-agent flow when the warning is declined', async () => {
+    const harness = createHarness({ assignedToCurrentAgent: true, confirmReassignment: false });
+
+    await harness.routing.openNewAgent({ item: harness.item });
+
+    expect(harness.confirmReassignment).toHaveBeenCalledWith(expect.stringContaining(
+      `already assigned to ${harness.agent.name}`,
+    ));
+    expect(harness.openNewAgent).not.toHaveBeenCalled();
+    expect(harness.routing.newAgentItem.value).toBeNull();
+  });
+
+  it('owns the Bench assignment lifecycle through team resolution and UI assignment', async () => {
+    const harness = createHarness();
+
+    await harness.routing.openBenchAgent({ item: harness.item, teamId: harness.teamId });
+    expect(harness.routing.benchAssignmentVisible.value).toBe(true);
+    expect(harness.routing.benchAgentTeamName.value).toBe('GitHub #12');
+
+    await harness.routing.assignBenchAgent({ benchTemplateId: 'bench-reviewer', newTeamName: 'Review' });
+
+    expect(harness.resolveTeam).toHaveBeenCalledWith(null, 'Review');
+    expect(harness.deployBenchTemplate).toHaveBeenCalledWith({
+      templateId: 'bench-reviewer',
+      teamId: harness.teamId,
+    });
+    expect(harness.assignFromUi).toHaveBeenCalledWith({
+      agentId: harness.createdAgent.id,
+      item: harness.item,
+    });
+    expect(harness.routing.benchAssignmentVisible.value).toBe(false);
+  });
+
+  it('prefills the active agent composer and returns focus to it', () => {
+    const harness = createHarness({ composerText: 'Please handle this carefully.' });
+
+    harness.routing.prefill(harness.agent.id, harness.item);
+
+    expect(harness.updateComposer).toHaveBeenCalledWith(
+      harness.agent.id,
+      expect.stringMatching(/^Please handle this carefully\.\n\n/),
+    );
+    expect(harness.selectAgent).toHaveBeenCalledWith(harness.agent.id);
+    expect(harness.focusComposer).toHaveBeenCalledOnce();
+  });
+});
+
+function createHarness(input: {
+  assignedToCurrentAgent?: boolean;
+  composerText?: string;
+  confirmReassignment?: boolean;
+  item?: WorkItem;
+  loadItemsResult?: WorkItem[];
+  remoteConnectionId?: string;
+} = {}) {
+  const snapshot = createInitialSnapshot();
+  const team = snapshot.teams[0]!;
+  const agent = snapshot.agents[0]!;
+  const listedItem = input.item ?? item();
+  if (input.remoteConnectionId) team.remoteConnectionId = input.remoteConnectionId;
+  if (input.assignedToCurrentAgent) {
+    snapshot.workBacklog.assignments[workItemAssignmentKey(listedItem)] = {
+      provider: listedItem.provider,
+      itemId: listedItem.id,
+      agentId: agent.id,
+      assignedAt: '2026-09-02T12:00:00.000Z',
+      policy: 'review',
+      status: 'inProgress',
+    };
+  }
+
+  const createdAgent: Agent = {
+    ...agent,
+    id: 'agent-created',
+    folder: '/workspace/codex-claw-feature',
+  };
+  const sourceRepositories: SourceRepository[] = [{
+    name: 'codex-claw',
+    path: '/workspace/codex-claw',
+    worktrees: [],
+  }];
+  const assign = vi.fn(async () => undefined);
+  const assignFromUi = vi.fn();
+  const createAgent = vi.fn(async () => createdAgent);
+  const createBranch = vi.fn(async () => undefined);
+  const createWorktree = vi.fn(async () => ({
+    name: 'feature/fix-routing',
+    path: '/workspace/codex-claw-feature',
+  }));
+  const deployBenchTemplate = vi.fn(async () => createdAgent);
+  const duplicateAgent = vi.fn(async () => createdAgent);
+  const loadItems = vi.fn(async () => input.loadItemsResult);
+  const confirmReassignment = vi.fn(async () => input.confirmReassignment ?? true);
+  const focusComposer = vi.fn();
+  const openNewAgent = vi.fn();
+  const resolveTeam = vi.fn(async () => team.id);
+  const selectAgent = vi.fn();
+  const updateComposer = vi.fn();
+
+  const routing = useWorkItemRouting({
+    actions: {
+      assign,
+      assignFromUi,
+      createAgent,
+      createBranch,
+      createWorktree,
+      deployBenchTemplate,
+      duplicateAgent,
+      loadItems,
+    },
+    model: {
+      activeTeamId: () => team.id,
+      composerText: () => input.composerText ?? '',
+      currentAgent: () => agent,
+      snapshot: () => snapshot as AppSnapshot,
+      sourceRepositories: () => sourceRepositories,
+    },
+    ui: {
+      confirmReassignment,
+      focusComposer,
+      openNewAgent,
+      resolveTeam,
+      selectAgent,
+      updateComposer,
+    },
+  });
+
+  return {
+    agent,
+    assign,
+    assignFromUi,
+    confirmReassignment,
+    createAgent,
+    createBranch,
+    createdAgent,
+    createWorktree,
+    deployBenchTemplate,
+    focusComposer,
+    item: listedItem,
+    loadItems,
+    openNewAgent,
+    resolveTeam,
+    routing,
+    selectAgent,
+    teamId: team.id,
+    updateComposer,
+  };
+}
+
+function item(overrides: Partial<WorkItem> = {}): WorkItem {
+  return {
+    provider: 'github',
+    id: 'nbonamy/codex-claw#12',
+    repositoryId: 'nbonamy/codex-claw',
+    repositoryFullName: 'nbonamy/codex-claw',
+    number: 12,
+    title: 'Fix cockpit drag target',
+    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    state: 'open',
+    labels: [],
+    createdAt: '2026-09-02T10:00:00.000Z',
+    updatedAt: '2026-09-02T11:00:00.000Z',
+    ...overrides,
+  };
+}

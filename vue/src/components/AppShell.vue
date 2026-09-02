@@ -3,109 +3,81 @@
     class="app-shell"
     :class="{ 'app-shell--auth-gated': showOnboardingGate }"
   >
-    <CodexLoginLanding
-      v-if="showLoginLanding"
-      :variant="initialAuthenticationLoading ? 'connecting' : 'sign-in'"
-      :loading="authenticationLoading || authentication?.login.status === 'pending'"
-      :cancellable="authentication?.login.status === 'pending'"
-      :cancelling="authenticationCancelling"
-      :error="authenticationError ?? authentication?.login.error"
+    <FirstRunOnboardingGate
+      :authentication="authentication"
+      :authentication-cancelling="authenticationCancelling"
+      :authentication-error="authenticationError"
+      :authentication-loading="authenticationLoading"
+      :github-onboarding-visible="githubOnboardingVisible"
+      :initial-authentication-loading="initialAuthenticationLoading"
+      :onboarding-complete-visible="onboardingCompleteVisible"
+      :repository-acquire-busy="repositoryAcquireBusy"
+      :repository-acquire-error="repositoryAcquireError"
+      :show-login-landing="showLoginLanding"
+      :snapshot="snapshot"
+      :work-backlog-error="workBacklogError"
+      :work-provider-authorization="workProviderAuthorization"
       @cancel="cancelChatGptLogin"
+      @complete="completeGitHubOnboardingStep"
+      @connect-github="connectGitHub"
+      @finish="finishFirstRunOnboarding"
       @login="startChatGptLogin"
+      @open-github-authorization="openGitHubAuthorization"
     />
-    <GitHubOnboardingLanding
-      v-else-if="githubOnboardingVisible"
-      :authorization="workProviderAuthorization"
-      :busy="repositoryAcquireBusy"
-      :error="repositoryAcquireError ?? workBacklogError"
-      @connect="connectGitHub"
-      @open-authorization="openGitHubAuthorization"
-      @skip="completeGitHubOnboardingStep"
-    />
-    <OnboardingCompleteLanding
-      v-else-if="onboardingCompleteVisible"
-      :celebrate="snapshot.general.celebrationsEnabled !== false"
-      @complete="finishFirstRunOnboarding"
-    />
-    <TeamRail
-      :teams="snapshot.teams"
+    <AppShellNavigation
+      :active-team="activeTeam"
+      :active-team-agents="activeTeamAgents"
+      :active-team-name="activeTeamName"
+      :agent-list-compact="agentListCompact"
+      :agent-sidebar-width="agentSidebarWidth"
+      :authentication="authentication"
+      :automations-visible="automationsVisible"
+      :cockpit-visible="cockpitVisible"
+      :current-agent="currentAgent"
+      :forkable-agent-ids="forkableAgentIds"
+      :list-repository-session-branches="listRepositorySessionBranches"
+      :open-in-applications="openInApplications"
+      :quick-agent-shortcuts-visible="quickAgentShortcutsVisible"
+      :settings-visible="settingsVisible"
+      :show-agent-sidebar="showAgentSidebar"
+      :snapshot="snapshot"
+      :unread-agent-ids="unreadAgentIds"
       :unread-team-ids="unreadTeamIds"
-      :active-team-id="cockpitVisible || automationsVisible || settingsVisible ? null : activeTeam?.id ?? null"
-      :cockpit-active="cockpitVisible"
-      :automations-active="automationsVisible"
-      :settings-active="settingsVisible"
-      :agent-sidebar-expanded="showAgentSidebar"
-      :rate-limits="snapshot.accountRateLimits"
-      :account="authentication?.account ?? null"
-      class="app-shell__team-rail"
       @close-team="$emit('close-team', $event)"
+      @close-agent="$emit('close-agent', $event)"
+      @collapse-sidebar="agentSidebarCollapsed = true"
+      @create-agent-from-repository="openRepositorySessionSource"
+      @create-agent-on-branch="createRepositorySessionOnBranch"
+      @create-agent-worktree-in-repository="openRepositorySessionWorktree"
+      @create-quick-chat="createQuickChat"
       @disconnect-team="$emit('disconnect-team', $event)"
+      @duplicate-agent="$emit('duplicate-agent', $event)"
+      @edit-agent="openEditAgent"
       @edit-team="openEditTeam"
+      @fork-agent="$emit('fork-agent', $event)"
+      @logout="logoutCodex"
+      @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @new-team="openNewTeam"
+      @open-automations="openAutomations"
+      @open-cockpit="openCockpit"
+      @open-in="openAgentIn($event.agentId, $event.application)"
       @open-settings="openSettings"
       @open-whats-new="openWhatsNew"
-      @logout="logoutCodex"
       @quit="quit"
+      @reorder-agents="$emit('reorder-agents', $event)"
       @reorder-teams="$emit('reorder-teams', $event)"
-      @select-cockpit="openCockpit"
-      @select-automations="openAutomations"
+      @resize-sidebar="setAgentSidebarWidth"
+      @restart-agent="$emit('restart-agent', $event)"
+      @resume-session="openResumeSession"
+      @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
+      @select-agent="selectAgentFromShell"
       @select-team="selectTeamFromRail"
+      @start-work="handleStartWorkAction"
+      @update-collapsed-repositories="updateCollapsedRepositories"
+      @update-repository-icon="updateRepositoryIcon"
     />
-    <Transition name="agent-sidebar">
-      <AgentSidebar
-        v-if="showAgentSidebar"
-        :agents="activeTeamAgents"
-        :forkable-agent-ids="forkableAgentIds"
-        :active-agent-id="currentAgent?.id ?? null"
-        :unread-agent-ids="unreadAgentIds"
-        :teams="snapshot.teams"
-        :team-id="activeTeam?.id ?? null"
-        :team-name="activeTeamName"
-        :compact="agentListCompact"
-        :collapsed-repository-keys="snapshot.general.collapsedRepositoryKeys"
-        :width="agentSidebarWidth"
-        :min-width="agentSidebarMinWidth"
-        :max-width="agentSidebarMaxWidth"
-        :open-in-catalog="openInApplications"
-        :quick-switch-shortcuts-visible="quickAgentShortcutsVisible"
-        :repository-icons="snapshot.general.repositoryIcons"
-        @collapse-sidebar="agentSidebarCollapsed = true"
-        @close-agent="$emit('close-agent', $event)"
-        @create-agent-from-repository="openRepositorySessionSource"
-        @create-agent-on-branch="createRepositorySessionOnBranch"
-        @create-agent-worktree-in-repository="openRepositorySessionWorktree"
-        :list-repository-branches="listRepositorySessionBranches"
-        @duplicate-agent="$emit('duplicate-agent', $event)"
-        @fork-agent="$emit('fork-agent', $event)"
-        @edit-agent="openEditAgent"
-        @move-agent-to-team="$emit('move-agent-to-team', $event)"
-        @open-in="openAgentIn($event.agentId, $event.application)"
-        @reorder-agents="$emit('reorder-agents', $event)"
-        @restart-agent="$emit('restart-agent', $event)"
-        @resize-sidebar="setAgentSidebarWidth"
-        @resume-session="openResumeSession"
-        @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
-        @select-agent="selectAgentFromShell"
-        @start-work="handleStartWorkAction"
-        @create-quick-chat="createQuickChat"
-        @update-repository-icon="updateRepositoryIcon"
-        @update-collapsed-repositories="updateCollapsedRepositories"
-      />
-    </Transition>
     <section class="app-shell__content">
-      <div
-        v-if="connectionState.status !== 'connected'"
-        class="app-shell__connection-status"
-        :class="`app-shell__connection-status--${connectionState.status}`"
-        role="status"
-        aria-live="polite"
-      >
-        <span class="app-shell__connection-status-dot" aria-hidden="true" />
-        <span>{{ connectionStatusLabel }}</span>
-        <span v-if="connectionStatusDetail" class="app-shell__connection-status-detail">
-          {{ connectionStatusDetail }}
-        </span>
-      </div>
+      <BackendConnectionBanner :connection-state="connectionState" />
       <SettingsView
         v-if="settingsVisible"
         :active-tab="settingsActiveTab"
@@ -210,119 +182,61 @@
         @select-agent="selectAgentFromCockpit"
         @select-team="selectTeamFromRail"
       />
-      <template v-else>
-        <AgentHeader
-          v-if="!isAgentEmpty && currentAgent"
-          :agent="currentAgent"
-          :repository-icon="repositoryIconForAgent(currentAgent, snapshot.general.repositoryIcons)"
-          :git-status="currentAgentGitStatus"
-          :backend-runtime="currentBackendRuntime"
-          :workspace-open="rightWorkspaceVisible"
-          :is-loading="isLoading"
-          :sidebar-collapsed="agentSidebarCollapsed"
-          :update-status="clawHostCapabilities.appUpdates ? updateStatus : undefined"
-          :execution-plan-available="Boolean(currentTurnPlan)"
-          :execution-plan-open="executionPlanVisible"
-          :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(currentAgent)"
-          :open-in-catalog="openInApplications"
-          :subagent-tree="currentSubagentTree"
-          :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
-          :get-git-workflow="props.getAgentGitWorkflow"
-          :generate-git-message="props.generateAgentGitMessage"
-          :commit-git-changes="props.commitAgentGitChanges"
-          :push-git-branch="props.pushAgentGitBranch"
-          :create-git-pull-request="props.createAgentGitPullRequest"
-          :merge-git-branch="props.mergeAgentGitBranch"
-          @expand-sidebar="agentSidebarCollapsed = false"
-          @toggle-execution-plan="toggleExecutionPlan"
-          @toggle-workspace="toggleRightWorkspace"
-          @open-git-diff="openAgentGitDiffPreview"
-          @open-in="openAgentIn(currentAgent.id, $event)"
-          @select-subagent="openSubagent(currentAgent.id, $event)"
-          @install-update="emit('install-update')"
-        />
-        <div ref="workspaceBody" class="app-shell__body">
-          <AgentEmptyState
-            v-if="isAgentEmpty"
-            @start-work="handleStartWorkAction"
-          />
-          <ConversationPane
-            v-else
-            ref="conversationPane"
-            :controller="conversationPaneController"
-            :agent="currentAgent"
-            :agents="snapshot.agents"
-            :attachment-annotation-counts="activeAttachmentAnnotationCounts"
-            :plan="currentTurnPlan"
-            :plan-visible="executionPlanVisible"
-            @annotate-attachment="openAttachmentImageAnnotation"
-            @close-plan="closeExecutionPlan"
-          />
-          <RightWorkspacePanel
-            v-for="agent in snapshot.agents"
-            :key="agent.id"
-            v-show="isRightWorkspaceVisible(agent.id)"
-            class="app-shell__right-workspace"
-            :style="{ flexBasis: `${rightWorkspaceFor(agent.id).width}px` }"
-            :active-tab="rightWorkspaceFor(agent.id).activeTab"
-            :agent="agent"
-            :agents="snapshot.agents"
-            :files="agent.id === currentAgent?.id ? agentFiles : []"
-            :files-pane-open="rightWorkspaceFor(agent.id).filesPaneOpen"
-            :files-pane-width="rightWorkspaceFor(agent.id).filesPaneWidth"
-            :git-panel="effectiveGitReviewPanelFor(agent)"
-            :git-status="snapshot.agentGitStatuses[agent.id] ?? null"
-            :plan-panel="rightWorkspaceFor(agent.id).planPanel"
-            :plan-updating="isPlanPreviewUpdatingFor(agent.id)"
-            :file-panels="rightWorkspaceFor(agent.id).filePanels"
-            :image-panels="rightWorkspaceFor(agent.id).imagePanels"
-            :diff-panels="rightWorkspaceFor(agent.id).diffPanels"
-            :tabs="rightWorkspaceFor(agent.id).tabs"
-            :visible="isRightWorkspaceVisible(agent.id) && !isModalDialogVisible"
-            :browser-id="rightWorkspaceFor(agent.id).browserId"
-            :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
-            :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
-            :browser-visualization="rightWorkspaceFor(agent.id).browserVisualization"
-            :browser-available="clawHostCapabilities.embeddedBrowser"
-            :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(agent)"
-            :open-in-catalog="openInApplications"
-            :subagent-tree="subagentTreeFor(agent.id)"
-            :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
-            :backlog-items="rightWorkspaceFor(agent.id).backlogItems"
-            :backlog-status="rightWorkspaceFor(agent.id).backlogStatus"
-            :backlog-error="rightWorkspaceFor(agent.id).backlogError"
-            :github-repository="snapshot.agentGitStatuses[agent.id]?.githubRepository ?? null"
-            :github-connection="snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? null"
-            :work-assignments="snapshot.workBacklog.assignments"
-            :prefill-repository-work="(item) => prefillRepositoryWork(agent.id, item)"
-            :clear-repository-work-assignment="(item) => $emit('remove-work-item-assignment', item)"
-            :close-repository-work-agent="(agentId) => $emit('close-agent', agentId)"
-            :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
-            :show-repository-work-agent="selectAgentFromShell"
-            :create-repository-issue="(description) => createRepositoryIssue(agent.id, description)"
-            @close-tab="closeRightWorkspaceTab(agent.id, $event)"
-            @cancel-plan="cancelPlanReview(agent.id)"
-            @comment-plan="commentOnPlan"
-            @confirm-plan="confirmPlan"
-            @open-tab="openRightWorkspaceTabFromMenu(agent.id, $event)"
-            @open-in="openAgentIn(agent.id, $event.application, $event.filePath)"
-            @preview-file="openFilePreviewForAgent(agent.id, $event)"
-            @toggle-files-pane="toggleFileExplorer(agent.id)"
-            @resize-files-pane="rightWorkspaceFor(agent.id).filesPaneWidth = $event"
-            @open-link="openConversationLink"
-            @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
-            @refresh-backlog="loadRepositoryBacklog(agent.id)"
-            @select-tab="selectRightWorkspaceTab(agent.id, $event)"
-            @send-prompt="forwardPrompt"
-          />
-          <div
-            v-if="rightWorkspaceVisible"
-            class="app-shell__right-workspace-resizer"
-            :aria-label="$t('surface.appShell.resizeRightWorkspace')"
-            @pointerdown="startRightWorkspaceResize"
-          />
-        </div>
-      </template>
+      <AgentWorkspace
+        v-else
+        ref="agentWorkspace"
+        :active-attachment-annotation-counts="activeAttachmentAnnotationCounts"
+        :agent-files="agentFiles"
+        :agent-sidebar-collapsed="agentSidebarCollapsed"
+        :close-right-workspace-tab="closeRightWorkspaceTab"
+        :commit-agent-git-changes="props.commitAgentGitChanges"
+        :confirm-plan="confirmPlan"
+        :conversation-pane-controller="conversationPaneController"
+        :create-agent-git-pull-request="props.createAgentGitPullRequest"
+        :create-work-item="props.createWorkItem"
+        :current-agent="currentAgent"
+        :current-agent-git-status="currentAgentGitStatus"
+        :current-backend-runtime="currentBackendRuntime"
+        :forward-prompt="forwardPrompt"
+        :generate-agent-git-message="props.generateAgentGitMessage"
+        :get-agent-git-workflow="props.getAgentGitWorkflow"
+        :handle-start-work-action="handleStartWorkAction"
+        :is-agent-empty="isAgentEmpty"
+        :is-conversation-loading="isConversationLoading"
+        :is-loading="isLoading"
+        :is-modal-dialog-visible="isModalDialogVisible"
+        :is-right-workspace-visible="isRightWorkspaceVisible"
+        :load-work-items="props.loadWorkItems"
+        :messages="messages"
+        :merge-agent-git-branch="props.mergeAgentGitBranch"
+        :open-agent-git-diff-preview="openAgentGitDiffPreview"
+        :open-agent-in="openAgentIn"
+        :open-attachment-image-annotation="openAttachmentImageAnnotation"
+        :open-file-preview="openFilePreview"
+        :open-file-preview-for-agent="openFilePreviewForAgent"
+        :open-in-applications="openInApplications"
+        :open-right-workspace-tab="openRightWorkspaceTab"
+        :prefill-work-item-for-agent="prefillWorkItemForAgent"
+        :push-agent-git-branch="props.pushAgentGitBranch"
+        :right-workspace-for="rightWorkspaceFor"
+        :right-workspaces="rightWorkspaces"
+        :right-workspace-visible="rightWorkspaceVisible"
+        :read-conversation-messages="readConversationMessages"
+        :select-agent-from-shell="selectAgentFromShell"
+        :select-right-workspace-tab="selectRightWorkspaceTab"
+        :snapshot="snapshot"
+        :start-repository-work="startRepositoryWork"
+        :start-right-workspace-resize="startRightWorkspaceResize"
+        :toggle-file-explorer="toggleFileExplorer"
+        :toggle-right-workspace="toggleRightWorkspace"
+        :update-status="updateStatus"
+        @close-agent="$emit('close-agent', $event)"
+        @expand-sidebar="agentSidebarCollapsed = false"
+        @install-update="emit('install-update')"
+        @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
+        @send-prompt="emit('sendPrompt', $event)"
+        @update:plan-mode="emit('update:planMode', $event)"
+      />
     </section>
     <RepositorySessionSourceDialog
       :visible="repositorySessionSourceVisible"
@@ -460,48 +374,38 @@
 import { translate } from '../i18n';
 import { localizedErrorMessage, localizedText } from '../i18n/errors';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkIntegrationConnection, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentFileActivity } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
-import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
-import { projectAgentMentionLabels, repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
+import { projectAgentMentionLabels } from '@codex-claw/core/workspace-sidebar';
 import { clawHostCapabilities, codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
-import AgentEmptyState from './AgentEmptyState.vue';
-import AgentHeader from './AgentHeader.vue';
-import AgentSidebar from './AgentSidebar.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
-import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
-import ConversationPane from './ConversationPane.vue';
-import ImageAnnotationDialog, { type ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
+import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
-import { centeredImageCropDataUrl, formatImageAnnotationPrompt, type SavedImageAnnotations } from './image-annotation';
 import AutomationsView from './AutomationsView.vue';
 import TeamDialog from './TeamDialog.vue';
-import TeamRail from './TeamRail.vue';
+import AppShellNavigation from './AppShellNavigation.vue';
+import BackendConnectionBanner from './BackendConnectionBanner.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
 import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
-import RightWorkspacePanel from './RightWorkspacePanel.vue';
+import AgentWorkspace from './AgentWorkspace.vue';
 import SettingsView from './SettingsView.vue';
-import CodexLoginLanding from './CodexLoginLanding.vue';
-import GitHubOnboardingLanding from './GitHubOnboardingLanding.vue';
-import OnboardingCompleteLanding from './OnboardingCompleteLanding.vue';
+import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
 import type { SettingsTab } from './settings-tabs';
-import { confirmCloseTeam } from './team-close-confirmation';
 import {
   createCodexConversationPaneController,
-  getCodexNativeRendererApi,
   type CodexCapabilities,
   type CodexConversationLink,
   type CodexConversationPaneActions,
@@ -513,35 +417,22 @@ import {
   type CodexMessageImageContext,
   type CodexNativeAttachment,
   type CodexComposerState,
-  languageForFilePath,
   type CodexQueuedPromptData as QueuedChatPrompt,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
-import { useConfetti } from '../shared/confetti/use-confetti';
-import { workItemAssignmentPrompt, workItemComposerPrompt, type WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
+import { useRepositorySession } from './use-repository-session';
+import { useRightWorkspaceState } from './use-right-workspace-state';
+import { useImageAnnotation } from './use-image-annotation';
+import { useCockpitBacklog } from './use-cockpit-backlog';
+import { useWorkspacePreviews } from './use-workspace-previews';
+import { useWorkItemRouting } from './use-work-item-routing';
+import { useAppShellCommands } from './use-app-shell-commands';
 
-import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
-  isRightWorkspaceFileTab,
-  isRightWorkspaceDiffTab,
-  isRightWorkspaceImageTab,
-  isRightWorkspaceSubagentTab,
-  rightWorkspaceDiffTab,
-  rightWorkspaceFileTab,
-  rightWorkspaceImageTab,
-  rightWorkspaceMarkdownTab,
-  rightWorkspaceSubagentConversationId,
-  rightWorkspaceSubagentTab,
-  type RightWorkspaceDiffPanel,
-  type RightWorkspaceDiffTab,
-  type RightWorkspaceFilePanel,
-  type RightWorkspaceFileTab,
-  type RightWorkspaceImageTab,
   type RightWorkspaceTab,
-  type RepositoryWorkStartInput,
 } from './right-workspace';
 
 const props = withDefaults(defineProps<{
@@ -822,46 +713,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-type WorkItemAssignmentIntent = {
-  item: WorkItem;
-  teamId?: string;
-};
-
-type CockpitBacklogConfiguration = {
-  assigneeLogin: string | null;
-  repositoryId: string | null;
-  tagName: string | null;
-};
-
-type AttachmentAnnotationTarget = {
-  agentId: string;
-  attachment: CodexNativeAttachment;
-};
-
 type AppSurface = 'agent' | 'cockpit' | 'automations' | 'settings';
 type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
-type AgentRightWorkspaceState = {
-  activeTab: RightWorkspaceTab | null;
-  backlogError: string | null;
-  backlogItems: WorkItem[];
-  backlogStatus: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  browserId: string;
-  browserInitialUrl: string;
-  browserOpenRequestId: number;
-  browserVisualization: CodexConversationVisualization | null;
-  filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
-  filesPaneOpen: boolean;
-  filesPaneWidth: number;
-  filePreviewRequestIds: Partial<Record<RightWorkspaceFileTab, number>>;
-  diffPanels: Partial<Record<RightWorkspaceDiffTab, RightWorkspaceDiffPanel>>;
-  gitReviewPanel: SidePanelGitDiffState | null;
-  imagePanels: Partial<Record<RightWorkspaceImageTab, SidePanelImageState>>;
-  planPanel: SidePanelMarkdownState | null;
-  open: boolean;
-  tabs: RightWorkspaceTab[];
-  width: number;
-};
-
 const agentSidebarCollapsed = ref(false);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
@@ -870,24 +723,20 @@ const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((a
   agent.status.type === 'working' ||
   agent.status.type === 'awaitingInput'
 )));
-const connectionStatusLabel = computed(() => {
-  if (props.connectionState.status === 'connecting') return translate('surface.appShell.connectingToClawd');
-  if (props.connectionState.status === 'reconnecting') return translate('surface.appShell.reconnectingToClawdAgentsKeepWorkingInTheBackground');
-  return translate('surface.appShell.clawdIsUnavailableReconnectionWillContinueAutomatically');
-});
-const connectionStatusDetail = computed(() => localizedText(props.connectionState.detail, translate));
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
-const rightWorkspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
 const fileQuickOpenVisible = ref(false);
-const attachmentAnnotationsByAgentId = reactive<Record<string, Record<string, SavedImageAnnotations>>>({});
-const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
-const quickAgentShortcutsVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
-const workspaceBody = ref<HTMLElement | null>(null);
-const conversationPane = ref<{ focusComposer(): void } | null>(null);
+const agentWorkspace = ref<{
+  focusComposer(): void;
+  handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void;
+  openConversationLink(link: CodexConversationLink): void | Promise<void>;
+  openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): boolean;
+  openConversationVisualization(visualization: CodexConversationVisualization): void;
+  workspaceBodyElement(): HTMLElement | null;
+} | null>(null);
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
 const resumeSessionAgentId = ref<string | null>(null);
@@ -896,36 +745,6 @@ const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
 const agentDialogSourceRepositoryName = ref<string | null>(null);
 const agentDialogSourceBranchName = ref('');
-const repositorySessionSource = ref<RepositorySessionSource | null>(null);
-const repositorySessionSourceVisible = ref(false);
-const repositorySessionSourceBranches = ref<SourceBranch[]>([]);
-const repositorySessionSourceWorkItems = ref<WorkItem[]>([]);
-const repositorySessionSourceLoading = ref(false);
-const repositorySessionSourceError = ref<string | null>(null);
-const repositorySessionAssignmentState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
-const repositorySessionAssignmentError = ref<string | null>(null);
-const repositorySessionAssignmentSessions = computed<WorkItemAssignmentSession[]>(() => {
-  const source = repositorySessionSource.value;
-  if (!source) return [];
-  const { teamId } = repositorySessionContext(source);
-  return props.snapshot.agents
-    .filter((agent) => (!teamId || agent.teamId === teamId)
-      && agent.workspace?.kind === 'git'
-      && agent.workspace.primaryWorktreeRoot === source.repositoryRoot)
-    .map((agent) => ({
-      agentId: agent.id,
-      label: agent.workspace?.kind === 'git' && agent.workspace.branch
-        ? `${agentDisplayName(agent)} · ${agent.workspace.branch}`
-        : agentDisplayName(agent),
-    }));
-});
-const repositorySessionWorktreeSource = ref<RepositorySessionSource | null>(null);
-const repositorySessionWorktreeBranches = ref<SourceBranch[]>([]);
-const repositorySessionWorktreeBranchesLoading = ref(false);
-const repositorySessionWorktreeRepository = computed<SourceRepository | null>(() => {
-  const source = repositorySessionWorktreeSource.value;
-  return source ? { name: source.repositoryName, path: source.repositoryRoot, worktrees: [] } : null;
-});
 const githubConnection = computed<WorkIntegrationConnection>(() => (
   props.snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? {
     provider: 'github',
@@ -952,42 +771,11 @@ const {
   logout: logoutCodex,
   startChatGptLogin,
 } = firstRunOnboarding;
-const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
-const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
-const pendingBenchAgentTeamId = ref<string | null>(null);
-const pendingCockpitBacklogConfiguration = ref<CockpitBacklogConfiguration | null>(null);
-const cockpitGlobalScope = ref<'assignedToMe' | 'all' | null>(null);
-const cockpitGlobalScopeStorageKey = 'cockpitGlobalScope:github';
-const cockpitGlobalPageSize = 25;
-type CockpitGlobalFeed = {
-  error: string | null;
-  page: number;
-  pages: Record<number, WorkItem[]>;
-  pageSize: number;
-  pendingPage: number | null;
-  status: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  totalItems: number;
-};
-const cockpitGlobalFeeds = reactive<Record<'assignedToMe' | 'all', CockpitGlobalFeed>>({
-  assignedToMe: { error: null, page: 1, pages: {}, pageSize: cockpitGlobalPageSize, pendingPage: null, status: 'notLoaded', totalItems: 0 },
-  all: { error: null, page: 1, pages: {}, pageSize: cockpitGlobalPageSize, pendingPage: null, status: 'notLoaded', totalItems: 0 },
-});
-const benchAssignmentDialogVisible = ref(false);
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const whatsNewVisible = ref(false);
-const debugImageAnnotationVisible = ref(false);
-const debugAnnotationPixelRatio = ref<1 | 2>(1);
-const debugAnnotationImageSource = ref(debugAnnotationScreenshotUrl);
-const attachmentAnnotationTarget = ref<AttachmentAnnotationTarget | null>(null);
 const editingTeamId = ref<string | null>(null);
-let filePreviewRequestId = 0;
-let markdownPreviewId = 0;
-let unsubscribeAppCommand: (() => void) | null = null;
-let quickAgentShortcutTimer: ReturnType<typeof setTimeout> | null = null;
 let cockpitInitialized = false;
-let commandKeyHeld = false;
-const quickAgentShortcutDelayMs = 350;
 const activeTeam = computed<Team | null>(() => {
   const selectedTeam = props.snapshot.activeTeamId
     ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
@@ -1006,6 +794,126 @@ const activeTeam = computed<Team | null>(() => {
 
   return props.snapshot.teams[0] ?? null;
 });
+const workItemRouting = useWorkItemRouting({
+  actions: {
+    assign: (payload) => props.assignWorkItemAction(payload),
+    assignFromUi: (payload) => emit('assign-work-item', payload),
+    createAgent: (input) => props.createAgent(input),
+    createBranch: (agentId, input) => props.createAgentGitBranch(agentId, input),
+    createWorktree: (input) => props.createSourceWorktree(input),
+    deployBenchTemplate: (input) => props.deployBenchTemplateAction(input),
+    duplicateAgent: (agentId, options) => props.duplicateAgentAction(agentId, options),
+    loadItems: (provider, repositoryId, query) => props.loadWorkItems(provider, repositoryId, undefined, query),
+  },
+  model: {
+    activeTeamId: () => activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined,
+    composerText: () => props.composerState.text,
+    currentAgent: () => currentAgent.value,
+    snapshot: () => props.snapshot,
+    sourceRepositories: () => props.sourceRepositories,
+  },
+  ui: {
+    confirmReassignment: async (message) => {
+      try {
+        await ElMessageBox.confirm(
+          message,
+          translate('surface.appShell.assignAnyway'),
+          {
+            cancelButtonText: translate('common.cancel'),
+            confirmButtonText: translate('dynamic.misc.assignAnyway'),
+            type: 'warning',
+          },
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    focusComposer: () => {
+      void nextTick(() => agentWorkspace.value?.focusComposer());
+    },
+    openNewAgent: (teamId, repositoryName) => openNewAgent(teamId, repositoryName),
+    resolveTeam: resolveSelectedTeam,
+    selectAgent: selectAgentFromShell,
+    updateComposer: (agentId, text) => emit('update:composerState', {
+      agentId,
+      state: {
+        text,
+        selectionStart: text.length,
+        selectionEnd: text.length,
+      },
+    }),
+  },
+});
+const {
+  assignBenchAgent: assignWorkItemToBenchAgent,
+  assignCreatedAgent: assignPendingWorkItemToCreatedAgent,
+  assignExisting: assignExistingAgentWorkItem,
+  benchAgentTeamName: pendingBenchAgentTeamName,
+  benchAssignmentVisible: benchAssignmentDialogVisible,
+  clearNewAgent: clearPendingNewAgentWorkItem,
+  closeBenchAgent: closeBenchAssignmentDialog,
+  createIsolatedAgent: createIsolatedWorkItemAgent,
+  newAgentItem: pendingNewAgentWorkItem,
+  newAgentTeamName: pendingNewAgentTeamName,
+  newAgentWorktreeBranchName: pendingWorkItemBranchName,
+  openBenchAgent: openBenchAgentAssignmentDialog,
+  openNewAgent: openNewAgentForWorkItem,
+  pendingBenchAgentTeamId,
+  prefill: prefillWorkItemForAgent,
+  startInExistingSession: startWorkItemInExistingSession,
+  startMany: startCockpitWorkItems,
+  startRepositoryWork,
+} = workItemRouting;
+const repositorySession = useRepositorySession({
+  activeTeamId: () => activeTeam.value?.id ?? undefined,
+  assignWorkItem: (payload) => props.assignWorkItemAction(payload),
+  createAgent: (input) => props.createAgent(input),
+  createIsolatedWorkItemAgent,
+  createSourceWorktree: (input) => props.createSourceWorktree(input),
+  getSnapshot: () => props.snapshot,
+  getWorkRepositories: () => props.workRepositoriesByProvider.github ?? [],
+  listSourceBranches: (repoPath, remoteConnectionId) => props.listSourceBranches(repoPath, remoteConnectionId),
+  loadWorkItems: async (repositoryId, location) => await props.loadWorkItems(
+    'github',
+    repositoryId,
+    location,
+    { kind: 'all', state: 'open' },
+  ) ?? [],
+  loadWorkRepositories: async (location) => await props.loadWorkRepositories('github', location) ?? [],
+  notifyError: (message) => ElMessage.error(message),
+  prefillWorkItemForAgent,
+  startWorkItemInExistingSession,
+  suggestSourceWorktreePath: (input) => props.suggestSourceWorktreePath(input),
+});
+const {
+  assignmentError: repositorySessionAssignmentError,
+  assignmentSessions: repositorySessionAssignmentSessions,
+  assignmentState: repositorySessionAssignmentState,
+  branches: repositorySessionSourceBranches,
+  close: closeRepositorySessionSource,
+  closeWorktree: closeRepositorySessionWorktree,
+  complete: completePreparedRepositorySession,
+  createForSourceBranch: openNewAgentForSourceBranch,
+  createFromWorktree: createRepositorySessionFromWorktree,
+  createOnBranch: createRepositorySessionOnBranch,
+  createWorktree: createRepositorySessionWorktree,
+  customizeWork: customizeRepositorySessionWork,
+  error: repositorySessionSourceError,
+  listBranches: listRepositorySessionBranches,
+  loading: repositorySessionSourceLoading,
+  open: openRepositorySessionSource,
+  openWorktree: openRepositorySessionWorktree,
+  source: repositorySessionSource,
+  startWork: startRepositorySessionWork,
+  suggestWorktreePath: suggestRepositorySessionWorktreePath,
+  visible: repositorySessionSourceVisible,
+  workItems: repositorySessionSourceWorkItems,
+  worktreeBranches: repositorySessionWorktreeBranches,
+  worktreeBranchesLoading: repositorySessionWorktreeBranchesLoading,
+  worktreeRepository: repositorySessionWorktreeRepository,
+  worktreeSource: repositorySessionWorktreeSource,
+} = repositorySession;
 const repositoryAcquisition = useRepositoryAcquisition({
   activeTeam: () => activeTeam.value,
   activeTeamId: () => props.snapshot.activeTeamId ?? undefined,
@@ -1092,6 +1000,112 @@ const currentAgent = computed(() => {
 
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
 });
+const rightWorkspaceState = useRightWorkspaceState({
+  currentAgentId: () => currentAgent.value?.id,
+  workspaceBody: () => agentWorkspace.value?.workspaceBodyElement() ?? null,
+});
+const {
+  closeTab: closeRightWorkspaceTab,
+  isVisible: isRightWorkspaceVisible,
+  openTab: openRightWorkspaceTab,
+  rightWorkspaceVisible,
+  selectTab: selectRightWorkspaceTab,
+  startResize: startRightWorkspaceResize,
+  toggle: toggleRightWorkspace,
+  toggleFiles: toggleFileExplorer,
+  workspaceFor: rightWorkspaceFor,
+  workspaces: rightWorkspaces,
+} = rightWorkspaceState;
+const workspacePreviews = useWorkspacePreviews({
+  closeTab: closeRightWorkspaceTab,
+  currentAgent: () => currentAgent.value,
+  getSnapshot: () => props.snapshot,
+  openAgentGitDiff: (agentId) => props.openAgentGitDiff(agentId),
+  openTab: openRightWorkspaceTab,
+  previewAgentFile: (agentId, filePath) => props.previewAgentFile(agentId, filePath),
+  workspaceFor: rightWorkspaceFor,
+});
+const {
+  handleFileActivity,
+  openAgentGitDiff: openAgentGitDiffForAgent,
+  openConversationFile: openFilePreview,
+  openFile: openFilePreviewForAgent,
+  openMarkdown: openMarkdownRequest,
+  openSidePanel: openSidePanelRequest,
+} = workspacePreviews;
+function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {
+  return agentId ? openAgentGitDiffForAgent(agentId) : Promise.resolve();
+}
+const imageAnnotation = useImageAnnotation({
+  composerAttachments: () => props.composerAttachments,
+  composerState: () => props.composerState,
+  currentAgentId: () => currentAgent.value?.id,
+  debugFallbackImageSource: debugAnnotationScreenshotUrl,
+  notifyError: (message) => ElMessage.error(message),
+  updateComposerAttachments: (agentId, attachments) => {
+    emit('update:composerAttachments', { agentId, attachments });
+  },
+  updateComposerState: (agentId, state) => {
+    emit('update:composerState', { agentId, state });
+  },
+});
+const {
+  activeCounts: activeAttachmentAnnotationCounts,
+  close: closeImageAnnotation,
+  fileName: imageAnnotationFileName,
+  forward: forwardCodexPromptWithImageAnnotations,
+  handleError: handleImageAnnotationError,
+  imageSource: imageAnnotationImageSource,
+  initialAnnotations: imageAnnotationInitialAnnotations,
+  openAttachment: openAttachmentImageAnnotation,
+  openDebug: openDebugImageAnnotation,
+  pixelRatio: imageAnnotationPixelRatio,
+  prune: pruneSavedImageAnnotations,
+  save: saveImageAnnotation,
+  target: attachmentAnnotationTarget,
+  visible: imageAnnotationVisible,
+} = imageAnnotation;
+const cockpitBacklogState = useCockpitBacklog({
+  configure: (input) => props.configureWorkBacklog(input),
+  confirmLoadAll: async () => {
+    try {
+      await ElMessageBox.confirm(
+        translate('surface.appShell.thisLoadsYourGlobalGitHubBacklogOnePageAtATimeLargeBackl'),
+        translate('surface.appShell.loadTheGlobalBacklog'),
+        {
+          confirmButtonText: translate('dynamic.misc.loadEverything'),
+          cancelButtonText: translate('common.cancel'),
+          type: 'warning',
+        },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  getSnapshot: () => props.snapshot,
+  getWorkBacklogError: () => props.workBacklogError,
+  getWorkBacklogStatus: () => props.workBacklogStatus,
+  getWorkItemsByRepository: () => props.workItemsByRepository,
+  getWorkRepositories: () => props.workRepositoriesByProvider.github ?? [],
+  loadGlobalWorkItems: (query) => props.loadGlobalWorkItems('github', undefined, query),
+  loadWorkItems: async (repositoryId) => {
+    await props.loadWorkItems('github', repositoryId);
+  },
+  loadWorkRepositories: async () => {
+    await props.loadWorkRepositories('github');
+  },
+});
+const {
+  changePage: changeGlobalWorkItemsPage,
+  initialize: initializeCockpitBacklog,
+  refresh: refreshWorkItems,
+  selectAssignee: selectWorkAssigneeForCockpit,
+  selectGlobalScope: selectGlobalBacklogScope,
+  selectRepository: selectWorkRepositoryForCockpit,
+  selectTag: selectWorkTagForCockpit,
+  workBacklog: cockpitWorkBacklog,
+} = cockpitBacklogState;
 const effectiveApprovals = computed(() => {
   const fixture = debugApproval.value;
   return [
@@ -1110,53 +1124,6 @@ const currentAgentGitStatus = computed<AgentGitStatus | null>(() => {
   const agentId = currentAgent.value?.id;
   return agentId ? props.snapshot.agentGitStatuses[agentId] ?? null : null;
 });
-const currentSubagentTree = computed<AgentSubagentTree | null>(() => {
-  const agentId = currentAgent.value?.id;
-  return agentId ? subagentTreeFor(agentId) : null;
-});
-watch(() => props.snapshot.agents.map((agent) => (
-  `${agent.id}:${agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : ''}:${props.snapshot.subagentTrees[agent.id]?.rootConversationId ?? ''}:${Object.keys(props.snapshot.subagentTrees[agent.id]?.nodes ?? {}).sort().join(',')}`
-)), () => {
-  for (const [agentId, workspace] of Object.entries(rightWorkspaces)) {
-    for (const tab of workspace.tabs.filter(isRightWorkspaceSubagentTab)) {
-      const conversationId = rightWorkspaceSubagentConversationId(tab);
-      if (!subagentTreeFor(agentId)?.nodes[conversationId]) {
-        closeRightWorkspaceTab(agentId, tab);
-      }
-    }
-  }
-});
-const currentTurnPlan = computed<ThreadPlan | null>(() => {
-  const plan = currentAgent.value?.plan;
-  if (!plan?.steps.length) {
-    return null;
-  }
-  if (props.isConversationLoading && props.messages.length === 0) {
-    return null;
-  }
-
-  let latestTurnId: string | undefined;
-  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    if (props.messages[index]?.turnId) {
-      latestTurnId = props.messages[index].turnId;
-      break;
-    }
-  }
-
-  return !latestTurnId || latestTurnId === plan.turnId ? plan : null;
-});
-const executionPlanVisible = computed(() => {
-  const agentId = currentAgent.value?.id;
-  const plan = currentTurnPlan.value;
-  if (!agentId || !plan) {
-    return false;
-  }
-
-  return executionPlanStates[agentId]?.turnId === plan.turnId
-    ? executionPlanStates[agentId].open
-    : true;
-});
-
 const conversationKey = computed(() => {
   const session = currentAgent.value?.backendSession;
   if (session?.kind === 'codex') return `codex:${session.threadId}`;
@@ -1270,9 +1237,9 @@ const conversationPaneActions: CodexConversationPaneActions = {
     const command = permissionModeCommand(item.payload);
     if (command) emit('select-permission-mode', command.mode);
   },
-  openLink: openConversationLink,
-  openImage: openConversationImage,
-  openVisualization: openConversationVisualization,
+  openLink: (link) => agentWorkspace.value?.openConversationLink(link),
+  openImage: (image, context) => agentWorkspace.value?.openConversationImage(image, context) ?? false,
+  openVisualization: (visualization) => agentWorkspace.value?.openConversationVisualization(visualization),
   resolveApproval: forwardApprovalResolution,
   retryMessage: (index) => emit('retry-message', index),
   steer: forwardCodexSteerPrompt,
@@ -1316,143 +1283,16 @@ const conversationPaneController = createCodexConversationPaneController({
   actions: conversationPaneActions,
 });
 
-watch(() => ({
-  agentId: currentAgent.value?.id ?? null,
-  turnId: currentTurnPlan.value?.turnId ?? null,
-}), ({ agentId, turnId }) => {
-  if (!agentId || !turnId) {
-    return;
-  }
-
-  const existing = executionPlanStates[agentId];
-  if (!existing || existing.turnId !== turnId) {
-    executionPlanStates[agentId] = { open: true, turnId };
-  }
-}, { immediate: true });
-
-function toggleExecutionPlan(): void {
-  const agentId = currentAgent.value?.id;
-  const plan = currentTurnPlan.value;
-  if (!agentId || !plan) {
-    return;
-  }
-
-  const existing = executionPlanStates[agentId];
-  executionPlanStates[agentId] = {
-    turnId: plan.turnId,
-    open: existing?.turnId === plan.turnId ? !existing.open : false,
-  };
-}
-
-function closeExecutionPlan(): void {
-  const agentId = currentAgent.value?.id;
-  const plan = currentTurnPlan.value;
-  if (!agentId || !plan) {
-    return;
-  }
-
-  executionPlanStates[agentId] = { turnId: plan.turnId, open: false };
-}
-const rightWorkspaceVisible = computed(() => {
-  const agentId = currentAgent.value?.id;
-  return Boolean(agentId && rightWorkspaceFor(agentId).open);
-});
-const savedCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => {
-  const configuration = props.snapshot.workBacklog.providerConfigurations.github ?? {};
-  return normalizedCockpitBacklogConfiguration({
-    repositoryId: configuration.repositoryId ?? null,
-    assigneeLogin: configuration.assigneeLogin ?? null,
-    tagName: configuration.tagName ?? null,
-  });
-});
-const effectiveCockpitBacklogConfiguration = computed<CockpitBacklogConfiguration>(() => (
-  pendingCockpitBacklogConfiguration.value ?? savedCockpitBacklogConfiguration.value
-));
-const cockpitWorkBacklog = computed(() => {
-  const connection = props.snapshot.workBacklog.connections.find((candidate) => candidate.provider === 'github');
-  if (!connection || connection.status !== 'connected') {
-    return null;
-  }
-
-  const provider = connection.provider;
-  const repositories = props.workRepositoriesByProvider[provider] ?? [];
-  const configuration = effectiveCockpitBacklogConfiguration.value;
-  const selectedRepositoryId = configuration.repositoryId ?? null;
-  const items = selectedRepositoryId
-    ? props.workItemsByRepository[workItemsKey(provider, selectedRepositoryId)] ?? []
-    : cockpitGlobalScope.value
-      ? cockpitGlobalFeeds[cockpitGlobalScope.value].pages[cockpitGlobalFeeds[cockpitGlobalScope.value].page] ?? []
-      : [];
-  const globalFeed = cockpitGlobalScope.value ? cockpitGlobalFeeds[cockpitGlobalScope.value] : null;
-
-  return {
-    assignments: props.snapshot.workBacklog.assignments,
-    connection,
-    globalScope: cockpitGlobalScope.value,
-    page: globalFeed?.page ?? 1,
-    pageSize: globalFeed?.pageSize ?? items.length,
-    pageLoading: globalFeed?.pendingPage !== null,
-    repositories,
-    selectedAssigneeLogin: cockpitGlobalScope.value === 'assignedToMe'
-      ? connection.accountLabel ?? configuration.assigneeLogin ?? null
-      : configuration.assigneeLogin ?? null,
-    selectedRepositoryId,
-    selectedTagName: configuration.tagName ?? null,
-    items,
-    status: selectedRepositoryId ? props.workBacklogStatus : globalFeed?.status ?? props.workBacklogStatus,
-    error: selectedRepositoryId ? props.workBacklogError : globalFeed?.error ?? null,
-    totalItems: globalFeed?.totalItems ?? items.length,
-  };
-});
-
-watch(savedCockpitBacklogConfiguration, (configuration) => {
-  if (pendingCockpitBacklogConfiguration.value && sameCockpitBacklogConfiguration(pendingCockpitBacklogConfiguration.value, configuration)) {
-    pendingCockpitBacklogConfiguration.value = null;
-  }
-});
 const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'create' && pendingNewAgentWorkItem.value !== null);
 const pendingNewAgentName = '';
-const pendingNewAgentTeamName = computed(() => pendingNewAgentWorkItem.value ? workItemTeamName(pendingNewAgentWorkItem.value) : '');
-const pendingNewAgentWorktreeBranchName = computed(() => {
-  const item = pendingNewAgentWorkItem.value;
-  if (!item) return agentDialogSourceBranchName.value;
-  return item.kind === 'pullRequest'
-    ? item.branchName?.trim() || `review/gh-${item.number}`
-    : `fix/gh-${item.number}`;
-});
-const pendingBenchAgentTeamName = computed(() => pendingBenchAgentWorkItem.value ? workItemTeamName(pendingBenchAgentWorkItem.value) : '');
+const pendingNewAgentWorktreeBranchName = computed(() => (
+  pendingNewAgentWorkItem.value ? pendingWorkItemBranchName.value : agentDialogSourceBranchName.value
+));
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
 const automationsVisible = computed(() => activeSurface.value === 'automations');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
-const imageAnnotationVisible = computed(() => (
-  debugImageAnnotationVisible.value || attachmentAnnotationTarget.value !== null
-));
-const imageAnnotationImageSource = computed(() => (
-  attachmentAnnotationTarget.value?.attachment.previewUrl ?? debugAnnotationImageSource.value
-));
-const imageAnnotationSavedDraft = computed<SavedImageAnnotations | null>(() => {
-  const target = attachmentAnnotationTarget.value;
-  return target ? attachmentAnnotationsByAgentId[target.agentId]?.[target.attachment.reference] ?? null : null;
-});
-const imageAnnotationInitialAnnotations = computed(() => imageAnnotationSavedDraft.value?.annotations ?? []);
-const imageAnnotationPixelRatio = computed<1 | 2>(() => (
-  attachmentAnnotationTarget.value
-    ? imageAnnotationSavedDraft.value?.pixelRatio ?? 1
-    : debugAnnotationPixelRatio.value
-));
-const imageAnnotationFileName = computed(() => {
-  const name = attachmentAnnotationTarget.value?.attachment.name;
-  if (!name) return 'codex-claw-annotated.png';
-  const baseName = name.replace(/\.[^.]+$/, '') || 'image';
-  return `${baseName}-annotated.png`;
-});
-const activeAttachmentAnnotationCounts = computed<Readonly<Record<string, number>>>(() => {
-  const agentId = currentAgent.value?.id;
-  const saved = agentId ? attachmentAnnotationsByAgentId[agentId] ?? {} : {};
-  return Object.fromEntries(Object.entries(saved).map(([reference, draft]) => [reference, draft.annotations.length]));
-});
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
   || benchAssignmentDialogVisible.value
@@ -1462,6 +1302,46 @@ const isModalDialogVisible = computed(() => (
   || fileQuickOpenVisible.value
   || props.codexResourceSharingMigrationRequired
 ));
+const { quickAgentShortcutsVisible } = useAppShellCommands({
+  state: {
+    activeTeam: () => activeTeam.value,
+    activeTeamAgents: () => activeTeamAgents.value,
+    agents: () => props.snapshot.agents,
+    attachmentsEnabled: () => props.backendCapabilities.attachments,
+    composerAttachments: () => props.composerAttachments,
+    currentAgent: () => currentAgent.value,
+    isAgentWorkspaceVisible: () => isAgentWorkspaceVisible.value,
+    isModalDialogVisible: () => isModalDialogVisible.value,
+    showOnboardingGate: () => showOnboardingGate.value,
+    teams: () => props.snapshot.teams,
+  },
+  actions: {
+    closeAgent: (agentId) => emit('close-agent', agentId),
+    closeTeam: (teamId) => emit('close-team', teamId),
+    debugMarkUnread: () => emit('debug-mark-unread'),
+    duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
+    editAgent: openEditAgent,
+    focusComposer: () => agentWorkspace.value?.focusComposer(),
+    newTeam: openNewTeam,
+    openAgentSurface: () => { activeSurface.value = 'agent'; },
+    openBrowser: (command) => agentWorkspace.value?.handleBrowserOpenCommand(command),
+    openDebugImageAnnotation,
+    openFileQuick: () => { fileQuickOpenVisible.value = true; },
+    openGitReview: openAgentGitDiffPreview,
+    openMarkdown: openMarkdownRequest,
+    openRightWorkspaceTab: (tab) => openRightWorkspaceTab(tab),
+    openSettings,
+    openWhatsNew,
+    quit,
+    restartAgent: (agentId) => emit('restart-agent', agentId),
+    selectAgent: selectAgentFromShell,
+    selectTeam: selectTeamFromRail,
+    sendAgentPrompt: (agentId, prompt) => emit('send-agent-prompt', { agentId, prompt }),
+    setDebugApproval: (approval) => { debugApproval.value = approval; },
+    updateComposerAttachments: (agentId, attachments) => emit('update:composerAttachments', { agentId, attachments }),
+    updateComposerState: (agentId, state) => emit('update:composerState', { agentId, state }),
+  },
+});
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
@@ -1476,360 +1356,12 @@ const agentDialogTargetTeam = computed(() => {
     : null;
 });
 const agentDialogRemoteConnectionId = computed(() => agentDialogTargetTeam.value?.remoteConnectionId ?? '');
-function isPlanPreviewUpdatingFor(agentId: string): boolean {
-  const panel = rightWorkspaceFor(agentId).planPanel;
-  if (!panel || panel.purpose !== 'plan') return false;
-  return props.messages.some((message) => (
-    message.agentId === agentId &&
-    message.parts.some((part) => (
-      part.type === 'tool' &&
-      part.status === 'running' &&
-      part.metadata?.planProgress === true
-    ))
-  ));
-}
-
 onMounted(() => {
-  if (typeof window.addEventListener === 'function') {
-    window.addEventListener('keydown', handleShellShortcut);
-    window.addEventListener('keyup', handleShellKeyup);
-    window.addEventListener('blur', resetQuickAgentShortcuts);
-  }
-  unsubscribeAppCommand = codexClawApi?.onAppCommand?.(handleAppCommand) ?? null;
   void loadAuthentication();
-});
-
-onBeforeUnmount(() => {
-  if (typeof window.removeEventListener === 'function') {
-    window.removeEventListener('keydown', handleShellShortcut);
-    window.removeEventListener('keyup', handleShellKeyup);
-    window.removeEventListener('blur', resetQuickAgentShortcuts);
-  }
-  resetQuickAgentShortcuts();
-  unsubscribeAppCommand?.();
-  unsubscribeAppCommand = null;
 });
 
 function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
-}
-
-function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
-  const existing = rightWorkspaces[agentId];
-  if (existing) return existing;
-
-  const created: AgentRightWorkspaceState = {
-    activeTab: null,
-    backlogError: null,
-    backlogItems: [],
-    backlogStatus: 'notLoaded',
-    browserId: PRIMARY_BROWSER_ID,
-    browserInitialUrl: '',
-    browserOpenRequestId: 0,
-    browserVisualization: null,
-    filePanels: {},
-    filesPaneOpen: false,
-    filesPaneWidth: 280,
-    filePreviewRequestIds: {},
-    diffPanels: {},
-    gitReviewPanel: null,
-    imagePanels: {},
-    planPanel: null,
-    open: false,
-    tabs: [],
-    width: 420,
-  };
-  rightWorkspaces[agentId] = created;
-  return created;
-}
-
-function isRightWorkspaceVisible(agentId: string): boolean {
-  return currentAgent.value?.id === agentId && rightWorkspaceFor(agentId).open;
-}
-
-function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {
-  return rightWorkspaceFor(agent.id).gitReviewPanel ?? {
-    kind: 'gitDiff',
-    title: translate('surface.appShell.review'),
-    ...(agent.folder ? { subtitle: agent.folder } : {}),
-    diff: '',
-    state: 'loading',
-    error: null,
-  };
-}
-
-function toggleRightWorkspace(): void {
-  const agentId = currentAgent.value?.id;
-  if (!agentId) return;
-  const workspace = rightWorkspaceFor(agentId);
-  if (rightWorkspaceVisible.value) {
-    workspace.open = false;
-    return;
-  }
-
-  workspace.open = true;
-}
-
-function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId = currentAgent.value?.id): void {
-  if (!agentId) return;
-  const workspace = rightWorkspaceFor(agentId);
-  if (!workspace.tabs.includes(tab)) {
-    workspace.tabs = [...workspace.tabs, tab];
-  }
-  workspace.activeTab = tab;
-  workspace.open = true;
-}
-
-function subagentTreeFor(agentId: string): AgentSubagentTree | null {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
-  const tree = props.snapshot.subagentTrees[agentId];
-  return agent?.backendSession?.kind === 'codex' && tree?.rootConversationId === agent.backendSession.threadId
-    ? tree
-    : null;
-}
-
-function openSubagent(agentId: string, conversationId: string): void {
-  const tree = subagentTreeFor(agentId);
-  if (!tree?.nodes[conversationId]) return;
-  openRightWorkspaceTab(rightWorkspaceSubagentTab(conversationId), agentId);
-}
-
-function selectedSubagentConversationIdFor(agentId: string): string | null {
-  const tab = rightWorkspaceFor(agentId).activeTab;
-  return tab && isRightWorkspaceSubagentTab(tab)
-    ? rightWorkspaceSubagentConversationId(tab)
-    : null;
-}
-
-function loadSubagentMessages(agentId: string, conversationId: string): Promise<RendererMessage[]> {
-  const tree = subagentTreeFor(agentId);
-  if (!tree?.nodes[conversationId]) return Promise.reject(new Error(translate('surface.appShell.subagentConversationIsUnavailable')));
-  return readConversationMessages({ backend: 'codex', threadId: conversationId }, agentId);
-}
-
-function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { type: 'open-browser' }>): void {
-  const workspace = rightWorkspaceFor(agentId);
-  workspace.browserId = command.browserId ?? PRIMARY_BROWSER_ID;
-  workspace.browserInitialUrl = command.url ?? '';
-  workspace.browserVisualization = null;
-  workspace.browserOpenRequestId += 1;
-  openRightWorkspaceTab('browser', agentId);
-}
-
-function openConversationVisualization(visualization: CodexConversationVisualization): void {
-  const agent = currentAgent.value;
-  if (!agent || !clawHostCapabilities.embeddedBrowser) return;
-  const workspace = rightWorkspaceFor(agent.id);
-  workspace.browserId = PRIMARY_BROWSER_ID;
-  workspace.browserInitialUrl = '';
-  workspace.browserVisualization = { ...visualization };
-  workspace.browserOpenRequestId += 1;
-  openRightWorkspaceTab('browser', agent.id);
-}
-
-function handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void {
-  const agentId = command.agentId ?? currentAgent.value?.id;
-  if (!agentId || !props.snapshot.agents.some((agent) => agent.id === agentId)) return;
-  openRequestedBrowser(agentId, command);
-}
-
-function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab): void {
-  if (tab === 'backlog') {
-    void openRepositoryBacklog(agentId);
-    return;
-  }
-  if (tab === 'review') {
-    void openAgentGitDiffPreview(agentId);
-    return;
-  }
-  if (tab === 'files') {
-    rightWorkspaceFor(agentId).filesPaneOpen = true;
-  }
-  openRightWorkspaceTab(tab, agentId);
-}
-
-async function openRepositoryBacklog(agentId: string): Promise<void> {
-  openRightWorkspaceTab('backlog', agentId);
-  const workspace = rightWorkspaceFor(agentId);
-  if (workspace.backlogStatus === 'notLoaded' || workspace.backlogStatus === 'error') {
-    await loadRepositoryBacklog(agentId);
-  }
-}
-
-async function loadRepositoryBacklog(agentId: string): Promise<void> {
-  const workspace = rightWorkspaceFor(agentId);
-  const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
-  if (!repositoryId) {
-    workspace.backlogStatus = 'error';
-    workspace.backlogError = translate('dynamic.misc.repositoryNotConnected');
-    return;
-  }
-
-  workspace.backlogStatus = 'loading';
-  workspace.backlogError = null;
-  try {
-    workspace.backlogItems = await props.loadWorkItems('github', repositoryId, undefined, {
-      kind: 'all',
-      state: 'all',
-    }) ?? [];
-    workspace.backlogStatus = 'loaded';
-  } catch (error) {
-    workspace.backlogStatus = 'error';
-    workspace.backlogError = error instanceof Error ? error.message : String(error);
-  }
-}
-
-async function createRepositoryIssue(agentId: string, description: string): Promise<WorkItem> {
-  const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
-  if (!repositoryId) throw new Error(translate('surface.appShell.thisRepositoryIsNotConnectedToGitHub'));
-  const item = await props.createWorkItem({
-    agentId,
-    provider: 'github',
-    repositoryId,
-    description,
-  });
-  const workspace = rightWorkspaceFor(agentId);
-  workspace.backlogItems = [item, ...workspace.backlogItems.filter((candidate) => candidate.id !== item.id)];
-  workspace.backlogStatus = 'loaded';
-  workspace.backlogError = null;
-  return item;
-}
-
-async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {
-  const sourceAgent = props.snapshot.agents.find((agent) => agent.id === agentId);
-  if (!sourceAgent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-
-  const workItem = await resolvePullRequestBranch(input.item);
-
-  const sourceAgentName = agentDisplayName(sourceAgent);
-  const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgentName}` : sourceAgentName;
-  if (!await confirmAssignedWorkItemOverride(workItem, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
-    throw new Error(translate('surface.appShell.assignmentCancelled'));
-  }
-
-  const targetAgent = input.target === 'duplicate'
-    ? await props.duplicateAgentAction(sourceAgent.id, {
-        select: false,
-        name: `${sourceAgentName} gh-${workItem.number}`,
-      })
-    : sourceAgent;
-  if (!targetAgent) throw new Error(translate('surface.appShell.theDuplicateAgentCouldNotBeCreated'));
-
-  if (input.target === 'duplicate' && input.workspace.kind !== 'worktree') {
-    throw new Error(translate('surface.appShell.aDuplicatedAgentRequiresANewWorktree'));
-  }
-
-  const pullRequestBranch = workItem.kind === 'pullRequest' ? workItem.branchName?.trim() : undefined;
-  if (workItem.kind === 'pullRequest' && !pullRequestBranch) {
-    throw new Error(translate('surface.appShell.gitHubDidNotReturnThePullRequestBranch'));
-  }
-
-  const checkoutBranch = pullRequestBranch
-    ?? (input.workspace.kind === 'worktree' ? input.workspace.branchName : undefined);
-  if (checkoutBranch) {
-    await props.createAgentGitBranch(targetAgent.id, {
-      name: checkoutBranch,
-      createWorktree: input.workspace.kind === 'worktree',
-      ...(workItem.kind === 'pullRequest' ? { pullRequestNumber: workItem.number } : {}),
-      confirmed: true,
-    });
-  }
-  await props.assignWorkItemAction({
-    agentId: targetAgent.id,
-    item: workItem,
-    prompt: workItemAssignmentPrompt(workItem, { action: input.action }),
-  });
-}
-
-function prefillRepositoryWork(agentId: string, item: WorkItem): void {
-  prefillWorkItemForAgent(agentId, item);
-}
-
-function prefillWorkItemForAgent(agentId: string, item: WorkItem): void {
-  const prompt = workItemComposerPrompt(item);
-  const existingText = currentAgent.value?.id === agentId ? props.composerState.text.trimEnd() : '';
-  const text = existingText ? `${existingText}\n\n${prompt}` : prompt;
-  emit('update:composerState', {
-    agentId,
-    state: {
-      text,
-      selectionStart: text.length,
-      selectionEnd: text.length,
-    },
-  });
-  selectAgentFromShell(agentId);
-  void nextTick(() => conversationPane.value?.focusComposer());
-}
-
-function toggleFileExplorer(agentId: string): void {
-  const workspace = rightWorkspaceFor(agentId);
-  workspace.filesPaneOpen = !workspace.filesPaneOpen;
-}
-
-function selectRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
-  const workspace = rightWorkspaceFor(agentId);
-  if (workspace.tabs.includes(tab)) {
-    workspace.activeTab = tab;
-  }
-}
-
-function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
-  const workspace = rightWorkspaceFor(agentId);
-  const tabIndex = workspace.tabs.indexOf(tab);
-  if (tabIndex === -1) {
-    return;
-  }
-
-  const nextTabs = workspace.tabs.filter((candidate) => candidate !== tab);
-  workspace.tabs = nextTabs;
-  if (tab === 'review') {
-    workspace.gitReviewPanel = null;
-  }
-  if (tab === 'plan') {
-    workspace.planPanel = null;
-  }
-  if (tab === 'files') {
-    workspace.filesPaneOpen = false;
-  }
-  if (isRightWorkspaceFileTab(tab)) {
-    const { [tab]: _closedPanel, ...filePanels } = workspace.filePanels;
-    const { [tab]: _closedRequest, ...filePreviewRequestIds } = workspace.filePreviewRequestIds;
-    workspace.filePanels = filePanels;
-    workspace.filePreviewRequestIds = filePreviewRequestIds;
-  }
-  if (isRightWorkspaceDiffTab(tab)) {
-    const { [tab]: _closedPanel, ...diffPanels } = workspace.diffPanels;
-    workspace.diffPanels = diffPanels;
-  }
-  if (isRightWorkspaceImageTab(tab)) {
-    const { [tab]: _closedPanel, ...imagePanels } = workspace.imagePanels;
-    workspace.imagePanels = imagePanels;
-  }
-  if (workspace.activeTab === tab) {
-    workspace.activeTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? null;
-  }
-  if (nextTabs.length === 0) {
-    workspace.activeTab = null;
-    workspace.open = false;
-  }
-}
-
-function startRightWorkspaceResize(event: PointerEvent): void {
-  event.preventDefault();
-  const body = workspaceBody.value;
-  if (!body) return;
-  const agentId = currentAgent.value?.id;
-  if (!agentId) return;
-  const updateWidth = (moveEvent: PointerEvent) => {
-    const availableWidth = Math.max(240, body.getBoundingClientRect().width - 240);
-    rightWorkspaceFor(agentId).width = Math.min(Math.max(body.getBoundingClientRect().right - moveEvent.clientX, 240), availableWidth);
-  };
-  const stop = () => {
-    window.removeEventListener('pointermove', updateWidth);
-    window.removeEventListener('pointerup', stop);
-  };
-  window.addEventListener('pointermove', updateWidth);
-  window.addEventListener('pointerup', stop, { once: true });
 }
 
 function openNewAgent(
@@ -1843,230 +1375,6 @@ function openNewAgent(
   agentDialogSourceRepositoryName.value = sourceRepositoryName;
   agentDialogSourceBranchName.value = sourceBranchName;
   agentDialogVisible.value = true;
-}
-
-let repositorySessionSourceRequestId = 0;
-
-async function openRepositorySessionSource(source: RepositorySessionSource): Promise<void> {
-  const requestId = ++repositorySessionSourceRequestId;
-  repositorySessionSource.value = source;
-  repositorySessionSourceVisible.value = true;
-  repositorySessionSourceBranches.value = [];
-  repositorySessionSourceWorkItems.value = [];
-  repositorySessionSourceError.value = null;
-  repositorySessionAssignmentState.value = 'idle';
-  repositorySessionAssignmentError.value = null;
-  repositorySessionSourceLoading.value = true;
-
-  const { remoteConnectionId, location } = repositorySessionContext(source);
-
-  try {
-    const branches = await props.listSourceBranches(
-      source.repositoryRoot,
-      remoteConnectionId || undefined,
-    );
-    if (requestId !== repositorySessionSourceRequestId) return;
-    repositorySessionSourceBranches.value = branches;
-
-    try {
-      const loadedRepositories = await props.loadWorkRepositories('github', location);
-      if (requestId !== repositorySessionSourceRequestId) return;
-      const repositories = loadedRepositories ?? props.workRepositoriesByProvider.github ?? [];
-      const workRepository = repositories.find((repository) => (
-        repository.name === source.repositoryName ||
-        repository.fullName.endsWith(`/${source.repositoryName}`)
-      ));
-      if (workRepository) {
-        repositorySessionSourceWorkItems.value = await props.loadWorkItems(
-          'github',
-          workRepository.id,
-          location,
-          { kind: 'all', state: 'open' },
-        ) ?? [];
-      }
-    } catch {
-      // Branch-based session creation remains available without a work-provider connection.
-      repositorySessionSourceWorkItems.value = [];
-    }
-  } catch (error) {
-    if (requestId !== repositorySessionSourceRequestId) return;
-    repositorySessionSourceError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    if (requestId === repositorySessionSourceRequestId) {
-      repositorySessionSourceLoading.value = false;
-    }
-  }
-}
-
-function closeRepositorySessionSource(): void {
-  repositorySessionSourceRequestId += 1;
-  repositorySessionSourceVisible.value = false;
-  repositorySessionSource.value = null;
-  repositorySessionSourceLoading.value = false;
-  repositorySessionSourceError.value = null;
-  repositorySessionAssignmentState.value = 'idle';
-  repositorySessionAssignmentError.value = null;
-}
-
-function completePreparedRepositorySession(): void {
-  closeRepositorySessionSource();
-}
-
-async function listRepositorySessionBranches(input: { agentId: string; repositoryRoot: string }): Promise<SourceBranch[]> {
-  const { remoteConnectionId } = repositorySessionContext({ agentId: input.agentId });
-  return await props.listSourceBranches(input.repositoryRoot, remoteConnectionId);
-}
-
-function createRepositorySessionOnBranch(payload: RepositorySessionSource & { branch: SourceBranch }): void {
-  const { branch, ...source } = payload;
-  const { teamId } = repositorySessionContext(source);
-  void createRepositorySession(source, branch, teamId);
-}
-
-let repositorySessionWorktreeBranchesRequestId = 0;
-
-async function openRepositorySessionWorktree(source: RepositorySessionSource): Promise<void> {
-  const requestId = ++repositorySessionWorktreeBranchesRequestId;
-  repositorySessionWorktreeSource.value = source;
-  repositorySessionWorktreeBranches.value = [];
-  repositorySessionWorktreeBranchesLoading.value = true;
-  const { remoteConnectionId } = repositorySessionContext(source);
-  try {
-    const branches = await props.listSourceBranches(source.repositoryRoot, remoteConnectionId || undefined);
-    if (requestId === repositorySessionWorktreeBranchesRequestId) {
-      repositorySessionWorktreeBranches.value = branches;
-    }
-  } catch (error) {
-    if (requestId === repositorySessionWorktreeBranchesRequestId) {
-      ElMessage.error(error instanceof Error ? error.message : String(error));
-      repositorySessionWorktreeSource.value = null;
-    }
-  } finally {
-    if (requestId === repositorySessionWorktreeBranchesRequestId) {
-      repositorySessionWorktreeBranchesLoading.value = false;
-    }
-  }
-}
-
-function closeRepositorySessionWorktree(): void {
-  repositorySessionWorktreeBranchesRequestId += 1;
-  repositorySessionWorktreeSource.value = null;
-  repositorySessionWorktreeBranches.value = [];
-  repositorySessionWorktreeBranchesLoading.value = false;
-}
-
-async function createRepositorySessionWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
-  const source = repositorySessionWorktreeSource.value;
-  const { remoteConnectionId } = repositorySessionContext(source);
-  return await props.createSourceWorktree({
-    ...input,
-    ...(remoteConnectionId ? { remoteConnectionId } : {}),
-  });
-}
-
-async function suggestRepositorySessionWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath'>): Promise<string> {
-  const source = repositorySessionWorktreeSource.value;
-  const { remoteConnectionId } = repositorySessionContext(source);
-  return await props.suggestSourceWorktreePath({
-    ...input,
-    ...(remoteConnectionId ? { remoteConnectionId } : {}),
-  });
-}
-
-async function createRepositorySessionFromWorktree(worktree: SourceWorktree): Promise<void> {
-  const source = repositorySessionWorktreeSource.value;
-  closeRepositorySessionWorktree();
-  if (!source) return;
-  const { teamId } = repositorySessionContext(source);
-  try {
-    await props.createAgent({
-      name: null,
-      folder: worktree.path,
-      backend: 'codex',
-      sourceRepositoryName: source.repositoryName,
-      ...(teamId ? { teamId } : {}),
-    });
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-function openNewAgentForSourceBranch(branch: SourceBranch): void {
-  const source = repositorySessionSource.value;
-  if (!source) return;
-  const { teamId } = repositorySessionContext(source);
-  void createRepositorySession(source, branch, teamId);
-}
-
-async function startRepositorySessionWork(selection: WorkItemAssignmentSelection): Promise<void> {
-  const source = repositorySessionSource.value;
-  if (!source) return;
-  const { teamId } = repositorySessionContext(source);
-  repositorySessionAssignmentState.value = 'running';
-  repositorySessionAssignmentError.value = null;
-  try {
-    if (selection.destination === 'existing') {
-      if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-      await startWorkItemInExistingSession(selection.agentId, selection.item, selection.action);
-    } else {
-      if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-      const { agent, item } = await createIsolatedWorkItemAgent(selection.item, teamId);
-      await props.assignWorkItemAction({
-        agentId: agent.id,
-        item,
-        prompt: workItemAssignmentPrompt(item, { action: selection.action }),
-      });
-    }
-    repositorySessionAssignmentState.value = 'success';
-  } catch (error) {
-    repositorySessionAssignmentState.value = 'error';
-    repositorySessionAssignmentError.value = error instanceof Error ? error.message : String(error);
-  }
-}
-
-async function customizeRepositorySessionWork(selection: Omit<WorkItemAssignmentSelection, 'action'>): Promise<void> {
-  const source = repositorySessionSource.value;
-  if (!source) return;
-  const { teamId } = repositorySessionContext(source);
-  repositorySessionAssignmentState.value = 'running';
-  repositorySessionAssignmentError.value = null;
-  try {
-    if (selection.destination === 'existing') {
-      if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-      prefillWorkItemForAgent(selection.agentId, selection.item);
-    } else {
-      if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-      const { agent, item } = await createIsolatedWorkItemAgent(selection.item, teamId);
-      prefillWorkItemForAgent(agent.id, item);
-    }
-    closeRepositorySessionSource();
-  } catch (error) {
-    repositorySessionAssignmentState.value = 'error';
-    repositorySessionAssignmentError.value = error instanceof Error ? error.message : String(error);
-  }
-}
-
-async function createRepositorySession(source: RepositorySessionSource, branch: SourceBranch, teamId?: string): Promise<void> {
-  closeRepositorySessionSource();
-  try {
-    const { remoteConnectionId } = repositorySessionContext({ ...source, teamId });
-    const worktree = branch.worktreePath
-      ? { name: branch.name, path: branch.worktreePath }
-      : await props.createSourceWorktree({
-          repoPath: source.repositoryRoot,
-          branchName: branch.name,
-          ...(remoteConnectionId ? { remoteConnectionId } : {}),
-        });
-    await props.createAgent({
-      name: null,
-      folder: worktree.path,
-      backend: 'codex',
-      sourceRepositoryName: source.repositoryName,
-      ...(teamId ? { teamId } : {}),
-    });
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : String(error));
-  }
 }
 
 function repositorySessionContext(source?: Pick<RepositorySessionSource, 'agentId' | 'teamId'> | null) {
@@ -2128,161 +1436,6 @@ watch(() => githubConnection.value.status, (status) => {
   }
 });
 
-async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promise<void> {
-  if (!await confirmAssignedWorkItemOverride(intent.item, 'a new agent')) {
-    return;
-  }
-
-  pendingNewAgentWorkItem.value = intent.item;
-  openNewAgent(
-    intent.teamId ?? activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined,
-    workItemRepositoryName(intent.item),
-  );
-}
-
-async function startCockpitWorkItems(input: {
-  action: WorkItemAssignmentAction;
-  items: WorkItem[];
-  teamId: string;
-}): Promise<void> {
-  await Promise.all(input.items.map(async (listedItem) => {
-    const { agent, item } = await createIsolatedWorkItemAgent(listedItem, input.teamId);
-    await props.assignWorkItemAction({
-      agentId: agent.id,
-      item,
-      prompt: workItemAssignmentPrompt(item, { action: input.action }),
-    });
-  }));
-}
-
-async function createIsolatedWorkItemAgent(listedItem: WorkItem, teamId: string): Promise<{ agent: Agent; item: WorkItem }> {
-  const team = props.snapshot.teams.find((candidate) => candidate.id === teamId);
-  if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
-
-  const item = await resolvePullRequestBranch(listedItem);
-  const repositoryName = workItemRepositoryName(item);
-  const repository = props.sourceRepositories.find((candidate) => candidate.name === repositoryName);
-  if (!repository) throw new Error(`${item.repositoryFullName} is not available in the source folder.`);
-
-  const branchName = workItemBranchName(item);
-  const remoteConnectionId = team.remoteConnectionId?.trim();
-  const worktree = await props.createSourceWorktree({
-    repoPath: repository.path,
-    branchName,
-    ...(remoteConnectionId ? { remoteConnectionId } : {}),
-  });
-  const agent = await props.createAgent({
-    name: null,
-    folder: worktree.path,
-    backend: 'codex',
-    sourceRepositoryName: repository.name,
-    teamId: team.id,
-  });
-  if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} #${item.number}.`);
-  return { agent, item };
-}
-
-async function startWorkItemInExistingSession(
-  agentId: string,
-  listedItem: WorkItem,
-  action: WorkItemAssignmentAction,
-): Promise<void> {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (!agent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-  const item = await resolvePullRequestBranch(listedItem);
-  if (!await confirmAssignedWorkItemOverride(item, agentDisplayName(agent), agent.id)) {
-    throw new Error(translate('surface.appShell.assignmentCancelled'));
-  }
-
-  const branchName = workItemBranchName(item);
-  if (agent.workspace?.kind !== 'git' || agent.workspace.branch !== branchName) {
-    await props.createAgentGitBranch(agent.id, {
-      name: branchName,
-      createWorktree: false,
-      ...(item.kind === 'pullRequest' ? { pullRequestNumber: item.number } : {}),
-      confirmed: true,
-    });
-  }
-  await props.assignWorkItemAction({
-    agentId: agent.id,
-    item,
-    prompt: workItemAssignmentPrompt(item, { action }),
-  });
-}
-
-function workItemBranchName(item: WorkItem): string {
-  const branchName = item.kind === 'pullRequest' ? item.branchName?.trim() : `fix/gh-${item.number}`;
-  if (!branchName) throw new Error(`GitHub did not return the branch for ${item.repositoryFullName} #${item.number}.`);
-  return branchName;
-}
-
-async function resolvePullRequestBranch(item: WorkItem): Promise<WorkItem> {
-  if (item.kind !== 'pullRequest' || item.branchName?.trim()) return item;
-
-  const refreshedItems = await props.loadWorkItems(item.provider, item.repositoryId, undefined, {
-    kind: 'pullRequest',
-    state: 'all',
-  });
-  return refreshedItems?.find((candidate) => candidate.id === item.id) ?? item;
-}
-
-async function openBenchAgentAssignmentDialog(intent: WorkItemAssignmentIntent): Promise<void> {
-  if (!await confirmAssignedWorkItemOverride(intent.item, 'a Bench agent')) {
-    return;
-  }
-
-  pendingBenchAgentWorkItem.value = intent.item;
-  pendingBenchAgentTeamId.value = intent.teamId ?? null;
-  benchAssignmentDialogVisible.value = true;
-}
-
-function workItemTeamName(item: WorkItem): string {
-  return `${workProviderTitle(item.provider)} #${item.number}`;
-}
-
-function workItemRepositoryName(item: WorkItem): string {
-  return item.repositoryFullName.split('/').filter(Boolean).at(-1) ?? item.repositoryFullName;
-}
-
-function workProviderTitle(provider: WorkItem['provider']): string {
-  return provider === 'github' ? translate('surface.appShell.gitHub') : provider;
-}
-
-async function assignExistingAgentWorkItem(payload: { agentId: string; item: WorkItem }): Promise<void> {
-  const targetAgent = props.snapshot.agents.find((agent) => agent.id === payload.agentId);
-  if (!await confirmAssignedWorkItemOverride(payload.item, targetAgent?.name ?? 'this agent', payload.agentId)) {
-    return;
-  }
-
-  emit('assign-work-item', payload);
-}
-
-async function confirmAssignedWorkItemOverride(item: WorkItem, targetLabel: string, targetAgentId?: string): Promise<boolean> {
-  const assignedAgent = assignedAgentForWorkItem(item);
-  if (!assignedAgent || assignedAgent.id === targetAgentId) {
-    return true;
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      `${workProviderTitle(item.provider)} #${item.number} is already assigned to ${assignedAgent.name}. We don't know if ${assignedAgent.name} is still working on it. Assign it to ${targetLabel} anyway?`,
-      translate('surface.appShell.assignAnyway'),
-      {
-        cancelButtonText: translate('common.cancel'),
-        confirmButtonText: translate('dynamic.misc.assignAnyway'),
-        type: 'warning',
-      },
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function assignedAgentForWorkItem(item: WorkItem): Agent | null {
-  return findAssignedAgentForWorkItem(props.snapshot.agents, props.snapshot.workBacklog.assignments, item);
-}
-
 function openNewTeam(): void {
   teamDialogMode.value = 'create';
   editingTeamId.value = null;
@@ -2315,7 +1468,7 @@ function closeAgentDialog(): void {
   agentDialogTeamId.value = null;
   agentDialogSourceRepositoryName.value = null;
   agentDialogSourceBranchName.value = '';
-  pendingNewAgentWorkItem.value = null;
+  clearPendingNewAgentWorkItem();
 }
 
 async function createAgentFromDialog(input: CreateAgentInput & { newTeamName?: string; teamId?: string }): Promise<void> {
@@ -2324,39 +1477,7 @@ async function createAgentFromDialog(input: CreateAgentInput & { newTeamName?: s
     ? await resolveSelectedTeam(input.teamId ?? agentDialogTeamId.value, newTeamName)
     : null;
   const agent = await props.createAgent(targetTeamId ? { ...agentInput, teamId: targetTeamId } : agentInput);
-  if (agent && pendingNewAgentWorkItem.value) {
-    emit('assign-work-item', {
-      agentId: agent.id,
-      item: pendingNewAgentWorkItem.value,
-    });
-  }
-  pendingNewAgentWorkItem.value = null;
-}
-
-function closeBenchAssignmentDialog(): void {
-  benchAssignmentDialogVisible.value = false;
-  pendingBenchAgentWorkItem.value = null;
-  pendingBenchAgentTeamId.value = null;
-}
-
-async function assignWorkItemToBenchAgent(input: { benchTemplateId?: string; newTeamName?: string; teamId?: string }): Promise<void> {
-  const item = pendingBenchAgentWorkItem.value;
-  if (!item || !input.benchTemplateId) {
-    return;
-  }
-
-  const targetTeamId = await resolveSelectedTeam(input.teamId ?? null, input.newTeamName);
-  const agent = await props.deployBenchTemplateAction({
-    templateId: input.benchTemplateId,
-    ...(targetTeamId ? { teamId: targetTeamId } : {}),
-  });
-  if (agent) {
-    emit('assign-work-item', {
-      agentId: agent.id,
-      item,
-    });
-  }
-  closeBenchAssignmentDialog();
+  assignPendingWorkItemToCreatedAgent(agent);
 }
 
 async function resolveSelectedTeam(teamId: string | null | undefined, newTeamName?: string): Promise<string | null> {
@@ -2376,20 +1497,7 @@ async function openCockpit(): Promise<void> {
   if (cockpitVisible.value && cockpitInitialized) return;
   activeSurface.value = 'cockpit';
   cockpitInitialized = true;
-  cockpitGlobalScope.value = null;
-  const crossRepositoryConfiguration = normalizedCockpitBacklogConfiguration({
-    repositoryId: null,
-    assigneeLogin: null,
-    tagName: null,
-  });
-  if ((props.workRepositoriesByProvider.github ?? []).length === 0) {
-    await props.loadWorkRepositories('github');
-    await nextTick();
-  }
-  pendingCockpitBacklogConfiguration.value = crossRepositoryConfiguration;
-  const scope = rememberedCockpitGlobalScope() === 'all' ? 'all' : 'assignedToMe';
-  cockpitGlobalScope.value = scope;
-  await ensureGlobalWorkItems(scope);
+  await initializeCockpitBacklog();
 }
 
 function openAutomations(): void {
@@ -2402,102 +1510,6 @@ function openSettings(): void {
 
 function openWhatsNew(): void {
   whatsNewVisible.value = true;
-}
-
-function openAttachmentImageAnnotation(attachment: CodexNativeAttachment): void {
-  const agentId = currentAgent.value?.id;
-  if (!agentId || attachment.type !== 'image') return;
-  if (!attachment.previewUrl) {
-    ElMessage.error(translate('surface.appShell.thisImageCannotBeOpenedForAnnotation'));
-    return;
-  }
-  debugImageAnnotationVisible.value = false;
-  attachmentAnnotationTarget.value = { agentId, attachment };
-}
-
-function closeImageAnnotation(): void {
-  debugImageAnnotationVisible.value = false;
-  attachmentAnnotationTarget.value = null;
-}
-
-function handleImageAnnotationError(): void {
-  if (attachmentAnnotationTarget.value) {
-    ElMessage.error(translate('surface.appShell.thisImageCannotBeOpenedForAnnotation'));
-    closeImageAnnotation();
-    return;
-  }
-  void useDebugAnnotationFallback();
-}
-
-function saveImageAnnotation(payload: ImageAnnotationSavePayload): void {
-  const target = attachmentAnnotationTarget.value;
-  if (!target) {
-    debugImageAnnotationVisible.value = false;
-    return;
-  }
-
-  if (payload.annotations.length === 0) {
-    removeSavedImageAnnotations(target.agentId, target.attachment.reference);
-  } else {
-    attachmentAnnotationsByAgentId[target.agentId] = {
-      ...attachmentAnnotationsByAgentId[target.agentId],
-      [target.attachment.reference]: cloneSavedImageAnnotations(payload),
-    };
-  }
-  attachmentAnnotationTarget.value = null;
-}
-
-function removeSavedImageAnnotations(agentId: string, reference: string): void {
-  const existing = attachmentAnnotationsByAgentId[agentId];
-  if (!existing?.[reference]) return;
-  const next = { ...existing };
-  delete next[reference];
-  attachmentAnnotationsByAgentId[agentId] = next;
-}
-
-function cloneSavedImageAnnotations(draft: SavedImageAnnotations): SavedImageAnnotations {
-  return {
-    ...draft,
-    annotations: draft.annotations.map((annotation) => ({
-      ...annotation,
-      start: { ...annotation.start },
-      end: { ...annotation.end },
-    })),
-  };
-}
-
-async function openDebugImageAnnotation(imageDataUrl?: string, pixelRatio: 1 | 2 = 1): Promise<void> {
-  attachmentAnnotationTarget.value = null;
-  if (imageDataUrl) {
-    debugAnnotationImageSource.value = imageDataUrl;
-    debugAnnotationPixelRatio.value = pixelRatio;
-    debugImageAnnotationVisible.value = true;
-    return;
-  }
-
-  await useDebugAnnotationFallback();
-  debugImageAnnotationVisible.value = true;
-}
-
-async function useDebugAnnotationFallback(): Promise<void> {
-  debugAnnotationPixelRatio.value = 1;
-  try {
-    debugAnnotationImageSource.value = await centeredImageCropDataUrl(debugAnnotationScreenshotUrl);
-  } catch {
-    debugAnnotationImageSource.value = debugAnnotationScreenshotUrl;
-  }
-}
-
-function imageDataUrlArrayBuffer(dataUrl: string): ArrayBuffer {
-  const separator = dataUrl.indexOf(',');
-  const header = separator >= 0 ? dataUrl.slice(0, separator) : '';
-  if (!header.startsWith('data:image/png;') || !header.endsWith(';base64')) {
-    throw new TypeError('Annotated image must be a base64 PNG data URL.');
-  }
-  const binary = atob(dataUrl.slice(separator + 1));
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes.buffer;
 }
 
 async function createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
@@ -2599,133 +1611,6 @@ async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSe
   await forwardCodexPromptWithImageAnnotations(prompt, options, forwardSteerPrompt);
 }
 
-async function forwardCodexPromptWithImageAnnotations(
-  prompt: string,
-  options: CodexRendererSendMessageOptions | undefined,
-  forward: (nextPrompt: string, nextOptions?: RendererSendPromptOptions) => void,
-): Promise<void> {
-  const agentId = currentAgent.value?.id;
-  const savedByReference = agentId ? attachmentAnnotationsByAgentId[agentId] ?? {} : {};
-  let imageNumber = 0;
-  const annotatedImages = props.composerAttachments.flatMap((attachment) => {
-    if (attachment.type !== 'image') return [];
-    imageNumber += 1;
-    const draft = savedByReference[attachment.reference];
-    return draft?.annotations.length ? [{ attachment, draft: cloneSavedImageAnnotations(draft), imageNumber }] : [];
-  });
-  if (!agentId || annotatedImages.length === 0) {
-    forward(prompt, promptOptions(options));
-    return;
-  }
-
-  const nativeApi = getCodexNativeRendererApi();
-  if (!nativeApi?.capabilities.attachments) {
-    throw new Error(translate('surface.appShell.annotatedImagesCannotBePreparedByThisHost'));
-  }
-  const composerState = { ...props.composerState };
-  const composerAttachments = props.composerAttachments.map((attachment) => ({ ...attachment }));
-  const savedDrafts = Object.fromEntries(
-    Object.entries(savedByReference).map(([reference, draft]) => [reference, cloneSavedImageAnnotations(draft)]),
-  );
-
-  try {
-    const ingested = await nativeApi.ingestAttachments(annotatedImages.map(({ draft }) => ({
-      name: draft.fileName,
-      mimeType: 'image/png',
-      data: imageDataUrlArrayBuffer(draft.dataUrl),
-    })));
-    if (ingested.length !== annotatedImages.length) {
-      throw new Error(translate('surface.appShell.oneOrMoreAnnotatedImagesCouldNotBePrepared'));
-    }
-    const replacementReferences = new Map(annotatedImages.map(({ attachment }, index) => [
-      attachment.reference,
-      ingested[index]!.reference,
-    ]));
-    const submittedAttachments = options?.attachments ?? composerAttachments.map((attachment) => ({
-      type: attachment.type,
-      reference: attachment.reference,
-    }));
-    const nextOptions: CodexRendererSendMessageOptions = {
-      ...options,
-      attachments: submittedAttachments.map((attachment) => ({
-        ...attachment,
-        reference: replacementReferences.get(attachment.reference) ?? attachment.reference,
-      })),
-    };
-    forward(formatImageAnnotationPrompt(annotatedImages.map(({ attachment, draft, imageNumber: number }) => ({
-      annotations: draft.annotations,
-      fileName: attachment.name,
-      imageNumber: number,
-    })), prompt), promptOptions(nextOptions));
-  } catch (error) {
-    attachmentAnnotationsByAgentId[agentId] = savedDrafts;
-    emit('update:composerState', { agentId, state: composerState });
-    emit('update:composerAttachments', { agentId, attachments: composerAttachments });
-    throw error;
-  }
-}
-
-function promptOptions(options?: CodexRendererSendMessageOptions): RendererSendPromptOptions | undefined {
-  const attachments = options?.attachments?.map<RendererPromptAttachment>((attachment) => ({ ...attachment }));
-  return attachments?.length ? { attachments } : undefined;
-}
-
-function openConversationLink(link: CodexConversationLink): void | Promise<void> {
-  if (link.kind === 'external') {
-    window.open(link.href, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  const context = link as CodexConversationLink & Partial<Pick<ConversationFileLink, 'turnId' | 'messageId' | 'itemId'>>;
-  return openFilePreview({
-    kind: 'file',
-    href: link.href,
-    path: link.path,
-    ...(link.filepath ? { filepath: link.filepath } : {}),
-    ...(link.action ? { action: link.action } : {}),
-    ...(link.line === undefined ? {} : { line: link.line }),
-    ...(link.column === undefined ? {} : { column: link.column }),
-    ...(context.turnId ? { turnId: context.turnId } : {}),
-    ...(context.messageId ? { messageId: context.messageId } : {}),
-    ...(context.itemId ? { itemId: context.itemId } : {}),
-  });
-}
-
-function openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): boolean {
-  if (context?.intent === 'fullscreen') return false;
-
-  const agent = currentAgent.value;
-  if (!agent) return false;
-
-  const durablePath = image.path?.trim() || undefined;
-  const messageIdentifier = context?.message?.id ?? `message-${context?.index ?? 'unknown'}`;
-  const tab = rightWorkspaceImageTab([
-    messageIdentifier,
-    image.kind,
-    durablePath ?? image.src,
-  ].join('\0'));
-  const title = image.title?.trim()
-    || image.name?.trim()
-    || (durablePath ? fileBasename(durablePath) : '')
-    || image.alt.trim()
-    || 'Image';
-  const workspace = rightWorkspaceFor(agent.id);
-  workspace.imagePanels = {
-    ...workspace.imagePanels,
-    [tab]: {
-      kind: 'image',
-      title,
-      ...(durablePath ? { subtitle: durablePath, path: durablePath } : {}),
-      ...(image.mimeType ? { mimeType: image.mimeType } : {}),
-      alt: image.alt || title,
-      src: image.src,
-      state: 'idle',
-      error: null,
-    },
-  };
-  openRightWorkspaceTab(tab, agent.id);
-  return true;
-}
-
 function updateConversationComposerState(state: CodexComposerState): void {
   const agentId = currentAgent.value?.id;
   if (agentId) emit('update:composerState', { agentId, state });
@@ -2736,206 +1621,6 @@ function updateConversationAttachments(attachments: readonly CodexNativeAttachme
   if (!agentId) return;
   pruneSavedImageAnnotations(agentId, attachments);
   emit('update:composerAttachments', { agentId, attachments });
-}
-
-function pruneSavedImageAnnotations(agentId: string, attachments: readonly CodexNativeAttachment[]): void {
-  const existing = attachmentAnnotationsByAgentId[agentId];
-  if (!existing) return;
-  const references = new Set(attachments.map((attachment) => attachment.reference));
-  const next = Object.fromEntries(Object.entries(existing).filter(([reference]) => references.has(reference)));
-  attachmentAnnotationsByAgentId[agentId] = next;
-}
-
-function cancelPlanReview(agentId: string): void {
-  emit('update:planMode', false);
-  closeRightWorkspaceTab(agentId, 'plan');
-}
-
-function commentOnPlan(comments: PlanReviewComment[]): void {
-  if (comments.length === 0) {
-    return;
-  }
-
-  emit('sendPrompt', formatPlanCommentPrompt(comments));
-}
-
-async function openFilePreview(link: ConversationFileLink): Promise<void> {
-  const agent = currentAgent.value;
-  if (!agent) return;
-  const filePath = link.filepath ?? link.path;
-  if (link.action === 'edit') {
-    if (link.turnId && openTurnDiffPreviewForAgent(agent.id, link.turnId, filePath)) {
-      return;
-    }
-    await openAgentGitDiffPreview(agent.id);
-    return;
-  }
-  await openFilePreviewForAgent(agent.id, filePath);
-}
-
-function openTurnDiffPreviewForAgent(agentId: string, turnId: string, filePath: string): boolean {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
-  const relativePath = normalizePreviewFilePath(filePath, agent?.folder);
-  const turnDiff = props.snapshot.turnGitDiffs[turnId]?.diff;
-  if (!agent || !relativePath || !turnDiff) return false;
-
-  const diff = diffForPath(turnDiff, relativePath);
-  if (!diff) return false;
-
-  const workspace = rightWorkspaceFor(agentId);
-  const tab = rightWorkspaceDiffTab(turnId, relativePath);
-  workspace.diffPanels = {
-    ...workspace.diffPanels,
-    [tab]: {
-      kind: 'gitDiff',
-      title: fileBasename(relativePath),
-      subtitle: relativePath,
-      diff,
-      state: 'idle',
-      error: null,
-    },
-  };
-  openRightWorkspaceTab(tab, agentId);
-  return true;
-}
-
-function diffForPath(diff: string, filePath: string): string | null {
-  const targetPath = normalizePathSeparators(filePath).replace(/^\.\//u, '');
-  const sections = diff.split(/(?=^diff --git )/mu).filter((section) => section.startsWith('diff --git '));
-  return sections.find((section) => {
-    const header = section.split('\n', 1)[0] ?? '';
-    const separator = header.indexOf(' b/');
-    if (separator < 0) return false;
-    const beforePath = header.slice('diff --git a/'.length, separator);
-    const afterPath = header.slice(separator + ' b/'.length);
-    return [beforePath, afterPath].some((candidate) => (
-      normalizePathSeparators(candidate).replace(/^[ab]\//u, '') === targetPath
-    ));
-  }) ?? null;
-}
-
-function handleFileActivity(activity: AgentFileActivity): void {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === activity.agentId);
-  const filePath = normalizePreviewFilePath(activity.path, agent?.folder);
-  if (!agent || !filePath) return;
-
-  const workspace = rightWorkspaceFor(agent.id);
-  const tab = rightWorkspaceFileTab(filePath);
-
-  if (activity.action === 'read' || activity.status !== 'completed' || !workspace.filePanels[tab]) return;
-
-  void openFilePreviewForAgent(agent.id, filePath, false);
-}
-
-async function openFilePreviewForAgent(agentId: string, filePath: string, reveal = true): Promise<void> {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
-  const trimmedPath = normalizePreviewFilePath(filePath, agent?.folder);
-  if (!agent || !trimmedPath) return;
-
-  const workspace = rightWorkspaceFor(agent.id);
-  const tab = rightWorkspaceFileTab(trimmedPath);
-  const requestId = filePreviewRequestId + 1;
-  filePreviewRequestId = requestId;
-  workspace.filePreviewRequestIds = { ...workspace.filePreviewRequestIds, [tab]: requestId };
-  const existingContent = workspace.filePanels[tab]?.content ?? '';
-  workspace.filePanels = {
-    ...workspace.filePanels,
-    [tab]: filePreviewPanel(trimmedPath, existingContent, 'loading', null),
-  };
-  if (reveal && workspace.activeTab === 'files' && workspace.tabs.includes('files')) {
-    workspace.tabs = workspace.tabs
-      .map((candidate) => candidate === 'files' ? tab : candidate)
-      .filter((candidate, index, tabs) => tabs.indexOf(candidate) === index);
-    workspace.activeTab = tab;
-    workspace.open = true;
-  } else if (reveal) {
-    openRightWorkspaceTab(tab, agent.id);
-  }
-
-  try {
-    const result = await props.previewAgentFile(agent.id, trimmedPath);
-    if (workspace.filePreviewRequestIds[tab] !== requestId) {
-      return;
-    }
-    if (result.kind === 'image' && result.dataUrl) {
-      const imageTab = rightWorkspaceImageTab(`workspace:${result.path}`);
-      workspace.imagePanels = {
-        ...workspace.imagePanels,
-        [imageTab]: {
-          kind: 'image', title: fileBasename(result.path), subtitle: result.path,
-          alt: result.path, path: result.path, src: result.dataUrl, mimeType: result.mimeType,
-          state: 'idle', error: null,
-        },
-      };
-      closeRightWorkspaceTab(agent.id, tab);
-      openRightWorkspaceTab(imageTab, agent.id);
-      return;
-    }
-    if (result.kind === 'text' && /\.(?:diff|patch)$/iu.test(result.path)) {
-      const diffTab = rightWorkspaceDiffTab('workspace', result.path);
-      workspace.diffPanels = {
-        ...workspace.diffPanels,
-        [diffTab]: {
-          kind: 'gitDiff', title: fileBasename(result.path), subtitle: result.path,
-          diff: result.content ?? '', state: 'idle', error: null,
-        },
-      };
-      closeRightWorkspaceTab(agent.id, tab);
-      openRightWorkspaceTab(diffTab, agent.id);
-      return;
-    }
-    const unavailable = result.kind === 'tooLarge'
-      ? `Preview unavailable: this file is ${formatFileSize(result.size)} and exceeds the preview limit.`
-      : result.kind === 'binary'
-        ? translate('surface.appShell.previewUnavailableThisIsABinaryOrUnsupportedFile')
-        : result.content ?? '';
-    workspace.filePanels = {
-      ...workspace.filePanels,
-      [tab]: filePreviewPanel(result.path, unavailable, 'idle', null),
-    };
-  } catch (error) {
-    if (workspace.filePreviewRequestIds[tab] !== requestId) {
-      return;
-    }
-    workspace.filePanels = {
-      ...workspace.filePanels,
-      [tab]: filePreviewPanel(
-        trimmedPath,
-        existingContent,
-        'error',
-        error instanceof Error ? error.message : String(error),
-      ),
-    };
-  }
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function filePreviewPanel(
-  filePath: string,
-  content: string,
-  state: 'idle' | 'loading' | 'error',
-  error: string | null,
-): RightWorkspaceFilePanel {
-  const kind = isMarkdownPath(filePath) ? 'markdown' : 'source';
-  return {
-    kind,
-    title: fileBasename(filePath),
-    subtitle: filePath,
-    content,
-    ...(kind === 'source' ? { language: languageForFilePath(filePath) ?? null } : {}),
-    state,
-    error,
-  } as RightWorkspaceFilePanel;
-}
-
-function isLocalAgent(agent: Agent): boolean {
-  const team = props.snapshot.teams.find((candidate) => candidate.id === agent.teamId);
-  return !team?.remoteConnectionId;
 }
 
 async function openAgentIn(
@@ -2950,378 +1635,7 @@ async function openAgentIn(
   }
 }
 
-async function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {
-  const agent = props.snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (!agent?.folder) {
-    return;
-  }
-
-  const workspace = rightWorkspaceFor(agent.id);
-  workspace.gitReviewPanel = {
-    kind: 'gitDiff',
-    title: translate('surface.appShell.review'),
-    subtitle: agent.folder,
-    diff: '',
-    state: 'loading',
-    error: null,
-  };
-  openRightWorkspaceTab('review', agent.id);
-  try {
-    await props.openAgentGitDiff(agent.id);
-  } catch (error) {
-    workspace.gitReviewPanel = {
-      kind: 'gitDiff',
-      title: translate('surface.appShell.review'),
-      subtitle: agent.folder,
-      diff: '',
-      state: 'error',
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-function handleShellShortcut(event: KeyboardEvent): void {
-  if (showOnboardingGate.value) {
-    return;
-  }
-  if (isModalDialogVisible.value || !isAgentWorkspaceVisible.value) {
-    return;
-  }
-
-  if (event.key === 'Meta') {
-    startQuickAgentShortcutReveal(event);
-    return;
-  }
-
-  if (event.metaKey) {
-    resetQuickAgentShortcuts();
-  }
-
-  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p' && currentAgent.value) {
-    event.preventDefault();
-    fileQuickOpenVisible.value = true;
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) {
-    const agent = activeTeamAgents.value[Number(event.key) - 1];
-    if (agent) {
-      event.preventDefault();
-      selectAgentFromShell(agent.id);
-    }
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'g' && currentAgent.value) {
-    event.preventDefault();
-    void openAgentGitDiffPreview();
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b' && currentAgent.value) {
-    if (!clawHostCapabilities.embeddedBrowser) return;
-    event.preventDefault();
-    openRightWorkspaceTab('browser');
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'd') {
-    duplicateActiveAgent(event);
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'r') {
-    event.preventDefault();
-    restartActiveAgent();
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'w') {
-    closeActiveAgent(event);
-    return;
-  }
-
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && (event.key === '`' || event.code === 'Backquote')) {
-    if (cycleTeams()) {
-      event.preventDefault();
-    }
-    return;
-  }
-
-  if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Tab') {
-    cycleAgents(event.shiftKey ? -1 : 1, event);
-  }
-}
-
-function startQuickAgentShortcutReveal(event: KeyboardEvent): void {
-  commandKeyHeld = true;
-  if (event.repeat || quickAgentShortcutTimer || quickAgentShortcutsVisible.value) {
-    return;
-  }
-  quickAgentShortcutTimer = setTimeout(() => {
-    quickAgentShortcutTimer = null;
-    if (commandKeyHeld && !showOnboardingGate.value && !isModalDialogVisible.value && isAgentWorkspaceVisible.value) {
-      quickAgentShortcutsVisible.value = true;
-    }
-  }, quickAgentShortcutDelayMs);
-}
-
-function handleShellKeyup(event: KeyboardEvent): void {
-  if (event.key === 'Meta' || !event.metaKey) {
-    resetQuickAgentShortcuts();
-  }
-}
-
-function resetQuickAgentShortcuts(): void {
-  commandKeyHeld = false;
-  quickAgentShortcutsVisible.value = false;
-  if (quickAgentShortcutTimer) {
-    clearTimeout(quickAgentShortcutTimer);
-    quickAgentShortcutTimer = null;
-  }
-}
-
-function handleAppCommand(command: AppCommand): void {
-  // Native menu accelerators can consume the matching key event before the
-  // renderer observes Meta keyup. Treat the resolved command as the end of
-  // the transient Command-number reveal so the sidebar cannot stay latched.
-  resetQuickAgentShortcuts();
-
-  if (command.type === 'appshot-failed') {
-    if (!clawHostCapabilities.appshots) return;
-    ElMessage.error(command.message);
-    return;
-  }
-
-  if (command.type === 'attach-appshot') {
-    if (!clawHostCapabilities.appshots) return;
-    void attachAppshot(command);
-    return;
-  }
-
-  if (command.type === 'open-settings') {
-    openSettings();
-    return;
-  }
-
-  if (command.type === 'open-whats-new') {
-    openWhatsNew();
-    return;
-  }
-
-  if (command.type === 'open-browser' && command.agentId && command.url) {
-    if (!clawHostCapabilities.embeddedBrowser) return;
-    handleBrowserOpenCommand(command);
-    return;
-  }
-
-  if (command.type === 'open-agent-composer') {
-    const agent = command.agentId
-      ? props.snapshot.agents.find((candidate) => candidate.id === command.agentId)
-      : currentAgent.value;
-    if (!agent) return;
-    activeSurface.value = 'agent';
-    emit('select-agent', agent.id);
-    if (command.prompt !== undefined) {
-      if (command.submit !== false) {
-        emit('send-agent-prompt', { agentId: agent.id, prompt: command.prompt });
-        return;
-      }
-      emit('update:composerState', {
-        agentId: agent.id,
-        state: {
-          text: command.prompt,
-          selectionStart: command.prompt.length,
-          selectionEnd: command.prompt.length,
-        },
-      });
-    }
-    void nextTick(() => conversationPane.value?.focusComposer());
-    return;
-  }
-
-  if (command.type === 'debug-open-markdown') {
-    activeSurface.value = 'agent';
-    openMarkdownRequest({
-      kind: 'markdown',
-      title: translate('surface.appShell.debugMarkdown'),
-      content: [
-        '# Debug Markdown',
-        '',
-        'Opened from the Codex Claw Debug menu.',
-        '',
-        '## Rendering fixtures',
-        '',
-        '- [x] Workspace tab',
-        '- [ ] Markdown content',
-        '',
-        '> A deterministic document for checking Markdown presentation.',
-        '',
-        '```ts',
-        "const source = 'Debug menu';",
-        '```',
-      ].join('\n'),
-    });
-    return;
-  }
-
-  if (command.type === 'debug-celebrate') {
-    useConfetti().celebrate({ kind: command.kind });
-    return;
-  }
-
-  if (command.type === 'debug-approval-request') {
-    const agent = currentAgent.value;
-    if (!agent) return;
-    activeSurface.value = 'agent';
-    debugApproval.value = {
-      agentId: agent.id,
-      request: {
-        id: 'debug-approval-request',
-        kind: 'command',
-        conversationId: `debug-${agent.id}`,
-        itemId: 'debug-command-item',
-        title: translate('surface.appShell.allowDebugCommand'),
-        description: translate('surface.appShell.aDeterministicApprovalRequestFromTheDebugMenu'),
-        command: 'npm test -- --run debug-fixture',
-        cwd: agent.folder ?? undefined,
-        allowedScopes: ['once', 'session'],
-        canDeny: true,
-      },
-    };
-    return;
-  }
-
-  if (command.type === 'debug-mark-unread') {
-    emit('debug-mark-unread');
-    return;
-  }
-
-  if (command.type === 'debug-image-annotation') {
-    if (isModalDialogVisible.value) return;
-    void openDebugImageAnnotation(command.imageDataUrl, command.pixelRatio);
-    return;
-  }
-
-  if (isModalDialogVisible.value) {
-    return;
-  }
-
-  if (command.type === 'quit') {
-    if (!clawHostCapabilities.appLifecycle) return;
-    void quit();
-    return;
-  }
-
-  if (command.type === 'cycle-teams') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    cycleTeams();
-    return;
-  }
-
-  if (command.type === 'open-review') {
-    if (isAgentWorkspaceVisible.value && currentAgent.value) {
-      void openAgentGitDiffPreview();
-    }
-    return;
-  }
-
-  if (command.type === 'open-browser') {
-    if (!clawHostCapabilities.embeddedBrowser) return;
-    if (isAgentWorkspaceVisible.value && currentAgent.value) {
-      handleBrowserOpenCommand(command);
-    }
-    return;
-  }
-
-  if (command.type === 'new-team') {
-    openNewTeam();
-    return;
-  }
-
-  if (command.type === 'close-active-agent') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    closeActiveAgent();
-    return;
-  }
-
-  if (command.type === 'close-active-team') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    void closeActiveTeam();
-    return;
-  }
-
-  if (command.type === 'cycle-agents') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    cycleAgents(command.direction);
-    return;
-  }
-
-  if (command.type === 'edit-active-agent') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    editActiveAgent();
-    return;
-  }
-
-  if (command.type === 'duplicate-active-agent') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    duplicateActiveAgent();
-    return;
-  }
-
-  if (command.type === 'restart-active-agent') {
-    if (!isAgentWorkspaceVisible.value) {
-      return;
-    }
-    restartActiveAgent();
-  }
-}
-
-async function attachAppshot(command: Extract<AppCommand, { type: 'attach-appshot' }>): Promise<void> {
-  const agent = currentAgent.value;
-  const nativeApi = getCodexNativeRendererApi();
-  if (!agent || !nativeApi || !props.backendCapabilities.attachments) {
-    ElMessage.error(translate('surface.appShell.selectAnAgentThatSupportsImageAttachmentsBeforeTakingAnA'));
-    return;
-  }
-
-  try {
-    const [attachment] = await nativeApi.ingestAttachments([{
-      name: appshotFileName(command.appName),
-      mimeType: 'image/png',
-      data: imageDataUrlArrayBuffer(command.imageDataUrl),
-    }]);
-    if (!attachment) throw new Error(translate('surface.appShell.appshotIngestionReturnedNoAttachment'));
-    activeSurface.value = 'agent';
-    emit('update:composerAttachments', {
-      agentId: agent.id,
-      attachments: [...props.composerAttachments, attachment],
-    });
-    await nextTick();
-    conversationPane.value?.focusComposer();
-  } catch {
-    ElMessage.error(translate('surface.appShell.theAppshotCouldNotBeAttached'));
-  }
-}
-
-function appshotFileName(appName?: string): string {
-  const source = appName?.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
-  return `${source ? `${source}-` : ''}appshot-${Date.now()}.png`;
-}
-
-async function updateSettings(input: UpdateSettingsInput): Promise<void> {
+ async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
 }
 
@@ -3397,276 +1711,11 @@ async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void>
   await props.disconnectWorkProvider(provider);
 }
 
-async function selectWorkRepositoryForCockpit(repositoryId: string | null): Promise<void> {
-  cockpitGlobalScope.value = repositoryId ? null : 'assignedToMe';
-  await configureCockpitWorkBacklog({
-    repositoryId,
-    assigneeLogin: null,
-    tagName: null,
-  });
-  if (repositoryId) {
-    await props.loadWorkItems('github', repositoryId);
-  } else {
-    await ensureGlobalWorkItems('assignedToMe');
-  }
-}
-
-async function selectWorkAssigneeForCockpit(assigneeLogin: string | null): Promise<void> {
-  if (cockpitGlobalScope.value === 'assignedToMe' && !assigneeLogin) {
-    cockpitGlobalScope.value = 'all';
-    await ensureGlobalWorkItems('all');
-  }
-  const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
-  await configureCockpitWorkBacklog({
-    repositoryId,
-    assigneeLogin,
-    tagName: cockpitWorkBacklog.value?.selectedTagName ?? null,
-  });
-}
-
-async function selectWorkTagForCockpit(tagName: string | null): Promise<void> {
-  const repositoryId = cockpitWorkBacklog.value?.selectedRepositoryId ?? null;
-  await configureCockpitWorkBacklog({
-    repositoryId,
-    assigneeLogin: cockpitWorkBacklog.value?.selectedAssigneeLogin ?? null,
-    tagName,
-  });
-}
-
-async function configureCockpitWorkBacklog(configuration: CockpitBacklogConfiguration): Promise<void> {
-  const normalized = normalizedCockpitBacklogConfiguration(configuration);
-  pendingCockpitBacklogConfiguration.value = normalized;
-  try {
-    await props.configureWorkBacklog({
-      provider: 'github',
-      configuration: normalized,
-    });
-  } catch (error) {
-    if (pendingCockpitBacklogConfiguration.value && sameCockpitBacklogConfiguration(pendingCockpitBacklogConfiguration.value, normalized)) {
-      pendingCockpitBacklogConfiguration.value = null;
-    }
-    throw error;
-  }
-}
-
-function normalizedCockpitBacklogConfiguration(configuration: CockpitBacklogConfiguration): CockpitBacklogConfiguration {
-  return {
-    repositoryId: normalizedOptionalString(configuration.repositoryId),
-    assigneeLogin: normalizedOptionalString(configuration.assigneeLogin),
-    tagName: normalizedOptionalString(configuration.tagName),
-  };
-}
-
-function sameCockpitBacklogConfiguration(left: CockpitBacklogConfiguration, right: CockpitBacklogConfiguration): boolean {
-  return left.repositoryId === right.repositoryId &&
-    left.assigneeLogin === right.assigneeLogin &&
-    left.tagName === right.tagName;
-}
-
-function normalizedOptionalString(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-async function refreshWorkItems(repositoryId: string | null): Promise<void> {
-  if (repositoryId) {
-    await props.loadWorkItems('github', repositoryId);
-  } else if (cockpitGlobalScope.value === 'assignedToMe') {
-    await loadGlobalWorkItems('assignedToMe', 1, true);
-  } else if (cockpitGlobalScope.value === 'all') {
-    await loadGlobalWorkItems('all', 1, true);
-  }
-}
-
-async function selectGlobalBacklogScope(scope: 'assignedToMe' | 'all'): Promise<void> {
-  if (scope === 'all') {
-    try {
-      await ElMessageBox.confirm(
-        translate('surface.appShell.thisLoadsYourGlobalGitHubBacklogOnePageAtATimeLargeBackl'),
-        translate('surface.appShell.loadTheGlobalBacklog'),
-        { confirmButtonText: translate('dynamic.misc.loadEverything'), cancelButtonText: translate('common.cancel'), type: 'warning' },
-      );
-    } catch {
-      return;
-    }
-  }
-  cockpitGlobalScope.value = scope;
-  if (scope === 'all') rememberCockpitGlobalScope('all');
-  await ensureGlobalWorkItems(scope);
-}
-
-async function ensureGlobalWorkItems(scope: 'assignedToMe' | 'all'): Promise<void> {
-  if (cockpitGlobalFeeds[scope].status === 'notLoaded') {
-    await loadGlobalWorkItems(scope, 1);
-  }
-}
-
-async function changeGlobalWorkItemsPage(page: number): Promise<void> {
-  const scope = cockpitGlobalScope.value;
-  if (!scope) return;
-  const feed = cockpitGlobalFeeds[scope];
-  const totalPages = Math.max(1, Math.ceil(feed.totalItems / feed.pageSize));
-  if (!Number.isInteger(page) || page < 1 || page > totalPages || page === feed.page) return;
-  await loadGlobalWorkItems(scope, page);
-}
-
-async function loadGlobalWorkItems(scope: 'assignedToMe' | 'all', page: number, force = false): Promise<void> {
-  const feed = cockpitGlobalFeeds[scope];
-  if (feed.pendingPage !== null) return;
-  if (!force && feed.pages[page]) {
-    feed.page = page;
-    feed.error = null;
-    return;
-  }
-  feed.pendingPage = page;
-  if (Object.keys(feed.pages).length === 0) feed.status = 'loading';
-  feed.error = null;
-  try {
-    const result = await props.loadGlobalWorkItems('github', undefined, {
-      assignment: scope === 'assignedToMe' ? 'viewer' : 'all',
-      state: 'open',
-      page,
-      pageSize: cockpitGlobalPageSize,
-    });
-    feed.pages[result.page] = result.items;
-    feed.page = result.page;
-    feed.pageSize = result.pageSize;
-    feed.totalItems = result.totalItems;
-    feed.status = 'loaded';
-  } catch (error) {
-    feed.error = error instanceof Error ? error.message : String(error);
-    if (Object.keys(feed.pages).length === 0) feed.status = 'error';
-  } finally {
-    feed.pendingPage = null;
-  }
-}
-
-function rememberedCockpitGlobalScope(): 'all' | null {
-  try {
-    return window.localStorage.getItem(cockpitGlobalScopeStorageKey) === 'all' ? 'all' : null;
-  } catch {
-    return null;
-  }
-}
-
-function rememberCockpitGlobalScope(scope: 'all'): void {
-  try {
-    window.localStorage.setItem(cockpitGlobalScopeStorageKey, scope);
-  } catch {
-    // Persistence can be unavailable in hardened renderer contexts.
-  }
-}
-
 async function quit(): Promise<void> {
   await props.quit();
 }
 
-function duplicateActiveAgent(event?: KeyboardEvent): void {
-  const agent = currentAgent.value;
-  if (!agent) {
-    return;
-  }
-
-  event?.preventDefault();
-  emit('duplicate-agent', agent.id);
-}
-
-function closeActiveAgent(event?: KeyboardEvent): void {
-  const agent = currentAgent.value;
-  if (!agent) {
-    return;
-  }
-
-  event?.preventDefault();
-  emit('close-agent', agent.id);
-}
-
-async function closeActiveTeam(): Promise<void> {
-  const team = activeTeam.value;
-  if (!team || props.snapshot.teams.length <= 1) {
-    return;
-  }
-
-  if (await confirmCloseTeam(team)) {
-    emit('close-team', team.id);
-  }
-}
-
-function restartActiveAgent(): void {
-  const agent = currentAgent.value;
-  if (!agent) {
-    return;
-  }
-
-  emit('restart-agent', agent.id);
-}
-
-function editActiveAgent(): void {
-  const agent = currentAgent.value;
-  if (!agent) {
-    return;
-  }
-
-  openEditAgent(agent.id);
-}
-
-function fileBasename(filePath: string): string {
-  return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
-}
-
-function isMarkdownPath(filePath: string): boolean {
-  const normalizedPath = filePath.split('#')[0]?.split('?')[0]?.toLowerCase() ?? '';
-  return /\.(md|markdown|mdown|mkdn)$/u.test(normalizedPath);
-}
-
-function normalizePreviewFilePath(filePath: string, agentFolder?: string | null): string {
-  const trimmedPath = filePath.trim();
-  if (!trimmedPath.startsWith('file://')) {
-    return toBackendPreviewPath(stripPreviewLineSuffix(trimmedPath), agentFolder);
-  }
-
-  try {
-    return toBackendPreviewPath(stripPreviewLineSuffix(decodeURIComponent(new URL(trimmedPath).pathname)), agentFolder);
-  } catch {
-    return toBackendPreviewPath(stripPreviewLineSuffix(trimmedPath), agentFolder);
-  }
-}
-
-function stripPreviewLineSuffix(filePath: string): string {
-  return filePath.replace(/:(?:\d+)(?::\d+)?$/u, '');
-}
-
-function toBackendPreviewPath(filePath: string, agentFolder?: string | null): string {
-  const normalizedPath = normalizePathSeparators(filePath);
-  if (!isAbsolutePreviewPath(normalizedPath)) {
-    return normalizedPath;
-  }
-
-  const normalizedFolder = normalizePathSeparators(agentFolder ?? '').replace(/\/+$/u, '');
-  if (!normalizedFolder || !isAbsolutePreviewPath(normalizedFolder)) {
-    return normalizedPath;
-  }
-
-  if (!normalizedPath.startsWith(`${normalizedFolder}/`)) {
-    return normalizedPath;
-  }
-
-  return normalizedPath.slice(normalizedFolder.length + 1);
-}
-
-function normalizePathSeparators(filePath: string): string {
-  return filePath.replace(/\\/gu, '/');
-}
-
-function isAbsolutePreviewPath(filePath: string): boolean {
-  return filePath.startsWith('/') || /^[a-z]:\//iu.test(filePath);
-}
-
-function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
-  return `${provider}:${repositoryId}`;
-}
-
-function benchForTeam(team: Team | null | undefined): BenchTemplate[] {
+ function benchForTeam(team: Team | null | undefined): BenchTemplate[] {
   const location = benchLocationForTeam(team);
   if (!isRemoteBenchLocation(location)) {
     return props.snapshot.bench;
@@ -3706,39 +1755,7 @@ function loadBenchForTeam(team: Team): void {
   void props.loadBench(location);
 }
 
-function cycleTeams(): boolean {
-  const teams = props.snapshot.teams;
-  if (teams.length < 2) {
-    return false;
-  }
-
-  const activeIndex = Math.max(teams.findIndex((team) => team.id === activeTeam.value?.id), 0);
-  const nextTeam = teams[(activeIndex + 1) % teams.length];
-  if (!nextTeam) {
-    return false;
-  }
-
-  selectTeamFromRail(nextTeam.id);
-  return true;
-}
-
-function cycleAgents(direction: 1 | -1, event?: KeyboardEvent): void {
-  const agents = activeTeamAgents.value;
-  if (agents.length < 2) {
-    return;
-  }
-
-  const activeIndex = Math.max(agents.findIndex((agent) => agent.id === currentAgent.value?.id), 0);
-  const nextAgent = agents[(activeIndex + direction + agents.length) % agents.length];
-  if (!nextAgent) {
-    return;
-  }
-
-  event?.preventDefault();
-  selectAgentFromShell(nextAgent.id);
-}
-
-const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
+ const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
 const resumeSessionAgent = computed(() => (
   props.snapshot.agents.find((agent) => agent.id === resumeSessionAgentId.value) ?? null
 ));
@@ -3772,82 +1789,6 @@ watch(() => props.fileActivity, (activity) => {
   if (activity) handleFileActivity(activity);
 });
 
-function openSidePanelRequest(request: SidePanelRequest): void {
-  if (request.kind === 'markdown') {
-    openMarkdownRequest(request);
-    return;
-  }
-
-  openGitDiffRequest(request);
-}
-
-function openMarkdownRequest(request: SidePanelMarkdownRequest): void {
-  const agent = currentAgent.value;
-  if (!agent) return;
-  if (request.purpose !== 'plan') {
-    const identifier = request.path ?? `inline-${++markdownPreviewId}`;
-    const tab = request.path ? rightWorkspaceFileTab(request.path) : rightWorkspaceMarkdownTab(identifier);
-    const subtitle = request.path;
-    const workspace = rightWorkspaceFor(agent.id);
-    workspace.filePanels = {
-      ...workspace.filePanels,
-      [tab]: {
-        kind: 'markdown',
-        title: localizedText(request.title, translate) ?? (subtitle ? fileBasename(subtitle) : translate('surface.appShell.markdown')),
-        ...(subtitle ? { subtitle } : {}),
-        content: request.content,
-        state: 'idle',
-        error: null,
-      },
-    };
-    openRightWorkspaceTab(tab, agent.id);
-    return;
-  }
-
-  const subtitle = request.path;
-  rightWorkspaceFor(agent.id).planPanel = {
-    kind: 'markdown',
-    purpose: 'plan',
-    title: localizedText(request.title, translate) ?? (subtitle ? fileBasename(subtitle) : translate('surface.appShell.markdown')),
-    ...(subtitle ? { subtitle } : {}),
-    content: request.content,
-    state: 'idle',
-    error: null,
-  };
-  openRightWorkspaceTab('plan', agent.id);
-}
-
-function openGitDiffRequest(request: Extract<SidePanelRequest, { kind: 'gitDiff' }>): void {
-  if (request.scope === 'turn') {
-    return;
-  }
-
-  const agentId = currentAgent.value?.id;
-  if (!agentId) return;
-  rightWorkspaceFor(agentId).gitReviewPanel = {
-    kind: 'gitDiff',
-    title: localizedText(request.title, translate) ?? translate('surface.appShell.review'),
-    ...(localizedText(request.subtitle, translate) ? { subtitle: localizedText(request.subtitle, translate)! } : {}),
-    diff: request.diff,
-    ...(request.sections ? { sections: request.sections } : {}),
-    state: request.state ?? 'idle',
-    error: request.error ?? null,
-  };
-  openRightWorkspaceTab('review', agentId);
-}
-
-function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
-  const formattedComments = comments.map((comment, index) => [
-    `${index + 1}. On: "${comment.quote}"`,
-    `   Comment: ${comment.body}`,
-  ].join('\n')).join('\n\n');
-
-  return [
-    'Refine the plan using these comments:',
-    '',
-    formattedComments,
-  ].join('\n');
-}
 </script>
 
 <style scoped>
@@ -3864,35 +1805,6 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   visibility: hidden;
 }
 
-.app-shell > .agent-sidebar-enter-active,
-.app-shell > .agent-sidebar-leave-active {
-  overflow: hidden;
-  transition:
-    flex-basis 180ms ease,
-    width 180ms ease,
-    min-width 180ms ease,
-    max-width 180ms ease,
-    opacity 140ms ease,
-    transform 180ms ease;
-}
-
-.app-shell > .agent-sidebar-enter-from,
-.app-shell > .agent-sidebar-leave-to {
-  flex-basis: 0;
-  width: 0;
-  min-width: 0;
-  max-width: 0;
-  opacity: 0;
-  transform: translateX(-8px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-shell > .agent-sidebar-enter-active,
-  .app-shell > .agent-sidebar-leave-active {
-    transition-duration: 1ms;
-  }
-}
-
 .app-shell__content {
   flex: 1 1 auto;
   min-width: 0;
@@ -3903,73 +1815,4 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   background: var(--color-shell-main);
 }
 
-.app-shell__connection-status {
-  position: relative;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 5px 14px;
-  border-bottom: 1px solid var(--color-outline-subtle);
-  background: var(--color-surface-low);
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.app-shell__connection-status-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--color-warning);
-}
-
-.app-shell__connection-status--error .app-shell__connection-status-dot {
-  background: var(--color-error);
-}
-
-.app-shell__connection-status-detail {
-  min-width: 0;
-  overflow: hidden;
-  opacity: 0.78;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.app-shell__body {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  box-shadow: var(--shadow-content-edge);
-}
-
-.app-shell__right-workspace {
-  flex: 0 0 420px;
-}
-
-.app-shell__right-workspace-resizer {
-  position: relative;
-  flex: 0 0 5px;
-  order: 1;
-  cursor: col-resize;
-  touch-action: none;
-  z-index: 1;
-}
-
-.app-shell__right-workspace-resizer::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 2px;
-  width: 1px;
-  background: var(--color-border);
-}
-
-.app-shell__right-workspace-resizer:hover::after {
-  background: var(--color-border-strong);
-}
 </style>

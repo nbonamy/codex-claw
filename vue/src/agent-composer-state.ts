@@ -1,0 +1,620 @@
+import {
+  promptSkillInputsFromText,
+} from '@codex-app-sdk/vue';
+import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type {
+  Agent,
+  AgentBackend,
+  AgentFileSearchItem,
+  AppSnapshot,
+  BackendCapabilities,
+  BackendModelOption,
+  BackendPluginSummary,
+  BackendSkillSummary,
+  MainToRendererEvent,
+  ReasoningEffort,
+  RendererSendPromptOptions,
+} from '@codex-claw/core/contracts';
+import { computed, ref } from 'vue';
+import { AsyncCatalogCache, type AsyncCatalogEntry, type AsyncCatalogStatus } from './async-catalog-cache';
+import { codexClawApi } from './platform-api';
+
+type AgentComposerConfiguration = {
+  selectionSource: string;
+  models: BackendModelOption[];
+  modelStatus: AsyncCatalogStatus;
+  modelError: string | null;
+  skills: BackendSkillSummary[];
+  plugins: BackendPluginSummary[];
+  skillStatus: AsyncCatalogStatus;
+  skillError: string | null;
+  files: AgentFileSearchItem[];
+  fileStatus: AsyncCatalogStatus;
+  fileError: string | null;
+  selectedModelId: string | null;
+  selectedReasoningEffort: ReasoningEffort | null;
+  selectedServiceTier: string | null;
+  planMode: boolean;
+};
+
+export function createAgentComposerState(options: { getSnapshot: () => AppSnapshot }) {
+  const backendModels = ref<BackendModelOption[]>([]);
+  const modelCatalogStatus = ref<AsyncCatalogStatus>('notLoaded');
+  const modelCatalogError = ref<string | null>(null);
+  const backendSkills = ref<BackendSkillSummary[]>([]);
+  const backendPlugins = ref<BackendPluginSummary[]>([]);
+  const skillCatalogStatus = ref<AsyncCatalogStatus>('notLoaded');
+  const skillCatalogError = ref<string | null>(null);
+  const agentFiles = ref<AgentFileSearchItem[]>([]);
+  const fileCatalogStatus = ref<AsyncCatalogStatus>('notLoaded');
+  const fileCatalogError = ref<string | null>(null);
+  const selectedModelId = ref<string | null>(null);
+  const selectedReasoningEffort = ref<ReasoningEffort | null>(null);
+  const selectedServiceTier = ref<string | null>(null);
+  const planMode = ref(false);
+  const selectedModel = computed(() => (
+    backendModels.value.find((model) => model.id === selectedModelId.value) ?? null
+  ));
+
+  const loadsByAgentId = new Map<string, Promise<void>>();
+  const modelCache = new AsyncCatalogCache<AgentBackend, BackendModelOption>((value) => ({ ...value }));
+  const skillCache = new AsyncCatalogCache<string, BackendSkillSummary>((value) => ({ ...value }));
+  const pluginCache = new AsyncCatalogCache<string, BackendPluginSummary>((value) => ({ ...value }));
+  const fileCache = new AsyncCatalogCache<string, AgentFileSearchItem>((value) => ({ ...value }));
+  const configurationByAgentId = new Map<string, AgentComposerConfiguration>();
+  let catalogSessionSource: unknown = null;
+
+  function snapshot(): AppSnapshot {
+    return options.getSnapshot();
+  }
+
+  function configuration(agentId: string): AgentComposerConfiguration {
+    const existing = configurationByAgentId.get(agentId);
+    const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
+    if (existing) {
+      if (agent) synchronizeSelectionWithAgent(existing, agent);
+      return existing;
+    }
+    const selection = selectionFromAgent(agent);
+    const created: AgentComposerConfiguration = {
+      selectionSource: selection.source,
+      models: [],
+      modelStatus: 'notLoaded',
+      modelError: null,
+      skills: [],
+      plugins: [],
+      skillStatus: 'notLoaded',
+      skillError: null,
+      files: [],
+      fileStatus: 'notLoaded',
+      fileError: null,
+      selectedModelId: selection.model,
+      selectedReasoningEffort: selection.reasoningEffort,
+      selectedServiceTier: selection.serviceTier,
+      planMode: false,
+    };
+    configurationByAgentId.set(agentId, created);
+    return created;
+  }
+
+  function rememberActive(): void {
+    const agentId = snapshot().activeAgentId;
+    if (!agentId) return;
+    Object.assign(configuration(agentId), {
+      models: backendModels.value,
+      modelStatus: modelCatalogStatus.value,
+      modelError: modelCatalogError.value,
+      skills: backendSkills.value,
+      plugins: backendPlugins.value,
+      skillStatus: skillCatalogStatus.value,
+      skillError: skillCatalogError.value,
+      files: agentFiles.value,
+      fileStatus: fileCatalogStatus.value,
+      fileError: fileCatalogError.value,
+      selectedModelId: selectedModelId.value,
+      selectedReasoningEffort: selectedReasoningEffort.value,
+      selectedServiceTier: selectedServiceTier.value,
+      planMode: planMode.value,
+    });
+  }
+
+  function restore(agentId: string): void {
+    const current = configuration(agentId);
+    backendModels.value = current.models;
+    modelCatalogStatus.value = current.modelStatus;
+    modelCatalogError.value = current.modelError;
+    backendSkills.value = current.skills;
+    backendPlugins.value = current.plugins;
+    skillCatalogStatus.value = current.skillStatus;
+    skillCatalogError.value = current.skillError;
+    agentFiles.value = current.files;
+    fileCatalogStatus.value = current.fileStatus;
+    fileCatalogError.value = current.fileError;
+    selectedModelId.value = current.selectedModelId;
+    selectedReasoningEffort.value = current.selectedReasoningEffort;
+    selectedServiceTier.value = current.selectedServiceTier;
+    planMode.value = current.planMode;
+  }
+
+  function clearActive(): void {
+    backendModels.value = [];
+    modelCatalogStatus.value = 'notLoaded';
+    modelCatalogError.value = null;
+    backendSkills.value = [];
+    backendPlugins.value = [];
+    skillCatalogStatus.value = 'notLoaded';
+    skillCatalogError.value = null;
+    agentFiles.value = [];
+    fileCatalogStatus.value = 'notLoaded';
+    fileCatalogError.value = null;
+    selectedModelId.value = null;
+    selectedReasoningEffort.value = null;
+    selectedServiceTier.value = null;
+    planMode.value = false;
+  }
+
+  function resetIfSourceChanged(source: unknown): void {
+    if (catalogSessionSource === null || catalogSessionSource === source) {
+      catalogSessionSource = source;
+      return;
+    }
+    catalogSessionSource = source;
+    modelCache.clear();
+    skillCache.clear();
+    pluginCache.clear();
+    fileCache.clear();
+    configurationByAgentId.clear();
+    clearActive();
+  }
+
+  function selectModel(modelId: string): void {
+    const model = backendModels.value.find((candidate) => candidate.id === modelId);
+    if (!model) return;
+    selectedModelId.value = model.id;
+    selectedReasoningEffort.value = defaultReasoningEffort(model);
+    selectedServiceTier.value = defaultServiceTier(model);
+    rememberActive();
+  }
+
+  function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
+    const model = selectedModel.value;
+    if (!model?.supportedReasoningEfforts?.some((option) => option.reasoningEffort === reasoningEffort)) return;
+    selectedReasoningEffort.value = reasoningEffort;
+    rememberActive();
+  }
+
+  function selectServiceTier(serviceTier: string | null): void {
+    const model = selectedModel.value;
+    if (!model || (serviceTier !== null && !model.serviceTiers?.some((tier) => tier.id === serviceTier))) return;
+    selectedServiceTier.value = serviceTier;
+    rememberActive();
+  }
+
+  function setPlanMode(enabled: boolean): void {
+    planMode.value = enabled;
+    rememberActive();
+  }
+
+  async function loadActive(agentId = snapshot().activeAgentId): Promise<void> {
+    if (!agentId) return;
+    const existing = loadsByAgentId.get(agentId);
+    if (existing) return existing;
+    const load = Promise.all([
+      loadModels(agentId),
+      loadPlugins(agentId),
+      loadSkills(agentId),
+      loadFiles(agentId),
+    ]).then(() => undefined).finally(() => {
+      if (loadsByAgentId.get(agentId) === load) loadsByAgentId.delete(agentId);
+    });
+    loadsByAgentId.set(agentId, load);
+    await load;
+  }
+
+  async function loadAll(): Promise<void> {
+    await Promise.all(snapshot().agents.map((agent) => loadActive(agent.id)));
+    const activeAgentId = snapshot().activeAgentId;
+    if (activeAgentId) restore(activeAgentId);
+  }
+
+  async function loadModels(agentId = snapshot().activeAgentId): Promise<void> {
+    if (agentId === snapshot().activeAgentId) rememberActive();
+    const source = codexClawApi;
+    const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
+    const initial = agentId ? configuration(agentId) : null;
+    if (!agent || !source?.listBackendModels) {
+      if (initial) {
+        initial.models = [];
+        initial.modelStatus = 'notLoaded';
+        if (agentId === snapshot().activeAgentId) restore(agentId!);
+      }
+      return;
+    }
+    const current = configuration(agent.id);
+    if (current.modelStatus === 'loading' || (agent.id === snapshot().activeAgentId && modelCatalogStatus.value === 'loading')) return;
+    await loadCatalog({
+      agentId: agent.id,
+      cache: modelCache,
+      key: agent.backend,
+      session: source,
+      source: source.listBackendModels,
+      load: () => source.listBackendModels!(agent.id),
+      sync: syncModels,
+    });
+  }
+
+  async function loadSkills(agentId = snapshot().activeAgentId): Promise<void> {
+    if (agentId === snapshot().activeAgentId) rememberActive();
+    const source = codexClawApi;
+    const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
+    const initial = agentId ? configuration(agentId) : null;
+    if (!agent || !source?.listBackendSkills) {
+      if (initial) {
+        initial.skills = [];
+        initial.skillStatus = 'notLoaded';
+        if (agentId === snapshot().activeAgentId) restore(agentId!);
+      }
+      return;
+    }
+    if (configuration(agent.id).skillStatus === 'loading') return;
+    await loadCatalog({
+      agentId: agent.id,
+      cache: skillCache,
+      key: catalogKey(agent),
+      session: source,
+      source: source.listBackendSkills,
+      load: () => source.listBackendSkills!(agent.id),
+      sync: syncSkills,
+    });
+  }
+
+  async function loadPlugins(agentId = snapshot().activeAgentId): Promise<void> {
+    if (agentId === snapshot().activeAgentId) rememberActive();
+    const source = codexClawApi;
+    const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
+    const initial = agentId ? configuration(agentId) : null;
+    if (!agent || !source?.listBackendPlugins) {
+      if (initial) {
+        initial.plugins = [];
+        if (agentId === snapshot().activeAgentId) restore(agentId!);
+      }
+      return;
+    }
+    await loadCatalog({
+      agentId: agent.id,
+      cache: pluginCache,
+      key: catalogKey(agent),
+      session: source,
+      source: source.listBackendPlugins,
+      load: () => source.listBackendPlugins!(agent.id),
+      sync: syncPlugins,
+    });
+  }
+
+  async function loadFiles(agentId = snapshot().activeAgentId): Promise<void> {
+    if (agentId === snapshot().activeAgentId) rememberActive();
+    const source = codexClawApi;
+    const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
+    const initial = agentId ? configuration(agentId) : null;
+    if (!agent || !agent.folder || !source?.listAgentFiles) {
+      if (initial) {
+        initial.files = [];
+        initial.fileStatus = agent && !agent.folder ? 'loaded' : 'notLoaded';
+        if (agentId === snapshot().activeAgentId) restore(agentId!);
+      }
+      return;
+    }
+    if (configuration(agent.id).fileStatus === 'loading') return;
+    await loadCatalog({
+      agentId: agent.id,
+      cache: fileCache,
+      key: agent.folder,
+      session: source,
+      source: source.listAgentFiles,
+      load: () => source.listAgentFiles!(agent.id),
+      sync: syncFiles,
+    });
+  }
+
+  function resolvePromptOptions(
+    agentId: string,
+    prompt: string,
+    submissionOptions?: RendererSendPromptOptions,
+  ): RendererSendPromptOptions | undefined {
+    const selectedOptions = promptOptions(agentId, prompt);
+    const attachments = submissionOptions?.attachments?.length ? [...submissionOptions.attachments] : undefined;
+    if (!selectedOptions && !submissionOptions) return undefined;
+    return {
+      ...selectedOptions,
+      ...submissionOptions,
+      ...(attachments ? { attachments } : {}),
+    };
+  }
+
+  function handleMainEvent(event: MainToRendererEvent): void {
+    syncMode(event);
+    applySkillsChanged(event);
+    applyModelsChanged(event);
+  }
+
+  function synchronizeAgentSelection(agentId: string | undefined): void {
+    if (!agentId || !configurationByAgentId.has(agentId)) return;
+    const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return;
+    synchronizeSelectionWithAgent(configurationByAgentId.get(agentId)!, agent);
+    if (agentId === snapshot().activeAgentId) restore(agentId);
+  }
+
+  function syncModels(agentId: string, cache: AsyncCatalogEntry<BackendModelOption>): void {
+    const current = configuration(agentId);
+    current.models = cache.value;
+    current.modelStatus = cache.status;
+    current.modelError = cache.error;
+    if (cache.status === 'loaded') selectDefaultModel(current);
+  }
+
+  function syncSkills(agentId: string, cache: AsyncCatalogEntry<BackendSkillSummary>): void {
+    const current = configuration(agentId);
+    current.skills = cache.value;
+    current.skillStatus = cache.status;
+    current.skillError = cache.error;
+  }
+
+  function syncPlugins(agentId: string, cache: AsyncCatalogEntry<BackendPluginSummary>): void {
+    configuration(agentId).plugins = cache.value;
+  }
+
+  function syncFiles(agentId: string, cache: AsyncCatalogEntry<AgentFileSearchItem>): void {
+    const current = configuration(agentId);
+    current.files = cache.value;
+    current.fileStatus = cache.status;
+    current.fileError = cache.error;
+  }
+
+  async function loadCatalog<Key, Value>(catalog: {
+    agentId: string;
+    cache: AsyncCatalogCache<Key, Value>;
+    key: Key;
+    session: unknown;
+    source: unknown;
+    load: () => Promise<Value[]>;
+    sync: (agentId: string, entry: AsyncCatalogEntry<Value>) => void;
+  }): Promise<void> {
+    const entry = catalog.cache.load(catalog.key, catalog.source, catalog.load);
+    catalog.sync(catalog.agentId, entry);
+    if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
+    await entry.promise;
+    if (catalog.session !== codexClawApi) return;
+    catalog.sync(catalog.agentId, entry);
+    if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
+  }
+
+  function applySkillsChanged(event: MainToRendererEvent): void {
+    if (event.type !== 'skills.changed' || !isRecord(event.payload) || !Array.isArray(event.payload.skills)) return;
+    const cwd = event.payload.cwd;
+    if (cwd !== null && typeof cwd !== 'string') return;
+    const skills = event.payload.skills.filter(isBackendSkillSummary).map((skill) => ({ ...skill }));
+    const agents = snapshot().agents.filter((agent) => (
+      agent.backend === 'codex' &&
+      (event.agentId === agent.id || (!event.agentId && (cwd === null || agent.folder === cwd)))
+    ));
+    for (const agent of agents) {
+      const cache = skillCache.entry(catalogKey(agent));
+      if (cache.status === 'loaded' && sameBackendSkills(cache.value, skills)) continue;
+      skillCache.replace(catalogKey(agent), skills);
+      syncSkills(agent.id, cache);
+      if (agent.id === snapshot().activeAgentId) restore(agent.id);
+    }
+  }
+
+  function applyModelsChanged(event: MainToRendererEvent): void {
+    if (event.type !== 'models.changed' || !event.backend || !isRecord(event.payload) || !Array.isArray(event.payload.models)) return;
+    const models = event.payload.models.filter(isBackendModelOption).map((model) => ({ ...model }));
+    const cache = modelCache.entry(event.backend);
+    if (cache.status === 'loaded' && JSON.stringify(cache.value) === JSON.stringify(models)) return;
+    modelCache.replace(event.backend, models);
+    for (const agent of snapshot().agents) {
+      if (agent.backend !== event.backend) continue;
+      syncModels(agent.id, cache);
+      if (agent.id === snapshot().activeAgentId) restore(agent.id);
+    }
+  }
+
+  function syncMode(event: MainToRendererEvent): void {
+    if (event.type === 'thread.settingsUpdated' && isRecord(event.payload)) {
+      const agentId = event.agentId ?? snapshot().activeAgentId;
+      const settings = isRecord(event.payload.threadSettings) ? event.payload.threadSettings : null;
+      if (!agentId || !settings) return;
+      const current = configuration(agentId);
+      if (typeof settings.model === 'string') current.selectedModelId = settings.model;
+      if (typeof settings.reasoningEffort === 'string') current.selectedReasoningEffort = settings.reasoningEffort;
+      if ('serviceTier' in settings && (typeof settings.serviceTier === 'string' || settings.serviceTier === null)) {
+        current.selectedServiceTier = settings.serviceTier;
+      }
+      if (agentId === snapshot().activeAgentId) restore(agentId);
+      return;
+    }
+    if (event.type !== 'thread.modeUpdated' || !isRecord(event.payload)) return;
+    const agentId = event.agentId ?? snapshot().activeAgentId;
+    const mode = event.payload.mode;
+    if (!agentId || (mode !== 'plan' && mode !== 'default')) return;
+    configuration(agentId).planMode = mode === 'plan';
+    if (agentId === snapshot().activeAgentId) restore(agentId);
+  }
+
+  function promptOptions(agentId: string, prompt: string): RendererSendPromptOptions | undefined {
+    const isActiveAgent = agentId === snapshot().activeAgentId;
+    const model = isActiveAgent ? selectedModel.value : null;
+    const skills = isActiveAgent ? promptSkillInputsFromText(prompt, backendSkills.value) : [];
+    const agent = snapshot().agents.find((candidate) => candidate.id === agentId) ?? null;
+    const capabilities = capabilitiesForAgent(agent);
+    const promptModel = capabilities.models ? model : null;
+    const selectedSkills = capabilities.skills ? skills : [];
+    const reasoningEffort = capabilities.reasoningEffort && promptModel
+      ? selectedReasoningEffort.value ?? defaultReasoningEffort(promptModel)
+      : null;
+    const serviceTier = capabilities.serviceTier && promptModel?.serviceTiers?.length
+      ? selectedServiceTier.value
+      : undefined;
+    if (
+      !promptModel &&
+      (capabilities.planMode === 'unsupported' || !isActiveAgent || !planMode.value) &&
+      !reasoningEffort && serviceTier === undefined && selectedSkills.length === 0
+    ) return undefined;
+    return {
+      ...(promptModel ? { model: promptModel.model } : {}),
+      ...(capabilities.planMode === 'native' && isActiveAgent ? { planMode: planMode.value } : {}),
+      ...(capabilities.planMode === 'prompted' && isActiveAgent && planMode.value ? { planMode: true } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+      ...(serviceTier !== undefined ? { serviceTier } : {}),
+      ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
+    };
+  }
+
+  function capabilitiesForAgent(agent: Agent | null): BackendCapabilities {
+    const backend = agent?.backend ?? 'codex';
+    const runtime = snapshot().backendRuntimes.find((candidate) => candidate.backend === backend);
+    return { ...defaultBackendCapabilities(backend), ...runtime?.capabilities };
+  }
+
+  return {
+    agentFiles,
+    backendModels,
+    backendPlugins,
+    backendSkills,
+    clearActive,
+    fileCatalogError,
+    fileCatalogStatus,
+    handleMainEvent,
+    loadActive,
+    loadAll,
+    loadFiles,
+    loadModels,
+    loadPlugins,
+    loadSkills,
+    modelCatalogError,
+    modelCatalogStatus,
+    planMode,
+    rememberActive,
+    resetIfSourceChanged,
+    resolvePromptOptions,
+    restore,
+    selectModel,
+    selectedModel,
+    selectedModelId,
+    selectedReasoningEffort,
+    selectedServiceTier,
+    selectReasoningEffort,
+    selectServiceTier,
+    setPlanMode,
+    skillCatalogError,
+    skillCatalogStatus,
+    synchronizeAgentSelection,
+  };
+}
+
+function catalogKey(agent: Agent): string {
+  return `${agent.backend}:${agent.folder}`;
+}
+
+function selectDefaultModel(configuration: AgentComposerConfiguration): void {
+  const selected = configuration.models.find((model) => modelMatchesSelection(model, configuration.selectedModelId));
+  if (selected) {
+    configuration.selectedModelId = selected.id;
+    if (
+      configuration.selectedReasoningEffort &&
+      !selected.supportedReasoningEfforts?.some((option) => option.reasoningEffort === configuration.selectedReasoningEffort)
+    ) configuration.selectedReasoningEffort = defaultReasoningEffort(selected);
+    return;
+  }
+  const fallback = configuration.models.find((model) => model.isDefault) ?? configuration.models[0] ?? null;
+  configuration.selectedModelId = fallback?.id ?? null;
+  configuration.selectedReasoningEffort = fallback ? defaultReasoningEffort(fallback) : null;
+  configuration.selectedServiceTier = fallback ? defaultServiceTier(fallback) : null;
+}
+
+function selectionFromAgent(agent: Agent | undefined): {
+  source: string;
+  model: string | null;
+  reasoningEffort: ReasoningEffort | null;
+  serviceTier: string | null;
+} {
+  if (!agent) return { source: 'missing', model: null, reasoningEffort: null, serviceTier: null };
+  const defaults = agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : undefined;
+  const claudeSession = agent.backendSession?.kind === 'claude' ? agent.backendSession : undefined;
+  const model = claudeSession?.model ?? defaults?.model ?? null;
+  const reasoningEffort = claudeSession?.reasoningEffort ?? defaults?.reasoningEffort ?? null;
+  const serviceTier = defaults?.kind === 'codex' ? defaults.serviceTier ?? null : null;
+  const sessionId = agent.backendSession?.kind === 'codex'
+    ? agent.backendSession.threadId
+    : agent.backendSession?.sessionId ?? 'new';
+  return {
+    source: JSON.stringify([agent.backend, sessionId, model, reasoningEffort, serviceTier]),
+    model,
+    reasoningEffort,
+    serviceTier,
+  };
+}
+
+function synchronizeSelectionWithAgent(configuration: AgentComposerConfiguration, agent: Agent): void {
+  const selection = selectionFromAgent(agent);
+  if (configuration.selectionSource === selection.source) return;
+  configuration.selectionSource = selection.source;
+  configuration.selectedModelId = selection.model;
+  configuration.selectedReasoningEffort = selection.reasoningEffort;
+  configuration.selectedServiceTier = selection.serviceTier;
+  if (configuration.modelStatus === 'loaded') selectDefaultModel(configuration);
+}
+
+function modelMatchesSelection(model: BackendModelOption, selection: string | null): boolean {
+  return Boolean(selection && (
+    model.id === selection || model.model === selection || model.providerMetadata?.resolvedModel === selection
+  ));
+}
+
+function defaultReasoningEffort(model: BackendModelOption): ReasoningEffort | null {
+  return model.defaultReasoningEffort || model.supportedReasoningEfforts?.[0]?.reasoningEffort || null;
+}
+
+function defaultServiceTier(model: BackendModelOption): string | null {
+  return model.defaultServiceTier ?? null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isBackendModelOption(value: unknown): value is BackendModelOption {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.model !== 'string' || typeof value.displayName !== 'string') {
+    return false;
+  }
+  return value.supportedReasoningEfforts === undefined || (
+    Array.isArray(value.supportedReasoningEfforts) && value.supportedReasoningEfforts.every((option) => (
+      isRecord(option) && typeof option.reasoningEffort === 'string' && typeof option.description === 'string'
+    ))
+  );
+}
+
+function isBackendSkillSummary(value: unknown): value is BackendSkillSummary {
+  return isRecord(value) && typeof value.name === 'string' && typeof value.path === 'string' && typeof value.enabled === 'boolean';
+}
+
+function sameBackendSkills(left: readonly BackendSkillSummary[], right: readonly BackendSkillSummary[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((skill, index) => {
+    const other = right[index];
+    return Boolean(other) &&
+      skill.id === other.id &&
+      skill.name === other.name &&
+      skill.description === other.description &&
+      skill.shortDescription === other.shortDescription &&
+      skill.displayName === other.displayName &&
+      skill.iconSmall === other.iconSmall &&
+      skill.iconLarge === other.iconLarge &&
+      skill.brandColor === other.brandColor &&
+      skill.defaultPrompt === other.defaultPrompt &&
+      skill.path === other.path &&
+      skill.scope === other.scope &&
+      skill.enabled === other.enabled;
+  });
+}
