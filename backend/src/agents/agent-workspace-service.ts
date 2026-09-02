@@ -1,0 +1,114 @@
+import { agentFolder } from '@codex-claw/core/agent-folder';
+import type { Agent, AgentGitStatus, AgentWorkspaceIdentity, AppSnapshot } from '@codex-claw/core/contracts';
+import { updateAgentWorkspace } from '@codex-claw/core/snapshot';
+
+export type AgentWorkspaceServiceOptions = {
+  applyGitStatus: (agentId: string, status: AgentGitStatus) => void;
+  getGitStatus: (agent: Agent) => Promise<AgentGitStatus | null>;
+  getSnapshot: () => AppSnapshot;
+  persistSnapshot: () => Promise<unknown>;
+  resolveIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
+};
+
+/** Owns workspace identity reconciliation and deduplicated Git status refreshes. */
+export class AgentWorkspaceService {
+  private readonly gitStatusRefreshes = new Map<string, Promise<boolean>>();
+  private reconciliation: Promise<void> | null = null;
+
+  constructor(private readonly options: AgentWorkspaceServiceOptions) {}
+
+  async reconcile(agentIds?: readonly string[], refreshExisting = false): Promise<void> {
+    if (this.reconciliation) return this.reconciliation;
+    const snapshot = this.options.getSnapshot();
+    const targetIds = agentIds ? new Set(agentIds) : null;
+    const targets = snapshot.agents.filter((agent) => (
+      (!targetIds || targetIds.has(agent.id)) &&
+      (refreshExisting || !agent.workspace || agent.workspace.folder !== agent.folder)
+    ));
+    if (targets.length === 0) return;
+
+    const reconciliation = (async () => {
+      let nextIndex = 0;
+      let changed = false;
+      const workers = Array.from({ length: Math.min(4, targets.length) }, async () => {
+        while (nextIndex < targets.length) {
+          const target = targets[nextIndex++];
+          if (target) changed = (await this.refreshIdentity(target.id)) || changed;
+        }
+      });
+      await Promise.all(workers);
+      if (changed) await this.options.persistSnapshot();
+    })().finally(() => {
+      if (this.reconciliation === reconciliation) this.reconciliation = null;
+    });
+    this.reconciliation = reconciliation;
+    return reconciliation;
+  }
+
+  async refreshIdentity(agentId: string): Promise<boolean> {
+    const snapshot = this.options.getSnapshot();
+    const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+    const folder = agent ? agentFolder(agent) : undefined;
+    if (!agent || !folder || !this.options.resolveIdentity) return false;
+
+    const identity = await this.options.resolveIdentity(folder);
+    if (sameWorkspaceIdentity(agent.workspace, identity)) return false;
+    updateAgentWorkspace(snapshot, agentId, identity, identity.updatedAt);
+    return true;
+  }
+
+  refreshGitStatus(agentId: string): Promise<boolean> {
+    const existing = this.gitStatusRefreshes.get(agentId);
+    if (existing) return existing;
+
+    const refresh = this.performGitStatusRefresh(agentId).finally(() => {
+      if (this.gitStatusRefreshes.get(agentId) === refresh) this.gitStatusRefreshes.delete(agentId);
+    });
+    this.gitStatusRefreshes.set(agentId, refresh);
+    return refresh;
+  }
+
+  private async performGitStatusRefresh(agentId: string): Promise<boolean> {
+    const snapshot = this.options.getSnapshot();
+    const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    if (!agentFolder(agent)) {
+      delete snapshot.agentGitStatuses[agentId];
+      return false;
+    }
+
+    let status: AgentGitStatus | null;
+    try {
+      status = await this.options.getGitStatus(agent);
+      if (!status) return false;
+    } catch {
+      return false;
+    }
+
+    this.options.applyGitStatus(agentId, status);
+    const workspace = agent.workspace;
+    if (workspace?.kind === 'git' && workspace.folder === agent.folder) {
+      const branch = status.branch ?? null;
+      if (workspace.branch !== branch) {
+        updateAgentWorkspace(snapshot, agentId, { ...workspace, branch, updatedAt: status.updatedAt }, status.updatedAt);
+      }
+    } else {
+      await this.refreshIdentity(agentId);
+    }
+    return true;
+  }
+}
+
+function sameWorkspaceIdentity(current: AgentWorkspaceIdentity | undefined, next: AgentWorkspaceIdentity): boolean {
+  if (!current || current.kind !== next.kind || current.folder !== next.folder) return false;
+  if (current.kind === 'folder' && next.kind === 'folder') return current.label === next.label;
+  if (current.kind === 'git' && next.kind === 'git') {
+    return current.repositoryName === next.repositoryName &&
+      current.repositoryRoot === next.repositoryRoot &&
+      current.branch === next.branch &&
+      current.isLinkedWorktree === next.isLinkedWorktree &&
+      current.primaryWorktreeRoot === next.primaryWorktreeRoot &&
+      current.originUrl === next.originUrl;
+  }
+  return false;
+}

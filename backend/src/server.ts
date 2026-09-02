@@ -1,10 +1,9 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
-import { AppError } from '@codex-claw/core/app-error';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentBackend, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AgentWorkspaceIdentity, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequest, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkRoutingRequest, WorkRoutingResult } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, BackendSession, BenchLocation, BenchTemplate, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendRollbackResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -31,6 +30,10 @@ import { loadPluginStatus } from './plugin-status';
 import { getCodexResourceSharingStatus, setCodexResourceSharing } from './codex-resource-sharing';
 import { AgentGitService } from './git/agent-git-service';
 import { AgentPromptManager } from './agents/agent-prompt-manager';
+import { AgentWorkspaceService } from './agents/agent-workspace-service';
+import { SubagentIdentityService } from './agents/subagent-identity-service';
+import { WorkRoutingService, type WorkRoutingPort } from './work-routing/work-routing-service';
+import { ClientRequestRegistry } from './client-requests/client-request-registry';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -52,10 +55,6 @@ export type ClawBackendServerOptions = {
   inspectPluginStatus?: () => Promise<AppPluginStatus>;
   agentGitService?: AgentGitService;
   workRouting?: WorkRoutingPort;
-};
-
-export type WorkRoutingPort = {
-  resolveWorkRoutingRequest(requestId: string, result: WorkRoutingResult): boolean;
 };
 
 export type SystemPermissionsPort = {
@@ -102,17 +101,13 @@ export class ClawBackendServer {
   private readonly configureCodexResourceSharing: (input: SetCodexResourceSharingInput) => Promise<void>;
   private readonly inspectCodexResourceSharing: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
   private readonly inspectPluginStatus: () => Promise<AppPluginStatus>;
-  private readonly clientRequestOwners = new Map<string,
-    | { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string }
-    | { kind: 'workRouting'; remoteConnectionId?: string }
-  >();
+  private readonly clientRequests: ClientRequestRegistry;
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
   private readonly agentPrompts: AgentPromptManager;
+  private readonly agentWorkspaces: AgentWorkspaceService;
+  private readonly subagentIdentities: SubagentIdentityService;
   private readonly agentGitService: AgentGitService;
-  private readonly workRouting?: WorkRoutingPort;
-  private readonly gitStatusRefreshPromises = new Map<string, Promise<boolean>>();
-  private workspaceIdentityReconciliationPromise: Promise<void> | null = null;
-  private subagentIdentityBackfillPromise: Promise<void> | null = null;
+  private readonly workRouting: WorkRoutingService;
   private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -135,13 +130,48 @@ export class ClawBackendServer {
     this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
     this.agentGitService = options.agentGitService ?? new AgentGitService();
-    this.workRouting = options.workRouting;
     this.agentPrompts = new AgentPromptManager({
       getSnapshot: () => this.snapshot,
       driverForAgent: (agent) => this.backendDriverForAgent(agent),
       applyEvent: (event) => this.applyAndEmitBackendEvent(event),
       persistSnapshot: () => this.persistSnapshotOnly(),
       setNewConversationTitle: (agentId, wasNewSession) => this.setNewConversationTitle(agentId, wasNewSession),
+    });
+    this.agentWorkspaces = new AgentWorkspaceService({
+      applyGitStatus: (agentId, status) => this.applyAndEmitBackendEvent({
+        agentId,
+        type: 'git.statusUpdated',
+        payload: status,
+      }),
+      getGitStatus: (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverGitStatusGet, { agent }) as Promise<AgentGitStatus | null>,
+      getSnapshot: () => this.snapshot,
+      persistSnapshot: () => this.persistSnapshotOnly(),
+      resolveIdentity: typeof this.agentGitService.identity === 'function'
+        ? (folder) => this.agentGitService.identity(folder)
+        : undefined,
+    });
+    this.subagentIdentities = new SubagentIdentityService({
+      applyEvent: (event) => this.handleBackendEvent(event, { persist: false }),
+      getSnapshot: () => this.snapshot,
+      loadSummary: this.driverRpc
+        ? (agent, conversationId) => this.driverRpc!.handle(backendMethods.driverConversationSummaryGet, {
+            agent,
+            ref: { backend: 'codex', threadId: conversationId },
+          }) as Promise<ConversationSummary | null>
+        : undefined,
+      persistSnapshot: () => this.persistSnapshotOnly(),
+    });
+    this.clientRequests = new ClientRequestRegistry({
+      getSnapshot: () => this.snapshot,
+      remoteConnectionIdForAgent: (agent) => this.remoteConnectionIdForAgent(agent),
+    });
+    this.workRouting = new WorkRoutingService({
+      getSnapshot: () => this.snapshot,
+      git: this.agentGitService,
+      port: options.workRouting,
+      persistAndEmitSnapshot: () => this.persistAndEmitSnapshot(),
+      refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
+      sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
     });
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
@@ -171,11 +201,11 @@ export class ClawBackendServer {
       case backendMethods.snapshotGet:
         await this.initializeSourceFolderIfNeeded();
         await this.ensureRemoteControlStatus();
-        await this.reconcileAgentWorkspaceIdentities();
-        void this.backfillSubagentIdentities();
+        await this.agentWorkspaces.reconcile();
+        void this.subagentIdentities.backfill();
         const snapshot = await this.clientSnapshot(false);
         if (snapshot.activeAgentId) {
-          await this.refreshAgentGitStatus(snapshot.activeAgentId);
+          await this.agentWorkspaces.refreshGitStatus(snapshot.activeAgentId);
         }
         return createClawRpcResult(message.id, {
           snapshot,
@@ -378,7 +408,7 @@ export class ClawBackendServer {
       }
       case backendMethods.clientRequestRespond: {
         const response = requireClientRequestResponse(message.params);
-        const owner = this.clientRequestOwners.get(response.id);
+        const owner = this.clientRequests.owner(response.id);
         if (!owner) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `No backend owns client request '${response.id}'.`);
         }
@@ -388,7 +418,7 @@ export class ClawBackendServer {
             this.locationFromRemoteConnectionId(owner.remoteConnectionId),
             backendMethods.mcpWorkRoutingRespond,
             { response },
-            () => this.respondToWorkRoutingRequest(response),
+            () => this.workRouting.respond(response),
           );
         } else {
           await this.requestInLocation(
@@ -398,12 +428,12 @@ export class ClawBackendServer {
             () => this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, { backend: owner.backend, response }),
           );
         }
-        this.clientRequestOwners.delete(response.id);
+        this.clientRequests.delete(response.id);
         return createClawRpcResult(message.id, await this.clientSnapshot());
       }
       case backendMethods.mcpWorkRoutingRespond: {
         const response = requireClientRequestResponse(message.params);
-        await this.respondToWorkRoutingRequest(response);
+        await this.workRouting.respond(response);
         return createClawRpcResult(message.id, this.snapshot);
       }
       case backendMethods.agentCreate: {
@@ -426,11 +456,11 @@ export class ClawBackendServer {
         createAgentInSnapshot(this.snapshot, input);
         this.addRecentSourceRepository(input.sourceRepositoryName);
         if (this.snapshot.activeAgentId) {
-          await this.refreshAgentWorkspaceIdentity(this.snapshot.activeAgentId);
+          await this.agentWorkspaces.refreshIdentity(this.snapshot.activeAgentId);
         }
         const snapshot = await this.persistAndEmitSnapshot();
         if (snapshot.activeAgentId) {
-          await this.refreshAgentGitStatus(snapshot.activeAgentId);
+          await this.agentWorkspaces.refreshGitStatus(snapshot.activeAgentId);
         }
         return createClawRpcResult(message.id, snapshot);
       }
@@ -649,7 +679,7 @@ export class ClawBackendServer {
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentFolderUpdate, { agentId, folder }, async (agent) => {
           await this.validateAgentInput({ name: 'Agent', folder }, this.remoteConnectionIdForAgent(agent));
           updateAgentFolder(this.snapshot, agentId, folder);
-          await this.refreshAgentWorkspaceIdentity(agentId);
+          await this.agentWorkspaces.refreshIdentity(agentId);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -823,7 +853,7 @@ export class ClawBackendServer {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
           }
-          const workspaceChanged = await this.refreshAgentWorkspaceIdentity(agentId);
+          const workspaceChanged = await this.agentWorkspaces.refreshIdentity(agentId);
           if (input.createWorktree === true || workspaceChanged) await this.persistAndEmitSnapshot();
           return this.gitWorkflow(agent, { refreshStatus: true });
         });
@@ -860,7 +890,7 @@ export class ClawBackendServer {
           if (deleteWorktree) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
-            await this.refreshAgentWorkspaceIdentity(agentId);
+            await this.agentWorkspaces.refreshIdentity(agentId);
             await this.persistAndEmitSnapshot();
           }
           return this.gitWorkflow(agent, { refreshStatus: true });
@@ -1321,7 +1351,7 @@ export class ClawBackendServer {
           selectTeam(this.snapshot, teamId);
           const selectedTeam = this.snapshot.teams.find((candidate) => candidate.id === teamId);
           if (selectedTeam) {
-            await this.reconcileAgentWorkspaceIdentities(selectedTeam.agentIds, true);
+            await this.agentWorkspaces.reconcile(selectedTeam.agentIds, true);
           }
         }
         if (this.snapshot.activeAgentId) {
@@ -2187,7 +2217,7 @@ export class ClawBackendServer {
       ...backendEvent
     } = event;
     const fullEvent = this.nextMainEvent(backendEvent);
-    this.recordClientRequestOwner(fullEvent, connectionId);
+    this.clientRequests.record(fullEvent, connectionId);
     this.emitRemoteBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
   }
@@ -2292,7 +2322,7 @@ export class ClawBackendServer {
       try {
         const remoteSnapshot = await this.remoteSnapshot(pointer.connectionId);
         projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
-        this.recordProjectedWorkRoutingOwners(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
+        this.clientRequests.recordProjectedWorkRouting(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
       } catch {
         team.agentIds = [];
         delete team.activeAgentId;
@@ -2315,7 +2345,7 @@ export class ClawBackendServer {
       const remoteSnapshot = this.remoteSnapshots.get(pointer.connectionId);
       if (remoteSnapshot) {
         projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
-        this.recordProjectedWorkRoutingOwners(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
+        this.clientRequests.recordProjectedWorkRouting(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
       } else {
         team.agentIds = [];
         delete team.activeAgentId;
@@ -2333,15 +2363,6 @@ export class ClawBackendServer {
     }
     this.remoteSnapshots.set(connectionId, result.snapshot);
     return result.snapshot;
-  }
-
-  private recordProjectedWorkRoutingOwners(connectionId: string, remoteSnapshot: AppSnapshot, remoteTeamId: string): void {
-    const agentIds = new Set(remoteSnapshot.teams.find((team) => team.id === remoteTeamId)?.agentIds ?? []);
-    for (const request of remoteSnapshot.workRoutingRequests ?? []) {
-      if (agentIds.has(request.payload.request.agentId)) {
-        this.clientRequestOwners.set(request.id, { kind: 'workRouting', remoteConnectionId: connectionId });
-      }
-    }
   }
 
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {
@@ -2553,7 +2574,7 @@ export class ClawBackendServer {
   private async gitWorkflow(agent: Agent, options: { includePullRequest?: boolean; refreshStatus?: boolean } = {}): Promise<AgentGitWorkflow> {
     const workflow = await this.agentGitService.workflow(requireAgentFolder(agent));
     if (options.refreshStatus) {
-      await this.refreshAgentGitStatus(agent.id);
+      await this.agentWorkspaces.refreshGitStatus(agent.id);
     }
     const githubConnected = await this.requireWorkIntegrations().githubConnected();
     let existingPullRequest = null;
@@ -2590,157 +2611,10 @@ export class ClawBackendServer {
     }
   }
 
-  private async backfillSubagentIdentities(): Promise<void> {
-    if (!this.driverRpc) return;
-    if (this.subagentIdentityBackfillPromise) return this.subagentIdentityBackfillPromise;
-    const targets = this.snapshot.agents.flatMap((agent) => {
-      if (agent.backendSession?.kind !== 'codex') return [];
-      const tree = this.snapshot.subagentTrees[agent.id];
-      if (!tree || tree.rootConversationId !== agent.backendSession.threadId) return [];
-      return Object.values(tree.nodes)
-        .filter((node) => !node.agentNickname && !node.agentRole)
-        .map((node) => ({ agent, conversationId: node.conversationId, rootConversationId: tree.rootConversationId }));
-    });
-    if (targets.length === 0) return;
-
-    const backfill = Promise.allSettled(targets.map(async ({ agent, conversationId, rootConversationId }) => {
-      const summary = await this.driverRpc!.handle(backendMethods.driverConversationSummaryGet, {
-        agent,
-        ref: { backend: 'codex', threadId: conversationId },
-      }) as ConversationSummary | null;
-      if (!summary?.agentNickname && !summary?.agentRole) return false;
-      const currentNode = this.snapshot.subagentTrees[agent.id]?.nodes[conversationId];
-      if (
-        currentNode?.agentNickname === summary.agentNickname &&
-        currentNode.agentRole === summary.agentRole
-      ) return false;
-      this.handleBackendEvent({
-        agentId: agent.id,
-        backend: 'codex',
-        threadId: rootConversationId,
-        type: 'subagent.identityChanged',
-        payload: {
-          rootConversationId,
-          conversationId,
-          ...(summary.agentNickname ? { agentNickname: summary.agentNickname } : {}),
-          ...(summary.agentRole ? { agentRole: summary.agentRole } : {}),
-        },
-        occurredAt: summary.updatedAt,
-      }, { persist: false });
-      return true;
-    })).then(async (results) => {
-      if (results.some((result) => result.status === 'fulfilled' && result.value)) {
-        await this.persistSnapshotOnly();
-      }
-    }).finally(() => {
-      if (this.subagentIdentityBackfillPromise === backfill) {
-        this.subagentIdentityBackfillPromise = null;
-      }
-    });
-    this.subagentIdentityBackfillPromise = backfill;
-    return backfill;
-  }
-
   private async hydrateAndRefreshSelectedAgent(agentId: string): Promise<void> {
     await this.hydrateAgentHistory(agentId);
-    await this.refreshAgentWorkspaceIdentity(agentId);
-    await this.refreshAgentGitStatus(agentId);
-  }
-
-  private async reconcileAgentWorkspaceIdentities(
-    agentIds?: readonly string[],
-    refreshExisting = false,
-  ): Promise<void> {
-    if (this.workspaceIdentityReconciliationPromise) {
-      return this.workspaceIdentityReconciliationPromise;
-    }
-    const targetIds = agentIds ? new Set(agentIds) : null;
-    const targets = this.snapshot.agents.filter((agent) => (
-      (!targetIds || targetIds.has(agent.id))
-      && (refreshExisting || !agent.workspace || agent.workspace.folder !== agent.folder)
-    ));
-    if (targets.length === 0) return;
-
-    const reconciliation = (async () => {
-      let nextIndex = 0;
-      let changed = false;
-      const workers = Array.from({ length: Math.min(4, targets.length) }, async () => {
-        while (nextIndex < targets.length) {
-          const target = targets[nextIndex++];
-          if (target) changed = (await this.refreshAgentWorkspaceIdentity(target.id)) || changed;
-        }
-      });
-      await Promise.all(workers);
-      if (changed) await this.persistSnapshotOnly();
-    })().finally(() => {
-      if (this.workspaceIdentityReconciliationPromise === reconciliation) {
-        this.workspaceIdentityReconciliationPromise = null;
-      }
-    });
-    this.workspaceIdentityReconciliationPromise = reconciliation;
-    return reconciliation;
-  }
-
-  private async refreshAgentWorkspaceIdentity(agentId: string): Promise<boolean> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    const folder = agent ? agentFolder(agent) : undefined;
-    if (!agent || !folder || typeof this.agentGitService.identity !== 'function') return false;
-
-    const identity = await this.agentGitService.identity(folder);
-    if (sameWorkspaceIdentity(agent.workspace, identity)) return false;
-    updateAgentWorkspace(this.snapshot, agentId, identity, identity.updatedAt);
-    return true;
-  }
-
-  private async refreshAgentGitStatus(agentId: string): Promise<boolean> {
-    const existing = this.gitStatusRefreshPromises.get(agentId);
-    if (existing) {
-      return existing;
-    }
-    const refresh = this.performAgentGitStatusRefresh(agentId).finally(() => {
-      if (this.gitStatusRefreshPromises.get(agentId) === refresh) {
-        this.gitStatusRefreshPromises.delete(agentId);
-      }
-    });
-    this.gitStatusRefreshPromises.set(agentId, refresh);
-    return refresh;
-  }
-
-  private async performAgentGitStatusRefresh(agentId: string): Promise<boolean> {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return false;
-    }
-    if (!agentFolder(agent)) {
-      delete this.snapshot.agentGitStatuses[agentId];
-      return false;
-    }
-
-    let status: AgentGitStatus | null = null;
-    try {
-      status = await this.handleAgentDriverRequest(agent, backendMethods.driverGitStatusGet, { agent }) as AgentGitStatus | null;
-      if (!status) {
-        return false;
-      }
-    } catch {
-      return false;
-    }
-
-    this.applyAndEmitBackendEvent({
-      agentId,
-      type: 'git.statusUpdated',
-      payload: status,
-    });
-    const workspace = agent.workspace;
-    if (workspace?.kind === 'git' && workspace.folder === agent.folder) {
-      const branch = status.branch ?? null;
-      if (workspace.branch !== branch) {
-        updateAgentWorkspace(this.snapshot, agentId, { ...workspace, branch, updatedAt: status.updatedAt }, status.updatedAt);
-      }
-    } else {
-      await this.refreshAgentWorkspaceIdentity(agentId);
-    }
-    return true;
+    await this.agentWorkspaces.refreshIdentity(agentId);
+    await this.agentWorkspaces.refreshGitStatus(agentId);
   }
 
   private addRecentSourceRepository(repoName?: string): void {
@@ -2827,7 +2701,7 @@ export class ClawBackendServer {
     if (options.trackTranscriptActivity !== false) this.touchTranscriptForEvent(event);
     const fullEvent = this.nextMainEvent(this.compactSnapshotEvent(event));
     applyMainEventToSnapshot(this.snapshot, fullEvent);
-    this.recordClientRequestOwner(fullEvent);
+    this.clientRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
@@ -2844,7 +2718,7 @@ export class ClawBackendServer {
     }
     const fullEvent = this.nextMainEvent(this.compactSnapshotEvent(event));
     applyMainEventToSnapshot(this.snapshot, fullEvent);
-    this.recordClientRequestOwner(fullEvent);
+    this.clientRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
@@ -2866,7 +2740,7 @@ export class ClawBackendServer {
       }
     }
     if (event.agentId === this.snapshot.activeAgentId && shouldRefreshGitStatusForEvent(event)) {
-      void this.refreshAgentGitStatus(event.agentId);
+      void this.agentWorkspaces.refreshGitStatus(event.agentId);
     }
   }
 
@@ -3010,137 +2884,6 @@ export class ClawBackendServer {
     });
   }
 
-  private async respondToWorkRoutingRequest(response: ClientRequestResponse): Promise<void> {
-    const request = this.snapshot.workRoutingRequests?.find((candidate) => candidate.id === response.id);
-    if (!request) {
-      throw new Error(`Work routing request not found: ${response.id}`);
-    }
-    if (!this.workRouting) {
-      throw new Error('Work routing is not configured.');
-    }
-
-    const selection = response.payload?.workRouting;
-    if (response.payload?.cancelled === true || !selection) {
-      this.resolveWorkRouting(request.id, { mode: 'cancelled' });
-      return;
-    }
-    if (selection.mode !== 'current' && selection.mode !== 'branch' && selection.mode !== 'delegate') {
-      throw new Error('Invalid work routing mode.');
-    }
-
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === request.payload.request.agentId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${request.payload.request.agentId}`);
-    }
-    const folder = requireAgentFolder(agent);
-
-    if (selection.mode === 'current') {
-      this.resolveWorkRouting(request.id, { mode: 'current', folder });
-      return;
-    }
-
-    const branchName = selection.branchName?.trim() ?? '';
-    if (!branchName) {
-      throw new AppError('workRouting.branchRequired', 'Enter a branch name.');
-    }
-
-    if (selection.mode === 'branch') {
-      if (request.payload.request.sharedFolderAgentNames.length > 0) {
-        const agents = request.payload.request.sharedFolderAgentNames.join(', ');
-        throw new AppError(
-          'workRouting.sharedFolder',
-          `This folder is also used by ${agents}. Delegate to a worktree instead.`,
-          { agents },
-        );
-      }
-      const gitStatus = await this.agentGitService.status(folder);
-      if (gitStatus.state === 'dirty') {
-        throw new AppError(
-          'workRouting.dirtyCheckout',
-          'This checkout has uncommitted changes. Commit, stash, or delegate to a worktree instead.',
-        );
-      }
-      if (gitStatus.state === 'unknown') {
-        throw new AppError(
-          'workRouting.dirtyCheckoutUnknown',
-          'Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.',
-        );
-      }
-      const branchFolder = await this.agentGitService.createBranch(folder, branchName, false);
-      await this.refreshAgentWorkspaceIdentity(agent.id);
-      await this.persistAndEmitSnapshot();
-      this.resolveWorkRouting(request.id, { mode: 'branch', branchName, folder: branchFolder });
-      return;
-    }
-
-    const delegatedFolder = await this.agentGitService.createBranch(folder, branchName, true);
-    const delegated = duplicateAgentInSnapshot(this.snapshot, agent.id, undefined, undefined, {
-      name: delegatedAgentName(agentDisplayName(agent), branchName),
-      select: false,
-    });
-    if (!delegated) {
-      throw new Error(`Agent not found: ${agent.id}`);
-    }
-    updateAgentFolder(this.snapshot, delegated.id, delegatedFolder);
-    await this.refreshAgentWorkspaceIdentity(delegated.id);
-    await this.persistAndEmitSnapshot();
-    this.agentPrompts.send(delegated.id, request.payload.request.task);
-    this.resolveWorkRouting(request.id, {
-      mode: 'delegated',
-      agentId: delegated.id,
-      agentName: agentDisplayName(delegated),
-      branchName,
-      folder: delegatedFolder,
-    });
-  }
-
-  private resolveWorkRouting(requestId: string, result: WorkRoutingResult): void {
-    if (!this.workRouting?.resolveWorkRoutingRequest(requestId, result)) {
-      throw new Error(`Work routing request is no longer pending: ${requestId}`);
-    }
-  }
-
-  private recordClientRequestOwner(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
-    if (event.type === 'workRouting.requested') {
-      const request = clientRequest(event.payload);
-      if (!request || request.kind !== 'work_routing') {
-        return;
-      }
-      this.clientRequestOwners.set(request.id, {
-        kind: 'workRouting',
-        ...(remoteConnectionIdOverride ? { remoteConnectionId: remoteConnectionIdOverride } : {}),
-      });
-      return;
-    }
-
-    if (
-      event.type !== 'approval.requested' &&
-      event.type !== 'backendApproval.requested' &&
-      event.type !== 'toolInput.requested'
-    ) {
-      return;
-    }
-
-    const requestId = event.type === 'backendApproval.requested'
-      ? backendApprovalRequestId(event.payload)
-      : clientRequest(event.payload)?.id ?? null;
-    if (!requestId) {
-      return;
-    }
-
-    const backend = event.backend ?? (event.agentId ? this.snapshot.agents.find((agent) => agent.id === event.agentId)?.backend : undefined);
-    if (backend) {
-      const ownerAgent = event.agentId
-        ? this.snapshot.agents.find((agent) => agent.id === event.agentId)
-        : undefined;
-      const remoteConnectionId = remoteConnectionIdOverride ?? (ownerAgent ? this.remoteConnectionIdForAgent(ownerAgent) : null);
-      this.clientRequestOwners.set(requestId, {
-        kind: 'driver',
-        backend,
-        ...(remoteConnectionId ? { remoteConnectionId } : {}),
-      });
-    }
-  }
 }
 
 function requireBacklogConfiguration(params: unknown): WorkBacklogConfigurationInput {
@@ -3723,22 +3466,6 @@ function isIntegrationBranchName(branch?: string): boolean {
   return branch === 'main' || branch === 'master' || branch === 'develop' || branch === 'development' || branch === 'trunk';
 }
 
-function sameWorkspaceIdentity(current: AgentWorkspaceIdentity | undefined, next: AgentWorkspaceIdentity): boolean {
-  if (!current || current.kind !== next.kind || current.folder !== next.folder) return false;
-  if (current.kind === 'folder' && next.kind === 'folder') {
-    return current.label === next.label;
-  }
-  if (current.kind === 'git' && next.kind === 'git') {
-    return current.repositoryName === next.repositoryName
-      && current.repositoryRoot === next.repositoryRoot
-      && current.branch === next.branch
-      && current.isLinkedWorktree === next.isLinkedWorktree
-      && current.primaryWorktreeRoot === next.primaryWorktreeRoot
-      && current.originUrl === next.originUrl;
-  }
-  return false;
-}
-
 function createUnsupportedSystemPermissionsPort(): SystemPermissionsPort {
   return {
     async getStatus() {
@@ -3806,41 +3533,6 @@ function isBackendSession(value: unknown): value is BackendSession {
     typeof record.sessionId === 'string' &&
     record.sessionId.trim().length > 0 &&
     typeof record.transport === 'string';
-}
-
-function clientRequest(value: unknown): ClientRequest | null {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    Array.isArray(value) ||
-    !('id' in value) ||
-    !('kind' in value) ||
-    typeof value.id !== 'string' ||
-    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user' && value.kind !== 'work_routing')
-  ) {
-    return null;
-  }
-
-  return value as ClientRequest;
-}
-
-function delegatedAgentName(agentName: string, branchName: string): string {
-  const branchLabel = branchName.split('/').filter(Boolean).at(-1) ?? branchName;
-  return `${agentName} ${branchLabel}`;
-}
-
-function backendApprovalRequestId(value: unknown): string | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  const approval = (value as Record<string, unknown>).approval;
-  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) {
-    return null;
-  }
-
-  const id = (approval as Record<string, unknown>).id;
-  return typeof id === 'string' && id.trim().length > 0 ? id : null;
 }
 
 function rendererMessageText(message: RendererMessage): string {

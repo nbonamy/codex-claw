@@ -168,6 +168,12 @@ Current implementation checkpoint:
 - Queued prompt admission, draining, retry scheduling, and timer cleanup live
   in `AgentPromptManager`; `ClawBackendServer` routes the protocol methods and
   backend events into that service rather than owning its lifecycle state.
+- Work-routing branch/worktree policy lives in `WorkRoutingService`, pending
+  client-request ownership in `ClientRequestRegistry`, and deduplicated agent
+  workspace identity/git refreshes in `AgentWorkspaceService`.
+  `SubagentIdentityService` owns non-overlapping Codex subagent identity
+  backfills. The server supplies ports and callbacks while those services own
+  their mutable workflow state.
 - `clawd` now owns derived side-panel requests for plans and current-turn diffs.
   Electron fans out backend events but no longer synthesizes `sidePanel.*`
   events from plan or diff events.

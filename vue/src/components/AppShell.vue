@@ -466,7 +466,6 @@ import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url'
 import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkIntegrationConnection, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
@@ -522,6 +521,7 @@ import { ShieldCheckIcon } from '../shared/icons/app-icons';
 import { useConfetti } from '../shared/confetti/use-confetti';
 import { workItemAssignmentPrompt, workItemComposerPrompt, type WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import { useFirstRunOnboarding } from './use-first-run-onboarding';
+import { useRepositoryAcquisition } from './use-repository-acquisition';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -926,33 +926,11 @@ const repositorySessionWorktreeRepository = computed<SourceRepository | null>(()
   const source = repositorySessionWorktreeSource.value;
   return source ? { name: source.repositoryName, path: source.repositoryRoot, worktrees: [] } : null;
 });
-const repositoryAcquireVisible = ref(false);
-const repositoryAcquireMode = ref<'github' | 'url'>('github');
-const repositoryAcquireRepositories = ref<WorkRepository[]>([]);
-const repositoryAcquireLoading = ref(false);
-const repositoryAcquireBusy = ref(false);
-const repositoryAcquireError = ref<string | null>(null);
 const githubConnection = computed<WorkIntegrationConnection>(() => (
   props.snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? {
     provider: 'github',
     status: 'disconnected',
   }
-));
-const repositoryAcquireDisplayError = computed(() => (
-  repositoryAcquireError.value
-  ?? (repositoryAcquireMode.value === 'github' ? props.workBacklogError : null)
-));
-const repositoryAcquireCatalogLoading = computed(() => (
-  repositoryAcquireLoading.value
-  || (
-    repositoryAcquireMode.value === 'github'
-    && githubConnection.value.status === 'connected'
-    && props.workBacklogStatus !== 'error'
-    && (
-      props.workBacklogStatus === 'loading'
-      || props.workRepositoriesByProvider.github === undefined
-    )
-  )
 ));
 const firstRunOnboarding = useFirstRunOnboarding({
   getApi: () => codexClawApi,
@@ -1028,6 +1006,40 @@ const activeTeam = computed<Team | null>(() => {
 
   return props.snapshot.teams[0] ?? null;
 });
+const repositoryAcquisition = useRepositoryAcquisition({
+  activeTeam: () => activeTeam.value,
+  activeTeamId: () => props.snapshot.activeTeamId ?? undefined,
+  catalog: () => props.workRepositoriesByProvider.github,
+  catalogError: () => props.workBacklogError,
+  catalogStatus: () => props.workBacklogStatus,
+  cloneRepository: (input) => props.cloneSourceRepository(input),
+  connectGitHub: () => props.connectWorkProvider('github'),
+  errorMessage: (error) => localizedErrorMessage(error, t),
+  githubConnection: () => githubConnection.value,
+  loadGitHubRepositories: () => props.loadWorkRepositories('github'),
+  openGitHubAuthorization: () => props.openWorkProviderAuthorization('github'),
+  openRepository: (repository, teamId) => openRepositorySessionSource({
+    teamId,
+    repositoryName: repository.name,
+    repositoryRoot: repository.path,
+  }),
+  sourceRepositories: () => props.sourceRepositories,
+});
+const {
+  busy: repositoryAcquireBusy,
+  catalogLoading: repositoryAcquireCatalogLoading,
+  cloneAndOpen: cloneRepositoryAndOpen,
+  close: closeRepositoryAcquire,
+  connect: connectGitHub,
+  displayError: repositoryAcquireDisplayError,
+  error: repositoryAcquireError,
+  mode: repositoryAcquireMode,
+  open: openRepositoryAcquire,
+  openAuthorization: openGitHubAuthorization,
+  repositories: repositoryAcquireRepositories,
+  select: selectWorkRepository,
+  visible: repositoryAcquireVisible,
+} = repositoryAcquisition;
 const activeTeamAgents = computed(() => {
   const team = activeTeam.value;
   if (!team) {
@@ -2075,35 +2087,7 @@ async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promis
     await openLocalRepositorySession();
     return;
   }
-
-  repositoryAcquireMode.value = action;
-  repositoryAcquireVisible.value = true;
-  repositoryAcquireError.value = null;
-  repositoryAcquireRepositories.value = [];
-  if (action === 'github' && githubConnection.value.status === 'connected') {
-    await loadRepositoryAcquireCatalog();
-  }
-}
-
-async function connectGitHub(): Promise<void> {
-  repositoryAcquireBusy.value = true;
-  repositoryAcquireError.value = null;
-  try {
-    await props.connectWorkProvider('github');
-  } catch (error) {
-    repositoryAcquireError.value = localizedErrorMessage(error, t);
-  } finally {
-    repositoryAcquireBusy.value = false;
-  }
-}
-
-async function openGitHubAuthorization(): Promise<void> {
-  repositoryAcquireError.value = null;
-  try {
-    await props.openWorkProviderAuthorization('github');
-  } catch (error) {
-    repositoryAcquireError.value = localizedErrorMessage(error, t);
-  }
+  await openRepositoryAcquire(action);
 }
 
 async function openLocalRepositorySession(): Promise<void> {
@@ -2132,25 +2116,6 @@ async function openLocalRepositorySession(): Promise<void> {
   });
 }
 
-async function loadRepositoryAcquireCatalog(): Promise<void> {
-  repositoryAcquireLoading.value = true;
-  try {
-    repositoryAcquireRepositories.value = await props.loadWorkRepositories('github')
-      ?? props.workRepositoriesByProvider.github
-      ?? [];
-  } catch (error) {
-    repositoryAcquireError.value = localizedErrorMessage(error, t);
-  } finally {
-    repositoryAcquireLoading.value = false;
-  }
-}
-
-function closeRepositoryAcquire(): void {
-  repositoryAcquireVisible.value = false;
-  repositoryAcquireBusy.value = false;
-  repositoryAcquireError.value = null;
-}
-
 function completeGitHubOnboardingStep(): void {
   repositoryAcquireBusy.value = false;
   repositoryAcquireError.value = null;
@@ -2162,56 +2127,6 @@ watch(() => githubConnection.value.status, (status) => {
     completeGitHubOnboardingStep();
   }
 });
-
-watch(() => props.workRepositoriesByProvider.github, (repositories) => {
-  if (
-    repositoryAcquireVisible.value
-    && repositoryAcquireMode.value === 'github'
-    && githubConnection.value.status === 'connected'
-    && repositories
-  ) {
-    repositoryAcquireRepositories.value = repositories;
-  }
-});
-
-async function selectWorkRepository(repository: WorkRepository): Promise<void> {
-  const selectedRemoteIdentity = canonicalGitRemoteIdentity(repository.url);
-  const local = selectedRemoteIdentity
-    ? props.sourceRepositories.find((candidate) => candidate.remoteIdentity === selectedRemoteIdentity)
-    : undefined;
-  if (local) {
-    closeRepositoryAcquire();
-    await openRepositorySessionSource({
-      teamId: activeTeam.value?.id ?? props.snapshot.activeTeamId ?? undefined,
-      repositoryName: local.name,
-      repositoryRoot: local.path,
-    });
-    return;
-  }
-  await cloneRepositoryAndOpen(repository.url);
-}
-
-async function cloneRepositoryAndOpen(url: string): Promise<void> {
-  repositoryAcquireBusy.value = true;
-  repositoryAcquireError.value = null;
-  try {
-    const team = activeTeam.value;
-    const repository = await props.cloneSourceRepository({
-      url,
-      ...(team?.remoteConnectionId ? { remoteConnectionId: team.remoteConnectionId } : {}),
-    });
-    closeRepositoryAcquire();
-    await openRepositorySessionSource({
-      teamId: team?.id ?? props.snapshot.activeTeamId ?? undefined,
-      repositoryName: repository.name,
-      repositoryRoot: repository.path,
-    });
-  } catch (error) {
-    repositoryAcquireError.value = localizedErrorMessage(error, t);
-  } finally {
-    repositoryAcquireBusy.value = false;
-  }
-}
 
 async function openNewAgentForWorkItem(intent: WorkItemAssignmentIntent): Promise<void> {
   if (!await confirmAssignedWorkItemOverride(intent.item, 'a new agent')) {

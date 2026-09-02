@@ -65,7 +65,9 @@ Shells coordinate focused modules; they do not implement multi-step workflows.
 Move polling, timers, persistence transitions, and cleanup for one workflow
 into a colocated composable. Use `AsyncCatalogCache` for keyed async catalogs so
 request deduplication, source invalidation, stale-result rejection, and pushed
-updates remain one policy instead of being repeated in renderer state.
+updates remain one policy instead of being repeated in renderer state. Keep
+reusable dialog workflows such as repository acquisition in composables so the
+shell only supplies product context and navigation callbacks.
 
 ### Component Rules
 
