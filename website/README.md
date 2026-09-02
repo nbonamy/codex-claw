@@ -12,7 +12,19 @@ Then open <http://127.0.0.1:4173>.
 
 ## Product preview
 
-The hero uses a lightweight HTML and CSS product composition rather than a release screenshot. Keep its Cockpit labels and sample work states aligned with the current product when the operator workflow changes.
+The hero currently uses a lightweight HTML and CSS product composition. It is deliberately structured as a replaceable media frame so a current release screenshot can take over later without changing the page narrative.
+
+When a product screenshot is ready, replace the `.product-window` element inside `.product-visual__media` with:
+
+```html
+<img
+  class="product-screenshot"
+  src="assets/product-shell.png"
+  alt="Codex Claw with repository-grouped sessions, an active conversation, and a review pane"
+/>
+```
+
+Keep the screenshot free of private repository names, issue content, messages, and account details. The core website story should remain repository → durable session → isolated worktree → reviewed change; Cockpit and Automations are supporting surfaces.
 
 Run the static-site checks with:
 

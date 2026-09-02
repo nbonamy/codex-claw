@@ -8,12 +8,33 @@ const websiteDirectory = path.dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(path.join(websiteDirectory, "index.html"), "utf8");
 const compactHtml = html.replace(/\s+/g, " ");
 
-test("presents the current Cockpit and Git workflow story", () => {
-  assert.match(compactHtml, /Your backlog,.*already in motion\./);
-  assert.match(compactHtml, /GitHub-native operator inbox/);
-  assert.match(compactHtml, /3.*agents launched.*isolated worktrees/);
-  assert.match(compactHtml, /Git, all the way through/);
-  assert.doesNotMatch(compactHtml, /drag a GitHub issue/i);
+test("presents the current repository-first product story", () => {
+  assert.match(compactHtml, /Code in parallel\./);
+  assert.match(compactHtml, /Repository-first sessions/);
+  assert.match(compactHtml, /Repository-grouped sessions/);
+  assert.match(compactHtml, /New isolated session/);
+  assert.match(compactHtml, /dedicated branch and worktree/);
+  assert.match(compactHtml, /Quick Chats/);
+  assert.match(compactHtml, /Automations/);
+  assert.doesNotMatch(compactHtml, /The new Cockpit/i);
+  assert.doesNotMatch(compactHtml, /New in 0\.11|v0\.11|\bLoops\b/);
+});
+
+test("keeps the core product sections in narrative order", () => {
+  const sectionIds = [
+    "sessions",
+    "routing",
+    "workspace",
+    "automations",
+    "download",
+  ];
+  let previousIndex = -1;
+
+  for (const id of sectionIds) {
+    const index = html.indexOf(`id="${id}"`);
+    assert.ok(index > previousIndex, `${id} should follow the prior section`);
+    previousIndex = index;
+  }
 });
 
 test("keeps every page anchor and local asset valid", () => {
@@ -47,4 +68,9 @@ test("uses one page heading and useful product metadata", () => {
   assert.match(compactHtml, /<meta name="description" content="[^"]+"/);
   assert.match(compactHtml, /<meta property="og:title" content="[^"]+"/);
   assert.match(compactHtml, /<meta property="og:description" content="[^"]+"/);
+  assert.match(compactHtml, /<meta property="og:image" content="[^"]+"/);
+  assert.match(
+    compactHtml,
+    /<meta name="twitter:card" content="summary_large_image"/,
+  );
 });
