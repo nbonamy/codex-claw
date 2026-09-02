@@ -225,24 +225,8 @@ html.dark {
   --el-color-primary-light-8: #20365F;
   --el-color-primary-light-9: var(--color-primary-container);
   --el-color-primary-dark-2: #A4C0FF;
-  --el-color-success: var(--color-success);
-  --el-color-danger: var(--color-error);
-  --el-color-error: var(--color-error);
   --el-bg-color-page: var(--color-surface);
-  --el-bg-color: var(--color-surface-lowest);
-  --el-bg-color-overlay: var(--color-surface-low);
-  --el-text-color-primary: var(--color-text);
-  --el-text-color-regular: var(--color-text);
-  --el-text-color-secondary: var(--color-text-muted);
-  --el-text-color-placeholder: var(--color-text-muted);
-  --el-border-color: var(--color-border);
-  --el-border-color-light: var(--color-outline-variant);
-  --el-border-color-lighter: var(--color-outline-variant);
-  --el-fill-color: var(--color-surface-base);
-  --el-fill-color-light: var(--color-surface-low);
-  --el-fill-color-lighter: var(--color-surface-lowest);
-  --el-fill-color-blank: var(--color-surface-lowest);
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.34);
   --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.38);

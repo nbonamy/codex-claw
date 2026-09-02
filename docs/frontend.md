@@ -61,6 +61,12 @@ product layer, stores, views, or backend clients. Components consume app-owned
 contracts rather than provider protocol types, Electron globals, filesystem
 APIs, or raw backend payloads.
 
+Shells coordinate focused modules; they do not implement multi-step workflows.
+Move polling, timers, persistence transitions, and cleanup for one workflow
+into a colocated composable. Use `AsyncCatalogCache` for keyed async catalogs so
+request deduplication, source invalidation, stale-result rejection, and pushed
+updates remain one policy instead of being repeated in renderer state.
+
 ### Component Rules
 
 - Name components after product concepts.

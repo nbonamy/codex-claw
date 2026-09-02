@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';
+import { claudeToolResultText } from './claude-tool-result';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 
 export type ClaudeTranscriptHistory = {
@@ -413,30 +414,6 @@ function applyToolResult(parts: RendererMessagePart[], block: Extract<ClaudeSdkC
       claudeToolResultText(block.content),
     ),
   );
-}
-
-function claudeToolResultText(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => {
-      if (typeof entry === 'string') {
-        return entry;
-      }
-      if (isRecord(entry) && typeof entry.text === 'string') {
-        return entry.text;
-      }
-      return JSON.stringify(entry);
-    }).join('\n');
-  }
-
-  if (value === undefined || value === null) {
-    return '';
-  }
-
-  return JSON.stringify(value);
 }
 
 function claudeTurnId(entry: TranscriptLine, sessionId: string, index: number): string {

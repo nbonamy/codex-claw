@@ -20,6 +20,7 @@ import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
 import { isFirstRunOnboardingActive } from './onboarding-session';
 import { clawHostCapabilities, clawPlatformActions, codexClawApi } from './platform-api';
+import { AsyncCatalogCache, type AsyncCatalogEntry, type AsyncCatalogStatus } from './async-catalog-cache';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -71,31 +72,21 @@ const hydratingAgentHistoryIds = ref(new Set<string>());
 const loadingOlderHistoryIds = ref(new Set<string>());
 const historyHasOlderByAgentId = ref<Record<string, boolean>>({});
 const catalogLoadsByAgentId = new Map<string, Promise<void>>();
-type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
-type CatalogCacheEntry<T> = {
-  value: T[];
-  status: CatalogStatus;
-  error: string | null;
-  promise: Promise<void> | null;
-  source: unknown;
-  revision: number;
-};
-
-const modelCatalogCache = new Map<AgentBackend, CatalogCacheEntry<BackendModelOption>>();
-const skillCatalogCache = new Map<string, CatalogCacheEntry<BackendSkillSummary>>();
-const pluginCatalogCache = new Map<string, CatalogCacheEntry<BackendPluginSummary>>();
-const fileCatalogCache = new Map<string, CatalogCacheEntry<AgentFileSearchItem>>();
+const modelCatalogCache = new AsyncCatalogCache<AgentBackend, BackendModelOption>((value) => ({ ...value }));
+const skillCatalogCache = new AsyncCatalogCache<string, BackendSkillSummary>((value) => ({ ...value }));
+const pluginCatalogCache = new AsyncCatalogCache<string, BackendPluginSummary>((value) => ({ ...value }));
+const fileCatalogCache = new AsyncCatalogCache<string, AgentFileSearchItem>((value) => ({ ...value }));
 type AgentComposerConfiguration = {
   selectionSource: string;
   models: BackendModelOption[];
-  modelStatus: CatalogStatus;
+  modelStatus: AsyncCatalogStatus;
   modelError: string | null;
   skills: BackendSkillSummary[];
   plugins: BackendPluginSummary[];
-  skillStatus: CatalogStatus;
+  skillStatus: AsyncCatalogStatus;
   skillError: string | null;
   files: AgentFileSearchItem[];
-  fileStatus: CatalogStatus;
+  fileStatus: AsyncCatalogStatus;
   fileError: string | null;
   selectedModelId: string | null;
   selectedReasoningEffort: ReasoningEffort | null;
@@ -2413,11 +2404,10 @@ function applySkillsChangedEvent(event: MainToRendererEvent): void {
   ));
 
   for (const agent of agents) {
-    const cache = catalogCacheEntry(skillCatalogCache, catalogKey(agent));
+    const key = catalogKey(agent);
+    const cache = skillCatalogCache.entry(key);
     if (cache.status === 'loaded' && sameBackendSkills(cache.value, skills)) continue;
-    cache.value = skills;
-    cache.status = 'loaded';
-    cache.error = null;
+    skillCatalogCache.replace(key, skills);
     syncSkillCatalogToConfiguration(agent.id, cache);
     if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
   }
@@ -2428,13 +2418,9 @@ function applyModelsChangedEvent(event: MainToRendererEvent): void {
   const models = event.payload.models
     .filter(isBackendModelOption)
     .map((model) => ({ ...model }));
-  const cache = catalogCacheEntry(modelCatalogCache, event.backend);
+  const cache = modelCatalogCache.entry(event.backend);
   if (cache.status === 'loaded' && sameBackendModels(cache.value, models)) return;
-  cache.revision += 1;
-  cache.value = models;
-  cache.status = 'loaded';
-  cache.error = null;
-  cache.promise = null;
+  modelCatalogCache.replace(event.backend, models);
 
   for (const agent of snapshot.value.agents) {
     if (agent.backend !== event.backend) continue;
@@ -2588,38 +2574,8 @@ async function loadAllAgentCatalogs(): Promise<void> {
   if (activeAgentId) restoreComposerConfiguration(activeAgentId);
 }
 
-function catalogCacheEntry<T>(cache: Map<string, CatalogCacheEntry<T>>, key: string): CatalogCacheEntry<T>;
-function catalogCacheEntry<T>(cache: Map<AgentBackend, CatalogCacheEntry<T>>, key: AgentBackend): CatalogCacheEntry<T>;
-function catalogCacheEntry<T>(cache: Map<string | AgentBackend, CatalogCacheEntry<T>>, key: string | AgentBackend): CatalogCacheEntry<T> {
-  const existing = cache.get(key);
-  if (existing) return existing;
-  const created: CatalogCacheEntry<T> = {
-    value: [],
-    status: 'notLoaded',
-    error: null,
-    promise: null,
-    source: null,
-    revision: 0,
-  };
-  cache.set(key, created);
-  return created;
-}
-
 function catalogKey(agent: Agent): string {
   return `${agent.backend}:${agent.folder}`;
-}
-
-function resetCatalogCacheIfSourceChanged<T>(cache: CatalogCacheEntry<T>, source: unknown): void {
-  if (cache.source === null || cache.source === source) {
-    cache.source = source;
-    return;
-  }
-  cache.value = [];
-  cache.status = 'notLoaded';
-  cache.error = null;
-  cache.promise = null;
-  cache.revision += 1;
-  cache.source = source;
 }
 
 function resetCatalogStateIfSourceChanged(source: unknown): void {
@@ -2645,7 +2601,7 @@ function resetCatalogStateIfSourceChanged(source: unknown): void {
   fileCatalogError.value = null;
 }
 
-function syncModelCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendModelOption>): void {
+function syncModelCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<BackendModelOption>): void {
   const configuration = composerConfiguration(agentId);
   configuration.models = cache.value;
   configuration.modelStatus = cache.status;
@@ -2653,18 +2609,18 @@ function syncModelCatalogToConfiguration(agentId: string, cache: CatalogCacheEnt
   if (cache.status === 'loaded') selectDefaultModelForConfiguration(configuration);
 }
 
-function syncSkillCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendSkillSummary>): void {
+function syncSkillCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<BackendSkillSummary>): void {
   const configuration = composerConfiguration(agentId);
   configuration.skills = cache.value;
   configuration.skillStatus = cache.status;
   configuration.skillError = cache.error;
 }
 
-function syncPluginCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<BackendPluginSummary>): void {
+function syncPluginCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<BackendPluginSummary>): void {
   composerConfiguration(agentId).plugins = cache.value;
 }
 
-function syncFileCatalogToConfiguration(agentId: string, cache: CatalogCacheEntry<AgentFileSearchItem>): void {
+function syncFileCatalogToConfiguration(agentId: string, cache: AsyncCatalogEntry<AgentFileSearchItem>): void {
   const configuration = composerConfiguration(agentId);
   configuration.files = cache.value;
   configuration.fileStatus = cache.status;
@@ -2724,7 +2680,7 @@ async function loadWorkItemsForRepository(provider: WorkProviderKind, repository
   };
 }
 
-async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
   if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
   const source = codexClawApi;
   const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
@@ -2738,41 +2694,19 @@ async function loadBackendModelsForActiveAgent(agentId = snapshot.value.activeAg
     return;
   }
   const configuration = composerConfiguration(agent.id);
-  if (!_allowConcurrent && (configuration.modelStatus === 'loading' || (agent.id === snapshot.value.activeAgentId && modelCatalogStatus.value === 'loading'))) return;
-
-  const cache = catalogCacheEntry(modelCatalogCache, agent.backend);
-  resetCatalogCacheIfSourceChanged(cache, source.listBackendModels);
-  if (!cache.promise && cache.status === 'notLoaded') {
-    cache.status = 'loading';
-    cache.error = null;
-    const revision = cache.revision;
-    const request = source.listBackendModels(agent.id)
-      .then((models) => {
-        if (cache.revision !== revision) return;
-        cache.value = models.map((model) => ({ ...model }));
-        cache.status = 'loaded';
-      })
-      .catch((error) => {
-        if (cache.revision !== revision) return;
-        cache.value = [];
-        cache.status = 'error';
-        cache.error = error instanceof Error ? error.message : String(error);
-      });
-    cache.promise = request;
-    void request.finally(() => {
-      if (cache.promise === request) cache.promise = null;
-    });
-  }
-
-  syncModelCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
-  await cache.promise;
-  if (source !== codexClawApi) return;
-  syncModelCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  if (configuration.modelStatus === 'loading' || (agent.id === snapshot.value.activeAgentId && modelCatalogStatus.value === 'loading')) return;
+  await loadCatalogForAgent({
+    agentId: agent.id,
+    cache: modelCatalogCache,
+    key: agent.backend,
+    session: source,
+    source: source.listBackendModels,
+    load: () => source.listBackendModels!(agent.id),
+    sync: syncModelCatalogToConfiguration,
+  });
 }
 
-async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
   if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
   const source = codexClawApi;
   const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
@@ -2785,37 +2719,19 @@ async function loadBackendSkillsForActiveAgent(agentId = snapshot.value.activeAg
     }
     return;
   }
-  const configuration = composerConfiguration(agent.id);
-  if (!_allowConcurrent && configuration.skillStatus === 'loading') return;
-  const cache = catalogCacheEntry(skillCatalogCache, catalogKey(agent));
-  resetCatalogCacheIfSourceChanged(cache, source.listBackendSkills);
-  if (!cache.promise && cache.status === 'notLoaded') {
-    cache.status = 'loading';
-    cache.error = null;
-    cache.promise = source.listBackendSkills(agent.id)
-      .then((skills) => {
-        cache.value = skills.map((skill) => ({ ...skill }));
-        cache.status = 'loaded';
-      })
-      .catch((error) => {
-        cache.value = [];
-        cache.status = 'error';
-        cache.error = error instanceof Error ? error.message : String(error);
-      })
-      .finally(() => {
-        cache.promise = null;
-      });
-  }
-
-  syncSkillCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
-  await cache.promise;
-  if (source !== codexClawApi) return;
-  syncSkillCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  if (composerConfiguration(agent.id).skillStatus === 'loading') return;
+  await loadCatalogForAgent({
+    agentId: agent.id,
+    cache: skillCatalogCache,
+    key: catalogKey(agent),
+    session: source,
+    source: source.listBackendSkills,
+    load: () => source.listBackendSkills!(agent.id),
+    sync: syncSkillCatalogToConfiguration,
+  });
 }
 
-async function loadBackendPluginsForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+async function loadBackendPluginsForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
   if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
   const source = codexClawApi;
   const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
@@ -2827,36 +2743,18 @@ async function loadBackendPluginsForActiveAgent(agentId = snapshot.value.activeA
     }
     return;
   }
-  const cache = catalogCacheEntry(pluginCatalogCache, catalogKey(agent));
-  resetCatalogCacheIfSourceChanged(cache, source.listBackendPlugins);
-  if (!_allowConcurrent && cache.status === 'loading') return;
-  if (!cache.promise && cache.status === 'notLoaded') {
-    cache.status = 'loading';
-    cache.error = null;
-    cache.promise = source.listBackendPlugins(agent.id)
-      .then((plugins) => {
-        cache.value = plugins.map((plugin) => ({ ...plugin }));
-        cache.status = 'loaded';
-      })
-      .catch((error) => {
-        cache.value = [];
-        cache.status = 'error';
-        cache.error = error instanceof Error ? error.message : String(error);
-      })
-      .finally(() => {
-        cache.promise = null;
-      });
-  }
-
-  syncPluginCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
-  await cache.promise;
-  if (source !== codexClawApi) return;
-  syncPluginCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+  await loadCatalogForAgent({
+    agentId: agent.id,
+    cache: pluginCatalogCache,
+    key: catalogKey(agent),
+    session: source,
+    source: source.listBackendPlugins,
+    load: () => source.listBackendPlugins!(agent.id),
+    sync: syncPluginCatalogToConfiguration,
+  });
 }
 
-async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId, _allowConcurrent = false): Promise<void> {
+async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgentId): Promise<void> {
   if (agentId === snapshot.value.activeAgentId) rememberActiveComposerConfiguration();
   const source = codexClawApi;
   const agent = agentId ? snapshot.value.agents.find((candidate) => candidate.id === agentId) : null;
@@ -2869,35 +2767,34 @@ async function loadAgentFilesForActiveAgent(agentId = snapshot.value.activeAgent
     }
     return;
   }
-  const configuration = composerConfiguration(agent.id);
-  if (!_allowConcurrent && configuration.fileStatus === 'loading') return;
+  if (composerConfiguration(agent.id).fileStatus === 'loading') return;
+  await loadCatalogForAgent({
+    agentId: agent.id,
+    cache: fileCatalogCache,
+    key: agent.folder,
+    session: source,
+    source: source.listAgentFiles,
+    load: () => source.listAgentFiles!(agent.id),
+    sync: syncFileCatalogToConfiguration,
+  });
+}
 
-  const cache = catalogCacheEntry(fileCatalogCache, agent.folder);
-  resetCatalogCacheIfSourceChanged(cache, source.listAgentFiles);
-  if (!cache.promise && cache.status === 'notLoaded') {
-    cache.status = 'loading';
-    cache.error = null;
-    cache.promise = source.listAgentFiles(agent.id)
-      .then((files) => {
-        cache.value = files.map((file) => ({ ...file }));
-        cache.status = 'loaded';
-      })
-      .catch((error) => {
-        cache.value = [];
-        cache.status = 'error';
-        cache.error = error instanceof Error ? error.message : String(error);
-      })
-      .finally(() => {
-        cache.promise = null;
-      });
-  }
-
-  syncFileCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
-  await cache.promise;
-  if (source !== codexClawApi) return;
-  syncFileCatalogToConfiguration(agent.id, cache);
-  if (agent.id === snapshot.value.activeAgentId) restoreComposerConfiguration(agent.id);
+async function loadCatalogForAgent<Key, Value>(options: {
+  agentId: string;
+  cache: AsyncCatalogCache<Key, Value>;
+  key: Key;
+  session: unknown;
+  source: unknown;
+  load: () => Promise<Value[]>;
+  sync: (agentId: string, entry: AsyncCatalogEntry<Value>) => void;
+}): Promise<void> {
+  const entry = options.cache.load(options.key, options.source, options.load);
+  options.sync(options.agentId, entry);
+  if (options.agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(options.agentId);
+  await entry.promise;
+  if (options.session !== codexClawApi) return;
+  options.sync(options.agentId, entry);
+  if (options.agentId === snapshot.value.activeAgentId) restoreComposerConfiguration(options.agentId);
 }
 
 function syncComposerModeFromMainEvent(event: MainToRendererEvent): void {

@@ -24,6 +24,14 @@ backend. Start with stdio because it is simple, local, easy to test, and also
 maps cleanly to future SSH remote execution. Do not expose Codex app-server,
 Claude stream-json, or MCP protocol messages directly across this boundary.
 
+Inside each process, keep protocol routers and transport adapters thin. A
+router validates and routes requests; a focused service owns stateful workflow
+policy such as retries, timers, persistence callbacks, and lifecycle cleanup.
+Transport-specific clients own only process or socket lifecycle and delegate
+JSON-RPC framing, pending requests, timeouts, and server callbacks to one shared
+session implementation. Do not copy lifecycle logic into a second transport or
+grow a request switch into the owner of the workflow it exposes.
+
 Do not make packaging the architecture. Author the backend as a normal Node
 program, then choose the packaged runtime after a spike. Node single executable
 applications are the better long-term candidate for a real standalone backend
@@ -157,6 +165,9 @@ Current implementation checkpoint:
 - `clawd` now owns prompt dispatch, rollback-to-turn history replacement, and
   delete/edit/retry message orchestration. Electron forwards message actions by
   agent/message ids and adopts the returned snapshot.
+- Queued prompt admission, draining, retry scheduling, and timer cleanup live
+  in `AgentPromptManager`; `ClawBackendServer` routes the protocol methods and
+  backend events into that service rather than owning its lifecycle state.
 - `clawd` now owns derived side-panel requests for plans and current-turn diffs.
   Electron fans out backend events but no longer synthesizes `sidePanel.*`
   events from plan or diff events.

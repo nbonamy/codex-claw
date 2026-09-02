@@ -5893,8 +5893,6 @@ describe('ClawBackendServer', () => {
     });
     expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(1);
     expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'error', message: 'transport disconnected' });
-    expect((server as unknown as { queuedPromptRetryTimers: Map<string, unknown> }).queuedPromptRetryTimers.size).toBe(1);
-
     await vi.runOnlyPendingTimersAsync();
     await flushMicrotasks();
     expect(sendPrompt).toHaveBeenCalledTimes(2);

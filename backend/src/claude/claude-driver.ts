@@ -32,6 +32,7 @@ import {
 import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
 import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
+import { claudeToolResultText } from './claude-tool-result';
 import {
   claudeToolFileActivity,
   claudeToolPart,
@@ -1181,30 +1182,6 @@ function finalAssistantTextDelta(activeTurn: ActiveClaudeTurn, text: string): st
 
   activeTurn.streamedText = '';
   return text;
-}
-
-function claudeToolResultText(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => {
-      if (typeof entry === 'string') {
-        return entry;
-      }
-      if (isRecord(entry) && typeof entry.text === 'string') {
-        return entry.text;
-      }
-      return JSON.stringify(entry);
-    }).join('\n');
-  }
-
-  if (value === undefined || value === null) {
-    return '';
-  }
-
-  return JSON.stringify(value);
 }
 
 function formatPermissionArguments(input: Record<string, unknown>): string {

@@ -463,7 +463,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type CodexAuthentication, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkIntegrationConnection, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID, type AddSshConnectionInput, type Agent, type AgentFileActivity, type AgentFilePreviewResult, type AgentFileSearchItem, type AgentGitStatus, type AgentSubagentTree, type AppCommand, type ApprovalPreset, type AppSnapshot, type BackendApprovalDecision, type BackendApprovalRequest, type BackendApprovalScope, type BackendCapabilities, type BackendCommandSummary, type BackendConnectionState, type BackendConversationRef, type BackendPermissionModeOption, type BenchLocation, type BenchTemplate, type BackendModelOption, type BackendPluginSummary, type BackendRuntimeStatus, type BackendSkillSummary, type ClawdDaemonStatus, type ClientRequestResponse, type CloneSourceRepositoryInput, type ConversationFileLink, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type DeployBenchTemplateInput, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type GlobalWorkItemQuery, type AutomationLocation, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererPromptAttachment, type ReasoningEffort, type RemoveBenchTemplateInput, type RendererMessage, type ReorderAgentsInput, type ReorderTeamsInput, type RendererSendPromptOptions, type SetCodexResourceSharingInput, type SidePanelMarkdownRequest, type SidePanelRequest, type SourceBranch, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SshHostCandidate, type Team, type ThreadGoal, type ThreadPlan, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkIntegrationConnection, type WorkItem, type WorkItemPage, type WorkItemQuery, type WorkProviderAuthorization, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -520,12 +520,8 @@ import {
 } from '@codex-app-sdk/vue';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 import { useConfetti } from '../shared/confetti/use-confetti';
-import {
-  clearFirstRunOnboardingStage,
-  getFirstRunOnboardingStage,
-  setFirstRunOnboardingStage,
-} from '../onboarding-session';
 import { workItemAssignmentPrompt, workItemComposerPrompt, type WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
+import { useFirstRunOnboarding } from './use-first-run-onboarding';
 
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
@@ -892,14 +888,6 @@ const quickAgentShortcutsVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
 const workspaceBody = ref<HTMLElement | null>(null);
 const conversationPane = ref<{ focusComposer(): void } | null>(null);
-const authentication = ref<CodexAuthentication | null>(null);
-const authenticationLoading = ref(true);
-const authenticationCancelling = ref(false);
-const authenticationError = ref<string | null>(null);
-const offerGitHubAfterChatGptLogin = ref(false);
-const githubOnboardingVisible = ref(false);
-const onboardingCompleteVisible = ref(false);
-let authenticationPoll: ReturnType<typeof setInterval> | null = null;
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
 const resumeSessionAgentId = ref<string | null>(null);
@@ -966,6 +954,26 @@ const repositoryAcquireCatalogLoading = computed(() => (
     )
   )
 ));
+const firstRunOnboarding = useFirstRunOnboarding({
+  getApi: () => codexClawApi,
+  isGitHubConnected: () => githubConnection.value.status === 'connected',
+});
+const {
+  authentication,
+  authenticationCancelling,
+  authenticationError,
+  authenticationLoading,
+  completeVisible: onboardingCompleteVisible,
+  gated: showOnboardingGate,
+  githubVisible: githubOnboardingVisible,
+  initialAuthenticationLoading,
+  showLogin: showLoginLanding,
+  cancelChatGptLogin,
+  finish: finishFirstRunOnboarding,
+  load: loadAuthentication,
+  logout: logoutCodex,
+  startChatGptLogin,
+} = firstRunOnboarding;
 const pendingNewAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentWorkItem = ref<WorkItem | null>(null);
 const pendingBenchAgentTeamId = ref<string | null>(null);
@@ -1443,16 +1451,6 @@ const isModalDialogVisible = computed(() => (
   || props.codexResourceSharingMigrationRequired
 ));
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
-const initialAuthenticationLoading = computed(() => authentication.value === null && authenticationLoading.value);
-const showLoginLanding = computed(() => (
-  initialAuthenticationLoading.value ||
-  (authentication.value?.account === null && authentication.value.requiresOpenaiAuth)
-));
-const showOnboardingGate = computed(() => (
-  showLoginLanding.value
-  || githubOnboardingVisible.value
-  || onboardingCompleteVisible.value
-));
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -1498,113 +1496,7 @@ onBeforeUnmount(() => {
   resetQuickAgentShortcuts();
   unsubscribeAppCommand?.();
   unsubscribeAppCommand = null;
-  stopAuthenticationPolling();
 });
-
-async function loadAuthentication(): Promise<void> {
-  authenticationLoading.value = true;
-  authenticationError.value = null;
-  try {
-    if (!codexClawApi) {
-      authentication.value = {
-        account: { type: 'apiKey' },
-        requiresOpenaiAuth: false,
-        login: { status: 'idle', error: null },
-      };
-      return;
-    }
-    authentication.value = await codexClawApi.getCodexAuthentication();
-    offerGitHubAfterChatGptLogin.value = (
-      authentication.value.account === null
-      && authentication.value.requiresOpenaiAuth
-    );
-    if (offerGitHubAfterChatGptLogin.value) {
-      setFirstRunOnboardingStage('github');
-    } else if (authentication.value.account) {
-      restoreFirstRunOnboarding();
-    }
-  } catch (error) {
-    authenticationError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    authenticationLoading.value = false;
-  }
-}
-
-async function startChatGptLogin(): Promise<void> {
-  authenticationLoading.value = true;
-  authenticationError.value = null;
-  try {
-    const api = codexClawApi;
-    if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
-    setFirstRunOnboardingStage('github');
-    await api.startCodexChatGptLogin();
-    authentication.value = {
-      account: null,
-      requiresOpenaiAuth: true,
-      login: { status: 'pending', error: null },
-    };
-    startAuthenticationPolling();
-  } catch (error) {
-    authenticationError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    authenticationLoading.value = false;
-  }
-}
-
-async function cancelChatGptLogin(): Promise<void> {
-  authenticationCancelling.value = true;
-  authenticationError.value = null;
-  stopAuthenticationPolling();
-  try {
-    const api = codexClawApi;
-    if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
-    authentication.value = await api.cancelCodexChatGptLogin();
-  } catch (error) {
-    authenticationError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    authenticationCancelling.value = false;
-  }
-}
-
-async function logoutCodex(): Promise<void> {
-  authenticationError.value = null;
-  const api = codexClawApi;
-  if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
-  authentication.value = await api.logoutCodex();
-  offerGitHubAfterChatGptLogin.value = false;
-  githubOnboardingVisible.value = false;
-  onboardingCompleteVisible.value = false;
-  clearFirstRunOnboardingStage();
-}
-
-function startAuthenticationPolling(): void {
-  stopAuthenticationPolling();
-  const api = codexClawApi;
-  if (!api) return;
-  authenticationPoll = setInterval(() => {
-    void api.getCodexAuthentication().then((next) => {
-      authentication.value = next;
-      if (next.account) {
-        if (offerGitHubAfterChatGptLogin.value && !getFirstRunOnboardingStage()) {
-          setFirstRunOnboardingStage('github');
-        }
-        restoreFirstRunOnboarding();
-        offerGitHubAfterChatGptLogin.value = false;
-        stopAuthenticationPolling();
-      } else if (next.login.status === 'error') {
-        stopAuthenticationPolling();
-      }
-    }).catch((error) => {
-      authenticationError.value = error instanceof Error ? error.message : String(error);
-      stopAuthenticationPolling();
-    });
-  }, 1000);
-}
-
-function stopAuthenticationPolling(): void {
-  if (authenticationPoll) clearInterval(authenticationPoll);
-  authenticationPoll = null;
-}
 
 function setAgentSidebarWidth(width: number): void {
   agentSidebarWidth.value = Math.min(Math.max(width, agentSidebarMinWidth), agentSidebarMaxWidth);
@@ -2260,29 +2152,9 @@ function closeRepositoryAcquire(): void {
 }
 
 function completeGitHubOnboardingStep(): void {
-  githubOnboardingVisible.value = false;
   repositoryAcquireBusy.value = false;
   repositoryAcquireError.value = null;
-  onboardingCompleteVisible.value = true;
-  setFirstRunOnboardingStage('complete');
-}
-
-function finishFirstRunOnboarding(): void {
-  onboardingCompleteVisible.value = false;
-  clearFirstRunOnboardingStage();
-}
-
-function restoreFirstRunOnboarding(): void {
-  const stage = getFirstRunOnboardingStage();
-  if (!stage) return;
-
-  if (stage === 'complete' || githubConnection.value.status === 'connected') {
-    completeGitHubOnboardingStep();
-    return;
-  }
-
-  githubOnboardingVisible.value = true;
-  onboardingCompleteVisible.value = false;
+  firstRunOnboarding.completeGitHub();
 }
 
 watch(() => githubConnection.value.status, (status) => {

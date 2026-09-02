@@ -145,19 +145,8 @@ export class WorkIntegrationManager {
   }
 
   async openAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
-    const pending = this.pendingAuthorizations.get(provider);
+    const pending = await this.activePendingAuthorization(provider);
     if (!pending) {
-      return this.snapshot();
-    }
-
-    if (Date.parse(pending.expiresAt) <= Date.now()) {
-      this.pendingAuthorizations.delete(provider);
-      this.setConnection({
-        provider,
-        status: 'error',
-        detail: { key: 'workProvider.verificationExpired' },
-      });
-      await this.options.saveSnapshot();
       return this.snapshot();
     }
 
@@ -166,19 +155,8 @@ export class WorkIntegrationManager {
   }
 
   async completeConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
-    const pending = this.pendingAuthorizations.get(provider);
+    const pending = await this.activePendingAuthorization(provider);
     if (!pending) {
-      return this.snapshot();
-    }
-
-    if (Date.parse(pending.expiresAt) <= Date.now()) {
-      this.pendingAuthorizations.delete(provider);
-      this.setConnection({
-        provider,
-        status: 'error',
-        detail: { key: 'workProvider.verificationExpired' },
-      });
-      await this.options.saveSnapshot();
       return this.snapshot();
     }
 
@@ -299,6 +277,21 @@ export class WorkIntegrationManager {
     const driver = this.driver(provider);
     if (!driver.listAssignedItems) throw new Error(`${providerLabel(provider)} cannot list assigned work across repositories.`);
     return driver.listAssignedItems(token);
+  }
+
+  private async activePendingAuthorization(provider: WorkProviderKind): Promise<PendingAuthorization | null> {
+    const pending = this.pendingAuthorizations.get(provider);
+    if (!pending) return null;
+    if (Date.parse(pending.expiresAt) > Date.now()) return pending;
+
+    this.pendingAuthorizations.delete(provider);
+    this.setConnection({
+      provider,
+      status: 'error',
+      detail: { key: 'workProvider.verificationExpired' },
+    });
+    await this.options.saveSnapshot();
+    return null;
   }
 
   private async connectedToken(provider: WorkProviderKind): Promise<WorkProviderToken> {

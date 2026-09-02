@@ -1,6 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
-import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { AppError } from '@codex-claw/core/app-error';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication, updateAgentWorkspace } from '@codex-claw/core/snapshot';
@@ -21,7 +20,6 @@ import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { agentFolder, requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { createEntityId } from '@codex-claw/core/ids';
 import { BackendDriverRpc } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
@@ -32,6 +30,7 @@ import { AgentTranscriptRetention, type AgentTranscriptRetentionOptions } from '
 import { loadPluginStatus } from './plugin-status';
 import { getCodexResourceSharingStatus, setCodexResourceSharing } from './codex-resource-sharing';
 import { AgentGitService } from './git/agent-git-service';
+import { AgentPromptManager } from './agents/agent-prompt-manager';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -108,7 +107,7 @@ export class ClawBackendServer {
     | { kind: 'workRouting'; remoteConnectionId?: string }
   >();
   private readonly remoteSnapshots = new Map<string, AppSnapshot>();
-  private readonly queuedPromptRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly agentPrompts: AgentPromptManager;
   private readonly agentGitService: AgentGitService;
   private readonly workRouting?: WorkRoutingPort;
   private readonly gitStatusRefreshPromises = new Map<string, Promise<boolean>>();
@@ -137,6 +136,13 @@ export class ClawBackendServer {
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
     this.agentGitService = options.agentGitService ?? new AgentGitService();
     this.workRouting = options.workRouting;
+    this.agentPrompts = new AgentPromptManager({
+      getSnapshot: () => this.snapshot,
+      driverForAgent: (agent) => this.backendDriverForAgent(agent),
+      applyEvent: (event) => this.applyAndEmitBackendEvent(event),
+      persistSnapshot: () => this.persistSnapshotOnly(),
+      setNewConversationTitle: (agentId, wasNewSession) => this.setNewConversationTitle(agentId, wasNewSession),
+    });
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
       onEvicted: (agentId) => this.releaseEvictedAgentTranscript(agentId),
@@ -1024,7 +1030,7 @@ export class ClawBackendServer {
             options: params.options as SendPromptOptions | undefined,
           },
           async () => {
-            const result = this.sendAgentPrompt(agentId, prompt, params.options as SendPromptOptions | undefined);
+            const result = this.agentPrompts.send(agentId, prompt, params.options as SendPromptOptions | undefined);
             await this.persistSnapshotOnly();
             return result;
           },
@@ -1060,8 +1066,7 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         const promptId = requireString(params.promptId, 'promptId');
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentQueuedPromptDelete, { agentId, promptId }, async () => {
-          this.clearQueuedPromptRetry(promptId);
-          this.applyAndEmitBackendEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
+          this.agentPrompts.dequeue(agentId, promptId);
           return this.snapshot;
         });
       }
@@ -1090,8 +1095,8 @@ export class ClawBackendServer {
           const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId && prompt.id === promptId);
           if (!queuedPrompt) return this.snapshot;
           const prompt = replacement ?? queuedPrompt.text;
-          if (canDrainQueuedPrompt(agent.status.type)) {
-            return this.startAgentPrompt(agent, prompt, queuedPrompt.options, queuedPrompt.id);
+          if (this.agentPrompts.canStart(agent)) {
+            return this.agentPrompts.startQueued(agent, queuedPrompt.id, prompt);
           }
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPromptSteer, {
             agent,
@@ -1099,8 +1104,7 @@ export class ClawBackendServer {
             options: queuedPrompt.options,
           }) as BackendSendResult;
           agent.backendSession = result.backendSession;
-          this.clearQueuedPromptRetry(promptId);
-          this.applyAndEmitBackendEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
+          this.agentPrompts.dequeue(agentId, promptId);
           this.applyAndEmitBackendEvent({
             agentId,
             ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
@@ -1170,7 +1174,7 @@ export class ClawBackendServer {
             return this.snapshot;
           }
           await this.rollbackAgentToTurn(action.agent.id, action.turnId);
-          const result = this.sendAgentPrompt(agentId, prompt);
+          const result = this.agentPrompts.send(agentId, prompt);
           await this.persistSnapshotOnly();
           return result;
         });
@@ -1185,7 +1189,7 @@ export class ClawBackendServer {
             return this.snapshot;
           }
           await this.rollbackAgentToTurn(action.agent.id, action.turnId);
-          const result = this.sendAgentPrompt(agentId, action.prompt);
+          const result = this.agentPrompts.send(agentId, action.prompt);
           await this.persistSnapshotOnly();
           return result;
         });
@@ -1795,8 +1799,7 @@ export class ClawBackendServer {
   }
 
   async close(): Promise<void> {
-    for (const timer of this.queuedPromptRetryTimers.values()) clearTimeout(timer);
-    this.queuedPromptRetryTimers.clear();
+    this.agentPrompts.close();
     this.unsubscribeDriverEvents?.();
     await this.transcriptRetention.close();
     await this.driverRpc?.close();
@@ -2341,107 +2344,6 @@ export class ClawBackendServer {
     }
   }
 
-  private sendAgentPrompt(agentId: string, prompt: string, options?: SendPromptOptions): AppSnapshot {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent) {
-      return this.snapshot;
-    }
-
-    if (agent.status.type === 'starting' || agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
-      this.applyAndEmitBackendEvent({
-        agentId,
-        type: 'agent.promptQueued',
-        payload: {
-          id: createEntityId('prompt'),
-          text: prompt.trim(),
-          ...(options ? { options } : {}),
-        },
-      });
-      return this.snapshot;
-    }
-
-    return this.startAgentPrompt(agent, prompt, options);
-  }
-
-  private startAgentPrompt(agent: Agent, prompt: string, options?: SendPromptOptions, queuedPromptId?: string): AppSnapshot {
-    const agentId = agent.id;
-    if (queuedPromptId) this.clearQueuedPromptRetry(queuedPromptId);
-    const queuedPrompt = queuedPromptId
-      ? (this.snapshot.queuedPrompts ?? []).find((candidate) => candidate.id === queuedPromptId)
-      : undefined;
-
-    return sendAgentPrompt(this.snapshot, this.backendDriverForAgent(agent), agentId, prompt, options, (event) => {
-      this.applyAndEmitBackendEvent(event);
-    }, {
-      appendUserMessage: !queuedPrompt || (!queuedPrompt.submitted && (queuedPrompt.attempts ?? 0) === 0),
-      onBackendSessionUpdated: async (_result, wasNewSession) => {
-        this.setNewConversationTitle(agentId, wasNewSession);
-        await this.persistSnapshotOnly();
-      },
-      onPromptStarted: () => {
-        if (queuedPromptId) {
-          this.applyAndEmitBackendEvent({
-            agentId,
-            type: 'agent.promptDequeued',
-            payload: { ids: [queuedPromptId] },
-          });
-        }
-      },
-      onPromptFailed: (error) => {
-        if (queuedPromptId) this.scheduleQueuedPromptRetry(agentId, queuedPromptId, error);
-      },
-    });
-  }
-
-  private drainQueuedPrompt(agentId: string): void {
-    const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || !canDrainQueuedPrompt(agent.status.type)) return;
-    const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId);
-    if (!queuedPrompt) return;
-    if (queuedPrompt.retryAt) {
-      const retryDelay = Date.parse(queuedPrompt.retryAt) - Date.now();
-      if (retryDelay > 0) {
-        this.installQueuedPromptRetry(agentId, queuedPrompt.id, retryDelay);
-        return;
-      }
-    }
-    this.startAgentPrompt(agent, queuedPrompt.text, queuedPrompt.options, queuedPrompt.id);
-  }
-
-  private scheduleQueuedPromptRetry(agentId: string, promptId: string, error: Error): void {
-    const queuedPrompt = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId && prompt.id === promptId);
-    if (!queuedPrompt) return;
-    const attempts = (queuedPrompt.attempts ?? 0) + 1;
-    const retryDelay = Math.min(30_000, 1_000 * (2 ** Math.min(attempts - 1, 5)));
-    const retryAt = new Date(Date.now() + retryDelay).toISOString();
-    this.applyAndEmitBackendEvent({
-      agentId,
-      type: 'agent.promptRetryScheduled',
-      payload: { id: promptId, attempts, lastError: error.message, retryAt },
-    });
-    this.installQueuedPromptRetry(agentId, promptId, retryDelay);
-  }
-
-  private installQueuedPromptRetry(agentId: string, promptId: string, delay: number): void {
-    if (this.queuedPromptRetryTimers.has(promptId)) return;
-    const timer = setTimeout(() => {
-      this.queuedPromptRetryTimers.delete(promptId);
-      const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
-      const head = (this.snapshot.queuedPrompts ?? []).find((prompt) => prompt.agentId === agentId);
-      if (agent && canDrainQueuedPrompt(agent.status.type) && head?.id === promptId) {
-        this.startAgentPrompt(agent, head.text, head.options, head.id);
-      }
-    }, Math.max(0, delay));
-    timer.unref?.();
-    this.queuedPromptRetryTimers.set(promptId, timer);
-  }
-
-  private clearQueuedPromptRetry(promptId: string): void {
-    const timer = this.queuedPromptRetryTimers.get(promptId);
-    if (timer) clearTimeout(timer);
-    this.queuedPromptRetryTimers.delete(promptId);
-  }
-
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {
     return {
       backend: agent.backend,
@@ -2947,10 +2849,10 @@ export class ClawBackendServer {
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
     if (event.type === 'turn.completed' && event.agentId) {
-      this.drainQueuedPrompt(event.agentId);
+      this.agentPrompts.drain(event.agentId);
     }
     if (event.type === 'agent.promptQueued' && event.agentId) {
-      this.drainQueuedPrompt(event.agentId);
+      this.agentPrompts.drain(event.agentId);
     }
     if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
       const persistence = this.saveSnapshot?.(this.snapshot);
@@ -3182,7 +3084,7 @@ export class ClawBackendServer {
     updateAgentFolder(this.snapshot, delegated.id, delegatedFolder);
     await this.refreshAgentWorkspaceIdentity(delegated.id);
     await this.persistAndEmitSnapshot();
-    this.sendAgentPrompt(delegated.id, request.payload.request.task);
+    this.agentPrompts.send(delegated.id, request.payload.request.task);
     this.resolveWorkRouting(request.id, {
       mode: 'delegated',
       agentId: delegated.id,
@@ -3239,10 +3141,6 @@ export class ClawBackendServer {
       });
     }
   }
-}
-
-function canDrainQueuedPrompt(status: Agent['status']['type']): boolean {
-  return status !== 'starting' && status !== 'working' && status !== 'awaitingInput';
 }
 
 function requireBacklogConfiguration(params: unknown): WorkBacklogConfigurationInput {
