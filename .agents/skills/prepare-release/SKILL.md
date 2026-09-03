@@ -178,7 +178,13 @@ git push origin "v<target-version>"
 ```
 
 Verify the branch upstream contains the release-prep commit, the remote tag
-resolves to that commit, and both repositories remain clean. Report the
-version, Claw commit hash, pushed tag, recorded SDK commit, and published macOS
-artifact. If build, signing, notarization, upload, or Git push fails, stop and
-report the exact failing phase; never claim the release was published.
+resolves to that commit, and both repositories remain clean. If build, signing,
+notarization, upload, or Git push fails, stop and report the exact failing phase;
+never claim the release was published.
+
+## 8. Celebrate and report
+
+After every publication and Git verification succeeds, call the Codex Claw
+`celebrate` tool exactly once with `kind: confetti`. The release is complete
+only after that call returns. Then report the version, Claw commit hash, pushed
+tag, recorded SDK commit, and published macOS artifact.

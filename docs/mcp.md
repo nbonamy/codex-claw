@@ -215,9 +215,12 @@ The `--allowed-tools` pattern authorizes only tools from the `codex_claw` MCP
 server.
 
 `clawd` also adds developer instructions that give the backend agent its Claw
-agent ID/name/folder and tell it to set status, list agents, send messages,
-and check inboxes through the `codex_claw` MCP server. Agents do not need to
-register or pass their own agent ID to tools.
+agent ID/name/folder and advertise the product workflows models do not reliably
+discover from schemas alone: delegate or start separate work with
+`create-agent`, keep substantial Markdown visible with `display-markdown`, and
+celebrate meaningful completed work. The same instructions require status and
+constrain teammate messaging. Agents do not need to register or pass their own
+agent ID to tools.
 
 For another backend, keep the tool semantics below unchanged and implement the
 smallest equivalent enablement path for that backend.
@@ -273,12 +276,12 @@ Input:
 - `kind`: optional `confetti`, `stars`, `shapes`, or `schoolPride`; defaults to
   `confetti`.
 
-The tool description explicitly prompts agents to celebrate releases, hard
-fixes, major features, migrations, and genuine breakthroughs once the
-accomplishment is complete. The request emits `celebration.requested`; it is
-not stored in conversation history or app state. Users can disable agent
-celebrations in General settings. The setting is enabled by default, and
-`clawd` suppresses the event when it is off.
+Developer instructions require one celebration before the final response for
+releases, hard fixes, major features, migrations, and other meaningful wins;
+the tool description reinforces the same completion behavior. The request
+emits `celebration.requested`; it is not stored in conversation history or app
+state. Users can disable agent celebrations in General settings. The setting
+is enabled by default, and `clawd` suppresses the event when it is off.
 
 ### `send-message`
 
