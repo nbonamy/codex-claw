@@ -38,6 +38,38 @@ describe('AppController', () => {
     expect(() => controller.setDockBadgeCount(1.5)).toThrow('non-negative integer');
   });
 
+  it('queues a bounded settings voice preview through the shared native speech queue', () => {
+    const spokenAnnouncements = {
+      dispose: vi.fn(),
+      queue: vi.fn().mockReturnValue({ queued: true }),
+    };
+    const controller = new AppController(
+      createInitialSnapshot(),
+      null,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      spokenAnnouncements,
+    );
+    const preview = (voice: string) => (controller as unknown as {
+      previewSpokenAnnouncementVoice(value: string): unknown;
+    }).previewSpokenAnnouncementVoice(voice);
+
+    expect(preview('bf_emma')).toStrictEqual({ queued: true });
+    expect(spokenAnnouncements.queue).toHaveBeenCalledWith({
+      agentId: 'settings-preview:bf_emma',
+      phase: 'start',
+      text: 'Codex Claw is on it—sharp claws, clean code.',
+      voice: 'bf_emma',
+    });
+    expect(() => preview('robot')).toThrowError('Invalid spoken announcement voice.');
+  });
+
   it('keeps agent and AC-only remote-access sleep prevention independent', () => {
     expect(shouldBlockDisplaySleep({
       sourceFolderPath: '',

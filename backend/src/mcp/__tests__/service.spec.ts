@@ -122,6 +122,7 @@ describe('ClawMcpService', () => {
       'check-messages',
       'broadcast-message',
       'set-status',
+      'announce',
     ]));
 
     const sendMessageResponse = await postJson(dinaUrl, {
@@ -549,6 +550,68 @@ describe('ClawMcpService', () => {
       message: 'Celebrations are disabled in General settings.',
     });
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+  });
+
+  it('queues spoken announcements only when enabled and selected', async () => {
+    const snapshot = createInitialSnapshot();
+    const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
+    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    const url = await service.start();
+
+    const disabled = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+    expect(disabled.result.structuredContent).toStrictEqual({
+      success: true,
+      queued: false,
+      phase: 'start',
+      message: 'Spoken announcements are disabled in General settings.',
+    });
+    expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
+
+    snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.activeAgentId = 'agent-dina';
+    const selected = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: '  On it.  ' });
+    expect(selected.result.structuredContent).toStrictEqual({
+      success: true,
+      queued: true,
+      phase: 'start',
+      message: 'Announcement queued.',
+    });
+    expect(queueSpokenAnnouncement).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'On it.',
+      voice: 'af_heart',
+    });
+
+    const background = await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
+    expect(background.result.structuredContent).toMatchObject({ queued: false, phase: 'finish' });
+    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
+
+    snapshot.general.spokenAnnouncementScope = 'all';
+    await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
+    expect(queueSpokenAnnouncement).toHaveBeenLastCalledWith({
+      agentId: 'agent-jesse',
+      phase: 'finish',
+      text: 'Done.',
+      voice: 'af_heart',
+    });
+  });
+
+  it('keeps TTS failures best-effort and rejects invalid MCP text before routing', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.activeAgentId = 'agent-dina';
+    const queueSpokenAnnouncement = vi.fn().mockRejectedValue(new Error('helper crashed'));
+    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    const url = await service.start();
+
+    const failed = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
+    expect(failed.result.isError).toBe(false);
+    expect(failed.result.structuredContent).toMatchObject({ success: true, queued: false });
+
+    const invalid = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'x'.repeat(161) });
+    expect(invalid.result.isError).toBe(true);
+    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
   });
 
   it('keeps celebrations enabled when a migrated live snapshot omits the setting', async () => {

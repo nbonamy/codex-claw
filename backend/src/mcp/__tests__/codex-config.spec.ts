@@ -49,6 +49,19 @@ describe('codex-config', () => {
     expect(config.config?.['mcp_servers.node_repl.enabled']).toBe(true);
   });
 
+  it('adds spoken acknowledgment policy only when the setting is enabled', () => {
+    const disabled = buildCodexClawThreadConfig(agent, 'http://127.0.0.1:8767/mcp');
+    const enabled = buildCodexClawThreadConfig(
+      agent,
+      'http://127.0.0.1:8767/mcp',
+      undefined,
+      true,
+    );
+
+    expect(disabled.developerInstructions).not.toContain('Spoken acknowledgments are enabled');
+    expect(enabled.developerInstructions).toContain('call announce at most once near the start');
+  });
+
   it('preserves existing query params when scoping an MCP URL to an agent', () => {
     expect(agentScopedMcpUrl('http://127.0.0.1:8767/mcp?debug=1', 'agent-dina')).toBe('http://127.0.0.1:8767/mcp?debug=1&agentId=agent-dina');
   });

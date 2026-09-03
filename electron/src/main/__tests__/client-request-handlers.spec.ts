@@ -78,6 +78,71 @@ describe('createClientRequestHandlers', () => {
     expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com');
   });
 
+  it('validates and queues a bounded provider-neutral spoken announcement', async () => {
+    const queue = vi.fn().mockReturnValue({ queued: true });
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(),
+      getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
+      spokenAnnouncements: { queue },
+    });
+
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'finish',
+      text: '  Wrapped up.  ',
+      voice: 'bf_emma',
+    })).toStrictEqual({ queued: true });
+    expect(queue).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      phase: 'finish',
+      text: 'Wrapped up.',
+      voice: 'bf_emma',
+    });
+    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'middle',
+      text: 'Nope.',
+      voice: 'af_heart',
+    })).rejects.toThrowError('Invalid phase.');
+    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'x'.repeat(161),
+      voice: 'af_heart',
+    })).rejects.toThrowError('Invalid text.');
+    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'Nope.',
+      voice: 'robot',
+    })).rejects.toThrowError('Invalid voice.');
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'Backwards compatible.',
+    })).toStrictEqual({ queued: true });
+    expect(queue).toHaveBeenLastCalledWith({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'Backwards compatible.',
+      voice: 'af_heart',
+    });
+  });
+
+  it('reports unsupported speech without failing the client request', async () => {
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(),
+      getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
+    });
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina', phase: 'start', text: 'On it.',
+    })).toStrictEqual({ queued: false, reason: 'unsupported' });
+  });
+
   it('checks system permissions through the desktop-native port', async () => {
     const status = {
       platform: 'darwin',

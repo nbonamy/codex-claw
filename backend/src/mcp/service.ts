@@ -9,6 +9,7 @@ import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
   Agent,
+  AnnouncementPhase,
   AgentCreationProgress,
   AgentWorkspaceIdentity,
   AppSnapshot,
@@ -19,6 +20,8 @@ import type {
   AutomationAction,
   AutomationExecutionLogEntry,
   MainToRendererEvent,
+  SpokenAnnouncementRequest,
+  SpokenAnnouncementQueueResult,
   SendPromptOptions,
   SourceRepository,
   SourceWorktree,
@@ -34,7 +37,7 @@ import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -49,6 +52,7 @@ export type ClawMcpServiceOptions = {
   computerUse?: ComputerUseClient;
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
+  queueSpokenAnnouncement?: (input: SpokenAnnouncementRequest) => Promise<SpokenAnnouncementQueueResult>;
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
 };
@@ -61,6 +65,7 @@ export class ClawMcpService {
   private readonly now: () => Date;
   private readonly resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   private readonly worktreeManager: WorktreeManager;
+  private readonly queueSpokenAnnouncement?: ClawMcpServiceOptions['queueSpokenAnnouncement'];
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
@@ -71,6 +76,7 @@ export class ClawMcpService {
     this.now = options.now ?? (() => new Date());
     this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
     this.resolveWorkspaceIdentity = options.resolveWorkspaceIdentity;
+    this.queueSpokenAnnouncement = options.queueSpokenAnnouncement;
     this.worktreeManager = options.worktreeManager ?? new WorktreeManager();
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
@@ -88,6 +94,7 @@ export class ClawMcpService {
       },
       onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
       onCelebrate: (agent, kind) => this.celebrateForAgent(agent, kind),
+      onAnnounce: (agent, phase, text) => this.announceForAgent(agent, phase, text),
       onUpdateWorkItem: (agent, workItemId, status, note) => this.updateWorkItemForAgent(agent, workItemId, status, note),
       onListSourceRepositories: () => this.listSourceRepositories(),
       onListSourceWorktrees: (repoPath) => this.listSourceWorktrees(repoPath),
@@ -308,6 +315,34 @@ export class ClawMcpService {
       payload: { kind },
     });
     return { success: true, displayed: true, kind, message: 'Celebration started.' };
+  }
+
+  private async announceForAgent(agent: Agent, phase: AnnouncementPhase, text: string): Promise<AnnouncementResponse> {
+    if (!this.snapshot.general.spokenAnnouncementsEnabled) {
+      return { success: true, queued: false, phase, message: 'Spoken announcements are disabled in General settings.' };
+    }
+    if (this.snapshot.general.spokenAnnouncementScope !== 'all' && this.snapshot.activeAgentId !== agent.id) {
+      return { success: true, queued: false, phase, message: 'Only the selected agent may speak.' };
+    }
+    if (!this.queueSpokenAnnouncement) {
+      return { success: true, queued: false, phase, message: 'Spoken announcements are unavailable on this client.' };
+    }
+    try {
+      const result = await this.queueSpokenAnnouncement({
+        agentId: agent.id,
+        phase,
+        text,
+        voice: this.snapshot.general.spokenAnnouncementVoice,
+      });
+      return {
+        success: true,
+        queued: result.queued,
+        phase,
+        message: result.queued ? 'Announcement queued.' : 'Announcement was not queued.',
+      };
+    } catch {
+      return { success: true, queued: false, phase, message: 'Announcement was not queued.' };
+    }
   }
 
   private updateWorkItemForAgent(agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): UpdateWorkItemResponse {

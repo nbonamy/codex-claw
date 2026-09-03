@@ -21,6 +21,7 @@ export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
+  spokenAnnouncementsEnabled?: () => boolean;
 };
 
 type CodexClawLoadingStrategy = 'eager' | 'lazy';
@@ -38,6 +39,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
     ['claude', new ClaudeBackendDriver(undefined, undefined, {
       clawMcpServerUrl: options.clawMcpServerUrl ?? null,
       pluginSettings: options.pluginSettings,
+      spokenAnnouncementsEnabled: options.spokenAnnouncementsEnabled,
     })],
   ]);
 }
@@ -63,6 +65,7 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
             extensionContext,
             options.clawMcpServerUrl ?? null,
             options.pluginSettings?.() ?? options.generalSettings?.plugins,
+            options.spokenAnnouncementsEnabled?.() ?? options.generalSettings?.spokenAnnouncementsEnabled,
           )
           : {}
       ),

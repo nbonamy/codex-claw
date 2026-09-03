@@ -165,11 +165,14 @@ export function claudeToolPart(
 
   const mcp = mcpToolName(block.name);
   if (mcp) {
+    const presentedInput = mcp.server === 'codex_claw' && mcp.tool.replaceAll('_', '-') === 'announce'
+      ? announcementInput(input)
+      : input;
     return toolPart(block, {
       kind: 'mcp',
       title: `${mcp.server}.${mcp.tool}`,
       status,
-      input,
+      input: presentedInput,
       metadata: {
         ...metadata,
         server: mcp.server,
@@ -185,6 +188,10 @@ export function claudeToolPart(
     input: block.input,
     metadata,
   });
+}
+
+function announcementInput(input: Record<string, unknown>): Record<string, unknown> {
+  return input.phase === 'start' || input.phase === 'finish' ? { phase: input.phase } : {};
 }
 
 export function claudeToolPartInputUpdate(toolPart: RendererToolPart): RendererToolPartUpdate {

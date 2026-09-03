@@ -34,6 +34,7 @@ describe('ipc channels', () => {
       listBackendSkills: 'backend:skills:list',
       listAgentFiles: 'agent:files:list',
       previewAgentFile: 'agent:file:preview',
+      previewSpokenAnnouncementVoice: 'settings:spoken-announcement-voice:preview',
       openAgentGitDiff: 'agent:git-diff:open',
       getAgentGitWorkflow: 'agent:git-workflow:get',
       generateAgentGitMessage: 'agent:git-workflow:message:generate',

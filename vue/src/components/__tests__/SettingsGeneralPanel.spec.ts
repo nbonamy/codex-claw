@@ -3,6 +3,7 @@ import ElementPlus, { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
+import { setElectronTestClient } from '../../test/client';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
@@ -38,6 +39,86 @@ describe('SettingsGeneralPanel', () => {
     expect(updateSettings).toHaveBeenCalledWith({
       general: { celebrationsEnabled: false },
     });
+  });
+
+  it('configures neural speech enablement, scope, voice, and preview', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const previewSpokenAnnouncementVoice = vi.fn().mockResolvedValue({ queued: true });
+    setElectronTestClient({ previewSpokenAnnouncementVoice });
+    const wrapper = mountPanel({ updateSettings });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: 'SettingsSection' })
+      .some((section) => section.text().includes('Voice'))).toBe(true);
+    const toggleRow = wrapper.findAllComponents({ name: 'SettingsRow' })
+      .find((candidate) => candidate.text().includes('Spoken acknowledgments'));
+    expect(toggleRow).toBeDefined();
+    expect(toggleRow!.text()).toContain('on-device neural voice');
+    expect(wrapper.text()).not.toContain('Choose which agents may speak');
+
+    await toggleRow!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', true);
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { spokenAnnouncementsEnabled: true },
+    });
+
+    await wrapper.setProps({
+      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
+    });
+    const rows = wrapper.findAllComponents({ name: 'SettingsRow' });
+    const scopeRow = rows.find((candidate) => candidate.text().includes('Choose which agents may speak'))!;
+    const scopeSelect = scopeRow.findComponent({ name: 'ElSelect' });
+    expect(scopeSelect.props('modelValue')).toBe('selected');
+    await scopeSelect.vm.$emit('update:modelValue', 'all');
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      general: { spokenAnnouncementScope: 'all' },
+    });
+
+    const voiceRow = rows.find((candidate) => candidate.text().includes('additional voices download'))!;
+    const voiceSelect = voiceRow.findComponent({ name: 'ElSelect' });
+    expect(voiceSelect.props('modelValue')).toBe('af_heart');
+    expect(voiceSelect.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
+      .toStrictEqual([
+        'Heart · American',
+        'Bella · American',
+        'Nicole · American',
+        'Sarah · American',
+        'Adam · American',
+        'Michael · American',
+        'Emma · British',
+        'George · British',
+      ]);
+    await voiceSelect.vm.$emit('update:modelValue', 'bf_emma');
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      general: { spokenAnnouncementVoice: 'bf_emma' },
+    });
+    await wrapper.setProps({
+      settings: {
+        ...defaultGeneralSettings,
+        spokenAnnouncementsEnabled: true,
+        spokenAnnouncementVoice: 'bf_emma',
+      },
+    });
+    await voiceRow.findAll('button').find((button) => button.text() === 'Preview')?.trigger('click');
+    await flushPromises();
+    expect(previewSpokenAnnouncementVoice).toHaveBeenCalledWith('bf_emma');
+  });
+
+  it('shows when native voice preview is unavailable', async () => {
+    setElectronTestClient({
+      previewSpokenAnnouncementVoice: vi.fn().mockResolvedValue({
+        queued: false,
+        reason: 'unsupported',
+      }),
+    });
+    const wrapper = mountPanel({
+      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
+    });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Preview')?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Voice preview could not be queued on this device.');
   });
 
   it('updates the worktree initialization policy', async () => {

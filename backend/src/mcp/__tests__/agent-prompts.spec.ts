@@ -74,6 +74,16 @@ describe('agent prompts', () => {
 
     expect(instructions).not.toContain('computer-use-status');
     expect(instructions).not.toContain('chrome:control-chrome');
+    expect(instructions).not.toContain('Spoken acknowledgments are enabled');
+  });
+
+  it('limits enabled spoken acknowledgments to task boundaries and safe short phrases', () => {
+    const instructions = codexClawDeveloperInstructions(agent(), undefined, true);
+
+    expect(instructions).toContain('call announce at most once near the start');
+    expect(instructions).toContain('once only at genuine completion');
+    expect(instructions).toContain('Never announce intermediate progress or reasoning');
+    expect(instructions).toContain('do not wait for speech or retry');
   });
 
   it('describes workspace-free Quick chats without inventing a folder', () => {

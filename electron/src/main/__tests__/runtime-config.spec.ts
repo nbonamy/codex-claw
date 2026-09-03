@@ -162,15 +162,17 @@ describe('runtime config', () => {
     expect(electronPackage.scripts['build:computer-use:local']).toBe(
       'node ../scripts/prepare-computer-use.mjs --local',
     );
+    expect(electronPackage.scripts['build:tts']).toBe('node ../scripts/prepare-tts-helper.mjs');
     expect(electronPackage.scripts.package).toBe(
-      'npm run build:codex && npm run build:computer-use && electron-forge package',
+      'npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge package',
     );
     expect(electronPackage.scripts.make).toBe(
-      'npm run release-notes:check && npm run build:codex && npm run build:computer-use && electron-forge make',
+      'npm run release-notes:check && npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge make',
     );
-    expect(electronPackage.scripts.build).toContain('npm run build:codex && npm run build:computer-use &&');
+    expect(electronPackage.scripts.build).toContain('npm run build:codex && npm run build:computer-use && npm run build:tts &&');
     expect(devScript).toContain("await run('npm', ['run', 'build:codex'])");
     expect(devScript).toContain("await run('npm', ['run', 'build:computer-use'])");
+    expect(devScript).toContain("await run('npm', ['run', 'build:tts'])");
     expect(devScript).toContain("start('npm', ['run', 'start:electron']");
     expect(devScript).not.toContain("['run', 'build:sdk']");
     expect(sdkBuildScript).toContain("specifier.startsWith('file:')");
@@ -215,6 +217,33 @@ describe('runtime config', () => {
     expect(prepareScript).toContain("process.env.COMPUTER_USE_LOCAL === '1'");
     expect(prepareScript).toContain('process.argv.includes(\'--local\')');
     expect(prepareScript).toContain('process.argv.includes(\'--release\')');
+  });
+
+  it('pins and packages the native neural TTS helper without a system voice fallback', () => {
+    const repositoryRoot = path.resolve(__dirname, '../../../..');
+    const packageManifest = readFileSync(path.join(repositoryRoot, 'native/tts-helper/Package.swift'), 'utf8');
+    const resolved = JSON.parse(
+      readFileSync(path.join(repositoryRoot, 'native/tts-helper/Package.resolved'), 'utf8'),
+    ) as { pins: Array<{ identity: string; state: { revision: string; version: string } }> };
+    const helperSource = readFileSync(
+      path.join(repositoryRoot, 'native/tts-helper/Sources/CodexClawTTSHelper/App.swift'),
+      'utf8',
+    );
+    const prepareScript = readFileSync(path.join(repositoryRoot, 'scripts/prepare-tts-helper.mjs'), 'utf8');
+    const forgeConfig = readFileSync(path.join(repositoryRoot, 'electron/forge.config.ts'), 'utf8');
+
+    expect(packageManifest).toContain('exact: "0.15.5"');
+    expect(resolved.pins).toContainEqual(expect.objectContaining({
+      identity: 'fluidaudio',
+      state: {
+        revision: '19600a485baa4998812e4654b70d2bab8f2c9949',
+        version: '0.15.5',
+      },
+    }));
+    expect(helperSource).toContain('KokoroAneManager()');
+    expect(helperSource).not.toContain('AVSpeechSynthesizer');
+    expect(prepareScript).toContain("process.platform !== 'darwin'");
+    expect(forgeConfig).toContain("'.tts/codex-claw-tts-helper'");
   });
 
   it('loads Electron build environment variables from the workspace root', () => {

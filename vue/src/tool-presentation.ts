@@ -13,6 +13,7 @@ import {
   IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
   IconUsers as UsersIcon,
+  IconVolume as VolumeIcon,
 } from '@tabler/icons-vue';
 import { clawMcpToolName, presentClawToolTitle } from './tool-title-presenter';
 
@@ -30,6 +31,7 @@ const icons = {
   markdown: MarkdownIcon as unknown as ToolIcon,
   messages: MessageIcon as unknown as ToolIcon,
   celebration: SparklesIcon as unknown as ToolIcon,
+  announcement: VolumeIcon as unknown as ToolIcon,
   workItem: SquareCheck as unknown as ToolIcon,
   workspace: GitBranchIcon as unknown as ToolIcon,
 };
@@ -96,6 +98,7 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (AGENT_TOOLS.has(tool)) return icons.agents;
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'celebrate') return icons.celebration;
+  if (tool === 'announce') return icons.announcement;
   if (tool === 'display-markdown') return icons.markdown;
   if (tool === 'update-work-item') return icons.workItem;
   return undefined;

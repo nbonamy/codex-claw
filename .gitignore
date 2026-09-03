@@ -8,3 +8,5 @@ coverage/
 .env
 .codex-claw-dev/
 electron/.computer-use-artifacts/
+electron/.tts/
+native/**/.build/

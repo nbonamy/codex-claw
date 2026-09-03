@@ -682,6 +682,12 @@ export const messages = {
               failed: 'Failed celebrating with {target}',
               running: 'Celebrating with {target}',
             },
+            announce: {
+              completed: 'Queued {target} acknowledgment',
+              failed: 'Failed queuing {target} acknowledgment',
+              running: 'Queuing {target} acknowledgment',
+              skipped: 'Skipped {target} acknowledgment',
+            },
             checkMessages: {
               completed: 'Checked messages',
               failed: 'Failed checking messages',

@@ -4,6 +4,7 @@ import { ClawBackendProcessClient } from './backend-process-client';
 import { ClawBackendSocketClient } from './backend-socket-client';
 import { warnMain } from './log';
 import { runtimeClawdBackendMode, runtimeClawdCommand, runtimeClawdSocketPath, runtimeClawdWatchFile } from './runtime-config';
+import type { SpokenAnnouncementQueue } from './spoken-announcements';
 
 export type ClawBackendClientPort = {
   close(): Promise<void>;
@@ -17,11 +18,17 @@ export type ClawBackendClientPort = {
 export function createRuntimeClawBackendClient(options: {
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
+  spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
 } = {}): ClawBackendClientPort | null {
   const mode = runtimeClawdBackendMode();
+  const requestHandlers = createRuntimeClientRequestHandlers({
+    browserExecute: options.browserExecute,
+    browserOpen: options.browserOpen,
+    spokenAnnouncements: options.spokenAnnouncements,
+  });
   const socketClient = new ClawBackendSocketClient({
     socketPath: runtimeClawdSocketPath(),
-    requestHandlers: createRuntimeClientRequestHandlers({ browserExecute: options.browserExecute, browserOpen: options.browserOpen }),
+    requestHandlers,
   });
 
   if (mode === 'existing') {
@@ -31,7 +38,7 @@ export function createRuntimeClawBackendClient(options: {
   const command = runtimeClawdCommand();
   const processClient = command ? new ClawBackendProcessClient({
     command,
-    requestHandlers: createRuntimeClientRequestHandlers({ browserExecute: options.browserExecute, browserOpen: options.browserOpen }),
+    requestHandlers,
     watchFile: runtimeClawdWatchFile(),
   }) : null;
 

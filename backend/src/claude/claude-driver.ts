@@ -89,6 +89,7 @@ type ClaudeBackendDriverOptions = {
   clawMcpServerUrl?: string | null;
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
+  spokenAnnouncementsEnabled?: () => boolean;
 };
 
 export class ClaudeBackendDriver implements AgentBackendDriver {
@@ -171,6 +172,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         existingSessionId,
         this.driverOptions.clawMcpServerUrl,
         this.driverOptions.pluginSettings?.(),
+        this.driverOptions.spokenAnnouncementsEnabled?.(),
       );
       const handle = this.transport.startTurn(
         turnParams,
@@ -519,6 +521,7 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
           sessionId,
           this.driverOptions.clawMcpServerUrl,
           this.driverOptions.pluginSettings?.(),
+          this.driverOptions.spokenAnnouncementsEnabled?.(),
         );
         const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;
         const usage = await this.transport.readContextUsage?.({ ...params, sessionId });
@@ -1109,6 +1112,7 @@ function claudeTurnParams(
   existingSessionId: string | null,
   clawMcpServerUrl: string | null | undefined,
   pluginSettings?: AppPluginSettings,
+  spokenAnnouncementsEnabled = false,
 ): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
@@ -1121,7 +1125,7 @@ function claudeTurnParams(
     model: options.model ?? defaults?.model ?? null,
     effort: claudeEffort(options.reasoningEffort ?? defaults?.reasoningEffort),
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
-    appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings),
+    appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings, spokenAnnouncementsEnabled),
     mcpServerUrl,
     allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
     ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),

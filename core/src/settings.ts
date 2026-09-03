@@ -1,4 +1,4 @@
-import type { AppGeneralSettings, AppPluginSettings, AppshotSettings, AppSnapshot, AppThemeSettings, SourceFolderState, UpdateSettingsInput, WorkProviderSettings } from './contracts';
+import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
 
 export const defaultPluginSettings: AppPluginSettings = {
@@ -16,6 +16,9 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   preventSleepWhenAgentsRun: true,
   preventSleepWhenRemoteAccessEnabled: true,
   celebrationsEnabled: true,
+  spokenAnnouncementsEnabled: false,
+  spokenAnnouncementScope: 'selected',
+  spokenAnnouncementVoice: 'af_heart',
   codexBinaryPath: '',
   claudeCodeEnabled: false,
   agentListCompact: false,
@@ -97,6 +100,9 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
     preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,
     celebrationsEnabled: value.celebrationsEnabled !== false,
+    spokenAnnouncementsEnabled: value.spokenAnnouncementsEnabled === true,
+    spokenAnnouncementScope: value.spokenAnnouncementScope === 'all' ? 'all' : 'selected',
+    spokenAnnouncementVoice: normalizeSpokenAnnouncementVoice(value.spokenAnnouncementVoice),
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     claudeCodeEnabled: value.claudeCodeEnabled === true,
     agentListCompact: value.agentListCompact === true,
@@ -107,6 +113,12 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
   };
+}
+
+function normalizeSpokenAnnouncementVoice(value: unknown): SpokenAnnouncementVoice {
+  return typeof value === 'string' && spokenAnnouncementVoices.includes(value as SpokenAnnouncementVoice)
+    ? value as SpokenAnnouncementVoice
+    : defaultGeneralSettings.spokenAnnouncementVoice;
 }
 
 function normalizeWorktreeInitializationMode(value: unknown): AppGeneralSettings['worktreeInitializationMode'] {

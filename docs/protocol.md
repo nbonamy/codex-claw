@@ -385,6 +385,7 @@ matches their platform capabilities.
 | `client/external/open` | `{ url }` | `true` | Electron opens the URL with `shell.openExternal`. |
 | `client/browser/open` | `{ agentId, browserId, url }` | `BrowserState` | Electron asks the renderer to mount or navigate that agent/browser workspace without changing the selected agent, and resolves after its sandboxed page loads. |
 | `client/browser/execute` | `{ agentId, browserId, command, arguments }` | command-specific result | Electron operates on the addressed agent/browser `WebContentsView`, including while its workspace is hidden. |
+| `client/spokenAnnouncement/queue` | `{ agentId, phase: "start" \| "finish", text, voice }` | `{ queued, reason? }` | Electron validates the bounded phrase and curated voice, then returns when its native no-overlap queue accepts or rejects it; playback completion is not part of this request. |
 | `client/system/permissions/get` | none | `SystemPermissionsStatus` | Electron reads native permission status. |
 | `client/system/permissions/accessibility/open` | none | `SystemPermissionsStatus` | Electron opens native settings and returns status. |
 
@@ -403,5 +404,5 @@ If a client request method is unknown, the client responds with JSON-RPC
   automations, scheduler execution, and transcription helper execution belong to
   `clawd`.
 - Electron owns only native desktop affordances: windows, menus, shortcuts,
-  dialogs, `openExternal`, native permission callbacks, process launching, and
-  transport plumbing.
+  dialogs, `openExternal`, native permission callbacks, native speech helper
+  lifecycle/audio playback, process launching, and transport plumbing.

@@ -90,8 +90,13 @@ function resolveDarwinBinaryPaths(
     label: 'Computer Use helper app',
     path: path.join(resourcePath, 'Codex Claw Computer Use.app'),
   }));
+  const ttsHelperPaths = resourcePaths.map((resourcePath) => ({
+    label: 'TTS helper',
+    path: path.join(resourcePath, 'codex-claw-tts-helper'),
+  }));
 
   const appleSpeechHelper = binaryPaths.find((binary) => existsSync(binary.path)) ?? binaryPaths[0];
   const computerUseHelper = computerUseAppPaths.find((binary) => existsSync(binary.path)) ?? computerUseAppPaths[0];
-  return [appleSpeechHelper, computerUseHelper];
+  const ttsHelper = ttsHelperPaths.find((binary) => existsSync(binary.path)) ?? ttsHelperPaths[0];
+  return [appleSpeechHelper, computerUseHelper, ttsHelper];
 }

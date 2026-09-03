@@ -74,6 +74,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       open: (input) => options.requestClient(backendMethods.clientBrowserOpen, input),
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
     } : undefined,
+    queueSpokenAnnouncement: (input) => options.requestClient(backendMethods.clientSpokenAnnouncementQueue, input),
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
     worktreeManager,
   });
@@ -82,6 +83,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     clawMcpServerUrl: mcpServerUrl,
     generalSettings: snapshot.general,
     pluginSettings,
+    spokenAnnouncementsEnabled: () => snapshot.general.spokenAnnouncementsEnabled,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
   let server: ClawBackendServer;
@@ -151,6 +153,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     remoteClients: new RemoteClawdClientManager({
       requestHandlers: {
         [backendMethods.clientExternalOpen]: (params) => options.requestClient(backendMethods.clientExternalOpen, params),
+        [backendMethods.clientSpokenAnnouncementQueue]: (params) => options.requestClient(backendMethods.clientSpokenAnnouncementQueue, params),
         [backendMethods.clientBrowserOpen]: (params) => options.requestClient(backendMethods.clientBrowserOpen, params),
         [backendMethods.clientBrowserExecute]: (params) => options.requestClient(backendMethods.clientBrowserExecute, params),
         [backendMethods.clientComputerUseExecute]: (params) => options.requestClient(backendMethods.clientComputerUseExecute, params),

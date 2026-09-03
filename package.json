@@ -27,6 +27,7 @@
     "build:computer-use:local": "node scripts/prepare-computer-use.mjs --local",
     "build:electron": "node scripts/build.mjs",
     "build:sdk": "node scripts/build-sdk.mjs",
+    "build:tts": "node scripts/prepare-tts-helper.mjs",
     "build:web": "npm run build:sdk && npm run build -w @codex-claw/backend && npm run build -w @codex-claw/web",
     "check-publish:macos": "node scripts/publish-macos.mjs --check-only",
     "clawd:start": "node scripts/clawd-launch-agent.mjs start",

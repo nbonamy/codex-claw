@@ -16,6 +16,7 @@ export function buildCodexClawThreadConfig(
   agent: Agent,
   mcpServerUrl: string | null,
   pluginSettings: AppPluginSettings = defaultPluginSettings,
+  spokenAnnouncementsEnabled = false,
 ): CodexThreadStartExtension {
   if (!mcpServerUrl) {
     return {};
@@ -29,7 +30,7 @@ export function buildCodexClawThreadConfig(
         ? { 'mcp_servers.node_repl.enabled': true }
         : {}),
     },
-    developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings),
+    developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings, spokenAnnouncementsEnabled),
   };
 }
 

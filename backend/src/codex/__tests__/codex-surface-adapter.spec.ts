@@ -1479,6 +1479,54 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(Buffer.byteLength(JSON.stringify(history))).toBeLessThan(64 * 1024);
   });
 
+  it('projects announcement lifecycle without retaining spoken text or messages', async () => {
+    const { adapter, surface } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+    const emitSurfaceEvent = (surface as unknown as {
+      emitEvent(origin: 'notification', event: unknown): void;
+    }).emitEvent.bind(surface);
+    emitSurfaceEvent('notification', {
+      type: 'tool.completed',
+      conversationId: 'thread-a',
+      turnId: 'turn-announcement',
+      payload: {
+        messageId: 'message-announcement',
+        toolPart: {
+          type: 'tool',
+          id: 'tool-announcement',
+          kind: 'mcp',
+          title: 'announce',
+          status: 'completed',
+          input: { phase: 'finish', text: 'A phrase that must not reach renderer state.' },
+          output: {
+          structuredContent: {
+            success: true,
+            queued: true,
+            phase: 'finish',
+            message: 'Announcement queued.',
+          },
+          content: [{ type: 'text', text: 'private tool transcript' }],
+          },
+          metadata: { server: 'codex_claw', tool: 'announce' },
+        },
+      },
+    });
+
+    const completed = events.find((event) => event.type === 'item.completed');
+    const part = (completed?.payload as { toolPart: RendererMessage['parts'][number] }).toolPart;
+    expect(part).toMatchObject({
+      type: 'tool',
+      input: { phase: 'finish' },
+      output: { structuredContent: { success: true, queued: true, phase: 'finish' } },
+    });
+    expect(JSON.stringify(part)).not.toContain('phrase that must not');
+    expect(JSON.stringify(part)).not.toContain('private tool transcript');
+    expect(JSON.stringify(part)).not.toContain('Announcement queued');
+  });
+
   it('suppresses server-owned action echoes while keeping hydrate and explicit resume ownership exact', async () => {
     const { adapter, surface, transport } = createAdapter();
     const events: BackendEvent[] = [];

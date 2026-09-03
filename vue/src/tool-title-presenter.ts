@@ -15,6 +15,7 @@ const TOOL_KEYS: Record<string, string> = {
   'browser-scroll': 'browserScroll',
   'browser-type': 'browserType',
   'celebrate': 'celebrate',
+  'announce': 'announce',
   'check-messages': 'checkMessages',
   'computer-use-click': 'computerUseClick',
   'computer-use-dismiss': 'computerUseDismiss',
@@ -59,6 +60,11 @@ export function presentClawToolTitle({
   const phase = toolPhase(descriptor?.phase, toolCall.state);
   if (identity.tool === 'set-status' && phase === 'completed' && args.status === '') {
     return translate('chat.tool.mcp.codexClaw.setStatus.cleared');
+  }
+  if (identity.tool === 'announce' && phase === 'completed' && resultBoolean(toolCall.result, 'queued') === false) {
+    return translate('chat.tool.mcp.codexClaw.announce.skipped', {
+      target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
+    });
   }
 
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
@@ -115,7 +121,9 @@ function toolTarget(
         requestedRecipient ? resolveAgentName?.(requestedRecipient) : undefined,
         requestedRecipient,
       ]
-    : tool === 'browser-open'
+    : tool === 'announce'
+      ? [announcementPhase(args.phase), announcementPhase(resultString(result, 'phase'))]
+      : tool === 'browser-open'
       ? [args.url]
       : tool === 'display-markdown'
         ? [args.title, args.path]
@@ -133,6 +141,10 @@ function toolTarget(
 
   const target = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
   return target?.trim() ?? '';
+}
+
+function announcementPhase(value: unknown): string | undefined {
+  return value === 'start' ? 'start' : value === 'finish' ? 'finish' : undefined;
 }
 
 function computerUseTarget(tool: string, args: Record<string, unknown>, result: unknown): string {
@@ -241,6 +253,14 @@ function resultString(result: unknown, key: string): string | undefined {
   for (const payload of nestedResultRecords(result)) {
     const value = payload[key];
     if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function resultBoolean(result: unknown, key: string): boolean | undefined {
+  for (const payload of nestedResultRecords(result)) {
+    const value = payload[key];
+    if (typeof value === 'boolean') return value;
   }
   return undefined;
 }
