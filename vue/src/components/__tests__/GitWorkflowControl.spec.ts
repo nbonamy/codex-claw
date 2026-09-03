@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
+import ElementPlus, { ElMessage } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import GitWorkflowControl from '../GitWorkflowControl.vue';
-import type { Agent, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { stubElectronTestWindow } from '../../test/client';
 
 const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktree', backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'idle' }, createdAt: '', updatedAt: '' } as Agent;
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
@@ -16,7 +18,10 @@ function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('GitWorkflowControl', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
 
   it('keeps dialog titles on one line while repository context truncates', () => {
     expect(componentSource).toMatch(/\.git-workflow-control__dialog-header \.claw-dialog__title\s*\{[^}]*flex:\s*0 0 auto;[^}]*white-space:\s*nowrap;/s);
@@ -423,6 +428,171 @@ describe('GitWorkflowControl', () => {
     expect(writingSurface.get('input').attributes('placeholder')).toBe('Title');
     expect((writingSurface.get('input').element as HTMLInputElement).value).toBe('');
     expect(writingSurface.get('textarea').attributes('placeholder')).toBe('Describe the change (optional)');
+  });
+
+  it('offers report-back by default for delegated pull requests and merges', async () => {
+    const createPullRequest = vi.fn(async () => workflow);
+    const pullRequest = mountControl({ createPullRequest, reportBackAgentName: 'main' });
+    await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy());
+    await pullRequest.get('.git-workflow-control__trigger').trigger('click');
+    await pullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+
+    expect(pullRequest.text()).toContain('Report to main agent');
+    expect(pullRequest.text()).not.toContain('Ask this agent for a summary');
+    expect(pullRequest.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
+    await pullRequest.get('.git-workflow-control__pull-request-form input').setValue('Complete delegated work');
+    await submitButton(pullRequest, 'Create PR').trigger('click');
+    await flushPromises();
+    expect(createPullRequest).toHaveBeenCalledWith('agent-1', {
+      title: 'Complete delegated work', body: '', reportBack: true, confirmed: true,
+    });
+
+    const mergeBranch = vi.fn(async () => workflow);
+    const merge = mountControl({ mergeBranch, reportBackAgentName: 'main' });
+    await vi.waitFor(() => expect(merge.get('.git-workflow-control__trigger')).toBeTruthy());
+    await merge.get('.git-workflow-control__trigger').trigger('click');
+    await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+
+    expect(merge.text()).toContain('Report to main agent');
+    expect(merge.text()).not.toContain('Ask this agent for a summary');
+    expect(merge.findAllComponents({ name: 'ElSwitch' })[0]?.props('modelValue')).toBe(true);
+    await submitButton(merge, 'Merge').trigger('click');
+    await flushPromises();
+    expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
+      strategy: 'merge', deleteBranch: false, deleteWorktree: false, reportBack: true, confirmed: true,
+    });
+  });
+
+  it('lets pull request and merge operations finish in the background', async () => {
+    const notifySuccess = vi.spyOn(ElMessage, 'success').mockImplementation(() => undefined as never);
+    const notifyError = vi.spyOn(ElMessage, 'error').mockImplementation(() => undefined as never);
+    const pendingPullRequest = deferred<AgentGitWorkflow>();
+    const pullRequest = mountControl({
+      createPullRequest: () => pendingPullRequest.promise,
+      reportBackAgentName: 'main',
+    });
+    await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy());
+    await pullRequest.get('.git-workflow-control__trigger').trigger('click');
+    await pullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await pullRequest.get('.git-workflow-control__pull-request-form input').setValue('Background report');
+    await submitButton(pullRequest, 'Create PR').trigger('click');
+
+    const pullRequestBackgroundButton = submitButton(pullRequest, 'Run in background');
+    expect(pullRequestBackgroundButton.isVisible()).toBe(true);
+    await pullRequestBackgroundButton.trigger('click');
+    expect(pullRequest.find('[role="dialog"]').exists()).toBe(false);
+    expect(pullRequest.get('.git-workflow-control__trigger').attributes('disabled')).toBeDefined();
+    pendingPullRequest.resolve(workflow);
+    await flushPromises();
+    expect(notifySuccess).toHaveBeenCalledWith('Pull request created');
+    expect(pullRequest.get('.git-workflow-control__trigger').attributes('disabled')).toBeUndefined();
+
+    const pendingMerge = deferred<AgentGitWorkflow>();
+    const merge = mountControl({ mergeBranch: () => pendingMerge.promise, reportBackAgentName: 'main' });
+    await vi.waitFor(() => expect(merge.get('.git-workflow-control__trigger')).toBeTruthy());
+    await merge.get('.git-workflow-control__trigger').trigger('click');
+    await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await submitButton(merge, 'Merge').trigger('click');
+    const mergeBackgroundButton = submitButton(merge, 'Run in background');
+    expect(mergeBackgroundButton.isVisible()).toBe(true);
+    await mergeBackgroundButton.trigger('click');
+    pendingMerge.reject(new Error('merge conflict'));
+    await flushPromises();
+
+    expect(notifyError).toHaveBeenCalledWith('Merge failed: merge conflict');
+  });
+
+  it('shows handoff preparation before Git delivery begins', async () => {
+    let listener: ((event: MainToRendererEvent) => void) | undefined;
+    stubElectronTestWindow({
+      codexClaw: {
+        onEvent: vi.fn((nextListener) => {
+          listener = nextListener;
+          return () => undefined;
+        }),
+      },
+    });
+    const pendingPullRequest = deferred<AgentGitWorkflow>();
+    const wrapper = mountControl({
+      createPullRequest: () => pendingPullRequest.promise,
+      reportBackAgentName: 'main',
+    });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Handoff progress');
+    await submitButton(wrapper, 'Create PR').trigger('click');
+
+    expect(wrapper.text()).toContain('Building handoff report');
+    expect(wrapper.text()).toContain('Waiting for the worker’s final summary.');
+    listener?.({
+      seq: 1,
+      agentId: agent.id,
+      type: 'git.operationProgress',
+      payload: { operation: 'pullRequest', phase: 'delivery' },
+      occurredAt: '2026-09-03T00:00:00.000Z',
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Creating pull request');
+
+    pendingPullRequest.resolve(workflow);
+    await flushPromises();
+
+    const pendingMerge = deferred<AgentGitWorkflow>();
+    const merge = mountControl({
+      mergeBranch: () => pendingMerge.promise,
+      reportBackAgentName: 'main',
+    });
+    await vi.waitFor(() => expect(merge.get('.git-workflow-control__trigger')).toBeTruthy());
+    await merge.get('.git-workflow-control__trigger').trigger('click');
+    await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await submitButton(merge, 'Merge').trigger('click');
+
+    expect(merge.text()).toContain('Building handoff report');
+    expect(merge.text()).toContain('Waiting for the worker’s final summary.');
+    expect(merge.text()).not.toContain('Merging changes');
+    listener?.({
+      seq: 2,
+      agentId: agent.id,
+      type: 'git.operationProgress',
+      payload: { operation: 'merge', phase: 'delivery' },
+      occurredAt: '2026-09-03T00:00:01.000Z',
+    });
+    await flushPromises();
+    expect(merge.text()).toContain('Merging feature/demo');
+
+    pendingMerge.resolve(workflow);
+    await flushPromises();
+  });
+
+  it('previews pull request and merge progress without running Git operations', async () => {
+    vi.useFakeTimers();
+    const createPullRequest = vi.fn();
+    const mergeBranch = vi.fn();
+    const wrapper = mountControl({ createPullRequest, mergeBranch });
+    const control = wrapper.vm as unknown as {
+      showDebugOperationProgress(operation: 'pullRequest' | 'merge'): Promise<void>;
+    };
+
+    await control.showDebugOperationProgress('pullRequest');
+    await nextTick();
+    expect(wrapper.text()).toContain('Building handoff report');
+    expect(wrapper.text()).toContain('Waiting for the worker’s final summary.');
+    expect(submitButton(wrapper, 'Run in background').isVisible()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(wrapper.text()).toContain('Creating pull request');
+
+    await control.showDebugOperationProgress('merge');
+    await nextTick();
+    expect(wrapper.text()).toContain('Building handoff report');
+    expect(wrapper.text()).toContain('Waiting for the worker’s final summary.');
+    expect(submitButton(wrapper, 'Run in background').isVisible()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(wrapper.text()).toContain('Merging feature/demo');
+    expect(createPullRequest).not.toHaveBeenCalled();
+    expect(mergeBranch).not.toHaveBeenCalled();
   });
 
   it('generates an editable pull request title and body together', async () => {

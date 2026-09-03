@@ -1,6 +1,7 @@
 <template>
   <AgentHeader
     v-if="!isAgentEmpty && currentAgent"
+    ref="agentHeader"
     :agent="currentAgent"
     :repository-icon="repositoryIconForAgent(currentAgent, snapshot.general.repositoryIcons)"
     :git-status="currentAgentGitStatus"
@@ -21,6 +22,7 @@
     :push-git-branch="props.pushAgentGitBranch"
     :create-git-pull-request="props.createAgentGitPullRequest"
     :merge-git-branch="props.mergeAgentGitBranch"
+    :report-back-agent-name="reportBackAgentName"
     @expand-sidebar="emit('expand-sidebar')"
     @toggle-execution-plan="toggleExecutionPlan"
     @toggle-workspace="toggleRightWorkspace"
@@ -151,6 +153,7 @@ import type {
 } from '@codex-app-sdk/vue';
 import { computed, reactive, ref, toRefs, watch } from 'vue';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { translate } from '../i18n';
 import { clawHostCapabilities } from '../platform-api';
 import AgentEmptyState from './AgentEmptyState.vue';
@@ -229,6 +232,10 @@ const props = defineProps<{
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
 }>();
 
+const agentHeader = ref<{
+  showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void>;
+} | null>(null);
+
 const emit = defineEmits<{
   'close-agent': [agentId: string];
   'expand-sidebar': [];
@@ -237,6 +244,13 @@ const emit = defineEmits<{
   sendPrompt: [prompt: string];
   'update:planMode': [enabled: boolean];
 }>();
+
+const reportBackAgentName = computed(() => {
+  const delegatedByAgentId = props.currentAgent?.delegatedByAgentId;
+  if (!delegatedByAgentId) return null;
+  const recipient = props.snapshot.agents.find((agent) => agent.id === delegatedByAgentId);
+  return recipient ? agentDisplayName(recipient) : null;
+});
 
 const {
   activeAttachmentAnnotationCounts,
@@ -628,12 +642,17 @@ function workspaceBodyElement(): HTMLElement | null {
   return workspaceBody.value;
 }
 
+function showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void> {
+  return agentHeader.value?.showDebugGitOperationProgress(operation);
+}
+
 defineExpose({
   focusComposer,
   handleBrowserOpenCommand,
   openConversationLink,
   openConversationImage,
   openConversationVisualization,
+  showDebugGitOperationProgress,
   workspaceBodyElement,
 });
 </script>

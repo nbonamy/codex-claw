@@ -172,6 +172,8 @@ export type AgentWorkspaceIdentity =
 export type Agent = {
   id: string;
   teamId?: string;
+  delegatedByAgentId?: string;
+  pullRequest?: AgentPullRequestTracking;
   sessionKind?: 'quickChat';
   name: string | null;
   conversationTitle?: string;
@@ -1245,6 +1247,17 @@ export type AgentGitPullRequest = {
   title: string;
   url: string;
   draft: boolean;
+  headSha: string;
+  state: 'open' | 'merged' | 'closed';
+  mergedAt?: string;
+};
+
+export type AgentPullRequestTracking = AgentGitPullRequest & {
+  provider: 'github';
+  repository: string;
+  branch: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AgentGitWorkflow = {
@@ -1276,9 +1289,9 @@ export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
 export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
 export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget' };
 export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
-export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; confirmed: boolean };
-export type AgentGitPullRequestInput = { title: string; body: string; confirmed: boolean };
-export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; confirmed: boolean };
+export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
+export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
+export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; reportBack?: boolean; confirmed: boolean };
 export type AgentGitMessageGenerationInput =
   | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }
   | { kind: 'pullRequest' };
@@ -1401,6 +1414,7 @@ export type MainToRendererEvent = {
     | 'file.activity'
     | 'diff.updated'
     | 'git.statusUpdated'
+    | 'git.operationProgress'
     | 'approval.requested'
     | 'backendApproval.requested'
     | 'backendApproval.resolved'
@@ -1431,6 +1445,11 @@ export type AgentCreationProgress = {
   error?: string;
 };
 
+export type AgentGitOperationProgress = {
+  operation: 'pullRequest' | 'merge';
+  phase: 'handoff' | 'delivery';
+};
+
 export type AppCommand =
   | {
     type: 'attach-appshot';
@@ -1450,6 +1469,7 @@ export type AppCommand =
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-mark-unread' }
   | { type: 'debug-open-markdown' }
+  | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
   | { type: 'new-team' }
   | { type: 'open-agent-composer'; agentId?: string; prompt?: string; submit?: boolean }
@@ -1466,6 +1486,7 @@ export type CreateAgentInput = {
   avatar?: string;
   backend?: AgentBackend;
   backendDefaults?: BackendDefaults;
+  delegatedByAgentId?: string;
   sourceRepositoryName?: string;
   teamId?: string;
 };

@@ -259,6 +259,16 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return githubPullRequest(pulls[0]) ?? null;
   }
 
+  async getPullRequest(token: WorkProviderToken, repositoryId: string, number: number): Promise<AgentGitPullRequest | null> {
+    const repository = parseRepositoryId(repositoryId);
+    if (!repository || !Number.isInteger(number) || number <= 0) return null;
+    const pullRequest = await githubApiRequest(
+      token,
+      `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/pulls/${number}`,
+    );
+    return githubPullRequest(pullRequest);
+  }
+
   async createPullRequest(token: WorkProviderToken, repositoryId: string, input: { branch: string; title: string; body: string }): Promise<AgentGitPullRequest> {
     const repository = parseRepositoryId(repositoryId);
     if (!repository) throw new Error('The Git remote is not a GitHub repository.');
@@ -432,8 +442,24 @@ async function defaultBranch(token: WorkProviderToken, repositoryId: string): Pr
 }
 
 function githubPullRequest(value: unknown): AgentGitPullRequest | null {
-  if (!isRecord(value) || !Number.isInteger(value.number) || typeof value.title !== 'string' || typeof value.html_url !== 'string') return null;
-  return { number: value.number as number, title: value.title, url: value.html_url, draft: value.draft === true };
+  if (
+    !isRecord(value) ||
+    !Number.isInteger(value.number) ||
+    typeof value.title !== 'string' ||
+    typeof value.html_url !== 'string' ||
+    !isRecord(value.head) ||
+    typeof value.head.sha !== 'string'
+  ) return null;
+  const mergedAt = typeof value.merged_at === 'string' ? value.merged_at : undefined;
+  return {
+    number: value.number as number,
+    title: value.title,
+    url: value.html_url,
+    draft: value.draft === true,
+    headSha: value.head.sha,
+    state: mergedAt ? 'merged' : value.state === 'closed' ? 'closed' : 'open',
+    ...(mergedAt ? { mergedAt } : {}),
+  };
 }
 
 function githubRepository(value: unknown): WorkRepository | null {

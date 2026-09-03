@@ -6,6 +6,8 @@ const longRunningRequestMethods = new Set<string>([
   backendMethods.agentDelete,
   backendMethods.agentFork,
   backendMethods.agentGitMessageGenerate,
+  backendMethods.agentGitMerge,
+  backendMethods.agentGitPullRequestCreate,
   backendMethods.agentHistoryHydrate,
   backendMethods.agentHistoryLoadOlder,
   backendMethods.agentSelect,

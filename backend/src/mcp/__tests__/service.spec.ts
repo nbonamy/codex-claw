@@ -492,7 +492,7 @@ describe('ClawMcpService', () => {
     });
 
     const createdAgent = snapshot.agents.find((agent) => agent.name === 'SDK worker');
-    expect(createdAgent).toBeDefined();
+    expect(createdAgent).toMatchObject({ delegatedByAgentId: 'agent-dina' });
     expect(snapshot.activeAgentId).toBe('agent-dina');
     expect(sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: createdAgent!.id }),

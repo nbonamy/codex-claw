@@ -533,6 +533,7 @@ export class ClawMcpService {
         name: input.name?.trim() || null,
         folder,
         backend: input.backend ?? 'codex',
+        delegatedByAgentId: caller.id,
         teamId: input.teamId ?? caller.teamId,
       };
       const previousAgentIds = new Set(this.snapshot.agents.map((agent) => agent.id));

@@ -26,6 +26,8 @@ type PersistedState = {
 };
 
 type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
+  delegatedByAgentId?: string;
+  pullRequest?: Agent['pullRequest'];
   sessionKind?: Agent['sessionKind'];
   conversationTitle?: string;
   avatar?: string;
@@ -145,6 +147,8 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
   return {
     id: agent.id,
     teamId: agent.teamId,
+    ...(agent.delegatedByAgentId ? { delegatedByAgentId: agent.delegatedByAgentId } : {}),
+    ...(agent.pullRequest ? { pullRequest: { ...agent.pullRequest } } : {}),
     ...(agent.sessionKind ? { sessionKind: agent.sessionKind } : {}),
     name: agent.name,
     ...(agent.conversationTitle ? { conversationTitle: agent.conversationTitle } : {}),
@@ -381,9 +385,14 @@ function sanitizeAgent(value: unknown): Agent | null {
   const goal = sanitizeThreadGoal(value.goal);
   const openInApplication = sanitizeOpenInApplication(value.openInApplication);
   const workspace = sanitizeAgentWorkspace(value.workspace);
+  const pullRequest = sanitizeAgentPullRequest(value.pullRequest);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
+    ...(typeof value.delegatedByAgentId === 'string' && value.delegatedByAgentId.trim()
+      ? { delegatedByAgentId: value.delegatedByAgentId.trim() }
+      : {}),
+    ...(pullRequest ? { pullRequest } : {}),
     ...(sessionKind ? { sessionKind } : {}),
     name: typeof value.name === 'string' ? value.name : null,
     ...(typeof value.conversationTitle === 'string' && value.conversationTitle.trim()
@@ -403,6 +412,39 @@ function sanitizeAgent(value: unknown): Agent | null {
     status: { type: 'idle' },
     createdAt,
     updatedAt,
+  };
+}
+
+function sanitizeAgentPullRequest(value: unknown): Agent['pullRequest'] | undefined {
+  if (
+    !isRecord(value) ||
+    value.provider !== 'github' ||
+    typeof value.repository !== 'string' ||
+    typeof value.branch !== 'string' ||
+    !Number.isInteger(value.number) ||
+    typeof value.title !== 'string' ||
+    typeof value.url !== 'string' ||
+    typeof value.draft !== 'boolean' ||
+    typeof value.headSha !== 'string' ||
+    (value.state !== 'open' && value.state !== 'merged' && value.state !== 'closed') ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    return undefined;
+  }
+  return {
+    provider: 'github',
+    repository: value.repository,
+    branch: value.branch,
+    number: value.number as number,
+    title: value.title,
+    url: value.url,
+    draft: value.draft,
+    headSha: value.headSha,
+    state: value.state,
+    ...(typeof value.mergedAt === 'string' ? { mergedAt: value.mergedAt } : {}),
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
   };
 }
 

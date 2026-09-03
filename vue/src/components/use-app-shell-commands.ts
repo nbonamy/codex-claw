@@ -45,6 +45,9 @@ type AppShellCommandOptions = {
     openAgentSurface: () => void;
     openBrowser: (command: Extract<AppCommand, { type: 'open-browser' }>) => void;
     openDebugImageAnnotation: (imageDataUrl?: string, pixelRatio?: 1 | 2) => void | Promise<void>;
+    openDebugOperationProgress: (
+      kind: Extract<AppCommand, { type: 'debug-operation-progress' }>['kind'],
+    ) => void | Promise<void>;
     openFileQuick: () => void;
     openGitReview: () => void | Promise<void>;
     openMarkdown: (request: SidePanelMarkdownRequest) => void;
@@ -318,6 +321,11 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     if (command.type === 'debug-image-annotation') {
       if (isModalDialogVisible.value) return;
       void options.actions.openDebugImageAnnotation(command.imageDataUrl, command.pixelRatio);
+      return;
+    }
+
+    if (command.type === 'debug-operation-progress') {
+      void options.actions.openDebugOperationProgress(command.kind);
       return;
     }
 

@@ -416,6 +416,81 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('debug-mark-unread')).toStrictEqual([[]]);
   });
 
+  it('previews the real worktree initialization progress from a Debug command', async () => {
+    vi.useFakeTimers();
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell();
+
+    listener({ type: 'debug-operation-progress', kind: 'worktreeInitialization' });
+    await nextTick();
+
+    const dialog = wrapper.getComponent({ name: 'AgentCreationProgressDialog' });
+    expect(dialog.props('progress')).toMatchObject({
+      state: 'running',
+      createWorktree: true,
+      phase: 'creatingWorktree',
+      branchName: 'debug/worktree-preview',
+    });
+    expect(wrapper.text()).toContain('Building an isolated home in codex-claw');
+
+    await vi.advanceTimersByTimeAsync(1_200);
+    expect(dialog.props('progress')).toMatchObject({
+      phase: 'initializingWorktree',
+      initializationDetail: 'Repository instructions · npm install',
+    });
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(dialog.props('progress')).toMatchObject({
+      state: 'success',
+      agentName: 'debug/worktree-preview',
+    });
+  });
+
+  it('routes Debug Git progress previews to the active agent workflow control', async () => {
+    vi.useFakeTimers();
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    snapshot.agentGitStatuses[agent.id] = {
+      folder: agent.folder!,
+      repository: 'codex-claw',
+      branch: 'feature/debug-progress',
+      ahead: 1,
+      behind: 0,
+      changedFiles: 0,
+      addedLines: 0,
+      removedLines: 0,
+      hasUntracked: false,
+      state: 'clean',
+      updatedAt: '2026-09-03T00:00:00.000Z',
+    };
+    const wrapper = mountShell({ snapshot });
+
+    listener({ type: 'debug-operation-progress', kind: 'pullRequest' });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Building handoff report');
+    expect(wrapper.text()).toContain('Run in background');
+
+    listener({ type: 'debug-operation-progress', kind: 'merge' });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Building handoff report');
+    expect(wrapper.text()).toContain('Run in background');
+  });
+
   it('attaches an Appshot command to the active agent composer', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     window.codexClaw = {

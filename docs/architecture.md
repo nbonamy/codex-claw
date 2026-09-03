@@ -173,6 +173,31 @@ branch or create a named worktree. The Claw MCP server exposes the same
 app-owned operations with `list-repos`, `list-worktrees`, `create-worktree`,
 and `create-agent`.
 
+Agents created through delegation keep a durable link to the agent that
+created them. When the user finishes delegated work through the pull-request
+or merge flow, `clawd` tells the idle worker which Git action Claw is taking
+over and asks for a whole-task handoff before touching the branch. The worker
+is told not to make further changes or speculate about delivery; after the Git
+operation succeeds, Claw adds its authoritative PR or direct-merge result and
+delivers the report to the delegating agent. This ordering also keeps a linked
+worktree alive until the worker finishes its handoff. When merge cleanup removes
+that worktree, `clawd` delivers the handoff and closes the worker instead of
+moving it onto the shared base checkout. The renderer only
+presents the opt-in control when that relationship resolves to a live agent.
+Pull-request and merge progress can be dismissed while the request continues;
+the renderer reports the final result through a notification without allowing
+a second Git operation to race the first one.
+
+Pull requests created by Claw are tracked on their owning agent with the
+repository, branch, head commit, provider state, and timestamps. A generic
+`clawd` runtime scheduler polls only those known PRs through the work-provider
+adapter, once at startup and then periodically. When GitHub reports a merge,
+the sidebar shows an agent-scoped cleanup alert. A closed but unmerged PR uses
+the same terminal-state alert with explicit warning copy and preserves its
+remote branch. Cleanup remains explicit and is accepted only for an idle agent
+whose linked worktree is unshared, clean, and still points at the PR head Claw
+recorded.
+
 ## Process Architecture
 
 The app is extracted from an Electron-main backend into a separate `clawd`

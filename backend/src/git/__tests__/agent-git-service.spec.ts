@@ -528,6 +528,31 @@ describe('agent git service parsers', () => {
     expect(runGit).not.toHaveBeenCalled();
   });
 
+  it('refuses merged pull-request cleanup after new local commits were added', async () => {
+    const runGit = vi.fn().mockResolvedValue({ stdout: 'newer-local-head\n' });
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo',
+      folder: '/repo-feature',
+      isLinkedWorktree: true,
+      branch: 'feature',
+      detached: false,
+      remote: 'origin',
+      upstream: 'origin/feature',
+      ahead: 0,
+      behind: 0,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+    });
+
+    await expect(service.validateLinkedWorktreeDeletion('/repo-feature', false, 'merged-head')).rejects.toThrow(
+      'This branch contains commits that are not part of the tracked pull request.',
+    );
+    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['rev-parse', 'HEAD']);
+    expect(runGit.mock.calls.some(([, args]) => args[0] === 'worktree')).toBe(false);
+  });
+
   it('reports whether the repository folder is a secondary linked worktree', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };

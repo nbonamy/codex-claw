@@ -238,8 +238,8 @@ describe('app menu', () => {
 
     const template = electronMenuMocks.buildFromTemplate.mock.calls.at(-1)?.[0];
     if (!Array.isArray(template)) throw new Error('Menu template was not built');
-    expect(menuItem(template, 'Debug', 'Send Message')).toMatchObject({ enabled: true });
-    clickItem(template, 'Debug', 'Send Message');
+    expect(nestedMenuItem(template, 'Debug', 'Agent Fixtures', 'Send Message')).toMatchObject({ enabled: true });
+    clickNestedItem(template, 'Debug', 'Agent Fixtures', 'Send Message');
     expect(sendDebugAgentMessage).toHaveBeenCalledOnce();
   });
 
@@ -258,16 +258,49 @@ describe('app menu', () => {
       'Reload',
       'Toggle Developer Tools',
     ]);
-    expect(menuLabels(submenu(debugMenu, 'Debug'))).toStrictEqual([
-      'Send Message',
-      'Celebrate',
+    const debugItems = submenu(debugMenu, 'Debug');
+    expect(debugItems.map((item) => item.type === 'separator' ? 'separator' : item.label)).toStrictEqual([
+      'Agent Fixtures',
+      'UI Previews',
+      'Effects',
+      'separator',
       'Open Codex Claw Website',
-      'Open Markdown',
+    ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'Agent Fixtures')).toStrictEqual([
+      'Send Message',
       'Approval Request',
-      'Mark as unread',
+      'Mark as Unread',
       'Execution Plan',
       'Plan Review',
+    ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
+      'Markdown',
       'Image Annotation',
+      'Worktree Initialization',
+      'Pull Request Progress',
+      'Merge Progress',
+    ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'Effects')).toStrictEqual([
+      'Confetti',
+      'Stars',
+      'Shapes',
+      'School Pride',
+    ]);
+    expect(nestedSubmenu(debugMenu, 'Debug', 'Agent Fixtures').map(menuEntryLabel)).toStrictEqual([
+      'Send Message',
+      'Approval Request',
+      'separator',
+      'Mark as Unread',
+      'Execution Plan',
+      'Plan Review',
+    ]);
+    expect(nestedSubmenu(debugMenu, 'Debug', 'UI Previews').map(menuEntryLabel)).toStrictEqual([
+      'Markdown',
+      'Image Annotation',
+      'separator',
+      'Worktree Initialization',
+      'Pull Request Progress',
+      'Merge Progress',
     ]);
     expect(menuItem(debugMenu, 'View', 'Next Team')?.accelerator).toBe('Command+`');
     expect(menuItem(debugMenu, 'View', 'Next Agent')?.accelerator).toBe('Control+Tab');
@@ -277,51 +310,68 @@ describe('app menu', () => {
 
     clickItem(debugMenu, 'View', 'Reload');
     clickItem(debugMenu, 'View', 'Toggle Developer Tools');
-    clickItem(debugMenu, 'Debug', 'Send Message');
-    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'Confetti');
-    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'Stars');
-    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'Shapes');
-    clickNestedItem(debugMenu, 'Debug', 'Celebrate', 'School Pride');
+    clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Send Message');
+    clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Approval Request');
+    clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Mark as Unread');
+    clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Execution Plan');
+    clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Plan Review');
+    clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Markdown');
+    clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Image Annotation');
+    clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Worktree Initialization');
+    clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Pull Request Progress');
+    clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Merge Progress');
+    clickNestedItem(debugMenu, 'Debug', 'Effects', 'Confetti');
+    clickNestedItem(debugMenu, 'Debug', 'Effects', 'Stars');
+    clickNestedItem(debugMenu, 'Debug', 'Effects', 'Shapes');
+    clickNestedItem(debugMenu, 'Debug', 'Effects', 'School Pride');
     clickItem(debugMenu, 'Debug', 'Open Codex Claw Website');
-    clickItem(debugMenu, 'Debug', 'Open Markdown');
-    clickItem(debugMenu, 'Debug', 'Approval Request');
-    clickItem(debugMenu, 'Debug', 'Mark as unread');
-    clickItem(debugMenu, 'Debug', 'Execution Plan');
-    clickItem(debugMenu, 'Debug', 'Plan Review');
-    clickItem(debugMenu, 'Debug', 'Image Annotation');
 
     expect(debugCallbacks.reload).toHaveBeenCalledOnce();
     expect(debugCallbacks.toggleDeveloperTools).toHaveBeenCalledOnce();
     expect(debugCallbacks.sendDebugAgentMessage).toHaveBeenCalledOnce();
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(1, {
-      type: 'debug-celebrate',
-      kind: 'confetti',
+      type: 'debug-approval-request',
     });
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, {
-      type: 'debug-celebrate',
-      kind: 'stars',
-    });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, {
-      type: 'debug-celebrate',
-      kind: 'shapes',
-    });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, {
-      type: 'debug-celebrate',
-      kind: 'schoolPride',
-    });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, {
-      type: 'open-browser',
-      url: 'https://codex-claw.nabocorp.com',
-    });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'debug-open-markdown' });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'debug-approval-request' });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, {
       type: 'debug-mark-unread',
     });
-    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, {
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'debug-open-markdown' });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, {
       type: 'debug-image-annotation',
       imageDataUrl: 'data:image/png;base64,clipboard-image',
       pixelRatio: 2,
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, {
+      type: 'debug-operation-progress',
+      kind: 'worktreeInitialization',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, {
+      type: 'debug-operation-progress',
+      kind: 'pullRequest',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, {
+      type: 'debug-operation-progress',
+      kind: 'merge',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, {
+      type: 'debug-celebrate',
+      kind: 'confetti',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, {
+      type: 'debug-celebrate',
+      kind: 'stars',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, {
+      type: 'debug-celebrate',
+      kind: 'shapes',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, {
+      type: 'debug-celebrate',
+      kind: 'schoolPride',
+    });
+    expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, {
+      type: 'open-browser',
+      url: 'https://codex-claw.nabocorp.com',
     });
     expect(electronClipboardMocks.readImage).toHaveBeenCalledOnce();
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
@@ -339,7 +389,7 @@ describe('app menu', () => {
     const nextCallbacks = callbacks();
     const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: true }, 'darwin');
 
-    clickItem(menu, 'Debug', 'Image Annotation');
+    clickNestedItem(menu, 'Debug', 'UI Previews', 'Image Annotation');
 
     expect(nextCallbacks.sendAppCommand).toHaveBeenCalledWith({ type: 'debug-image-annotation' });
   });
@@ -353,7 +403,7 @@ describe('app menu', () => {
     const nextCallbacks = callbacks();
     const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: true }, 'darwin');
 
-    clickItem(menu, 'Debug', 'Image Annotation');
+    clickNestedItem(menu, 'Debug', 'UI Previews', 'Image Annotation');
 
     expect(nextCallbacks.sendAppCommand).toHaveBeenCalledWith({
       type: 'debug-image-annotation',
@@ -387,6 +437,37 @@ function menuItem(template: MenuItemConstructorOptions[], menuLabel: string, ite
   return submenu(template, menuLabel).find((item) => item.label === itemLabel);
 }
 
+function nestedMenuItem(
+  template: MenuItemConstructorOptions[],
+  menuLabel: string,
+  parentLabel: string,
+  itemLabel: string,
+): MenuItemConstructorOptions | undefined {
+  return nestedSubmenu(template, menuLabel, parentLabel).find((item) => item.label === itemLabel);
+}
+
+function nestedSubmenu(
+  template: MenuItemConstructorOptions[],
+  menuLabel: string,
+  parentLabel: string,
+): MenuItemConstructorOptions[] {
+  const parent = menuItem(template, menuLabel, parentLabel);
+  if (!parent || !Array.isArray(parent.submenu)) throw new Error(`${parentLabel} submenu not found`);
+  return parent.submenu;
+}
+
+function submenuLabels(
+  template: MenuItemConstructorOptions[],
+  menuLabel: string,
+  parentLabel: string,
+): string[] {
+  return menuLabels(nestedSubmenu(template, menuLabel, parentLabel));
+}
+
+function menuEntryLabel(item: MenuItemConstructorOptions): string | undefined {
+  return item.type === 'separator' ? 'separator' : item.label;
+}
+
 function menuLabels(items: MenuItemConstructorOptions[]): string[] {
   return items
     .filter((item) => item.type !== 'separator')
@@ -409,11 +490,7 @@ function clickNestedItem(
   parentLabel: string,
   itemLabel: string,
 ): void {
-  const parent = menuItem(template, menuLabel, parentLabel);
-  if (!parent || !Array.isArray(parent.submenu)) {
-    throw new Error(`${parentLabel} submenu not found`);
-  }
-  const item = parent.submenu.find((candidate) => candidate.label === itemLabel);
+  const item = nestedMenuItem(template, menuLabel, parentLabel, itemLabel);
   if (!item?.click) throw new Error(`${itemLabel} menu item not found`);
   item.click({ checked: true } as never, undefined as never, undefined as never);
 }

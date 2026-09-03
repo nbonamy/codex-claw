@@ -1,4 +1,4 @@
-import type { Agent, AgentStatus } from './contracts';
+import type { Agent, AgentPullRequestTracking, AgentStatus } from './contracts';
 import { agentDisplayName } from './agent-display';
 import { repositoryIconKeyForRemote } from './git-remote';
 
@@ -14,6 +14,7 @@ export type WorkspaceSidebarSession = {
   isActive: boolean;
   isUnread: boolean;
   status: AgentStatus;
+  pullRequest?: AgentPullRequestTracking;
   quickSwitchIndex: number;
 };
 
@@ -115,6 +116,7 @@ export function projectWorkspaceSidebar(input: {
       isActive: agent.id === input.activeAgentId,
       isUnread: unreadIds.has(agent.id),
       status: { ...agent.status },
+      ...(agent.pullRequest ? { pullRequest: { ...agent.pullRequest } } : {}),
       quickSwitchIndex,
     });
   });

@@ -45,6 +45,41 @@ describe('AgentSidebar actions', () => {
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
   });
 
+  it('offers closed pull request cleanup without selecting the agent', async () => {
+    const closedAgent = {
+      ...agents[0]!,
+      pullRequest: {
+        provider: 'github' as const,
+        repository: 'nbonamy/id8',
+        branch: 'feat/merged',
+        number: 7,
+        title: 'Merged work',
+        url: 'https://github.com/nbonamy/id8/pull/7',
+        draft: false,
+        headSha: 'abc123',
+        state: 'closed' as const,
+        createdAt: '2026-09-03T11:00:00.000Z',
+        updatedAt: '2026-09-03T12:00:00.000Z',
+      },
+    };
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [closedAgent],
+        activeAgentId: closedAgent.id,
+        teamName: 'Codex Claw',
+      },
+      global: { components: { ElPopover } },
+    });
+
+    const attention = wrapper.get('.agent-sidebar__pull-request-attention');
+    expect(attention.attributes('aria-label')).toContain('#7 was closed');
+    expect(wrapper.find('.agent-sidebar__status').exists()).toBe(false);
+    await attention.trigger('click');
+
+    expect(wrapper.emitted('cleanup-pull-request')).toStrictEqual([[closedAgent.id]]);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
   it('emits agent reorder drops and marks the drop location', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

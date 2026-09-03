@@ -109,8 +109,11 @@ Current implementation checkpoint:
   fetched from `client/state/get` or received on backend events instead of
   being recomputed from agent statuses in Electron.
 - `clawd` now owns automation CRUD, manual automation runs, and the automation
-  scheduler/runner. Electron proxies automation IPC to backend RPC and adopts
-  the returned snapshot.
+  runner. A reusable runtime scheduler is composed in `createClawdRuntime` and
+  runs independent registered tasks without overlap; automation scans and
+  pull-request monitoring are its first task modules. Domain modules do not
+  self-register global timers. Electron proxies automation IPC to backend RPC
+  and adopts the returned snapshot.
 - `clawd` now owns team create/update/reorder/close/select mutations. Electron
   proxies team IPC to backend RPC and adopts the returned snapshot; renderer
   selection controls also wait for backend snapshots instead of mutating active

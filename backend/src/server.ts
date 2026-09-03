@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -32,6 +32,7 @@ import { AgentGitService } from './git/agent-git-service';
 import { AgentPromptManager } from './agents/agent-prompt-manager';
 import { AgentWorkspaceService } from './agents/agent-workspace-service';
 import { AgentConversationService } from './agents/agent-conversation-service';
+import { DelegatedWorkReportService, type DelegatedWorkReportPort } from './agents/delegated-work-report-service';
 import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { WorkRoutingService, type WorkRoutingPort } from './work-routing/work-routing-service';
 import { ClientRequestRegistry } from './client-requests/client-request-registry';
@@ -55,6 +56,7 @@ export type ClawBackendServerOptions = {
   inspectCodexResourceSharing?: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
   inspectPluginStatus?: () => Promise<AppPluginStatus>;
   agentGitService?: AgentGitService;
+  delegatedWorkReports?: DelegatedWorkReportPort;
   workRouting?: WorkRoutingPort;
 };
 
@@ -106,6 +108,7 @@ export class ClawBackendServer {
   private readonly remoteTeams: RemoteTeamService;
   private readonly agentPrompts: AgentPromptManager;
   private readonly agentConversations: AgentConversationService;
+  private readonly delegatedWorkReports: DelegatedWorkReportPort;
   private readonly agentWorkspaces: AgentWorkspaceService;
   private readonly subagentIdentities: SubagentIdentityService;
   private readonly agentGitService: AgentGitService;
@@ -159,6 +162,11 @@ export class ClawBackendServer {
       applyEvent: (event) => this.applyAndEmitBackendEvent(event),
       persistSnapshot: () => this.persistSnapshotOnly(),
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
+    });
+    this.delegatedWorkReports = options.delegatedWorkReports ?? new DelegatedWorkReportService({
+      getSnapshot: () => this.snapshot,
+      sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
+      sendMessage: this.sendAgentMessage,
     });
     this.subagentIdentities = new SubagentIdentityService({
       applyEvent: (event) => this.handleBackendEvent(event, { persist: false }),
@@ -691,11 +699,29 @@ export class ClawBackendServer {
           agentId,
           ...(input ? { input } : {}),
         }, async (existingAgent) => {
+          const finishedPullRequest = input?.pullRequestCleanup === true
+            ? existingAgent.pullRequest
+            : undefined;
+          if (input?.pullRequestCleanup === true) {
+            if (!finishedPullRequest || (finishedPullRequest.state !== 'merged' && finishedPullRequest.state !== 'closed')) {
+              throw new Error('This agent does not have a finished pull request ready for cleanup.');
+            }
+            if (existingAgent.status.type === 'starting' || existingAgent.status.type === 'working' || existingAgent.status.type === 'awaitingInput') {
+              throw new Error('Wait for the agent to finish before cleaning up its pull request.');
+            }
+            if (finishedPullRequest.state === 'closed' && input.deleteRemoteBranch === true) {
+              throw new Error('Keep the remote branch when cleaning up a pull request that was closed without merging.');
+            }
+          }
           if (input?.deleteWorktree) {
             const folder = requireAgentFolder(existingAgent);
             const sharedAgent = this.snapshot.agents.find((agent) => agent.id !== agentId && agent.folder === folder);
             if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
-            await this.agentGitService.validateLinkedWorktreeDeletion(folder, input.deleteRemoteBranch === true);
+            await this.agentGitService.validateLinkedWorktreeDeletion(
+              folder,
+              input.deleteRemoteBranch === true,
+              finishedPullRequest?.headSha,
+            );
           }
           if (existingAgent.backendSession) {
             await this.driverRpc?.handle(backendMethods.driverSessionForget, {
@@ -704,7 +730,11 @@ export class ClawBackendServer {
             });
           }
           if (input?.deleteWorktree) {
-            await this.agentGitService.deleteLinkedWorktree(requireAgentFolder(existingAgent), input.deleteRemoteBranch === true);
+            await this.agentGitService.deleteLinkedWorktree(
+              requireAgentFolder(existingAgent),
+              input.deleteRemoteBranch === true,
+              finishedPullRequest?.headSha,
+            );
           }
           const agent = closeAgentInSnapshot(this.snapshot, agentId);
           if (!agent) {
@@ -904,6 +934,7 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentGitPullRequestCreate, params, async (agent) => {
+          const folder = requireAgentFolder(agent);
           const input = requireConfirmed(params.input, 'Creating a pull request');
           const workflow = await this.gitWorkflow(agent, { includePullRequest: true });
           if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before creating a pull request.');
@@ -911,12 +942,49 @@ export class ClawBackendServer {
           if (!workflow.remote || !workflow.remoteUrl) throw new Error('Add a GitHub remote before creating a pull request.');
           if (workflow.githubError) throw new Error(`Could not verify existing pull requests: ${workflow.githubError}`);
           if (workflow.existingPullRequest) throw new Error(`Pull request #${workflow.existingPullRequest.number} already exists for this branch.`);
-          await this.requireWorkIntegrations().createPullRequest(workflow.repository, {
+          if (input.reportBack === true) this.emitGitOperationProgress(agentId, 'pullRequest', 'handoff');
+          const handoff = input.reportBack === true
+            ? await this.delegatedWorkReports.prepare(agent, {
+              kind: 'pullRequest',
+              branch: workflow.branch,
+            })
+            : null;
+          if (input.reportBack === true) this.emitGitOperationProgress(agentId, 'pullRequest', 'delivery');
+          if (!workflow.upstream || workflow.ahead > 0) {
+            await this.agentGitService.push(folder, workflow.remote, workflow.branch, !workflow.upstream);
+          }
+          const createdPullRequest = await this.requireWorkIntegrations().createPullRequest(workflow.repository, {
             branch: workflow.branch,
             title: requireString(input.title, 'title'),
             body: typeof input.body === 'string' ? input.body : '',
           });
-          return this.gitWorkflow(agent, { refreshStatus: true });
+          const outcome = {
+            kind: 'pullRequest' as const,
+            branch: workflow.branch,
+            title: createdPullRequest.title,
+            number: createdPullRequest.number,
+            url: createdPullRequest.url,
+            draft: createdPullRequest.draft,
+          };
+          const now = new Date().toISOString();
+          agent.pullRequest = {
+            ...createdPullRequest,
+            provider: 'github',
+            repository: workflow.repository,
+            branch: workflow.branch,
+            createdAt: now,
+            updatedAt: now,
+          };
+          const result = {
+            ...await this.gitWorkflow(agent, { refreshStatus: true }),
+            existingPullRequest: createdPullRequest,
+          };
+          this.delegatedWorkReports.notifyWorker(agent, outcome);
+          if (input.reportBack === true) {
+            this.delegatedWorkReports.deliver(agent, outcome, handoff);
+          }
+          await this.persistAndEmitSnapshot();
+          return result;
         });
       }
       case backendMethods.agentGitMerge: {
@@ -928,14 +996,36 @@ export class ClawBackendServer {
           const strategy = input.strategy === 'squash' ? 'squash' : 'merge';
           const commitMessage = strategy === 'squash' ? requireString(input.commitMessage, 'commitMessage') : undefined;
           const deleteWorktree = input.deleteWorktree === true;
+          const workflow = input.reportBack === true ? await this.gitWorkflow(agent) : null;
+          if (input.reportBack === true) this.emitGitOperationProgress(agentId, 'merge', 'handoff');
+          const handoff = input.reportBack === true
+            ? await this.delegatedWorkReports.prepare(agent, {
+              kind: 'merge',
+              branch: workflow?.branch ?? 'branch',
+              repository: workflow?.repository ?? 'the base branch',
+            })
+            : null;
+          if (input.reportBack === true) this.emitGitOperationProgress(agentId, 'merge', 'delivery');
           const targetFolder = await this.agentGitService.merge(folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
+          const outcome = {
+            kind: 'merge' as const,
+            branch: workflow?.branch ?? 'branch',
+            repository: workflow?.repository ?? 'the base branch',
+          };
           if (deleteWorktree) {
             updateAgentFolder(this.snapshot, agentId, targetFolder);
             await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
-            await this.agentWorkspaces.refreshIdentity(agentId);
+          }
+          const result = await this.gitWorkflow(agent, { refreshStatus: true });
+          if (input.reportBack === true) {
+            this.delegatedWorkReports.deliver(agent, outcome, handoff);
+          }
+          if (deleteWorktree) {
+            closeAgentInSnapshot(this.snapshot, agentId);
+            this.transcriptRetention.delete(agentId);
             await this.persistAndEmitSnapshot();
           }
-          return this.gitWorkflow(agent, { refreshStatus: true });
+          return result;
         });
       }
       case backendMethods.agentWorkItemAssign: {
@@ -1871,6 +1961,7 @@ export class ClawBackendServer {
   }
 
   async close(): Promise<void> {
+    this.delegatedWorkReports.close();
     this.agentPrompts.close();
     this.unsubscribeDriverEvents?.();
     await this.transcriptRetention.close();
@@ -2235,6 +2326,18 @@ export class ClawBackendServer {
     this.snapshot.sourceFolder.recentRepoNames = nextNames.slice(0, 5);
   }
 
+  private emitGitOperationProgress(
+    agentId: string,
+    operation: AgentGitOperationProgress['operation'],
+    phase: AgentGitOperationProgress['phase'],
+  ): void {
+    this.applyAndEmitBackendEvent({
+      agentId,
+      type: 'git.operationProgress',
+      payload: { operation, phase } satisfies AgentGitOperationProgress,
+    }, { trackTranscriptActivity: false });
+  }
+
   private async validateAgentInput(input: Pick<CreateAgentInput, 'name' | 'folder'>, remoteConnectionId: string | null = null): Promise<void> {
     if (input.name !== null && !input.name.trim()) {
       throw new Error('Agent name is required.');
@@ -2278,6 +2381,7 @@ export class ClawBackendServer {
     if (options.trackTranscriptActivity !== false) this.touchTranscriptForEvent(event);
     const fullEvent = this.nextMainEvent(this.compactSnapshotEvent(event));
     applyMainEventToSnapshot(this.snapshot, fullEvent);
+    this.delegatedWorkReports?.handleEvent(fullEvent);
     this.clientRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
@@ -2295,6 +2399,7 @@ export class ClawBackendServer {
     }
     const fullEvent = this.nextMainEvent(this.compactSnapshotEvent(event));
     applyMainEventToSnapshot(this.snapshot, fullEvent);
+    this.delegatedWorkReports.handleEvent(fullEvent);
     this.clientRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
@@ -2629,7 +2734,7 @@ function requireAgentId(params: unknown): string {
 
 function requireAgentCloseRequest(params: unknown): {
   agentId: string;
-  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; confirmed: true };
+  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: true };
 } {
   const record = requireRecord(params);
   const agentId = requireString(record.agentId, 'agentId');
@@ -2640,14 +2745,21 @@ function requireAgentCloseRequest(params: unknown): {
   if (input.deleteRemoteBranch !== undefined && typeof input.deleteRemoteBranch !== 'boolean') {
     throw new Error('deleteRemoteBranch must be a boolean.');
   }
+  if (input.pullRequestCleanup !== undefined && typeof input.pullRequestCleanup !== 'boolean') {
+    throw new Error('pullRequestCleanup must be a boolean.');
+  }
   if (input.deleteRemoteBranch === true && input.deleteWorktree !== true) {
     throw new Error('Delete the worktree before deleting its remote branch.');
+  }
+  if (input.pullRequestCleanup === true && input.deleteWorktree !== true) {
+    throw new Error('Delete the worktree when cleaning up a pull request.');
   }
   return {
     agentId,
     input: {
       deleteWorktree: input.deleteWorktree,
       ...(input.deleteRemoteBranch === undefined ? {} : { deleteRemoteBranch: input.deleteRemoteBranch }),
+      ...(input.pullRequestCleanup === undefined ? {} : { pullRequestCleanup: input.pullRequestCleanup }),
       confirmed: true,
     },
   };

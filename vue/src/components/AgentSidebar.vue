@@ -122,56 +122,71 @@
           </span>
         </header>
 
-        <button
+        <div
           v-for="session in group.sessions"
-          v-show="!isWorkspaceCollapsed(group)"
           :key="session.agentId"
-          class="agent-sidebar__agent"
-          :class="[
-            { 'agent-sidebar__agent--active': session.isActive },
-            agentReorder.dropTargetClass(session.agentId),
-          ]"
-          type="button"
-          v-bind="agentReorder.dragItemAttributes(session.agentId)"
-          :data-session-kind="session.kind"
-          :aria-pressed="session.isActive"
-          @click="selectAgent(session.agentId)"
-          @contextmenu.prevent="openAgentMenu(session.agentId, $event)"
-          @dragstart="agentReorder.onDragStart(session.agentId, $event)"
-          @dragover="agentReorder.onDragOver(session.agentId, $event)"
-          @dragleave="agentReorder.onDragLeave(session.agentId, $event)"
-          @drop="agentReorder.onDrop(session.agentId, $event)"
-          @dragend="agentReorder.onDragEnd"
+          class="agent-sidebar__agent-row"
         >
-          <GitForkIcon
-            v-if="group.kind !== 'quickChats' && session.kind === 'worktree'"
-            class="agent-sidebar__session-icon"
-            aria-hidden="true"
-          />
-          <GitBranchIcon
-            v-else-if="group.kind !== 'quickChats'"
-            class="agent-sidebar__session-icon"
-            aria-hidden="true"
-          />
-          <span class="agent-sidebar__meta">
-            <strong
-              class="agent-sidebar__session-title"
-              :class="{ 'agent-sidebar__session-title--active': session.isActive }"
-            >{{ session.displayTitle }}</strong>
-          </span>
-          <span
-            v-if="!session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
-            class="agent-sidebar__quick-switch-shortcut"
-            :aria-label="t('sidebar.switchShortcut', { session: session.displayTitle, number: session.quickSwitchIndex + 1 })"
-          ><span aria-hidden="true">⌘</span>{{ session.quickSwitchIndex + 1 }}</span>
-          <span
-            v-else
-            class="agent-sidebar__status"
-            :class="{ 'agent-sidebar__status--unread': session.isUnread }"
-            :data-status="session.status.type"
-            :aria-label="session.isUnread ? t('sidebar.unread') : statusLabel(session.status.type)"
-          />
-        </button>
+          <button
+            v-show="!isWorkspaceCollapsed(group)"
+            class="agent-sidebar__agent"
+            :class="[
+              { 'agent-sidebar__agent--active': session.isActive },
+              agentReorder.dropTargetClass(session.agentId),
+            ]"
+            type="button"
+            v-bind="agentReorder.dragItemAttributes(session.agentId)"
+            :data-session-kind="session.kind"
+            :aria-pressed="session.isActive"
+            @click="selectAgent(session.agentId)"
+            @contextmenu.prevent="openAgentMenu(session.agentId, $event)"
+            @dragstart="agentReorder.onDragStart(session.agentId, $event)"
+            @dragover="agentReorder.onDragOver(session.agentId, $event)"
+            @dragleave="agentReorder.onDragLeave(session.agentId, $event)"
+            @drop="agentReorder.onDrop(session.agentId, $event)"
+            @dragend="agentReorder.onDragEnd"
+          >
+            <GitForkIcon
+              v-if="group.kind !== 'quickChats' && session.kind === 'worktree'"
+              class="agent-sidebar__session-icon"
+              aria-hidden="true"
+            />
+            <GitBranchIcon
+              v-else-if="group.kind !== 'quickChats'"
+              class="agent-sidebar__session-icon"
+              aria-hidden="true"
+            />
+            <span class="agent-sidebar__meta">
+              <strong
+                class="agent-sidebar__session-title"
+                :class="{ 'agent-sidebar__session-title--active': session.isActive }"
+              >{{ session.displayTitle }}</strong>
+            </span>
+            <span
+              v-if="!isPullRequestFinished(session) && !session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
+              class="agent-sidebar__quick-switch-shortcut"
+              :aria-label="t('sidebar.switchShortcut', { session: session.displayTitle, number: session.quickSwitchIndex + 1 })"
+            ><span aria-hidden="true">⌘</span>{{ session.quickSwitchIndex + 1 }}</span>
+            <span
+              v-else-if="!isPullRequestFinished(session)"
+              class="agent-sidebar__status"
+              :class="{ 'agent-sidebar__status--unread': session.isUnread }"
+              :data-status="session.status.type"
+              :aria-label="session.isUnread ? t('sidebar.unread') : statusLabel(session.status.type)"
+            />
+          </button>
+          <button
+            v-if="isPullRequestFinished(session)"
+            v-show="!isWorkspaceCollapsed(group)"
+            class="agent-sidebar__pull-request-attention"
+            type="button"
+            :aria-label="pullRequestAttentionLabel(session)"
+            :title="pullRequestAttentionLabel(session)"
+            @click.stop="emit('cleanup-pull-request', session.agentId)"
+          >
+            <AlertTriangleIcon aria-hidden="true" />
+          </button>
+        </div>
       </section>
     </nav>
 
@@ -212,8 +227,9 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@codex-claw/core/contracts';
-import { projectWorkspaceSidebar, type WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
+import { projectWorkspaceSidebar, type WorkspaceSidebarGroup, type WorkspaceSidebarSession } from '@codex-claw/core/workspace-sidebar';
 import {
+  AlertTriangleIcon,
   GitBranchIcon,
   GitForkIcon,
   MessageIcon,
@@ -253,6 +269,7 @@ const { t } = useI18n();
 const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
+  'cleanup-pull-request': [agentId: string];
   'update-collapsed-repositories': [repositoryKeys: string[]];
   'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
   'create-agent-on-branch': [payload: { agentId: string; repositoryName: string; repositoryRoot: string; branch: SourceBranch }];
@@ -434,6 +451,19 @@ function repositorySessionMenuItems(
 
 function statusLabel(status: Agent['status']['type']): string {
   return t(`status.${status}`);
+}
+
+function isPullRequestFinished(session: WorkspaceSidebarSession): boolean {
+  return session.pullRequest?.state === 'merged' || session.pullRequest?.state === 'closed';
+}
+
+function pullRequestAttentionLabel(session: WorkspaceSidebarSession): string {
+  const pullRequest = session.pullRequest;
+  if (!pullRequest) return '';
+  return t(
+    pullRequest.state === 'closed' ? 'sidebar.pullRequestClosedCleanup' : 'sidebar.pullRequestMergedCleanup',
+    { number: pullRequest.number },
+  );
 }
 
 function selectRepositorySessionMenuItem(
@@ -842,6 +872,37 @@ function onResizePointerEnd(event: PointerEvent): void {
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.agent-sidebar__agent-row {
+  position: relative;
+}
+
+.agent-sidebar__pull-request-attention {
+  position: absolute;
+  top: 50%;
+  right: var(--space-6);
+  display: grid;
+  place-items: center;
+  width: var(--agent-sidebar-status-column-width);
+  height: var(--line-height-18);
+  padding: 0;
+  border: 0;
+  color: var(--color-warning);
+  background: transparent;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.agent-sidebar__pull-request-attention svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  stroke-width: 2;
+}
+
+.agent-sidebar__pull-request-attention:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .agent-sidebar__workspace-group[data-group-kind="quickChats"]

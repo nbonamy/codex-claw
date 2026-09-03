@@ -297,8 +297,8 @@ export class AgentGitService {
     return folder;
   }
 
-  async deleteLinkedWorktree(folder: string, deleteRemoteBranch = false): Promise<void> {
-    const { current, target } = await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch);
+  async deleteLinkedWorktree(folder: string, deleteRemoteBranch = false, expectedHeadSha?: string): Promise<void> {
+    const { current, target } = await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch, expectedHeadSha);
 
     if (deleteRemoteBranch) {
       await this.runGit(target.path, ['push', current.remote!, '--delete', current.upstream!.slice(current.remote!.length + 1)]);
@@ -307,11 +307,11 @@ export class AgentGitService {
     await this.runGit(target.path, ['branch', '-D', current.branch!]);
   }
 
-  async validateLinkedWorktreeDeletion(folder: string, deleteRemoteBranch = false): Promise<void> {
-    await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch);
+  async validateLinkedWorktreeDeletion(folder: string, deleteRemoteBranch = false, expectedHeadSha?: string): Promise<void> {
+    await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch, expectedHeadSha);
   }
 
-  private async linkedWorktreeDeletionPlan(folder: string, deleteRemoteBranch: boolean): Promise<{
+  private async linkedWorktreeDeletionPlan(folder: string, deleteRemoteBranch: boolean, expectedHeadSha?: string): Promise<{
     current: Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>;
     target: { path: string; branch?: string };
   }> {
@@ -319,6 +319,12 @@ export class AgentGitService {
     if (!current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
     if (!current.branch || current.detached) throw new Error('The linked worktree does not have a local branch to delete.');
     if (current.files.length > 0) throw new Error('Commit or discard the worktree changes before deleting it.');
+    if (expectedHeadSha) {
+      const headSha = (await this.runGit(folder, ['rev-parse', 'HEAD'])).stdout.trim();
+      if (headSha !== expectedHeadSha) {
+        throw new Error('This branch contains commits that are not part of the tracked pull request.');
+      }
+    }
 
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
     const target = selectMergeTarget(worktrees, current.folder);

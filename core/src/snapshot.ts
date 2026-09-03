@@ -139,10 +139,12 @@ export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnec
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
   const name = normalizedOptionalString(input.name) ?? null;
   const backend = normalizedBackend(input.backend);
+  const delegatedByAgentId = normalizedOptionalString(input.delegatedByAgentId);
 
   return {
     id,
     teamId,
+    ...(delegatedByAgentId ? { delegatedByAgentId } : {}),
     name,
     avatar: normalizedOptionalString(input.avatar),
     folder: normalizedFolder(input.folder),
@@ -275,6 +277,7 @@ export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder
   const nextFolder = normalizedFolder(folder);
   if (nextFolder !== agent.folder) {
     delete agent.workspace;
+    delete agent.pullRequest;
   }
   agent.folder = nextFolder;
   clearAgentRuntimeState(agent);

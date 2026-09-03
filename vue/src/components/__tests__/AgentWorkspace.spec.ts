@@ -32,8 +32,9 @@ function createWorkspaceState(): AgentRightWorkspaceState {
   };
 }
 
-function mountWorkspace() {
+function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createInitialSnapshot>) => void) {
   const snapshot = createInitialSnapshot();
+  configureSnapshot?.(snapshot);
   const currentAgent = snapshot.agents[0] as Agent;
   const workspace = createWorkspaceState();
   const openRightWorkspaceTab = vi.fn((tab: RightWorkspaceTab) => {
@@ -94,6 +95,21 @@ function mountWorkspace() {
 }
 
 describe('AgentWorkspace', () => {
+  it('resolves the delegating agent name for Git workflow report-back', () => {
+    const { wrapper } = mountWorkspace((snapshot) => {
+      const worker = snapshot.agents[0] as Agent;
+      worker.delegatedByAgentId = 'agent-main';
+      snapshot.agents.push({
+        ...worker,
+        id: 'agent-main',
+        name: 'Main agent',
+        delegatedByAgentId: undefined,
+      });
+    });
+
+    expect(wrapper.findComponent({ name: 'AgentHeader' }).props('reportBackAgentName')).toBe('Main agent');
+  });
+
   it('lets the SDK handle fullscreen images and opens inline images in the agent workspace', () => {
     const { currentAgent, openRightWorkspaceTab, workspace, wrapper } = mountWorkspace();
     const image: CodexMessageImage = {

@@ -45,6 +45,7 @@
       :unread-team-ids="unreadTeamIds"
       @close-team="$emit('close-team', $event)"
       @close-agent="$emit('close-agent', $event)"
+      @cleanup-pull-request="$emit('cleanup-pull-request', $event)"
       @collapse-sidebar="agentSidebarCollapsed = true"
       @create-agent-from-repository="openRepositorySessionSource"
       @create-agent-on-branch="createRepositorySessionOnBranch"
@@ -355,6 +356,10 @@
       @image-error="handleImageAnnotationError"
       @save="saveImageAnnotation"
     />
+    <AgentCreationProgressDialog
+      :progress="debugAgentCreationProgress"
+      @close="closeDebugAgentCreationProgress"
+    />
     <CodexResourceSharingMigrationDialog
       :blocked="codexResourceSharingBlocked"
       :pending="codexResourceSharingMigrationPending"
@@ -375,17 +380,18 @@
 import { translate } from '../i18n';
 import { localizedErrorMessage, localizedText } from '../i18n/errors';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { projectAgentMentionLabels } from '@codex-claw/core/workspace-sidebar';
 import { clawHostCapabilities, codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
+import AgentCreationProgressDialog from './AgentCreationProgressDialog.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
@@ -673,6 +679,7 @@ const emit = defineEmits<{
   'close-team': [teamId: string];
   'disconnect-team': [teamId: string];
   'close-agent': [agentId: string];
+  'cleanup-pull-request': [agentId: string];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
   'delete-message': [index: number];
@@ -731,12 +738,15 @@ const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const fileQuickOpenVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
+const debugAgentCreationProgress = ref<AgentCreationProgress | null>(null);
+const debugAgentCreationTimers: Array<ReturnType<typeof setTimeout>> = [];
 const agentWorkspace = ref<{
   focusComposer(): void;
   handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void;
   openConversationLink(link: CodexConversationLink): void | Promise<void>;
   openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): boolean;
   openConversationVisualization(visualization: CodexConversationVisualization): void;
+  showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void>;
   workspaceBodyElement(): HTMLElement | null;
 } | null>(null);
 const settingsActiveTab = ref<SettingsTab>('general');
@@ -1301,6 +1311,7 @@ const isModalDialogVisible = computed(() => (
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
+  || debugAgentCreationProgress.value !== null
   || fileQuickOpenVisible.value
   || props.codexResourceSharingMigrationRequired
 ));
@@ -1328,6 +1339,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openAgentSurface: () => { activeSurface.value = 'agent'; },
     openBrowser: (command) => agentWorkspace.value?.handleBrowserOpenCommand(command),
     openDebugImageAnnotation,
+    openDebugOperationProgress,
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
     openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,
@@ -1344,6 +1356,67 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     updateComposerState: (agentId, state) => emit('update:composerState', { agentId, state }),
   },
 });
+
+function openDebugOperationProgress(
+  kind: Extract<AppCommand, { type: 'debug-operation-progress' }>['kind'],
+): void {
+  if (kind === 'worktreeInitialization') {
+    startDebugAgentCreationProgress();
+    return;
+  }
+
+  activeSurface.value = 'agent';
+  void nextTick(() => agentWorkspace.value?.showDebugGitOperationProgress(kind));
+}
+
+function startDebugAgentCreationProgress(): void {
+  clearDebugAgentCreationTimers();
+  const id = `debug-agent-creation-${Date.now()}`;
+  debugAgentCreationProgress.value = {
+    id,
+    state: 'running',
+    backend: 'codex',
+    repositoryName: 'codex-claw',
+    createWorktree: true,
+    branchName: 'debug/worktree-preview',
+    hasPrompt: true,
+    phase: 'creatingWorktree',
+  };
+  scheduleDebugAgentCreationUpdate(id, 1_200, {
+    phase: 'initializingWorktree',
+    initializationDetail: 'Repository instructions · npm install',
+  });
+  scheduleDebugAgentCreationUpdate(id, 3_200, { phase: 'creatingAgent' });
+  scheduleDebugAgentCreationUpdate(id, 4_700, { phase: 'startingPrompt' });
+  scheduleDebugAgentCreationUpdate(id, 6_200, {
+    state: 'success',
+    agentId: 'debug-agent',
+    agentName: 'debug/worktree-preview',
+  });
+}
+
+function scheduleDebugAgentCreationUpdate(
+  id: string,
+  delay: number,
+  update: Partial<AgentCreationProgress>,
+): void {
+  debugAgentCreationTimers.push(setTimeout(() => {
+    if (debugAgentCreationProgress.value?.id !== id) return;
+    debugAgentCreationProgress.value = { ...debugAgentCreationProgress.value, ...update };
+  }, delay));
+}
+
+function closeDebugAgentCreationProgress(id: string): void {
+  if (debugAgentCreationProgress.value?.id !== id) return;
+  clearDebugAgentCreationTimers();
+  debugAgentCreationProgress.value = null;
+}
+
+function clearDebugAgentCreationTimers(): void {
+  debugAgentCreationTimers.splice(0).forEach((timer) => clearTimeout(timer));
+}
+
+onBeforeUnmount(clearDebugAgentCreationTimers);
 const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null

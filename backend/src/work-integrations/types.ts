@@ -40,5 +40,6 @@ export interface WorkProviderDriver {
   listAssignedItems?(token: WorkProviderToken): Promise<WorkItem[]>;
   createItem?(token: WorkProviderToken, repositoryId: string, input: { title: string; body: string }): Promise<WorkItem>;
   findPullRequest?(token: WorkProviderToken, repositoryId: string, branch: string): Promise<AgentGitPullRequest | null>;
+  getPullRequest?(token: WorkProviderToken, repositoryId: string, number: number): Promise<AgentGitPullRequest | null>;
   createPullRequest?(token: WorkProviderToken, repositoryId: string, input: { branch: string; title: string; body: string }): Promise<AgentGitPullRequest>;
 }

@@ -86,6 +86,39 @@ describe('AppStatePersistence', () => {
     });
   });
 
+  it('round-trips the agent that delegated a worker', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].delegatedByAgentId = 'agent-main';
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.agents[0].delegatedByAgentId).toBe('agent-main');
+  });
+
+  it('round-trips tracked pull request state and rejects incomplete tracking records', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].pullRequest = {
+      provider: 'github',
+      repository: 'nbonamy/codex-claw',
+      branch: 'feat/pr-monitoring',
+      number: 42,
+      title: 'Monitor pull requests',
+      url: 'https://github.com/nbonamy/codex-claw/pull/42',
+      draft: false,
+      headSha: 'abc123',
+      state: 'merged',
+      mergedAt: '2026-09-03T12:00:00.000Z',
+      createdAt: '2026-09-03T11:00:00.000Z',
+      updatedAt: '2026-09-03T12:00:00.000Z',
+    };
+
+    const persisted = persistedStateFromSnapshot(snapshot);
+    expect(snapshotFromPersistedState(persisted).agents[0].pullRequest).toStrictEqual(snapshot.agents[0].pullRequest);
+
+    (persisted.agents[0] as { pullRequest?: unknown }).pullRequest = { provider: 'github', number: 42 };
+    expect(snapshotFromPersistedState(persisted).agents[0].pullRequest).toBeUndefined();
+  });
+
   it('round-trips workspace identity and ignores invalid legacy metadata', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].name = null;

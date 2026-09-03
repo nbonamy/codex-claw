@@ -133,6 +133,8 @@ export const messages = {
       newSessionIn: 'New session in {repository}',
       newWorktree: 'New worktree…',
       noAgents: 'No agents',
+      pullRequestMergedCleanup: 'Pull request #{number} was merged. Clean up this agent.',
+      pullRequestClosedCleanup: 'Pull request #{number} was closed. Review this agent.',
       chats: 'Chats',
       collapseChats: 'Collapse chats',
       expandChats: 'Expand chats',
@@ -146,6 +148,14 @@ export const messages = {
       workspaceSessions: 'Workspace sessions',
       welcome: 'Welcome to Codex Claw',
       welcomeDetail: 'Choose a source to start a session',
+    },
+    pullRequestCleanup: {
+      mergedTitle: 'PR #{number} was merged',
+      mergedDetail: 'Claw can close this agent and remove its worktree and local branch.',
+      closedTitle: 'PR #{number} was closed',
+      closedDetail: 'This PR was not merged. Claw can still close this agent and remove its worktree and local branch. The remote branch will be kept.',
+      later: 'Later',
+      action: 'Close agent & clean up',
     },
     status: {
       awaitingInput: 'Awaiting input',

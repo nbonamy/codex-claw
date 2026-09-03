@@ -73,31 +73,18 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
     label: 'Debug',
     submenu: [
       {
-        label: 'Send Message',
-        enabled: Boolean(callbacks.sendDebugAgentMessage),
-        click: () => callbacks.sendDebugAgentMessage?.(),
+        label: 'Agent Fixtures',
+        submenu: buildDebugAgentFixtures(callbacks),
       },
       {
-        label: 'Celebrate',
-        submenu: [
-          {
-            label: 'Confetti',
-            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'confetti' }),
-          },
-          {
-            label: 'Stars',
-            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'stars' }),
-          },
-          {
-            label: 'Shapes',
-            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'shapes' }),
-          },
-          {
-            label: 'School Pride',
-            click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'schoolPride' }),
-          },
-        ],
+        label: 'UI Previews',
+        submenu: buildDebugUiPreviews(callbacks),
       },
+      {
+        label: 'Effects',
+        submenu: buildDebugEffects(callbacks),
+      },
+      { type: 'separator' },
       {
         label: 'Open Codex Claw Website',
         click: () => callbacks.sendAppCommand({
@@ -105,50 +92,113 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
           url: 'https://codex-claw.nabocorp.com',
         }),
       },
-      {
-        label: 'Open Markdown',
-        click: () => callbacks.sendAppCommand({ type: 'debug-open-markdown' }),
-      },
-      {
-        label: 'Approval Request',
-        click: () => callbacks.sendAppCommand({ type: 'debug-approval-request' }),
-      },
-      {
-        label: 'Mark as unread',
-        click: () => callbacks.sendAppCommand({ type: 'debug-mark-unread' }),
-      },
-      {
-        label: 'Execution Plan',
-        enabled: Boolean(callbacks.toggleDebugExecutionPlan),
-        click: () => callbacks.toggleDebugExecutionPlan?.(),
-      },
-      {
-        label: 'Plan Review',
-        enabled: Boolean(callbacks.injectDebugPlanReview),
-        click: () => callbacks.injectDebugPlanReview?.(),
-      },
-      {
-        label: 'Image Annotation',
-        click: () => {
-          const image = clipboard.readImage();
-          if (image.isEmpty()) {
-            callbacks.sendAppCommand({ type: 'debug-image-annotation' });
-            return;
-          }
-
-          const pngBuffer = readClipboardPngBuffer(clipboard);
-          const pixelRatio = detectPngRetinaPixelRatio(pngBuffer ?? Buffer.alloc(0))
-            ?? (image.getScaleFactors().some((scaleFactor) => scaleFactor >= 2) ? 2 : 1);
-          callbacks.sendAppCommand({
-            type: 'debug-image-annotation',
-            imageDataUrl: pngBuffer
-              ? `data:image/png;base64,${pngBuffer.toString('base64')}`
-              : image.toDataURL({ scaleFactor: pixelRatio }),
-            ...(pixelRatio === 2 ? { pixelRatio } : {}),
-          });
-        },
-      },
     ],
+  };
+}
+
+function buildDebugAgentFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Send Message',
+      enabled: Boolean(callbacks.sendDebugAgentMessage),
+      click: () => callbacks.sendDebugAgentMessage?.(),
+    },
+    {
+      label: 'Approval Request',
+      click: () => callbacks.sendAppCommand({ type: 'debug-approval-request' }),
+    },
+    { type: 'separator' },
+    {
+      label: 'Mark as Unread',
+      click: () => callbacks.sendAppCommand({ type: 'debug-mark-unread' }),
+    },
+    {
+      label: 'Execution Plan',
+      enabled: Boolean(callbacks.toggleDebugExecutionPlan),
+      click: () => callbacks.toggleDebugExecutionPlan?.(),
+    },
+    {
+      label: 'Plan Review',
+      enabled: Boolean(callbacks.injectDebugPlanReview),
+      click: () => callbacks.injectDebugPlanReview?.(),
+    },
+  ];
+}
+
+function buildDebugUiPreviews(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Markdown',
+      click: () => callbacks.sendAppCommand({ type: 'debug-open-markdown' }),
+    },
+    debugImageAnnotationMenuItem(callbacks),
+    { type: 'separator' },
+    {
+      label: 'Worktree Initialization',
+      click: () => callbacks.sendAppCommand({
+        type: 'debug-operation-progress',
+        kind: 'worktreeInitialization',
+      }),
+    },
+    {
+      label: 'Pull Request Progress',
+      click: () => callbacks.sendAppCommand({
+        type: 'debug-operation-progress',
+        kind: 'pullRequest',
+      }),
+    },
+    {
+      label: 'Merge Progress',
+      click: () => callbacks.sendAppCommand({
+        type: 'debug-operation-progress',
+        kind: 'merge',
+      }),
+    },
+  ];
+}
+
+function buildDebugEffects(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Confetti',
+      click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'confetti' }),
+    },
+    {
+      label: 'Stars',
+      click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'stars' }),
+    },
+    {
+      label: 'Shapes',
+      click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'shapes' }),
+    },
+    {
+      label: 'School Pride',
+      click: () => callbacks.sendAppCommand({ type: 'debug-celebrate', kind: 'schoolPride' }),
+    },
+  ];
+}
+
+function debugImageAnnotationMenuItem(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+  return {
+    label: 'Image Annotation',
+    click: () => {
+      const image = clipboard.readImage();
+      if (image.isEmpty()) {
+        callbacks.sendAppCommand({ type: 'debug-image-annotation' });
+        return;
+      }
+
+      const pngBuffer = readClipboardPngBuffer(clipboard);
+      const pixelRatio = detectPngRetinaPixelRatio(pngBuffer ?? Buffer.alloc(0))
+        ?? (image.getScaleFactors().some((scaleFactor) => scaleFactor >= 2) ? 2 : 1);
+      callbacks.sendAppCommand({
+        type: 'debug-image-annotation',
+        imageDataUrl: pngBuffer
+          ? `data:image/png;base64,${pngBuffer.toString('base64')}`
+          : image.toDataURL({ scaleFactor: pixelRatio }),
+        ...(pixelRatio === 2 ? { pixelRatio } : {}),
+      });
+    },
   };
 }
 

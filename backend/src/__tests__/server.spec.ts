@@ -224,7 +224,11 @@ describe('ClawBackendServer', () => {
     expect(createBranch).toHaveBeenCalledWith('/repo', 'feat/routed-work', true);
     expect(snapshot.activeAgentId).toBe('agent-dina');
     const delegated = snapshot.agents.find((agent) => agent.id !== 'agent-dina');
-    expect(delegated).toMatchObject({ folder: '/repo-feat-routed-work', backend: 'codex' });
+    expect(delegated).toMatchObject({
+      folder: '/repo-feat-routed-work',
+      backend: 'codex',
+      delegatedByAgentId: 'agent-dina',
+    });
     await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ id: delegated!.id, folder: '/repo-feat-routed-work' }),
       'Implement the routed feature.',
@@ -383,6 +387,9 @@ describe('ClawBackendServer', () => {
       ahead: 0, behind: 0, files: [], stagedFiles: [], unstagedFiles: [],
     });
     const merge = vi.fn();
+    const prepareReport = vi.fn().mockResolvedValue('Complete implementation summary.');
+    const deliverReport = vi.fn();
+    const events: BackendEvent[] = [];
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -397,16 +404,36 @@ describe('ClawBackendServer', () => {
     const server = new ClawBackendServer({
       version: 'test-version',
       snapshot,
+      onEvent: (event) => events.push(event),
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       agentGitService: { workflow, merge } as unknown as AgentGitService,
+      delegatedWorkReports: {
+        close: vi.fn(),
+        deliver: deliverReport,
+        handleEvent: vi.fn(),
+        notifyWorker: vi.fn(),
+        prepare: prepareReport,
+        recipientName: vi.fn(),
+      },
       workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
     });
 
     await server.handleMessage({
       jsonrpc: '2.0', id: 'merge', method: backendMethods.agentGitMerge,
-      params: { agentId: 'agent-dina', input: { strategy: 'squash', commitMessage: 'feat: combine demo work', deleteBranch: false, deleteWorktree: false, confirmed: true } },
+      params: { agentId: 'agent-dina', input: { strategy: 'squash', commitMessage: 'feat: combine demo work', deleteBranch: false, deleteWorktree: false, reportBack: true, confirmed: true } },
     });
     expect(merge).toHaveBeenCalledWith('/repo-feature', 'squash', false, false, 'feat: combine demo work');
+    expect(prepareReport).toHaveBeenCalledWith(snapshot.agents[0], {
+      kind: 'merge', branch: 'feature/demo', repository: 'owner/repo',
+    });
+    expect(prepareReport.mock.invocationCallOrder[0]).toBeLessThan(merge.mock.invocationCallOrder[0]!);
+    expect(events.filter((event) => event.type === 'git.operationProgress').map((event) => event.payload)).toStrictEqual([
+      { operation: 'merge', phase: 'handoff' },
+      { operation: 'merge', phase: 'delivery' },
+    ]);
+    expect(deliverReport).toHaveBeenCalledWith(snapshot.agents[0], {
+      kind: 'merge', branch: 'feature/demo', repository: 'owner/repo',
+    }, 'Complete implementation summary.');
 
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'merge-empty', method: backendMethods.agentGitMerge,
@@ -415,7 +442,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('rehomes an agent before refreshing git after its linked worktree is removed', async () => {
+  it('closes an agent after refreshing the merge result from its removed worktree', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -432,8 +459,13 @@ describe('ClawBackendServer', () => {
       ...featureWorkflow,
       folder: '/repo', isLinkedWorktree: false, branch: 'main',
     };
-    const workflow = vi.fn().mockResolvedValue(baseWorkflow);
+    const workflow = vi.fn(async (folder: string) => folder === '/repo-feature' ? featureWorkflow : baseWorkflow);
     const merge = vi.fn().mockResolvedValue('/repo');
+    const prepareReport = vi.fn().mockResolvedValue('Complete implementation summary.');
+    const deliverReport = vi.fn((worker: Agent) => {
+      expect(snapshot.agents).toContainEqual(expect.objectContaining({ id: worker.id }));
+      return true;
+    });
     const forgetAgentSession = vi.fn();
     const getGitStatus = vi.fn(async (agent: Agent) => ({
       folder: agent.folder!, ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
@@ -456,23 +488,35 @@ describe('ClawBackendServer', () => {
       version: 'test-version', snapshot, saveSnapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       agentGitService: { workflow, merge } as unknown as AgentGitService,
+      delegatedWorkReports: {
+        close: vi.fn(),
+        deliver: deliverReport,
+        handleEvent: vi.fn(),
+        notifyWorker: vi.fn(),
+        prepare: prepareReport,
+        recipientName: vi.fn(),
+      },
       workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
     });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'merge-cleanup', method: backendMethods.agentGitMerge,
-      params: { agentId: 'agent-dina', input: { strategy: 'merge', deleteBranch: true, deleteWorktree: true, confirmed: true } },
+      params: { agentId: 'agent-dina', input: { strategy: 'merge', deleteBranch: true, deleteWorktree: true, reportBack: true, confirmed: true } },
     })).resolves.toMatchObject({ result: { folder: '/repo', branch: 'main', isLinkedWorktree: false } });
 
     expect(merge).toHaveBeenCalledWith('/repo-feature', 'merge', true, true, undefined);
-    expect(snapshot.agents[0]).toMatchObject({ folder: '/repo' });
-    expect(snapshot.agents[0]).not.toHaveProperty('backendSession');
+    expect(snapshot.agents).toHaveLength(0);
+    expect(snapshot.teams[0]?.agentIds).toStrictEqual([]);
+    expect(snapshot.activeAgentId).toBeNull();
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
     expect(saveSnapshot).toHaveBeenCalled();
-    expect(workflow).toHaveBeenCalledOnce();
-    expect(workflow).toHaveBeenCalledWith('/repo');
+    expect(workflow).toHaveBeenNthCalledWith(1, '/repo-feature');
+    expect(workflow).toHaveBeenNthCalledWith(2, '/repo');
     expect(getGitStatus).toHaveBeenCalledOnce();
     expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina', folder: '/repo' }));
+    expect(deliverReport).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
+      kind: 'merge', branch: 'feature/demo', repository: 'owner/repo',
+    }, 'Complete implementation summary.');
     await server.close();
   });
 
@@ -3909,8 +3953,67 @@ describe('ClawBackendServer', () => {
       },
     })).resolves.toMatchObject({ result: { agents: [] } });
 
-    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-fix-gh-22', true);
-    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-fix-gh-22', true);
+    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-fix-gh-22', true, undefined);
+    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-fix-gh-22', true, undefined);
+    await server.close();
+  });
+
+  it('cleans up a closed pull request after verifying its recorded head', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo-feature',
+      backend: 'codex',
+      status: { type: 'idle' },
+      pullRequest: {
+        provider: 'github',
+        repository: 'owner/repo',
+        branch: 'feature',
+        number: 7,
+        title: 'Feature',
+        url: 'https://github.com/owner/repo/pull/7',
+        draft: false,
+        headSha: 'merged-head',
+        state: 'closed',
+        createdAt: '2026-09-03T11:00:00.000Z',
+        updatedAt: '2026-09-03T12:00:00.000Z',
+      },
+      createdAt: '2026-09-03T10:00:00.000Z',
+      updatedAt: '2026-09-03T10:00:00.000Z',
+    }];
+    const validateLinkedWorktreeDeletion = vi.fn();
+    const deleteLinkedWorktree = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'cleanup-closed-pr-remote',
+      method: backendMethods.agentDelete,
+      params: {
+        agentId: 'agent-dina',
+        input: { deleteWorktree: true, deleteRemoteBranch: true, pullRequestCleanup: true, confirmed: true },
+      },
+    })).rejects.toThrow('Keep the remote branch');
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'cleanup-closed-pr',
+      method: backendMethods.agentDelete,
+      params: {
+        agentId: 'agent-dina',
+        input: { deleteWorktree: true, pullRequestCleanup: true, confirmed: true },
+      },
+    })).resolves.toMatchObject({ result: { agents: [] } });
+
+    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-feature', false, 'merged-head');
+    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-feature', false, 'merged-head');
     await server.close();
   });
 
@@ -4824,7 +4927,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('checks for an existing pull request only when creation is confirmed', async () => {
+  it('checks for an existing pull request and pushes local commits before creation', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -4844,29 +4947,45 @@ describe('ClawBackendServer', () => {
       detached: false,
       remote: 'origin',
       remoteUrl: 'git@github.com:owner/repo.git',
-      upstream: 'origin/feature/demo',
-      ahead: 0,
+      upstream: null,
+      ahead: 1,
       behind: 0,
       files: [],
       stagedFiles: [],
       unstagedFiles: [],
     });
     const findPullRequest = vi.fn().mockResolvedValue(null);
+    const push = vi.fn().mockResolvedValue(undefined);
     const createPullRequest = vi.fn().mockResolvedValue({
       number: 12,
       title: 'A useful change',
       url: 'https://github.com/owner/repo/pull/12',
       draft: true,
+      headSha: 'pull-request-head',
+      state: 'open',
     });
+    const prepareReport = vi.fn().mockResolvedValue('The complete PR handoff.');
+    const deliverReport = vi.fn();
+    const notifyWorker = vi.fn();
+    const events: BackendEvent[] = [];
     const server = new ClawBackendServer({
       version: 'test-version',
       snapshot,
-      agentGitService: { workflow } as unknown as AgentGitService,
+      onEvent: (event) => events.push(event),
+      agentGitService: { workflow, push } as unknown as AgentGitService,
       workIntegrations: {
         githubConnected: vi.fn().mockResolvedValue(true),
         findPullRequest,
         createPullRequest,
       } as unknown as WorkIntegrationManager,
+      delegatedWorkReports: {
+        close: vi.fn(),
+        deliver: deliverReport,
+        handleEvent: vi.fn(),
+        notifyWorker,
+        prepare: prepareReport,
+        recipientName: vi.fn(),
+      },
     });
 
     await expect(server.handleMessage({
@@ -4875,17 +4994,52 @@ describe('ClawBackendServer', () => {
       method: backendMethods.agentGitPullRequestCreate,
       params: {
         agentId: 'agent-dina',
-        input: { title: 'A useful change', body: 'Details', confirmed: true },
+        input: { title: 'A useful change', body: 'Details', reportBack: true, confirmed: true },
       },
     })).resolves.toMatchObject({ result: { repository: 'owner/repo', branch: 'feature/demo' } });
 
     expect(findPullRequest).toHaveBeenCalledOnce();
     expect(findPullRequest).toHaveBeenCalledWith('owner/repo', 'feature/demo');
+    expect(push).toHaveBeenCalledWith('/repo', 'origin', 'feature/demo', true);
     expect(createPullRequest).toHaveBeenCalledOnce();
     expect(createPullRequest).toHaveBeenCalledWith('owner/repo', {
       branch: 'feature/demo',
       title: 'A useful change',
       body: 'Details',
+    });
+    expect(prepareReport).toHaveBeenCalledWith(snapshot.agents[0], {
+      kind: 'pullRequest',
+      branch: 'feature/demo',
+    });
+    expect(prepareReport.mock.invocationCallOrder[0]).toBeLessThan(push.mock.invocationCallOrder[0]!);
+    expect(prepareReport.mock.invocationCallOrder[0]).toBeLessThan(createPullRequest.mock.invocationCallOrder[0]!);
+    expect(events.filter((event) => event.type === 'git.operationProgress').map((event) => event.payload)).toStrictEqual([
+      { operation: 'pullRequest', phase: 'handoff' },
+      { operation: 'pullRequest', phase: 'delivery' },
+    ]);
+    expect(deliverReport).toHaveBeenCalledWith(snapshot.agents[0], {
+      kind: 'pullRequest',
+      branch: 'feature/demo',
+      number: 12,
+      title: 'A useful change',
+      url: 'https://github.com/owner/repo/pull/12',
+      draft: true,
+    }, 'The complete PR handoff.');
+    expect(notifyWorker).toHaveBeenCalledWith(snapshot.agents[0], {
+      kind: 'pullRequest',
+      branch: 'feature/demo',
+      number: 12,
+      title: 'A useful change',
+      url: 'https://github.com/owner/repo/pull/12',
+      draft: true,
+    });
+    expect(snapshot.agents[0]?.pullRequest).toMatchObject({
+      provider: 'github',
+      repository: 'owner/repo',
+      branch: 'feature/demo',
+      number: 12,
+      headSha: 'pull-request-head',
+      state: 'open',
     });
     await server.close();
   });

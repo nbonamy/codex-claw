@@ -79,8 +79,14 @@ describe('snapshot reducer', () => {
     };
 
     expect(updateAgentWorkspace(snapshot, 'agent-dina', workspace)).toMatchObject({ workspace });
+    snapshot.agents[0].pullRequest = {
+      provider: 'github', repository: 'owner/repo', branch: 'feature', number: 7, title: 'Feature',
+      url: 'https://github.com/owner/repo/pull/7', draft: false, headSha: 'abc123', state: 'open',
+      createdAt: '2026-09-03T11:00:00.000Z', updatedAt: '2026-09-03T11:00:00.000Z',
+    };
     updateAgentFolder(snapshot, 'agent-dina', '/Users/nbonamy/src/id8');
     expect(snapshot.agents[0].workspace).toBeUndefined();
+    expect(snapshot.agents[0].pullRequest).toBeUndefined();
   });
 
   it('creates agents in the active team and selects the new agent', () => {
@@ -90,6 +96,7 @@ describe('snapshot reducer', () => {
       name: ' Jules ',
       avatar: '🤖',
       folder: '/Users/nbonamy/src/id8',
+      delegatedByAgentId: ' agent-dina ',
     }, '2026-06-05T10:11:12.000Z', 'agent-new-jules');
 
     expect(snapshot.activeAgentId).toBe('agent-new-jules');
@@ -98,6 +105,7 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents.at(-1)).toStrictEqual({
       id: 'agent-new-jules',
       teamId: 'team-codex-claw',
+      delegatedByAgentId: 'agent-dina',
       name: 'Jules',
       avatar: '🤖',
       folder: '/Users/nbonamy/src/id8',

@@ -88,6 +88,12 @@ export class WorkIntegrationManager {
     return driver.findPullRequest(await this.connectedToken('github'), repositoryId, branch);
   }
 
+  async getPullRequest(repositoryId: string, number: number): Promise<AgentGitPullRequest | null> {
+    const driver = this.driver('github');
+    if (!driver.getPullRequest) return null;
+    return driver.getPullRequest(await this.connectedToken('github'), repositoryId, number);
+  }
+
   async createPullRequest(repositoryId: string, input: { branch: string; title: string; body: string }): Promise<AgentGitPullRequest> {
     const driver = this.driver('github');
     if (!driver.createPullRequest) throw new Error('GitHub pull request creation is unavailable.');

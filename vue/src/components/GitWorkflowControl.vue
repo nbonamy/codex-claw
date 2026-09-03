@@ -16,6 +16,7 @@
     <button
       class="git-workflow-control__trigger"
       type="button"
+      :disabled="busy"
       :aria-label="$t('surface.gitWorkflowControl.chooseGitAction')"
       :title="$t('surface.gitWorkflowControl.chooseGitAction')"
       :aria-expanded="menuOpen"
@@ -158,7 +159,7 @@
     v-if="pullRequestDialogOpen"
     v-model="pullRequestDialogOpen"
     class="claw-dialog git-workflow-control__dialog"
-    :class="{ 'git-workflow-control__dialog--transient': pullRequestOperation.status === 'creating' || pullRequestOperation.status === 'success' }"
+    :class="{ 'git-workflow-control__dialog--transient': pullRequestOperation.status === 'success' }"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
     :show-close="false"
@@ -189,6 +190,10 @@
         </button>
       </div>
       <p v-if="generationError && generationErrorKind === 'pullRequest'" class="git-workflow-control__generation-error">{{ generationError }}</p>
+      <label v-if="reportBackAgentName" class="git-workflow-control__check git-workflow-control__report-back">
+        <el-switch v-model="reportBack" size="small" />
+        <span>{{ $t('surface.gitWorkflowControl.reportBackTo', { name: reportBackAgentName }) }}</span>
+      </label>
     </div>
     <GitOperationFeedback
       v-else
@@ -204,6 +209,10 @@
         class="claw-dialog__footer"
       ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.createPR') }}</button></div>
       <div
+        v-else-if="pullRequestOperation.status === 'creating'"
+        class="claw-dialog__footer"
+      ><button class="claw-button claw-button--secondary" type="button" @click="runPullRequestInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
+      <div
         v-else-if="pullRequestOperation.status === 'error'"
         class="claw-dialog__footer"
       ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
@@ -214,7 +223,7 @@
     v-if="mergeDialogOpen"
     v-model="mergeDialogOpen"
     class="claw-dialog git-workflow-control__dialog"
-    :class="{ 'git-workflow-control__dialog--transient': mergeOperation.status === 'merging' || mergeOperation.status === 'pushing' || mergeOperation.status === 'success' }"
+    :class="{ 'git-workflow-control__dialog--transient': mergeOperation.status === 'success' }"
     width="min(660px, calc(100vw - 32px))"
     :teleported="false"
     :show-close="false"
@@ -251,6 +260,10 @@
         :aria-label="$t('surface.gitWorkflowControl.squashCommitMessage')"
         :placeholder="$t('surface.gitWorkflowControl.squashCommitMessage2')"
       />
+      <label v-if="reportBackAgentName" class="git-workflow-control__check git-workflow-control__report-back">
+        <el-switch v-model="reportBack" size="small" />
+        <span>{{ $t('surface.gitWorkflowControl.reportBackTo', { name: reportBackAgentName }) }}</span>
+      </label>
       <label v-if="workflow?.isLinkedWorktree" class="git-workflow-control__check git-workflow-control__merge-cleanup">
         <el-switch v-model="deleteWorktree" size="small" />
         <span>{{ $t('surface.gitWorkflowControl.deleteWorktreeAfterMerging') }}</span>
@@ -271,6 +284,7 @@
     </GitOperationFeedback>
     <template #footer>
       <div v-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
+      <div v-else-if="mergeOperationRunning" class="claw-dialog__footer"><button class="claw-button claw-button--secondary" type="button" @click="runMergeInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
       <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
@@ -279,8 +293,10 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import { ElMessage } from 'element-plus';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
+import { codexClawApi } from '../platform-api';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
@@ -294,6 +310,7 @@ const props = defineProps<{
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
+  reportBackAgentName?: string | null;
 }>();
 
 const emit = defineEmits<{ 'open-git-diff': [] }>();
@@ -317,6 +334,8 @@ const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const squashCommitMessage = ref('');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
+const reportBack = ref(true);
+const gitOperationProgress = ref<AgentGitOperationProgress | null>(null);
 const committedMessage = ref('');
 const generatingKind = ref<'commit' | 'pullRequest' | null>(null);
 const generationError = ref<string | null>(null);
@@ -341,6 +360,7 @@ type PullRequestOperation =
   | { status: 'success' }
   | { status: 'error'; message: string };
 const pullRequestOperation = ref<PullRequestOperation>({ status: 'editing' });
+const pullRequestBackgrounded = ref(false);
 type MergeOperation =
   | { status: 'confirming' }
   | { status: 'merging'; branch: string; pushAfter: boolean }
@@ -348,10 +368,12 @@ type MergeOperation =
   | { status: 'success'; branch: string; pushed: boolean }
   | { status: 'error'; branch: string; mergeCreated: boolean; pushAfter: boolean; message: string };
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
+const mergeBackgrounded = ref(false);
 let commitSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pushSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pullRequestSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let mergeSuccessTimer: ReturnType<typeof setTimeout> | null = null;
+const debugOperationTimers: Array<ReturnType<typeof setTimeout>> = [];
 const mergeUnavailable = computed(() => !props.mergeBranch);
 const canGenerateMessage = computed(() => props.agent.backend === 'codex' && Boolean(props.generateMessage));
 const unstagedAddedLines = computed(() => workflow.value?.unstagedAddedLines ?? props.gitStatus?.addedLines ?? 0);
@@ -386,7 +408,9 @@ const pushOperationDetail = computed(() => pushOperation.value.status === 'error
 const pullRequestOperationRunning = computed(() => pullRequestOperation.value.status === 'creating');
 const pullRequestFeedbackStatus = computed<'running' | 'success' | 'error'>(() => pullRequestOperation.value.status === 'success' ? 'success' : pullRequestOperation.value.status === 'error' ? 'error' : 'running');
 const pullRequestOperationTitle = computed(() => pullRequestOperation.value.status === 'creating'
-  ? translate('surface.gitWorkflowControl.creatingPullRequest')
+  ? gitOperationProgress.value?.operation === 'pullRequest' && gitOperationProgress.value.phase === 'handoff'
+    ? translate('surface.gitWorkflowControl.buildingHandoffReport')
+    : translate('surface.gitWorkflowControl.creatingPullRequest')
   : pullRequestOperation.value.status === 'success'
     ? translate('surface.gitWorkflowControl.pullRequestCreated')
     : pullRequestOperation.value.status === 'error'
@@ -394,6 +418,8 @@ const pullRequestOperationTitle = computed(() => pullRequestOperation.value.stat
       : '');
 const pullRequestOperationDetail = computed(() => pullRequestOperation.value.status === 'error'
   ? pullRequestOperation.value.message
+  : gitOperationProgress.value?.operation === 'pullRequest' && gitOperationProgress.value.phase === 'handoff'
+    ? translate('surface.gitWorkflowControl.waitingForWorkerSummary')
   : pullRequestTitle.value.trim());
 const mergeOperationRunning = computed(() => mergeOperation.value.status === 'merging' || mergeOperation.value.status === 'pushing');
 const mergeFeedbackStatus = computed<'running' | 'success' | 'error'>(() => mergeOperation.value.status === 'success' ? 'success' : mergeOperation.value.status === 'error' ? 'error' : 'running');
@@ -401,6 +427,8 @@ const mergeOperationTitle = computed(() => mergeOperation.value.status === 'succ
   ? mergeOperation.value.pushed ? translate('surface.gitWorkflowControl.mergedAndPushed') : translate('surface.gitWorkflowControl.mergeComplete')
   : mergeOperation.value.status === 'error'
     ? mergeOperation.value.mergeCreated ? translate('surface.gitWorkflowControl.mergeCompleteButPushFailed') : translate('surface.gitWorkflowControl.mergeFailed')
+    : gitOperationProgress.value?.operation === 'merge' && gitOperationProgress.value.phase === 'handoff'
+      ? translate('surface.gitWorkflowControl.buildingHandoffReport')
     : mergeOperation.value.status === 'pushing'
       ? translate('surface.gitWorkflowControl.pushingMergedBranch')
     : mergeOperation.value.status === 'merging'
@@ -410,6 +438,8 @@ const mergeOperationDetail = computed(() => mergeOperation.value.status === 'err
   ? mergeOperation.value.message
   : mergeOperation.value.status === 'success'
     ? mergeOperation.value.pushed ? `${mergeOperation.value.branch} merged and pushed successfully` : `${mergeOperation.value.branch} merged successfully`
+    : gitOperationProgress.value?.operation === 'merge' && gitOperationProgress.value.phase === 'handoff'
+      ? translate('surface.gitWorkflowControl.waitingForWorkerSummary')
     : mergeOperation.value.status === 'pushing'
       ? translate('surface.gitWorkflowControl.pushingTheResultingBaseBranch')
     : deleteWorktree.value
@@ -448,7 +478,9 @@ watch(pushDialogOpen, (open) => {
 });
 
 watch(pullRequestDialogOpen, (open) => {
-  if (!open) {
+  if (open) {
+    reportBack.value = true;
+  } else if (!pullRequestOperationRunning.value) {
     generationRequestId += 1;
     resetPullRequestOperation();
   }
@@ -457,12 +489,13 @@ watch(pullRequestDialogOpen, (open) => {
 watch(mergeDialogOpen, (open) => {
   if (open) {
     resetMergeOperation();
+    reportBack.value = true;
     squashCommitMessage.value = '';
     if (!workflow.value?.isLinkedWorktree) {
       deleteWorktree.value = false;
       deleteBranch.value = false;
     }
-  } else {
+  } else if (!mergeOperationRunning.value) {
     resetMergeOperation();
   }
 });
@@ -477,14 +510,17 @@ watch(mergeStrategy, (strategy) => {
 
 onMounted(() => {
   document.addEventListener('click', closeMenu);
+  unsubscribeMainEvents = codexClawApi?.onEvent(handleMainEvent) ?? null;
   void loadWorkflow({ reset: true });
 });
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeMenu);
+  unsubscribeMainEvents?.();
   clearCommitSuccessTimer();
   clearPushSuccessTimer();
   clearPullRequestSuccessTimer();
   clearMergeSuccessTimer();
+  clearDebugOperationTimers();
 });
 watch(() => props.agent.id, () => { void loadWorkflow({ reset: true }); });
 watch(() => props.gitStatus?.updatedAt, () => {
@@ -526,10 +562,12 @@ async function loadWorkflow(options: { closeMenu?: boolean; reset?: boolean } = 
 }
 function closeMenu(event: MouseEvent): void { if (!root.value?.contains(event.target as Node)) menuOpen.value = false; }
 function toggleMenu(): void {
+  if (busy.value) return;
   menuOpen.value = !menuOpen.value;
 }
 function runFirstEnabled(): void { if (firstEnabledAction.value) selectAction(firstEnabledAction.value); }
 function selectAction(action: string): void {
+  if (busy.value) return;
   menuOpen.value = false;
   if (action === 'commit' && commitEnabled.value) {
     resetCommitOperation();
@@ -637,24 +675,41 @@ async function push(): Promise<void> {
 }
 async function createPullRequest(): Promise<void> {
   if (!props.createPullRequest) return;
+  clearDebugOperationTimers();
   clearPullRequestSuccessTimer();
+  const agentId = props.agent.id;
   busy.value = true;
   workflowError.value = null;
+  gitOperationProgress.value = {
+    operation: 'pullRequest',
+    phase: props.reportBackAgentName && reportBack.value ? 'handoff' : 'delivery',
+  };
   pullRequestOperation.value = { status: 'creating' };
   try {
-    workflow.value = await props.createPullRequest(props.agent.id, {
+    const result = await props.createPullRequest(agentId, {
       title: pullRequestTitle.value,
       body: pullRequestBody.value,
+      ...(props.reportBackAgentName ? { reportBack: reportBack.value } : {}),
       confirmed: true,
     });
+    if (props.agent.id === agentId) workflow.value = result;
     pullRequestOperation.value = { status: 'success' };
-    pullRequestSuccessTimer = setTimeout(() => {
-      pullRequestDialogOpen.value = false;
-    }, 1500);
+    if (pullRequestBackgrounded.value) {
+      ElMessage.success(translate('surface.gitWorkflowControl.pullRequestCreated'));
+      resetPullRequestOperation();
+    } else {
+      pullRequestSuccessTimer = setTimeout(() => {
+        pullRequestDialogOpen.value = false;
+      }, 1500);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
     pullRequestOperation.value = { status: 'error', message };
+    if (pullRequestBackgrounded.value) {
+      ElMessage.error(`${translate('surface.gitWorkflowControl.pullRequestFailed')}: ${message}`);
+      resetPullRequestOperation();
+    }
   } finally {
     busy.value = false;
   }
@@ -684,30 +739,43 @@ async function generatePullRequestMessage(): Promise<void> {
 }
 async function merge(pushAfter: boolean): Promise<void> {
   if (!props.mergeBranch || !canMerge.value) return;
+  clearDebugOperationTimers();
   clearMergeSuccessTimer();
+  const agentId = props.agent.id;
   const branch = workflow.value?.branch ?? 'branch';
   busy.value = true;
   workflowError.value = null;
+  gitOperationProgress.value = {
+    operation: 'merge',
+    phase: props.reportBackAgentName && reportBack.value ? 'handoff' : 'delivery',
+  };
   mergeOperation.value = { status: 'merging', branch, pushAfter };
   let mergeCreated = false;
   try {
-    workflow.value = await props.mergeBranch!(props.agent.id, {
+    const mergeResult = await props.mergeBranch!(agentId, {
       strategy: mergeStrategy.value,
       ...(mergeStrategy.value === 'squash' ? { commitMessage: squashCommitMessage.value.trim() } : {}),
       deleteBranch: deleteBranch.value,
       deleteWorktree: deleteWorktree.value,
+      ...(props.reportBackAgentName ? { reportBack: reportBack.value } : {}),
       confirmed: true,
     });
+    if (props.agent.id === agentId) workflow.value = mergeResult;
     mergeCreated = true;
     if (pushAfter && props.pushBranch) {
       mergeOperation.value = { status: 'pushing', branch };
-      workflow.value = await props.pushBranch(props.agent.id, { confirmed: true, target: 'mergeTarget' });
+      const pushResult = await props.pushBranch(agentId, { confirmed: true, target: 'mergeTarget' });
+      if (props.agent.id === agentId) workflow.value = pushResult;
     }
     showMergeSuccess(branch, pushAfter);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
     mergeOperation.value = { status: 'error', branch, mergeCreated, pushAfter, message };
+    if (mergeBackgrounded.value) {
+      ElMessage.error(`${mergeOperationTitle.value}: ${message}`);
+      resetMergeOperation();
+    }
   } finally {
     busy.value = false;
   }
@@ -764,6 +832,8 @@ function clearPushSuccessTimer(): void {
 }
 function resetPullRequestOperation(): void {
   clearPullRequestSuccessTimer();
+  pullRequestBackgrounded.value = false;
+  gitOperationProgress.value = null;
   pullRequestOperation.value = { status: 'editing' };
   resetGeneration();
 }
@@ -781,19 +851,108 @@ function clearPullRequestSuccessTimer(): void {
 }
 function resetMergeOperation(): void {
   clearMergeSuccessTimer();
+  mergeBackgrounded.value = false;
+  gitOperationProgress.value = null;
   mergeOperation.value = { status: 'confirming' };
 }
 function showMergeSuccess(branch: string, pushed: boolean): void {
   mergeOperation.value = { status: 'success', branch, pushed };
+  if (mergeBackgrounded.value) {
+    ElMessage.success(mergeOperationTitle.value);
+    resetMergeOperation();
+    return;
+  }
   mergeSuccessTimer = setTimeout(() => {
     mergeDialogOpen.value = false;
   }, 1500);
+}
+
+function runPullRequestInBackground(): void {
+  if (!pullRequestOperationRunning.value) return;
+  pullRequestBackgrounded.value = true;
+  pullRequestDialogOpen.value = false;
+}
+
+function runMergeInBackground(): void {
+  if (!mergeOperationRunning.value) return;
+  mergeBackgrounded.value = true;
+  mergeDialogOpen.value = false;
 }
 function clearMergeSuccessTimer(): void {
   if (mergeSuccessTimer !== null) {
     clearTimeout(mergeSuccessTimer);
     mergeSuccessTimer = null;
   }
+}
+
+async function showDebugOperationProgress(operation: 'pullRequest' | 'merge'): Promise<void> {
+  clearDebugOperationTimers();
+  pullRequestDialogOpen.value = false;
+  mergeDialogOpen.value = false;
+  resetPullRequestOperation();
+  resetMergeOperation();
+
+  if (operation === 'pullRequest') {
+    pullRequestTitle.value = 'Debug progress preview';
+    pullRequestDialogOpen.value = true;
+    pullRequestOperation.value = { status: 'creating' };
+  } else {
+    mergeDialogOpen.value = true;
+    await nextTick();
+    mergeOperation.value = {
+      status: 'merging',
+      branch: workflow.value?.branch ?? props.gitStatus?.branch ?? 'debug/worktree-preview',
+      pushAfter: false,
+    };
+  }
+
+  gitOperationProgress.value = { operation, phase: 'handoff' };
+  debugOperationTimers.push(setTimeout(() => {
+    if (gitOperationProgress.value?.operation !== operation) return;
+    gitOperationProgress.value = { operation, phase: 'delivery' };
+  }, 3_000));
+  debugOperationTimers.push(setTimeout(() => {
+    if (gitOperationProgress.value?.operation !== operation) return;
+    if (operation === 'pullRequest') {
+      pullRequestOperation.value = { status: 'success' };
+      if (pullRequestBackgrounded.value) {
+        ElMessage.success(translate('surface.gitWorkflowControl.pullRequestCreated'));
+        resetPullRequestOperation();
+      } else {
+        pullRequestSuccessTimer = setTimeout(() => {
+          pullRequestDialogOpen.value = false;
+        }, 1_500);
+      }
+      return;
+    }
+
+    const branch = mergeOperation.value.status === 'merging'
+      ? mergeOperation.value.branch
+      : workflow.value?.branch ?? props.gitStatus?.branch ?? 'debug/worktree-preview';
+    showMergeSuccess(branch, false);
+  }, 6_000));
+}
+
+function clearDebugOperationTimers(): void {
+  debugOperationTimers.splice(0).forEach((timer) => clearTimeout(timer));
+}
+
+defineExpose({ showDebugOperationProgress });
+
+let unsubscribeMainEvents: (() => void) | null = null;
+
+function handleMainEvent(event: MainToRendererEvent): void {
+  if (event.type !== 'git.operationProgress' || event.agentId !== props.agent.id) return;
+  const progress = agentGitOperationProgress(event.payload);
+  if (progress) gitOperationProgress.value = progress;
+}
+
+function agentGitOperationProgress(value: unknown): AgentGitOperationProgress | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<AgentGitOperationProgress>;
+  if (candidate.operation !== 'pullRequest' && candidate.operation !== 'merge') return null;
+  if (candidate.phase !== 'handoff' && candidate.phase !== 'delivery') return null;
+  return { operation: candidate.operation, phase: candidate.phase };
 }
 
 </script>
@@ -1126,6 +1285,11 @@ function clearMergeSuccessTimer(): void {
 }
 
 .git-workflow-control__merge-cleanup {
+  min-height: var(--space-24);
+  box-sizing: border-box;
+}
+
+.git-workflow-control__report-back {
   min-height: var(--space-24);
   box-sizing: border-box;
 }

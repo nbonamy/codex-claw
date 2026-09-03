@@ -61,6 +61,7 @@ export class WorkRoutingService {
       select: false,
     });
     if (!delegated) throw new Error(`Agent not found: ${agent.id}`);
+    delegated.delegatedByAgentId = agent.id;
 
     updateAgentFolder(snapshot, delegated.id, delegatedFolder);
     await this.options.refreshWorkspaceIdentity(delegated.id);

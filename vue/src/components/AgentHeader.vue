@@ -80,6 +80,7 @@
       </span>
       <GitWorkflowControl
         v-if="gitReviewAvailable && agent"
+        ref="gitWorkflowControl"
         :agent="agent"
         :git-status="gitStatus"
         :get-workflow="getGitWorkflow"
@@ -88,6 +89,7 @@
         :push-branch="pushGitBranch"
         :create-pull-request="createGitPullRequest"
         :merge-branch="mergeGitBranch"
+        :report-back-agent-name="reportBackAgentName"
       />
       <OpenInControl
         v-if="agent?.folder && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
@@ -134,7 +136,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
@@ -162,6 +164,7 @@ const props = defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   selectedSubagentConversationId?: string | null;
+  reportBackAgentName?: string | null;
   getGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   generateGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
   commitGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
@@ -179,6 +182,16 @@ const emit = defineEmits<{
   'open-in': [application: OpenInApplication];
   'select-subagent': [conversationId: string];
 }>();
+
+const gitWorkflowControl = ref<{
+  showDebugOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void>;
+} | null>(null);
+
+function showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void> {
+  return gitWorkflowControl.value?.showDebugOperationProgress(operation);
+}
+
+defineExpose({ showDebugGitOperationProgress });
 
 const displayName = computed(() => props.agent ? agentDisplayName(props.agent) : '');
 

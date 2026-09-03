@@ -356,16 +356,53 @@ describe('GitHubWorkProviderDriver', () => {
 
   it('looks up and creates draft pull requests', async () => {
     const fetch = vi.fn()
-      .mockResolvedValueOnce(jsonResponse([{ number: 7, title: 'Existing', html_url: 'https://github.com/o/r/pull/7', draft: true }]))
+      .mockResolvedValueOnce(jsonResponse([{ number: 7, title: 'Existing', html_url: 'https://github.com/o/r/pull/7', draft: true, head: { sha: 'existing-sha' }, state: 'open' }]))
       .mockResolvedValueOnce(jsonResponse({ default_branch: 'main' }))
-      .mockResolvedValueOnce(jsonResponse({ number: 8, title: 'New PR', html_url: 'https://github.com/o/r/pull/8', draft: true }));
+      .mockResolvedValueOnce(jsonResponse({ number: 8, title: 'New PR', html_url: 'https://github.com/o/r/pull/8', draft: true, head: { sha: 'new-sha' }, state: 'open' }));
     vi.stubGlobal('fetch', fetch);
     const driver = new GitHubWorkProviderDriver('client-id');
     const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
 
-    await expect(driver.findPullRequest(token, 'o/r', 'feature')).resolves.toMatchObject({ number: 7 });
-    await expect(driver.createPullRequest(token, 'o/r', { branch: 'feature', title: 'New PR', body: 'Body' })).resolves.toMatchObject({ number: 8, draft: true });
+    await expect(driver.findPullRequest(token, 'o/r', 'feature')).resolves.toMatchObject({ number: 7, headSha: 'existing-sha', state: 'open' });
+    await expect(driver.createPullRequest(token, 'o/r', { branch: 'feature', title: 'New PR', body: 'Body' })).resolves.toMatchObject({ number: 8, draft: true, headSha: 'new-sha', state: 'open' });
     expect(JSON.parse(String(fetch.mock.calls[2]?.[1]?.body))).toStrictEqual({ title: 'New PR', body: 'Body', head: 'feature', base: 'main', draft: true });
+  });
+
+  it('loads a pull request by number and distinguishes merged from closed', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        number: 8,
+        title: 'Merged PR',
+        html_url: 'https://github.com/o/r/pull/8',
+        draft: false,
+        head: { sha: 'merged-sha' },
+        state: 'closed',
+        merged_at: '2026-09-03T12:00:00.000Z',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        number: 9,
+        title: 'Closed PR',
+        html_url: 'https://github.com/o/r/pull/9',
+        draft: false,
+        head: { sha: 'closed-sha' },
+        state: 'closed',
+        merged_at: null,
+      }));
+    vi.stubGlobal('fetch', fetch);
+    const driver = new GitHubWorkProviderDriver('client-id');
+    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
+
+    await expect(driver.getPullRequest(token, 'o/r', 8)).resolves.toStrictEqual({
+      number: 8,
+      title: 'Merged PR',
+      url: 'https://github.com/o/r/pull/8',
+      draft: false,
+      headSha: 'merged-sha',
+      state: 'merged',
+      mergedAt: '2026-09-03T12:00:00.000Z',
+    });
+    await expect(driver.getPullRequest(token, 'o/r', 9)).resolves.toMatchObject({ state: 'closed' });
+    expect(fetch).toHaveBeenNthCalledWith(1, 'https://api.github.com/repos/o/r/pulls/8', expect.any(Object));
   });
 
   it('creates issues and normalizes the returned work item', async () => {

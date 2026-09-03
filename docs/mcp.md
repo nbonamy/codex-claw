@@ -359,6 +359,10 @@ creation, agent creation, and initial-prompt handoff. The renderer shows the
 staged preparation dialog only when the calling agent is still active, so
 background delegation never interrupts an unrelated conversation.
 
+Agents created by this tool retain their delegating agent relationship. Their
+pull-request and merge dialogs can optionally request a whole-task handoff from
+the worker and deliver it back to that agent after the Git operation succeeds.
+
 ### `display-markdown`
 
 Displays Markdown in Codex Claw's right side panel.

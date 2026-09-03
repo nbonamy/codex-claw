@@ -118,7 +118,7 @@ the synchronization barrier bounded even for very long threads.
 | `agent/fork` | `{ agentId, messageIndex? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at an absolute host message index, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
-| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. |
+| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
 | `agent/folder/update` | `{ agentId, folder }` | `AppSnapshot` | Folder picker remains client-side; mutation and validation are backend-owned. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
@@ -129,8 +129,8 @@ the synchronization barrier bounded even for very long threads.
 | `agent/git/stage` | `{ agentId, input: { paths, confirmed } }` | `AgentGitWorkflow` | Stages explicitly selected repository-relative paths; rejects unconfirmed requests. |
 | `agent/git/commit` | `{ agentId, input: { message, confirmed } }` | `AgentGitWorkflow` | Creates a commit from the index with an explicit message and confirmation. |
 | `agent/git/push` | `{ agentId, input: { confirmed, target? } }` | `AgentGitWorkflow` | Pushes the current named branch by default; `target: 'mergeTarget'` pushes the base branch produced by the preceding merge. Sets upstream when missing. |
-| `agent/git/pullRequest/create` | `{ agentId, input: { title, body, confirmed } }` | `AgentGitWorkflow` | Performs one existing-PR lookup after confirmation, then creates a draft GitHub PR through the connected work-provider token. |
-| `agent/git/merge` | `{ agentId, input: { strategy, commitMessage?, deleteBranch, deleteWorktree, confirmed } }` | `AgentGitWorkflow` | Merges the current branch into a checked-out base worktree when one exists, otherwise switches the primary checkout to a local integration branch first. Squash merges require the explicit commit message, and worktree cleanup is accepted only from a linked worktree. |
+| `agent/git/pullRequest/create` | `{ agentId, input: { title, body, reportBack?, confirmed } }` | `AgentGitWorkflow` | Performs one existing-PR lookup after confirmation, then creates a draft GitHub PR through the connected work-provider token and persists its repository, branch, head commit, and lifecycle state on the agent. For delegated agents, `reportBack` first tells the worker that Claw is taking over PR delivery and requests an implementation handoff without further changes; after success, Claw adds the authoritative PR result and delivers it to the delegating agent. |
+| `agent/git/merge` | `{ agentId, input: { strategy, commitMessage?, deleteBranch, deleteWorktree, reportBack?, confirmed } }` | `AgentGitWorkflow` | Merges the current branch into a checked-out base worktree when one exists, otherwise switches the primary checkout to a local integration branch first. Squash merges require the explicit commit message, and worktree cleanup is accepted only from a linked worktree. For delegated agents, `reportBack` follows the same handoff lifecycle as pull-request creation. Removing the worktree also closes its agent after report delivery instead of rehoming it onto the base checkout. |
 | `agent/workItem/assign` | `{ agentId, item }` | `AppSnapshot` | Records provider-neutral work item assignment in the owning backend location. Remote assignments are projected for connected remote-team pointers. |
 | `agent/workItem/assignment/delete` | `{ item }` | `AppSnapshot` | Clears provider-neutral assignment state from the backend location that owns the assigned agent. |
 
@@ -352,7 +352,7 @@ Event `type` values are the app-owned `MainToRendererEvent['type']` union from
 - backend-owned prompt queue: `agent.promptQueued`, `agent.promptDequeued`,
   `agent.promptRetryScheduled`;
 - artifacts and account state: `diff.updated`, `sidePanel.markdownRequested`,
-  `sidePanel.gitDiffRequested`, `git.statusUpdated`,
+  `sidePanel.gitDiffRequested`, `git.statusUpdated`, `git.operationProgress`,
   `context.compactionStarted`,
   `account.rateLimitsUpdated`, `skills.changed`;
 - native browser feedback: `browser.annotationCreated` (ephemeral element or area metadata that the renderer queues for a batched agent prompt);

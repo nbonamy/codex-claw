@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import AppShell from '../components/AppShell.vue';
 import AgentCloseDialog from '../components/AgentCloseDialog.vue';
+import PullRequestCleanupDialog from '../components/PullRequestCleanupDialog.vue';
 import WorkRoutingDialog from '../components/WorkRoutingDialog.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
@@ -172,6 +173,51 @@ describe('App', () => {
       deleteRemoteBranch: true,
       confirmed: true,
     });
+  });
+
+  it('cleans up a tracked closed pull request from the sidebar alert', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.pullRequest = {
+      provider: 'github',
+      repository: 'nbonamy/codex-claw',
+      branch: 'feat/merged',
+      number: 7,
+      title: 'Merged work',
+      url: 'https://github.com/nbonamy/codex-claw/pull/7',
+      draft: false,
+      headSha: 'abc123',
+      state: 'closed',
+      createdAt: '2026-09-03T11:00:00.000Z',
+      updatedAt: '2026-09-03T12:00:00.000Z',
+    };
+    const closeAgent = vi.fn().mockResolvedValue({ ...snapshot, agents: [] });
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      closeAgent,
+      onEvent: vi.fn(),
+    });
+    const wrapper = mount(App, {
+      global: {
+        plugins: [ElementPlus],
+        stubs: { ElPopover: { template: '<div><slot name="reference" /><slot /></div>' } },
+      },
+    });
+    await flushPromises();
+
+    wrapper.findComponent(AppShell).vm.$emit('cleanup-pull-request', snapshot.agents[0]!.id);
+    await wrapper.vm.$nextTick();
+    const dialog = wrapper.findComponent(PullRequestCleanupDialog);
+    expect(dialog.props('visible')).toBe(true);
+
+    dialog.vm.$emit('confirm');
+    await flushPromises();
+
+    expect(closeAgent).toHaveBeenCalledWith(snapshot.agents[0]!.id, {
+      deleteWorktree: true,
+      pullRequestCleanup: true,
+      confirmed: true,
+    });
+    expect(dialog.props('visible')).toBe(false);
   });
 
   it('routes a pending MCP work choice through the app-owned client response', async () => {

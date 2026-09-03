@@ -10,7 +10,7 @@ import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
 import { AutomationRunner } from './automations/runner';
-import { AutomationScheduler } from './automations/scheduler';
+import { RuntimeScheduler } from './scheduling/runtime-scheduler';
 import { ClawMcpService } from './mcp/service';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
@@ -22,6 +22,7 @@ import { warnMain } from './log';
 import { initializeCodexResourceSharing } from './codex-resource-sharing';
 import { loadPluginStatus } from './plugin-status';
 import { AgentGitService } from './git/agent-git-service';
+import { PullRequestMonitor } from './git/pull-request-monitor';
 import { WorktreeManager } from './worktrees/worktree-manager';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
@@ -129,11 +130,40 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       return Promise.resolve(snapshot);
     },
   });
-  const automationScheduler = new AutomationScheduler({
-    runAutomations: () => automationRunner.runAll(),
-    onError: (error) => {
-      warnMain('automation-scheduler', 'check failed', { message: error instanceof Error ? error.message : String(error) });
+  const scheduler = new RuntimeScheduler({
+    onError: (taskId, error) => {
+      warnMain('runtime-scheduler', 'task failed', {
+        taskId,
+        message: error instanceof Error ? error.message : String(error),
+      });
     },
+  });
+  scheduler.register({
+    id: 'automations',
+    intervalMs: 60_000,
+    runOnStart: true,
+    run: () => automationRunner.runAll(),
+  });
+  const pullRequestMonitor = new PullRequestMonitor({
+    getSnapshot: () => snapshot,
+    notifySnapshotUpdated: () => server.emitEvent({
+      type: 'snapshot.updated',
+      payload: snapshot,
+    }),
+    onError: (agentId, error) => {
+      warnMain('pull-request-monitor', 'check failed', {
+        agentId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    },
+    pullRequests: workIntegrations,
+    saveSnapshot: () => saveBackendSnapshot(snapshot),
+  });
+  scheduler.register({
+    id: 'pull-request-monitor',
+    intervalMs: 5 * 60_000,
+    runOnStart: true,
+    run: () => pullRequestMonitor.check(),
   });
   server = new ClawBackendServer({
     version: options.version,
@@ -175,12 +205,12 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   });
   mcpService.setDriverRpc(driverRpc);
   mcpService.setEventSink((event) => server.emitEvent(event));
-  automationScheduler.start();
+  scheduler.start();
 
   return {
     server,
     async stop() {
-      automationScheduler.stop();
+      scheduler.stop();
       await server.close();
       await mcpService.stop();
     },

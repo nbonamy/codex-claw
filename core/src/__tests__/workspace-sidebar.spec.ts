@@ -117,6 +117,27 @@ describe('workspace sidebar projection', () => {
       ]);
   });
 
+  it('projects tracked pull request state into its agent session', () => {
+    const agent = gitAgent('agent-pr', 'PR work', '/src/repo-pr', 'feat/pr', true);
+    agent.pullRequest = {
+      provider: 'github',
+      repository: 'owner/repo',
+      branch: 'feat/pr',
+      number: 7,
+      title: 'Ship the feature',
+      url: 'https://github.com/owner/repo/pull/7',
+      draft: false,
+      headSha: 'abc123',
+      state: 'merged',
+      mergedAt: '2026-09-03T12:00:00.000Z',
+      createdAt: '2026-09-03T11:00:00.000Z',
+      updatedAt: '2026-09-03T12:00:00.000Z',
+    };
+
+    expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0]?.pullRequest)
+      .toStrictEqual(agent.pullRequest);
+  });
+
   it('prefers the persisted current conversation title', () => {
     const agent = gitAgent('agent-one', 'Custom agent', '/src/repo-one', 'feat/one', true);
     agent.conversationTitle = 'Current thread title';

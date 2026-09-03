@@ -1,0 +1,137 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, AgentGitPullRequest } from '@codex-claw/core/contracts';
+import { PullRequestMonitor } from '../pull-request-monitor';
+
+describe('PullRequestMonitor', () => {
+  it('persists one snapshot update when a tracked pull request is merged', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [trackedAgent('agent-one'), trackedAgent('agent-two')];
+    const pullRequests = {
+      githubConnected: vi.fn().mockResolvedValue(true),
+      getPullRequest: vi.fn()
+        .mockResolvedValueOnce(pullRequest({ number: 7, state: 'merged', mergedAt: '2026-09-03T12:00:00.000Z' }))
+        .mockResolvedValueOnce(pullRequest({ number: 7 })),
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const monitor = new PullRequestMonitor({
+      getSnapshot: () => snapshot,
+      notifySnapshotUpdated,
+      pullRequests,
+      saveSnapshot,
+      now: () => new Date('2026-09-03T12:01:00.000Z'),
+    });
+
+    await monitor.check();
+
+    expect(snapshot.agents[0]?.pullRequest).toMatchObject({
+      state: 'merged',
+      mergedAt: '2026-09-03T12:00:00.000Z',
+      updatedAt: '2026-09-03T12:01:00.000Z',
+    });
+    expect(snapshot.agents[1]?.pullRequest?.updatedAt).toBe('2026-09-03T11:00:00.000Z');
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
+  });
+
+  it('tracks meaningful open pull-request changes without publishing unchanged checks', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [trackedAgent('agent-one')];
+    const pullRequests = {
+      githubConnected: vi.fn().mockResolvedValue(true),
+      getPullRequest: vi.fn().mockResolvedValue(pullRequest({ headSha: 'new-head' })),
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const notifySnapshotUpdated = vi.fn();
+    const monitor = new PullRequestMonitor({
+      getSnapshot: () => snapshot,
+      notifySnapshotUpdated,
+      pullRequests,
+      saveSnapshot,
+    });
+
+    await monitor.check();
+    expect(snapshot.agents[0]?.pullRequest?.headSha).toBe('new-head');
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+
+    await monitor.check();
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
+  });
+
+  it('does nothing while GitHub is disconnected', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [trackedAgent('agent-one')];
+    const pullRequests = {
+      githubConnected: vi.fn().mockResolvedValue(false),
+      getPullRequest: vi.fn(),
+    };
+    const saveSnapshot = vi.fn();
+    const monitor = new PullRequestMonitor({
+      getSnapshot: () => snapshot,
+      notifySnapshotUpdated: vi.fn(),
+      pullRequests,
+      saveSnapshot,
+    });
+
+    await monitor.check();
+    expect(pullRequests.getPullRequest).not.toHaveBeenCalled();
+    expect(saveSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('isolates one provider failure and continues checking other agents', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [trackedAgent('agent-one'), trackedAgent('agent-two')];
+    const onError = vi.fn();
+    const monitor = new PullRequestMonitor({
+      getSnapshot: () => snapshot,
+      notifySnapshotUpdated: vi.fn(),
+      onError,
+      pullRequests: {
+        githubConnected: vi.fn().mockResolvedValue(true),
+        getPullRequest: vi.fn()
+          .mockRejectedValueOnce(new Error('rate limited'))
+          .mockResolvedValueOnce(pullRequest({ state: 'closed' })),
+      },
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await monitor.check();
+    expect(onError).toHaveBeenCalledWith('agent-one', expect.objectContaining({ message: 'rate limited' }));
+    expect(snapshot.agents[1]?.pullRequest?.state).toBe('closed');
+  });
+});
+
+function trackedAgent(id: string): Agent {
+  return {
+    id,
+    teamId: 'team-claw',
+    name: id,
+    folder: `/src/${id}`,
+    backend: 'codex',
+    status: { type: 'idle' },
+    pullRequest: {
+      provider: 'github',
+      repository: 'owner/repo',
+      branch: 'feature',
+      ...pullRequest(),
+      createdAt: '2026-09-03T11:00:00.000Z',
+      updatedAt: '2026-09-03T11:00:00.000Z',
+    },
+    createdAt: '2026-09-03T10:00:00.000Z',
+    updatedAt: '2026-09-03T10:00:00.000Z',
+  };
+}
+
+function pullRequest(overrides: Partial<AgentGitPullRequest> = {}): AgentGitPullRequest {
+  return {
+    number: 7,
+    title: 'Improve issue seven',
+    url: 'https://github.com/owner/repo/pull/7',
+    draft: false,
+    headSha: 'head-sha',
+    state: 'open',
+    ...overrides,
+  };
+}

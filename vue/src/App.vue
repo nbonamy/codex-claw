@@ -122,6 +122,7 @@
     @close-team="closeTeam"
     @disconnect-team="disconnectTeam"
     @close-agent="requestCloseAgent"
+    @cleanup-pull-request="requestPullRequestCleanup"
     @duplicate-agent="duplicateAgent"
     @fork-agent="forkAgent"
     @fork-message="forkActiveAgentMessage"
@@ -171,6 +172,14 @@
     @keep-worktree="confirmAgentClose(false)"
     @delete-worktree="confirmAgentClose(true, $event)"
   />
+  <PullRequestCleanupDialog
+    :visible="pendingPullRequestCleanup !== null"
+    :agent="pendingPullRequestCleanup"
+    :busy="pullRequestCleanupBusy"
+    :error="pullRequestCleanupError"
+    @close="cancelPullRequestCleanup"
+    @confirm="confirmPullRequestCleanup"
+  />
   <WorkRoutingDialog
     :visible="pendingWorkRoutingRequest !== null"
     :request="pendingWorkRoutingRequest"
@@ -210,6 +219,7 @@ import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, WorkRoutingMode } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
+import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
 import AgentCreationProgressDialog from './components/AgentCreationProgressDialog.vue';
 import WorkRoutingDialog from './components/WorkRoutingDialog.vue';
 import { useAppState } from './app-state';
@@ -387,6 +397,9 @@ const updateStatus = ref<DesktopUpdateStatus>({ state: 'idle' });
 const pendingAgentClose = ref<{ agent: Agent; workflow: AgentGitWorkflow } | null>(null);
 const agentCloseBusy = ref(false);
 const agentCloseError = ref<string | null>(null);
+const pendingPullRequestCleanup = ref<Agent | null>(null);
+const pullRequestCleanupBusy = ref(false);
+const pullRequestCleanupError = ref<string | null>(null);
 const pendingWorkRoutingRequest = computed(() => snapshot.value.workRoutingRequests?.[0] ?? null);
 const workRoutingBusy = ref(false);
 const workRoutingError = ref<string | null>(null);
@@ -476,6 +489,38 @@ async function confirmAgentClose(deleteWorktree: boolean, deleteRemoteBranch = f
     agentCloseError.value = error instanceof Error ? error.message : String(error);
   } finally {
     agentCloseBusy.value = false;
+  }
+}
+
+function requestPullRequestCleanup(agentId: string): void {
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  if (agent?.pullRequest?.state !== 'merged' && agent?.pullRequest?.state !== 'closed') return;
+  pendingPullRequestCleanup.value = agent;
+  pullRequestCleanupError.value = null;
+}
+
+function cancelPullRequestCleanup(): void {
+  if (pullRequestCleanupBusy.value) return;
+  pendingPullRequestCleanup.value = null;
+  pullRequestCleanupError.value = null;
+}
+
+async function confirmPullRequestCleanup(): Promise<void> {
+  const agent = pendingPullRequestCleanup.value;
+  if (!agent || pullRequestCleanupBusy.value) return;
+  pullRequestCleanupBusy.value = true;
+  pullRequestCleanupError.value = null;
+  try {
+    await closeAgentAction(agent.id, {
+      deleteWorktree: true,
+      pullRequestCleanup: true,
+      confirmed: true,
+    });
+    pendingPullRequestCleanup.value = null;
+  } catch (error) {
+    pullRequestCleanupError.value = localizedErrorMessage(error, t);
+  } finally {
+    pullRequestCleanupBusy.value = false;
   }
 }
 

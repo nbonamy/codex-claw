@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   serverOptions: [] as unknown[],
   automationRunnerOptions: [] as unknown[],
   schedulerOptions: [] as unknown[],
+  schedulerTasks: [] as unknown[],
   remoteOptions: [] as unknown[],
   workIntegrationOptions: [] as unknown[],
   agentGitServices: [] as Array<{ identity: ReturnType<typeof vi.fn> }>,
@@ -41,8 +42,11 @@ const mocks = vi.hoisted(() => ({
   mcpHandleBackendEvent: vi.fn(),
   mcpSendMessage: vi.fn(),
   hydrateConnections: vi.fn(),
+  githubConnected: vi.fn(),
+  getPullRequest: vi.fn(),
   schedulerStart: vi.fn(),
   schedulerStop: vi.fn(),
+  schedulerRegister: vi.fn(),
   automationRunAll: vi.fn(),
   serverEmitEvent: vi.fn(),
   serverClose: vi.fn(),
@@ -97,6 +101,8 @@ vi.mock('../work-integrations/manager', () => ({
   WorkIntegrationManager: class {
     constructor(options: unknown) { mocks.workIntegrationOptions.push(options); }
     hydrateConnections = mocks.hydrateConnections;
+    githubConnected = mocks.githubConnected;
+    getPullRequest = mocks.getPullRequest;
   },
 }));
 
@@ -119,9 +125,13 @@ vi.mock('../automations/runner', () => ({
   },
 }));
 
-vi.mock('../automations/scheduler', () => ({
-  AutomationScheduler: class {
+vi.mock('../scheduling/runtime-scheduler', () => ({
+  RuntimeScheduler: class {
     constructor(options: unknown) { mocks.schedulerOptions.push(options); }
+    register = (task: unknown) => {
+      mocks.schedulerRegister(task);
+      mocks.schedulerTasks.push(task);
+    };
     start = mocks.schedulerStart;
     stop = mocks.schedulerStop;
   },
@@ -199,7 +209,8 @@ type AutomationRunnerOptions = {
   sendPrompt(agentId: string, prompt: string, context: { automationId: string; executionId: string }): Promise<unknown>;
 };
 
-type SchedulerOptions = { runAutomations(): Promise<unknown>; onError(error: unknown): void };
+type SchedulerOptions = { onError(taskId: string, error: unknown): void };
+type SchedulerTask = { id: string; intervalMs: number; runOnStart?: boolean; run(): Promise<unknown> };
 
 type WorkIntegrationOptions = {
   drivers: Array<{ getClientId(): string }>;
@@ -225,6 +236,7 @@ describe('clawd runtime', () => {
     mocks.serverOptions.length = 0;
     mocks.automationRunnerOptions.length = 0;
     mocks.schedulerOptions.length = 0;
+    mocks.schedulerTasks.length = 0;
     mocks.remoteOptions.length = 0;
     mocks.workIntegrationOptions.length = 0;
     mocks.agentGitServices.length = 0;
@@ -240,6 +252,7 @@ describe('clawd runtime', () => {
     mocks.mcpStart.mockResolvedValue('http://127.0.0.1:4242/mcp');
     mocks.mcpStop.mockResolvedValue(undefined);
     mocks.hydrateConnections.mockResolvedValue(undefined);
+    mocks.githubConnected.mockResolvedValue(false);
     mocks.serverClose.mockResolvedValue(undefined);
     mocks.createDefaultBackendDrivers.mockReturnValue(mocks.drivers);
     mocks.runtimeGitHubOAuthClientId.mockReturnValue('github-client');
@@ -262,6 +275,10 @@ describe('clawd runtime', () => {
     }));
     expect(mocks.hydrateConnections).toHaveBeenCalledOnce();
     expect(mocks.schedulerStart).toHaveBeenCalledOnce();
+    expect(mocks.schedulerTasks).toEqual([
+      expect.objectContaining({ id: 'automations', intervalMs: 60_000, runOnStart: true }),
+      expect.objectContaining({ id: 'pull-request-monitor', intervalMs: 300_000, runOnStart: true }),
+    ]);
     expect(mocks.mcpSetDriverRpc).toHaveBeenCalledOnce();
     expect(mocks.mcpSetEventSink).toHaveBeenCalledOnce();
 
@@ -326,8 +343,8 @@ describe('clawd runtime', () => {
     sink({ type: 'sink-event' });
     expect(mocks.serverEmitEvent).toHaveBeenCalledWith({ type: 'sink-event' });
 
-    const scheduler = mocks.schedulerOptions[0] as SchedulerOptions;
-    await scheduler.runAutomations();
+    const automationTask = mocks.schedulerTasks[0] as SchedulerTask;
+    await automationTask.run();
     expect(mocks.automationRunAll).toHaveBeenCalledOnce();
   });
 
@@ -460,10 +477,10 @@ describe('clawd runtime', () => {
     });
 
     const scheduler = mocks.schedulerOptions[0] as SchedulerOptions;
-    scheduler.onError(new Error('automation failed'));
-    scheduler.onError('automation string failure');
-    expect(mocks.warnMain).toHaveBeenCalledWith('automation-scheduler', 'check failed', { message: 'automation failed' });
-    expect(mocks.warnMain).toHaveBeenCalledWith('automation-scheduler', 'check failed', { message: 'automation string failure' });
+    scheduler.onError('automations', new Error('automation failed'));
+    scheduler.onError('pull-request-monitor', 'github string failure');
+    expect(mocks.warnMain).toHaveBeenCalledWith('runtime-scheduler', 'task failed', { taskId: 'automations', message: 'automation failed' });
+    expect(mocks.warnMain).toHaveBeenCalledWith('runtime-scheduler', 'task failed', { taskId: 'pull-request-monitor', message: 'github string failure' });
 
     await runtime.stop();
     expect(mocks.schedulerStop).toHaveBeenCalledOnce();
