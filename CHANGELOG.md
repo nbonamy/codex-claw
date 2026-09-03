@@ -4,6 +4,15 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.15.2] - 2026-09-02
+
+### Improvements and fixes
+
+- Composer chips and rendered mentions now align cleanly with the surrounding
+  text.
+- The empty right workspace no longer shows a redundant Backlog shortcut;
+  repository work remains available from the new-tab menu.
+
 ## [0.15.1] - 2026-09-02
 
 ### Improvements and fixes

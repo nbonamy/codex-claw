@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.15.1",
+  "currentVersion": "0.15.2",
   "releases": [
+    {
+      "version": "0.15.2",
+      "releasedAt": "2026-09-02",
+      "sourceSha256": "30a48edffd8be8d1c03bdb62669fa195663f09143b41605fd6d69d510af22b73",
+      "markdown": "### Improvements and fixes\n\n- Composer chips and rendered mentions now align cleanly with the surrounding\n  text.\n- The empty right workspace no longer shows a redundant Backlog shortcut;\n  repository work remains available from the new-tab menu."
+    },
     {
       "version": "0.15.1",
       "releasedAt": "2026-09-02",
