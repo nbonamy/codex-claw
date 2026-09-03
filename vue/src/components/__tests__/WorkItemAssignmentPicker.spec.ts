@@ -31,8 +31,17 @@ describe('WorkItemAssignmentPicker', () => {
       global: { plugins: [ElementPlus] },
     });
 
-    expect(wrapper.get('.work-item-assignment-picker__target-options button.is-selected').text())
-      .toContain('New isolated session');
+    const destinationButtons = wrapper.findAll('.work-item-assignment-picker__target-options button');
+    expect(destinationButtons[0]!.text()).toContain('New agent');
+    expect(destinationButtons[0]!.text()).toContain('Create an agent in a dedicated worktree.');
+    expect(destinationButtons[0]!.classes()).toContain('is-selected');
+    expect(destinationButtons[0]!.attributes('aria-pressed')).toBe('true');
+    expect(destinationButtons[1]!.text()).toContain('Existing agent');
+    expect(destinationButtons[1]!.attributes('aria-pressed')).toBe('false');
+    expect(wrapper.find('input[aria-label="Branch"]').attributes('readonly')).toBeDefined();
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-24');
+    expect(wrapper.find('.work-item-assignment-picker__workspace').text()).not.toContain('Workspace');
+    expect(wrapper.find('.work-item-assignment-picker__workspace').text()).not.toContain('New worktree');
     await wrapper.get('.claw-button--primary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
@@ -50,11 +59,13 @@ describe('WorkItemAssignmentPicker', () => {
       global: { plugins: [ElementPlus] },
     });
 
-    await wrapper.findAll('.work-item-assignment-picker__target-options button')[0]!.trigger('click');
+    await wrapper.findAll('.work-item-assignment-picker__target-options button')[1]!.trigger('click');
+    expect(wrapper.findAll('.work-item-assignment-picker__target-options button')[1]!.attributes('aria-pressed')).toBe('true');
     expect(wrapper.text()).toContain('main · main');
-    expect(wrapper.text()).toContain('This switches the selected session’s current folder to this branch. No worktree is created.');
+    expect(wrapper.text()).toContain('Assign this branch to one of your agents.');
+    expect(wrapper.text()).toContain('Uses the selected agent’s current folder. No worktree will be created.');
     expect(wrapper.find('.work-item-assignment-picker__branch-warning svg').exists()).toBe(true);
-    expect(wrapper.text()).not.toContain('New worktree');
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-24');
     await wrapper.get('.claw-button--secondary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
@@ -68,8 +79,8 @@ describe('WorkItemAssignmentPicker', () => {
       global: { plugins: [ElementPlus] },
     });
 
-    const existingButton = wrapper.findAll('.work-item-assignment-picker__target-options button')[0]!;
+    const existingButton = wrapper.findAll('.work-item-assignment-picker__target-options button')[1]!;
     expect(existingButton.attributes('disabled')).toBeDefined();
-    expect(existingButton.text()).toContain('No sessions are available in this repository');
+    expect(existingButton.text()).toContain('No agents are available in this repository');
   });
 });

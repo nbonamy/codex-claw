@@ -112,7 +112,7 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.text()).toContain('Start work on #24');
     expect(wrapper.find('.repository-session-source-dialog__toolbar').exists()).toBe(false);
     expect(wrapper.get('.repository-session-source-dialog').classes()).toContain('repository-session-source-dialog--assignment');
-    expect(wrapper.get('.repository-session-source-dialog').attributes('style')).toContain('width: 480px');
+    expect(wrapper.get('.repository-session-source-dialog').attributes('style')).toContain('width: 440px');
 
     await wrapper.get('.claw-button--primary').trigger('click');
     expect(wrapper.emitted('start-work-item')).toStrictEqual([[

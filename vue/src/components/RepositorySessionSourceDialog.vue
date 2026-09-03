@@ -4,7 +4,7 @@
     :class="{ 'repository-session-source-dialog--assignment': selectedWorkItem }"
     :model-value="visible"
     :teleported="false"
-    :style="{ width: selectedWorkItem ? '480px' : '720px' }"
+    :style="{ width: selectedWorkItem ? '440px' : '720px' }"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
@@ -387,7 +387,7 @@ function resetPreparation(clearSelection = true): void {
 .repository-session-source-dialog--assignment
   .repository-session-source-dialog__results {
   min-height: 0;
-  padding: var(--space-6);
+  padding: var(--space-3) var(--space-8) var(--space-8);
 }
 
 .repository-session-source-dialog__results h3 {

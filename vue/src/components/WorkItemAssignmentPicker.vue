@@ -3,7 +3,19 @@
     <div class="work-item-assignment-picker__target-options">
       <button
         type="button"
+        :class="{ 'is-selected': destination === 'new' }"
+        :aria-pressed="destination === 'new'"
+        :disabled="busy"
+        @click="destination = 'new'"
+      >
+        <IconCopy aria-hidden="true" />
+        <strong>{{ t('repositoryBacklog.newIsolatedSession') }}</strong>
+        <span>{{ t('repositoryBacklog.newIsolatedSessionDetail') }}</span>
+      </button>
+      <button
+        type="button"
         :class="{ 'is-selected': destination === 'existing' }"
+        :aria-pressed="destination === 'existing'"
         :disabled="busy || sessions.length === 0"
         @click="destination = 'existing'"
       >
@@ -12,22 +24,11 @@
         <span v-if="sessions.length === 0">{{ t('repositoryBacklog.noExistingSessions') }}</span>
         <span v-else>{{ t('repositoryBacklog.useExistingSessionDetail') }}</span>
       </button>
-      <button
-        type="button"
-        :class="{ 'is-selected': destination === 'new' }"
-        :disabled="busy"
-        @click="destination = 'new'"
-      >
-        <IconCopy aria-hidden="true" />
-        <strong>{{ t('repositoryBacklog.newIsolatedSession') }}</strong>
-        <span>{{ t('repositoryBacklog.newIsolatedSessionDetail') }}</span>
-      </button>
     </div>
 
     <div class="work-item-assignment-picker__workspace">
-      <span>{{ destination === 'existing' ? t('repositoryBacklog.session') : t('repositoryBacklog.workspace') }}</span>
-      <label v-if="destination === 'existing'">
-        <IconRobotFace aria-hidden="true" />
+      <label v-if="destination === 'existing'" class="work-item-assignment-picker__field">
+        <span>{{ t('repositoryBacklog.session') }}</span>
         <el-select
           v-model="selectedAgentId"
           :disabled="busy"
@@ -42,18 +43,23 @@
           />
         </el-select>
       </label>
-      <div v-else class="work-item-assignment-picker__workspace-row">
-        <IconGitBranch aria-hidden="true" />
-        <strong>{{ t('repositoryBacklog.newWorktree') }}</strong>
-      </div>
-      <div class="work-item-assignment-picker__branch">
-        <IconGitPullRequest v-if="item.kind === 'pullRequest'" aria-hidden="true" />
-        <IconGitBranch v-else aria-hidden="true" />
-        {{ branchName }}
-      </div>
+      <label class="work-item-assignment-picker__field">
+        <span>{{ t('repositoryBacklog.branch') }}</span>
+        <el-input
+          class="work-item-assignment-picker__branch"
+          :model-value="branchName"
+          :aria-label="t('repositoryBacklog.branch')"
+          readonly
+        >
+          <template #prefix>
+            <IconGitPullRequest v-if="item.kind === 'pullRequest'" aria-hidden="true" />
+            <IconGitBranch v-else aria-hidden="true" />
+          </template>
+        </el-input>
+      </label>
       <p v-if="destination === 'existing'" class="work-item-assignment-picker__branch-warning">
         <IconAlertTriangle aria-hidden="true" />
-        {{ t('repositoryBacklog.existingSessionBranchWarning') }}
+        <span>{{ t('repositoryBacklog.existingSessionBranchWarning') }}</span>
       </p>
     </div>
 
@@ -147,33 +153,36 @@ function selection(): Omit<WorkItemAssignmentSelection, 'action'> {
 <style scoped>
 .work-item-assignment-picker {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-6);
 }
 
 .work-item-assignment-picker__target-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 240px));
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
 .work-item-assignment-picker__target-options > button {
-  min-height: 86px;
+  min-width: 0;
+  min-height: 66px;
   display: grid;
-  justify-items: center;
+  grid-template-columns: var(--icon-lg) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-1);
   align-content: center;
-  gap: 3px;
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   color: var(--color-text);
   background: transparent;
   font: inherit;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
 }
 
-.work-item-assignment-picker__target-options > button:hover:not(:disabled) {
+.work-item-assignment-picker__target-options > button:hover:not(:disabled):not(.is-selected) {
   border-color: var(--color-outline);
   background: var(--color-surface-low);
 }
@@ -190,81 +199,63 @@ function selection(): Omit<WorkItemAssignmentSelection, 'action'> {
 }
 
 .work-item-assignment-picker__target-options strong {
-  font-size: var(--font-size-12);
+  grid-column: 2;
+  font-size: var(--font-size-13);
 }
 
 .work-item-assignment-picker__target-options svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
 }
 
 .work-item-assignment-picker__target-options span {
+  grid-column: 2;
   color: var(--color-text-muted);
-  font-size: var(--font-size-11);
+  font-size: var(--font-size-12);
   line-height: 1.25;
 }
 
 .work-item-assignment-picker__workspace {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  gap: var(--space-4);
 }
 
-.work-item-assignment-picker__workspace > span {
+.work-item-assignment-picker__field {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.work-item-assignment-picker__field > span {
   color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-}
-
-.work-item-assignment-picker__workspace label,
-.work-item-assignment-picker__workspace-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   font-size: var(--font-size-12);
 }
 
-.work-item-assignment-picker__workspace label :deep(.el-select) {
+.work-item-assignment-picker__field :deep(.el-select),
+.work-item-assignment-picker__field :deep(.el-input) {
+  width: 100%;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
-.work-item-assignment-picker__workspace label > svg,
-.work-item-assignment-picker__workspace-row svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-}
-
-.work-item-assignment-picker__branch {
-  height: 28px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-left: 27px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface-lowest);
+.work-item-assignment-picker__branch :deep(.el-input__inner) {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-11);
 }
 
-.work-item-assignment-picker__branch svg {
+.work-item-assignment-picker__branch :deep(svg) {
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--color-text-muted);
 }
 
 .work-item-assignment-picker__branch-warning {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--icon-sm) minmax(0, 1fr);
   align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0 0 0 27px;
+  gap: var(--space-3);
+  margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
   line-height: 1.3;
@@ -287,5 +278,8 @@ function selection(): Omit<WorkItemAssignmentSelection, 'action'> {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+  margin: 0 calc(-1 * var(--space-8));
+  padding: var(--space-6) var(--space-8) 0;
+  border-top: 1px solid var(--color-border);
 }
 </style>
