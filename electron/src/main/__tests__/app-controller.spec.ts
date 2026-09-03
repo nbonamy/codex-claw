@@ -702,6 +702,7 @@ describe('AppController', () => {
     const input: CreateSourceWorktreeInput = {
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'backend-split',
+      reuseExisting: true,
     };
 
     await controller.initialize();

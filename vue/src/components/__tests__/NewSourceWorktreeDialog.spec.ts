@@ -181,11 +181,45 @@ describe('NewSourceWorktreeDialog', () => {
       branchName: 'feature/source-folder',
     });
   });
+
+  it('asks before reusing an existing worktree', async () => {
+    const createWorktree = vi.fn().mockResolvedValue({
+      name: 'feature/existing',
+      path: '/Users/nbonamy/src/codex-claw-feature-existing',
+    });
+    const wrapper = mountDialog({
+      branches: [{
+        name: 'feature/existing',
+        isDefault: false,
+        worktreePath: '/Users/nbonamy/src/codex-claw-feature-existing',
+      }],
+      createWorktree,
+    });
+
+    await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/existing');
+    await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+
+    expect(createWorktree).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('Worktree already exists');
+    expect(wrapper.text()).toContain('/Users/nbonamy/src/codex-claw-feature-existing');
+
+    await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await flushPromises();
+
+    expect(createWorktree).toHaveBeenCalledWith({
+      repoPath: '/Users/nbonamy/src/codex-claw',
+      branchName: 'feature/existing',
+      reuseExisting: true,
+    });
+    expect(wrapper.emitted('created')).toStrictEqual([[
+      { name: 'feature/existing', path: '/Users/nbonamy/src/codex-claw-feature-existing' },
+    ]]);
+  });
 });
 
 function mountDialog(overrides: Partial<{
   chooseDestination: (defaultPath: string) => Promise<string | null>;
-  createWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string }) => Promise<{ name: string; path: string }>;
+  createWorktree: (input: { repoPath: string; branchName: string; destinationPath?: string; reuseExisting?: boolean }) => Promise<{ name: string; path: string }>;
   branches: Array<{ name: string; isDefault: boolean; worktreePath?: string }>;
   repo: SourceRepository | null;
   suggestDestination: (input: { branchName: string; repoPath: string }) => Promise<string>;

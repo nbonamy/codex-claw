@@ -50,6 +50,7 @@
           v-else
           :item="selectedWorkItem"
           :branch-name="assignmentBranchName"
+          :existing-worktree-path="assignmentExistingWorktreePath"
           :sessions="sessions"
           :error="assignmentError"
           @custom="emit('custom-work-item', $event)"
@@ -170,6 +171,9 @@ const assignmentBranchName = computed(() => {
   if (item.kind === 'pullRequest') return item.branchName?.trim() || `review/gh-${item.number}`;
   return `fix/gh-${item.number}`;
 });
+const assignmentExistingWorktreePath = computed(() => (
+  props.branches.find((branch) => branch.name === assignmentBranchName.value)?.worktreePath ?? ''
+));
 const preparationSteps = computed(() => {
   if (preparationSelection.value?.destination === 'existing') {
     const session = props.sessions.find((candidate) => candidate.agentId === preparationSelection.value?.agentId);

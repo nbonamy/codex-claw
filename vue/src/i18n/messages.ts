@@ -19,6 +19,12 @@ export const messages = {
       retry: 'Try again',
       revoke: 'Revoke',
     },
+    worktreeReuse: {
+      title: 'Worktree already exists',
+      detail: '{branch} is already checked out at:',
+      question: 'Reuse it for this agent?',
+      action: 'Reuse worktree',
+    },
     dynamic: {
       annotation: {
         edit: 'Edit annotation {number}',

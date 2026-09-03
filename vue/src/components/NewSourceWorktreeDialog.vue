@@ -5,92 +5,101 @@
     :title="$t('surface.newSourceWorktreeDialog.newWorktree')"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="create">
-      <FormDialogField
-        v-if="orderedBranches.length || branchesLoading"
-        :label="$t('surface.newSourceWorktreeDialog.startFrom')"
-        label-for="new-source-worktree-base-branch"
-      >
-        <div class="claw-form-dialog__control">
-          <el-select
-            id="new-source-worktree-base-branch"
-            v-model="baseBranch"
-            class="new-source-worktree-dialog__base-select"
-            :aria-label="$t('surface.newSourceWorktreeDialog.startFrom')"
-            :disabled="branchesLoading"
-            :loading="branchesLoading"
-            :placeholder="$t('surface.newSourceWorktreeDialog.chooseBaseBranch')"
-          >
-            <el-option
-              v-for="branch in orderedBranches"
-              :key="branch.name"
-              :label="branch.name"
-              :value="branch.name"
-            />
-          </el-select>
-        </div>
-      </FormDialogField>
-
-      <FormDialogField
-        :label="$t('surface.newSourceWorktreeDialog.branch')"
-        label-for="new-source-worktree-branch"
-      >
-        <div class="claw-form-dialog__control claw-form-dialog__input-control">
-          <input
-            id="new-source-worktree-branch"
-            v-model="branchName"
-            class="claw-form-dialog__text-input new-source-worktree-dialog__branch-input"
-            type="text"
-            :placeholder="$t('repositories.worktree.branchPlaceholder')"
-          />
-        </div>
-      </FormDialogField>
-
-      <FormDialogField
-        v-if="allowDestinationOverride"
-        :label="$t('surface.newSourceWorktreeDialog.folder')"
-        label-for="new-source-worktree-folder"
-      >
-        <div class="claw-form-dialog__control claw-form-dialog__input-control new-source-worktree-dialog__folder-control">
-          <input
-            id="new-source-worktree-folder"
-            class="claw-form-dialog__text-input new-source-worktree-dialog__folder-input"
-            type="text"
-            readonly
-            :value="destinationPath"
-            :placeholder="$t('surface.newSourceWorktreeDialog.enterABranchName')"
-          />
-          <button
-            class="new-source-worktree-dialog__folder-picker"
-            type="button"
-            :aria-label="$t('surface.newSourceWorktreeDialog.chooseWorktreeFolder')"
-            :title="$t('surface.newSourceWorktreeDialog.chooseWorktreeFolder')"
-            :disabled="!repo"
-            @click="chooseDestination"
-          >
-            <FolderIcon aria-hidden="true" />
-          </button>
-        </div>
-      </FormDialogField>
-
-      <el-alert
-        v-if="errorMessage"
-        :title="errorMessage"
-        type="error"
-        :closable="false"
-        show-icon
+    <form class="claw-form-dialog" @submit.prevent="create()">
+      <WorktreeReusePrompt
+        v-if="existingWorktree"
+        :branch="existingWorktree.name"
+        :path="existingWorktree.path"
       />
+      <template v-else>
+        <FormDialogField
+          v-if="orderedBranches.length || branchesLoading"
+          :label="$t('surface.newSourceWorktreeDialog.startFrom')"
+          label-for="new-source-worktree-base-branch"
+        >
+          <div class="claw-form-dialog__control">
+            <el-select
+              id="new-source-worktree-base-branch"
+              v-model="baseBranch"
+              class="new-source-worktree-dialog__base-select"
+              :aria-label="$t('surface.newSourceWorktreeDialog.startFrom')"
+              :disabled="branchesLoading"
+              :loading="branchesLoading"
+              :placeholder="$t('surface.newSourceWorktreeDialog.chooseBaseBranch')"
+            >
+              <el-option
+                v-for="branch in orderedBranches"
+                :key="branch.name"
+                :label="branch.name"
+                :value="branch.name"
+              />
+            </el-select>
+          </div>
+        </FormDialogField>
+
+        <FormDialogField
+          :label="$t('surface.newSourceWorktreeDialog.branch')"
+          label-for="new-source-worktree-branch"
+        >
+          <div class="claw-form-dialog__control claw-form-dialog__input-control">
+            <input
+              id="new-source-worktree-branch"
+              v-model="branchName"
+              class="claw-form-dialog__text-input new-source-worktree-dialog__branch-input"
+              type="text"
+              :placeholder="$t('repositories.worktree.branchPlaceholder')"
+            />
+          </div>
+        </FormDialogField>
+
+        <FormDialogField
+          v-if="allowDestinationOverride"
+          :label="$t('surface.newSourceWorktreeDialog.folder')"
+          label-for="new-source-worktree-folder"
+        >
+          <div class="claw-form-dialog__control claw-form-dialog__input-control new-source-worktree-dialog__folder-control">
+            <input
+              id="new-source-worktree-folder"
+              class="claw-form-dialog__text-input new-source-worktree-dialog__folder-input"
+              type="text"
+              readonly
+              :value="destinationPath"
+              :placeholder="$t('surface.newSourceWorktreeDialog.enterABranchName')"
+            />
+            <button
+              class="new-source-worktree-dialog__folder-picker"
+              type="button"
+              :aria-label="$t('surface.newSourceWorktreeDialog.chooseWorktreeFolder')"
+              :title="$t('surface.newSourceWorktreeDialog.chooseWorktreeFolder')"
+              :disabled="!repo"
+              @click="chooseDestination"
+            >
+              <FolderIcon aria-hidden="true" />
+            </button>
+          </div>
+        </FormDialogField>
+
+        <el-alert
+          v-if="errorMessage"
+          :title="errorMessage"
+          type="error"
+          :closable="false"
+          show-icon
+        />
+      </template>
     </form>
 
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.newSourceWorktreeDialog.cancel') }}</button>
+      <button class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
+        {{ existingWorktree ? $t('common.back') : $t('surface.newSourceWorktreeDialog.cancel') }}
+      </button>
       <button
         class="claw-button claw-button--primary"
         type="button"
         :aria-busy="creating"
-        :disabled="creating || !canCreate"
-        @click="create"
-      > {{ $t('surface.newSourceWorktreeDialog.create') }} </button>
+        :disabled="creating || (!existingWorktree && !canCreate)"
+        @click="create(Boolean(existingWorktree))"
+      > {{ existingWorktree ? $t('worktreeReuse.action') : $t('surface.newSourceWorktreeDialog.create') }} </button>
     </template>
   </FormDialog>
 </template>
@@ -101,6 +110,7 @@ import type { CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceW
 import { FolderIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 
 const props = withDefaults(defineProps<{
   allowDestinationOverride?: boolean;
@@ -129,6 +139,7 @@ const customDestinationPath = ref('');
 const suggestedDestinationPath = ref('');
 const creating = ref(false);
 const errorMessage = ref<string | null>(null);
+const existingWorktree = ref<SourceWorktree | null>(null);
 let suggestionRequestId = 0;
 
 const orderedBranches = computed(() => [...props.branches].sort((left, right) => (
@@ -150,6 +161,7 @@ watch(() => props.visible, (visible) => {
     customDestinationPath.value = '';
     suggestedDestinationPath.value = '';
     errorMessage.value = null;
+    existingWorktree.value = null;
     creating.value = false;
   }
 });
@@ -183,8 +195,16 @@ async function chooseDestination(): Promise<void> {
   }
 }
 
-async function create(): Promise<void> {
+async function create(reuseExisting = false): Promise<void> {
   if (!props.repo || !canCreate.value) {
+    return;
+  }
+
+  const existingBranch = orderedBranches.value.find((branch) => (
+    branch.name === branchName.value.trim() && branch.worktreePath
+  ));
+  if (existingBranch?.worktreePath && !reuseExisting) {
+    existingWorktree.value = { name: existingBranch.name, path: existingBranch.worktreePath };
     return;
   }
 
@@ -194,8 +214,12 @@ async function create(): Promise<void> {
     const worktree = await props.createWorktree({
       repoPath: props.repo.path,
       branchName: branchName.value,
-      ...(baseBranch.value ? { baseBranch: baseBranch.value } : {}),
-      ...(customDestinationPath.value ? { destinationPath: customDestinationPath.value } : {}),
+      ...(reuseExisting
+        ? { reuseExisting: true }
+        : {
+            ...(baseBranch.value ? { baseBranch: baseBranch.value } : {}),
+            ...(customDestinationPath.value ? { destinationPath: customDestinationPath.value } : {}),
+          }),
     });
     emit('created', worktree);
     close();
@@ -210,6 +234,14 @@ function onVisibilityChanged(visible: boolean): void {
   if (!visible) {
     close();
   }
+}
+
+function backOrClose(): void {
+  if (existingWorktree.value) {
+    existingWorktree.value = null;
+    return;
+  }
+  close();
 }
 
 function close(): void {

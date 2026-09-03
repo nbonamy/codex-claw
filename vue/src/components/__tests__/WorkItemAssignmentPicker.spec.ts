@@ -83,4 +83,28 @@ describe('WorkItemAssignmentPicker', () => {
     expect(existingButton.attributes('disabled')).toBeDefined();
     expect(existingButton.text()).toContain('No agents are available in this repository');
   });
+
+  it('asks before reusing an existing worktree', async () => {
+    const wrapper = mount(WorkItemAssignmentPicker, {
+      props: {
+        item: issue,
+        branchName: 'fix/gh-24',
+        existingWorktreePath: '/Users/nbonamy/src/codex-claw-fix-gh-24',
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    await wrapper.get('.claw-button--primary').trigger('click');
+
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    expect(wrapper.text()).toContain('Worktree already exists');
+    expect(wrapper.text()).toContain('fix/gh-24 is already checked out at:');
+    expect(wrapper.text()).toContain('/Users/nbonamy/src/codex-claw-fix-gh-24');
+
+    await wrapper.get('.claw-button--primary').trigger('click');
+
+    expect(wrapper.emitted('submit')).toStrictEqual([[
+      { action: 'fix', destination: 'new', item: issue, reuseExisting: true },
+    ]]);
+  });
 });

@@ -1056,6 +1056,7 @@ export type CreateSourceWorktreeInput = {
   branchName: string;
   baseBranch?: string;
   destinationPath?: string;
+  reuseExisting?: boolean;
   remoteConnectionId?: string;
 };
 

@@ -1,11 +1,13 @@
 import { execFile } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, copyFile, mkdir, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { SourceWorktree, WorktreeInitializationMode } from '@codex-claw/core/contracts';
 import {
   createGitWorktree,
   type GitWorktreeCreateInput,
+  listSourceBranches,
 } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
@@ -25,6 +27,7 @@ export type WorktreeInitializationProgress =
     phase: 'complete';
     source: WorktreeInitializationSource;
     commands: string[];
+    copiedFiles: string[];
   };
 
 export type PreparedWorktree = {
@@ -33,12 +36,14 @@ export type PreparedWorktree = {
   initialization: {
     source: WorktreeInitializationSource;
     commands: string[];
+    copiedFiles: string[];
   };
 };
 
 export type WorktreeManagerOptions = {
   createGitWorktree?: typeof createGitWorktree;
   getInitializationMode?: () => WorktreeInitializationMode;
+  listSourceBranches?: typeof listSourceBranches;
   platform?: NodeJS.Platform;
   runCommand?: WorktreeCommandRunner;
 };
@@ -73,12 +78,14 @@ const defaultCommandRunner: WorktreeCommandRunner = (command, args, options) => 
 export class WorktreeManager {
   private readonly getInitializationMode: () => WorktreeInitializationMode;
   private readonly createGitWorktree: typeof createGitWorktree;
+  private readonly listSourceBranches: typeof listSourceBranches;
   private readonly platform: NodeJS.Platform;
   private readonly runCommand: WorktreeCommandRunner;
 
   constructor(options: WorktreeManagerOptions = {}) {
     this.createGitWorktree = options.createGitWorktree ?? createGitWorktree;
     this.getInitializationMode = options.getInitializationMode ?? (() => 'off');
+    this.listSourceBranches = options.listSourceBranches ?? listSourceBranches;
     this.platform = options.platform ?? process.platform;
     this.runCommand = options.runCommand ?? defaultCommandRunner;
   }
@@ -88,7 +95,7 @@ export class WorktreeManager {
     if (!created.created) {
       return {
         ...created,
-        initialization: { source: 'none', commands: [] },
+        initialization: { source: 'none', commands: [], copiedFiles: [] },
       };
     }
 
@@ -107,20 +114,45 @@ export class WorktreeManager {
   ): Promise<PreparedWorktree['initialization']> {
     const mode = this.getInitializationMode();
     if (mode === 'off') {
-      const initialization = { source: 'none' as const, commands: [] };
+      const initialization = { source: 'none' as const, commands: [], copiedFiles: [] };
       onProgress?.({ phase: 'complete', ...initialization });
       return initialization;
     }
 
     onProgress?.({ phase: 'detecting' });
     const repositoryPlan = await this.repositoryPlan(worktreePath);
-    const plan = repositoryPlan ?? (mode === 'automatic' ? await this.automaticPlan(worktreePath) : null);
-    if (!plan) {
-      const initialization = { source: 'none' as const, commands: [] };
+    if (repositoryPlan) {
+      return this.runPlan(repositoryPlan, repositoryPath, worktreePath, [], onProgress);
+    }
+
+    if (mode !== 'automatic') {
+      const initialization = { source: 'none' as const, commands: [], copiedFiles: [] };
       onProgress?.({ phase: 'complete', ...initialization });
       return initialization;
     }
 
+    const copiedFiles = await this.copyEnvironmentFiles(repositoryPath, worktreePath);
+    const plan = await this.automaticPlan(worktreePath);
+    if (!plan) {
+      const initialization: PreparedWorktree['initialization'] = {
+        source: copiedFiles.length > 0 ? 'automatic' : 'none',
+        commands: [],
+        copiedFiles,
+      };
+      onProgress?.({ phase: 'complete', ...initialization });
+      return initialization;
+    }
+
+    return this.runPlan(plan, repositoryPath, worktreePath, copiedFiles, onProgress);
+  }
+
+  private async runPlan(
+    plan: WorktreeInitializationPlan,
+    repositoryPath: string,
+    worktreePath: string,
+    copiedFiles: string[],
+    onProgress?: (progress: WorktreeInitializationProgress) => void,
+  ): Promise<PreparedWorktree['initialization']> {
     const commands = plan.commands.map((command) => command.display);
     const environment = {
       ...process.env,
@@ -139,9 +171,34 @@ export class WorktreeManager {
       await this.runCommand(command.command, command.args, { cwd: worktreePath, env: environment });
     }
 
-    const initialization = { source: plan.source, commands };
+    const initialization = { source: plan.source, commands, copiedFiles };
     onProgress?.({ phase: 'complete', ...initialization });
     return initialization;
+  }
+
+  private async copyEnvironmentFiles(repositoryPath: string, worktreePath: string): Promise<string[]> {
+    const sourcePath = await this.environmentSourcePath(repositoryPath, worktreePath);
+    if (!sourcePath) return [];
+    return copyEnvironmentFiles(sourcePath, worktreePath);
+  }
+
+  private async environmentSourcePath(repositoryPath: string, worktreePath: string): Promise<string | null> {
+    const branches = await this.listSourceBranches(repositoryPath).catch(() => []);
+    const defaultWorktreePath = branches.find((branch) => (
+      branch.isDefault
+      && branch.worktreePath
+      && !samePath(branch.worktreePath, worktreePath)
+    ))?.worktreePath;
+    if (defaultWorktreePath && await exists(defaultWorktreePath)) return defaultWorktreePath;
+    if (!samePath(repositoryPath, worktreePath) && await exists(repositoryPath)) return repositoryPath;
+    for (const branch of branches) {
+      if (branch.worktreePath
+        && !samePath(branch.worktreePath, worktreePath)
+        && await exists(branch.worktreePath)) {
+        return branch.worktreePath;
+      }
+    }
+    return null;
   }
 
   private async repositoryPlan(worktreePath: string): Promise<WorktreeInitializationPlan | null> {
@@ -191,6 +248,85 @@ export class WorktreeManager {
     ];
     return commands.length > 0 ? { source: 'automatic', commands } : null;
   }
+}
+
+const environmentScanExcludedDirectories = new Set([
+  '.cache',
+  '.git',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.venv',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+  'out',
+  'target',
+  'vendor',
+  'venv',
+]);
+
+const environmentTemplateSuffixes = ['.dist', '.example', '.sample', '.template'];
+
+async function copyEnvironmentFiles(sourcePath: string, worktreePath: string): Promise<string[]> {
+  const relativePaths = await findEnvironmentFiles(sourcePath, worktreePath);
+  const copiedFiles: string[] = [];
+  for (const relativePath of relativePaths) {
+    const destinationPath = path.join(worktreePath, relativePath);
+    if (await exists(destinationPath)) continue;
+    await mkdir(path.dirname(destinationPath), { recursive: true });
+    try {
+      await copyFile(path.join(sourcePath, relativePath), destinationPath, constants.COPYFILE_EXCL);
+      copiedFiles.push(relativePath);
+    } catch (error) {
+      if (isFileExistsError(error)) continue;
+      throw error;
+    }
+  }
+  return copiedFiles;
+}
+
+async function findEnvironmentFiles(
+  sourcePath: string,
+  worktreePath: string,
+  currentPath = sourcePath,
+): Promise<string[]> {
+  const environmentFiles: string[] = [];
+  const entries = await readdir(currentPath, { withFileTypes: true });
+  if (!samePath(currentPath, sourcePath) && entries.some((entry) => entry.name === '.git')) {
+    return [];
+  }
+  for (const entry of entries) {
+    const entryPath = path.join(currentPath, entry.name);
+    if (entry.isDirectory()) {
+      if (environmentScanExcludedDirectories.has(entry.name) || isPathInside(entryPath, worktreePath)) continue;
+      environmentFiles.push(...await findEnvironmentFiles(sourcePath, worktreePath, entryPath));
+    } else if (entry.isFile() && isEnvironmentFile(entry.name)) {
+      environmentFiles.push(path.relative(sourcePath, entryPath));
+    }
+  }
+  return environmentFiles.sort((left, right) => left.localeCompare(right));
+}
+
+function isEnvironmentFile(fileName: string): boolean {
+  if (fileName === '.env') return true;
+  if (!fileName.startsWith('.env.')) return false;
+  const normalized = fileName.toLowerCase();
+  return !environmentTemplateSuffixes.some((suffix) => normalized.endsWith(suffix));
+}
+
+function isPathInside(candidatePath: string, parentPath: string): boolean {
+  const relativePath = path.relative(parentPath, candidatePath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+}
+
+function samePath(left: string, right: string): boolean {
+  return path.resolve(left) === path.resolve(right);
+}
+
+function isFileExistsError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'EEXIST';
 }
 
 async function nodeCommands(worktreePath: string): Promise<WorktreeCommand[]> {

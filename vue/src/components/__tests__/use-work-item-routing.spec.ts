@@ -48,6 +48,18 @@ describe('useWorkItemRouting', () => {
     expect(result).toStrictEqual({ agent: harness.createdAgent, item: resolvedItem });
   });
 
+  it('passes an explicit existing-worktree decision to creation', async () => {
+    const harness = createHarness();
+
+    await harness.routing.createIsolatedAgent(harness.item, harness.teamId, { reuseExisting: true });
+
+    expect(harness.createWorktree).toHaveBeenCalledWith({
+      repoPath: '/workspace/codex-claw',
+      branchName: 'fix/gh-12',
+      reuseExisting: true,
+    });
+  });
+
   it('keeps a reassigned item out of the new-agent flow when the warning is declined', async () => {
     const harness = createHarness({ assignedToCurrentAgent: true, confirmReassignment: false });
 

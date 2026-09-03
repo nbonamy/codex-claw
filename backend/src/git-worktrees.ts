@@ -10,7 +10,6 @@ type CommandRunner = {
 };
 
 export type GitWorktreeCreateInput = CreateSourceWorktreeInput & {
-  reuseExisting?: boolean;
   startPoint?: string;
 };
 

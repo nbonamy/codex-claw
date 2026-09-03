@@ -77,6 +77,7 @@
       >
         <template #control>
           <el-select
+            class="settings-general-panel__worktree-select"
             :model-value="settings.worktreeInitializationMode"
             :aria-label="$t('surface.settingsGeneralPanel.worktreeInitialization')"
             @update:model-value="updateWorktreeInitializationMode"
@@ -90,7 +91,7 @@
               value="repository"
             />
             <el-option
-              :label="$t('surface.settingsGeneralPanel.off')"
+              :label="$t('surface.settingsGeneralPanel.worktreeInitializationDisabled')"
               value="off"
             />
           </el-select>
@@ -443,6 +444,11 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
 </script>
 
 <style scoped>
+.settings-general-panel__worktree-select {
+  width: 280px;
+  max-width: 100%;
+}
+
 .settings-general-panel__actions {
   min-width: 0;
   display: inline-flex;

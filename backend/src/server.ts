@@ -2761,6 +2761,7 @@ function sourceWorktreeInputWithoutRemoteConnection(input: CreateSourceWorktreeI
     branchName: input.branchName,
     ...(input.baseBranch ? { baseBranch: input.baseBranch } : {}),
     ...(input.destinationPath ? { destinationPath: input.destinationPath } : {}),
+    ...(input.reuseExisting ? { reuseExisting: true } : {}),
   };
 }
 

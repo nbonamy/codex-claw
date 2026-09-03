@@ -154,11 +154,16 @@ macOS, Claw selects `setup-macos.sh` and falls back to `setup`; Linux selects
 `setup-linux.sh` and falls back to `setup`; Windows selects `setup-win.ps1` and
 falls back to `setup`. Only the first applicable file runs. An empty applicable
 file is an intentional no-op. When no repository setup applies, the user's
-worktree-initialization setting may let `clawd` detect every supported ecosystem
-at the worktree root and restore their dependencies sequentially. Repository
-setup always takes precedence over detection, and existing worktrees are not
-initialized again. Local and remote worktrees follow the same contract on the
-`clawd` that owns their filesystem.
+worktree-initialization setting may let `clawd` copy local `.env` and `.env.*`
+files into the new checkout, then detect every supported ecosystem at the
+worktree root and restore their dependencies sequentially. Environment files
+come from an existing default-branch worktree when available, then the source
+checkout, then another existing worktree. Claw preserves relative paths, skips
+templates, generated dependency/build folders, and nested Git checkouts, and
+never overwrites a file already present in the new worktree. Repository setup
+always takes precedence and suppresses both environment copying and ecosystem
+detection. Existing worktrees are not initialized again. Local and remote
+worktrees follow the same contract on the `clawd` that owns their filesystem.
 
 The renderer uses source repositories only as creation affordances: Settings
 chooses or clears the source folder; **Add project** can open a discovered

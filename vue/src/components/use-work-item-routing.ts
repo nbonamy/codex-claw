@@ -164,7 +164,11 @@ export function useWorkItemRouting(options: {
     }));
   }
 
-  async function createIsolatedAgent(listedItem: WorkItem, teamId: string): Promise<{ agent: Agent; item: WorkItem }> {
+  async function createIsolatedAgent(
+    listedItem: WorkItem,
+    teamId: string,
+    creationOptions: { reuseExisting?: boolean } = {},
+  ): Promise<{ agent: Agent; item: WorkItem }> {
     const team = options.model.snapshot().teams.find((candidate) => candidate.id === teamId);
     if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
 
@@ -176,6 +180,7 @@ export function useWorkItemRouting(options: {
     const worktree = await options.actions.createWorktree({
       repoPath: repository.path,
       branchName: workItemBranchName(item),
+      ...(creationOptions.reuseExisting ? { reuseExisting: true } : {}),
       ...remoteConnection(team),
     });
     const agent = await options.actions.createAgent({

@@ -1,81 +1,94 @@
 <template>
   <section class="work-item-assignment-picker">
-    <div class="work-item-assignment-picker__target-options">
-      <button
-        type="button"
-        :class="{ 'is-selected': destination === 'new' }"
-        :aria-pressed="destination === 'new'"
-        :disabled="busy"
-        @click="destination = 'new'"
-      >
-        <IconCopy aria-hidden="true" />
-        <strong>{{ t('repositoryBacklog.newIsolatedSession') }}</strong>
-        <span>{{ t('repositoryBacklog.newIsolatedSessionDetail') }}</span>
-      </button>
-      <button
-        type="button"
-        :class="{ 'is-selected': destination === 'existing' }"
-        :aria-pressed="destination === 'existing'"
-        :disabled="busy || sessions.length === 0"
-        @click="destination = 'existing'"
-      >
-        <IconRobotFace aria-hidden="true" />
-        <strong>{{ t('repositoryBacklog.useExistingSession') }}</strong>
-        <span v-if="sessions.length === 0">{{ t('repositoryBacklog.noExistingSessions') }}</span>
-        <span v-else>{{ t('repositoryBacklog.useExistingSessionDetail') }}</span>
-      </button>
-    </div>
-
-    <div class="work-item-assignment-picker__workspace">
-      <label v-if="destination === 'existing'" class="work-item-assignment-picker__field">
-        <span>{{ t('repositoryBacklog.session') }}</span>
-        <el-select
-          v-model="selectedAgentId"
+    <template v-if="reuseAction && existingWorktreePath">
+      <WorktreeReusePrompt :branch="branchName" :path="existingWorktreePath" />
+      <footer>
+        <button class="claw-button claw-button--tertiary" type="button" @click="reuseAction = null">
+          {{ t('common.cancel') }}
+        </button>
+        <button class="claw-button claw-button--primary" type="button" @click="confirmReuse">
+          {{ t('worktreeReuse.action') }}
+        </button>
+      </footer>
+    </template>
+    <template v-else>
+      <div class="work-item-assignment-picker__target-options">
+        <button
+          type="button"
+          :class="{ 'is-selected': destination === 'new' }"
+          :aria-pressed="destination === 'new'"
           :disabled="busy"
-          :aria-label="t('repositoryBacklog.existingSession')"
-          :placeholder="t('repositoryBacklog.chooseSession')"
+          @click="destination = 'new'"
         >
-          <el-option
-            v-for="session in sessions"
-            :key="session.agentId"
-            :label="session.label"
-            :value="session.agentId"
-          />
-        </el-select>
-      </label>
-      <label class="work-item-assignment-picker__field">
-        <span>{{ t('repositoryBacklog.branch') }}</span>
-        <el-input
-          class="work-item-assignment-picker__branch"
-          :model-value="branchName"
-          :aria-label="t('repositoryBacklog.branch')"
-          readonly
+          <IconCopy aria-hidden="true" />
+          <strong>{{ t('repositoryBacklog.newIsolatedSession') }}</strong>
+          <span>{{ t('repositoryBacklog.newIsolatedSessionDetail') }}</span>
+        </button>
+        <button
+          type="button"
+          :class="{ 'is-selected': destination === 'existing' }"
+          :aria-pressed="destination === 'existing'"
+          :disabled="busy || sessions.length === 0"
+          @click="destination = 'existing'"
         >
-          <template #prefix>
-            <IconGitPullRequest v-if="item.kind === 'pullRequest'" aria-hidden="true" />
-            <IconGitBranch v-else aria-hidden="true" />
-          </template>
-        </el-input>
-      </label>
-      <p v-if="destination === 'existing'" class="work-item-assignment-picker__branch-warning">
-        <IconAlertTriangle aria-hidden="true" />
-        <span>{{ t('repositoryBacklog.existingSessionBranchWarning') }}</span>
-      </p>
-    </div>
+          <IconRobotFace aria-hidden="true" />
+          <strong>{{ t('repositoryBacklog.useExistingSession') }}</strong>
+          <span v-if="sessions.length === 0">{{ t('repositoryBacklog.noExistingSessions') }}</span>
+          <span v-else>{{ t('repositoryBacklog.useExistingSessionDetail') }}</span>
+        </button>
+      </div>
 
-    <p v-if="error" class="work-item-assignment-picker__error" role="alert">{{ error }}</p>
+      <div class="work-item-assignment-picker__workspace">
+        <label v-if="destination === 'existing'" class="work-item-assignment-picker__field">
+          <span>{{ t('repositoryBacklog.session') }}</span>
+          <el-select
+            v-model="selectedAgentId"
+            :disabled="busy"
+            :aria-label="t('repositoryBacklog.existingSession')"
+            :placeholder="t('repositoryBacklog.chooseSession')"
+          >
+            <el-option
+              v-for="session in sessions"
+              :key="session.agentId"
+              :label="session.label"
+              :value="session.agentId"
+            />
+          </el-select>
+        </label>
+        <label class="work-item-assignment-picker__field">
+          <span>{{ t('repositoryBacklog.branch') }}</span>
+          <el-input
+            class="work-item-assignment-picker__branch"
+            :model-value="branchName"
+            :aria-label="t('repositoryBacklog.branch')"
+            readonly
+          >
+            <template #prefix>
+              <IconGitPullRequest v-if="item.kind === 'pullRequest'" aria-hidden="true" />
+              <IconGitBranch v-else aria-hidden="true" />
+            </template>
+          </el-input>
+        </label>
+        <p v-if="destination === 'existing'" class="work-item-assignment-picker__branch-warning">
+          <IconAlertTriangle aria-hidden="true" />
+          <span>{{ t('repositoryBacklog.existingSessionBranchWarning') }}</span>
+        </p>
+      </div>
 
-    <footer>
-      <button class="claw-button claw-button--tertiary" type="button" :disabled="!canSubmit" @click="emitCustom">
-        {{ t('repositoryBacklog.custom') }}
-      </button>
-      <button class="claw-button claw-button--secondary" type="button" :disabled="!canSubmit" @click="emitSubmit(secondaryAction)">
-        {{ item.kind === 'pullRequest' ? t('repositoryBacklog.addressFeedback') : t('repositoryBacklog.investigate') }}
-      </button>
-      <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmit" @click="emitSubmit(primaryAction)">
-        {{ item.kind === 'pullRequest' ? t('repositoryBacklog.review') : t('repositoryBacklog.fix') }}
-      </button>
-    </footer>
+      <p v-if="error" class="work-item-assignment-picker__error" role="alert">{{ error }}</p>
+
+      <footer>
+        <button class="claw-button claw-button--tertiary" type="button" :disabled="!canSubmit" @click="requestCustom">
+          {{ t('repositoryBacklog.custom') }}
+        </button>
+        <button class="claw-button claw-button--secondary" type="button" :disabled="!canSubmit" @click="requestSubmit(secondaryAction)">
+          {{ item.kind === 'pullRequest' ? t('repositoryBacklog.addressFeedback') : t('repositoryBacklog.investigate') }}
+        </button>
+        <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmit" @click="requestSubmit(primaryAction)">
+          {{ item.kind === 'pullRequest' ? t('repositoryBacklog.review') : t('repositoryBacklog.fix') }}
+        </button>
+      </footer>
+    </template>
   </section>
 </template>
 
@@ -85,6 +98,7 @@ import { useI18n } from 'vue-i18n';
 import { IconAlertTriangle, IconCopy, IconGitBranch, IconGitPullRequest, IconRobotFace } from '@tabler/icons-vue';
 import type { WorkItem } from '@codex-claw/core/contracts';
 import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
+import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 
 export type WorkItemAssignmentDestination = 'existing' | 'new';
 
@@ -98,17 +112,20 @@ export type WorkItemAssignmentSelection = {
   agentId?: string;
   destination: WorkItemAssignmentDestination;
   item: WorkItem;
+  reuseExisting?: boolean;
 };
 
 const props = withDefaults(defineProps<{
   branchName: string;
   busy?: boolean;
   error?: string | null;
+  existingWorktreePath?: string;
   item: WorkItem;
   sessions?: WorkItemAssignmentSession[];
 }>(), {
   busy: false,
   error: null,
+  existingWorktreePath: '',
   sessions: () => [],
 });
 
@@ -120,6 +137,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const destination = ref<WorkItemAssignmentDestination>('new');
 const selectedAgentId = ref('');
+const reuseAction = ref<WorkItemAssignmentAction | 'custom' | null>(null);
 const secondaryAction = computed<WorkItemAssignmentAction>(() => props.item.kind === 'pullRequest' ? 'addressFeedback' : 'investigate');
 const primaryAction = computed<WorkItemAssignmentAction>(() => props.item.kind === 'pullRequest' ? 'review' : 'fix');
 const canSubmit = computed(() => !props.busy
@@ -129,23 +147,42 @@ const canSubmit = computed(() => !props.busy
 watch(() => [props.item.id, props.sessions.map((session) => session.agentId).join('|')] as const, () => {
   destination.value = 'new';
   selectedAgentId.value = props.sessions[0]?.agentId ?? '';
+  reuseAction.value = null;
 }, { immediate: true });
 
-function emitCustom(): void {
+function requestCustom(): void {
   if (!canSubmit.value) return;
+  if (requestReuse('custom')) return;
   emit('custom', selection());
 }
 
-function emitSubmit(action: WorkItemAssignmentAction): void {
+function requestSubmit(action: WorkItemAssignmentAction): void {
   if (!canSubmit.value) return;
+  if (requestReuse(action)) return;
   emit('submit', { ...selection(), action });
 }
 
-function selection(): Omit<WorkItemAssignmentSelection, 'action'> {
+function requestReuse(action: WorkItemAssignmentAction | 'custom'): boolean {
+  if (destination.value !== 'new' || !props.existingWorktreePath) return false;
+  reuseAction.value = action;
+  return true;
+}
+
+function confirmReuse(): void {
+  const action = reuseAction.value;
+  if (!action) return;
+  reuseAction.value = null;
+  const nextSelection = selection(true);
+  if (action === 'custom') emit('custom', nextSelection);
+  else emit('submit', { ...nextSelection, action });
+}
+
+function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'action'> {
   return {
     destination: destination.value,
     ...(destination.value === 'existing' ? { agentId: selectedAgentId.value } : {}),
     item: props.item,
+    ...(reuseExisting ? { reuseExisting: true } : {}),
   };
 }
 </script>

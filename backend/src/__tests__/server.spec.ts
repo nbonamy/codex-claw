@@ -6677,6 +6677,7 @@ describe('ClawBackendServer', () => {
         input: {
           repoPath: '/home/nicolas/src/codex-claw',
           branchName: 'remote-agent',
+          reuseExisting: true,
           remoteConnectionId: 'connection-devbox',
         },
       },
@@ -6691,6 +6692,7 @@ describe('ClawBackendServer', () => {
         input: {
           repoPath: '/home/nicolas/src/codex-claw',
           branchName: 'remote-agent',
+          reuseExisting: true,
         },
       },
       expect.any(Function),

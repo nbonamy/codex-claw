@@ -21,7 +21,11 @@ export function useRepositorySession(options: {
   activeTeamId: () => string | undefined;
   assignWorkItem: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
-  createIsolatedWorkItemAgent: (item: WorkItem, teamId: string) => Promise<{ agent: Agent; item: WorkItem }>;
+  createIsolatedWorkItemAgent: (
+    item: WorkItem,
+    teamId: string,
+    options?: { reuseExisting?: boolean },
+  ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
   getWorkRepositories: () => WorkRepository[];
@@ -199,7 +203,11 @@ export function useRepositorySession(options: {
         await options.startWorkItemInExistingSession(selection.agentId, selection.item, selection.action);
       } else {
         if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-        const { agent, item } = await options.createIsolatedWorkItemAgent(selection.item, teamId);
+        const { agent, item } = await options.createIsolatedWorkItemAgent(
+          selection.item,
+          teamId,
+          selection.reuseExisting ? { reuseExisting: true } : {},
+        );
         await options.assignWorkItem({
           agentId: agent.id,
           item,
@@ -225,7 +233,11 @@ export function useRepositorySession(options: {
         options.prefillWorkItemForAgent(selection.agentId, selection.item);
       } else {
         if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-        const { agent, item } = await options.createIsolatedWorkItemAgent(selection.item, teamId);
+        const { agent, item } = await options.createIsolatedWorkItemAgent(
+          selection.item,
+          teamId,
+          selection.reuseExisting ? { reuseExisting: true } : {},
+        );
         options.prefillWorkItemForAgent(agent.id, item);
       }
       close();

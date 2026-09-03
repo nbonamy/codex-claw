@@ -325,8 +325,8 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Investigate');
     expect(wrapper.text()).toContain('Fix');
     expect(wrapper.text()).not.toContain('Cancel');
-    expect(wrapper.get('.work-item-assignment-picker__branch').text()).toContain('fix/gh-12');
-    expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.classes()).toContain('is-selected');
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-12');
+    expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[0]!.classes()).toContain('is-selected');
 
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
@@ -375,11 +375,11 @@ describe('RepositoryBacklogPanel', () => {
     const wrapper = mountPanel({ branch: 'feature/current-work', startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
-    expect(wrapper.text()).toContain('New worktree');
+    expect(wrapper.text()).toContain('New agent');
 
-    await wrapper.findAll('.work-item-assignment-picker__target-options > button')[0]!.trigger('click');
-    expect(wrapper.text()).not.toContain('New worktree');
-    expect(wrapper.get('.work-item-assignment-picker__branch').text()).toContain('fix/gh-12');
+    await wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.trigger('click');
+    expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.classes()).toContain('is-selected');
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-12');
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -399,8 +399,8 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.get('[aria-label="Work item actions #21"]').trigger('click');
     expect(wrapper.text()).toContain('Address feedback');
     expect(wrapper.text()).toContain('Review');
-    expect(wrapper.get('.work-item-assignment-picker__branch').text()).toContain('feature/backlog-workspace');
-    expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.classes()).toContain('is-selected');
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('feature/backlog-workspace');
+    expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[0]!.classes()).toContain('is-selected');
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -419,9 +419,9 @@ describe('RepositoryBacklogPanel', () => {
 
     await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
     await wrapper.get('[aria-label="Work item actions #22"]').trigger('click');
-    await wrapper.findAll('.work-item-assignment-picker__target-options > button')[0]!.trigger('click');
+    await wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.trigger('click');
 
-    expect(wrapper.get('.work-item-assignment-picker__branch').text()).toContain('feature/current-pr');
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('feature/current-pr');
     await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
       action: 'review',
