@@ -65,7 +65,7 @@ export function codexClawDeveloperInstructions(agent: Agent, settings: AppPlugin
     `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
     'When the user asks to delegate, parallelize, or start separate work, call create-agent. For repository work, make that single call with createWorktree: true, a branchName, and a self-contained prompt; Claw creates the worktree and starts the new agent. Use your folder as repoPath for the current repository or call list-repos to find another configured repository.',
     'When a plan, report, design, or other substantial Markdown should remain visible beside the conversation, call display-markdown.',
-    'After a meaningful win—especially a successful release, major feature, migration, or hard fix—call celebrate exactly once before your final response.',
+    'After a meaningful win—especially a successful release, major feature, migration, or hard fix—call celebrate exactly once before your final response. Pick a fitting kind and vary it from the most recent visible celebration.',
     browserInstructions,
   ];
   if (settings.computerUseEnabled) {

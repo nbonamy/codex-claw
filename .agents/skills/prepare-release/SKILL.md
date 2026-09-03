@@ -185,6 +185,9 @@ never claim the release was published.
 ## 8. Celebrate and report
 
 After every publication and Git verification succeeds, call the Codex Claw
-`celebrate` tool exactly once with `kind: confetti`. The release is complete
-only after that call returns. Then report the version, Claw commit hash, pushed
-tag, recorded SDK commit, and published macOS artifact.
+`celebrate` tool exactly once. Choose the effect deliberately: vary it from the
+most recent visible celebration, rotate `confetti`, `stars`, and `shapes` for
+ordinary releases, and reserve `schoolPride` for a major product or team
+milestone. The release is complete only after that call returns. Then report
+the version, Claw commit hash, pushed tag, recorded SDK commit, and published
+macOS artifact.

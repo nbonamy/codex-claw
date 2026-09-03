@@ -277,11 +277,13 @@ Input:
   `confetti`.
 
 Developer instructions require one celebration before the final response for
-releases, hard fixes, major features, migrations, and other meaningful wins;
-the tool description reinforces the same completion behavior. The request
-emits `celebration.requested`; it is not stored in conversation history or app
-state. Users can disable agent celebrations in General settings. The setting
-is enabled by default, and `clawd` suppresses the event when it is off.
+releases, hard fixes, major features, migrations, and other meaningful wins.
+Agents choose the effect deliberately and vary it from the most recent visible
+celebration; `schoolPride` is reserved for major product or team milestones.
+The request emits `celebration.requested`; it is not stored in conversation
+history or app state. Users can disable agent celebrations in General settings.
+The setting is enabled by default, and `clawd` suppresses the event when it is
+off.
 
 ### `send-message`
 
