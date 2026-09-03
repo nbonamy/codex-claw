@@ -11,6 +11,7 @@ import {
   removeBenchTemplateFromSnapshot,
   removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
+  reorderRepositoryInTeam,
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
   saveAgentToBench,
@@ -19,7 +20,7 @@ import {
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
 import { createTeamInSnapshot } from '../team-manager';
-import type { WorkItem } from '../contracts';
+import type { Agent, WorkItem } from '../contracts';
 import { workItemAssignmentKey } from '../work-assignments';
 
 describe('agent-manager', () => {
@@ -417,6 +418,39 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse']);
   });
 
+  it('keeps agent reorders inside their repository group', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.workspace = gitWorkspace('claw');
+    snapshot.agents[1]!.workspace = gitWorkspace('sdk');
+    const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
+
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', duplicate!.id, 'agent-jesse')).toBeNull();
+    expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'agent-jesse']);
+
+    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', null)).toStrictEqual(snapshot.agents[0]);
+    expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-abby', 'agent-dina', 'agent-jesse']);
+  });
+
+  it('reorders a repository as one block with all of its agents', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.workspace = gitWorkspace('claw');
+    snapshot.agents[1]!.workspace = gitWorkspace('sdk');
+    duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
+    const quickChat = duplicateAgentInSnapshot(snapshot, 'agent-jesse', '2026-06-05T10:11:13.000Z', () => 'quick-chat');
+    quickChat!.sessionKind = 'quickChat';
+    delete quickChat!.workspace;
+    snapshot.teams[0]!.agentIds = ['agent-dina', 'agent-abby', 'quick-chat', 'agent-jesse'];
+
+    expect(reorderRepositoryInTeam(snapshot, 'team-codex-claw', '/src/sdk', '/src/claw')?.map((agent) => agent.id))
+      .toStrictEqual(['agent-jesse']);
+    expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-jesse', 'quick-chat', 'agent-dina', 'agent-abby']);
+
+    expect(reorderRepositoryInTeam(snapshot, 'team-codex-claw', '/src/sdk', null)?.map((agent) => agent.id))
+      .toStrictEqual(['agent-jesse']);
+    expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'quick-chat', 'agent-jesse']);
+    expect(reorderRepositoryInTeam(snapshot, 'team-codex-claw', '/src/missing', null)).toBeNull();
+  });
+
   it('restarts an idle agent by clearing conversation and runtime state', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
@@ -613,5 +647,18 @@ function workItem(number: number, title: string): WorkItem {
     labels: [],
     createdAt: '2026-06-09T12:00:00.000Z',
     updatedAt: '2026-06-09T12:30:00.000Z',
+  };
+}
+
+function gitWorkspace(repository: string): Extract<Agent['workspace'], { kind: 'git' }> {
+  return {
+    kind: 'git',
+    folder: `/src/${repository}`,
+    repositoryName: repository,
+    repositoryRoot: `/src/${repository}`,
+    primaryWorktreeRoot: `/src/${repository}`,
+    branch: 'main',
+    isLinkedWorktree: false,
+    updatedAt: '2026-06-05T00:00:00.000Z',
   };
 }

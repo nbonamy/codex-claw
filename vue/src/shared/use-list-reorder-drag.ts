@@ -15,6 +15,7 @@ export type ReorderDrop<TId extends string> = {
 export type ListReorderDragOptions<TId extends string> = {
   itemIds: () => readonly TId[];
   onDrop: (drop: ReorderDrop<TId>) => void;
+  scopeForId?: (id: TId) => string;
 };
 
 export function useListReorderDrag<TId extends string>(options: ListReorderDragOptions<TId>) {
@@ -25,7 +26,7 @@ export function useListReorderDrag<TId extends string>(options: ListReorderDragO
 
   function dragItemAttributes(id: TId): Record<string, string | boolean> {
     return {
-      draggable: canReorder(),
+      draggable: canReorder(id),
       'data-reorder-id': id,
     };
   }
@@ -39,7 +40,7 @@ export function useListReorderDrag<TId extends string>(options: ListReorderDragO
   }
 
   function onDragStart(id: TId, event: DragEvent): void {
-    if (!canReorder()) {
+    if (!canReorder(id)) {
       event.preventDefault();
       return;
     }
@@ -54,7 +55,7 @@ export function useListReorderDrag<TId extends string>(options: ListReorderDragO
   }
 
   function onDragOver(id: TId, event: DragEvent): void {
-    if (!draggedId.value || draggedId.value === id) {
+    if (!draggedId.value || draggedId.value === id || !sameScope(draggedId.value, id)) {
       dropTarget.value = null;
       return;
     }
@@ -79,13 +80,13 @@ export function useListReorderDrag<TId extends string>(options: ListReorderDragO
   }
 
   function onDrop(id: TId, event: DragEvent): void {
-    event.preventDefault();
     const sourceId = draggedId.value;
-    if (!sourceId || sourceId === id) {
+    if (!sourceId || sourceId === id || !sameScope(sourceId, id)) {
       reset();
       return;
     }
 
+    event.preventDefault();
     const target = dropTarget.value?.id === id
       ? dropTarget.value
       : { id, position: dropPositionForEvent(event) };
@@ -105,18 +106,29 @@ export function useListReorderDrag<TId extends string>(options: ListReorderDragO
     dropTarget.value = null;
   }
 
-  function canReorder(): boolean {
-    return options.itemIds().length > 1;
+  function canReorder(id: TId): boolean {
+    return itemIdsFor(id).length > 1;
   }
 
   function beforeIdFromDrop(sourceId: TId, target: ReorderDropTarget<TId>): TId | null {
-    const ids = options.itemIds().filter((candidate) => candidate !== sourceId);
+    const ids = itemIdsFor(sourceId).filter((candidate) => candidate !== sourceId);
     if (target.position === 'before') {
       return target.id;
     }
 
     const targetIndex = ids.indexOf(target.id);
     return ids[targetIndex + 1] ?? null;
+  }
+
+  function itemIdsFor(id: TId): readonly TId[] {
+    const scope = options.scopeForId?.(id);
+    return scope === undefined
+      ? options.itemIds()
+      : options.itemIds().filter((candidate) => options.scopeForId?.(candidate) === scope);
+  }
+
+  function sameScope(left: TId, right: TId): boolean {
+    return !options.scopeForId || options.scopeForId(left) === options.scopeForId(right);
   }
 
   return {

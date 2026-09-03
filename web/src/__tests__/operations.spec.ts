@@ -59,6 +59,7 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation(backend, 'cloneSourceRepository', [{ url: 'https://github.com/nbonamy/codex-claw' }]);
     await invokeClawWebOperation(backend, 'forkAgent', ['agent-1', undefined]);
     await invokeClawWebOperation(backend, 'duplicateAgent', ['agent-1', { select: false }]);
+    await invokeClawWebOperation(backend, 'reorderRepositories', [{ teamId: 'team-1', repositoryRoot: '/repo-b', beforeRepositoryRoot: '/repo-a' }]);
     await invokeClawWebOperation(backend, 'listWorkItems', ['github', null, { kind: 'remote' }]);
     await invokeClawWebOperation(backend, 'listGlobalWorkItems', ['github', undefined, { assignment: 'all', page: 2 }]);
     await invokeClawWebOperation(backend, 'getPluginStatus', []);
@@ -77,6 +78,7 @@ describe('Claw web operations', () => {
       [backendMethods.sourceRepositoryClone, { input: { url: 'https://github.com/nbonamy/codex-claw' } }],
       [backendMethods.agentFork, { agentId: 'agent-1' }],
       [backendMethods.agentDuplicate, { agentId: 'agent-1', options: { select: false } }],
+      [backendMethods.repositoryReorder, { input: { teamId: 'team-1', repositoryRoot: '/repo-b', beforeRepositoryRoot: '/repo-a' } }],
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
       [backendMethods.workProviderGlobalItemsList, { provider: 'github', query: { assignment: 'all', page: 2 } }],
       [backendMethods.settingsPluginStatusGet, undefined],

@@ -14,6 +14,20 @@ import {
 } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar actions', () => {
+  const id8Agents = [
+    agents[0]!,
+    {
+      ...agents[0]!,
+      id: 'agent-abby',
+      name: 'Abby',
+      workspace: {
+        ...agents[0]!.workspace!,
+        branch: 'feat/sidebar-drag',
+        isLinkedWorktree: true,
+      },
+    },
+  ];
+
   it('emits agent selection from agent rows', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
@@ -34,7 +48,7 @@ describe('AgentSidebar actions', () => {
   it('emits agent reorder drops and marks the drop location', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
-        agents,
+        agents: [...id8Agents, agents[1]!],
         activeAgentId: 'agent-dina',
         teamId: 'team-codex-claw',
         teamName: 'Codex Claw',
@@ -45,11 +59,13 @@ describe('AgentSidebar actions', () => {
     });
     const rows = wrapper.findAll('.agent-sidebar__agent');
     const dinaRow = rows[0];
-    const jesseRow = rows[1];
-    expect(jesseRow.attributes('draggable')).toBe('true');
+    const abbyRow = rows[1];
+    const jesseRow = rows[2];
+    expect(abbyRow.attributes('draggable')).toBe('true');
+    expect(jesseRow.attributes('draggable')).toBe('false');
     mockRect(dinaRow.element, { top: 100, height: 64 });
 
-    jesseRow.element.dispatchEvent(dragEvent('dragstart', 0));
+    abbyRow.element.dispatchEvent(dragEvent('dragstart', 0));
     dinaRow.element.dispatchEvent(dragEvent('dragover', 108));
     await wrapper.vm.$nextTick();
 
@@ -61,8 +77,73 @@ describe('AgentSidebar actions', () => {
     expect(wrapper.emitted('reorder-agents')).toStrictEqual([[
       {
         teamId: 'team-codex-claw',
-        agentId: 'agent-jesse',
+        agentId: 'agent-abby',
         beforeAgentId: 'agent-dina',
+      },
+    ]]);
+  });
+
+  it('does not accept agent drops across repositories', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [...id8Agents, agents[1]!],
+        activeAgentId: 'agent-dina',
+        teamId: 'team-codex-claw',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        components: { ElPopover },
+      },
+    });
+    const rows = wrapper.findAll('.agent-sidebar__agent');
+    const abbyRow = rows[1];
+    const jesseRow = rows[2];
+    mockRect(jesseRow.element, { top: 100, height: 64 });
+
+    abbyRow.element.dispatchEvent(dragEvent('dragstart', 0));
+    jesseRow.element.dispatchEvent(dragEvent('dragover', 108));
+    jesseRow.element.dispatchEvent(dragEvent('drop', 108));
+    await wrapper.vm.$nextTick();
+
+    expect(jesseRow.classes()).not.toContain('list-reorder-drag--drop-before');
+    expect(jesseRow.classes()).not.toContain('list-reorder-drag--drop-after');
+    expect(wrapper.emitted('reorder-agents')).toBeUndefined();
+  });
+
+  it('emits repository reorder drops for the entire workspace group', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents,
+        activeAgentId: 'agent-dina',
+        teamId: 'team-codex-claw',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        components: { ElPopover },
+      },
+    });
+    const groups = wrapper.findAll('.agent-sidebar__workspace-group');
+    const id8Group = groups[0];
+    const multiLlmGroup = groups[1];
+    const headers = wrapper.findAll('.agent-sidebar__workspace-header');
+    expect(headers[0].attributes('draggable')).toBe('true');
+    expect(headers[1].attributes('draggable')).toBe('true');
+    mockRect(id8Group.element, { top: 100, height: 96 });
+
+    headers[1].element.dispatchEvent(dragEvent('dragstart', 0));
+    id8Group.element.dispatchEvent(dragEvent('dragover', 108));
+    await wrapper.vm.$nextTick();
+
+    expect(id8Group.classes()).toContain('list-reorder-drag--drop-before');
+
+    id8Group.element.dispatchEvent(dragEvent('drop', 108));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('reorder-repositories')).toStrictEqual([[
+      {
+        teamId: 'team-codex-claw',
+        repositoryRoot: '~/src/multi-llm-ts',
+        beforeRepositoryRoot: '~/src/id8',
       },
     ]]);
   });
@@ -70,7 +151,7 @@ describe('AgentSidebar actions', () => {
   it('does not emit agent reorder drops without a team id', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
-        agents,
+        agents: id8Agents,
         activeAgentId: 'agent-dina',
         teamName: 'Codex Claw',
       },

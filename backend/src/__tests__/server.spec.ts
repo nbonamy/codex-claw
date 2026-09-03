@@ -3747,6 +3747,87 @@ describe('ClawBackendServer', () => {
     }
   });
 
+  it('reorders repository groups atomically with every agent in the repository', async () => {
+    const snapshot = createTestSnapshot();
+    const createdAt = '2026-06-05T00:00:00.000Z';
+    snapshot.agents = [
+      {
+        id: 'agent-claw-main',
+        teamId: 'team-test',
+        name: 'Claw main',
+        folder: '/src/codex-claw',
+        workspace: gitWorkspace('/src/codex-claw', 'codex-claw', 'main'),
+        backend: 'codex',
+        backendDefaults: { kind: 'codex' },
+        status: { type: 'idle' },
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: 'agent-id8',
+        teamId: 'team-test',
+        name: 'id8',
+        folder: '/src/id8',
+        workspace: gitWorkspace('/src/id8', 'id8', 'main'),
+        backend: 'codex',
+        backendDefaults: { kind: 'codex' },
+        status: { type: 'idle' },
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: 'agent-claw-worktree',
+        teamId: 'team-test',
+        name: 'Claw worktree',
+        folder: '/src/codex-claw.worktrees/drag-drop',
+        workspace: {
+          ...gitWorkspace('/src/codex-claw', 'codex-claw', 'feat/drag-drop'),
+          folder: '/src/codex-claw.worktrees/drag-drop',
+          repositoryRoot: '/src/codex-claw.worktrees/drag-drop',
+          isLinkedWorktree: true,
+        },
+        backend: 'codex',
+        backendDefaults: { kind: 'codex' },
+        status: { type: 'idle' },
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ];
+    snapshot.teams[0]!.agentIds = snapshot.agents.map((agent) => agent.id);
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map()),
+    });
+
+    try {
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'reorder-repository',
+        method: 'repository/reorder',
+        params: {
+          input: {
+            teamId: 'team-test',
+            repositoryRoot: '/src/codex-claw',
+            beforeRepositoryRoot: null,
+          },
+        },
+      })).resolves.toMatchObject({ result: { activeTeamId: 'team-test' } });
+
+      expect(snapshot.teams[0]!.agentIds).toStrictEqual([
+        'agent-id8',
+        'agent-claw-main',
+        'agent-claw-worktree',
+      ]);
+      expect(saveSnapshot).toHaveBeenCalledOnce();
+    } finally {
+      await server.close();
+    }
+  });
+
   it('forgets the live backend session before closing its agent without retiring the conversation', async () => {
     const snapshot = createTestSnapshot();
     const agent = {
@@ -7096,6 +7177,19 @@ function createRemoteAgent(): AppSnapshot['agents'][number] {
     status: { type: 'idle' },
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',
+  };
+}
+
+function gitWorkspace(primaryWorktreeRoot: string, repositoryName: string, branch: string): Extract<NonNullable<Agent['workspace']>, { kind: 'git' }> {
+  return {
+    kind: 'git',
+    folder: primaryWorktreeRoot,
+    repositoryName,
+    repositoryRoot: primaryWorktreeRoot,
+    branch,
+    isLinkedWorktree: false,
+    primaryWorktreeRoot,
+    updatedAt: '2026-06-05T00:00:00.000Z',
   };
 }
 

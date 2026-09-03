@@ -3,12 +3,12 @@ import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/core/agent-manager';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -657,6 +657,31 @@ export class ClawBackendServer {
         const agent = reorderAgentInTeam(this.snapshot, input.teamId, input.agentId, input.beforeAgentId);
         if (!agent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent reorder target not found: ${input.agentId}`);
+        }
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case backendMethods.repositoryReorder: {
+        const input = requireReorderRepositoriesInput(message.params);
+        const team = this.snapshot.teams.find((candidate) => candidate.id === input.teamId) ?? null;
+        const pointer = this.remoteTeams.pointerForTeam(team);
+        if (pointer) {
+          const remoteSnapshot = await this.remoteTeams.request<AppSnapshot>(pointer.connectionId, backendMethods.repositoryReorder, {
+            input: {
+              ...input,
+              teamId: pointer.remoteTeamId,
+            },
+          });
+          this.remoteTeams.rememberSnapshot(pointer.connectionId, remoteSnapshot);
+          return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+        }
+        const agents = reorderRepositoryInTeam(
+          this.snapshot,
+          input.teamId,
+          input.repositoryRoot,
+          input.beforeRepositoryRoot,
+        );
+        if (!agents) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Repository reorder target not found: ${input.repositoryRoot}`);
         }
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
@@ -2555,6 +2580,11 @@ function requireMoveAgentInput(params: unknown): MoveAgentToTeamInput {
 function requireReorderAgentsInput(params: unknown): ReorderAgentsInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as ReorderAgentsInput;
+}
+
+function requireReorderRepositoriesInput(params: unknown): ReorderRepositoriesInput {
+  const record = requireRecord(params);
+  return requireRecord(record.input) as ReorderRepositoriesInput;
 }
 
 function requireAutomationCreateInput(params: unknown): CreateAutomationInput {

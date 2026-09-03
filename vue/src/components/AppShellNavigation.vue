@@ -53,6 +53,7 @@
       @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @open-in="openAgentIn($event.agentId, $event.application)"
       @reorder-agents="$emit('reorder-agents', $event)"
+      @reorder-repositories="$emit('reorder-repositories', $event)"
       @restart-agent="$emit('restart-agent', $event)"
       @resize-sidebar="setAgentSidebarWidth"
       @resume-session="openResumeSession"
@@ -75,6 +76,7 @@ import type {
   OpenInApplication,
   OpenInApplicationCatalog,
   ReorderAgentsInput,
+  ReorderRepositoriesInput,
   ReorderTeamsInput,
   SourceBranch,
   Team,
@@ -133,6 +135,7 @@ const emit = defineEmits<{
   'open-whats-new': [];
   quit: [];
   'reorder-agents': [input: ReorderAgentsInput];
+  'reorder-repositories': [input: ReorderRepositoriesInput];
   'reorder-teams': [input: ReorderTeamsInput];
   'resize-sidebar': [width: number];
   'restart-agent': [agentId: string];

@@ -27,6 +27,8 @@ describe('AgentSidebar sessions', () => {
     expect(wrapper.text()).toContain('Jesse');
     expect(wrapper.find('.agent-sidebar__agent--active').text()).toContain('Dina');
     expect(wrapper.find('.agent-sidebar__agent--active').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('.agent-sidebar__session-title--active').text()).toBe('Dina');
+    expect(wrapper.findAll('.agent-sidebar__session-title--active')).toHaveLength(1);
     expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
   });
 

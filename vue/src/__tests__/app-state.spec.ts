@@ -3775,6 +3775,53 @@ describe('useAppState', () => {
     expect(reorderAgents).not.toHaveBeenCalled();
   });
 
+  it('forwards repository reorders after validating both repository roots', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.workspace = {
+      kind: 'git',
+      folder: '/Users/nbonamy/src/codex-claw',
+      repositoryName: 'codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      branch: 'main',
+      isLinkedWorktree: false,
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    };
+    remoteSnapshot.agents[1]!.workspace = {
+      kind: 'git',
+      folder: '/Users/nbonamy/src/id8',
+      repositoryName: 'id8',
+      repositoryRoot: '/Users/nbonamy/src/id8',
+      primaryWorktreeRoot: '/Users/nbonamy/src/id8',
+      branch: 'main',
+      isLinkedWorktree: false,
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    };
+    const reorderRepositories = vi.fn().mockResolvedValue(remoteSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+        reorderRepositories,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    const input = {
+      teamId: 'team-codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/id8',
+      beforeRepositoryRoot: '/Users/nbonamy/src/codex-claw',
+    };
+    await state.reorderRepositories(input);
+    await state.reorderRepositories({ ...input, repositoryRoot: '/missing' });
+    await state.reorderRepositories({ ...input, beforeRepositoryRoot: '/missing' });
+
+    expect(reorderRepositories).toHaveBeenCalledOnce();
+    expect(reorderRepositories).toHaveBeenCalledWith(input);
+  });
+
   it('loads backend models, selects the default reasoning effort, and sends it with prompts', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
