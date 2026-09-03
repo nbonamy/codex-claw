@@ -151,6 +151,11 @@ describe('RightWorkspacePanel', () => {
     const prefillRepositoryWork = vi.fn();
     const createRepositoryIssue = vi.fn().mockResolvedValue(undefined);
     const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
+    const launcher = mountPanel([], null);
+    await launcher.setProps({ githubRepository: 'nbonamy/codex-claw' });
+
+    expect(launcher.get('[aria-label="Open a workspace tab"]').text()).not.toContain('Backlog');
+
     const wrapper = mountPanel(['backlog'], 'backlog');
     await wrapper.setProps({
       githubRepository: 'nbonamy/codex-claw',

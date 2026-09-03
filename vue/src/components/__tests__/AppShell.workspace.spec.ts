@@ -334,10 +334,11 @@ describe('AppShell workspace and plans', () => {
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await nextTick();
-    const backlogLauncher = wrapper.findAll('.right-workspace-panel__launcher button')
+    await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
+    const backlogMenuItem = wrapper.findAll('.right-workspace-panel__add-menu .app-menu__item')
       .find((candidate) => candidate.text().includes('Backlog'));
-    expect(backlogLauncher).toBeDefined();
-    await backlogLauncher!.trigger('click');
+    expect(backlogMenuItem).toBeDefined();
+    await backlogMenuItem!.trigger('click');
     await flushPromises();
 
     expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, { kind: 'all', state: 'all' });

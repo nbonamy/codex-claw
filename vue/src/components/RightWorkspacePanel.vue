@@ -86,10 +86,6 @@
       class="right-workspace-panel__launcher"
       :aria-label="$t('surface.rightWorkspacePanel.openAWorkspaceTab')"
     >
-      <button v-if="githubRepository" type="button" @click="emit('openTab', 'backlog')">
-        <BacklogIcon aria-hidden="true" />
-        <span>{{ $t('surface.rightWorkspacePanel.backlog') }}</span>
-      </button>
       <button type="button" @click="emit('openTab', 'review')">
         <GitHubIcon aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.review') }}</span>
