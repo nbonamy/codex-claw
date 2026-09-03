@@ -1175,6 +1175,25 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
   });
 
+  it('reports an active resumed goal as working before its next turn is observable', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    transport.goalsByThreadId.set('thread-a', {
+      threadId: 'thread-a', objective: 'Finish the campaign', status: 'active', tokenBudget: null,
+      tokensUsed: 10, timeUsedSeconds: 5, createdAt: 1, updatedAt: 2,
+    });
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    }));
+  });
+
   it('forwards completed goal status from the SDK', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];

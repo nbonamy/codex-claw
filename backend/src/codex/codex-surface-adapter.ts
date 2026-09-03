@@ -1648,7 +1648,7 @@ function statusFromSnapshot(snapshot: CodexConversationSnapshot): AgentStatus {
   if (snapshot.clientRequests.length > 0 || snapshot.approvals.length > 0) {
     return { type: 'awaitingInput', detail: { key: 'backend.awaitingUserInput' } };
   }
-  return snapshot.busy ? { type: 'working' } : { type: 'idle' };
+  return snapshot.busy || snapshot.goal?.status === 'active' ? { type: 'working' } : { type: 'idle' };
 }
 
 function runtimeStatus(snapshot: CodexSurfaceSnapshot): BackendRuntimeStatus {
