@@ -4,6 +4,30 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.15.0] - 2026-09-02
+
+### New features
+
+- Agents can now delegate work as one complete handoff: create an isolated
+  worktree, start another agent with initial instructions, and show staged
+  setup progress while the agent gets ready.
+- New worktrees can now initialize before an agent starts. Repository-owned
+  `.agents/worktree` scripts take precedence, while Auto-detect can copy local
+  environment files and restore Node.js, Python, and Go dependencies. Settings
+  can limit initialization to repository instructions or disable it entirely.
+
+### Improvements and fixes
+
+- Work assignment and worktree creation now use clearer new-agent and
+  existing-agent choices, allow branch names to be edited, and offer to reuse
+  an existing worktree instead of surfacing a raw Git error.
+- Cockpit repository rows now link directly to GitHub instead of showing an
+  ambiguous agent-launch control.
+- Closing an agent now gives linked-worktree cleanup enough time to finish
+  without timing out.
+- Plain code blocks now preserve their original line breaks when no syntax
+  highlighter is available.
+
 ## [0.14.3] - 2026-09-02
 
 ### Improvements and fixes

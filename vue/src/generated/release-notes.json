@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.14.3",
+  "currentVersion": "0.15.0",
   "releases": [
+    {
+      "version": "0.15.0",
+      "releasedAt": "2026-09-02",
+      "sourceSha256": "e90cfc0928d3ebe25972ae240bdc3244b42e6c99cc19408899b7eee4ee80ccdd",
+      "markdown": "### New features\n\n- Agents can now delegate work as one complete handoff: create an isolated\n  worktree, start another agent with initial instructions, and show staged\n  setup progress while the agent gets ready.\n- New worktrees can now initialize before an agent starts. Repository-owned\n  `.agents/worktree` scripts take precedence, while Auto-detect can copy local\n  environment files and restore Node.js, Python, and Go dependencies. Settings\n  can limit initialization to repository instructions or disable it entirely.\n\n### Improvements and fixes\n\n- Work assignment and worktree creation now use clearer new-agent and\n  existing-agent choices, allow branch names to be edited, and offer to reuse\n  an existing worktree instead of surfacing a raw Git error.\n- Cockpit repository rows now link directly to GitHub instead of showing an\n  ambiguous agent-launch control.\n- Closing an agent now gives linked-worktree cleanup enough time to finish\n  without timing out.\n- Plain code blocks now preserve their original line breaks when no syntax\n  highlighter is available."
+    },
     {
       "version": "0.14.3",
       "releasedAt": "2026-09-02",
