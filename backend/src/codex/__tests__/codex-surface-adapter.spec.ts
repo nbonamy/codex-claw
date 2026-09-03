@@ -21,6 +21,7 @@ class FakeTransport implements RpcTransport {
   readonly summaryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
   readonly threadMetadataByThreadId = new Map<string, Record<string, unknown>>();
   readonly staleActiveThreadIds = new Set<string>();
+  readonly goalsByThreadId = new Map<string, Record<string, unknown>>();
   private readonly listeners = new Set<(message: unknown) => void>();
   private readonly errorListeners = new Set<(error: Error) => void>();
 
@@ -185,7 +186,10 @@ class FakeTransport implements RpcTransport {
           ? new Promise((resolve) => setTimeout(() => resolve(result), this.turnsListDelayMs))
           : result;
       }
-      case 'thread/goal/get': return { goal: null };
+      case 'thread/goal/get': {
+        const threadId = String((params as { threadId: string }).threadId);
+        return { goal: this.goalsByThreadId.get(threadId) ?? null };
+      }
       case 'thread/goal/set': {
         const input = params as { threadId: string; objective: string };
         return { goal: {
@@ -1144,6 +1148,56 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events.find((event) => event.type === 'thread.historyLoaded')).toMatchObject({
       payload: { messages: expect.not.arrayContaining([expect.objectContaining({ status: 'streaming' })]) },
     });
+  });
+
+  it('keeps a resumed active goal working during cold hydration', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    transport.staleActiveThreadIds.add('thread-a');
+    transport.goalsByThreadId.set('thread-a', {
+      threadId: 'thread-a', objective: 'Finish the campaign', status: 'active', tokenBudget: null,
+      tokensUsed: 10, timeUsedSeconds: 5, createdAt: 1, updatedAt: 2,
+    });
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+
+    expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'agent.statusChanged',
+      payload: { type: 'working' },
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'thread.goalUpdated',
+      payload: { goal: expect.objectContaining({ status: 'active' }) },
+    }));
+  });
+
+  it('forwards completed goal status from the SDK', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.emit({
+      method: 'thread/goal/updated',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-thread-a',
+        goal: {
+          threadId: 'thread-a', objective: 'Finish the campaign', status: 'complete', tokenBudget: null,
+          tokensUsed: 20, timeUsedSeconds: 10, createdAt: 1, updatedAt: 3,
+        },
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-a',
+      type: 'thread.goalUpdated',
+      payload: { goal: expect.objectContaining({ status: 'complete' }) },
+    }));
   });
 
   it('keeps cached active history authoritative and reconciles through live completion events', async () => {

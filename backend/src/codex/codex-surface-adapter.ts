@@ -556,10 +556,12 @@ export class CodexSurfaceAgentAdapter {
     try {
       let snapshot = await session.handle.load({ ...agentCwd(agent), extensionContext: agent });
       const interruptedTurnId = snapshot.activeTurnId;
-      if (interruptedTurnId) {
+      const resumedActiveGoal = snapshot.goal?.status === 'active';
+      if (interruptedTurnId && !resumedActiveGoal) {
         // A newly created Claw backend has no ownership of an old in-progress
-        // turn. Leaving it active here permanently disables the composer after
-        // an app restart, so ask app-server to end that orphaned turn before
+        // turn unless app-server is continuing a persistent goal. Leaving a
+        // genuinely orphaned turn active permanently disables the composer
+        // after an app restart, so ask app-server to end only that case before
         // exposing the hydrated conversation.
         snapshot = await session.handle.interrupt();
       }
@@ -580,7 +582,7 @@ export class CodexSurfaceAgentAdapter {
         await session.handle.updateSettings({ serviceTier: requestedServiceTier });
       }
       if (emitHistory) {
-        if (interruptedTurnId) {
+        if (interruptedTurnId && !resumedActiveGoal) {
           this.emitThread(session, {
             type: 'turn.completed',
             turnId: interruptedTurnId,
