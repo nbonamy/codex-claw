@@ -38,17 +38,21 @@ describe('BackendDriverRpc', () => {
     expect(pluginSettings).toHaveBeenCalledOnce();
   });
 
-  it('uses the live spoken-announcement setting for Codex agent instructions', async () => {
+  it('uses the live effect settings for Codex agent instructions', async () => {
+    const celebrationsEnabled = vi.fn().mockReturnValue(false);
     const spokenAnnouncementsEnabled = vi.fn().mockReturnValue(true);
     const options = codexClawSurfaceOptions({
       clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+      celebrationsEnabled,
       spokenAnnouncementsEnabled,
     });
     const configureConversation = options.extensions?.[0]?.configureConversation;
     const extension = await configureConversation?.({ extensionContext: createAgent() } as never);
 
+    expect(celebrationsEnabled).toHaveBeenCalledOnce();
     expect(spokenAnnouncementsEnabled).toHaveBeenCalledOnce();
-    expect(extension?.developerInstructions).toContain('call announce at most once near the start');
+    expect(extension?.developerInstructions).toContain('call announce exactly once');
+    expect(extension?.developerInstructions).not.toContain('call celebrate');
   });
 
   it('routes model requests to the agent backend driver', async () => {

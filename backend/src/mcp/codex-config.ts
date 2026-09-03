@@ -1,7 +1,7 @@
 import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
 import { defaultPluginSettings } from '@codex-claw/core/settings';
 import type { CodexThreadStartExtension } from '@codex-app-sdk/backend';
-import { codexClawDeveloperInstructions } from './agent-prompts';
+import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from './agent-prompts';
 
 export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettings = defaultPluginSettings): string[] {
   return [
@@ -16,7 +16,7 @@ export function buildCodexClawThreadConfig(
   agent: Agent,
   mcpServerUrl: string | null,
   pluginSettings: AppPluginSettings = defaultPluginSettings,
-  spokenAnnouncementsEnabled = false,
+  effects: AgentEffectInstructionSettings = {},
 ): CodexThreadStartExtension {
   if (!mcpServerUrl) {
     return {};
@@ -30,7 +30,7 @@ export function buildCodexClawThreadConfig(
         ? { 'mcp_servers.node_repl.enabled': true }
         : {}),
     },
-    developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings, spokenAnnouncementsEnabled),
+    developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings, effects),
   };
 }
 

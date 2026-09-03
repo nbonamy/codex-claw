@@ -276,8 +276,10 @@ Input:
 - `kind`: optional `confetti`, `stars`, `shapes`, or `schoolPride`; defaults to
   `confetti`.
 
-Developer instructions require one celebration before the final response for
-releases, hard fixes, major features, migrations, and other meaningful wins.
+When celebrations are enabled, developer instructions require one celebration
+before the final response for releases, hard fixes, major features, migrations,
+and other meaningful wins. Disabled celebrations are not advertised to the
+model.
 Agents choose the effect deliberately and vary it from the most recent visible
 celebration; `schoolPride` is reserved for major product or team milestones.
 The request emits `celebration.requested`; it is not stored in conversation

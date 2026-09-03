@@ -21,6 +21,7 @@ export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
+  celebrationsEnabled?: () => boolean;
   spokenAnnouncementsEnabled?: () => boolean;
 };
 
@@ -39,6 +40,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
     ['claude', new ClaudeBackendDriver(undefined, undefined, {
       clawMcpServerUrl: options.clawMcpServerUrl ?? null,
       pluginSettings: options.pluginSettings,
+      celebrationsEnabled: options.celebrationsEnabled,
       spokenAnnouncementsEnabled: options.spokenAnnouncementsEnabled,
     })],
   ]);
@@ -65,7 +67,10 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
             extensionContext,
             options.clawMcpServerUrl ?? null,
             options.pluginSettings?.() ?? options.generalSettings?.plugins,
-            options.spokenAnnouncementsEnabled?.() ?? options.generalSettings?.spokenAnnouncementsEnabled,
+            {
+              celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
+              spokenAnnouncementsEnabled: options.spokenAnnouncementsEnabled?.() ?? options.generalSettings?.spokenAnnouncementsEnabled,
+            },
           )
           : {}
       ),

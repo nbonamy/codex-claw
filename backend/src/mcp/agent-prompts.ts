@@ -14,6 +14,11 @@ export type MessageInfo = {
   content: string;
 };
 
+export type AgentEffectInstructionSettings = {
+  celebrationsEnabled?: boolean;
+  spokenAnnouncementsEnabled?: boolean;
+};
+
 export const CHECK_INBOX_PROMPT = 'Manual recovery: check your unread Codex Claw agent messages.';
 
 const COLLABORATION_BOUNDARY = [
@@ -52,7 +57,7 @@ export function agentMessagesPrompt(messages: MessageInfo[]): string {
 export function codexClawDeveloperInstructions(
   agent: Agent,
   settings: AppPluginSettings = defaultPluginSettings,
-  spokenAnnouncementsEnabled = false,
+  effects: AgentEffectInstructionSettings = {},
 ): string {
   const workspaceIdentity = agent.folder
     ? `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`
@@ -69,12 +74,16 @@ export function codexClawDeveloperInstructions(
     `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
     'When the user asks to delegate, parallelize, or start separate work, call create-agent. For repository work, make that single call with createWorktree: true, a branchName, and a self-contained prompt; Claw creates the worktree and starts the new agent. Use your folder as repoPath for the current repository or call list-repos to find another configured repository.',
     'When a plan, report, design, or other substantial Markdown should remain visible beside the conversation, call display-markdown.',
-    'After a meaningful win—especially a successful release, major feature, migration, or hard fix—call celebrate exactly once before your final response. Pick a fitting kind and vary it from the most recent visible celebration.',
     browserInstructions,
   ];
-  if (spokenAnnouncementsEnabled) {
+  if (effects.celebrationsEnabled !== false) {
     instructions.push(
-      'Spoken acknowledgments are enabled. For a substantive user task, call announce at most once near the start with phase start and once only at genuine completion with phase finish. Use a varied, natural phrase no longer than a short sentence. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. The tool is best-effort; do not wait for speech or retry a rejected announcement.',
+      'After a meaningful win—especially a successful release, major feature, migration, or hard fix—call celebrate exactly once before your final response. Pick a fitting kind and vary it from the most recent visible celebration.',
+    );
+  }
+  if (effects.spokenAnnouncementsEnabled) {
+    instructions.push(
+      'Spoken acknowledgments are enabled. At the beginning of every user task, call announce exactly once with phase start and one short, natural sentence acknowledging the task. For a long-running task, you may call announce once more with phase finish at genuine completion. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. The tool is best-effort; do not wait for speech or retry a rejected announcement.',
     );
   }
   if (settings.computerUseEnabled) {

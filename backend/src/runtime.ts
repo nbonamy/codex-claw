@@ -83,6 +83,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     clawMcpServerUrl: mcpServerUrl,
     generalSettings: snapshot.general,
     pluginSettings,
+    celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
     spokenAnnouncementsEnabled: () => snapshot.general.spokenAnnouncementsEnabled,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);

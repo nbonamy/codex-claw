@@ -444,6 +444,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport, async () => null, {
       clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+      celebrationsEnabled: () => false,
       spokenAnnouncementsEnabled: () => true,
     });
 
@@ -455,8 +456,9 @@ describe('ClaudeBackendDriver', () => {
       appendSystemPrompt: expect.stringContaining('Use the codex_claw MCP server for agent collaboration.'),
     });
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain(
-      'call announce at most once near the start',
+      'call announce exactly once',
     );
+    expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).not.toContain('call celebrate');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-mcp' });
     await expect(sendResult).resolves.toMatchObject({
       backendSession: { kind: 'claude', sessionId: 'claude-session-mcp', transport: 'stdio' },

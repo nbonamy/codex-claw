@@ -77,12 +77,22 @@ describe('agent prompts', () => {
     expect(instructions).not.toContain('Spoken acknowledgments are enabled');
   });
 
-  it('limits enabled spoken acknowledgments to task boundaries and safe short phrases', () => {
-    const instructions = codexClawDeveloperInstructions(agent(), undefined, true);
+  it('advertises celebrations only when enabled', () => {
+    const enabled = codexClawDeveloperInstructions(agent());
+    const disabled = codexClawDeveloperInstructions(agent(), undefined, { celebrationsEnabled: false });
 
-    expect(instructions).toContain('call announce at most once near the start');
-    expect(instructions).toContain('once only at genuine completion');
+    expect(enabled).toContain('call celebrate exactly once');
+    expect(disabled).not.toContain('call celebrate');
+  });
+
+  it('requires a short start acknowledgment and reserves finish speech for long-running tasks', () => {
+    const instructions = codexClawDeveloperInstructions(agent(), undefined, { spokenAnnouncementsEnabled: true });
+
+    expect(instructions).toContain('At the beginning of every user task, call announce exactly once');
+    expect(instructions).toContain('one short, natural sentence');
+    expect(instructions).toContain('For a long-running task, you may call announce once more');
     expect(instructions).toContain('Never announce intermediate progress or reasoning');
+    expect(instructions).toContain('or the full answer');
     expect(instructions).toContain('do not wait for speech or retry');
   });
 

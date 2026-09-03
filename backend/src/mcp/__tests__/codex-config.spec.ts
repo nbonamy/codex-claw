@@ -55,11 +55,24 @@ describe('codex-config', () => {
       agent,
       'http://127.0.0.1:8767/mcp',
       undefined,
-      true,
+      { spokenAnnouncementsEnabled: true },
     );
 
     expect(disabled.developerInstructions).not.toContain('Spoken acknowledgments are enabled');
-    expect(enabled.developerInstructions).toContain('call announce at most once near the start');
+    expect(enabled.developerInstructions).toContain('call announce exactly once');
+  });
+
+  it('adds celebration policy only when the setting is enabled', () => {
+    const enabled = buildCodexClawThreadConfig(agent, 'http://127.0.0.1:8767/mcp');
+    const disabled = buildCodexClawThreadConfig(
+      agent,
+      'http://127.0.0.1:8767/mcp',
+      undefined,
+      { celebrationsEnabled: false },
+    );
+
+    expect(enabled.developerInstructions).toContain('call celebrate exactly once');
+    expect(disabled.developerInstructions).not.toContain('call celebrate');
   });
 
   it('preserves existing query params when scoping an MCP URL to an agent', () => {

@@ -198,6 +198,9 @@ app event, not from the result text.
 
 `announce` follows the transient-effect path without changing agent state:
 
+- developer instructions advertise it only when spoken acknowledgments are
+  enabled, require one short sentence at the start of every user task, and
+  permit one additional short completion sentence only for long-running work;
 - the MCP schema accepts `phase: start | finish` and trims text to 1–160
   characters;
 - the coordinator validates the caller and delegates without touching

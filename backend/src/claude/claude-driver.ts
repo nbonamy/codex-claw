@@ -19,7 +19,7 @@ import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities
 import { type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
-import { codexClawDeveloperInstructions } from '../mcp/agent-prompts';
+import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
 import {
   type ClaudePermissionRequest,
@@ -89,6 +89,7 @@ type ClaudeBackendDriverOptions = {
   clawMcpServerUrl?: string | null;
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
+  celebrationsEnabled?: () => boolean;
   spokenAnnouncementsEnabled?: () => boolean;
 };
 
@@ -172,7 +173,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         existingSessionId,
         this.driverOptions.clawMcpServerUrl,
         this.driverOptions.pluginSettings?.(),
-        this.driverOptions.spokenAnnouncementsEnabled?.(),
+        {
+          celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
+          spokenAnnouncementsEnabled: this.driverOptions.spokenAnnouncementsEnabled?.(),
+        },
       );
       const handle = this.transport.startTurn(
         turnParams,
@@ -521,7 +525,10 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
           sessionId,
           this.driverOptions.clawMcpServerUrl,
           this.driverOptions.pluginSettings?.(),
-          this.driverOptions.spokenAnnouncementsEnabled?.(),
+          {
+            celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
+            spokenAnnouncementsEnabled: this.driverOptions.spokenAnnouncementsEnabled?.(),
+          },
         );
         const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;
         const usage = await this.transport.readContextUsage?.({ ...params, sessionId });
@@ -1112,7 +1119,7 @@ function claudeTurnParams(
   existingSessionId: string | null,
   clawMcpServerUrl: string | null | undefined,
   pluginSettings?: AppPluginSettings,
-  spokenAnnouncementsEnabled = false,
+  effects: AgentEffectInstructionSettings = {},
 ): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
@@ -1125,7 +1132,7 @@ function claudeTurnParams(
     model: options.model ?? defaults?.model ?? null,
     effort: claudeEffort(options.reasoningEffort ?? defaults?.reasoningEffort),
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
-    appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings, spokenAnnouncementsEnabled),
+    appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings, effects),
     mcpServerUrl,
     allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
     ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),

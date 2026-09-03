@@ -68,7 +68,7 @@ export function createCodexClawMcpServer(
   }, () => coordinator.setStatus(callerAgentId, status)));
 
   server.registerTool('celebrate', {
-    description: 'Celebrate meaningful wins in Codex Claw: successful releases, hard bugs fixed, major features shipped, completed migrations, or genuine breakthroughs. Call this once after the accomplishment; do not omit it merely to stay concise. Choose the effect deliberately and vary it from the most recent visible celebration: confetti, stars, and shapes all fit ordinary wins, while schoolPride marks a major team achievement.',
+    description: 'Request a transient visual celebration in Codex Claw when celebrations are enabled by the user. Confetti, stars, and shapes fit ordinary wins, while schoolPride marks a major team achievement.',
     inputSchema: {
       kind: z.enum(['confetti', 'stars', 'shapes', 'schoolPride']).default('confetti').describe('Visual celebration style; choose deliberately and vary it across wins.'),
     },
@@ -78,7 +78,7 @@ export function createCodexClawMcpServer(
   }, () => coordinator.celebrate(callerAgentId, kind)));
 
   server.registerTool('announce', {
-    description: 'Queue one brief spoken acknowledgment for the user at the start or genuine finish of their task. Use at most once near task start and once at genuine completion. Keep it natural and varied. Never announce intermediate reasoning, plans, transcripts, command output, code, secrets, or the full answer. This is best-effort and returns as soon as playback is queued.',
+    description: 'Queue one brief spoken acknowledgment when spoken acknowledgments are enabled by the user. The text must be one short, natural sentence, never intermediate reasoning, command output, code, secrets, or the full answer. This is best-effort and returns as soon as playback is queued.',
     inputSchema: {
       phase: z.enum(['start', 'finish']).describe('Whether this acknowledges starting or genuinely finishing the user task.'),
       text: z.string().trim().min(1).max(160).describe('One brief natural phrase, at most 160 characters.'),
