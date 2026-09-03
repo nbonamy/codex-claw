@@ -2,6 +2,7 @@ import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemp
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 import { agentDisplayName } from './agent-display';
+import { workspaceSidebarGroupIdForAgent, workspaceSidebarRepositoryRootForAgent } from './workspace-sidebar';
 
 export function duplicateAgentInSnapshot(
   snapshot: AppSnapshot,
@@ -312,12 +313,77 @@ export function reorderAgentInTeam(snapshot: AppSnapshot, teamId: string, agentI
     return agent;
   }
 
-  if (beforeAgentId !== null && !team.agentIds.includes(beforeAgentId)) {
+  const sourceGroupId = workspaceSidebarGroupIdForAgent(agent);
+  const beforeAgent = beforeAgentId === null
+    ? null
+    : snapshot.agents.find((candidate) => candidate.id === beforeAgentId) ?? null;
+  if (
+    beforeAgentId !== null &&
+    (!team.agentIds.includes(beforeAgentId) || !beforeAgent || workspaceSidebarGroupIdForAgent(beforeAgent) !== sourceGroupId)
+  ) {
     return null;
   }
 
-  team.agentIds = reorderIdsByBeforeId(team.agentIds, agentId, beforeAgentId);
+  const groupAgentIds = team.agentIds.filter((candidateId) => {
+    const candidate = snapshot.agents.find((value) => value.id === candidateId);
+    return candidate && workspaceSidebarGroupIdForAgent(candidate) === sourceGroupId;
+  });
+  const reorderedGroupAgentIds = reorderIdsByBeforeId(groupAgentIds, agentId, beforeAgentId);
+  let groupIndex = 0;
+  team.agentIds = team.agentIds.map((candidateId) => (
+    groupAgentIds.includes(candidateId)
+      ? reorderedGroupAgentIds[groupIndex++]!
+      : candidateId
+  ));
   return agent;
+}
+
+export function reorderRepositoryInTeam(
+  snapshot: AppSnapshot,
+  teamId: string,
+  repositoryRoot: string,
+  beforeRepositoryRoot: string | null,
+): Agent[] | null {
+  const team = snapshot.teams.find((candidate) => candidate.id === teamId);
+  if (!team) return null;
+
+  const agentsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
+  const groups = new Map<string, { agentIds: string[]; repositoryRoot: string | null }>();
+  for (const agentId of team.agentIds) {
+    const agent = agentsById.get(agentId);
+    const groupId = agent ? workspaceSidebarGroupIdForAgent(agent) : `missing:${agentId}`;
+    const group = groups.get(groupId) ?? {
+      agentIds: [],
+      repositoryRoot: agent ? workspaceSidebarRepositoryRootForAgent(agent) : null,
+    };
+    group.agentIds.push(agentId);
+    groups.set(groupId, group);
+  }
+
+  const orderedGroups = [...groups.values()];
+  const repositoryGroups = orderedGroups.filter((group) => group.repositoryRoot !== null);
+  const sourceGroup = repositoryGroups.find((group) => group.repositoryRoot === repositoryRoot);
+  const sourceAgents = sourceGroup?.agentIds
+    .map((agentId) => agentsById.get(agentId))
+    .filter((agent): agent is Agent => Boolean(agent)) ?? [];
+  if (sourceAgents.length === 0) return null;
+  if (beforeRepositoryRoot === repositoryRoot) return sourceAgents;
+  if (beforeRepositoryRoot !== null && !repositoryGroups.some((group) => group.repositoryRoot === beforeRepositoryRoot)) {
+    return null;
+  }
+
+  const reorderedRoots = reorderIdsByBeforeId(
+    repositoryGroups.map((group) => group.repositoryRoot!),
+    repositoryRoot,
+    beforeRepositoryRoot,
+  );
+  const repositoryGroupsByRoot = new Map(repositoryGroups.map((group) => [group.repositoryRoot!, group]));
+  let repositoryIndex = 0;
+  team.agentIds = orderedGroups.flatMap((group) => {
+    if (group.repositoryRoot === null) return group.agentIds;
+    return repositoryGroupsByRoot.get(reorderedRoots[repositoryIndex++]!)!.agentIds;
+  });
+  return sourceAgents;
 }
 
 export function restartAgentConversation(snapshot: AppSnapshot, agentId: string, updatedAt = new Date().toISOString()): Agent | null {

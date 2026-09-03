@@ -127,6 +127,7 @@
     @fork-message="forkActiveAgentMessage"
     @move-agent-to-team="moveAgentToTeam"
     @reorder-agents="reorderAgents"
+    @reorder-repositories="reorderRepositories"
     @reorder-teams="reorderTeams"
     @assign-work-item="assignWorkItemToAgent"
     @remove-work-item-assignment="removeWorkItemAssignment"
@@ -308,6 +309,7 @@ const {
   forkActiveAgentMessage,
   moveAgentToTeam,
   reorderAgents,
+  reorderRepositories,
   saveAgentToBench,
   deployBenchTemplate,
   removeBenchTemplate,

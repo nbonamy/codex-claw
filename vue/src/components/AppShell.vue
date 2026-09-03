@@ -65,6 +65,7 @@
       @open-whats-new="openWhatsNew"
       @quit="quit"
       @reorder-agents="$emit('reorder-agents', $event)"
+      @reorder-repositories="$emit('reorder-repositories', $event)"
       @reorder-teams="$emit('reorder-teams', $event)"
       @resize-sidebar="setAgentSidebarWidth"
       @restart-agent="$emit('restart-agent', $event)"
@@ -378,7 +379,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -685,6 +686,7 @@ const emit = defineEmits<{
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'reorder-agents': [input: ReorderAgentsInput];
+  'reorder-repositories': [input: ReorderRepositoriesInput];
   'reorder-teams': [input: ReorderTeamsInput];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'remove-work-item-assignment': [item: WorkItem];

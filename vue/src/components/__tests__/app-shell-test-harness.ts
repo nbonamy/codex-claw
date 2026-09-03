@@ -54,6 +54,7 @@ const AgentSidebarStub = defineComponent({
     'move-agent-to-team',
     'open-in',
     'reorder-agents',
+    'reorder-repositories',
     'resize-sidebar',
     'restart-agent',
     'resume-session',

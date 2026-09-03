@@ -74,6 +74,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   forkAgent: [backendMethods.agentFork, namedOptional('agentId', 'messageIndex')],
   moveAgentToTeam: [backendMethods.agentTeamMove, named('input')],
   reorderAgents: [backendMethods.agentReorder, named('input')],
+  reorderRepositories: [backendMethods.repositoryReorder, named('input')],
   saveAgentToBench: [backendMethods.benchAgentTemplateCreate, named('agentId')],
   deployBenchTemplate: [backendMethods.benchTemplateDeploy, namedOptional('templateId', 'teamId', 'location')],
   removeBenchTemplate: [backendMethods.benchTemplateDelete, namedOptional('templateId', 'location')],

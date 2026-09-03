@@ -35,9 +35,18 @@
         v-for="group in workspaceGroups"
         :key="group.id"
         class="agent-sidebar__workspace-group"
+        :class="repositoryReorder.dropTargetClass(group.id)"
         :data-group-kind="group.kind"
+        @dragover="group.kind === 'repository' && repositoryReorder.onDragOver(group.id, $event)"
+        @dragleave="group.kind === 'repository' && repositoryReorder.onDragLeave(group.id, $event)"
+        @drop="group.kind === 'repository' && repositoryReorder.onDrop(group.id, $event)"
       >
-        <header class="agent-sidebar__workspace-header">
+        <header
+          class="agent-sidebar__workspace-header"
+          v-bind="group.kind === 'repository' ? repositoryReorder.dragItemAttributes(group.id) : {}"
+          @dragstart="group.kind === 'repository' && repositoryReorder.onDragStart(group.id, $event)"
+          @dragend="repositoryReorder.onDragEnd"
+        >
           <MessageIcon
             v-if="group.kind === 'quickChats'"
             class="agent-sidebar__workspace-icon"
@@ -199,7 +208,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, SourceBranch, Team } from '@codex-claw/core/contracts';
+import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@codex-claw/core/contracts';
 import { projectWorkspaceSidebar, type WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
 import {
   GitBranchIcon,
@@ -251,6 +260,7 @@ const emit = defineEmits<{
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'open-in': [payload: { agentId: string; application: OpenInApplication }];
   'reorder-agents': [payload: ReorderAgentsInput];
+  'reorder-repositories': [payload: ReorderRepositoriesInput];
   'resize-sidebar': [width: number];
   'resume-session': [agentId: string];
   'restart-agent': [agentId: string];
@@ -309,6 +319,7 @@ const contextMenuMoveTargets = computed(() => {
 });
 const agentReorder = useListReorderDrag<string>({
   itemIds: () => props.agents.map((agent) => agent.id),
+  scopeForId: (agentId) => agentWorkspaceGroupIds.value.get(agentId) ?? agentId,
   onDrop: ({ draggedId, beforeId }) => {
     if (!props.teamId) {
       return;
@@ -318,6 +329,28 @@ const agentReorder = useListReorderDrag<string>({
       teamId: props.teamId,
       agentId: draggedId,
       beforeAgentId: beforeId,
+    });
+  },
+});
+const agentWorkspaceGroupIds = computed(() => new Map(
+  workspaceGroups.value.flatMap((group) => group.sessions.map((session) => [session.agentId, group.id] as const)),
+));
+const repositoryReorder = useListReorderDrag<string>({
+  itemIds: () => workspaceGroups.value
+    .filter((group) => group.kind === 'repository')
+    .map((group) => group.id),
+  onDrop: ({ draggedId, beforeId }) => {
+    if (!props.teamId) return;
+    const repository = workspaceGroups.value.find((group) => group.id === draggedId);
+    const beforeRepository = beforeId === null
+      ? null
+      : workspaceGroups.value.find((group) => group.id === beforeId) ?? null;
+    if (repository?.kind !== 'repository' || !repository.repositoryRoot) return;
+
+    emit('reorder-repositories', {
+      teamId: props.teamId,
+      repositoryRoot: repository.repositoryRoot,
+      beforeRepositoryRoot: beforeRepository?.repositoryRoot ?? null,
     });
   },
 });
@@ -678,6 +711,10 @@ function onResizePointerEnd(event: PointerEvent): void {
   margin-top: var(--space-2);
 }
 
+.agent-sidebar__workspace-group {
+  position: relative;
+}
+
 .agent-sidebar__workspace-header {
   box-sizing: border-box;
   min-width: 0;
@@ -812,6 +849,8 @@ function onResizePointerEnd(event: PointerEvent): void {
   );
 }
 
+.agent-sidebar__workspace-group::before,
+.agent-sidebar__workspace-group::after,
 .agent-sidebar__agent::before,
 .agent-sidebar__agent::after {
   content: "";
@@ -830,20 +869,25 @@ function onResizePointerEnd(event: PointerEvent): void {
   pointer-events: none;
 }
 
+.agent-sidebar__workspace-group::before,
 .agent-sidebar__agent::before {
   top: -2px;
 }
 
+.agent-sidebar__workspace-group::after,
 .agent-sidebar__agent::after {
   bottom: -2px;
 }
 
+.agent-sidebar__workspace-group.list-reorder-drag--drop-before::before,
+.agent-sidebar__workspace-group.list-reorder-drag--drop-after::after,
 .agent-sidebar__agent.list-reorder-drag--drop-before::before,
 .agent-sidebar__agent.list-reorder-drag--drop-after::after {
   opacity: 1;
   transform: scaleX(1);
 }
 
+.agent-sidebar__workspace-group.list-reorder-drag--dragging,
 .agent-sidebar__agent.list-reorder-drag--dragging {
   opacity: 0.48;
 }

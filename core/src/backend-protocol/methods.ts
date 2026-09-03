@@ -138,6 +138,7 @@ export const backendMethods = {
   sourceWorktreeCreate: 'source/worktree/create',
   sourceWorktreePathSuggest: 'source/worktree/path/suggest',
   sourceWorktreesList: 'source/worktrees/list',
+  repositoryReorder: 'repository/reorder',
   systemPermissionsAccessibilityOpen: 'system/permissions/accessibility/open',
   systemPermissionsGet: 'system/permissions/get',
   systemPermissionsScreenRecordingOpen: 'system/permissions/screenRecording/open',

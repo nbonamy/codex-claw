@@ -3,7 +3,7 @@ import { translate } from './i18n';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -20,6 +20,7 @@ import { createAgentUnreadState } from './agent-unread-state';
 import { createAgentHistoryState } from './agent-history-state';
 import { createRemoteBenchState } from './remote-bench-state';
 import { createSourceRepositoryState } from './source-repository-state';
+import { workspaceSidebarRepositoryRootForAgent } from '@codex-claw/core/workspace-sidebar';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -1123,6 +1124,24 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.reorderAgents(input));
   }
 
+  async function reorderRepositories(input: ReorderRepositoriesInput): Promise<void> {
+    const team = snapshot.value.teams.find((candidate) => candidate.id === input.teamId);
+    const repositoryRoots = new Set((team?.agentIds ?? []).flatMap((agentId) => {
+      const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+      const repositoryRoot = agent ? workspaceSidebarRepositoryRootForAgent(agent) : null;
+      return repositoryRoot ? [repositoryRoot] : [];
+    }));
+    if (
+      !codexClawApi?.reorderRepositories ||
+      !repositoryRoots.has(input.repositoryRoot) ||
+      (input.beforeRepositoryRoot !== null && !repositoryRoots.has(input.beforeRepositoryRoot))
+    ) {
+      return;
+    }
+
+    adoptBackgroundSnapshot(await codexClawApi.reorderRepositories(input));
+  }
+
   async function saveAgentToBench(agentId: string): Promise<void> {
     if (!codexClawApi?.saveAgentToBench) {
       return;
@@ -1402,6 +1421,7 @@ export function useAppState() {
     forkActiveAgentMessage,
     moveAgentToTeam,
     reorderAgents,
+    reorderRepositories,
     saveAgentToBench,
     deployBenchTemplate,
     removeBenchTemplate,

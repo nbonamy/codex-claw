@@ -83,6 +83,7 @@ describe('ipc channels', () => {
       forkAgent: 'agent:fork',
       moveAgentToTeam: 'agent:move-to-team',
       reorderAgents: 'agent:reorder',
+      reorderRepositories: 'repository:reorder',
       saveAgentToBench: 'agent:save-to-bench',
       deployBenchTemplate: 'bench:deploy-template',
       removeBenchTemplate: 'bench:remove-template',

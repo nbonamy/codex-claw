@@ -31,6 +31,18 @@ export type AgentMentionProjection = {
   label: string;
 };
 
+export function workspaceSidebarRepositoryRootForAgent(agent: Agent): string | null {
+  const workspace = agent.workspace;
+  return agent.sessionKind !== 'quickChat' && workspace?.kind === 'git'
+    ? workspace.primaryWorktreeRoot
+    : null;
+}
+
+export function workspaceSidebarGroupIdForAgent(agent: Agent): string {
+  const repositoryRoot = workspaceSidebarRepositoryRootForAgent(agent);
+  return repositoryRoot ? `git:${repositoryRoot}` : 'quick-chats';
+}
+
 export function repositoryIconForAgent(
   agent: Agent | null | undefined,
   repositoryIcons: Readonly<Record<string, string>>,
@@ -64,7 +76,7 @@ export function projectWorkspaceSidebar(input: {
     const workspace = agent.workspace;
     const isQuickChat = agent.sessionKind === 'quickChat';
     const isGit = !isQuickChat && workspace?.kind === 'git';
-    const id = isGit ? `git:${workspace.primaryWorktreeRoot}` : 'quick-chats';
+    const id = workspaceSidebarGroupIdForAgent(agent);
     let group = groups.get(id);
     if (!group) {
       group = isGit

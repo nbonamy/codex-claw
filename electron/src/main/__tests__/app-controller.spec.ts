@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationCleanup, AutomationLocation, AutomationTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationCleanup, AutomationLocation, AutomationTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -964,6 +964,11 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       beforeAgentId: null,
     };
+    const reorderRepositoriesInput: ReorderRepositoriesInput = {
+      teamId: 'team-codex-claw',
+      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      beforeRepositoryRoot: null,
+    };
 
     await controller.initialize();
 
@@ -973,6 +978,7 @@ describe('AppController', () => {
     await expect(forkAgent(controller, 'agent-dina', 4)).resolves.toBe(backendSnapshot);
     await expect(moveAgentToTeam(controller, moveInput)).resolves.toBe(backendSnapshot);
     await expect(reorderAgents(controller, reorderInput)).resolves.toBe(backendSnapshot);
+    await expect(reorderRepositories(controller, reorderRepositoriesInput)).resolves.toBe(backendSnapshot);
     await expect(updateAgentFolder(controller, 'agent-dina', '/Users/nbonamy/src/id8')).resolves.toBe(backendSnapshot);
     await expect(selectAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
     await expect(closeAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
@@ -983,9 +989,10 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(4, 'agent/fork', { agentId: 'agent-dina', messageIndex: 4 });
     expect(request).toHaveBeenNthCalledWith(5, 'agent/team/move', { input: moveInput });
     expect(request).toHaveBeenNthCalledWith(6, 'agent/reorder', { input: reorderInput });
-    expect(request).toHaveBeenNthCalledWith(7, 'agent/folder/update', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
-    expect(request).toHaveBeenNthCalledWith(8, 'agent/select', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(9, 'agent/delete', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(7, 'repository/reorder', { input: reorderRepositoriesInput });
+    expect(request).toHaveBeenNthCalledWith(8, 'agent/folder/update', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
+    expect(request).toHaveBeenNthCalledWith(9, 'agent/select', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(10, 'agent/delete', { agentId: 'agent-dina' });
     expect(request).not.toHaveBeenCalledWith('agent/folder/validate', expect.anything());
   });
 
@@ -2539,6 +2546,12 @@ async function reorderAgents(controller: AppController, input: ReorderAgentsInpu
   return (controller as unknown as {
     reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   }).reorderAgents(input);
+}
+
+async function reorderRepositories(controller: AppController, input: ReorderRepositoriesInput): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
+  }).reorderRepositories(input);
 }
 
 async function closeAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {

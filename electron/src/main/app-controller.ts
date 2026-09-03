@@ -14,7 +14,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -402,6 +402,10 @@ export class AppController {
 
     ipc.handle(ipcChannels.reorderAgents, async (_event, input: ReorderAgentsInput) => {
       return this.reorderAgents(input);
+    });
+
+    ipc.handle(ipcChannels.reorderRepositories, async (_event, input: ReorderRepositoriesInput) => {
+      return this.reorderRepositories(input);
     });
 
     ipc.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
@@ -803,6 +807,10 @@ export class AppController {
 
   private async reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentReorder, { input }));
+  }
+
+  private async reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.repositoryReorder, { input }));
   }
 
   private async closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<AppSnapshot> {

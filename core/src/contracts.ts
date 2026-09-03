@@ -1483,6 +1483,12 @@ export type ReorderAgentsInput = {
   beforeAgentId: string | null;
 };
 
+export type ReorderRepositoriesInput = {
+  teamId: string;
+  repositoryRoot: string;
+  beforeRepositoryRoot: string | null;
+};
+
 export type ToolConfirmationDecision =
   | 'allow'
   | 'allow_conversation'
@@ -1664,6 +1670,7 @@ export type CodexClawApi = {
   forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
+  reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
   saveAgentToBench(agentId: string): Promise<AppSnapshot>;
   deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot>;
   removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;

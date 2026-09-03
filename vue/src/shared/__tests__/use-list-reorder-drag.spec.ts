@@ -53,6 +53,32 @@ describe('useListReorderDrag', () => {
     expect(reorder.isDragging.value).toBe(false);
   });
 
+  it('limits dragging and dropping to items in the same scope', () => {
+    const drops: ReorderDrop<string>[] = [];
+    const reorder = useListReorderDrag<string>({
+      itemIds: () => ['a-1', 'a-2', 'b-1'],
+      onDrop: (drop) => drops.push(drop),
+      scopeForId: (id) => id.split('-')[0]!,
+    });
+    const source = dragEvent('dragstart', { currentTarget: elementWithRect({ top: 0, height: 40 }) });
+    const otherScope = dragEvent('dragover', { currentTarget: elementWithRect({ top: 40, height: 40 }) });
+
+    expect(reorder.dragItemAttributes('a-1').draggable).toBe(true);
+    expect(reorder.dragItemAttributes('b-1').draggable).toBe(false);
+    reorder.onDragStart('a-1', source);
+    reorder.onDragOver('b-1', otherScope);
+    reorder.onDrop('b-1', otherScope);
+
+    expect(otherScope.defaultPrevented).toBe(false);
+    expect(drops).toStrictEqual([]);
+
+    reorder.onDragStart('a-1', source);
+    reorder.onDragOver('a-2', dragEvent('dragover', { currentTarget: elementWithRect({ top: 40, height: 40 }), clientY: 70 }));
+    reorder.onDrop('a-2', dragEvent('drop', { currentTarget: elementWithRect({ top: 40, height: 40 }), clientY: 70 }));
+
+    expect(drops).toStrictEqual([{ draggedId: 'a-1', beforeId: null }]);
+  });
+
   it('tolerates browser drag events without dataTransfer', () => {
     const drops: ReorderDrop<string>[] = [];
     const reorder = useListReorderDrag<string>({
