@@ -4,6 +4,32 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.16.0] - 2026-09-03
+
+### New features
+
+- Agents can now speak a brief acknowledgment when work starts and an optional
+  completion cue through on-device neural voices on macOS. Voice, agent scope,
+  foreground-only behavior, previews, and a global mute shortcut are available
+  in Settings.
+- Delegated Git work can now report back to its parent agent when creating a
+  pull request or merging directly. Claw asks the worker for a final handoff,
+  shows the handoff phase in progress, and lets the operation continue in the
+  background.
+- Claw now tracks pull requests created for agents and flags them when they are
+  merged or closed, with guided cleanup for the agent, worktree, and local
+  branch while preserving work from unmerged pull requests.
+
+### Improvements and fixes
+
+- Repository and agent drag-and-drop are now distinct: repositories move with
+  all their agents, while agents can only be reordered inside their repository.
+- The active sidebar session is easier to distinguish from other sessions.
+- Agent celebrations now respect the celebration setting and vary their visual
+  effect instead of always showing confetti.
+- Rolling back a long, paginated Codex conversation now uses the current Codex
+  revert protocol and refreshes the retained history correctly.
+
 ## [0.15.2] - 2026-09-02
 
 ### Improvements and fixes
