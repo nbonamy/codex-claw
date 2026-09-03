@@ -78,6 +78,50 @@ describe('createClientRequestHandlers', () => {
     expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com');
   });
 
+  it('validates and queues a bounded provider-neutral spoken announcement', async () => {
+    const queue = vi.fn().mockReturnValue({ queued: true });
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(),
+      getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
+      spokenAnnouncements: { queue },
+    });
+
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'finish',
+      text: '  Wrapped up.  ',
+    })).toStrictEqual({ queued: true });
+    expect(queue).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
+      phase: 'finish',
+      text: 'Wrapped up.',
+    });
+    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'middle',
+      text: 'Nope.',
+    })).rejects.toThrowError('Invalid phase.');
+    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'x'.repeat(161),
+    })).rejects.toThrowError('Invalid text.');
+  });
+
+  it('reports unsupported speech without failing the client request', async () => {
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(),
+      getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(),
+      computerUseOptions,
+    });
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina', phase: 'start', text: 'On it.',
+    })).toStrictEqual({ queued: false, reason: 'unsupported' });
+  });
+
   it('checks system permissions through the desktop-native port', async () => {
     const status = {
       platform: 'darwin',

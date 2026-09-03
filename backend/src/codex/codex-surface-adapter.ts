@@ -1557,13 +1557,13 @@ function boundedToolStatus(value: string, fallback: SurfaceMessageToolPart['stat
 
 const toolInputPresentationKeys = new Set([
   'app', 'appName', 'branchName', 'bundleIdentifier', 'changes', 'command', 'commandActions',
-  'cwd', 'deltaY', 'destinationPath', 'displayId', 'element_index', 'kind', 'name', 'path', 'pid',
+  'cwd', 'deltaY', 'destinationPath', 'displayId', 'element_index', 'kind', 'name', 'path', 'phase', 'pid',
   'query', 'repoPath', 'rootElementIndex', 'scope', 'title', 'to', 'type', 'url', 'x', 'y',
 ]);
 
 const toolOutputPresentationKeys = new Set([
-  'agentName', 'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'prompt',
-  'recipientName', 'result', 'structuredContent', 'url',
+  'agentName', 'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'phase', 'prompt',
+  'queued', 'recipientName', 'result', 'structuredContent', 'success', 'url',
 ]);
 
 function toolInputProjection(value: unknown): unknown {

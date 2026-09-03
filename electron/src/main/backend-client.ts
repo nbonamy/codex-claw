@@ -19,9 +19,13 @@ export function createRuntimeClawBackendClient(options: {
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
 } = {}): ClawBackendClientPort | null {
   const mode = runtimeClawdBackendMode();
+  const requestHandlers = createRuntimeClientRequestHandlers({
+    browserExecute: options.browserExecute,
+    browserOpen: options.browserOpen,
+  });
   const socketClient = new ClawBackendSocketClient({
     socketPath: runtimeClawdSocketPath(),
-    requestHandlers: createRuntimeClientRequestHandlers({ browserExecute: options.browserExecute, browserOpen: options.browserOpen }),
+    requestHandlers,
   });
 
   if (mode === 'existing') {
@@ -31,7 +35,7 @@ export function createRuntimeClawBackendClient(options: {
   const command = runtimeClawdCommand();
   const processClient = command ? new ClawBackendProcessClient({
     command,
-    requestHandlers: createRuntimeClientRequestHandlers({ browserExecute: options.browserExecute, browserOpen: options.browserOpen }),
+    requestHandlers,
     watchFile: runtimeClawdWatchFile(),
   }) : null;
 

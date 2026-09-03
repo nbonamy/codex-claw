@@ -165,6 +165,7 @@ import { createClawdRuntime } from '../runtime';
 
 type McpOptions = {
   resolveWorkspaceIdentity(folder: string): Promise<unknown>;
+  queueSpokenAnnouncement(input: unknown): Promise<unknown>;
   computerUse?: {
     execute(input: unknown): Promise<unknown>;
     requestAccessibility(): Promise<unknown>;
@@ -257,6 +258,7 @@ describe('clawd runtime', () => {
       clawMcpServerUrl: 'http://127.0.0.1:4242/mcp',
       generalSettings: mocks.snapshot.general,
       pluginSettings: expect.any(Function),
+      spokenAnnouncementsEnabled: expect.any(Function),
     }));
     expect(mocks.hydrateConnections).toHaveBeenCalledOnce();
     expect(mocks.schedulerStart).toHaveBeenCalledOnce();
@@ -272,6 +274,7 @@ describe('clawd runtime', () => {
     await mcp.computerUse!.stop();
     await mcp.browser!.open({ url: 'https://example.com' });
     await mcp.browser!.execute({ command: 'dom' });
+    await mcp.queueSpokenAnnouncement({ agentId: 'agent-dina', phase: 'start', text: 'On it.' });
     expect(requestClient.mock.calls.map(([method]) => method)).toStrictEqual([
       backendMethods.clientComputerUseExecute,
       backendMethods.clientComputerUseRequestAccessibility,
@@ -279,6 +282,7 @@ describe('clawd runtime', () => {
       backendMethods.clientComputerUseStop,
       backendMethods.clientBrowserOpen,
       backendMethods.clientBrowserExecute,
+      backendMethods.clientSpokenAnnouncementQueue,
     ]);
 
     const server = mocks.serverOptions[0] as ServerOptions;

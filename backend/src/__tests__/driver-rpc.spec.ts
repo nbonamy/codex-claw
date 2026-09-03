@@ -38,6 +38,19 @@ describe('BackendDriverRpc', () => {
     expect(pluginSettings).toHaveBeenCalledOnce();
   });
 
+  it('uses the live spoken-announcement setting for Codex agent instructions', async () => {
+    const spokenAnnouncementsEnabled = vi.fn().mockReturnValue(true);
+    const options = codexClawSurfaceOptions({
+      clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+      spokenAnnouncementsEnabled,
+    });
+    const configureConversation = options.extensions?.[0]?.configureConversation;
+    const extension = await configureConversation?.({ extensionContext: createAgent() } as never);
+
+    expect(spokenAnnouncementsEnabled).toHaveBeenCalledOnce();
+    expect(extension?.developerInstructions).toContain('call announce at most once near the start');
+  });
+
   it('routes model requests to the agent backend driver', async () => {
     const agent = createAgent();
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);

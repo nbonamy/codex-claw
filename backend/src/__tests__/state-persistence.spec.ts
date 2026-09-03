@@ -978,6 +978,8 @@ describe('AppStatePersistence', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: false,
+      spokenAnnouncementsEnabled: true,
+      spokenAnnouncementScope: 'all',
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       agentListCompact: true,

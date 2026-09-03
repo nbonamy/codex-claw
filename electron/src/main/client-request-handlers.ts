@@ -1,8 +1,10 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { app, shell } from 'electron';
 import type { SystemPermissionsStatus } from '@codex-claw/core/contracts';
+import type { AnnouncementPhase, SpokenAnnouncementRequest } from '@codex-claw/core/contracts';
 import { executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, requestComputerUseAccessibility, requestComputerUseScreenCapture, stopComputerUseHelper, type ComputerUseOptions } from './computer-use-tools';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
+import { createRuntimeSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
 
 export type ClientRequestHandler = (params: unknown) => unknown | Promise<unknown>;
 
@@ -13,9 +15,16 @@ export type ClientRequestHandlersOptions = {
   computerUseOptions: () => ComputerUseOptions;
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
+  spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
 };
 
 export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute' | 'browserOpen'> = {}): Record<string, ClientRequestHandler> {
+  const spokenAnnouncements = createRuntimeSpokenAnnouncementQueue({
+    appPath: app?.getAppPath?.() ?? process.cwd(),
+    isPackaged: app?.isPackaged ?? false,
+    platform: process.platform,
+    resourcesPath: process.resourcesPath,
+  });
   return createClientRequestHandlers({
     openExternal: (url) => shell.openExternal(url),
     getSystemPermissionsStatus,
@@ -26,6 +35,7 @@ export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequest
       platform: process.platform,
       resourcesPath: process.resourcesPath,
     }),
+    spokenAnnouncements,
     ...overrides,
   });
 }
@@ -47,6 +57,18 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
       if (!options.browserOpen) throw new Error('In-app browser tools are unavailable.');
       const input = requireRecord(params);
       return options.browserOpen(requireString(input.agentId, 'agentId'), requireString(input.browserId, 'browserId'), requireString(input.url, 'url'));
+    },
+    [backendMethods.clientSpokenAnnouncementQueue]: (params) => {
+      const input = requireRecord(params);
+      const text = requireString(input.text, 'text').trim();
+      if (text.length > 160) throw new Error('Invalid text.');
+      const phase = requireAnnouncementPhase(input.phase);
+      const request: SpokenAnnouncementRequest = {
+        agentId: requireString(input.agentId, 'agentId'),
+        phase,
+        text,
+      };
+      return options.spokenAnnouncements?.queue(request) ?? { queued: false, reason: 'unsupported' };
     },
     [backendMethods.clientSystemPermissionsGet]: async () => mergeComputerUsePermissions(
       options.getSystemPermissionsStatus(),
@@ -104,6 +126,11 @@ function requireString(value: unknown, name: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`Invalid ${name}.`);
   }
+  return value;
+}
+
+function requireAnnouncementPhase(value: unknown): AnnouncementPhase {
+  if (value !== 'start' && value !== 'finish') throw new Error('Invalid phase.');
   return value;
 }
 

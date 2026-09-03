@@ -77,6 +77,18 @@ export function createCodexClawMcpServer(
     kind,
   }, () => coordinator.celebrate(callerAgentId, kind)));
 
+  server.registerTool('announce', {
+    description: 'Queue one brief spoken acknowledgment for the user at the start or genuine finish of their task. Use at most once near task start and once at genuine completion. Keep it natural and varied. Never announce intermediate reasoning, plans, transcripts, command output, code, secrets, or the full answer. This is best-effort and returns as soon as playback is queued.',
+    inputSchema: {
+      phase: z.enum(['start', 'finish']).describe('Whether this acknowledges starting or genuinely finishing the user task.'),
+      text: z.string().trim().min(1).max(160).describe('One brief natural phrase, at most 160 characters.'),
+    },
+  }, ({ phase, text }) => toolResult('announce', {
+    agentId: callerAgentId,
+    phase,
+    textLength: text.length,
+  }, () => coordinator.announce(callerAgentId, phase, text)));
+
   server.registerTool('update-work-item', {
     description: 'Update the lifecycle of a backlog work item assigned to you through Codex Claw. Use blocked with a note when you need help, inProgress when work resumes, readyForReview when the user can review the outcome, or completed when the assignment explicitly requires completion.',
     inputSchema: {

@@ -338,6 +338,29 @@ describe('ClawMcpAgentCoordinator', () => {
       message: 'bad input',
     });
   });
+
+  it('validates, trims, and delegates spoken announcements without updating agent state', async () => {
+    const onAnnounce = vi.fn().mockResolvedValue({
+      success: true,
+      queued: true,
+      phase: 'start',
+      message: 'Announcement queued.',
+    });
+    const { agents, coordinator, onAgentUpdated } = fixture({ onAnnounce });
+
+    await expect(coordinator.announce('agent-dina', 'start', '  I’ll take it.  ')).resolves.toMatchObject({
+      queued: true,
+      phase: 'start',
+    });
+    expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'start', 'I’ll take it.');
+    expect(onAgentUpdated).not.toHaveBeenCalled();
+    await expect(coordinator.announce('agent-dina', 'finish', '   '))
+      .rejects.toThrowError('Announcement text must not be empty.');
+    await expect(coordinator.announce('agent-dina', 'finish', 'x'.repeat(161)))
+      .rejects.toThrowError('Announcement text must be 160 characters or fewer.');
+    await expect(fixture().coordinator.announce('agent-dina', 'start', 'Hi'))
+      .rejects.toThrowError('Spoken announcements are not available.');
+  });
 });
 
 function fixture(overrides: Partial<ClawMcpAgentCoordinatorOptions> = {}) {

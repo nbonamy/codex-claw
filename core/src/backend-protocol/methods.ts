@@ -54,6 +54,7 @@ export const backendMethods = {
   benchTemplateDelete: 'bench/template/delete',
   benchTemplateDeploy: 'bench/template/deploy',
   clientExternalOpen: 'client/external/open',
+  clientSpokenAnnouncementQueue: 'client/spokenAnnouncement/queue',
   clientBrowserOpen: 'client/browser/open',
   clientBrowserExecute: 'client/browser/execute',
   clientComputerUseExecute: 'client/computerUse/execute',

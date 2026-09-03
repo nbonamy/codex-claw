@@ -49,7 +49,11 @@ export function agentMessagesPrompt(messages: MessageInfo[]): string {
   ].join('\n');
 }
 
-export function codexClawDeveloperInstructions(agent: Agent, settings: AppPluginSettings = defaultPluginSettings): string {
+export function codexClawDeveloperInstructions(
+  agent: Agent,
+  settings: AppPluginSettings = defaultPluginSettings,
+  spokenAnnouncementsEnabled = false,
+): string {
   const workspaceIdentity = agent.folder
     ? `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`
     : `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)}. This is a workspace-free Quick chat and has no project folder.`;
@@ -68,6 +72,11 @@ export function codexClawDeveloperInstructions(agent: Agent, settings: AppPlugin
     'After a meaningful win—especially a successful release, major feature, migration, or hard fix—call celebrate exactly once before your final response. Pick a fitting kind and vary it from the most recent visible celebration.',
     browserInstructions,
   ];
+  if (spokenAnnouncementsEnabled) {
+    instructions.push(
+      'Spoken acknowledgments are enabled. For a substantive user task, call announce at most once near the start with phase start and once only at genuine completion with phase finish. Use a varied, natural phrase no longer than a short sentence. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. The tool is best-effort; do not wait for speech or retry a rejected announcement.',
+    );
+  }
   if (settings.computerUseEnabled) {
     instructions.push(
       'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools. Before the first Computer Use action, call computer-use-guide and follow the returned instructions.',

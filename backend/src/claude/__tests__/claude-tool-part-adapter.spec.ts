@@ -139,6 +139,22 @@ describe('Claude tool part adapter', () => {
     });
   });
 
+  it('projects announcement phases without retaining the spoken phrase', () => {
+    const part = claudeToolPart({
+      type: 'tool_use',
+      id: 'announce-1',
+      name: 'mcp__codex_claw__announce',
+      input: { phase: 'finish', text: 'A phrase that must not enter renderer state.' },
+    });
+
+    expect(part).toMatchObject({
+      kind: 'mcp',
+      input: { phase: 'finish' },
+      metadata: { server: 'codex_claw', tool: 'announce' },
+    });
+    expect(JSON.stringify(part)).not.toContain('phrase that must not');
+  });
+
   it('updates streamed inputs and completed semantic phases', () => {
     const running = claudeToolPart({
       type: 'tool_use',

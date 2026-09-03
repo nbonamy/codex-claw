@@ -72,6 +72,37 @@
         </template>
       </SettingsRow>
       <SettingsRow
+        as="label"
+        :title="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
+        :description="$t('surface.settingsGeneralPanel.letAgentsSpeakBriefTaskStartAndFinishPhrases')"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions">
+            <el-select
+              v-if="settings.spokenAnnouncementsEnabled"
+              class="settings-general-panel__speech-scope-select"
+              :model-value="settings.spokenAnnouncementScope"
+              :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgmentScope')"
+              @update:model-value="updateSpokenAnnouncementScope"
+            >
+              <el-option
+                :label="$t('surface.settingsGeneralPanel.selectedAgentOnly')"
+                value="selected"
+              />
+              <el-option
+                :label="$t('surface.settingsGeneralPanel.allAgents')"
+                value="all"
+              />
+            </el-select>
+            <el-switch
+              :model-value="settings.spokenAnnouncementsEnabled"
+              :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
+              @update:model-value="updateSpokenAnnouncementsEnabled"
+            />
+          </span>
+        </template>
+      </SettingsRow>
+      <SettingsRow
         :title="$t('surface.settingsGeneralPanel.worktreeInitialization')"
         :description="$t('surface.settingsGeneralPanel.prepareNewWorktreesBeforeAgentsStart')"
       >
@@ -201,7 +232,7 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
+import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SpokenAnnouncementScope, SystemPermissionsStatus, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
 import { defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
@@ -402,6 +433,20 @@ function updateCelebrationsEnabled(value: boolean | string | number): void {
   });
 }
 
+function updateSpokenAnnouncementsEnabled(value: boolean | string | number): void {
+  void props.updateSettings?.({
+    general: {
+      spokenAnnouncementsEnabled: value === true,
+    },
+  });
+}
+
+function updateSpokenAnnouncementScope(value: SpokenAnnouncementScope): void {
+  void props.updateSettings?.({
+    general: { spokenAnnouncementScope: value },
+  });
+}
+
 function updateWorktreeInitializationMode(value: WorktreeInitializationMode): void {
   void props.updateSettings?.({
     general: { worktreeInitializationMode: value },
@@ -447,6 +492,10 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
 .settings-general-panel__worktree-select {
   width: 280px;
   max-width: 100%;
+}
+
+.settings-general-panel__speech-scope-select {
+  width: 170px;
 }
 
 .settings-general-panel__actions {

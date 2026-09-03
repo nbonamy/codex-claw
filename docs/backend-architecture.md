@@ -208,6 +208,9 @@ Current implementation checkpoint:
 - `clawd` owns client request ownership and response routing. Electron forwards
   renderer approval/user-input responses as `client/request/respond`; the backend
   remembers which provider emitted the request and dispatches to that provider.
+- `clawd` owns spoken-announcement MCP policy and settings checks. Electron owns
+  the serialized audio queue and signed native helper process, so backend
+  drivers and renderer code never branch on the speech engine.
 - Electron startup no longer performs global shell PATH repair. Dev mode passes
   an explicit Node executable and backend bundle path, packaged mode should use
   a bundled/configured backend command, and provider CLI PATH normalization

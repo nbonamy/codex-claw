@@ -665,10 +665,27 @@ export type AppshotSettings = {
 
 export type WorktreeInitializationMode = 'automatic' | 'repository' | 'off';
 
+export type SpokenAnnouncementScope = 'selected' | 'all';
+
+export type AnnouncementPhase = 'start' | 'finish';
+
+export type SpokenAnnouncementRequest = {
+  agentId: string;
+  phase: AnnouncementPhase;
+  text: string;
+};
+
+export type SpokenAnnouncementQueueResult = {
+  queued: boolean;
+  reason?: 'unsupported' | 'rateLimited' | 'superseded';
+};
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
   celebrationsEnabled: boolean;
+  spokenAnnouncementsEnabled: boolean;
+  spokenAnnouncementScope: SpokenAnnouncementScope;
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;

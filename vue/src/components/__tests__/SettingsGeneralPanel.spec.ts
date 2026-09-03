@@ -40,6 +40,33 @@ describe('SettingsGeneralPanel', () => {
     });
   });
 
+  it('opts into neural spoken acknowledgments and scopes them to selected agents by default', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+    await flushPromises();
+
+    const row = wrapper.findAllComponents({ name: 'SettingsRow' })
+      .find((candidate) => candidate.text().includes('Spoken acknowledgments'));
+    expect(row).toBeDefined();
+    expect(row!.text()).toContain('on-device neural voice');
+    expect(row!.findComponent({ name: 'ElSelect' }).exists()).toBe(false);
+
+    await row!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', true);
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { spokenAnnouncementsEnabled: true },
+    });
+
+    await wrapper.setProps({
+      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
+    });
+    const select = row!.findComponent({ name: 'ElSelect' });
+    expect(select.props('modelValue')).toBe('selected');
+    await select.vm.$emit('update:modelValue', 'all');
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      general: { spokenAnnouncementScope: 'all' },
+    });
+  });
+
   it('updates the worktree initialization policy', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({ updateSettings });

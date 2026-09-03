@@ -6973,6 +6973,8 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenAgentsRun: true,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: true,
+      spokenAnnouncementsEnabled: false,
+      spokenAnnouncementScope: 'selected',
       codexBinaryPath: '',
       claudeCodeEnabled: false,
       agentListCompact: false,

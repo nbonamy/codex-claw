@@ -9,6 +9,7 @@ import {
   IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
   IconUsers as UsersIcon,
+  IconVolume as VolumeIcon,
 } from '@tabler/icons-vue';
 import { messages } from '../i18n/messages';
 import { presentClawTool } from '../tool-presentation';
@@ -27,6 +28,7 @@ describe('Claw tool presentation', () => {
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
     ['update-work-item', SquareCheck, 'Updated work item'],
     ['celebrate', SparklesIcon, 'Celebrated with stars'],
+    ['announce', VolumeIcon, 'Queued start acknowledgment'],
   ])('presents %s with a semantic Claw icon and title', (tool, icon, title) => {
     const args = tool === 'send-message'
       ? { to: 'codex-app-sdk' }
@@ -40,6 +42,8 @@ describe('Claw tool presentation', () => {
               ? { scope: 'screen' }
               : tool === 'celebrate'
                 ? { kind: 'stars' }
+                : tool === 'announce'
+                  ? { phase: 'start', text: 'private phrase' }
                 : {};
 
     expect(presentClawTool(context(tool, args), translate)).toStrictEqual({ icon, title });

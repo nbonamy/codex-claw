@@ -194,6 +194,40 @@ app event, not from the result text.
 - the presenter reads the bounded `kind` value and renders a phase-aware row;
 - the Debug menu exposes the same effect variants for deterministic visual QA.
 
+### `announce`: transient native audio tool
+
+`announce` follows the transient-effect path without changing agent state:
+
+- the MCP schema accepts `phase: start | finish` and trims text to 1–160
+  characters;
+- the coordinator validates the caller and delegates without touching
+  `agent.statusText`;
+- the service applies the opt-in and selected-agent policy, then sends the
+  provider-neutral `client/spokenAnnouncement/queue` request;
+- Electron returns as soon as its bounded global queue accepts the request,
+  coalesces pending phrases, rate-limits repeated phases, and owns native helper
+  cancellation;
+- Vue only renders the setting and a phase-aware tool row. The spoken text and
+  result message are excluded from renderer projections.
+
+The macOS helper uses FluidAudio 0.15.5 with Kokoro 82M Core ML audio and
+`AVAudioPlayer`; it does not use `AVSpeechSynthesizer`. The helper binary is
+built and signed with the app, while model and phonemizer data download on the
+first enabled use and remain outside the app bundle. A measured first-use cache
+is about 190 MiB because FluidAudio retains downloaded model packages beside
+compiled Core ML artifacts. There is no system-voice fallback: native synthesis
+failure is silent and never fails or delays the agent task.
+
+The original KittenTTS 0.1.0 integration gate was rejected before product
+wiring because its official Swift package exports unsafe target flags, which
+SwiftPM refuses when consumed as a dependency. Its packaged phonemizer assets
+also carry GPL-3.0 licensing. Kokoro through FluidAudio is the smallest clean
+native alternative verified under the app's build and signing constraints.
+
+Keep future platforms behind the same one-phrase helper protocol. A Windows or
+Linux implementation may use sherpa-onnx without introducing renderer branches
+or provider-specific MCP contracts.
+
 ## Tests
 
 Add focused tests at every owned seam the tool crosses:
