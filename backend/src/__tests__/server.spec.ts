@@ -7209,6 +7209,8 @@ function createTestSnapshot(): AppSnapshot {
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: true,
       spokenAnnouncementsEnabled: false,
+      spokenAnnouncementsMuted: false,
+      spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'selected',
       spokenAnnouncementVoice: 'af_heart',
       codexBinaryPath: '',

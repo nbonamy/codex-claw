@@ -693,7 +693,7 @@ export type SpokenAnnouncementRequest = {
 
 export type SpokenAnnouncementQueueResult = {
   queued: boolean;
-  reason?: 'unsupported' | 'rateLimited' | 'superseded';
+  reason?: 'suppressed' | 'unsupported' | 'rateLimited' | 'superseded';
 };
 
 export type AppGeneralSettings = {
@@ -701,6 +701,8 @@ export type AppGeneralSettings = {
   preventSleepWhenRemoteAccessEnabled: boolean;
   celebrationsEnabled: boolean;
   spokenAnnouncementsEnabled: boolean;
+  spokenAnnouncementsMuted: boolean;
+  spokenAnnouncementsOnlyWhenFocused: boolean;
   spokenAnnouncementScope: SpokenAnnouncementScope;
   spokenAnnouncementVoice: SpokenAnnouncementVoice;
   codexBinaryPath: string;
@@ -1478,7 +1480,8 @@ export type AppCommand =
   | { type: 'open-settings' }
   | { type: 'open-whats-new' }
   | { type: 'quit' }
-  | { type: 'restart-active-agent' };
+  | { type: 'restart-active-agent' }
+  | { type: 'toggle-spoken-announcements-muted' };
 
 export type CreateAgentInput = {
   name: string | null;

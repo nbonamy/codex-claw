@@ -37,9 +37,11 @@ describe('AppShellNavigation', () => {
 
     rail.vm.$emit('new-team');
     rail.vm.$emit('select-team', 'team-codex-claw');
+    rail.vm.$emit('toggle-speech-mute');
 
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
   });
 
   it('forwards sidebar actions without translating their payloads', () => {

@@ -60,6 +60,7 @@ type AppShellCommandOptions = {
     selectTeam: (teamId: string) => void;
     sendAgentPrompt: (agentId: string, prompt: string) => void;
     setDebugApproval: (approval: DebugApproval | null) => void;
+    toggleSpokenAnnouncementsMuted: () => void;
     updateComposerAttachments: (agentId: string, attachments: readonly CodexNativeAttachment[]) => void;
     updateComposerState: (agentId: string, state: CodexComposerState) => void;
   };
@@ -79,6 +80,17 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
   let unsubscribeAppCommand: (() => void) | null = null;
 
   function handleShellShortcut(event: KeyboardEvent): void {
+    if (
+      event.metaKey &&
+      event.shiftKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === 'm'
+    ) {
+      event.preventDefault();
+      options.actions.toggleSpokenAnnouncementsMuted();
+      return;
+    }
     if (showOnboardingGate.value) {
       return;
     }
@@ -230,6 +242,11 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'open-whats-new') {
       options.actions.openWhatsNew();
+      return;
+    }
+
+    if (command.type === 'toggle-spoken-announcements-muted') {
+      options.actions.toggleSpokenAnnouncementsMuted();
       return;
     }
 

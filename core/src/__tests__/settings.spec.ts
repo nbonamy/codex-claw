@@ -9,6 +9,8 @@ describe('settings contracts', () => {
       claudeCodeEnabled: true,
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
+      spokenAnnouncementsMuted: true,
+      spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'bf_emma',
       preventSleepWhenAgentsRun: false,
@@ -20,6 +22,8 @@ describe('settings contracts', () => {
       claudeCodeEnabled: true,
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
+      spokenAnnouncementsMuted: true,
+      spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'bf_emma',
       collapsedRepositoryKeys: [],
@@ -34,6 +38,9 @@ describe('settings contracts', () => {
     });
 
     expect(normalizeGeneralSettings({})).toStrictEqual(defaultGeneralSettings);
+    expect(normalizeGeneralSettings({}).spokenAnnouncementsOnlyWhenFocused).toBe(true);
+    expect(normalizeGeneralSettings({ spokenAnnouncementsOnlyWhenFocused: false }).spokenAnnouncementsOnlyWhenFocused)
+      .toBe(false);
     expect(normalizeGeneralSettings({ spokenAnnouncementVoice: 'not-a-voice' }).spokenAnnouncementVoice)
       .toBe('af_heart');
     expect(normalizeGeneralSettings(null)).toStrictEqual(defaultGeneralSettings);
@@ -97,6 +104,8 @@ describe('settings contracts', () => {
       claudeCodeEnabled: false,
       celebrationsEnabled: true,
       spokenAnnouncementsEnabled: false,
+      spokenAnnouncementsMuted: false,
+      spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'selected',
       spokenAnnouncementVoice: 'af_heart',
       collapsedRepositoryKeys: [],

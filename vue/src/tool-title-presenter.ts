@@ -61,12 +61,6 @@ export function presentClawToolTitle({
   if (identity.tool === 'set-status' && phase === 'completed' && args.status === '') {
     return translate('chat.tool.mcp.codexClaw.setStatus.cleared');
   }
-  if (identity.tool === 'announce' && phase === 'completed' && resultBoolean(toolCall.result, 'queued') === false) {
-    return translate('chat.tool.mcp.codexClaw.announce.skipped', {
-      target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
-    });
-  }
-
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
     target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
   });
@@ -253,14 +247,6 @@ function resultString(result: unknown, key: string): string | undefined {
   for (const payload of nestedResultRecords(result)) {
     const value = payload[key];
     if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return undefined;
-}
-
-function resultBoolean(result: unknown, key: string): boolean | undefined {
-  for (const payload of nestedResultRecords(result)) {
-    const value = payload[key];
-    if (typeof value === 'boolean') return value;
   }
   return undefined;
 }

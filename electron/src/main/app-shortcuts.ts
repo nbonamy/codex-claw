@@ -34,6 +34,10 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
       return { type: 'close-active-team' };
     }
 
+    if (input.shift === true && key === 'm') {
+      return { type: 'toggle-spoken-announcements-muted' };
+    }
+
     if (input.shift !== true) {
       if (key === 'n') {
         return { type: 'new-team' };

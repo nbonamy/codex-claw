@@ -24,6 +24,17 @@ type QueueOptions = {
   rateLimitMs?: number;
 };
 
+export type SpokenAnnouncementPolicyState = {
+  activeAgentId: string | null;
+  enabled: boolean;
+  focused: boolean;
+  muted: boolean;
+  onlyWhenFocused: boolean;
+  scope: 'selected' | 'all';
+};
+
+type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue'>;
+
 type QueueItem = SpokenAnnouncementRequest & { id: number };
 
 export class SpokenAnnouncementQueue {
@@ -109,6 +120,34 @@ export class SpokenAnnouncementQueue {
   }
 }
 
+export class PolicyAwareSpokenAnnouncementQueue {
+  private previousState: SpokenAnnouncementPolicyState;
+
+  constructor(
+    private readonly queuePort: SpokenAnnouncementQueuePort,
+    private readonly getState: () => SpokenAnnouncementPolicyState,
+  ) {
+    this.previousState = { ...getState() };
+  }
+
+  queue(request: SpokenAnnouncementRequest): SpokenAnnouncementQueueResult {
+    const state = { ...this.getState() };
+    this.previousState = { ...state };
+    if (!canPlaySpokenAnnouncement(request, state)) {
+      return { queued: false, reason: 'suppressed' };
+    }
+    return this.queuePort.queue(request);
+  }
+
+  refresh(): void {
+    const nextState = { ...this.getState() };
+    if (shouldCancelSpokenAnnouncements(this.previousState, nextState)) {
+      this.queuePort.dispose();
+    }
+    this.previousState = { ...nextState };
+  }
+}
+
 export type NativeSpokenAnnouncementOptions = {
   appPath: string;
   isPackaged: boolean;
@@ -158,7 +197,7 @@ export class NativeSpokenAnnouncementEngine implements SpokenAnnouncementEngine 
     child.stdin.end(JSON.stringify({
       version: 1,
       id: `${request.agentId}:${request.phase}`,
-      text: request.text,
+      text: spokenAnnouncementTextForSynthesis(request.text),
       voice: request.voice,
     }));
     return {
@@ -178,4 +217,29 @@ export function resolveSpokenAnnouncementHelperPath(options: NativeSpokenAnnounc
 
 export function createRuntimeSpokenAnnouncementQueue(options: NativeSpokenAnnouncementOptions): SpokenAnnouncementQueue {
   return new SpokenAnnouncementQueue(new NativeSpokenAnnouncementEngine(options));
+}
+
+export function spokenAnnouncementTextForSynthesis(text: string): string {
+  return text.replace(/\bI(['’])ll\b/g, 'I will').replace(/\bi(['’])ll\b/g, 'i will');
+}
+
+function canPlaySpokenAnnouncement(
+  request: SpokenAnnouncementRequest,
+  state: SpokenAnnouncementPolicyState,
+): boolean {
+  return state.enabled
+    && !state.muted
+    && (!state.onlyWhenFocused || state.focused)
+    && (state.scope === 'all' || state.activeAgentId === request.agentId);
+}
+
+function shouldCancelSpokenAnnouncements(
+  previous: SpokenAnnouncementPolicyState,
+  next: SpokenAnnouncementPolicyState,
+): boolean {
+  if (previous.enabled && !next.enabled) return true;
+  if (!previous.muted && next.muted) return true;
+  if (next.onlyWhenFocused && !next.focused && (previous.focused || !previous.onlyWhenFocused)) return true;
+  if (previous.scope === 'all' && next.scope === 'selected') return true;
+  return next.scope === 'selected' && previous.activeAgentId !== next.activeAgentId;
 }

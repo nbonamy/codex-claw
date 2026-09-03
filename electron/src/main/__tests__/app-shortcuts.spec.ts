@@ -57,6 +57,7 @@ describe('appCommandFromInput', () => {
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 't' })).toBeNull();
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'w' })).toStrictEqual({ type: 'close-active-agent' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'w' })).toStrictEqual({ type: 'close-active-team' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'm' })).toStrictEqual({ type: 'toggle-spoken-announcements-muted' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'q' })).toStrictEqual({ type: 'quit' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'e' })).toStrictEqual({ type: 'edit-active-agent' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'd' })).toStrictEqual({ type: 'duplicate-active-agent' });

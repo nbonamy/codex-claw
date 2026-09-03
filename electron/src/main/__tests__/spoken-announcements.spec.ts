@@ -7,9 +7,11 @@ vi.mock('../log', () => ({ warnMain: vi.fn() }));
 
 import {
   NativeSpokenAnnouncementEngine,
+  PolicyAwareSpokenAnnouncementQueue,
   SpokenAnnouncementQueue,
   createRuntimeSpokenAnnouncementQueue,
   resolveSpokenAnnouncementHelperPath,
+  spokenAnnouncementTextForSynthesis,
   type SpokenAnnouncementEngine,
   type SpokenAnnouncementPlayback,
 } from '../spoken-announcements';
@@ -98,6 +100,60 @@ describe('SpokenAnnouncementQueue', () => {
   });
 });
 
+describe('PolicyAwareSpokenAnnouncementQueue', () => {
+  it('allows only the selected agent and suppresses muted or unfocused playback', () => {
+    const queuePort = { queue: vi.fn().mockReturnValue({ queued: true }), dispose: vi.fn() };
+    const state = {
+      activeAgentId: 'agent-a',
+      enabled: true,
+      focused: true,
+      muted: false,
+      onlyWhenFocused: true,
+      scope: 'selected' as const,
+    };
+    const queue = new PolicyAwareSpokenAnnouncementQueue(queuePort, () => state);
+
+    expect(queue.queue(request('agent-a', 'start'))).toStrictEqual({ queued: true });
+    expect(queue.queue(request('agent-b', 'start'))).toStrictEqual({ queued: false, reason: 'suppressed' });
+    state.muted = true;
+    expect(queue.queue(request('agent-a', 'finish'))).toStrictEqual({ queued: false, reason: 'suppressed' });
+    state.muted = false;
+    state.focused = false;
+    expect(queue.queue(request('agent-a', 'finish'))).toStrictEqual({ queued: false, reason: 'suppressed' });
+    expect(queuePort.queue).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels queued speech when selection or foreground policy makes it ineligible', () => {
+    const queuePort = { queue: vi.fn().mockReturnValue({ queued: true }), dispose: vi.fn() };
+    const state = {
+      activeAgentId: 'agent-a',
+      enabled: true,
+      focused: true,
+      muted: false,
+      onlyWhenFocused: true,
+      scope: 'selected' as 'selected' | 'all',
+    };
+    const queue = new PolicyAwareSpokenAnnouncementQueue(queuePort, () => state);
+
+    state.activeAgentId = 'agent-b';
+    queue.refresh();
+    state.focused = false;
+    queue.refresh();
+    state.focused = true;
+    state.scope = 'all';
+    queue.refresh();
+    state.scope = 'selected';
+    queue.refresh();
+    state.muted = true;
+    queue.refresh();
+    state.muted = false;
+    state.enabled = false;
+    queue.refresh();
+
+    expect(queuePort.dispose).toHaveBeenCalledTimes(5);
+  });
+});
+
 describe('NativeSpokenAnnouncementEngine', () => {
   it('uses unpacked and development helper paths deterministically', () => {
     expect(resolveSpokenAnnouncementHelperPath({
@@ -149,6 +205,11 @@ describe('NativeSpokenAnnouncementEngine', () => {
     child.emit('close', 0);
     child.emit('close', 0);
     expect(settled).toHaveBeenCalledOnce();
+  });
+
+  it('expands I’ll contractions for clearer synthesis without changing other words', () => {
+    expect(spokenAnnouncementTextForSynthesis("I'll finish, and I’ll verify. Jill's ready; i'll wait."))
+      .toBe("I will finish, and I will verify. Jill's ready; i will wait.");
   });
 
   it('reports platform/helper availability and settles helper errors once', () => {

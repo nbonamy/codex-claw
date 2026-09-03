@@ -6,6 +6,8 @@
     :cockpit-active="cockpitVisible"
     :automations-active="automationsVisible"
     :settings-active="settingsVisible"
+    :spoken-announcements-enabled="snapshot.general.spokenAnnouncementsEnabled"
+    :spoken-announcements-muted="snapshot.general.spokenAnnouncementsMuted"
     :agent-sidebar-expanded="showAgentSidebar"
     :rate-limits="snapshot.accountRateLimits"
     :account="authentication?.account ?? null"
@@ -22,6 +24,7 @@
     @select-cockpit="openCockpit"
     @select-automations="openAutomations"
     @select-team="selectTeamFromRail"
+    @toggle-speech-mute="$emit('toggle-speech-mute')"
   />
   <Transition name="agent-sidebar">
     <AgentSidebar
@@ -146,6 +149,7 @@ const emit = defineEmits<{
   'select-agent': [agentId: string];
   'select-team': [teamId: string];
   'start-work': [action: 'github' | 'local' | 'url'];
+  'toggle-speech-mute': [];
   'update-collapsed-repositories': [repositoryKeys: string[]];
   'update-repository-icon': [
     payload: {

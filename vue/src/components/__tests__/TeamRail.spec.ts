@@ -204,12 +204,38 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
   });
 
+  it('toggles global speech mute above automations when acknowledgments are enabled', async () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+      spokenAnnouncementsEnabled: true,
+      spokenAnnouncementsMuted: false,
+    });
+
+    const mute = wrapper.get('[aria-label="Mute spoken acknowledgments (⇧⌘M)"]');
+    const automations = wrapper.get('[aria-label="Automations"]');
+    expect(mute.element.compareDocumentPosition(automations.element) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .not.toBe(0);
+    expect(mute.attributes('aria-pressed')).toBe('false');
+    await mute.trigger('click');
+    expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ spokenAnnouncementsMuted: true });
+    expect(wrapper.get('[aria-label="Unmute spoken acknowledgments (⇧⌘M)"]').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('hides global speech mute when spoken acknowledgments are disabled', () => {
+    const wrapper = mountRail({ teams, activeTeamId: 'team-sk' });
+    expect(wrapper.find('.team-rail__speech-mute').exists()).toBe(false);
+  });
+
   it('keeps app surface icons visually consistent', () => {
     expect(teamRailSource()).toContain(':deep() .settings-menu__trigger svg');
     expect(teamRailSource()).toContain('width: var(--icon-xl);');
     expect(teamRailSource()).toContain('stroke-width: 1.25px;');
     expect(teamRailSource()).toContain('transform: scale(1.15);');
     expect(teamRailSource()).toContain('.team-rail__new svg');
+    expect(teamRailSource()).toContain('.team-rail__speech-mute svg');
     expect(teamRailSource()).toContain('CockpitIcon');
     expect(teamRailSource()).not.toContain('DashboardIcon');
     expect(teamRailSource()).toContain('.team-rail__cockpit:not(.team-rail__cockpit--active)');
@@ -456,6 +482,8 @@ function mountRail(props: {
   rateLimits?: AccountRateLimits;
   settingsActive?: boolean;
   agentSidebarExpanded?: boolean;
+  spokenAnnouncementsEnabled?: boolean;
+  spokenAnnouncementsMuted?: boolean;
   unreadTeamIds?: string[];
 }) {
   const wrapper = mount(TeamRail, {

@@ -23,8 +23,8 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.create-worktree', { branchName: 'feature/tool-labels' }, 'error', 'Failed creating worktree feature/tool-labels'],
     ['codex_claw.celebrate', { kind: 'schoolPride' }, 'running', 'Celebrating with school pride'],
     ['codex_claw.celebrate', { kind: 'schoolPride' }, 'completed', 'Celebrated with school pride'],
-    ['codex_claw.announce', { phase: 'start', text: 'I am on it.' }, 'running', 'Queuing start acknowledgment'],
-    ['codex_claw.announce', { phase: 'finish', text: 'The secret is hunter2.' }, 'completed', 'Queued finish acknowledgment'],
+    ['codex_claw.announce', { phase: 'start', text: 'I am on it.' }, 'running', 'Acknowledging start'],
+    ['codex_claw.announce', { phase: 'finish', text: 'The secret is hunter2.' }, 'completed', 'Acknowledged finish'],
   ])('presents %s as user-facing activity text', (functionName, args, state, expected) => {
     expect(presentClawToolTitle(context(
       functionName,
@@ -126,14 +126,14 @@ describe('Claw tool title presenter', () => {
     expect(presentClawToolTitle(celebration)).toBe('Celebrated with school pride');
   });
 
-  it('shows a skipped announcement without exposing the spoken phrase', () => {
+  it('keeps playback policy out of announcement presentation', () => {
     const announcement = context('codex_claw.announce', { phase: 'start', text: 'private phrase' }, 'completed');
     announcement.toolCall = {
       ...announcement.toolCall,
       result: { structuredContent: { queued: false, phase: 'start' } },
     };
 
-    expect(presentClawToolTitle(announcement)).toBe('Skipped start acknowledgment');
+    expect(presentClawToolTitle(announcement)).toBe('Acknowledged start');
     expect(presentClawToolTitle(announcement)).not.toContain('private phrase');
   });
 });

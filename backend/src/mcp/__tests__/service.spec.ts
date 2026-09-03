@@ -561,9 +561,7 @@ describe('ClawMcpService', () => {
     const disabled = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
     expect(disabled.result.structuredContent).toStrictEqual({
       success: true,
-      queued: false,
       phase: 'start',
-      message: 'Spoken announcements are disabled in General settings.',
     });
     expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
 
@@ -572,9 +570,7 @@ describe('ClawMcpService', () => {
     const selected = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: '  On it.  ' });
     expect(selected.result.structuredContent).toStrictEqual({
       success: true,
-      queued: true,
       phase: 'start',
-      message: 'Announcement queued.',
     });
     expect(queueSpokenAnnouncement).toHaveBeenCalledWith({
       agentId: 'agent-dina',
@@ -584,9 +580,15 @@ describe('ClawMcpService', () => {
     });
 
     const background = await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(background.result.structuredContent).toMatchObject({ queued: false, phase: 'finish' });
+    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
 
+    snapshot.general.spokenAnnouncementsMuted = true;
+    const muted = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
+    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
+    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
+
+    snapshot.general.spokenAnnouncementsMuted = false;
     snapshot.general.spokenAnnouncementScope = 'all';
     await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
     expect(queueSpokenAnnouncement).toHaveBeenLastCalledWith({
@@ -607,11 +609,27 @@ describe('ClawMcpService', () => {
 
     const failed = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
     expect(failed.result.isError).toBe(false);
-    expect(failed.result.structuredContent).toMatchObject({ success: true, queued: false });
+    expect(failed.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
 
     const invalid = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'x'.repeat(161) });
     expect(invalid.result.isError).toBe(true);
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps client-side playback suppression out of model-facing results', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.activeAgentId = 'agent-dina';
+    const queueSpokenAnnouncement = vi.fn().mockResolvedValue({
+      queued: false,
+      reason: 'suppressed',
+    });
+    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    const url = await service.start();
+
+    const response = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+
+    expect(response.result.structuredContent).toStrictEqual({ success: true, phase: 'start' });
   });
 
   it('keeps celebrations enabled when a migrated live snapshot omits the setting', async () => {

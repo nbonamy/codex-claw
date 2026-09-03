@@ -1504,9 +1504,7 @@ describe('CodexSurfaceAgentAdapter', () => {
           output: {
           structuredContent: {
             success: true,
-            queued: true,
             phase: 'finish',
-            message: 'Announcement queued.',
           },
           content: [{ type: 'text', text: 'private tool transcript' }],
           },
@@ -1520,7 +1518,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(part).toMatchObject({
       type: 'tool',
       input: { phase: 'finish' },
-      output: { structuredContent: { success: true, queued: true, phase: 'finish' } },
+      output: { structuredContent: { success: true, phase: 'finish' } },
     });
     expect(JSON.stringify(part)).not.toContain('phrase that must not');
     expect(JSON.stringify(part)).not.toContain('private tool transcript');

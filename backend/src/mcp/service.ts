@@ -318,31 +318,24 @@ export class ClawMcpService {
   }
 
   private async announceForAgent(agent: Agent, phase: AnnouncementPhase, text: string): Promise<AnnouncementResponse> {
-    if (!this.snapshot.general.spokenAnnouncementsEnabled) {
-      return { success: true, queued: false, phase, message: 'Spoken announcements are disabled in General settings.' };
+    const response = { success: true, phase } as const;
+    const canRequestPlayback = this.snapshot.general.spokenAnnouncementsEnabled
+      && !this.snapshot.general.spokenAnnouncementsMuted
+      && (this.snapshot.general.spokenAnnouncementScope === 'all' || this.snapshot.activeAgentId === agent.id);
+    if (canRequestPlayback && this.queueSpokenAnnouncement) {
+      try {
+        await this.queueSpokenAnnouncement({
+          agentId: agent.id,
+          phase,
+          text,
+          voice: this.snapshot.general.spokenAnnouncementVoice,
+        });
+      } catch {
+        // Playback is intentionally best-effort and its delivery state must not
+        // become durable conversation context for the model.
+      }
     }
-    if (this.snapshot.general.spokenAnnouncementScope !== 'all' && this.snapshot.activeAgentId !== agent.id) {
-      return { success: true, queued: false, phase, message: 'Only the selected agent may speak.' };
-    }
-    if (!this.queueSpokenAnnouncement) {
-      return { success: true, queued: false, phase, message: 'Spoken announcements are unavailable on this client.' };
-    }
-    try {
-      const result = await this.queueSpokenAnnouncement({
-        agentId: agent.id,
-        phase,
-        text,
-        voice: this.snapshot.general.spokenAnnouncementVoice,
-      });
-      return {
-        success: true,
-        queued: result.queued,
-        phase,
-        message: result.queued ? 'Announcement queued.' : 'Announcement was not queued.',
-      };
-    } catch {
-      return { success: true, queued: false, phase, message: 'Announcement was not queued.' };
-    }
+    return response;
   }
 
   private updateWorkItemForAgent(agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): UpdateWorkItemResponse {

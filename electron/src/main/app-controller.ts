@@ -27,7 +27,7 @@ import { AppshotsKeyMonitor } from './appshots-key-monitor';
 import { captureAppshot as captureFrontmostAppshot } from './appshots';
 import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from './open-in';
 import { installLocalMediaProtocol as installLocalMediaProtocolHandler, LocalMediaRegistry, withRendererMediaUrls } from './local-media';
-import { createRuntimeSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
+import { createRuntimeSpokenAnnouncementQueue, PolicyAwareSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
@@ -78,6 +78,7 @@ export class AppController {
   };
   private powerSourceListenersInstalled = false;
   private readonly backendClient: ClawBackendClientPort | null;
+  private readonly policyAwareSpokenAnnouncements: PolicyAwareSpokenAnnouncementQueue;
 
   constructor(
     initialSnapshot: AppSnapshot | null = null,
@@ -98,10 +99,21 @@ export class AppController {
     }),
   ) {
     this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
+    this.policyAwareSpokenAnnouncements = new PolicyAwareSpokenAnnouncementQueue(
+      this.spokenAnnouncements,
+      () => ({
+        activeAgentId: this.snapshot?.activeAgentId ?? null,
+        enabled: this.snapshot?.general.spokenAnnouncementsEnabled === true,
+        focused: this.mainWindow?.isFocused?.() === true,
+        muted: this.snapshot?.general.spokenAnnouncementsMuted === true,
+        onlyWhenFocused: this.snapshot?.general.spokenAnnouncementsOnlyWhenFocused === true,
+        scope: this.snapshot?.general.spokenAnnouncementScope ?? 'selected',
+      }),
+    );
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
-      spokenAnnouncements: this.spokenAnnouncements,
+      spokenAnnouncements: this.policyAwareSpokenAnnouncements,
     });
   }
 
@@ -588,6 +600,8 @@ export class AppController {
       this.rendererReady = true;
       this.flushPendingDeepLinkCommands();
     });
+    this.mainWindow.on('focus', () => this.policyAwareSpokenAnnouncements.refresh());
+    this.mainWindow.on('blur', () => this.policyAwareSpokenAnnouncements.refresh());
   }
 
   openDeepLink(value: string): boolean {
@@ -1081,6 +1095,7 @@ export class AppController {
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
     this.snapshot = metadataOnlySnapshot(snapshot);
+    this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
     try {
       await this.refreshClientStateFromBackend();
@@ -1093,6 +1108,7 @@ export class AppController {
   private async adoptBackendMetadata(metadata: AppSnapshotMetadata): Promise<AppSnapshotMetadata> {
     if (!this.snapshot) throw new Error('clawd snapshot is not available.');
     applySnapshotMetadata(this.snapshot, metadata);
+    this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
     return metadata;
   }
@@ -1454,6 +1470,7 @@ export class AppController {
 
       let synchronizedSnapshot = backendState.snapshot;
       this.snapshot = metadataOnlySnapshot(synchronizedSnapshot);
+      this.policyAwareSpokenAnnouncements.refresh();
       this.clientState = backendState.clientState;
       this.lastBackendEventSeq = backendState.lastEventSeq;
       const buffered = this.backendEventBuffer;
@@ -1622,6 +1639,7 @@ export class AppController {
       applyMainEventToSnapshot(this.snapshot, rendererEvent);
       this.snapshot.messages = [];
     }
+    this.policyAwareSpokenAnnouncements.refresh();
     if (isClientState(event.clientState)) {
       this.clientState = event.clientState;
     }

@@ -75,6 +75,7 @@
       @select-agent="selectAgentFromShell"
       @select-team="selectTeamFromRail"
       @start-work="handleStartWorkAction"
+      @toggle-speech-mute="toggleSpokenAnnouncementsMuted"
       @update-collapsed-repositories="updateCollapsedRepositories"
       @update-repository-icon="updateRepositoryIcon"
     />
@@ -1352,6 +1353,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     selectTeam: selectTeamFromRail,
     sendAgentPrompt: (agentId, prompt) => emit('send-agent-prompt', { agentId, prompt }),
     setDebugApproval: (approval) => { debugApproval.value = approval; },
+    toggleSpokenAnnouncementsMuted,
     updateComposerAttachments: (agentId, attachments) => emit('update:composerAttachments', { agentId, attachments }),
     updateComposerState: (agentId, state) => emit('update:composerState', { agentId, state }),
   },
@@ -1581,6 +1583,15 @@ function openAutomations(): void {
 
 function openSettings(): void {
   activeSurface.value = 'settings';
+}
+
+function toggleSpokenAnnouncementsMuted(): void {
+  if (!props.snapshot.general.spokenAnnouncementsEnabled) return;
+  void updateSettings({
+    general: {
+      spokenAnnouncementsMuted: !props.snapshot.general.spokenAnnouncementsMuted,
+    },
+  });
 }
 
 function openWhatsNew(): void {

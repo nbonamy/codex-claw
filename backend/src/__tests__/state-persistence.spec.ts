@@ -1012,6 +1012,8 @@ describe('AppStatePersistence', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
+      spokenAnnouncementsMuted: true,
+      spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'af_bella',
       codexBinaryPath: '/opt/homebrew/bin/codex',

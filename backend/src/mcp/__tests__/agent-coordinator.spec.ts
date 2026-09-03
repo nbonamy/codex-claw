@@ -342,14 +342,12 @@ describe('ClawMcpAgentCoordinator', () => {
   it('validates, trims, and delegates spoken announcements without updating agent state', async () => {
     const onAnnounce = vi.fn().mockResolvedValue({
       success: true,
-      queued: true,
       phase: 'start',
-      message: 'Announcement queued.',
     });
     const { agents, coordinator, onAgentUpdated } = fixture({ onAnnounce });
 
-    await expect(coordinator.announce('agent-dina', 'start', '  I’ll take it.  ')).resolves.toMatchObject({
-      queued: true,
+    await expect(coordinator.announce('agent-dina', 'start', '  I’ll take it.  ')).resolves.toStrictEqual({
+      success: true,
       phase: 'start',
     });
     expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'start', 'I’ll take it.');

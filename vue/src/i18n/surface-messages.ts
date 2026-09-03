@@ -689,6 +689,8 @@ export const surfaceMessages = {
     "spokenAcknowledgmentScope": "Spoken acknowledgment scope",
     "scope": "Scope",
     "chooseWhichAgentsMaySpeak": "Choose which agents may speak",
+    "onlySpeakWhileFocused": "Only speak while Codex Claw is focused",
+    "silenceAcknowledgmentsWhileCodexClawIsInTheBackground": "Silence acknowledgments while Codex Claw is in the background",
     "chooseAnOnDeviceNeuralVoice": "Choose an on-device neural voice; additional voices download on first preview",
     "preview": "Preview",
     "previewVoice": "Preview voice",
@@ -833,7 +835,9 @@ export const surfaceMessages = {
     "teams": "Teams",
     "cockpit": "Cockpit",
     "createTeam": "Create team",
-    "automations": "Automations"
+    "automations": "Automations",
+    "muteSpokenAcknowledgments": "Mute spoken acknowledgments (⇧⌘M)",
+    "unmuteSpokenAcknowledgments": "Unmute spoken acknowledgments (⇧⌘M)"
   },
   "updateAvailableBadge": {
     "checkingForUpdates": "Checking…",

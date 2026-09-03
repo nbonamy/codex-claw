@@ -205,15 +205,19 @@ app event, not from the result text.
   characters;
 - the coordinator validates the caller and delegates without touching
   `agent.statusText`;
-- the service applies the opt-in and selected-agent policy, then sends the
-  provider-neutral `client/spokenAnnouncement/queue` request;
+- the service applies persisted enablement, mute, and selected-agent policy,
+  then sends the provider-neutral `client/spokenAnnouncement/queue` request;
+- Electron rechecks selected-agent and foreground eligibility when accepting
+  playback and cancels active or pending speech when it becomes ineligible;
 - Electron returns as soon as its bounded global queue accepts the request,
   coalesces pending phrases, rate-limits repeated phases, and owns native helper
   cancellation;
-- Vue only renders the Voice settings section and a phase-aware tool row. The
-  section owns enablement, selected-agent scope, a curated Kokoro voice picker,
-  and a local preview action. The spoken text and result message are excluded
-  from renderer projections.
+- the MCP result confirms only that the acknowledgment request was handled;
+  playback delivery and suppression reasons stay out of model context;
+- Vue renders the Voice settings section, rail mute control, and a phase-aware
+  tool row. The section owns enablement, selected-agent and foreground scope, a
+  curated Kokoro voice picker, and a local preview action. The spoken text and
+  playback result are excluded from renderer projections.
 
 The macOS helper uses FluidAudio 0.15.5 with Kokoro 82M Core ML audio and
 `AVAudioPlayer`; it does not use `AVSpeechSynthesizer`. The helper binary is

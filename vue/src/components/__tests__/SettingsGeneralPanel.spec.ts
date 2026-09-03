@@ -73,6 +73,14 @@ describe('SettingsGeneralPanel', () => {
       general: { spokenAnnouncementScope: 'all' },
     });
 
+    const focusedOnlyRow = rows.find((candidate) => candidate.text().includes('Only speak while Codex Claw is focused'))!;
+    expect(focusedOnlyRow.text()).toContain('Silence acknowledgments');
+    expect(focusedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
+    await focusedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      general: { spokenAnnouncementsOnlyWhenFocused: false },
+    });
+
     const voiceRow = rows.find((candidate) => candidate.text().includes('additional voices download'))!;
     const voiceSelect = voiceRow.findComponent({ name: 'ElSelect' });
     expect(voiceSelect.props('modelValue')).toBe('af_heart');

@@ -141,6 +141,20 @@
       </SettingsRow>
       <SettingsRow
         v-if="settings.spokenAnnouncementsEnabled"
+        as="label"
+        :title="$t('surface.settingsGeneralPanel.onlySpeakWhileFocused')"
+        :description="$t('surface.settingsGeneralPanel.silenceAcknowledgmentsWhileCodexClawIsInTheBackground')"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.spokenAnnouncementsOnlyWhenFocused"
+            :aria-label="$t('surface.settingsGeneralPanel.onlySpeakWhileFocused')"
+            @update:model-value="updateSpokenAnnouncementsOnlyWhenFocused"
+          />
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        v-if="settings.spokenAnnouncementsEnabled"
         :title="$t('surface.settingsGeneralPanel.voice')"
         :description="$t('surface.settingsGeneralPanel.chooseAnOnDeviceNeuralVoice')"
         :error="voicePreviewError"
@@ -499,6 +513,12 @@ function updateSpokenAnnouncementsEnabled(value: boolean | string | number): voi
 function updateSpokenAnnouncementScope(value: SpokenAnnouncementScope): void {
   void props.updateSettings?.({
     general: { spokenAnnouncementScope: value },
+  });
+}
+
+function updateSpokenAnnouncementsOnlyWhenFocused(value: boolean | string | number): void {
+  void props.updateSettings?.({
+    general: { spokenAnnouncementsOnlyWhenFocused: value === true },
   });
 }
 

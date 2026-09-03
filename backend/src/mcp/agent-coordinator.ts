@@ -68,9 +68,7 @@ export type CelebrationResponse = {
 
 export type AnnouncementResponse = {
   success: true;
-  queued: boolean;
   phase: AnnouncementPhase;
-  message: string;
 };
 
 export type UpdateWorkItemResponse =

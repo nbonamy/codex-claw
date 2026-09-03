@@ -84,5 +84,7 @@ export {
   IconTextWrapDisabled as TextWrapDisabledIcon,
   IconTrash as Trash2Icon,
   IconUserCircle as UserCircleIcon,
+  IconVolume as VolumeIcon,
+  IconVolumeOff as VolumeOffIcon,
   IconX as X,
 } from '@tabler/icons-vue';

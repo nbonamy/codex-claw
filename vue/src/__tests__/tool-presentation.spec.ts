@@ -28,7 +28,7 @@ describe('Claw tool presentation', () => {
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
     ['update-work-item', SquareCheck, 'Updated work item'],
     ['celebrate', SparklesIcon, 'Celebrated with stars'],
-    ['announce', VolumeIcon, 'Queued start acknowledgment'],
+    ['announce', VolumeIcon, 'Acknowledged start'],
   ])('presents %s with a semantic Claw icon and title', (tool, icon, title) => {
     const args = tool === 'send-message'
       ? { to: 'codex-app-sdk' }

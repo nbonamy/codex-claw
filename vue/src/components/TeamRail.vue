@@ -60,6 +60,26 @@
 
       <div class="team-rail__bottom">
         <button
+          v-if="spokenAnnouncementsEnabled"
+          class="team-rail__speech-mute"
+          :class="{ 'team-rail__speech-mute--active': spokenAnnouncementsMuted }"
+          type="button"
+          :title="spokenAnnouncementsMuted ? $t('surface.teamRail.unmuteSpokenAcknowledgments') : $t('surface.teamRail.muteSpokenAcknowledgments')"
+          :aria-label="spokenAnnouncementsMuted ? $t('surface.teamRail.unmuteSpokenAcknowledgments') : $t('surface.teamRail.muteSpokenAcknowledgments')"
+          :aria-pressed="spokenAnnouncementsMuted"
+          @click="emit('toggle-speech-mute')"
+        >
+          <VolumeOffIcon
+            v-if="spokenAnnouncementsMuted"
+            aria-hidden="true"
+          />
+          <VolumeIcon
+            v-else
+            aria-hidden="true"
+          />
+        </button>
+
+        <button
           class="team-rail__automations"
           :class="{ 'team-rail__automations--active': automationsActive }"
           type="button"
@@ -104,7 +124,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { teamInitials } from '@codex-claw/core/team-manager';
-import { AutomationIcon, PlusIcon } from '../shared/icons/app-icons';
+import { AutomationIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
@@ -119,6 +139,8 @@ const props = defineProps<{
   rateLimits?: AccountRateLimits;
   account?: CodexAccount | null;
   settingsActive?: boolean;
+  spokenAnnouncementsEnabled?: boolean;
+  spokenAnnouncementsMuted?: boolean;
   agentSidebarExpanded?: boolean;
   unreadTeamIds?: string[];
 }>();
@@ -136,6 +158,7 @@ const emit = defineEmits<{
   'select-cockpit': [];
   'select-automations': [];
   'select-team': [teamId: string];
+  'toggle-speech-mute': [];
 }>();
 
 const railRoot = ref<HTMLElement | null>(null);
@@ -326,7 +349,8 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit,
-.team-rail__automations {
+.team-rail__automations,
+.team-rail__speech-mute {
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   display: grid;
@@ -345,13 +369,16 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
 .team-rail__automations:hover,
-.team-rail__automations:focus-visible {
+.team-rail__automations:focus-visible,
+.team-rail__speech-mute:hover,
+.team-rail__speech-mute:focus-visible {
   color: var(--team-rail-icon-hover-color);
   outline: none;
 }
 
 .team-rail__cockpit--active,
-.team-rail__automations--active {
+.team-rail__automations--active,
+.team-rail__speech-mute--active {
   color: var(--team-rail-icon-active-color);
   opacity: 1;
 }
@@ -362,6 +389,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__automations svg,
+.team-rail__speech-mute svg,
 .team-rail__new svg,
 :deep() .settings-menu__trigger svg {
   width: var(--icon-xl);

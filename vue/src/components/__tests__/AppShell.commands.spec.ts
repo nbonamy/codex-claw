@@ -154,6 +154,25 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('main.ts');
   });
 
+  it('toggles spoken acknowledgment mute with Shift-Command-M', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.spokenAnnouncementsEnabled = true;
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    mountShell({ snapshot, updateSettings });
+
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'm',
+      metaKey: true,
+      shiftKey: true,
+      cancelable: true,
+    }));
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { spokenAnnouncementsMuted: true },
+    });
+  });
+
   it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
     vi.useFakeTimers();
     let listener: (command: AppCommand) => void = () => undefined;
@@ -587,6 +606,29 @@ describe('AppShell dialogs and commands', () => {
     await nextTick();
 
     expect(wrapper.find('.settings-view').exists()).toBe(true);
+  });
+
+  it('toggles spoken acknowledgment mute from the native app command', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.general.spokenAnnouncementsMuted = true;
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    mountShell({ snapshot, updateSettings });
+
+    listener({ type: 'toggle-spoken-announcements-muted' });
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { spokenAnnouncementsMuted: false },
+    });
   });
 
   it('prefills a deep-linked agent composer when submission is disabled', async () => {

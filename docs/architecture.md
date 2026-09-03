@@ -323,13 +323,16 @@ routes permission status through the app-owned backend protocol and delivers
 the resulting PNG to the active renderer composer as a normal SDK attachment.
 
 Spoken agent acknowledgments are another native desktop effect. `clawd` owns
-the provider-neutral MCP semantics and opt-in/selected-agent policy, then asks
-the connected client to queue a bounded phrase. Electron owns the global
-no-overlap queue and signed Swift helper lifecycle; the helper synthesizes
-Kokoro audio through FluidAudio and plays the resulting waveform. Vue owns only
-the enablement, scope, voice picker/preview, and tool-row presentation. Extra
-curated Kokoro voice packs download on demand through the helper. Speech never
-mutates agent status and failure remains best-effort.
+the provider-neutral MCP semantics and persisted enablement, mute, and
+selected-agent policy, then asks the connected client to queue a bounded
+phrase. Electron rechecks selected-agent and foreground policy at playback,
+cancels speech that becomes ineligible, and owns the global no-overlap queue
+and signed Swift helper lifecycle. The helper synthesizes Kokoro audio through
+FluidAudio and plays the resulting waveform. Vue owns the settings, rail mute
+control, voice picker/preview, and tool-row presentation. Extra curated Kokoro
+voice packs download on demand through the helper. Playback delivery remains
+opaque to the model, speech never mutates agent status, and failure remains
+best-effort.
 
 Modules:
 
