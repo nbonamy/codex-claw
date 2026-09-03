@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.15.0",
+  "currentVersion": "0.15.1",
   "releases": [
+    {
+      "version": "0.15.1",
+      "releasedAt": "2026-09-02",
+      "sourceSha256": "4b5acdfb6ce9fde106076c8ff028f72a00835f3e64cd05069ccc91ede2466cd5",
+      "markdown": "### Improvements and fixes\n\n- Resumed goals now continue running across restarts, remain visibly marked as\n  working between turns, and leave the composer shelf once complete.\n- Claw agents now receive explicit guidance for single-call worktree\n  delegation, persistent Markdown presentation, and meaningful celebrations,\n  making those existing workflows more reliable to invoke."
+    },
     {
       "version": "0.15.0",
       "releasedAt": "2026-09-02",

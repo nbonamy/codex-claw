@@ -4,6 +4,16 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.15.1] - 2026-09-02
+
+### Improvements and fixes
+
+- Resumed goals now continue running across restarts, remain visibly marked as
+  working between turns, and leave the composer shelf once complete.
+- Claw agents now receive explicit guidance for single-call worktree
+  delegation, persistent Markdown presentation, and meaningful celebrations,
+  making those existing workflows more reliable to invoke.
+
 ## [0.15.0] - 2026-09-02
 
 ### New features
