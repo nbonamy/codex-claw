@@ -27,6 +27,7 @@ const extraResource = [
   'resources/clawd',
   'resources/codex',
   ...(process.platform === 'darwin' ? ['.computer-use/Codex Claw Computer Use.app'] : []),
+  ...(process.platform === 'darwin' ? ['.tts/codex-claw-tts-helper'] : []),
 ];
 
 // osx special configuration

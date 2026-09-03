@@ -56,6 +56,7 @@ describe('signDarwinBinaries', () => {
       existsSync: (filePath) => [
         '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
         '/build/Codex Claw.app/Contents/Resources/Codex Claw Computer Use.app',
+        '/build/Codex Claw.app/Contents/Resources/codex-claw-tts-helper',
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -85,7 +86,18 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(2);
+    expect(execFileSync).toHaveBeenNthCalledWith(3, 'codesign', [
+      '--force',
+      '--verbose',
+      '--options',
+      'runtime',
+      '--sign',
+      'Developer ID Application: Codex Claw',
+      '/build/Codex Claw.app/Contents/Resources/codex-claw-tts-helper',
+    ], {
+      stdio: 'inherit',
+    });
+    expect(execFileSync).toHaveBeenCalledTimes(3);
   });
 
   it('supports the afterCopy app directory path used by older signing hooks', () => {
@@ -99,6 +111,7 @@ describe('signDarwinBinaries', () => {
       existsSync: (filePath) => [
         '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
         '/build/Codex Claw.app/Contents/Resources/Codex Claw Computer Use.app',
+        '/build/Codex Claw.app/Contents/Resources/codex-claw-tts-helper',
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -117,7 +130,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(2);
+    expect(execFileSync).toHaveBeenCalledTimes(3);
   });
 
   it('supports the afterCopyExtraResources staging root before the app is renamed', () => {
@@ -131,6 +144,7 @@ describe('signDarwinBinaries', () => {
       existsSync: (filePath) => [
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/apple-speechanalyzer-cli',
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/Codex Claw Computer Use.app',
+        '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/codex-claw-tts-helper',
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -149,7 +163,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(2);
+    expect(execFileSync).toHaveBeenCalledTimes(3);
   });
 
   it('fails when a required helper has not been copied yet', () => {
