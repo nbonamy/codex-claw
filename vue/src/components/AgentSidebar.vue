@@ -154,7 +154,10 @@
             aria-hidden="true"
           />
           <span class="agent-sidebar__meta">
-            <strong>{{ session.displayTitle }}</strong>
+            <strong
+              class="agent-sidebar__session-title"
+              :class="{ 'agent-sidebar__session-title--active': session.isActive }"
+            >{{ session.displayTitle }}</strong>
           </span>
           <span
             v-if="!session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
@@ -935,10 +938,14 @@ function onResizePointerEnd(event: PointerEvent): void {
   white-space: nowrap;
 }
 
-.agent-sidebar__meta strong {
+.agent-sidebar__session-title {
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-18);
+}
+
+.agent-sidebar__session-title--active {
+  font-weight: var(--font-weight-bold);
 }
 
 .agent-sidebar__status {
@@ -1001,7 +1008,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: block;
 }
 
-.agent-sidebar--compact .agent-sidebar__meta strong {
+.agent-sidebar--compact .agent-sidebar__session-title {
   display: block;
   font-size: var(--font-size-14);
   line-height: var(--line-height-18);
