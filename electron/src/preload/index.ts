@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -92,6 +92,7 @@ const api: CodexClawApi = {
   closeAgent: (agentId: string, input) => ipc.invoke(ipcChannels.closeAgent, agentId, input),
   selectAgent: (agentId: string) => ipc.invoke(ipcChannels.selectAgent, agentId),
   updateSettings: (input: UpdateSettingsInput) => ipc.invoke(ipcChannels.updateSettings, input),
+  previewSpokenAnnouncementVoice: (voice: SpokenAnnouncementVoice) => ipc.invoke(ipcChannels.previewSpokenAnnouncementVoice, voice),
   getCodexResourceSharingStatus: () => ipc.invoke(ipcChannels.getCodexResourceSharingStatus),
   setCodexResourceSharing: (input: SetCodexResourceSharingInput) => ipc.invoke(ipcChannels.setCodexResourceSharing, input),
   getPluginStatus: () => ipc.invoke(ipcChannels.getPluginStatus),

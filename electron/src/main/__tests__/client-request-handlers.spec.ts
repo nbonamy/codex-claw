@@ -92,22 +92,43 @@ describe('createClientRequestHandlers', () => {
       agentId: 'agent-dina',
       phase: 'finish',
       text: '  Wrapped up.  ',
+      voice: 'bf_emma',
     })).toStrictEqual({ queued: true });
     expect(queue).toHaveBeenCalledWith({
       agentId: 'agent-dina',
       phase: 'finish',
       text: 'Wrapped up.',
+      voice: 'bf_emma',
     });
     await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
       agentId: 'agent-dina',
       phase: 'middle',
       text: 'Nope.',
+      voice: 'af_heart',
     })).rejects.toThrowError('Invalid phase.');
     await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
       agentId: 'agent-dina',
       phase: 'start',
       text: 'x'.repeat(161),
+      voice: 'af_heart',
     })).rejects.toThrowError('Invalid text.');
+    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'Nope.',
+      voice: 'robot',
+    })).rejects.toThrowError('Invalid voice.');
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'Backwards compatible.',
+    })).toStrictEqual({ queued: true });
+    expect(queue).toHaveBeenLastCalledWith({
+      agentId: 'agent-dina',
+      phase: 'start',
+      text: 'Backwards compatible.',
+      voice: 'af_heart',
+    });
   });
 
   it('reports unsupported speech without failing the client request', async () => {

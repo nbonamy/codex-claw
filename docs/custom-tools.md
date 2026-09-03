@@ -207,8 +207,10 @@ app event, not from the result text.
 - Electron returns as soon as its bounded global queue accepts the request,
   coalesces pending phrases, rate-limits repeated phases, and owns native helper
   cancellation;
-- Vue only renders the setting and a phase-aware tool row. The spoken text and
-  result message are excluded from renderer projections.
+- Vue only renders the Voice settings section and a phase-aware tool row. The
+  section owns enablement, selected-agent scope, a curated Kokoro voice picker,
+  and a local preview action. The spoken text and result message are excluded
+  from renderer projections.
 
 The macOS helper uses FluidAudio 0.15.5 with Kokoro 82M Core ML audio and
 `AVAudioPlayer`; it does not use `AVSpeechSynthesizer`. The helper binary is
@@ -217,6 +219,14 @@ first enabled use and remain outside the app bundle. A measured first-use cache
 is about 190 MiB because FluidAudio retains downloaded model packages beside
 compiled Core ML artifacts. There is no system-voice fallback: native synthesis
 failure is silent and never fails or delays the agent task.
+
+The default voice is `af_heart`. Seven additional English Kokoro voice packs
+are fetched individually from the Apache-2.0 upstream model at a pinned
+revision when first selected or previewed. The helper extracts the raw stored
+tensor, checks its exact size and pinned SHA-256 digest, and places it in
+FluidAudio's cache. Preview uses the same global Electron queue as agent speech
+with the fixed phrase “Codex Claw is on it—sharp claws, clean code,” so previews
+cannot overlap live acknowledgments.
 
 The original KittenTTS 0.1.0 integration gate was rejected before product
 wiring because its official Swift package exports unsafe target flags, which

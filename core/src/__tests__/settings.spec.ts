@@ -10,6 +10,7 @@ describe('settings contracts', () => {
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementScope: 'all',
+      spokenAnnouncementVoice: 'bf_emma',
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
       appshots: defaultAppshotSettings,
@@ -20,6 +21,7 @@ describe('settings contracts', () => {
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementScope: 'all',
+      spokenAnnouncementVoice: 'bf_emma',
       collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
@@ -32,6 +34,8 @@ describe('settings contracts', () => {
     });
 
     expect(normalizeGeneralSettings({})).toStrictEqual(defaultGeneralSettings);
+    expect(normalizeGeneralSettings({ spokenAnnouncementVoice: 'not-a-voice' }).spokenAnnouncementVoice)
+      .toBe('af_heart');
     expect(normalizeGeneralSettings(null)).toStrictEqual(defaultGeneralSettings);
     expect(normalizeAppshotSettings(null)).toStrictEqual(defaultAppshotSettings);
     expect(normalizePluginSettings([])).toStrictEqual(defaultPluginSettings);
@@ -94,6 +98,7 @@ describe('settings contracts', () => {
       celebrationsEnabled: true,
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementScope: 'selected',
+      spokenAnnouncementVoice: 'af_heart',
       collapsedRepositoryKeys: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,

@@ -31,6 +31,7 @@ const request = (agentId: string, phase: 'start' | 'finish', text = 'On it.'): S
   agentId,
   phase,
   text,
+  voice: 'af_heart',
 });
 
 describe('SpokenAnnouncementQueue', () => {
@@ -139,6 +140,7 @@ describe('NativeSpokenAnnouncementEngine', () => {
       version: 1,
       id: 'agent-a:finish',
       text: 'Done.',
+      voice: 'af_heart',
     });
     playback.cancel();
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');

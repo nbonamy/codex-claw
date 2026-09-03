@@ -14,7 +14,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, ApprovalPreset, AppCommand, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BackendConversationRef, BenchLocation, BackendModelOption, BackendPluginSummary, BackendSkillSummary, BrowserAnnotation, BrowserBounds, BrowserState, ClawdDaemonStatus, ClientRequestResponse, CodexAuthentication, CodexChatGptLogin, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -27,10 +27,12 @@ import { AppshotsKeyMonitor } from './appshots-key-monitor';
 import { captureAppshot as captureFrontmostAppshot } from './appshots';
 import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from './open-in';
 import { installLocalMediaProtocol as installLocalMediaProtocolHandler, LocalMediaRegistry, withRendererMediaUrls } from './local-media';
+import { createRuntimeSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
 type StartupMaintenance = () => Promise<void>;
+type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue'>;
 type PendingBrowserOpen = {
   agentId: string;
   browserId: string;
@@ -88,11 +90,18 @@ export class AppController {
     private readonly daemonRefresher: () => Promise<ClawdDaemonStatus> = () => refreshClawdDaemon(),
     private readonly openInProvider: OpenInProvider = createOpenInProvider(),
     private readonly badgeApplication: BadgeApplication = app,
+    private readonly spokenAnnouncements: SpokenAnnouncementQueuePort = createRuntimeSpokenAnnouncementQueue({
+      appPath: app?.getAppPath?.() ?? process.cwd(),
+      isPackaged: app?.isPackaged ?? false,
+      platform: process.platform,
+      resourcesPath: process.resourcesPath,
+    }),
   ) {
     this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
     this.backendClient = backendClient ?? createRuntimeClawBackendClient({
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
+      spokenAnnouncements: this.spokenAnnouncements,
     });
   }
 
@@ -439,6 +448,9 @@ export class AppController {
     ipc.handle(ipcChannels.updateSettings, async (_event, input: UpdateSettingsInput) => {
       return this.updateSettings(input);
     });
+    ipc.handle(ipcChannels.previewSpokenAnnouncementVoice, (_event, voice: SpokenAnnouncementVoice) => {
+      return this.previewSpokenAnnouncementVoice(voice);
+    });
     ipc.handle(ipcChannels.getCodexResourceSharingStatus, () => this.getCodexResourceSharingStatus());
     ipc.handle(ipcChannels.setCodexResourceSharing, async (_event, input: SetCodexResourceSharingInput) => {
       return this.setCodexResourceSharing(input);
@@ -601,6 +613,7 @@ export class AppController {
     }
     this.autoUpdateService?.stop();
     this.appshotsKeyMonitor?.stop();
+    this.spokenAnnouncements.dispose();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
     this.backendClientEventUnsubscribe?.();
@@ -609,6 +622,18 @@ export class AppController {
     this.backendClientConnectionUnsubscribe = null;
     await this.backendClient?.close();
     logMain('shutdown', 'application resources closed');
+  }
+
+  private previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): SpokenAnnouncementQueueResult {
+    if (!spokenAnnouncementVoices.includes(voice)) {
+      throw new Error('Invalid spoken announcement voice.');
+    }
+    return this.spokenAnnouncements.queue({
+      agentId: `settings-preview:${voice}`,
+      phase: 'start',
+      text: 'Codex Claw is on it—sharp claws, clean code.',
+      voice,
+    });
   }
 
   private async initializeBackendClient(): Promise<void> {

@@ -87,6 +87,7 @@ export const ipcChannels = {
   closeAgent: 'agent:close',
   selectAgent: 'agent:select',
   updateSettings: 'settings:update',
+  previewSpokenAnnouncementVoice: 'settings:spoken-announcement-voice:preview',
   getCodexResourceSharingStatus: 'settings:codex-resource-sharing:get',
   setCodexResourceSharing: 'settings:codex-resource-sharing:set',
   getPluginStatus: 'settings:plugin-status:get',

@@ -159,6 +159,7 @@ export class NativeSpokenAnnouncementEngine implements SpokenAnnouncementEngine 
       version: 1,
       id: `${request.agentId}:${request.phase}`,
       text: request.text,
+      voice: request.voice,
     }));
     return {
       cancel: () => {

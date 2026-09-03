@@ -302,8 +302,9 @@ the provider-neutral MCP semantics and opt-in/selected-agent policy, then asks
 the connected client to queue a bounded phrase. Electron owns the global
 no-overlap queue and signed Swift helper lifecycle; the helper synthesizes
 Kokoro audio through FluidAudio and plays the resulting waveform. Vue owns only
-the settings and tool-row presentation. Speech never mutates agent status and
-failure remains best-effort.
+the enablement, scope, voice picker/preview, and tool-row presentation. Extra
+curated Kokoro voice packs download on demand through the helper. Speech never
+mutates agent status and failure remains best-effort.
 
 Modules:
 

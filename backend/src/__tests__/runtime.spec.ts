@@ -274,7 +274,9 @@ describe('clawd runtime', () => {
     await mcp.computerUse!.stop();
     await mcp.browser!.open({ url: 'https://example.com' });
     await mcp.browser!.execute({ command: 'dom' });
-    await mcp.queueSpokenAnnouncement({ agentId: 'agent-dina', phase: 'start', text: 'On it.' });
+    await mcp.queueSpokenAnnouncement({
+      agentId: 'agent-dina', phase: 'start', text: 'On it.', voice: 'af_heart',
+    });
     expect(requestClient.mock.calls.map(([method]) => method)).toStrictEqual([
       backendMethods.clientComputerUseExecute,
       backendMethods.clientComputerUseRequestAccessibility,

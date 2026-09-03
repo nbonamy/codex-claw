@@ -667,12 +667,26 @@ export type WorktreeInitializationMode = 'automatic' | 'repository' | 'off';
 
 export type SpokenAnnouncementScope = 'selected' | 'all';
 
+export const spokenAnnouncementVoices = [
+  'af_heart',
+  'af_bella',
+  'af_nicole',
+  'af_sarah',
+  'am_adam',
+  'am_michael',
+  'bf_emma',
+  'bm_george',
+] as const;
+
+export type SpokenAnnouncementVoice = typeof spokenAnnouncementVoices[number];
+
 export type AnnouncementPhase = 'start' | 'finish';
 
 export type SpokenAnnouncementRequest = {
   agentId: string;
   phase: AnnouncementPhase;
   text: string;
+  voice: SpokenAnnouncementVoice;
 };
 
 export type SpokenAnnouncementQueueResult = {
@@ -686,6 +700,7 @@ export type AppGeneralSettings = {
   celebrationsEnabled: boolean;
   spokenAnnouncementsEnabled: boolean;
   spokenAnnouncementScope: SpokenAnnouncementScope;
+  spokenAnnouncementVoice: SpokenAnnouncementVoice;
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
@@ -1690,6 +1705,7 @@ export type CodexClawApi = {
   closeAgent(agentId: string, input?: AgentCloseInput): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): Promise<SpokenAnnouncementQueueResult>;
   getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;
   setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;
   getPluginStatus(): Promise<AppPluginStatus>;

@@ -980,6 +980,7 @@ describe('AppStatePersistence', () => {
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementScope: 'all',
+      spokenAnnouncementVoice: 'af_bella',
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       agentListCompact: true,

@@ -580,6 +580,7 @@ describe('ClawMcpService', () => {
       agentId: 'agent-dina',
       phase: 'start',
       text: 'On it.',
+      voice: 'af_heart',
     });
 
     const background = await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
@@ -592,6 +593,7 @@ describe('ClawMcpService', () => {
       agentId: 'agent-jesse',
       phase: 'finish',
       text: 'Done.',
+      voice: 'af_heart',
     });
   });
 

@@ -72,37 +72,6 @@
         </template>
       </SettingsRow>
       <SettingsRow
-        as="label"
-        :title="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
-        :description="$t('surface.settingsGeneralPanel.letAgentsSpeakBriefTaskStartAndFinishPhrases')"
-      >
-        <template #control>
-          <span class="settings-general-panel__actions">
-            <el-select
-              v-if="settings.spokenAnnouncementsEnabled"
-              class="settings-general-panel__speech-scope-select"
-              :model-value="settings.spokenAnnouncementScope"
-              :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgmentScope')"
-              @update:model-value="updateSpokenAnnouncementScope"
-            >
-              <el-option
-                :label="$t('surface.settingsGeneralPanel.selectedAgentOnly')"
-                value="selected"
-              />
-              <el-option
-                :label="$t('surface.settingsGeneralPanel.allAgents')"
-                value="all"
-              />
-            </el-select>
-            <el-switch
-              :model-value="settings.spokenAnnouncementsEnabled"
-              :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
-              @update:model-value="updateSpokenAnnouncementsEnabled"
-            />
-          </span>
-        </template>
-      </SettingsRow>
-      <SettingsRow
         :title="$t('surface.settingsGeneralPanel.worktreeInitialization')"
         :description="$t('surface.settingsGeneralPanel.prepareNewWorktreesBeforeAgentsStart')"
       >
@@ -126,6 +95,80 @@
               value="off"
             />
           </el-select>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
+
+    <SettingsSection
+      :title="$t('surface.settingsGeneralPanel.voice')"
+      title-id="settings-general-voice-title"
+    >
+      <SettingsRow
+        as="label"
+        :title="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
+        :description="$t('surface.settingsGeneralPanel.letAgentsSpeakBriefTaskStartAndFinishPhrases')"
+      >
+        <template #control>
+          <el-switch
+            :model-value="settings.spokenAnnouncementsEnabled"
+            :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
+            @update:model-value="updateSpokenAnnouncementsEnabled"
+          />
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        v-if="settings.spokenAnnouncementsEnabled"
+        :title="$t('surface.settingsGeneralPanel.scope')"
+        :description="$t('surface.settingsGeneralPanel.chooseWhichAgentsMaySpeak')"
+      >
+        <template #control>
+          <el-select
+            class="settings-general-panel__speech-scope-select"
+            :model-value="settings.spokenAnnouncementScope"
+            :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgmentScope')"
+            @update:model-value="updateSpokenAnnouncementScope"
+          >
+            <el-option
+              :label="$t('surface.settingsGeneralPanel.selectedAgentOnly')"
+              value="selected"
+            />
+            <el-option
+              :label="$t('surface.settingsGeneralPanel.allAgents')"
+              value="all"
+            />
+          </el-select>
+        </template>
+      </SettingsRow>
+      <SettingsRow
+        v-if="settings.spokenAnnouncementsEnabled"
+        :title="$t('surface.settingsGeneralPanel.voice')"
+        :description="$t('surface.settingsGeneralPanel.chooseAnOnDeviceNeuralVoice')"
+        :error="voicePreviewError"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions">
+            <el-select
+              class="settings-general-panel__voice-select"
+              :model-value="settings.spokenAnnouncementVoice"
+              :aria-label="$t('surface.settingsGeneralPanel.voice')"
+              @update:model-value="updateSpokenAnnouncementVoice"
+            >
+              <el-option
+                v-for="option in voiceOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-button
+              size="small"
+              :loading="previewingVoice"
+              :aria-label="$t('surface.settingsGeneralPanel.previewVoice')"
+              @click="previewVoice"
+            >
+              {{ $t('surface.settingsGeneralPanel.preview') }}
+            </el-button>
+          </span>
         </template>
       </SettingsRow>
     </SettingsSection>
@@ -232,7 +275,7 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SpokenAnnouncementScope, SystemPermissionsStatus, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
+import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
 import { defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
@@ -274,6 +317,18 @@ const choosingSourceFolder = ref(false);
 const settingDaemon = ref(false);
 const daemonOperation = ref<'installing' | 'uninstalling' | null>(null);
 const sourceFolderError = ref<string | null>(null);
+const previewingVoice = ref(false);
+const voicePreviewError = ref<string | null>(null);
+const voiceOptions: Array<{ label: string; value: SpokenAnnouncementVoice }> = [
+  { label: translate('surface.settingsGeneralPanel.voiceHeart'), value: 'af_heart' },
+  { label: translate('surface.settingsGeneralPanel.voiceBella'), value: 'af_bella' },
+  { label: translate('surface.settingsGeneralPanel.voiceNicole'), value: 'af_nicole' },
+  { label: translate('surface.settingsGeneralPanel.voiceSarah'), value: 'af_sarah' },
+  { label: translate('surface.settingsGeneralPanel.voiceAdam'), value: 'am_adam' },
+  { label: translate('surface.settingsGeneralPanel.voiceMichael'), value: 'am_michael' },
+  { label: translate('surface.settingsGeneralPanel.voiceEmma'), value: 'bf_emma' },
+  { label: translate('surface.settingsGeneralPanel.voiceGeorge'), value: 'bm_george' },
+];
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
@@ -447,6 +502,30 @@ function updateSpokenAnnouncementScope(value: SpokenAnnouncementScope): void {
   });
 }
 
+function updateSpokenAnnouncementVoice(value: SpokenAnnouncementVoice): void {
+  voicePreviewError.value = null;
+  void props.updateSettings?.({
+    general: { spokenAnnouncementVoice: value },
+  });
+}
+
+async function previewVoice(): Promise<void> {
+  voicePreviewError.value = null;
+  previewingVoice.value = true;
+  try {
+    const result = await codexClawApi?.previewSpokenAnnouncementVoice?.(
+      props.settings.spokenAnnouncementVoice,
+    );
+    if (!result?.queued) {
+      voicePreviewError.value = translate('surface.settingsGeneralPanel.voicePreviewUnavailable');
+    }
+  } catch {
+    voicePreviewError.value = translate('surface.settingsGeneralPanel.voicePreviewUnavailable');
+  } finally {
+    previewingVoice.value = false;
+  }
+}
+
 function updateWorktreeInitializationMode(value: WorktreeInitializationMode): void {
   void props.updateSettings?.({
     general: { worktreeInitializationMode: value },
@@ -496,6 +575,10 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
 
 .settings-general-panel__speech-scope-select {
   width: 170px;
+}
+
+.settings-general-panel__voice-select {
+  width: 190px;
 }
 
 .settings-general-panel__actions {

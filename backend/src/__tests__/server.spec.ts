@@ -6975,6 +6975,7 @@ function createTestSnapshot(): AppSnapshot {
       celebrationsEnabled: true,
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementScope: 'selected',
+      spokenAnnouncementVoice: 'af_heart',
       codexBinaryPath: '',
       claudeCodeEnabled: false,
       agentListCompact: false,

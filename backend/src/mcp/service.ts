@@ -20,6 +20,7 @@ import type {
   AutomationAction,
   AutomationExecutionLogEntry,
   MainToRendererEvent,
+  SpokenAnnouncementRequest,
   SpokenAnnouncementQueueResult,
   SendPromptOptions,
   SourceRepository,
@@ -51,7 +52,7 @@ export type ClawMcpServiceOptions = {
   computerUse?: ComputerUseClient;
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
-  queueSpokenAnnouncement?: (input: { agentId: string; phase: AnnouncementPhase; text: string }) => Promise<SpokenAnnouncementQueueResult>;
+  queueSpokenAnnouncement?: (input: SpokenAnnouncementRequest) => Promise<SpokenAnnouncementQueueResult>;
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
 };
@@ -327,7 +328,12 @@ export class ClawMcpService {
       return { success: true, queued: false, phase, message: 'Spoken announcements are unavailable on this client.' };
     }
     try {
-      const result = await this.queueSpokenAnnouncement({ agentId: agent.id, phase, text });
+      const result = await this.queueSpokenAnnouncement({
+        agentId: agent.id,
+        phase,
+        text,
+        voice: this.snapshot.general.spokenAnnouncementVoice,
+      });
       return {
         success: true,
         queued: result.queued,
