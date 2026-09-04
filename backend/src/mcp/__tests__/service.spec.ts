@@ -562,6 +562,7 @@ describe('ClawMcpService', () => {
     expect(disabled.result.structuredContent).toStrictEqual({
       success: true,
       phase: 'start',
+      outcome: 'skipped',
     });
     expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
 
@@ -572,6 +573,7 @@ describe('ClawMcpService', () => {
     expect(selected.result.structuredContent).toStrictEqual({
       success: true,
       phase: 'start',
+      outcome: 'queued',
     });
     expect(queueSpokenAnnouncement).toHaveBeenCalledWith({
       agentId: 'agent-dina',
@@ -581,12 +583,12 @@ describe('ClawMcpService', () => {
     });
 
     const background = await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
+    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'skipped' });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
 
     snapshot.general.spokenAnnouncementsMuted = true;
     const muted = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
+    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'skipped' });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
 
     snapshot.general.spokenAnnouncementsMuted = false;
@@ -610,12 +612,16 @@ describe('ClawMcpService', () => {
     const url = await service.start();
 
     service.recordPromptInputMethod('agent-dina', 'typed');
-    await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+    const typed = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+    expect(typed.result.structuredContent).toStrictEqual({ success: true, phase: 'start', outcome: 'skipped' });
     expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
 
     service.recordPromptInputMethod('agent-dina', 'dictated');
-    await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
-    await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
+    const dictatedStart = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+    const dictatedFinish = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
+
+    expect(dictatedStart.result.structuredContent).toStrictEqual({ success: true, phase: 'start', outcome: 'queued' });
+    expect(dictatedFinish.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'queued' });
 
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
   });
@@ -631,14 +637,14 @@ describe('ClawMcpService', () => {
 
     const failed = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
     expect(failed.result.isError).toBe(false);
-    expect(failed.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
+    expect(failed.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'skipped' });
 
     const invalid = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'x'.repeat(161) });
     expect(invalid.result.isError).toBe(true);
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps client-side playback suppression out of model-facing results', async () => {
+  it('reports client-side playback suppression as skipped without exposing its reason', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.spokenAnnouncementsEnabled = true;
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
@@ -652,7 +658,7 @@ describe('ClawMcpService', () => {
 
     const response = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
 
-    expect(response.result.structuredContent).toStrictEqual({ success: true, phase: 'start' });
+    expect(response.result.structuredContent).toStrictEqual({ success: true, phase: 'start', outcome: 'skipped' });
   });
 
   it('keeps celebrations enabled when a migrated live snapshot omits the setting', async () => {

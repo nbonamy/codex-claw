@@ -1583,7 +1583,7 @@ const toolInputPresentationKeys = new Set([
 
 const toolOutputPresentationKeys = new Set([
   'agentName', 'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'phase', 'prompt',
-  'queued', 'recipientName', 'result', 'structuredContent', 'success', 'url',
+  'outcome', 'queued', 'recipientName', 'result', 'structuredContent', 'success', 'url',
 ]);
 
 function toolInputProjection(value: unknown): unknown {

@@ -697,7 +697,9 @@ export const messages = {
             announce: {
               completed: 'Acknowledged {target}',
               failed: 'Failed {target} acknowledgment',
-              running: 'Acknowledging {target}',
+              queued: 'Voice acknowledgment queued',
+              running: 'Checking voice acknowledgment',
+              skipped: 'Voice acknowledgment skipped',
             },
             checkMessages: {
               completed: 'Checked messages',

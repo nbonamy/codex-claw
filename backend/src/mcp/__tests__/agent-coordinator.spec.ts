@@ -343,12 +343,14 @@ describe('ClawMcpAgentCoordinator', () => {
     const onAnnounce = vi.fn().mockResolvedValue({
       success: true,
       phase: 'start',
+      outcome: 'queued',
     });
     const { agents, coordinator, onAgentUpdated } = fixture({ onAnnounce });
 
     await expect(coordinator.announce('agent-dina', 'start', '  I’ll take it.  ')).resolves.toStrictEqual({
       success: true,
       phase: 'start',
+      outcome: 'queued',
     });
     expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'start', 'I’ll take it.');
     expect(onAgentUpdated).not.toHaveBeenCalled();

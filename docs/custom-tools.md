@@ -213,8 +213,9 @@ app event, not from the result text.
 - Electron returns as soon as its bounded global queue accepts the request,
   coalesces pending phrases, rate-limits repeated phases, and owns native helper
   cancellation;
-- the MCP result confirms only that the acknowledgment request was handled;
-  playback delivery and suppression reasons stay out of model context;
+- the MCP result exposes only the bounded presentation outcome (`queued` or
+  `skipped`), allowing the tool row to stay truthful while the phrase and
+  detailed suppression reason remain private;
 - Vue renders the Voice settings section, rail mute control, and a phase-aware
   tool row. The section owns enablement, selected-agent and foreground scope, a
   curated Kokoro voice picker, and a local preview action. The spoken text and

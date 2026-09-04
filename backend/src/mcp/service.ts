@@ -322,26 +322,28 @@ export class ClawMcpService {
   }
 
   private async announceForAgent(agent: Agent, phase: AnnouncementPhase, text: string): Promise<AnnouncementResponse> {
-    const response = { success: true, phase } as const;
     const canRequestPlayback = this.snapshot.general.spokenAnnouncementsEnabled
       && !this.snapshot.general.spokenAnnouncementsMuted
       && (!this.snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts
         || this.promptInputMethodsByAgentId.get(agent.id) === 'dictated')
       && (this.snapshot.general.spokenAnnouncementScope === 'all' || this.snapshot.activeAgentId === agent.id);
-    if (canRequestPlayback && this.queueSpokenAnnouncement) {
-      try {
-        await this.queueSpokenAnnouncement({
-          agentId: agent.id,
-          phase,
-          text,
-          voice: this.snapshot.general.spokenAnnouncementVoice,
-        });
-      } catch {
-        // Playback is intentionally best-effort and its delivery state must not
-        // become durable conversation context for the model.
-      }
+    if (!canRequestPlayback || !this.queueSpokenAnnouncement) {
+      return { success: true, phase, outcome: 'skipped' };
     }
-    return response;
+    try {
+      const result = await this.queueSpokenAnnouncement({
+        agentId: agent.id,
+        phase,
+        text,
+        voice: this.snapshot.general.spokenAnnouncementVoice,
+      });
+      return { success: true, phase, outcome: result.queued ? 'queued' : 'skipped' };
+    } catch {
+      // Playback is intentionally best-effort. Only its safe presentation
+      // outcome reaches conversation state; the phrase and suppression reason
+      // remain private.
+      return { success: true, phase, outcome: 'skipped' };
+    }
   }
 
   private updateWorkItemForAgent(agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): UpdateWorkItemResponse {

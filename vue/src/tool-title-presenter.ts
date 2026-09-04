@@ -61,6 +61,10 @@ export function presentClawToolTitle({
   if (identity.tool === 'set-status' && phase === 'completed' && args.status === '') {
     return translate('chat.tool.mcp.codexClaw.setStatus.cleared');
   }
+  if (identity.tool === 'announce' && phase === 'completed') {
+    const outcome = announcementOutcome(toolCall.result);
+    if (outcome) return translate(`chat.tool.mcp.codexClaw.announce.${outcome}`);
+  }
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
     target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
   });
@@ -139,6 +143,11 @@ function toolTarget(
 
 function announcementPhase(value: unknown): string | undefined {
   return value === 'start' ? 'start' : value === 'finish' ? 'finish' : undefined;
+}
+
+function announcementOutcome(result: unknown): 'queued' | 'skipped' | undefined {
+  const outcome = resultString(result, 'outcome');
+  return outcome === 'queued' || outcome === 'skipped' ? outcome : undefined;
 }
 
 function computerUseTarget(tool: string, args: Record<string, unknown>, result: unknown): string {
