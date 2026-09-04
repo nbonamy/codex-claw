@@ -1,0 +1,946 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { nextTick, reactive } from 'vue';
+import { useAppState } from '../app-state';
+import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
+import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
+import { stubElectronTestWindow } from '../test/client';
+import { configureClawClient } from '../platform-api';
+import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+describe('useAppState', () => {
+  afterEach(() => {
+    clearConfetti();
+    clearFirstRunOnboardingStage();
+    vi.useRealTimers();
+  });
+
+  it('does not send prompts without preload or an active agent', async () => {
+    stubElectronTestWindow({});
+    const state = useAppState();
+    state.snapshot.value.activeAgentId = null;
+
+    await state.sendPrompt('ignored');
+
+    expect(state.visibleMessages.value).toStrictEqual([]);
+    expect(state.isSending.value).toBe(false);
+  });
+
+  it('does not mark client requests answered when preload is unavailable', async () => {
+    stubElectronTestWindow({});
+    const state = useAppState();
+
+    await state.respondToClientRequest({
+      id: 'request-local',
+      payload: {
+        decision: 'deny',
+      },
+    });
+
+    expect(state.answeredClientRequestIds.value.has('request-local')).toBe(false);
+  });
+
+  it('stores detailed approvals by agent and maps every resolution through the existing client-response bridge', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const respondToClientRequest = vi.fn().mockImplementation(async () => {
+      return { ...remoteSnapshot, backendApprovals: {} };
+    });
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        respondToClientRequest,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const approval: BackendApprovalRequest = {
+      id: 'approval-native-1',
+      kind: 'permissions',
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'item-1',
+      title: 'Allow workspace and network access',
+      description: 'The tool needs both permissions.',
+      cwd: '/tmp/project',
+      requestedPermissions: [
+        { kind: 'filesystem', access: 'write', path: '/tmp/project' },
+        { kind: 'network', enabled: true, host: 'example.com', protocol: 'https' },
+      ],
+      allowedScopes: ['once', 'session'],
+      canDeny: true,
+    };
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'backendApproval.requested',
+      payload: { approval },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-jesse',
+      backend: 'codex',
+      threadId: 'thread-other',
+      type: 'backendApproval.requested',
+      payload: { approval: { ...approval, id: 'approval-other', conversationId: 'thread-other' } },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(state.activeBackendApprovals.value).toStrictEqual([approval]);
+    await state.resolveBackendApproval('approval-native-1', 'approve', 'session');
+
+    expect(respondToClientRequest).toHaveBeenCalledWith({
+      id: 'approval-native-1',
+      payload: { decision: 'allow_conversation' },
+    });
+    expect(state.activeBackendApprovals.value).toStrictEqual([]);
+    expect(state.answeredClientRequestIds.value.has('approval-native-1')).toBe(true);
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'backendApproval.requested',
+      payload: { approval: { ...approval, id: 'approval-once' } },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    await state.resolveBackendApproval('approval-once', 'approve', 'once');
+
+    expect(respondToClientRequest).toHaveBeenNthCalledWith(2, {
+      id: 'approval-once',
+      payload: { decision: 'allow' },
+    });
+
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'backendApproval.requested',
+      payload: { approval: { ...approval, id: 'approval-deny' } },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+    await state.resolveBackendApproval('approval-deny', 'deny', 'once');
+
+    expect(respondToClientRequest).toHaveBeenNthCalledWith(3, {
+      id: 'approval-deny',
+      payload: { decision: 'deny' },
+    });
+    expect(state.activeBackendApprovals.value).toStrictEqual([]);
+    expect(state.answeredClientRequestIds.value.has('approval-once')).toBe(true);
+    expect(state.answeredClientRequestIds.value.has('approval-deny')).toBe(true);
+  });
+
+  it('removes externally resolved detailed approvals and marks generic requests answered', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const approval: BackendApprovalRequest = {
+      id: 'approval-server',
+      kind: 'command',
+      conversationId: 'thread-1',
+      itemId: 'command-1',
+      title: 'Run tests',
+      command: 'npm test',
+    };
+    const state = useAppState();
+    await state.loadSnapshot();
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'backendApproval.requested',
+      payload: { approval },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'backendApproval.resolved',
+      payload: { approval, decision: null, scope: null, reason: 'server' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'clientRequest.resolved',
+      payload: { id: 'question-1' },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    expect(state.activeBackendApprovals.value).toStrictEqual([]);
+    expect(state.answeredClientRequestIds.value.has('approval-server')).toBe(true);
+    expect(state.answeredClientRequestIds.value.has('question-1')).toBe(true);
+  });
+
+  it('sets the active approval preset through the preload bridge', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].backendDefaults = {
+      kind: 'codex',
+      approvalPreset: 'approve-for-me',
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'auto_review',
+      sandboxMode: 'workspace-write',
+    };
+    const setAgentApprovalPreset = vi.fn().mockResolvedValue(updatedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        setAgentApprovalPreset,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = remoteSnapshot;
+
+    expect(state.activeApprovalPreset.value).toBe('full-access');
+    await state.setApprovalPreset('approve-for-me');
+
+    expect(setAgentApprovalPreset).toHaveBeenCalledWith('agent-dina', 'approve-for-me');
+    expect(state.snapshot.value).toStrictEqual(updatedSnapshot);
+    expect(state.activeApprovalPreset.value).toBe('approve-for-me');
+  });
+
+  it('uses the first allowed approval preset when stored defaults are forbidden', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.backendRuntimes = [{
+      backend: 'codex',
+      status: 'running',
+      capabilities: {
+        approvalPresets: ['ask-for-approval'],
+      },
+    }];
+    remoteSnapshot.agents[0].backendDefaults = {
+      kind: 'codex',
+      approvalPreset: 'full-access',
+      approvalPolicy: 'never',
+      sandboxMode: 'danger-full-access',
+    };
+    const setAgentApprovalPreset = vi.fn();
+    stubElectronTestWindow({
+      codexClaw: {
+        setAgentApprovalPreset,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = remoteSnapshot;
+
+    expect(state.activeApprovalPreset.value).toBe('ask-for-approval');
+    await state.setApprovalPreset('full-access');
+    expect(setAgentApprovalPreset).not.toHaveBeenCalled();
+  });
+
+  it('sets Claude permission modes through their separate backend contract', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0] = {
+      ...remoteSnapshot.agents[0],
+      backend: 'claude',
+      backendSession: undefined,
+      backendDefaults: { kind: 'claude', model: 'sonnet', permissionMode: 'acceptEdits' },
+    };
+    const updatedSnapshot = structuredClone(remoteSnapshot);
+    updatedSnapshot.agents[0].backendDefaults = {
+      kind: 'claude',
+      model: 'sonnet',
+      permissionMode: 'bypassPermissions',
+    };
+    const setAgentPermissionMode = vi.fn().mockResolvedValue(updatedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        setAgentPermissionMode,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    state.snapshot.value = remoteSnapshot;
+
+    expect(state.activePermissionMode.value).toBe('acceptEdits');
+    expect(state.activeBackendCapabilities.value.approvalPresets).toStrictEqual([]);
+    expect(state.activeBackendCapabilities.value.permissionModes?.map((option) => option.id)).toStrictEqual([
+      'default',
+      'acceptEdits',
+      'dontAsk',
+      'auto',
+      'bypassPermissions',
+    ]);
+    await state.setPermissionMode('bypassPermissions');
+
+    expect(setAgentPermissionMode).toHaveBeenCalledWith('agent-dina', 'bypassPermissions');
+    expect(state.activePermissionMode.value).toBe('bypassPermissions');
+    await state.setPermissionMode('not-a-claude-mode');
+    expect(setAgentPermissionMode).toHaveBeenCalledOnce();
+  });
+
+  it('sends prompts through preload and adopts the submitted-message event', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.messages.push({
+      id: 'message-user',
+      agentId: 'agent-dina',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'hello' }],
+    });
+
+    const sendPrompt = vi.fn().mockImplementation(async () => {
+      listeners[0]?.({
+        seq: 1,
+        agentId: 'agent-dina',
+        type: 'message.userSubmitted',
+        payload: { message: updatedSnapshot.messages[0] },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      return snapshotMetadata(updatedSnapshot);
+    });
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    const send = state.sendPrompt('hello');
+
+    expect(state.isSending.value).toBe(true);
+    await send;
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'hello');
+    expect(state.isSending.value).toBe(false);
+    expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
+  });
+
+  it('can send prompts to a specific agent from overview surfaces', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.messages.push({
+      id: 'message-jesse',
+      agentId: 'agent-jesse',
+      role: 'user',
+      status: 'complete',
+      createdAt: '2026-06-05T00:00:01.000Z',
+      parts: [{ type: 'text', text: 'ship this' }],
+    });
+
+    const sendPrompt = vi.fn().mockImplementation(async () => {
+      listeners[0]?.({
+        seq: 1,
+        agentId: 'agent-jesse',
+        type: 'message.userSubmitted',
+        payload: { message: updatedSnapshot.messages[0] },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      return snapshotMetadata(updatedSnapshot);
+    });
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendAgentPrompt('agent-jesse', '  ship this  ');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-jesse', 'ship this');
+    expect(state.snapshot.value).toStrictEqual(updatedSnapshot);
+  });
+
+  it('deletes, edits, and retries active messages through preload message actions', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.messages = [
+      {
+        id: 'user-turn-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'original prompt' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [{ type: 'text', text: 'original answer' }],
+      },
+    ];
+    const afterDelete = { ...remoteSnapshot, messages: [] };
+    const afterEdit = {
+      ...remoteSnapshot,
+      messages: [remoteSnapshot.messages[0]],
+    };
+    const afterRetry = {
+      ...remoteSnapshot,
+      messages: [remoteSnapshot.messages[1]],
+    };
+    const deleteMessage = vi.fn().mockResolvedValue(afterDelete);
+    const editMessage = vi.fn().mockResolvedValue(afterEdit);
+    const retryMessage = vi.fn().mockResolvedValue(afterRetry);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        deleteMessage,
+        editMessage,
+        retryMessage,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.deleteMessage(0);
+    expect(deleteMessage).toHaveBeenCalledWith('agent-dina', 'user-turn-1');
+
+    state.snapshot.value = remoteSnapshot;
+    await state.editMessage({ content: '  edited prompt  ', index: 0 });
+    expect(editMessage).toHaveBeenCalledWith('agent-dina', 'user-turn-1', 'edited prompt');
+
+    state.snapshot.value = remoteSnapshot;
+    await state.retryMessage(1);
+    expect(retryMessage).toHaveBeenCalledWith('agent-dina', 'assistant-turn-1');
+  });
+
+  it('blocks message actions when the active backend does not support them', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].backend = 'claude';
+    remoteSnapshot.agents[0].backendDefaults = { kind: 'claude' };
+    remoteSnapshot.messages = [
+      {
+        id: 'user-turn-1',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{ type: 'text', text: 'original prompt' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-06-05T00:00:02.000Z',
+        parts: [{ type: 'text', text: 'original answer' }],
+      },
+    ];
+    const deleteMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+    const editMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+    const retryMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        deleteMessage,
+        editMessage,
+        retryMessage,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.deleteMessage(0);
+    await state.editMessage({ content: 'edited prompt', index: 0 });
+    await state.retryMessage(1);
+
+    expect(deleteMessage).not.toHaveBeenCalled();
+    expect(editMessage).not.toHaveBeenCalled();
+    expect(retryMessage).not.toHaveBeenCalled();
+  });
+
+  it('renders backend-owned queues and never drains them from the renderer', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const queuedSnapshot = createInitialSnapshot();
+    queuedSnapshot.agents[0].status = { type: 'working' };
+    queuedSnapshot.queuedPrompts = [{
+      id: 'prompt-1', agentId: 'agent-dina', text: 'run this after the turn', createdAt: '2026-06-05T00:00:01.000Z',
+    }];
+    const sendPrompt = vi.fn().mockResolvedValue(queuedSnapshot);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.sendPrompt('run this after the turn');
+
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'run this after the turn');
+    expect(state.activeQueuedPrompts.value).toStrictEqual([
+      expect.objectContaining({
+        text: 'run this after the turn',
+      }),
+    ]);
+
+    const drainedSnapshot = createInitialSnapshot();
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'turn.completed',
+      payload: { status: 'completed' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+      snapshot: drainedSnapshot,
+    });
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+    expect(sendPrompt).toHaveBeenCalledTimes(1);
+  });
+
+  it('responds to client requests through preload and tracks answered request ids', async () => {
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].status = { type: 'working' };
+    const respondToClientRequest = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
+        onEvent: vi.fn(),
+        respondToClientRequest,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.respondToClientRequest({
+      id: 'approval-1',
+      payload: {
+        decision: 'allow',
+      },
+    });
+
+    expect(respondToClientRequest).toHaveBeenCalledWith({
+      id: 'approval-1',
+      payload: {
+        decision: 'allow',
+      },
+    });
+    expect(state.answeredClientRequestIds.value.has('approval-1')).toBe(true);
+    expect(state.snapshot.value.agents[0].status).toStrictEqual({ type: 'working' });
+  });
+
+  it('lists and resumes active agent conversations through preload', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const resumedSnapshot = {
+      ...remoteSnapshot,
+      agents: remoteSnapshot.agents.map((agent) => (
+        agent.id === 'agent-dina'
+          ? { ...agent, backendSession: { kind: 'codex' as const, threadId: 'thread-dina' } }
+          : agent
+      )),
+      messages: [{
+        id: 'user-thread-dina',
+        agentId: 'agent-dina',
+        role: 'user' as const,
+        status: 'complete' as const,
+        createdAt: '2026-06-09T10:00:00.000Z',
+        parts: [{ type: 'text' as const, text: 'hello again' }],
+      }],
+    };
+    const conversations: ConversationSummary[] = [{
+      id: 'thread-dina',
+      title: 'hello again',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+      messageCount: 1,
+      ref: { backend: 'codex', threadId: 'thread-dina' },
+    }];
+    const listAgentConversations = vi.fn().mockResolvedValue(conversations);
+    const resumeAgentConversation = vi.fn().mockResolvedValue(resumedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn(),
+        listAgentConversations,
+        resumeAgentConversation,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await expect(state.listAgentConversations('agent-dina')).resolves.toStrictEqual(conversations);
+
+    const reactiveConversationRef = reactive({
+      backend: 'codex' as const,
+      threadId: 'thread-dina',
+    });
+    await state.resumeAgentConversation('agent-dina', reactiveConversationRef as BackendConversationRef);
+
+    expect(listAgentConversations).toHaveBeenCalledWith('agent-dina');
+    expect(resumeAgentConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-dina' });
+    expect(resumeAgentConversation.mock.calls.at(-1)?.[1]).not.toBe(reactiveConversationRef);
+    expect(state.snapshot.value).toStrictEqual(resumedSnapshot);
+  });
+
+  it('switches the Claude composer selection when a different conversation is resumed', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0] = {
+      ...remoteSnapshot.agents[0],
+      backend: 'claude',
+      backendSession: {
+        kind: 'claude',
+        sessionId: 'claude-session-haiku',
+        transport: 'stdio',
+        model: 'claude-haiku-4-5-20251001',
+      },
+      backendDefaults: { kind: 'claude', model: 'haiku' },
+    };
+    const resumedSnapshot = structuredClone(remoteSnapshot);
+    resumedSnapshot.agents[0].backendSession = {
+      kind: 'claude',
+      sessionId: 'claude-session-sonnet',
+      transport: 'stdio',
+      model: 'claude-sonnet-5',
+      reasoningEffort: 'xhigh',
+    };
+    const resumeAgentConversation = vi.fn().mockResolvedValue(resumedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        listBackendModels: vi.fn().mockResolvedValue([
+          {
+            id: 'haiku',
+            model: 'haiku',
+            displayName: 'Haiku',
+            providerMetadata: { resolvedModel: 'claude-haiku-4-5-20251001' },
+            isDefault: true,
+          },
+          {
+            id: 'sonnet',
+            model: 'sonnet',
+            displayName: 'Sonnet',
+            providerMetadata: { resolvedModel: 'claude-sonnet-5' },
+            supportedReasoningEfforts: [
+              { reasoningEffort: 'high', description: 'Deep reasoning' },
+              { reasoningEffort: 'xhigh', description: 'Deeper reasoning' },
+            ],
+          },
+        ]),
+        resumeAgentConversation,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    expect(state.selectedModelId.value).toBe('haiku');
+
+    await state.resumeAgentConversation('agent-dina', {
+      backend: 'claude',
+      folder: remoteSnapshot.agents[0].folder!,
+      sessionId: 'claude-session-sonnet',
+    });
+
+    expect(state.selectedModelId.value).toBe('sonnet');
+    expect(state.selectedReasoningEffort.value).toBe('xhigh');
+  });
+
+  it('sets a Codex goal from slash goal without sending a prompt', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].goal = {
+      threadId: 'thread-1',
+      objective: 'ship the feature',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+    const setAgentGoal = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        setAgentGoal,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.sendPrompt('/goal ship the feature');
+
+    expect(setAgentGoal).toHaveBeenCalledWith('agent-dina', 'ship the feature');
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeGoal.value?.objective).toBe('ship the feature');
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('clears a Codex goal from slash goal clear even while busy', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    remoteSnapshot.agents[0].goal = {
+      threadId: 'thread-1',
+      objective: 'ship the feature',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const updatedSnapshot = createInitialSnapshot();
+    updatedSnapshot.agents[0].status = { type: 'working' };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+    const clearAgentGoal = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        clearAgentGoal,
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    await state.sendPrompt('/goal clear');
+
+    expect(clearAgentGoal).toHaveBeenCalledWith('agent-dina');
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeGoal.value).toBeNull();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('enables plan mode from bare slash plan without sending a prompt', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.backendModels.value = [];
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(false);
+
+    await state.sendPrompt('/plan');
+
+    expect(state.planMode.value).toBe(true);
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('strips slash plan arguments and submits the prompt in plan mode', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const updatedSnapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.backendModels.value = [];
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(false);
+
+    await state.sendPrompt('/plan build the plan');
+
+    expect(state.planMode.value).toBe(true);
+    expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'build the plan', {
+      planMode: true,
+    });
+  });
+
+  it('does not queue or send bare slash plan while an agent is busy', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].status = { type: 'working' };
+    const sendPrompt = vi.fn().mockResolvedValue(createInitialSnapshot());
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        sendPrompt,
+        onEvent: vi.fn(),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.backendModels.value = [];
+    state.selectedModelId.value = null;
+    state.selectedReasoningEffort.value = null;
+    state.setPlanMode(false);
+
+    await state.sendPrompt('/plan');
+
+    expect(state.planMode.value).toBe(true);
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.activeQueuedPrompts.value).toStrictEqual([]);
+  });
+
+  it('syncs composer settings, mode, and active goal from app-owned main events', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.settingsUpdated',
+      payload: { threadSettings: { model: 'gpt-5.4', reasoningEffort: 'high', serviceTier: 'fast' } },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.modeUpdated',
+      payload: { mode: 'plan' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    const goalSnapshot = createInitialSnapshot();
+    goalSnapshot.agents[0].goal = {
+      threadId: 'thread-1',
+      objective: 'ship it',
+      status: 'active',
+      tokenBudget: null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.goalUpdated',
+      payload: {
+        goal: {
+          threadId: 'thread-1',
+          objective: 'ship it',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+      snapshot: goalSnapshot,
+    });
+
+    expect(state.selectedModelId.value).toBe('gpt-5.4');
+    expect(state.selectedReasoningEffort.value).toBe('high');
+    expect(state.selectedServiceTier.value).toBe('fast');
+    expect(state.planMode.value).toBe(true);
+    expect(state.activeGoal.value?.objective).toBe('ship it');
+
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.modeUpdated',
+      payload: { mode: 'default' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    });
+    listeners[0]?.({
+      seq: 5,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.goalCleared',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:05.000Z',
+      snapshot: createInitialSnapshot(),
+    });
+
+    expect(state.planMode.value).toBe(false);
+    expect(state.activeGoal.value).toBeNull();
+
+    listeners[0]?.({
+      seq: 6,
+      agentId: 'agent-dina',
+      threadId: 'thread-1',
+      type: 'thread.settingsUpdated',
+      payload: { threadSettings: { serviceTier: null } },
+      occurredAt: '2026-06-05T00:00:06.000Z',
+    });
+    expect(state.selectedServiceTier.value).toBeNull();
+  });
+});
