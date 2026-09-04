@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { BackendConnectionState, BrowserAnnotation, ClientState, SubagentStatusChange } from '../contracts';
+import type { AgentBackend, BackendConnectionState, BrowserAnnotation, ClientState, RendererMessage, SubagentStatusChange } from '../contracts';
 import { createInitialSnapshot } from '../snapshot';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '../backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
@@ -66,6 +66,28 @@ describe('backend protocol guards', () => {
         backend: 'codex' | 'claude';
         threadId: string;
         turnId?: string;
+      }>();
+    type MessageDeltaEvent = Extract<ClawBackendEvent, { type: 'message.delta' }>;
+    expectTypeOf<MessageDeltaEvent['payload']>().toEqualTypeOf<{
+      delta: string;
+      messageId?: string;
+      itemId?: string;
+      phase?: 'commentary' | 'final_answer';
+    }>();
+    expectTypeOf<Pick<MessageDeltaEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{
+        agentId: string;
+        backend: AgentBackend;
+        threadId?: string;
+        turnId: string;
+      }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'thread.historyLoaded' }>['payload']>()
+      .toEqualTypeOf<{
+        messages: RendererMessage[];
+        replace?: boolean;
+        preserveKnownTurns?: boolean;
+        preserveKnownMessages?: boolean;
+        hasOlderMessages?: boolean;
       }>();
     expectTypeOf<AnnotationEvent['seq']>().toEqualTypeOf<number>();
     expectTypeOf<AnnotationEvent['occurredAt']>().toEqualTypeOf<string>();

@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { Agent, BackendConnectionState, BrowserAnnotation, SendPromptOptions, SubagentOperationChange } from '../contracts';
+import type { Agent, BackendConnectionState, BrowserAnnotation, RendererMessage, SendPromptOptions, SubagentOperationChange } from '../contracts';
 import { createEmptySnapshot } from '../snapshot';
 import {
   backendDisplayName,
@@ -65,6 +65,28 @@ describe('backend driver helpers', () => {
         threadId: string;
         turnId?: string;
         source?: 'backend' | 'client';
+      }>();
+    type MessageDeltaEvent = Extract<BackendEvent, { type: 'message.delta' }>;
+    expectTypeOf<MessageDeltaEvent['payload']>().toEqualTypeOf<{
+      delta: string;
+      messageId?: string;
+      itemId?: string;
+      phase?: 'commentary' | 'final_answer';
+    }>();
+    expectTypeOf<Pick<MessageDeltaEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{
+        agentId: string;
+        backend: Agent['backend'];
+        threadId?: string;
+        turnId: string;
+      }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'thread.historyLoaded' }>['payload']>()
+      .toEqualTypeOf<{
+        messages: RendererMessage[];
+        replace?: boolean;
+        preserveKnownTurns?: boolean;
+        preserveKnownMessages?: boolean;
+        hasOlderMessages?: boolean;
       }>();
     expectTypeOf<ConnectionEvent['seq']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ConnectionEvent['occurredAt']>().toEqualTypeOf<string | undefined>();

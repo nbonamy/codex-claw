@@ -727,7 +727,7 @@ describe('snapshot runtime reducer', () => {
       type: 'message.delta',
       payload: { delta: 'missing agent' },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    })).toBe(true);
+    } as unknown as MainToRendererEvent)).toBe(true);
 
     expect(applyMainEventToSnapshot(snapshot, {
       seq: 3,
@@ -770,7 +770,7 @@ describe('snapshot runtime reducer', () => {
       type: 'message.delta',
       payload: { delta: 'conversation-owned' },
       occurredAt: '2026-06-05T00:00:07.000Z',
-    })).toBe(false);
+    } as unknown as MainToRendererEvent)).toBe(false);
   });
 
   it('ignores malformed work-routing and backlog payloads at the runtime boundary', () => {

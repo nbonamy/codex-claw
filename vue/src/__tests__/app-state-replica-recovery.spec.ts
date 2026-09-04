@@ -217,6 +217,7 @@ describe('useAppState', () => {
             seq: 1,
             source: 'backend',
             agentId: 'agent-dina',
+            backend: 'codex',
             threadId: 'thread-dina',
             turnId: 'turn-1',
             type: 'message.delta',

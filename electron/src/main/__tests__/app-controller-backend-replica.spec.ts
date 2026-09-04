@@ -259,6 +259,7 @@ describe('AppController', () => {
     }).emitBackendEvent({
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-image',
       type: 'message.updated',

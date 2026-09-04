@@ -1472,6 +1472,35 @@ type ClaudeTurnCompletedPayload = {
   };
 };
 type CompactionPayload = { itemId: string | null } | Record<string, never>;
+type ThreadHistoryLoadedPayload = {
+  messages: RendererMessage[];
+  replace?: boolean;
+  preserveKnownTurns?: boolean;
+  preserveKnownMessages?: boolean;
+  hasOlderMessages?: boolean;
+};
+type MessageDeltaPayload = {
+  delta: string;
+  messageId?: string;
+  itemId?: string;
+  phase?: Extract<RendererMessagePart, { type: 'text' }>['phase'];
+};
+type MessageSteerPayload = {
+  prompt: string;
+  attachments?: readonly PromptAttachment[];
+};
+type AgentPromptQueuedPayload = {
+  id: string;
+  text: string;
+  options?: SendPromptOptions;
+  submitted?: boolean;
+};
+type AgentPromptRetryScheduledPayload = {
+  id: string;
+  attempts: number;
+  lastError: string;
+  retryAt?: string;
+};
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
@@ -1497,6 +1526,7 @@ type TypedMainToRendererEventType =
   | 'thread.goalUpdated'
   | 'thread.goalCleared'
   | 'thread.tokenUsageUpdated'
+  | 'thread.historyLoaded'
   | 'subagent.operationChanged'
   | 'subagent.activityChanged'
   | 'subagent.identityChanged'
@@ -1507,7 +1537,14 @@ type TypedMainToRendererEventType =
   | 'turn.proposedPlanCompleted'
   | 'turn.completed'
   | 'context.compactionStarted'
-  | 'context.compactionCompleted';
+  | 'context.compactionCompleted'
+  | 'message.delta'
+  | 'message.updated'
+  | 'message.userSubmitted'
+  | 'message.steer'
+  | 'agent.promptQueued'
+  | 'agent.promptRetryScheduled'
+  | 'agent.promptDequeued';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1657,6 +1694,11 @@ export type MainToRendererEvent =
       payload: AgentContextUsage | { contextUsage: AgentContextUsage };
     }>
   | MainToRendererEventWith<{
+      type: 'thread.historyLoaded';
+      agentId: string;
+      payload: ThreadHistoryLoadedPayload;
+    }>
+  | MainToRendererEventWith<{
       type: 'subagent.operationChanged';
       agentId: string;
       backend: AgentBackend;
@@ -1711,6 +1753,39 @@ export type MainToRendererEvent =
   | MainToRendererEventWith<TurnEventContext & {
       type: 'context.compactionCompleted';
       payload: CompactionPayload;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'message.delta';
+      payload: MessageDeltaPayload;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'message.updated';
+      payload: { message: RendererMessage };
+    }>
+  | MainToRendererEventWith<{
+      type: 'message.userSubmitted';
+      agentId: string;
+      payload: { message: RendererMessage };
+    }>
+  | MainToRendererEventWith<{
+      type: 'message.steer';
+      agentId: string;
+      payload: MessageSteerPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.promptQueued';
+      agentId: string;
+      payload: AgentPromptQueuedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.promptRetryScheduled';
+      agentId: string;
+      payload: AgentPromptRetryScheduledPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.promptDequeued';
+      agentId: string;
+      payload: { ids: string[] };
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;

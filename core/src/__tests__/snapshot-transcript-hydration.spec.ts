@@ -5,7 +5,7 @@ import {
   selectAgent,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererMessage } from '../contracts';
+import type { MainToRendererEvent, RendererMessage } from '../contracts';
 import {
   commandToolPart,
   toolPartPayload,
@@ -31,6 +31,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'message.updated',
@@ -92,7 +93,7 @@ describe('snapshot reducer', () => {
         agentId: 'agent-dina',
         threadId: 'thread-1',
         type: 'thread.historyLoaded',
-        payload: { messages, preserveKnownMessages: true, replace: false },
+        payload: { messages: [...messages], preserveKnownMessages: true, replace: false },
         occurredAt: '2026-06-05T00:00:06.000Z',
       });
     }
@@ -128,7 +129,7 @@ describe('snapshot reducer', () => {
         }],
       },
       occurredAt: '2026-06-05T00:00:06.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['older-page', 'genuine-tail']);
   });
@@ -169,6 +170,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-page-two',
       type: 'message.updated',
@@ -595,7 +597,7 @@ describe('snapshot reducer', () => {
         ],
       },
       occurredAt: '2026-06-05T00:00:04.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.messages).toStrictEqual([
       {

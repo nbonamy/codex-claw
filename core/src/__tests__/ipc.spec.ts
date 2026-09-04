@@ -24,7 +24,10 @@ import type {
   LaunchChatGptAppResult,
   MainToRendererEvent,
   OpenInApplication,
+  PromptAttachment,
+  RendererMessage,
   RendererSendPromptOptions,
+  SendPromptOptions,
   SidePanelGitDiffRequest,
   SidePanelMarkdownRequest,
   SubagentActivityChange,
@@ -495,6 +498,62 @@ describe('ipc channels', () => {
       .toEqualTypeOf<TurnEventContext>();
     expectTypeOf<Pick<CompactionCompletedEvent, keyof TurnEventContext>>()
       .toEqualTypeOf<TurnEventContext>();
+    type ThreadHistoryLoadedEvent = Extract<MainToRendererEvent, { type: 'thread.historyLoaded' }>;
+    expectTypeOf<ThreadHistoryLoadedEvent['payload']>().toEqualTypeOf<{
+      messages: RendererMessage[];
+      replace?: boolean;
+      preserveKnownTurns?: boolean;
+      preserveKnownMessages?: boolean;
+      hasOlderMessages?: boolean;
+    }>();
+    expectTypeOf<Pick<ThreadHistoryLoadedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type MessageDeltaEvent = Extract<MainToRendererEvent, { type: 'message.delta' }>;
+    expectTypeOf<MessageDeltaEvent['payload']>().toEqualTypeOf<{
+      delta: string;
+      messageId?: string;
+      itemId?: string;
+      phase?: 'commentary' | 'final_answer';
+    }>();
+    expectTypeOf<Pick<MessageDeltaEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    type MessageUpdatedEvent = Extract<MainToRendererEvent, { type: 'message.updated' }>;
+    expectTypeOf<MessageUpdatedEvent['payload']>().toEqualTypeOf<{ message: RendererMessage }>();
+    expectTypeOf<Pick<MessageUpdatedEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type MessageUserSubmittedEvent = Extract<MainToRendererEvent, { type: 'message.userSubmitted' }>;
+    expectTypeOf<MessageUserSubmittedEvent['payload']>().toEqualTypeOf<{ message: RendererMessage }>();
+    expectTypeOf<Pick<MessageUserSubmittedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type MessageSteerEvent = Extract<MainToRendererEvent, { type: 'message.steer' }>;
+    expectTypeOf<MessageSteerEvent['payload']>().toEqualTypeOf<{
+      prompt: string;
+      attachments?: readonly PromptAttachment[];
+    }>();
+    expectTypeOf<Pick<MessageSteerEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentPromptQueuedEvent = Extract<MainToRendererEvent, { type: 'agent.promptQueued' }>;
+    expectTypeOf<AgentPromptQueuedEvent['payload']>().toEqualTypeOf<{
+      id: string;
+      text: string;
+      options?: SendPromptOptions;
+      submitted?: boolean;
+    }>();
+    expectTypeOf<Pick<AgentPromptQueuedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentPromptRetryScheduledEvent = Extract<MainToRendererEvent, { type: 'agent.promptRetryScheduled' }>;
+    expectTypeOf<AgentPromptRetryScheduledEvent['payload']>().toEqualTypeOf<{
+      id: string;
+      attempts: number;
+      lastError: string;
+      retryAt?: string;
+    }>();
+    expectTypeOf<Pick<AgentPromptRetryScheduledEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentPromptDequeuedEvent = Extract<MainToRendererEvent, { type: 'agent.promptDequeued' }>;
+    expectTypeOf<AgentPromptDequeuedEvent['payload']>().toEqualTypeOf<{ ids: string[] }>();
+    expectTypeOf<Pick<AgentPromptDequeuedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()

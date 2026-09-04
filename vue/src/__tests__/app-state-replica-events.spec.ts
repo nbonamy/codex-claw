@@ -37,6 +37,7 @@ describe('useAppState', () => {
     emitMainEvent({
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'message.delta',
@@ -73,6 +74,7 @@ describe('useAppState', () => {
     listeners[0]!({
       seq: 1,
       agentId: 'agent-jesse',
+      backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse',
       type: 'message.delta',

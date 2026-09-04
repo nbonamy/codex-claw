@@ -4,6 +4,7 @@ import {
   applyMainEventToSnapshot,
   createInitialSnapshot,
 } from '../snapshot';
+import type { MainToRendererEvent } from '../contracts';
 
 describe('snapshot reducer', () => {
 
@@ -17,7 +18,7 @@ describe('snapshot reducer', () => {
       type: 'message.delta',
       payload: { delta: 'ignored without agent' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    });
+    } as unknown as MainToRendererEvent);
     expect(snapshot.messages).toHaveLength(0);
 
     applyMainEventToSnapshot(snapshot, {
@@ -28,7 +29,7 @@ describe('snapshot reducer', () => {
       type: 'message.delta',
       payload: { delta: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    });
+    } as unknown as MainToRendererEvent);
     expect(snapshot.messages).toHaveLength(0);
 
     applyMainEventToSnapshot(snapshot, {

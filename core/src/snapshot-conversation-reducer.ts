@@ -122,8 +122,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
   }
 
   if (event.type === 'message.updated') {
-    const payload = isRecord(event.payload) ? event.payload : {};
-    const [message] = rendererMessages([payload.message], event.agentId);
+    const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
+    const [message] = rendererMessages([payload['message']], event.agentId);
     if (!message) return;
     const messageIndex = snapshot.messages.findIndex((candidate) => (
       candidate.agentId === event.agentId && candidate.id === message.id
@@ -135,8 +135,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
   }
 
   if (event.type === 'message.userSubmitted') {
-    const payload = isRecord(event.payload) ? event.payload : {};
-    const [message] = rendererMessages([payload.message], event.agentId);
+    const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
+    const [message] = rendererMessages([payload['message']], event.agentId);
     if (message && !snapshot.messages.some((candidate) => candidate.id === message.id)) {
       snapshot.messages.push(message);
       pruneSupersededEmptyAssistantPlaceholders(snapshot, event.agentId);
