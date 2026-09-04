@@ -566,6 +566,7 @@ describe('ClawMcpService', () => {
     expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
 
     snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
     snapshot.activeAgentId = 'agent-dina';
     const selected = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: '  On it.  ' });
     expect(selected.result.structuredContent).toStrictEqual({
@@ -599,9 +600,30 @@ describe('ClawMcpService', () => {
     });
   });
 
+  it('queues spoken announcements only for dictated prompts when configured', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = true;
+    snapshot.activeAgentId = 'agent-dina';
+    const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
+    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    const url = await service.start();
+
+    service.recordPromptInputMethod('agent-dina', 'typed');
+    await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+    expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
+
+    service.recordPromptInputMethod('agent-dina', 'dictated');
+    await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
+    await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
+
+    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps TTS failures best-effort and rejects invalid MCP text before routing', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
     snapshot.activeAgentId = 'agent-dina';
     const queueSpokenAnnouncement = vi.fn().mockRejectedValue(new Error('helper crashed'));
     service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
@@ -619,6 +641,7 @@ describe('ClawMcpService', () => {
   it('keeps client-side playback suppression out of model-facing results', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.spokenAnnouncementsEnabled = true;
+    snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
     snapshot.activeAgentId = 'agent-dina';
     const queueSpokenAnnouncement = vi.fn().mockResolvedValue({
       queued: false,

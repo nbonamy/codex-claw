@@ -9,6 +9,7 @@ export type AgentPromptManagerOptions = {
   applyEvent: (event: BackendEvent) => void;
   persistSnapshot: () => Promise<unknown>;
   setNewConversationTitle: (agentId: string, wasNewSession: boolean) => void;
+  onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
 };
 
 /** Owns prompt admission, queued delivery, and bounded retry scheduling. */
@@ -83,6 +84,7 @@ export class AgentPromptManager {
     const queuedPrompt = queuedPromptId
       ? (snapshot.queuedPrompts ?? []).find((candidate) => candidate.id === queuedPromptId)
       : undefined;
+    this.options.onPromptStarting?.(agent.id, promptOptions);
 
     return sendAgentPrompt(
       snapshot,

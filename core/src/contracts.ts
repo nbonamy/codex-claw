@@ -702,6 +702,7 @@ export type AppGeneralSettings = {
   celebrationsEnabled: boolean;
   spokenAnnouncementsEnabled: boolean;
   spokenAnnouncementsMuted: boolean;
+  spokenAnnouncementsOnlyForDictatedPrompts: boolean;
   spokenAnnouncementsOnlyWhenFocused: boolean;
   spokenAnnouncementScope: SpokenAnnouncementScope;
   spokenAnnouncementVoice: SpokenAnnouncementVoice;
@@ -991,6 +992,7 @@ export type SendPromptOptions = {
   reasoningEffort?: ReasoningEffort | null;
   serviceTier?: string | null;
   skills?: PromptSkillInput[];
+  inputMethod?: 'typed' | 'dictated';
   backendOptions?: BackendPromptOptions;
 };
 

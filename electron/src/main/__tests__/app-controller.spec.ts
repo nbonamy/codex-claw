@@ -38,10 +38,18 @@ describe('AppController', () => {
     expect(() => controller.setDockBadgeCount(1.5)).toThrow('non-negative integer');
   });
 
-  it('queues a bounded settings voice preview through the shared native speech queue', () => {
+  it('waits for a bounded settings voice preview to finish', async () => {
+    let finishPreview: () => void = () => {};
+    const completion = new Promise<void>((resolve) => {
+      finishPreview = resolve;
+    });
     const spokenAnnouncements = {
       dispose: vi.fn(),
       queue: vi.fn().mockReturnValue({ queued: true }),
+      queueWithCompletion: vi.fn().mockReturnValue({
+        completion,
+        result: { queued: true },
+      }),
     };
     const controller = new AppController(
       createInitialSnapshot(),
@@ -57,17 +65,23 @@ describe('AppController', () => {
       spokenAnnouncements,
     );
     const preview = (voice: string) => (controller as unknown as {
-      previewSpokenAnnouncementVoice(value: string): unknown;
+      previewSpokenAnnouncementVoice(value: string): Promise<unknown>;
     }).previewSpokenAnnouncementVoice(voice);
 
-    expect(preview('bf_emma')).toStrictEqual({ queued: true });
-    expect(spokenAnnouncements.queue).toHaveBeenCalledWith({
+    const result = preview('bf_emma');
+    let settled = false;
+    void result.finally(() => { settled = true; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(spokenAnnouncements.queueWithCompletion).toHaveBeenCalledWith({
       agentId: 'settings-preview:bf_emma',
       phase: 'start',
       text: 'Codex Claw is on it—sharp claws, clean code.',
       voice: 'bf_emma',
     });
-    expect(() => preview('robot')).toThrowError('Invalid spoken announcement voice.');
+    finishPreview();
+    await expect(result).resolves.toStrictEqual({ queued: true });
+    await expect(preview('robot')).rejects.toThrowError('Invalid spoken announcement voice.');
   });
 
   it('keeps agent and AC-only remote-access sleep prevention independent', () => {

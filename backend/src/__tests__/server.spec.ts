@@ -5940,6 +5940,7 @@ describe('ClawBackendServer', () => {
     }];
     let acceptPrompt!: (value: { backendSession: { kind: 'codex'; threadId: string }; turnId: string }) => void;
     const sendPrompt = vi.fn().mockReturnValue(new Promise((resolve) => { acceptPrompt = resolve; }));
+    const onPromptStarting = vi.fn();
     const events: Array<{ type: string; snapshot?: AppSnapshot; payload: unknown }> = [];
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -5955,6 +5956,7 @@ describe('ClawBackendServer', () => {
       version: 'test-version', pid: 123, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       onEvent: (event) => events.push(event),
+      onPromptStarting,
     });
 
     await server.handleMessage({
@@ -5962,15 +5964,22 @@ describe('ClawBackendServer', () => {
       params: {
         agentId: 'agent-dina',
         prompt: 'run next',
-        options: { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+        options: {
+          attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
+          inputMethod: 'dictated',
+        },
       },
     });
     expect(snapshot.queuedPrompts).toEqual([expect.objectContaining({
       agentId: 'agent-dina',
       text: 'run next',
-      options: { attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }] },
+      options: {
+        attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
+        inputMethod: 'dictated',
+      },
     })]);
     expect(sendPrompt).not.toHaveBeenCalled();
+    expect(onPromptStarting).not.toHaveBeenCalled();
 
     server.emitEvent({
       agentId: 'agent-dina', threadId: 'thread-dina', turnId: 'turn-old',
@@ -5978,6 +5987,11 @@ describe('ClawBackendServer', () => {
     });
     expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
       attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
+      inputMethod: 'dictated',
+    });
+    expect(onPromptStarting).toHaveBeenCalledWith('agent-dina', {
+      attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
+      inputMethod: 'dictated',
     });
     expect(snapshot.queuedPrompts).toHaveLength(1);
     const submittedEvent = events.find((event) => event.type === 'message.userSubmitted');
@@ -7210,6 +7224,7 @@ function createTestSnapshot(): AppSnapshot {
       celebrationsEnabled: true,
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementsMuted: false,
+      spokenAnnouncementsOnlyForDictatedPrompts: false,
       spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'selected',
       spokenAnnouncementVoice: 'af_heart',

@@ -69,6 +69,7 @@ export class ClawMcpService {
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
+  private readonly promptInputMethodsByAgentId = new Map<string, SendPromptOptions['inputMethod']>();
   private readonly workRoutingResolvers = new Map<string, (response: PrepareWorkResponse) => void>();
 
   constructor(options: ClawMcpServiceOptions) {
@@ -155,6 +156,10 @@ export class ClawMcpService {
     this.coordinator.sendMessage(fromAgentId, toAgentId, content);
   }
 
+  recordPromptInputMethod(agentId: string, inputMethod: SendPromptOptions['inputMethod']): void {
+    this.promptInputMethodsByAgentId.set(agentId, inputMethod ?? 'typed');
+  }
+
   private async deliverUnreadAgentMessages(agentId: string): Promise<void> {
     const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent || !this.driverRpc) {
@@ -193,6 +198,7 @@ export class ClawMcpService {
       return;
     }
 
+    this.recordPromptInputMethod(agent.id, 'typed');
     sendAgentPrompt(
       this.snapshot,
       this.backendDriverForAgent(agent),
@@ -321,6 +327,8 @@ export class ClawMcpService {
     const response = { success: true, phase } as const;
     const canRequestPlayback = this.snapshot.general.spokenAnnouncementsEnabled
       && !this.snapshot.general.spokenAnnouncementsMuted
+      && (!this.snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts
+        || this.promptInputMethodsByAgentId.get(agent.id) === 'dictated')
       && (this.snapshot.general.spokenAnnouncementScope === 'all' || this.snapshot.activeAgentId === agent.id);
     if (canRequestPlayback && this.queueSpokenAnnouncement) {
       try {
@@ -607,6 +615,7 @@ export class ClawMcpService {
 
   private startAgentWithPrompt(agent: Agent, prompt: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.recordPromptInputMethod(agent.id, 'typed');
       sendAgentPrompt(
         this.snapshot,
         this.backendDriverForAgent(agent),

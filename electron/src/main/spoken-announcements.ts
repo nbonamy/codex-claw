@@ -35,7 +35,10 @@ export type SpokenAnnouncementPolicyState = {
 
 type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue'>;
 
-type QueueItem = SpokenAnnouncementRequest & { id: number };
+type QueueItem = SpokenAnnouncementRequest & {
+  id: number;
+  complete?: () => void;
+};
 
 export class SpokenAnnouncementQueue {
   private active: (QueueItem & { playback: SpokenAnnouncementPlayback | null }) | null = null;
@@ -54,6 +57,26 @@ export class SpokenAnnouncementQueue {
   }
 
   queue(request: SpokenAnnouncementRequest): SpokenAnnouncementQueueResult {
+    return this.enqueue(request);
+  }
+
+  queueWithCompletion(request: SpokenAnnouncementRequest): {
+    completion: Promise<void>;
+    result: SpokenAnnouncementQueueResult;
+  } {
+    let complete: () => void = () => {};
+    const completion = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    const result = this.enqueue(request, complete);
+    if (!result.queued) complete();
+    return { completion, result };
+  }
+
+  private enqueue(
+    request: SpokenAnnouncementRequest,
+    complete?: () => void,
+  ): SpokenAnnouncementQueueResult {
     if (!this.engine.available) return { queued: false, reason: 'unsupported' };
 
     const key = `${request.agentId}:${request.phase}`;
@@ -63,7 +86,7 @@ export class SpokenAnnouncementQueue {
       return { queued: false, reason: 'rateLimited' };
     }
 
-    const item = { ...request, id: this.nextId++ };
+    const item = { ...request, complete, id: this.nextId++ };
     if (!this.active) {
       this.markRecent(key, now);
       this.start(item);
@@ -74,6 +97,7 @@ export class SpokenAnnouncementQueue {
       return { queued: false, reason: 'superseded' };
     }
 
+    this.complete(this.pending);
     this.pending = item;
     this.markRecent(key, now);
     if (this.active.agentId === item.agentId
@@ -85,9 +109,13 @@ export class SpokenAnnouncementQueue {
   }
 
   dispose(): void {
+    const active = this.active;
+    const pending = this.pending;
     this.pending = null;
-    this.active?.playback?.cancel();
     this.active = null;
+    active?.playback?.cancel();
+    this.complete(active);
+    this.complete(pending);
   }
 
   private start(item: QueueItem): void {
@@ -102,10 +130,18 @@ export class SpokenAnnouncementQueue {
 
   private settle(id: number): void {
     if (this.active?.id !== id) return;
+    const completed = this.active;
     this.active = null;
+    this.complete(completed);
     const next = this.pending;
     this.pending = null;
     if (next) this.start(next);
+  }
+
+  private complete(item: QueueItem | null): void {
+    const callback = item?.complete;
+    if (item) item.complete = undefined;
+    callback?.();
   }
 
   private markRecent(key: string, now: number): void {

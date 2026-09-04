@@ -110,6 +110,7 @@ function hasPromptOptions(options: SendPromptOptions | undefined): options is Se
     typeof options?.planMode === 'boolean' ||
     options?.reasoningEffort ||
     (options?.skills?.length ?? 0) > 0 ||
+    options?.inputMethod ||
     options?.backendOptions,
   );
 }

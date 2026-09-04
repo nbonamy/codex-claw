@@ -58,6 +58,7 @@ export type ClawBackendServerOptions = {
   agentGitService?: AgentGitService;
   delegatedWorkReports?: DelegatedWorkReportPort;
   workRouting?: WorkRoutingPort;
+  onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
 };
 
 export type SystemPermissionsPort = {
@@ -162,6 +163,7 @@ export class ClawBackendServer {
       applyEvent: (event) => this.applyAndEmitBackendEvent(event),
       persistSnapshot: () => this.persistSnapshotOnly(),
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
+      onPromptStarting: options.onPromptStarting,
     });
     this.delegatedWorkReports = options.delegatedWorkReports ?? new DelegatedWorkReportService({
       getSnapshot: () => this.snapshot,

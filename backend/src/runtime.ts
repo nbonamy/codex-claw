@@ -111,6 +111,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
         return Promise.resolve(snapshot);
       }
       const driver = requireBackendDriver(backendDrivers, agent);
+      mcpService.recordPromptInputMethod(agentId, 'typed');
       sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, (event) => server.emitEvent(event), {
         onBackendSessionUpdated: (result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
         onPromptStarted: async (result) => {
@@ -179,6 +180,9 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     },
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
     workRouting: mcpService,
+    onPromptStarting: (agentId, promptOptions) => {
+      mcpService.recordPromptInputMethod(agentId, promptOptions?.inputMethod);
+    },
     workIntegrations,
     automationRunner,
     remoteClients: new RemoteClawdClientManager({

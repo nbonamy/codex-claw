@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   mcpSetEventSink: vi.fn(),
   mcpHandleBackendEvent: vi.fn(),
   mcpSendMessage: vi.fn(),
+  mcpRecordPromptInputMethod: vi.fn(),
   hydrateConnections: vi.fn(),
   githubConnected: vi.fn(),
   getPullRequest: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock('../mcp/service', () => ({
     setEventSink = mocks.mcpSetEventSink;
     handleBackendEvent = mocks.mcpHandleBackendEvent;
     sendMessage = mocks.mcpSendMessage;
+    recordPromptInputMethod = mocks.mcpRecordPromptInputMethod;
   },
 }));
 

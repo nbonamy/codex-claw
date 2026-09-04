@@ -64,13 +64,33 @@ describe('SettingsGeneralPanel', () => {
     await wrapper.setProps({
       settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
     });
+    const voiceSection = wrapper.findAllComponents({ name: 'SettingsSection' })
+      .find((section) => section.text().includes('Spoken acknowledgments'))!;
+    expect(voiceSection.text().indexOf('Choose an on-device neural voice'))
+      .toBeLessThan(voiceSection.text().indexOf('Playback rules'));
+    const playbackRules = wrapper.get('details.settings-general-panel__voice-rules');
+    expect((playbackRules.element as HTMLDetailsElement).open).toBe(false);
+    expect(playbackRules.get('summary').text())
+      .toContain('Selected agent only · Dictated prompts · While focused');
+    await playbackRules.get('summary').trigger('click');
+    expect((playbackRules.element as HTMLDetailsElement).open).toBe(true);
+
     const rows = wrapper.findAllComponents({ name: 'SettingsRow' });
     const scopeRow = rows.find((candidate) => candidate.text().includes('Choose which agents may speak'))!;
     const scopeSelect = scopeRow.findComponent({ name: 'ElSelect' });
+    expect(scopeSelect.classes()).toContain('settings-general-panel__speech-scope-select');
     expect(scopeSelect.props('modelValue')).toBe('selected');
     await scopeSelect.vm.$emit('update:modelValue', 'all');
     expect(updateSettings).toHaveBeenLastCalledWith({
       general: { spokenAnnouncementScope: 'all' },
+    });
+
+    const dictatedOnlyRow = rows.find((candidate) => candidate.text().includes('Dictated prompts only'))!;
+    expect(dictatedOnlyRow.text()).toContain('tasks started with voice dictation');
+    expect(dictatedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
+    await dictatedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      general: { spokenAnnouncementsOnlyForDictatedPrompts: false },
     });
 
     const focusedOnlyRow = rows.find((candidate) => candidate.text().includes('Only speak while Codex Claw is focused'))!;
@@ -127,6 +147,29 @@ describe('SettingsGeneralPanel', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Voice preview could not be queued on this device.');
+  });
+
+  it('disables voice preview until the native operation finishes', async () => {
+    let finishPreview: (result: { queued: boolean }) => void = () => {};
+    const previewSpokenAnnouncementVoice = vi.fn().mockImplementation(() => (
+      new Promise<{ queued: boolean }>((resolve) => {
+        finishPreview = resolve;
+      })
+    ));
+    setElectronTestClient({ previewSpokenAnnouncementVoice });
+    const wrapper = mountPanel({
+      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
+    });
+    await flushPromises();
+    const preview = wrapper.findAllComponents({ name: 'ElButton' })
+      .find((button) => button.text() === 'Preview')!;
+
+    await preview.trigger('click');
+    expect(preview.props('disabled')).toBe(true);
+
+    finishPreview({ queued: true });
+    await flushPromises();
+    expect(preview.props('disabled')).toBe(false);
   });
 
   it('updates the worktree initialization policy', async () => {

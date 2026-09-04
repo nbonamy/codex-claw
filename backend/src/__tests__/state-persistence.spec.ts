@@ -1013,6 +1013,7 @@ describe('AppStatePersistence', () => {
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementsMuted: true,
+      spokenAnnouncementsOnlyForDictatedPrompts: true,
       spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'af_bella',

@@ -10,6 +10,7 @@ describe('settings contracts', () => {
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementsMuted: true,
+      spokenAnnouncementsOnlyForDictatedPrompts: true,
       spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'bf_emma',
@@ -23,6 +24,7 @@ describe('settings contracts', () => {
       celebrationsEnabled: false,
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementsMuted: true,
+      spokenAnnouncementsOnlyForDictatedPrompts: true,
       spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'bf_emma',
@@ -39,6 +41,9 @@ describe('settings contracts', () => {
 
     expect(normalizeGeneralSettings({})).toStrictEqual(defaultGeneralSettings);
     expect(normalizeGeneralSettings({}).spokenAnnouncementsOnlyWhenFocused).toBe(true);
+    expect(normalizeGeneralSettings({}).spokenAnnouncementsOnlyForDictatedPrompts).toBe(true);
+    expect(normalizeGeneralSettings({ spokenAnnouncementsOnlyForDictatedPrompts: false })
+      .spokenAnnouncementsOnlyForDictatedPrompts).toBe(false);
     expect(normalizeGeneralSettings({ spokenAnnouncementsOnlyWhenFocused: false }).spokenAnnouncementsOnlyWhenFocused)
       .toBe(false);
     expect(normalizeGeneralSettings({ spokenAnnouncementVoice: 'not-a-voice' }).spokenAnnouncementVoice)
@@ -105,6 +110,7 @@ describe('settings contracts', () => {
       celebrationsEnabled: true,
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementsMuted: false,
+      spokenAnnouncementsOnlyForDictatedPrompts: true,
       spokenAnnouncementsOnlyWhenFocused: true,
       spokenAnnouncementScope: 'selected',
       spokenAnnouncementVoice: 'af_heart',

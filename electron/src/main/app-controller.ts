@@ -32,7 +32,7 @@ import { createRuntimeSpokenAnnouncementQueue, PolicyAwareSpokenAnnouncementQueu
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
 type StartupMaintenance = () => Promise<void>;
-type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue'>;
+type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue' | 'queueWithCompletion'>;
 type PendingBrowserOpen = {
   agentId: string;
   browserId: string;
@@ -642,16 +642,18 @@ export class AppController {
     logMain('shutdown', 'application resources closed');
   }
 
-  private previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): SpokenAnnouncementQueueResult {
+  private async previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): Promise<SpokenAnnouncementQueueResult> {
     if (!spokenAnnouncementVoices.includes(voice)) {
       throw new Error('Invalid spoken announcement voice.');
     }
-    return this.spokenAnnouncements.queue({
+    const preview = this.spokenAnnouncements.queueWithCompletion({
       agentId: `settings-preview:${voice}`,
       phase: 'start',
       text: 'Codex Claw is on it—sharp claws, clean code.',
       voice,
     });
+    await preview.completion;
+    return preview.result;
   }
 
   private async initializeBackendClient(): Promise<void> {

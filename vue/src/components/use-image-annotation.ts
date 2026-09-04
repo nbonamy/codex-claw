@@ -231,5 +231,9 @@ function cloneDraft(draft: SavedImageAnnotations): SavedImageAnnotations {
 
 function promptOptions(options?: CodexRendererSendMessageOptions): RendererSendPromptOptions | undefined {
   const attachments = options?.attachments?.map<RendererPromptAttachment>((attachment) => ({ ...attachment }));
-  return attachments?.length ? { attachments } : undefined;
+  if (!attachments?.length && !options?.inputMethod) return undefined;
+  return {
+    ...(attachments?.length ? { attachments } : {}),
+    ...(options?.inputMethod ? { inputMethod: options.inputMethod } : {}),
+  };
 }

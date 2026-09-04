@@ -233,6 +233,29 @@ describe('agent chat service', () => {
     );
   });
 
+  it('preserves dictated input provenance without other prompt options', () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeBackendDriver(Promise.resolve({
+      backendSession: { kind: 'codex', threadId: 'thread-1' },
+      turnId: 'turn-1',
+    }));
+
+    sendAgentPrompt(
+      snapshot,
+      backendDriver,
+      'agent-dina',
+      'hello',
+      { inputMethod: 'dictated' },
+      vi.fn(),
+    );
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      'hello',
+      { inputMethod: 'dictated' },
+    );
+  });
+
   it('preserves provider-neutral attachment descriptors for the backend driver', () => {
     const snapshot = createInitialSnapshot();
     const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));

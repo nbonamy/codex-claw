@@ -81,6 +81,34 @@ describe('SpokenAnnouncementQueue', () => {
     expect(queue.queue(request('a', 'start'))).toStrictEqual({ queued: false, reason: 'unsupported' });
   });
 
+  it('reports completion only after playback settles', async () => {
+    const engine = new FakeEngine();
+    const queue = new SpokenAnnouncementQueue(engine);
+    const preview = queue.queueWithCompletion(request('preview', 'start'));
+    const completed = vi.fn();
+    void preview.completion.then(completed);
+
+    expect(preview.result).toStrictEqual({ queued: true });
+    await Promise.resolve();
+    expect(completed).not.toHaveBeenCalled();
+
+    engine.playbacks[0]?.finish();
+    await preview.completion;
+    expect(completed).toHaveBeenCalledOnce();
+  });
+
+  it('settles completion when pending playback is replaced or the queue is disposed', async () => {
+    const engine = new FakeEngine();
+    const queue = new SpokenAnnouncementQueue(engine);
+    queue.queue(request('active', 'start'));
+    const replaced = queue.queueWithCompletion(request('replaced', 'start'));
+    const pending = queue.queueWithCompletion(request('pending', 'finish'));
+
+    await replaced.completion;
+    queue.dispose();
+    await pending.completion;
+  });
+
   it('recovers from synchronous engine failure, bounds rate-limit state, and disposes playback', () => {
     const failing = new SpokenAnnouncementQueue({
       available: true,
