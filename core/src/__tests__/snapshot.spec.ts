@@ -3673,11 +3673,11 @@ describe('snapshot reducer', () => {
       payload: {
         rootConversationId: 'thread-root',
         operation: {
-          id: 'spawn-1',
+          id: 'followup-1',
           turnId: 'turn-1',
           lifecycle: 'started',
-          kind: 'spawnAgent',
-          status: 'inProgress',
+          kind: 'followupTask',
+          status: 'interrupted',
           senderConversationId: 'thread-root',
           receiverConversationIds: ['thread-child'],
           prompt: 'Inspect tests',
@@ -3704,7 +3704,7 @@ describe('snapshot reducer', () => {
           id: 'activity-1',
           turnId: 'turn-1',
           lifecycle: 'completed',
-          kind: 'interacted',
+          kind: 'completed',
           conversationId: 'thread-child',
           agentPath: '/root/scout',
           occurredAt: '2026-06-05T00:00:02.000Z',
@@ -3744,10 +3744,10 @@ describe('snapshot reducer', () => {
         },
       },
       operations: {
-        'spawn-1': expect.objectContaining({ kind: 'spawnAgent', receiverConversationIds: ['thread-child'] }),
+        'followup-1': expect.objectContaining({ kind: 'followupTask', status: 'interrupted', receiverConversationIds: ['thread-child'] }),
       },
       activities: {
-        'activity-1': expect.objectContaining({ kind: 'interacted', conversationId: 'thread-child' }),
+        'activity-1': expect.objectContaining({ kind: 'completed', conversationId: 'thread-child' }),
       },
     });
 

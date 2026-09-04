@@ -400,28 +400,38 @@ export type ConversationSummary = {
   ref: BackendConversationRef;
 };
 
-export type SubagentStatus =
-  | 'pendingInit'
-  | 'running'
-  | 'interrupted'
-  | 'completed'
-  | 'errored'
-  | 'shutdown'
-  | 'notFound';
+export const subagentStatuses = [
+  'pendingInit',
+  'running',
+  'interrupted',
+  'completed',
+  'errored',
+  'shutdown',
+  'notFound',
+] as const;
+export type SubagentStatus = typeof subagentStatuses[number];
 
-export type SubagentOperationKind =
-  | 'spawnAgent'
-  | 'sendInput'
-  | 'resumeAgent'
-  | 'wait'
-  | 'closeAgent'
-  | 'sendMessage'
-  | 'followupTask'
-  | 'interruptAgent'
-  | 'listAgents';
-export type SubagentOperationLifecycle = 'started' | 'completed';
-export type SubagentOperationStatus = 'inProgress' | 'completed' | 'failed' | 'interrupted';
-export type SubagentActivityKind = 'started' | 'interacted' | 'interrupted' | 'completed';
+export const subagentOperationKinds = [
+  'spawnAgent',
+  'sendInput',
+  'resumeAgent',
+  'wait',
+  'closeAgent',
+  'sendMessage',
+  'followupTask',
+  'interruptAgent',
+  'listAgents',
+] as const;
+export type SubagentOperationKind = typeof subagentOperationKinds[number];
+
+export const subagentOperationLifecycles = ['started', 'completed'] as const;
+export type SubagentOperationLifecycle = typeof subagentOperationLifecycles[number];
+
+export const subagentOperationStatuses = ['inProgress', 'completed', 'failed', 'interrupted'] as const;
+export type SubagentOperationStatus = typeof subagentOperationStatuses[number];
+
+export const subagentActivityKinds = ['started', 'interacted', 'interrupted', 'completed'] as const;
+export type SubagentActivityKind = typeof subagentActivityKinds[number];
 
 export type SubagentNode = {
   conversationId: string;

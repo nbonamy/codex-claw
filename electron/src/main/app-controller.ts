@@ -28,6 +28,7 @@ import { captureAppshot as captureFrontmostAppshot } from './appshots';
 import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from './open-in';
 import { installLocalMediaProtocol as installLocalMediaProtocolHandler, LocalMediaRegistry, withRendererMediaUrls } from './local-media';
 import { createRuntimeSpokenAnnouncementQueue, PolicyAwareSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
+import { registerAgentGitIpcHandlers } from './agent-git-ipc';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
@@ -256,17 +257,7 @@ export class AppController {
       return this.previewAgentFile(agentId, filePath);
     });
 
-    ipc.handle(ipcChannels.openAgentGitDiff, async (_event, agentId: string) => {
-      return this.openAgentGitDiff(agentId);
-    });
-    ipc.handle(ipcChannels.getAgentGitWorkflow, (_event, agentId: string) => this.requireBackendClient().request(backendMethods.agentGitWorkflowGet, { agentId }));
-    ipc.handle(ipcChannels.generateAgentGitMessage, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitMessageGenerate, { agentId, input }));
-    ipc.handle(ipcChannels.stageAgentGitFiles, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitStage, { agentId, input }));
-    ipc.handle(ipcChannels.commitAgentGitChanges, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitCommit, { agentId, input }));
-    ipc.handle(ipcChannels.pushAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPush, { agentId, input }));
-    ipc.handle(ipcChannels.createAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitBranchCreate, { agentId, input }));
-    ipc.handle(ipcChannels.createAgentGitPullRequest, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitPullRequestCreate, { agentId, input }));
-    ipc.handle(ipcChannels.mergeAgentGitBranch, (_event, agentId: string, input) => this.requireBackendClient().request(backendMethods.agentGitMerge, { agentId, input }));
+    registerAgentGitIpcHandlers(ipc, () => this.requireBackendClient());
 
     ipc.handle(ipcChannels.getOpenInApplications, () => this.getOpenInApplications());
     ipc.handle(ipcChannels.openAgentPath, (_event, agentId: string, application: OpenInApplication, filePath?: string) => {
@@ -1243,10 +1234,6 @@ export class AppController {
       agentId,
       filePath,
     });
-  }
-
-  private async openAgentGitDiff(agentId: string): Promise<void> {
-    await this.requireBackendClient().request(backendMethods.agentGitDiffOpen, { agentId });
   }
 
   private async steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata> {

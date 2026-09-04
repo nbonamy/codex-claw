@@ -34,6 +34,9 @@ found, invalid params, internal error, backend unavailable, and timeout.
 Method names use `resource[/subresource]/verb`. Multiword path segments are
 lower camel case, and the action belongs at the end of the path. Method values
 are centralized in `shared/src/backend-protocol/methods.ts`.
+The shared request map is being adopted one product domain at a time; all
+app-level `agent/git/*` methods currently have compile-time parameter and result
+contracts used by the Electron adapter and backend routing seam.
 
 This protocol version is a breaking dev-mode cleanup. There are no legacy
 aliases for older names such as `agent/listFiles` or `backend/event`; stale

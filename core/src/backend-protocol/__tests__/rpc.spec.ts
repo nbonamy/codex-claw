@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { backendMethods, backendMethodValues } from '../methods';
-import { createClawRpcError, createClawRpcRequest, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage } from '../rpc';
+import { createClawRpcError, createClawRpcRequest, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, requestClawBackend } from '../rpc';
 
 describe('backend JSON-RPC protocol', () => {
   it('parses requests with string or number ids', () => {
@@ -46,6 +46,22 @@ describe('backend JSON-RPC protocol', () => {
         code: -32700,
         message: 'Bad JSON',
       },
+    });
+  });
+
+  it('forwards typed backend requests through the shared request port', async () => {
+    const workflow = { repository: 'nbonamy/codex-claw' };
+    const client = {
+      request: vi.fn().mockResolvedValue(workflow),
+    };
+
+    await expect(requestClawBackend(client, backendMethods.agentGitStage, {
+      agentId: 'agent-1',
+      input: { paths: ['core/src/contracts.ts'], confirmed: true },
+    })).resolves.toBe(workflow);
+    expect(client.request).toHaveBeenCalledWith(backendMethods.agentGitStage, {
+      agentId: 'agent-1',
+      input: { paths: ['core/src/contracts.ts'], confirmed: true },
     });
   });
 

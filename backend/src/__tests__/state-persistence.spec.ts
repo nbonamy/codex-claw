@@ -162,17 +162,26 @@ describe('AppStatePersistence', () => {
         },
       },
       operations: {
-        'spawn-1': {
-          id: 'spawn-1',
+        'followup-1': {
+          id: 'followup-1',
           lifecycle: 'completed',
-          kind: 'spawnAgent',
-          status: 'completed',
+          kind: 'followupTask',
+          status: 'interrupted',
           senderConversationId: 'thread-root',
           receiverConversationIds: ['thread-child'],
           occurredAt: '2026-06-05T00:00:01.000Z',
         },
       },
-      activities: {},
+      activities: {
+        'activity-child': {
+          id: 'activity-child',
+          lifecycle: 'completed',
+          kind: 'completed',
+          conversationId: 'thread-child',
+          agentPath: '/root/scout',
+          occurredAt: '2026-06-05T00:00:02.000Z',
+        },
+      },
     };
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));

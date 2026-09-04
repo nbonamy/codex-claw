@@ -172,6 +172,12 @@ Current implementation checkpoint:
 - Work-routing branch/worktree policy lives in `WorkRoutingService`, pending
   client-request ownership in `ClientRequestRegistry`, and deduplicated agent
   workspace identity/git refreshes in `AgentWorkspaceService`.
+  `AgentGitWorkflowService` owns the app-level Git workflow from validation
+  through staging, commits, pushes, pull requests, merge handoffs, and cleanup;
+  `ClawBackendServer` only resolves local/remote ownership and routes the typed
+  agent-Git request into that service. Electron registers the matching IPC
+  routes as a single thin adapter instead of duplicating workflow methods in
+  `AppController`.
   `SubagentIdentityService` owns non-overlapping Codex subagent identity
   backfills. `RemoteTeamService` owns remote clawd snapshot caching, remote-team
   projection, and remote agent/work-assignment ownership lookup. The server

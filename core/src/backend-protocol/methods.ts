@@ -160,3 +160,17 @@ export const backendMethods = {
 export type BackendMethod = (typeof backendMethods)[keyof typeof backendMethods];
 
 export const backendMethodValues = Object.values(backendMethods) as BackendMethod[];
+
+export const agentGitBackendMethods = [
+  backendMethods.agentGitDiffOpen,
+  backendMethods.agentGitWorkflowGet,
+  backendMethods.agentGitMessageGenerate,
+  backendMethods.agentGitStage,
+  backendMethods.agentGitCommit,
+  backendMethods.agentGitPush,
+  backendMethods.agentGitBranchCreate,
+  backendMethods.agentGitPullRequestCreate,
+  backendMethods.agentGitMerge,
+] as const;
+
+export type AgentGitBackendMethod = typeof agentGitBackendMethods[number];

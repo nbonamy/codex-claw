@@ -1,5 +1,18 @@
 import { backendMethods } from './methods';
-import type { AppSnapshot, ClientState, MainToRendererEvent } from '../contracts';
+import type {
+  AgentGitBranchInput,
+  AgentGitCommitInput,
+  AgentGitMergeInput,
+  AgentGitMessageGenerationInput,
+  AgentGitMessageGenerationResult,
+  AgentGitPullRequestInput,
+  AgentGitPushInput,
+  AgentGitStageInput,
+  AgentGitWorkflow,
+  AppSnapshot,
+  ClientState,
+  MainToRendererEvent,
+} from '../contracts';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
 export type ClawRpcId = string | number;
@@ -79,7 +92,61 @@ export type ClawBackendRequestMap = {
     params: undefined;
     result: ClientState;
   };
+  [backendMethods.agentGitDiffOpen]: {
+    params: { agentId: string };
+    result: true;
+  };
+  [backendMethods.agentGitWorkflowGet]: {
+    params: { agentId: string };
+    result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitMessageGenerate]: {
+    params: { agentId: string; input: AgentGitMessageGenerationInput };
+    result: AgentGitMessageGenerationResult;
+  };
+  [backendMethods.agentGitStage]: {
+    params: { agentId: string; input: AgentGitStageInput };
+    result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitCommit]: {
+    params: { agentId: string; input: AgentGitCommitInput };
+    result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitPush]: {
+    params: { agentId: string; input: AgentGitPushInput };
+    result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitBranchCreate]: {
+    params: { agentId: string; input: AgentGitBranchInput };
+    result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitPullRequestCreate]: {
+    params: { agentId: string; input: AgentGitPullRequestInput };
+    result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitMerge]: {
+    params: { agentId: string; input: AgentGitMergeInput };
+    result: AgentGitWorkflow;
+  };
 };
+
+export type ClawBackendRequestMethod = keyof ClawBackendRequestMap;
+export type ClawBackendRequestParams<Method extends ClawBackendRequestMethod> = ClawBackendRequestMap[Method]['params'];
+export type ClawBackendRequestResult<Method extends ClawBackendRequestMethod> = ClawBackendRequestMap[Method]['result'];
+
+export type ClawBackendRequestPort = {
+  request<Result>(method: string, params?: unknown): Promise<Result>;
+};
+
+export function requestClawBackend<Method extends ClawBackendRequestMethod>(
+  client: ClawBackendRequestPort,
+  method: Method,
+  ...args: ClawBackendRequestParams<Method> extends undefined
+    ? [params?: undefined]
+    : [params: ClawBackendRequestParams<Method>]
+): Promise<ClawBackendRequestResult<Method>> {
+  return client.request<ClawBackendRequestResult<Method>>(method, args[0]);
+}
 
 export function isClawSnapshotGetResult(value: unknown): value is ClawSnapshotGetResult {
   return isRecord(value) &&

@@ -8,6 +8,7 @@ import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { appText } from '@codex-claw/core/app-text';
+import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
 
 type PersistedState = {
   teams: Team[];
@@ -334,27 +335,6 @@ function sanitizeSubagentActivity(value: unknown): SubagentActivity | null {
     agentPath: value.agentPath,
     occurredAt: value.occurredAt,
   };
-}
-
-function isSubagentStatus(value: unknown): value is SubagentStatus {
-  return value === 'pendingInit' || value === 'running' || value === 'interrupted' || value === 'completed' ||
-    value === 'errored' || value === 'shutdown' || value === 'notFound';
-}
-
-function isSubagentOperationLifecycle(value: unknown): value is SubagentOperation['lifecycle'] {
-  return value === 'started' || value === 'completed';
-}
-
-function isSubagentOperationKind(value: unknown): value is SubagentOperation['kind'] {
-  return value === 'spawnAgent' || value === 'sendInput' || value === 'resumeAgent' || value === 'wait' || value === 'closeAgent';
-}
-
-function isSubagentOperationStatus(value: unknown): value is SubagentOperation['status'] {
-  return value === 'inProgress' || value === 'completed' || value === 'failed';
-}
-
-function isSubagentActivityKind(value: unknown): value is SubagentActivity['kind'] {
-  return value === 'started' || value === 'interacted' || value === 'interrupted';
 }
 
 function sanitizeAgent(value: unknown): Agent | null {

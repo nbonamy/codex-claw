@@ -33,6 +33,7 @@ import type {
   UpdateAgentInput,
   WorkBacklogAssignment,
 } from './contracts';
+import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from './subagent-values';
 import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
 import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
@@ -966,27 +967,6 @@ function ensureSubagentTree(snapshot: AppSnapshot, agentId: string, rootConversa
   };
   snapshot.subagentTrees[agentId] = created;
   return created;
-}
-
-function isSubagentStatus(value: unknown): value is SubagentStatus {
-  return value === 'pendingInit' || value === 'running' || value === 'interrupted' || value === 'completed' ||
-    value === 'errored' || value === 'shutdown' || value === 'notFound';
-}
-
-function isSubagentOperationKind(value: unknown): value is SubagentOperationChange['operation']['kind'] {
-  return value === 'spawnAgent' || value === 'sendInput' || value === 'resumeAgent' || value === 'wait' || value === 'closeAgent';
-}
-
-function isSubagentOperationLifecycle(value: unknown): value is SubagentOperationChange['operation']['lifecycle'] {
-  return value === 'started' || value === 'completed';
-}
-
-function isSubagentOperationStatus(value: unknown): value is SubagentOperationChange['operation']['status'] {
-  return value === 'inProgress' || value === 'completed' || value === 'failed';
-}
-
-function isSubagentActivityKind(value: unknown): value is SubagentActivityChange['activity']['kind'] {
-  return value === 'started' || value === 'interacted' || value === 'interrupted';
 }
 
 export function formatThreadPlanMarkdown(input: Pick<ThreadPlan, 'explanation' | 'steps'>): string {

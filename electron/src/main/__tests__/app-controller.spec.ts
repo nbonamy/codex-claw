@@ -1406,17 +1406,6 @@ describe('AppController', () => {
     expect(currentSnapshot(controller).messages).toStrictEqual([]);
   });
 
-  it('opens repo git diff previews through clawd', async () => {
-    const snapshot = createInitialSnapshot();
-    const request = vi.fn().mockResolvedValue(true);
-    const controller = new AppController(snapshot, createBackendClient({ request }));
-
-    await controller.initialize();
-    await openAgentGitDiff(controller, 'agent-dina');
-
-    expect(request).toHaveBeenCalledWith('agent/git/diff/open', { agentId: 'agent-dina' });
-  });
-
   it('routes agent restart through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
@@ -2252,12 +2241,6 @@ async function hydrateAgentHistory(controller: AppController, agentId: string): 
   return (controller as unknown as {
     hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
   }).hydrateAgentHistory(agentId);
-}
-
-async function openAgentGitDiff(controller: AppController, agentId: string): Promise<void> {
-  await (controller as unknown as {
-    openAgentGitDiff(agentId: string): Promise<void>;
-  }).openAgentGitDiff(agentId);
 }
 
 async function selectAgent(controller: AppController, agentId: string): Promise<AppSnapshot> {
