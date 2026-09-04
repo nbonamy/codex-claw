@@ -537,6 +537,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.completed',

@@ -360,6 +360,7 @@ export class ClawBackendServer {
           turnId,
           type: 'turn.proposedPlanCompleted',
           payload: {
+            itemId: `${turnId}-plan`,
             markdown: [
               '# Debug plan review',
               '',

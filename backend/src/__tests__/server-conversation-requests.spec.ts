@@ -294,7 +294,7 @@ describe('ClawBackendServer', () => {
     expect(onPromptStarting).not.toHaveBeenCalled();
 
     server.emitEvent({
-      agentId: 'agent-dina', threadId: 'thread-dina', turnId: 'turn-old',
+      agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina', turnId: 'turn-old',
       type: 'turn.completed', payload: { status: 'completed' },
     });
     expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
@@ -439,7 +439,7 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina', prompt: 'retry safely' },
     });
     server.emitEvent({
-      agentId: 'agent-dina', threadId: 'thread-dina', turnId: 'turn-old',
+      agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina', turnId: 'turn-old',
       type: 'turn.completed', payload: { status: 'completed' },
     });
     await flushMicrotasks();

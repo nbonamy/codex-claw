@@ -130,10 +130,11 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.started',
-      payload: { status: 'running' },
+      payload: { status: 'inProgress', startedAt: '2026-06-05T00:00:00.000Z' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {

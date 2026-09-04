@@ -3,6 +3,7 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
+import type { MainToRendererEvent } from '../contracts';
 
 describe('snapshot reducer', () => {
 
@@ -12,12 +13,14 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.planUpdated',
       payload: {
         status: 'completed',
         explanation: 'Current plan',
+        markdown: 'Provider markdown must not override the normalized plan',
         plan: [
           { step: 'Inspect composer', status: 'completed' },
           { step: 'Wire Plan mode', status: 'inProgress' },
@@ -68,6 +71,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.planUpdated',
@@ -91,7 +95,7 @@ describe('snapshot reducer', () => {
   it.each([
     ['completed turn with pending work', { status: 'completed' }, 'incomplete'],
     ['provider-neutral interrupted turn', { status: 'interrupted' }, 'interrupted'],
-    ['nested provider interrupted turn', { turn: { status: 'interrupted' } }, 'interrupted'],
+    ['nested provider interrupted turn', { turn: { id: 'turn-plan', status: 'interrupted' } }, 'interrupted'],
     ['failed turn', { status: 'failed' }, 'failed'],
   ] as const)('finalizes an execution plan for a %s', (_scenario, turnPayload, expectedStatus) => {
     const snapshot = createInitialSnapshot();
@@ -99,6 +103,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.planUpdated',
@@ -111,6 +116,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.completed',
@@ -131,6 +137,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.planUpdated',
@@ -143,7 +150,7 @@ describe('snapshot reducer', () => {
         ],
       },
       occurredAt: '2026-06-05T00:00:00.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
@@ -161,14 +168,35 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-empty-plan',
       type: 'turn.planUpdated',
       payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.agents[0].plan?.turnId).toBe('turn-plan');
+  });
+
+  it('ignores plan events missing required thread context at a legacy boundary', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 0,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      turnId: 'turn-plan',
+      type: 'turn.planUpdated',
+      payload: {
+        explanation: 'Must not be applied',
+        plan: [{ step: 'Ignored', status: 'completed' }],
+      },
+      occurredAt: '2026-06-05T00:00:00.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(snapshot.agents[0].plan).toBeUndefined();
+    expect(snapshot.messages).toStrictEqual([]);
   });
 
   it('stores proposed plan deltas and overwrites them with completed plan item text', () => {
@@ -177,6 +205,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanDelta',
@@ -189,6 +218,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanDelta',
@@ -204,6 +234,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanCompleted',
@@ -228,6 +259,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.completed',
@@ -334,10 +366,11 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanDelta',
-      payload: { delta: '# Plan' },
+      payload: { itemId: 'turn-plan-plan', delta: '# Plan' },
       occurredAt: '2026-06-05T00:00:00.000Z',
     });
     expect(snapshot.agents[0].plan?.status).toBe('inProgress');
@@ -345,10 +378,11 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanCompleted',
-      payload: { markdown: '# Plan' },
+      payload: { itemId: 'turn-plan-plan', markdown: '# Plan' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
@@ -405,6 +439,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 0,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanDelta',
@@ -417,6 +452,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanDelta',

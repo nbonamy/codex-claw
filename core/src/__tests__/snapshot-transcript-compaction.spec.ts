@@ -5,13 +5,28 @@ import {
   selectAgent,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererMessage } from '../contracts';
+import type { MainToRendererEvent, RendererMessage } from '../contracts';
 import {
   commandToolPart,
   toolPartPayload,
 } from './snapshot-test-fixtures';
 
 describe('snapshot reducer', () => {
+
+  it('ignores compaction events missing required turn context at a legacy boundary', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      type: 'context.compactionStarted',
+      payload: { itemId: 'compact-1' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(snapshot.messages).toStrictEqual([]);
+  });
 
   it('inserts running compaction markers without showing empty assistant thinking after the boundary', () => {
     const snapshot = createInitialSnapshot();
@@ -28,6 +43,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'context.compactionStarted',
@@ -82,6 +98,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'context.compactionStarted',
@@ -91,6 +108,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.completed',
@@ -118,6 +136,7 @@ describe('snapshot reducer', () => {
       applyMainEventToSnapshot(snapshot, {
         seq,
         agentId: 'agent-dina',
+        backend: 'codex',
         threadId: 'thread-1',
         turnId,
         type: 'context.compactionStarted',
@@ -129,6 +148,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-2',
       type: 'context.compactionCompleted',

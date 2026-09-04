@@ -1419,6 +1419,59 @@ type ClaudeThreadStartedPayload = {
   reasoningEffort?: string;
 };
 type ThreadMode = 'default' | 'plan';
+type TurnEventContext = {
+  agentId: string;
+  backend: AgentBackend;
+  turnId: string;
+};
+type ThreadTurnEventContext = TurnEventContext & {
+  threadId: string;
+};
+type CodexTurnStartedPayload = {
+  status: 'inProgress';
+  startedAt: string;
+};
+type ClaudeTurnStartedPayload = {
+  turn: {
+    id: string;
+    backend: 'claude';
+  };
+};
+type TurnPlanUpdatedPayload = {
+  explanation: string | null;
+  plan: ThreadPlanStep[];
+  markdown?: string;
+  status?: 'running' | 'completed';
+};
+type CodexProposedPlanDeltaPayload = {
+  itemId: string;
+  delta: string;
+  markdown: string;
+};
+type ClaudeProposedPlanDeltaPayload = Omit<CodexProposedPlanDeltaPayload, 'markdown'>;
+type ProposedPlanCompletedPayload = {
+  itemId: string;
+  markdown: string;
+};
+type CodexTurnCompletedPayload = {
+  status: 'completed' | 'interrupted' | 'failed' | 'inProgress';
+  error?: {
+    message: string;
+    additionalDetails: string | null;
+    codexErrorInfo: unknown;
+  } | null;
+  willRetry?: boolean;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  durationMs?: number | null;
+};
+type ClaudeTurnCompletedPayload = {
+  turn: {
+    id: string;
+    status: 'completed' | 'interrupted';
+  };
+};
+type CompactionPayload = { itemId: string | null } | Record<string, never>;
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
@@ -1447,7 +1500,14 @@ type TypedMainToRendererEventType =
   | 'subagent.operationChanged'
   | 'subagent.activityChanged'
   | 'subagent.identityChanged'
-  | 'subagent.statusChanged';
+  | 'subagent.statusChanged'
+  | 'turn.started'
+  | 'turn.planUpdated'
+  | 'turn.proposedPlanDelta'
+  | 'turn.proposedPlanCompleted'
+  | 'turn.completed'
+  | 'context.compactionStarted'
+  | 'context.compactionCompleted';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1623,6 +1683,34 @@ export type MainToRendererEvent =
       backend: AgentBackend;
       threadId: string;
       payload: SubagentStatusChange;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'turn.started';
+      payload: CodexTurnStartedPayload | ClaudeTurnStartedPayload;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'turn.planUpdated';
+      payload: TurnPlanUpdatedPayload;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'turn.proposedPlanDelta';
+      payload: CodexProposedPlanDeltaPayload | ClaudeProposedPlanDeltaPayload;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'turn.proposedPlanCompleted';
+      payload: ProposedPlanCompletedPayload;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'turn.completed';
+      payload: CodexTurnCompletedPayload | ClaudeTurnCompletedPayload;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'context.compactionStarted';
+      payload: CompactionPayload;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'context.compactionCompleted';
+      payload: CompactionPayload;
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;

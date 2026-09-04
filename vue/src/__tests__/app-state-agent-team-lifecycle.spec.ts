@@ -354,6 +354,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-jesse',
+      backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse',
       type: 'turn.completed',

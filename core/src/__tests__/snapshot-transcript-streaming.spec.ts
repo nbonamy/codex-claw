@@ -5,13 +5,34 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererMessage } from '../contracts';
+import type { MainToRendererEvent, RendererMessage } from '../contracts';
 import {
   commandToolPart,
   toolPartPayload,
 } from './snapshot-test-fixtures';
 
 describe('snapshot reducer', () => {
+
+  it('starts a turn even when a legacy boundary supplies a malformed payload', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      turnId: 'turn-legacy',
+      type: 'turn.started',
+      payload: { status: 'running' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
+    expect(snapshot.messages.at(-1)).toMatchObject({
+      id: 'assistant-turn-legacy',
+      status: 'streaming',
+      turnId: 'turn-legacy',
+    });
+  });
 
   it('appends user prompts and reduces assistant deltas into one streaming message', () => {
     const snapshot = createInitialSnapshot();
@@ -20,10 +41,11 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.started',
-      payload: { status: 'running' },
+      payload: { status: 'inProgress', startedAt: '2026-06-05T00:00:00.000Z' },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     expect(snapshot.messages.at(-1)).toMatchObject({
@@ -68,6 +90,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 4,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.completed',
@@ -85,10 +108,11 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.started',
-      payload: { status: 'running' },
+      payload: { status: 'inProgress', startedAt: '2026-06-05T00:00:00.000Z' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
@@ -166,6 +190,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 5,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'turn.completed',
@@ -264,15 +289,17 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-empty',
       type: 'turn.started',
-      payload: { status: 'running' },
+      payload: { status: 'inProgress', startedAt: '2026-06-05T00:00:00.000Z' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-empty',
       type: 'turn.completed',
@@ -290,10 +317,11 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-empty',
       type: 'turn.started',
-      payload: { status: 'running' },
+      payload: { status: 'inProgress', startedAt: '2026-06-05T00:00:00.000Z' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
@@ -340,6 +368,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-review',
       type: 'turn.completed',

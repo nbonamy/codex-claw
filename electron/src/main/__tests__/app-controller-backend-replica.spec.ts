@@ -393,6 +393,7 @@ describe('AppController', () => {
     setMainWindowSend(controller, send);
     emitBackendEvent(controller, {
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-plan',
       type: 'turn.planUpdated',
@@ -440,6 +441,7 @@ describe('AppController', () => {
     setMainWindowSend(controller, send);
     emitBackendEvent(controller, {
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-plan',
       type: 'turn.proposedPlanCompleted',

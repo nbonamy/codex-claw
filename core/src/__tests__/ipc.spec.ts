@@ -32,6 +32,7 @@ import type {
   SubagentOperationChange,
   SubagentStatusChange,
   ThreadGoal,
+  ThreadPlanStep,
   WorkBacklogAssignment,
   WorkBacklogAssignmentPolicy,
   WorkBacklogAssignmentStatus,
@@ -257,6 +258,24 @@ describe('ipc channels', () => {
       turnId: string;
       source?: 'backend' | 'client';
     };
+    type TurnEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId: string;
+      source?: 'backend' | 'client';
+    };
+    type ThreadTurnEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId: string;
+      source?: 'backend' | 'client';
+    };
 
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
@@ -424,6 +443,58 @@ describe('ipc channels', () => {
     expectTypeOf<SubagentStatusChangedEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
     expectTypeOf<Pick<SubagentStatusChangedEvent, keyof BackendThreadEventContext>>()
       .toEqualTypeOf<BackendThreadEventContext>();
+    type TurnStartedEvent = Extract<MainToRendererEvent, { type: 'turn.started' }>;
+    expectTypeOf<TurnStartedEvent['payload']>().toEqualTypeOf<
+      | { status: 'inProgress'; startedAt: string }
+      | { turn: { id: string; backend: 'claude' } }
+    >();
+    expectTypeOf<Pick<TurnStartedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    type TurnPlanUpdatedEvent = Extract<MainToRendererEvent, { type: 'turn.planUpdated' }>;
+    expectTypeOf<TurnPlanUpdatedEvent['payload']>().toEqualTypeOf<{
+      explanation: string | null;
+      plan: ThreadPlanStep[];
+      markdown?: string;
+      status?: 'running' | 'completed';
+    }>();
+    expectTypeOf<Pick<TurnPlanUpdatedEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type ProposedPlanDeltaEvent = Extract<MainToRendererEvent, { type: 'turn.proposedPlanDelta' }>;
+    expectTypeOf<ProposedPlanDeltaEvent['payload']>().toEqualTypeOf<
+      | { itemId: string; delta: string; markdown: string }
+      | { itemId: string; delta: string }
+    >();
+    expectTypeOf<Pick<ProposedPlanDeltaEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type ProposedPlanCompletedEvent = Extract<MainToRendererEvent, { type: 'turn.proposedPlanCompleted' }>;
+    expectTypeOf<ProposedPlanCompletedEvent['payload']>()
+      .toEqualTypeOf<{ itemId: string; markdown: string }>();
+    expectTypeOf<Pick<ProposedPlanCompletedEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type TurnCompletedEvent = Extract<MainToRendererEvent, { type: 'turn.completed' }>;
+    expectTypeOf<TurnCompletedEvent['payload']>().toEqualTypeOf<
+      | {
+          status: 'completed' | 'interrupted' | 'failed' | 'inProgress';
+          error?: { message: string; additionalDetails: string | null; codexErrorInfo: unknown } | null;
+          willRetry?: boolean;
+          startedAt?: string | null;
+          completedAt?: string | null;
+          durationMs?: number | null;
+        }
+      | { turn: { id: string; status: 'completed' | 'interrupted' } }
+    >();
+    expectTypeOf<Pick<TurnCompletedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    type CompactionStartedEvent = Extract<MainToRendererEvent, { type: 'context.compactionStarted' }>;
+    type CompactionCompletedEvent = Extract<MainToRendererEvent, { type: 'context.compactionCompleted' }>;
+    expectTypeOf<CompactionStartedEvent['payload']>()
+      .toEqualTypeOf<{ itemId: string | null } | Record<string, never>>();
+    expectTypeOf<CompactionCompletedEvent['payload']>()
+      .toEqualTypeOf<{ itemId: string | null } | Record<string, never>>();
+    expectTypeOf<Pick<CompactionStartedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    expectTypeOf<Pick<CompactionCompletedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()

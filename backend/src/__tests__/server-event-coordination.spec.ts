@@ -330,6 +330,7 @@ describe('ClawBackendServer', () => {
     } as unknown as BackendEvent);
     server.emitEvent({
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-dina',
       type: 'turn.planUpdated',
@@ -339,6 +340,7 @@ describe('ClawBackendServer', () => {
 
     server.emitEvent({
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-dina',
       type: 'turn.completed',
@@ -483,7 +485,7 @@ describe('ClawBackendServer', () => {
       threadId: 'thread-dina',
       turnId: 'turn-proposed-plan',
       type: 'turn.proposedPlanCompleted',
-      payload: { markdown: '# Proposed plan\n\n- Build it' },
+      payload: { itemId: 'turn-proposed-plan-plan', markdown: '# Proposed plan\n\n- Build it' },
       occurredAt: '2026-06-13T00:00:02.000Z',
     });
 
