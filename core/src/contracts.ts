@@ -1251,11 +1251,11 @@ export type AgentGitWorkflow = {
 
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
 export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
-export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget' };
+export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget'; closeAgentAfterPush?: boolean };
 export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
 export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
 export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
-export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; reportBack?: boolean; confirmed: boolean };
+export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
 export type AgentGitMessageGenerationInput =
   | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }
   | { kind: 'pullRequest' };

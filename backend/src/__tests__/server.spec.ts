@@ -520,6 +520,73 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('keeps a cleaned-up agent routable until the requested merged-branch push succeeds', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: snapshot.teams[0]!.id, name: 'Dina', folder: '/repo-feature',
+      backend: 'codex', backendSession: { kind: 'codex', threadId: 'thread-feature' },
+      status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    const featureWorkflow = {
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      branch: 'feature/demo', detached: false, remote: 'origin', upstream: 'origin/feature/demo',
+      ahead: 0, behind: 0, files: [], stagedFiles: [], unstagedFiles: [],
+    };
+    const baseWorkflow = {
+      ...featureWorkflow, folder: '/repo', isLinkedWorktree: false, branch: 'main', upstream: 'origin/main', ahead: 2,
+    };
+    const workflow = vi.fn(async (folder: string) => folder === '/repo-feature' ? featureWorkflow : baseWorkflow);
+    const merge = vi.fn().mockResolvedValue('/repo');
+    const push = vi.fn();
+    const forgetAgentSession = vi.fn();
+    const saveSnapshot = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      forgetAgentSession,
+      getGitStatus: async () => null,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot, saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { workflow, merge, push } as unknown as AgentGitService,
+      workIntegrations: { githubConnected: vi.fn().mockResolvedValue(false) } as unknown as WorkIntegrationManager,
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'merge-before-push', method: backendMethods.agentGitMerge,
+      params: {
+        agentId: 'agent-dina',
+        input: {
+          strategy: 'squash', commitMessage: 'feat: combine demo work', deleteBranch: true,
+          deleteWorktree: true, pushAfter: true, confirmed: true,
+        },
+      },
+    });
+
+    expect(snapshot.agents[0]).toMatchObject({ id: 'agent-dina', folder: '/repo' });
+
+    await server.handleMessage({
+      jsonrpc: '2.0', id: 'push-after-merge', method: backendMethods.agentGitPush,
+      params: {
+        agentId: 'agent-dina',
+        input: { target: 'mergeTarget', closeAgentAfterPush: true, confirmed: true },
+      },
+    });
+
+    expect(push).toHaveBeenCalledWith('/repo', 'origin', 'main', false);
+    expect(snapshot.agents).toHaveLength(0);
+    expect(snapshot.teams[0]?.agentIds).toStrictEqual([]);
+    await server.close();
+  });
+
   it('pushes the merged base branch instead of a retained feature worktree', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

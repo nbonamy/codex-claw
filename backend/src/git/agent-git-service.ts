@@ -388,7 +388,7 @@ export class AgentGitService {
     await this.runGit(targetFolder, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', '--no-ff', current.branch]);
     if (strategy === 'squash') await this.runGit(targetFolder, ['commit', '-m', normalizedCommitMessage!]);
     if (deleteWorktree) await this.runGit(targetFolder, ['worktree', 'remove', current.folder]);
-    if (deleteBranch) await this.runGit(targetFolder, ['branch', '-d', current.branch]);
+    if (deleteBranch) await this.runGit(targetFolder, ['branch', strategy === 'squash' ? '-D' : '-d', current.branch]);
     return targetFolder;
   }
 

@@ -78,6 +78,9 @@ export class AgentGitWorkflowService {
       case backendMethods.agentGitPush: {
         const folder = requireAgentFolder(agent);
         const input = requireConfirmed(params.input, 'Pushing a branch');
+        if (input.closeAgentAfterPush === true && input.target !== 'mergeTarget') {
+          throw new Error('Closing an agent after pushing is only available for a completed merge.');
+        }
         const currentWorkflow = await this.options.git.workflow(folder);
         const pushFolder = input.target === 'mergeTarget' && !isIntegrationBranchName(currentWorkflow.branch)
           ? await this.options.git.mergeTarget(folder)
@@ -86,7 +89,13 @@ export class AgentGitWorkflowService {
         if (workflow.detached || !workflow.branch) throw new Error('Create or check out a branch before pushing.');
         if (!workflow.remote) throw new Error('Add a Git remote before pushing.');
         await this.options.git.push(pushFolder, workflow.remote, workflow.branch, !workflow.upstream);
-        return this.workflow(agent, { refreshStatus: true });
+        const result = await this.workflow(agent, { refreshStatus: true });
+        if (input.closeAgentAfterPush === true) {
+          closeAgentInSnapshot(this.options.getSnapshot(), agentId);
+          this.options.deleteTranscript(agentId);
+          await this.options.persistAndEmitSnapshot();
+        }
+        return result;
       }
       case backendMethods.agentGitBranchCreate: {
         const folder = requireAgentFolder(agent);
@@ -307,8 +316,10 @@ export class AgentGitWorkflowService {
       this.options.delegatedWorkReports.deliver(agent, outcome, handoff);
     }
     if (deleteWorktree) {
-      closeAgentInSnapshot(this.options.getSnapshot(), agentId);
-      this.options.deleteTranscript(agentId);
+      if (input.pushAfter !== true) {
+        closeAgentInSnapshot(this.options.getSnapshot(), agentId);
+        this.options.deleteTranscript(agentId);
+      }
       await this.options.persistAndEmitSnapshot();
     }
     return result;

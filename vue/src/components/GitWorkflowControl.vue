@@ -363,10 +363,10 @@ const pullRequestOperation = ref<PullRequestOperation>({ status: 'editing' });
 const pullRequestBackgrounded = ref(false);
 type MergeOperation =
   | { status: 'confirming' }
-  | { status: 'merging'; branch: string; pushAfter: boolean }
-  | { status: 'pushing'; branch: string }
+  | { status: 'merging'; branch: string; pushAfter: boolean; closeAgentAfterPush: boolean }
+  | { status: 'pushing'; branch: string; closeAgentAfterPush: boolean }
   | { status: 'success'; branch: string; pushed: boolean }
-  | { status: 'error'; branch: string; mergeCreated: boolean; pushAfter: boolean; message: string };
+  | { status: 'error'; branch: string; mergeCreated: boolean; pushAfter: boolean; closeAgentAfterPush: boolean; message: string };
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
 const mergeBackgrounded = ref(false);
 let commitSuccessTimer: ReturnType<typeof setTimeout> | null = null;
@@ -743,13 +743,14 @@ async function merge(pushAfter: boolean): Promise<void> {
   clearMergeSuccessTimer();
   const agentId = props.agent.id;
   const branch = workflow.value?.branch ?? 'branch';
+  const closeAgentAfterPush = pushAfter && deleteWorktree.value;
   busy.value = true;
   workflowError.value = null;
   gitOperationProgress.value = {
     operation: 'merge',
     phase: props.reportBackAgentName && reportBack.value ? 'handoff' : 'delivery',
   };
-  mergeOperation.value = { status: 'merging', branch, pushAfter };
+  mergeOperation.value = { status: 'merging', branch, pushAfter, closeAgentAfterPush };
   let mergeCreated = false;
   try {
     const mergeResult = await props.mergeBranch!(agentId, {
@@ -757,21 +758,26 @@ async function merge(pushAfter: boolean): Promise<void> {
       ...(mergeStrategy.value === 'squash' ? { commitMessage: squashCommitMessage.value.trim() } : {}),
       deleteBranch: deleteBranch.value,
       deleteWorktree: deleteWorktree.value,
+      ...(pushAfter ? { pushAfter: true } : {}),
       ...(props.reportBackAgentName ? { reportBack: reportBack.value } : {}),
       confirmed: true,
     });
     if (props.agent.id === agentId) workflow.value = mergeResult;
     mergeCreated = true;
     if (pushAfter && props.pushBranch) {
-      mergeOperation.value = { status: 'pushing', branch };
-      const pushResult = await props.pushBranch(agentId, { confirmed: true, target: 'mergeTarget' });
+      mergeOperation.value = { status: 'pushing', branch, closeAgentAfterPush };
+      const pushResult = await props.pushBranch(agentId, {
+        confirmed: true,
+        target: 'mergeTarget',
+        ...(closeAgentAfterPush ? { closeAgentAfterPush: true } : {}),
+      });
       if (props.agent.id === agentId) workflow.value = pushResult;
     }
     showMergeSuccess(branch, pushAfter);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
-    mergeOperation.value = { status: 'error', branch, mergeCreated, pushAfter, message };
+    mergeOperation.value = { status: 'error', branch, mergeCreated, pushAfter, closeAgentAfterPush, message };
     if (mergeBackgrounded.value) {
       ElMessage.error(`${mergeOperationTitle.value}: ${message}`);
       resetMergeOperation();
@@ -783,16 +789,21 @@ async function merge(pushAfter: boolean): Promise<void> {
 async function retryMergePush(): Promise<void> {
   if (!props.pushBranch || mergeOperation.value.status !== 'error' || !mergeOperation.value.mergeCreated) return;
   const branch = mergeOperation.value.branch;
+  const closeAgentAfterPush = mergeOperation.value.closeAgentAfterPush;
   busy.value = true;
   workflowError.value = null;
-  mergeOperation.value = { status: 'pushing', branch };
+  mergeOperation.value = { status: 'pushing', branch, closeAgentAfterPush };
   try {
-    workflow.value = await props.pushBranch(props.agent.id, { confirmed: true, target: 'mergeTarget' });
+    workflow.value = await props.pushBranch(props.agent.id, {
+      confirmed: true,
+      target: 'mergeTarget',
+      ...(closeAgentAfterPush ? { closeAgentAfterPush: true } : {}),
+    });
     showMergeSuccess(branch, true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
-    mergeOperation.value = { status: 'error', branch, mergeCreated: true, pushAfter: true, message };
+    mergeOperation.value = { status: 'error', branch, mergeCreated: true, pushAfter: true, closeAgentAfterPush, message };
   } finally {
     busy.value = false;
   }
@@ -903,6 +914,7 @@ async function showDebugOperationProgress(operation: 'pullRequest' | 'merge'): P
       status: 'merging',
       branch: workflow.value?.branch ?? props.gitStatus?.branch ?? 'debug/worktree-preview',
       pushAfter: false,
+      closeAgentAfterPush: false,
     };
   }
 

@@ -343,11 +343,17 @@ describe('GitWorkflowControl', () => {
     await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[1]!.setValue(true);
     await submitButton(wrapper, 'Merge and push').trigger('click');
     await flushPromises();
 
-    expect(mergeBranch).toHaveBeenCalledTimes(1);
-    expect(pushBranch).toHaveBeenCalledWith('agent-1', { confirmed: true, target: 'mergeTarget' });
+    expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
+      strategy: 'merge', deleteBranch: true, deleteWorktree: true, pushAfter: true, confirmed: true,
+    });
+    expect(pushBranch).toHaveBeenCalledWith('agent-1', {
+      confirmed: true, target: 'mergeTarget', closeAgentAfterPush: true,
+    });
     expect(wrapper.text()).toContain('Pushing merged branch');
 
     vi.useFakeTimers();
@@ -370,6 +376,7 @@ describe('GitWorkflowControl', () => {
     await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     await submitButton(wrapper, 'Merge and push').trigger('click');
     await flushPromises();
 
@@ -384,6 +391,12 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.text()).toContain('Merged and pushed');
     expect(mergeBranch).toHaveBeenCalledTimes(1);
     expect(pushBranch).toHaveBeenCalledTimes(2);
+    expect(pushBranch).toHaveBeenNthCalledWith(1, 'agent-1', {
+      confirmed: true, target: 'mergeTarget', closeAgentAfterPush: true,
+    });
+    expect(pushBranch).toHaveBeenNthCalledWith(2, 'agent-1', {
+      confirmed: true, target: 'mergeTarget', closeAgentAfterPush: true,
+    });
   });
 
   it('keeps a failed merge open with its error and a retry action', async () => {

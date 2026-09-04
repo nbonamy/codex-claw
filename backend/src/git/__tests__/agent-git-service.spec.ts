@@ -585,16 +585,17 @@ describe('agent git service parsers', () => {
       if (args[0] === 'remote' && args[1] === undefined) return { stdout: '' };
       if (args[0] === 'status') return { stdout: '## feature\n' };
       if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n' };
+      if (args[0] === 'branch' && args[1] === '-d') throw new Error("the branch 'feature' is not fully merged");
       return { stdout: '' };
     });
     const service = new AgentGitService(() => new Date(), runGit);
     await expect(service.merge('/repo-feature', 'squash', true, true, 'feat: combine the workflow')).resolves.toBe('/repo');
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--squash', 'feature']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', 'feat: combine the workflow']);
-    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-d', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['worktree', 'remove', '/repo-feature']);
     const removeWorktreeCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'worktree' && args[1] === 'remove');
-    const deleteBranchCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'branch' && args[1] === '-d');
+    const deleteBranchCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'branch' && args[1] === '-D');
     expect(removeWorktreeCall).toBeLessThan(deleteBranchCall);
   });
 
@@ -638,7 +639,7 @@ describe('agent git service parsers', () => {
     expect(runGit.mock.calls.some(([, args]) => args[0] === 'merge' || args[0] === 'branch')).toBe(false);
   });
 
-  it('forces a local merge commit without pushing the base branch', async () => {
+  it('uses safe branch deletion after a merge commit without pushing the base branch', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
       if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
@@ -650,9 +651,10 @@ describe('agent git service parsers', () => {
     });
     const service = new AgentGitService(() => new Date(), runGit);
 
-    await service.merge('/repo-feature', 'merge', false, false);
+    await service.merge('/repo-feature', 'merge', true, true);
 
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--no-ff', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-d', 'feature']);
     expect(runGit.mock.calls.some(([, args]) => args[0] === 'push')).toBe(false);
   });
 
