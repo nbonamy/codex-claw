@@ -1,6 +1,7 @@
 import { bench, describe } from 'vitest';
 import type { Agent, AppSnapshot, MainToRendererEvent, RendererMessage } from '../contracts';
-import { applyMainEventToSnapshot, createEmptySnapshot } from '../snapshot';
+import { createEmptySnapshot } from '../snapshot-construction';
+import { applyMainEventToSnapshot } from '../snapshot';
 
 const AGENT_COUNT = 5;
 const MESSAGES_PER_AGENT = 400;

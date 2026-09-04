@@ -15,9 +15,8 @@ import type {
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 import { agentDisplayName } from './agent-display';
+import { seedTeamId } from './seed-ids';
 import { workspaceSidebarGroupIdForAgent, workspaceSidebarRepositoryRootForAgent } from './workspace-sidebar';
-
-const seedTeamId = 'team-codex-claw';
 
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
   const name = normalizedOptionalString(input.name) ?? null;

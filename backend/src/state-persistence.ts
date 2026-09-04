@@ -4,7 +4,7 @@ import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSu
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { appText } from '@codex-claw/core/app-text';

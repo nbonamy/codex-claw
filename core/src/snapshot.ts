@@ -29,8 +29,6 @@ import type {
   WorkBacklogAssignment,
 } from './contracts';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from './subagent-values';
-import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
-import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { workItemAssignmentKey } from './work-assignments';
@@ -47,98 +45,12 @@ export {
   updateAgentWorkspace,
 } from './agent-manager';
 
-const seedCreatedAt = '2026-06-05T00:00:00.000Z';
-const seedTeamId = 'team-codex-claw';
+export {
+  createDefaultRemoteConnectionsState,
+  createEmptySnapshot,
+  createInitialSnapshot,
+} from './snapshot-construction';
 type ToolPart = RendererToolPart;
-
-export function createEmptySnapshot(): AppSnapshot {
-  return {
-    teams: [
-      createDefaultTeam(),
-    ],
-    agents: [],
-    automations: [],
-    activeTeamId: seedTeamId,
-    activeAgentId: null,
-    messages: [],
-    queuedPrompts: [],
-    workRoutingRequests: [],
-    backendApprovals: {},
-    agentGitStatuses: {},
-    turnGitDiffs: {},
-    subagentTrees: {},
-    backendRuntimes: [{
-      backend: 'codex',
-      status: 'notConfigured',
-      detail: { key: 'backend.codexNotConnected' },
-    }, {
-      backend: 'claude',
-      status: 'notConfigured',
-      detail: { key: 'backend.claudeNotStarted' },
-    }],
-    workBacklog: createDefaultWorkBacklogState(),
-    remoteConnections: createDefaultRemoteConnectionsState(),
-    general: { ...defaultGeneralSettings, plugins: { ...defaultPluginSettings } },
-    sourceFolder: { ...defaultSourceFolderState },
-    theme: { ...defaultThemeSettings },
-  };
-}
-
-export function createInitialSnapshot(): AppSnapshot {
-  const agents = createSeedAgents();
-
-  return {
-    teams: [
-      {
-        ...createDefaultTeam(),
-        agentIds: agents.map((agent) => agent.id),
-      },
-    ],
-    agents,
-    automations: [],
-    activeTeamId: seedTeamId,
-    activeAgentId: agents[0]?.id ?? null,
-    messages: [],
-    queuedPrompts: [],
-    workRoutingRequests: [],
-    backendApprovals: {},
-    agentGitStatuses: {},
-    turnGitDiffs: {},
-    subagentTrees: {},
-    backendRuntimes: [{
-      backend: 'codex',
-      status: 'notConfigured',
-      detail: { key: 'backend.codexNotConnected' },
-    }, {
-      backend: 'claude',
-      status: 'notConfigured',
-      detail: { key: 'backend.claudeNotStarted' },
-    }],
-    workBacklog: createDefaultWorkBacklogState(),
-    remoteConnections: createDefaultRemoteConnectionsState(),
-    general: { ...defaultGeneralSettings, plugins: { ...defaultPluginSettings } },
-    sourceFolder: { ...defaultSourceFolderState },
-    theme: { ...defaultThemeSettings },
-  };
-}
-
-function createDefaultWorkBacklogState(): AppSnapshot['workBacklog'] {
-  return {
-    connections: [{
-      provider: 'github',
-      status: 'disconnected',
-    }],
-    providerConfigurations: {},
-    providerSettings: {},
-    assignments: {},
-  };
-}
-
-export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnections'] {
-  return {
-    connections: [],
-  };
-}
 
 export function appendUserPrompt(
   snapshot: AppSnapshot,
@@ -2325,43 +2237,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
-}
-
-function createDefaultTeam(): AppSnapshot['teams'][number] {
-  return {
-    id: seedTeamId,
-    name: 'Codex Claw',
-    avatar: 'CC',
-    color: defaultTeamColor,
-    agentIds: [],
-  };
-}
-
-function createSeedAgents(): Agent[] {
-  return [
-    {
-      id: 'agent-dina',
-      teamId: seedTeamId,
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
-      backendDefaults: { kind: 'codex' },
-      status: { type: 'idle' },
-      createdAt: seedCreatedAt,
-      updatedAt: seedCreatedAt,
-    },
-    {
-      id: 'agent-jesse',
-      teamId: seedTeamId,
-      name: 'Jesse',
-      avatar: 'JE',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
-      backendDefaults: { kind: 'codex' },
-      status: { type: 'idle' },
-      createdAt: seedCreatedAt,
-      updatedAt: seedCreatedAt,
-    },
-  ];
 }

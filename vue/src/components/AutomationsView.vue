@@ -161,7 +161,7 @@ import type {
   WorkProviderKind,
   WorkRepository,
 } from '@codex-claw/core/contracts';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
