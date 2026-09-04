@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 13b active — decode local backend-event transports.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 13c active — decode remote backend-event transports.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -114,8 +114,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 12b: migrate mixed snapshot callers and add boundary regressions.
 - [ ] Phase 1.4 slice 13: add typed decoding at every backend-event wire ingress.
 - [x] Phase 1.4 slice 13a: add the Core wire-event decoder and characterizations.
-- [ ] Phase 1.4 slice 13b: decode local Electron and Web backend events. **Active.**
-- [ ] Phase 1.4 slice 13c: decode remote backend events.
+- [x] Phase 1.4 slice 13b: decode local Electron and Web backend events.
+- [ ] Phase 1.4 slice 13c: decode remote backend events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -160,10 +160,12 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 12a: deep snapshot decoder | Complete | core snapshot agent / root integrator | Public façade: 32 lines; private metadata/collection/primitive leaves: 531 / 180 / 51 lines; exactly five façade exports and no dependency cycles | 51 malformed nested cases; focused 16 tests and Core 263 tests passed; full `npm run test:ai`: 271 files / 2,074 tests in 24.92s; all-workspace typecheck and lint/Knip passed; guard coverage 100% lines/functions and 97.97% branches | `22c6f7e9eb3a5ccd3e1fdf8fdd2dfda55584dbe9` | One identity-preserving, linear decoder now classifies full versus metadata snapshots, rejects present malformed `messages` without downgrade, permits additive fields, and remains separate from persistence restoration |
 | 2026-09-04 | Phase 1.4 slice 12b: classified snapshot adoption | Complete | snapshot boundary agent / root integrator | All mixed boundaries now decode once and branch on classification: backend remote results, remote-team events, Core runtime reduction, Electron synchronization/transient/cache replicas, and Vue adoption; full-only guards remain where only a complete snapshot is valid | Focused: Core 30, Backend 54, Electron 14, and Vue 18 tests. Full `npm run test:ai`: 272 files / 2,077 tests in 28.02s. All-workspace typecheck and lint/Knip passed | `79572a0db1d821ed30ca3a7a5fc4f998aca889b0` | Review found and fixed an invalid full snapshot downgrading to metadata. Persistence remains separate and permissive; full/metadata precedence, transcript replacement/retention, cache behavior, selection, unread state, remote projection, and receiving-server client-state recomputation remain intact |
 | 2026-09-04 | Phase 1.4 slice 13a: typed wire-event decoder | Complete | core event decoder agent / root integrator | Public API: two symbols; 225-line façade plus private leaves from 85 to 479 lines; exhaustive 55-key compile-time/runtime registry; moved event type block remained byte-identical | Decoder preserves valid event identity and reports safe structural path/reason diagnostics without payload values. Focused coverage: 94.79% statements / 90.24% branches / 95.67% functions / 95.52% lines. Core: 42 files / 275 tests. Full `npm run test:ai`: 274 files / 2,089 tests. All-workspace typecheck, lint, stylelint, Knip, and diff checks passed; Madge found no cycles across 95 files | `96151235f08d9e26c1e64f0324eabf3992f817de` | Structure-only decoding landed without normalization, semantic cross-field checks, or transport changes. Compatibility re-exports preserve the prior RPC import surface while transport adoption proceeds |
-| 2026-09-04 | Phase 1.4 slice 13b: local transport decoder adoption | Active | root orchestrator | Electron `backend-rpc-session` and Web `backend-process` still trust typed backend-event notification casts | Decode unknown event notifications exactly once at each local ingress. Add direct transport tests proving malformed decoded notifications are ignored and logged without state mutation, while malformed JSON/RPC framing retains its current fatal behavior | — | Do not change remote transports until slice 13c. Preserve all valid-event behavior and transport framing; remove only the local event casts made obsolete by the decoder |
+| 2026-09-04 | Phase 1.4 slice 13b: local transport decoder adoption | Complete | local transport agent / root integrator | Electron `backend-rpc-session` and Web `backend-process` typed casts → one decode from `unknown` at each local notification ingress | 34 focused tests passed. Full `npm run test:ai`: 274 files / 2,092 tests in 26.48s (Core 275, Backend 613, Vue 897, Electron 285, Web 22). All-workspace typecheck, Stylelint, Knip, and diff checks passed | `b1058b2da5874955342703f87389f22635cccdb6` | Independent review found no defects. Malformed events are safely logged and dropped without publication; each transport remains usable for subsequent valid events. Existing malformed JSON and JSON-RPC framing behavior is unchanged |
+| 2026-09-04 | Phase 1.4 slice 13c: remote transport decoder adoption | Active | root orchestrator | Backend `remote-clawd-client` and the Web protocol still trust backend-event notification casts | Decode remote event notifications exactly once; prove malformed decoded events do not terminate transport or reject pending requests, and that subsequent valid events recover normally; retain current malformed JSON/RPC framing behavior; update protocol documentation | — | Sole active checkpoint. Preserve request/event ordering and transport lifecycle; remove only obsolete event casts |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
+| 2026-09-04 | Phase 3.1: Electron backend replica manifest | Pending / prepared | root orchestrator | `AppController` 1,863 lines; replica responsibility about 205 lines / 29 conditionals; 47 full-snapshot and four metadata callers | Read-only snapshot/event replication and test-ownership audit complete; target owner is `electron-backend-replica.ts` | — | Execute three exact commits: `test: characterize electron backend replication`, `chore: extract electron backend replica`, `test: move electron backend replica specifications`. Preserve raw/transient identity, metadata-only cache, three-attempt sequence barrier, event/client-state/publication ordering, and renderer-only media projection; remote automation remains outside |
 
 For each future row, include:
 
@@ -768,16 +770,20 @@ normalization, or application behavior changes.
 
 Execute in three checkpoints:
 
-1. `chore: add typed wire event decoder` — add the decoder and exhaustive
-   direct Core characterizations; do not change transports.
-2. `chore: decode local backend events` — migrate Electron
-   `backend-rpc-session` and Web `backend-process`. Ignore and log malformed
-   decoded event notifications, while malformed JSON or RPC framing remains
-   fatal.
-3. `chore: decode remote backend events` — migrate backend
+1. `chore: add typed wire event decoder` — completed in
+   `96151235f08d9e26c1e64f0324eabf3992f817de`; the decoder and exhaustive
+   direct Core characterizations do not change transports.
+2. `chore: decode local backend events` — completed in
+   `b1058b2da5874955342703f87389f22635cccdb6`; Electron
+   `backend-rpc-session` and Web `backend-process` decode exactly once, ignore
+   and safely log malformed decoded event notifications, and retain their
+   existing malformed JSON and JSON-RPC framing behavior.
+3. `chore: decode remote backend events` — active; migrate backend
    `remote-clawd-client` and the Web protocol, then update the relevant docs.
    Decode failures must not terminate the transport or reject pending
-   requests.
+   requests. Tests must prove recovery through subsequent valid events and
+   continued pending-request resolution while current malformed JSON/RPC
+   framing behavior remains unchanged.
 
 Every relocation follows `lossless-code-moves` with byte/AST fidelity. Slice
 13 exits when all four wire ingress seams decode `unknown` exactly once, no
@@ -942,6 +948,29 @@ subagent at most 150, and every persistence spec at most 600 lines.
 - Make raw snapshot adoption, normalized snapshot adoption, and metadata
   adoption explicit policies.
 - Keep renderer notification ordering deterministic.
+
+The prepared baseline is `AppController` at 1,863 lines. Its backend replica
+responsibility is approximately 205 lines with 29 conditionals, serving 47
+full-snapshot callers and four metadata callers. Extract it into
+`electron-backend-replica.ts` while keeping remote automation outside the
+module.
+
+Preserve raw and transient snapshot identity, the metadata-only cache, the
+three-attempt event-sequence barrier, event → client-state → renderer
+publication ordering, and renderer-only media projection. Every substantial
+source and test move must follow `lossless-code-moves` with declaration, AST,
+body, and test fidelity proved before boundary edits.
+
+Execute in three exact checkpoints:
+
+1. `test: characterize electron backend replication`
+2. `chore: extract electron backend replica`
+3. `test: move electron backend replica specifications`
+
+Exit when `AppController` is at most 1,725 lines with at least 135 net lines
+removed, the replica is at most 300 lines with no more than seven public
+members, direct replica specifications are at most 450 lines, and the remaining
+composition specification is at most 250 lines.
 
 Commit checkpoint: `chore: extract electron backend replica`
 
