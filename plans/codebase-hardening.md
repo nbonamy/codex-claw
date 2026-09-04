@@ -18,7 +18,7 @@ Measured on 2026-09-04 before implementation begins.
 | `backend/src/server.spec.ts` | 7,270 lines; 116 tests |
 | `core/src/snapshot.ts` | 2,558 lines; 42 event branches |
 | `core/src/contracts.ts` | 1,745 lines; 213 exports; 238 consumers |
-| Typed backend protocol | 13 of 156 methods |
+| Typed backend protocol | 12 of 156 methods |
 | Electron app controller | 1,835 lines; about 120 IPC registrations |
 | Renderer app state | 1,837 lines; 164 returned members |
 | `AppShell.vue` | 1,798 lines; 112 props; 39 emits |
@@ -91,7 +91,14 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.1 active — the lossless agent-state move manifest is prepared.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 1 active — type connection and annotation events.**
+- [x] Phase 1.1: consolidate agent state ownership.
+- [x] Phase 1.2: extract snapshot construction.
+- [x] Phase 1.3: extract deep snapshot reducers.
+- [x] Phase 1.3a: extract the subagent reducer.
+- [x] Phase 1.3b: extract the runtime/global reducer.
+- [x] Phase 1.3c: extract the conversation reducer.
+- [ ] Phase 1.4 slice 1: type connection and annotation events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -115,8 +122,15 @@ row is not complete.
 | 2026-09-04 | Phase 0.3: Electron app-controller specifications | Complete | Electron test agent / root integrator | 1 spec → 6 specs; 71 → 71 tests; original 2,827 → 96 lines; replacement specs total 2,805 lines plus a 91-line harness; largest spec 946 lines; 71/71 test bodies and 99/99 helpers byte-identical | Focused: 71 passed in 813ms, baseline 1.10s; full Electron: 3.88s, baseline 5.20s; Electron typecheck, lint, and diff checks passed | `174952716bb43b933e7034a07ba69ce089b479c4` | Electron lane complete; phase remains active with renderer state test lane active |
 | 2026-09-04 | Phase 0.3: renderer app-state specifications | Complete | renderer test agent / root integrator | 1 spec / 4,739 lines → 7 owner-aligned specs / 4,825 lines + 30-line fixture; 113 declarations preserved: 112 regular tests and one three-row parameterized test; 115 → 115 runtime cases; every declaration body byte-identical; largest spec 946 lines | Focused: 115 passed in 1.80s, baseline 1.55s; full Vue: 896 passed in 13.22s, pre-split run 14.31s; Vue typecheck, lint, CSS lint, and diff checks passed | `076d905b7beef0e59106967eb5fae08c467bfb02` | Split required no singleton-isolation or production-state change |
 | 2026-09-04 | Phase 0.3: split remediation | Complete | root integrator | Two oversized core specs at 1,346 and 1,145 lines → six cohesive specs, largest 611 lines; unused Electron `getSnapshot` export → private harness helper | Focused remediation tests passed; full core: 226 passed; Electron controller: 71 passed; core/Electron typecheck and lint passed; diff checks passed | `0e6af2ad4e8a5a653820552fd46f66e6f616ad9a` | Every Phase 0 split spec is now below 1,000 lines |
-| 2026-09-04 | Phase 0 boundary qualification | Complete | plan steward / root orchestrator | 2,036 tests passed on every run; all split declarations preserved; largest Phase 0 split spec is 992 lines | `npm run test:ai` wall runs: 20.58s, 20.59s, 20.27s; median 20.58s, 4.43s faster than the 25.01s baseline. `npm run typecheck`: passed in 16.93s. `npm run lint`: passed in 19.42s, with one non-failing stale `lipo` ignore hint. Size gate and `git diff --check`: passed | `chore: complete hardening foundation` (this commit) | Phase 0 exit criteria met; the earlier 29.51s run was not a persistent regression |
-| 2026-09-04 | Phase 1.1: agent state ownership move manifest | Active | root orchestrator | Agent mutations spread across `snapshot.ts`, `agent-manager.ts`, and `team-manager.ts` → lossless move manifest prepared; no production move yet | Read-only symbol and mutation-path inventory; Phase 0 boundary gates provide the clean starting point | — | Creation/update/selection, team membership, and runtime-reset paths are the first consolidation seam; move mechanically before changing ownership policy |
+| 2026-09-04 | Phase 0 boundary qualification | Complete | plan steward / root orchestrator | 2,036 tests passed on every run; all split declarations preserved; largest Phase 0 split spec is 992 lines | `npm run test:ai` wall runs: 20.58s, 20.59s, 20.27s; median 20.58s, 4.43s faster than the 25.01s baseline. `npm run typecheck`: passed in 16.93s. `npm run lint`: passed in 19.42s, with one non-failing stale `lipo` ignore hint. Size gate and `git diff --check`: passed | `6eb9cecaa961a1462176b82002d6dba3acfa2b69` | Phase 0 exit criteria met; the earlier 29.51s run was not a persistent regression |
+| 2026-09-04 | Phase 1.1: consolidate agent state ownership | Complete | core state agent / root integrator | `snapshot.ts` 2,558 → 2,367 lines; `agent-manager.ts` 449 → 651 lines; agent-state interface 15 → 23 exports, including 8 compatibility re-exports from `snapshot.ts`; lifecycle coverage 10 → 16 tests; core 226 → 232 tests | Moved helper bodies mechanically and verified them byte-for-byte before boundary edits; semantic review found no behavior drift. Focused lifecycle: 16 passed; full core: 232 passed; core typecheck, lint, and diff checks passed | `5ce6f800a24e8081527b9612e12ef5384d0cd016` | `agent-manager.ts` is now the authoritative owner for creation, update, selection, membership, and runtime reset; temporary `snapshot.ts` re-exports preserve callers during migration |
+| 2026-09-04 | Phase 1.2: extract snapshot construction | Complete | core state agent / root integrator | `snapshot.ts` 2,367 → 2,240 lines; extracted a 152-line construction owner and one-line `seedTeamId` dependency leaf; core 232 → 236 tests, including five direct construction tests in a 209-line spec; three construction functions remain compatibility re-exports from `snapshot.ts` | Construction tests: 5 passed; full core: 236 passed in 598ms; core typecheck, lint, mechanical move review, independent semantic review, and diff checks passed | `30a7ae93306ac1ae9b3ffc4484a1d32b6107ec0a` | The independent review found nested mutable defaults were aliased across snapshots. Construction now clones nested arrays/objects, with mutation coverage proving fresh teams, runtimes, backlog, remote connections, general settings, source-folder state, and theme state. The dependency leaf avoids a construction/agent-state cycle; the temporary façade remains until consumer migration |
+| 2026-09-04 | Phase 1.3a: extract subagent reducer | Complete | core reducer agent / root integrator | `snapshot.ts` 2,240 → 2,046 lines; extracted a 220-line reducer with one exported function; mixed façade spec 272 → 113 lines plus a 164-line direct reducer spec; five tests preserved across the split | Four dispatcher branches, five helpers, and all five original test bodies verified byte-for-byte. Focused: 2 files / 5 tests passed in 166ms; full core: 38 files / 236 tests passed in 611ms; core typecheck, lint, Knip, acyclic dependency check, and staged diff check passed | `5c8b7bd60b82782ee6fda5370dfe7e9937b90ce2` | Neutral subagent enum/value validators remain in `subagent-values.ts`; reducer-local structural validation stays private. `thread.started` remains the explicit façade bridge that clears a stale root tree before future runtime reduction |
+| 2026-09-04 | Phase 1.3b: extract runtime/global reducer | Complete | core reducer agent / root integrator | `snapshot.ts` 2,046 → 1,591 lines; extracted a 468-line reducer with one exported handled-result function; runtime spec 419 → 590 lines and 11 → 15 tests; interaction spec 443 → 406 lines; core 236 → 239 tests; metadata helpers moved to construction and two shared agent helpers moved to `agent-manager.ts` | Focused runtime/façade coverage: 4 files / 28 tests passed in 191ms; full core: 38 files / 239 tests passed in 631ms; core typecheck, lint, Knip, fidelity review, acyclic dependency review, and staged/diff checks passed | `1518dfe8a29bf6d8ec4f59456538c540fe7223f9` | Review fixed two routing regressions before commit: `thread.settingsUpdated` is now reported handled even without a thread ID, and stale subagent-tree invalidation was restored to the façade before runtime delegation. Wall-clock agent-status timestamps, agentless global events, owned no-ops, and the legacy missing-agent gate now have direct characterization coverage |
+| 2026-09-04 | Phase 1.3c: extract conversation reducer | Complete | core reducer agent / root integrator | `snapshot.ts` 1,591 → 64 lines; extracted payloads 273, transcript 413, tools 317, plans 305, and reducer 307 lines; largest private module 413 lines; one reducer entrypoint owns 24 conversation event types | Focused owners: 8 files / 55 runtime tests passed in 238ms, comprising 51 declared test bodies with four additional parameterized cases; full core at the boundary: 39 files / 239 tests passed in 649ms; core typecheck, lint, Knip, move-fidelity review, acyclic dependency review, and diff checks passed | `e03dd5da636a1545677fcf888ad67bb6bcd0d2bc` | The architecture review moved agent resolution to the reducer and passes the `Agent` into plan helpers, so plans do not import `agent-manager`; the dependency graph remains payloads → transcript → tools → plans → reducer. Temporary façade exports preserve callers, and frozen semantic risks move to 1.4 rather than contaminating the extraction |
+| 2026-09-04 | Phase 1.3 boundary qualification | Complete | plan steward / root orchestrator | Three deep reducers complete; `snapshot.ts` 2,240 at the start of 1.3 → 64 lines; total suite 270 files / 2,049 tests | `npm run test:ai`: core 39 files / 239 tests in 649ms; backend 61 / 611 in 1.64s; Vue 124 / 896 in 13.76s; Electron 40 / 282 in 3.58s; Web 6 / 21 in 453ms; wall 21.57s, 3.44s faster than the 25.01s program baseline | `chore: record snapshot reducer extraction` (this commit) | Phase 1.3 exit is qualified; Phase 1.4 slice 1 is active |
+| 2026-09-04 | Phase 1.4 slice 1: type connection and annotation events | Active | root orchestrator | Two events selected from the permissive event surface: `client.connectionChanged` with `BackendConnectionState`, and `browser.annotationCreated` with `BrowserAnnotation` | Exact type-flow and compile-pressure audit prepared; implementation and gates pending | — | Preserve optional envelope/source fields and source-less legacy/test fallback classification. Annotation identity remains in the payload, so do not require envelope `agentId`. Keep `BackendEvent` and `ClawBackendEvent` distributive without excluding client-local events; expect compile pressure at `nextMainEvent`, `eventForRenderer`, remote forwarding, and the Electron test harness. Runtime guards stay unchanged until a later slice; bundle no behavior changes |
+| 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
 
@@ -206,9 +220,116 @@ Commit checkpoint: `chore: extract snapshot construction`
 - Keep cross-domain transitions explicit at the façade.
 - Move tests with their owning reducers.
 
-Commit checkpoint: `chore: extract snapshot reducers`
+#### 1.3a Subagent reducer
+
+- Own operation, activity, identity, and status events plus subagent-tree
+  construction behind one reducer function.
+- Keep neutral subagent value validators in `subagent-values.ts`.
+- Keep root-conversation invalidation in the `thread.started` façade bridge.
+
+Commit checkpoint: `chore: extract snapshot subagent reducer`
+
+#### 1.3b Runtime/global reducer
+
+- Own `snapshot.updated`, work-routing request/resolution, backend status,
+  account rate limits, backlog assignments, agent update/status, thread
+  start/settings/token/goal/mode, and git-status events.
+- Move `snapshotMetadata` and `applySnapshotMetadata` to snapshot construction,
+  retaining temporary façade re-exports for existing callers.
+- Move the shared agent lookup and status mutation helpers into
+  `agent-manager.ts`; runtime and conversation reducers must use that
+  authoritative owner rather than duplicate agent mutation policy.
+- Keep the stale-subagent-tree check in `snapshot.ts` as the explicit
+  cross-domain `thread.started` bridge before delegating the remaining runtime
+  transition.
+- Preserve `thread.modeUpdated` as an explicit no-op. Preserve
+  `agentCreation.progress`, `browser.annotationCreated`,
+  `celebration.requested`, `client.connectionChanged`,
+  `clientRequest.resolved`, `devicePairing.statusChanged`, `file.activity`,
+  `git.operationProgress`, `models.changed`, `sidePanel.gitDiffRequested`,
+  `sidePanel.markdownRequested`, and `skills.changed` as no-ops without making
+  their handling exhaustive until 1.4.
+
+Commit checkpoint: `chore: extract snapshot runtime reducer`
+
+#### 1.3c Conversation reducer
+
+Completed in `e03dd5da636a1545677fcf888ad67bb6bcd0d2bc`.
+
+- Own transcript streaming and hydration, compaction, plans, tools and diffs,
+  approvals and user input, prompt queues, turn completion, and errors behind
+  one reducer function.
+- Own exactly these 24 event types: `thread.historyLoaded`; `turn.started`,
+  `turn.planUpdated`, `turn.proposedPlanDelta`,
+  `turn.proposedPlanCompleted`, and `turn.completed`; `message.delta`,
+  `message.updated`, `message.userSubmitted`, and `message.steer`;
+  `agent.promptQueued`, `agent.promptRetryScheduled`, and
+  `agent.promptDequeued`; `backendApproval.requested` and
+  `backendApproval.resolved`; `context.compactionStarted` and
+  `context.compactionCompleted`; `item.started`, `item.completed`, and
+  `item.updated`; `diff.updated`; `approval.requested`;
+  `toolInput.requested`; and `error`.
+- Build five private modules in one direction: payload validation depends only
+  on contracts; transcript depends on payload validation; tools and diffs
+  depend on payload validation, transcript, and `tool-output`; plans depend on
+  payload validation, transcript, and tools; the reducer composes all four and
+  the agent-state owner. No private module may import the façade or another
+  top-level reducer.
+- Move detailed reducer tests to their direct owner while retaining only
+  composition and cross-domain smokes on `applyMainEventToSnapshot`. Preserve
+  51 existing direct-owner cases: 21 transcript/hydration/compaction, eight
+  plans, 13 tool/diff, eight interaction, and one retryable-error case.
+- Keep temporary façade exports for `appendUserPrompt`, `appendSteerPrompt`,
+  `appendSystemMessage`, and `formatThreadPlanMarkdown` while callers migrate.
+- Target reducer ≤320 lines, transcript ≤550, tools ≤450, plans ≤330, payloads
+  ≤300, no private file above 600, and the composed façade at roughly 150–250
+  lines.
+- Freeze the early `!agentId` behavior and unreachable all-agent
+  `backendApproval.resolved` path; atomic turn completion and diff updates;
+  approval/input/error status coupling; hydrated object identity and canonical
+  placement; streaming IDs, segment, and compaction order; and proposed-plan
+  tag filtering. Those semantics can change only in 1.4.
+
+Commit checkpoint: `chore: extract snapshot conversation reducer`
+
+Approved extraction order and boundaries:
+
+1. Extract subagent operation, activity, identity, and status events with their
+   tree helper.
+2. Extract global/runtime state, routing, backend/account, agent, settings,
+   goal, token, and git-status events.
+3. Extract conversation events as one cohesive owner: thread history and
+   turns, transcript and prompt queues, hydration and compaction, plans, tools,
+   approvals, diffs, and errors.
+
+`snapshot.ts` remains the temporary façade, owns the cross-domain
+`thread.started` transition, and keeps the existing early `!agentId` gate.
+Reducers must not import the façade. Preserve current no-op behavior for
+`agentCreation.progress`, `browser.annotationCreated`,
+`celebration.requested`, `client.connectionChanged`,
+`clientRequest.resolved`, `devicePairing.statusChanged`, `file.activity`,
+`git.operationProgress`, `models.changed`, `sidePanel.gitDiffRequested`,
+`sidePanel.markdownRequested`, and `skills.changed`. Making ignored events
+exhaustive and resolving the unreachable all-agent `backendApproval.resolved`
+path are deliberately deferred to 1.4 so the move remains lossless.
 
 ### 1.4 Make event reduction honest and typed
+
+#### Slice 1 — connection and annotation events
+
+- Type `client.connectionChanged` with payload `BackendConnectionState`.
+- Type `browser.annotationCreated` with payload `BrowserAnnotation`.
+- Preserve optional envelope and source fields, including the source-less
+  legacy/test fallback classification.
+- Do not require an envelope `agentId` for annotations; annotation identity is
+  carried by the payload.
+- Keep `BackendEvent` and `ClawBackendEvent` distributive without excluding
+  client-local events.
+- Expect compile pressure at `nextMainEvent`, `eventForRenderer`, remote
+  forwarding, and the Electron test harness; update those consumers without
+  changing behavior.
+- Keep existing runtime guards unchanged. Deep boundary decoding belongs to a
+  later slice.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
@@ -243,6 +364,19 @@ Commit checkpoint: `chore: split core contract domains`
 - Move source, filesystem, and worktree behavior out of driver RPC handling.
 - Preserve backend filesystem ownership and security checks.
 - Ensure repository initialization and worktree policy live in one service.
+
+Future extraction discovery: `driver-rpc.ts` currently owns 11 non-provider
+source/file/worktree cases among 47, while `server.ts` owns another nine cases
+among 102. Introduce a deep source-workspace request service whose narrow
+entrypoint is `tryHandle(message)` and whose legitimate domain operations are
+folder validation and initial source-folder setup. It owns request parsing,
+authoritative agent-folder lookup, local/remote targeting, initialization,
+recent-repository persistence, local execution, and domain error shapes while
+retaining realpath confinement, symlink-escape prevention, file-size caps,
+remote-field stripping, and the shared worktree manager. Remove two obsolete
+internal file methods and type the 11 app-owned methods, moving the corrected
+protocol baseline from 12/156 toward 23/154. Phase 2.2 then deepens the
+temporary location adapter rather than preserving a pass-through layer.
 
 Commit checkpoint: `chore: isolate source workspace requests`
 
