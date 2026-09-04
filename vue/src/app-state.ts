@@ -1633,13 +1633,12 @@ function isBackendConnectionState(value: unknown): value is BackendConnectionSta
 }
 
 function syncAnsweredClientRequestsFromMainEvent(event: MainToRendererEvent): void {
-  if (
-    (event.type !== 'clientRequest.resolved' && event.type !== 'backendApproval.resolved') ||
-    !isRecord(event.payload)
-  ) return;
-  const id = event.type === 'backendApproval.resolved' && isRecord(event.payload.approval)
-    ? event.payload.approval.id
-    : event.payload.id;
+  if (event.type !== 'clientRequest.resolved' && event.type !== 'backendApproval.resolved') return;
+  const payload: unknown = event.payload;
+  if (!isRecord(payload)) return;
+  const id = event.type === 'backendApproval.resolved'
+    ? (isRecord(payload.approval) ? payload.approval.id : payload.id)
+    : payload.id;
   if (typeof id === 'string' && id) markClientRequestAnswered(id);
 }
 

@@ -1508,6 +1508,29 @@ type RendererToolPartEventPayload = {
 type RendererToolPartUpdateEventPayload = RendererToolPartUpdate & {
   messageId?: string;
 };
+type CodexClientRequestEventContext = {
+  agentId: string;
+  backend: 'codex';
+  threadId: string;
+  turnId?: string;
+};
+type ClaudeClientRequestEventContext = {
+  agentId: string;
+  backend: 'claude';
+  backendSessionId?: string;
+  turnId: string;
+};
+type BackendApprovalResolutionReason =
+  | 'host'
+  | 'server'
+  | 'conversation_closed'
+  | 'conversation_removed'
+  | 'surface_disconnected';
+type BackendErrorPayload = {
+  message: string;
+  willRetry?: boolean;
+  error?: unknown;
+};
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
@@ -1557,7 +1580,12 @@ type TypedMainToRendererEventType =
   | 'item.completed'
   | 'diff.updated'
   | 'file.activity'
-  | 'git.statusUpdated';
+  | 'git.statusUpdated'
+  | 'approval.requested'
+  | 'toolInput.requested'
+  | 'backendApproval.requested'
+  | 'backendApproval.resolved'
+  | 'error';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1824,6 +1852,48 @@ export type MainToRendererEvent =
       type: 'git.statusUpdated';
       agentId: string;
       payload: AgentGitStatus;
+    }>
+  | MainToRendererEventWith<CodexClientRequestEventContext & {
+      type: 'approval.requested';
+      payload: Extract<ClientRequest, { kind: 'confirm_tool' }>;
+    }>
+  | MainToRendererEventWith<ClaudeClientRequestEventContext & {
+      type: 'approval.requested';
+      payload: Extract<ClientRequest, { kind: 'confirm_tool' }>;
+    }>
+  | MainToRendererEventWith<CodexClientRequestEventContext & {
+      type: 'toolInput.requested';
+      payload: Extract<ClientRequest, { kind: 'ask_user' }>;
+    }>
+  | MainToRendererEventWith<ClaudeClientRequestEventContext & {
+      type: 'toolInput.requested';
+      payload: Extract<ClientRequest, { kind: 'ask_user' }>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'backendApproval.requested';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      turnId?: string;
+      payload: { approval: BackendApprovalRequest };
+    }>
+  | MainToRendererEventWith<{
+      type: 'backendApproval.resolved';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      turnId?: string;
+      payload: {
+        approval: BackendApprovalRequest;
+        decision: BackendApprovalDecision | null;
+        scope: BackendApprovalScope | null;
+        reason: BackendApprovalResolutionReason;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'error';
+      agentId: string;
+      payload: BackendErrorPayload;
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;

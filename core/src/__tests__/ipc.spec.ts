@@ -12,6 +12,9 @@ import type {
   AppCommand,
   AppSnapshot,
   AppSnapshotMetadata,
+  BackendApprovalDecision,
+  BackendApprovalRequest,
+  BackendApprovalScope,
   BackendConnectionState,
   BackendModelOption,
   BackendRuntimeStatus,
@@ -587,6 +590,46 @@ describe('ipc channels', () => {
     type GitStatusUpdatedEvent = Extract<MainToRendererEvent, { type: 'git.statusUpdated' }>;
     expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
     expectTypeOf<Pick<GitStatusUpdatedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type ApprovalRequestedEvent = Extract<MainToRendererEvent, { type: 'approval.requested' }>;
+    type CodexApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'codex' }>;
+    type ClaudeApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'claude' }>;
+    expectTypeOf<ApprovalRequestedEvent['payload']>()
+      .toEqualTypeOf<Extract<ClientRequest, { kind: 'confirm_tool' }>>();
+    expectTypeOf<Pick<CodexApprovalRequestedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    expectTypeOf<Pick<ClaudeApprovalRequestedEvent, keyof ClaudeModeEventContext>>()
+      .toEqualTypeOf<ClaudeModeEventContext>();
+    type ToolInputRequestedEvent = Extract<MainToRendererEvent, { type: 'toolInput.requested' }>;
+    type CodexToolInputRequestedEvent = Extract<ToolInputRequestedEvent, { backend: 'codex' }>;
+    type ClaudeToolInputRequestedEvent = Extract<ToolInputRequestedEvent, { backend: 'claude' }>;
+    expectTypeOf<ToolInputRequestedEvent['payload']>()
+      .toEqualTypeOf<Extract<ClientRequest, { kind: 'ask_user' }>>();
+    expectTypeOf<Pick<CodexToolInputRequestedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    expectTypeOf<Pick<ClaudeToolInputRequestedEvent, keyof ClaudeModeEventContext>>()
+      .toEqualTypeOf<ClaudeModeEventContext>();
+    type BackendApprovalRequestedEvent = Extract<MainToRendererEvent, { type: 'backendApproval.requested' }>;
+    expectTypeOf<BackendApprovalRequestedEvent['payload']>()
+      .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
+    expectTypeOf<Pick<BackendApprovalRequestedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    type BackendApprovalResolvedEvent = Extract<MainToRendererEvent, { type: 'backendApproval.resolved' }>;
+    expectTypeOf<BackendApprovalResolvedEvent['payload']>().toEqualTypeOf<{
+      approval: BackendApprovalRequest;
+      decision: BackendApprovalDecision | null;
+      scope: BackendApprovalScope | null;
+      reason: 'host' | 'server' | 'conversation_closed' | 'conversation_removed' | 'surface_disconnected';
+    }>();
+    expectTypeOf<Pick<BackendApprovalResolvedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    type ErrorEvent = Extract<MainToRendererEvent, { type: 'error' }>;
+    expectTypeOf<ErrorEvent['payload']>().toEqualTypeOf<{
+      message: string;
+      willRetry?: boolean;
+      error?: unknown;
+    }>();
+    expectTypeOf<Pick<ErrorEvent, keyof AgentOnlyEventContext>>()
       .toEqualTypeOf<AgentOnlyEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();

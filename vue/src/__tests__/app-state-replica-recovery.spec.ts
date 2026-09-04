@@ -184,6 +184,8 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
       type: 'backendApproval.requested',
       payload: { approval },
       occurredAt: '2026-06-05T00:00:01.000Z',

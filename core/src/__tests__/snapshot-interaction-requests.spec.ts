@@ -3,7 +3,12 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type {
+  BackendApprovalRequest,
+  MainToRendererEvent,
+  RendererToolPart,
+  RendererToolPartUpdate,
+} from '../contracts';
 import {
   commandOutputDeltaToToolPartUpdate,
   commandToolPart,
@@ -120,6 +125,8 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
       type: 'backendApproval.requested',
       payload: { approval },
       occurredAt: '2026-06-05T00:00:01.000Z',
@@ -131,8 +138,10 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
       type: 'backendApproval.resolved',
-      payload: { approval, decision: 'allow' },
+      payload: { approval, decision: 'approve', scope: 'once', reason: 'host' },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([]);
@@ -163,6 +172,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'approval.requested',
@@ -223,6 +233,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'approval.requested',
@@ -278,6 +289,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'toolInput.requested',
@@ -374,6 +386,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'approval.requested',
@@ -404,5 +417,124 @@ describe('snapshot reducer', () => {
         tool: 'register-agent',
       },
     });
+  });
+
+  it('keeps conversation-scoped Codex approval and input requests invisible without a turn', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'approval.requested',
+      payload: {
+        id: 'approval-without-turn',
+        kind: 'confirm_tool',
+        payload: {
+          confirmation: {
+            argumentsPreview: 'npm test',
+            integrationId: 'shell',
+            integrationName: 'Shell',
+            summary: 'Run tests?',
+            toolName: 'exec',
+          },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'toolInput.requested',
+      payload: {
+        id: 'input-without-turn',
+        kind: 'ask_user',
+        payload: { request: { itemId: 'ask-1', questions: [] } },
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages).toStrictEqual([]);
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
+  });
+
+  it('preserves malformed approval and input status fallbacks', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'backendApproval.requested',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+    expect(snapshot.backendApprovals).toStrictEqual({});
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'approval.requested',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    } as unknown as MainToRendererEvent);
+    expect(snapshot.messages).toStrictEqual([]);
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'awaitingInput', detail: undefined });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'toolInput.requested',
+      payload: {},
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    } as unknown as MainToRendererEvent);
+    expect(snapshot.messages).toStrictEqual([]);
+    expect(snapshot.agents[0].status).toStrictEqual({
+      type: 'awaitingInput',
+      detail: 'Waiting for user input',
+    });
+  });
+
+  it('retains flat approval parsing and leaves agent-less global resolution dormant', () => {
+    const snapshot = createInitialSnapshot();
+    const approval: BackendApprovalRequest = {
+      id: 'approval-flat',
+      kind: 'command',
+      conversationId: 'thread-1',
+      itemId: 'command-1',
+      title: 'Run tests',
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'backendApproval.requested',
+      payload: approval,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+    snapshot.backendApprovals['agent-jesse'] = [approval];
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      type: 'backendApproval.resolved',
+      payload: { approval, decision: null, scope: null, reason: 'server' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([approval]);
+    expect(snapshot.backendApprovals['agent-jesse']).toStrictEqual([approval]);
   });
 });

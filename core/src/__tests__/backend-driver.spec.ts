@@ -3,8 +3,12 @@ import type {
   Agent,
   AgentFileActivity,
   AgentGitStatus,
+  BackendApprovalDecision,
+  BackendApprovalRequest,
+  BackendApprovalScope,
   BackendConnectionState,
   BrowserAnnotation,
+  ClientRequest,
   RendererMessage,
   RendererToolPart,
   RendererToolPartUpdate,
@@ -120,6 +124,31 @@ describe('backend driver helpers', () => {
     type GitStatusUpdatedEvent = Extract<BackendEvent, { type: 'git.statusUpdated' }>;
     expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
     expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend?: Agent['backend']; threadId?: string; turnId?: string }>();
+    type ApprovalRequestedEvent = Extract<BackendEvent, { type: 'approval.requested' }>;
+    type CodexApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'codex' }>;
+    type ClaudeApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'claude' }>;
+    expectTypeOf<ApprovalRequestedEvent['payload']>()
+      .toEqualTypeOf<Extract<ClientRequest, { kind: 'confirm_tool' }>>();
+    expectTypeOf<Pick<CodexApprovalRequestedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: 'codex'; threadId: string; turnId?: string }>();
+    expectTypeOf<Pick<ClaudeApprovalRequestedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: 'claude'; threadId?: string; turnId: string }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'toolInput.requested' }>['payload']>()
+      .toEqualTypeOf<Extract<ClientRequest, { kind: 'ask_user' }>>();
+    expectTypeOf<Extract<BackendEvent, { type: 'backendApproval.requested' }>['payload']>()
+      .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'backendApproval.resolved' }>['payload']>()
+      .toEqualTypeOf<{
+        approval: BackendApprovalRequest;
+        decision: BackendApprovalDecision | null;
+        scope: BackendApprovalScope | null;
+        reason: 'host' | 'server' | 'conversation_closed' | 'conversation_removed' | 'surface_disconnected';
+      }>();
+    type ErrorEvent = Extract<BackendEvent, { type: 'error' }>;
+    expectTypeOf<ErrorEvent['payload']>()
+      .toEqualTypeOf<{ message: string; willRetry?: boolean; error?: unknown }>();
+    expectTypeOf<Pick<ErrorEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{ agentId: string; backend?: Agent['backend']; threadId?: string; turnId?: string }>();
     expectTypeOf<ConnectionEvent['seq']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ConnectionEvent['occurredAt']>().toEqualTypeOf<string | undefined>();

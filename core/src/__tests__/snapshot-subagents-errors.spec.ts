@@ -38,10 +38,34 @@ describe('snapshot reducer', () => {
       type: 'error',
       payload: {},
       occurredAt: '2026-06-05T00:00:03.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Backend error' });
     expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Backend error' }]);
+
+    const approval = {
+      id: 'approval-global',
+      kind: 'command' as const,
+      conversationId: 'thread-1',
+      itemId: 'command-1',
+      title: 'Run tests',
+    };
+    snapshot.backendApprovals['agent-dina'] = [approval];
+    applyMainEventToSnapshot(snapshot, {
+      seq: 4,
+      type: 'backendApproval.resolved',
+      payload: { approval, decision: null, scope: null, reason: 'server' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    } as unknown as MainToRendererEvent);
+    applyMainEventToSnapshot(snapshot, {
+      seq: 5,
+      type: 'error',
+      payload: { message: 'ignored without agent' },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([approval]);
+    expect(snapshot.messages).toHaveLength(1);
   });
 
 

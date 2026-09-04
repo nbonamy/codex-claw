@@ -1119,8 +1119,8 @@ export class CodexSurfaceAgentAdapter {
     request: CodexSurfaceClientRequest,
     occurredAt?: string,
   ): void {
-    const payload: ClientRequest = request.kind === 'ask_user'
-      ? {
+    if (request.kind === 'ask_user') {
+      const payload: Extract<ClientRequest, { kind: 'ask_user' }> = {
         id: request.id,
         kind: 'ask_user',
         payload: {
@@ -1132,10 +1132,22 @@ export class CodexSurfaceAgentAdapter {
             })),
           },
         },
-      }
-      : { id: request.id, kind: 'confirm_tool', payload: { confirmation: { ...request.payload.confirmation } } };
+      };
+      this.emitThread(session, {
+        type: 'toolInput.requested',
+        turnId: request.turnId ?? undefined,
+        payload,
+        ...(occurredAt ? { occurredAt } : {}),
+      });
+      return;
+    }
+    const payload: Extract<ClientRequest, { kind: 'confirm_tool' }> = {
+      id: request.id,
+      kind: 'confirm_tool',
+      payload: { confirmation: { ...request.payload.confirmation } },
+    };
     this.emitThread(session, {
-      type: request.kind === 'ask_user' ? 'toolInput.requested' : 'approval.requested',
+      type: 'approval.requested',
       turnId: request.turnId ?? undefined,
       payload,
       ...(occurredAt ? { occurredAt } : {}),

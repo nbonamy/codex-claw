@@ -791,39 +791,50 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
   }
 
   private emitPermissionRequest(activeTurn: ActiveClaudeTurn, request: ClaudePermissionRequest): void {
-    const payload: ClientRequest = request.kind === 'ask_user'
-      ? {
-          id: request.id,
-          kind: 'ask_user',
-          payload: {
-            request: {
-              itemId: request.id,
-              questions: request.questions ?? [],
-            },
+    if (request.kind === 'ask_user') {
+      const payload: Extract<ClientRequest, { kind: 'ask_user' }> = {
+        id: request.id,
+        kind: 'ask_user',
+        payload: {
+          request: {
+            itemId: request.id,
+            questions: request.questions ?? [],
           },
-        }
-      : {
-          id: request.id,
-          kind: 'confirm_tool',
-          payload: {
-            confirmation: {
-              argumentsPreview: formatPermissionArguments(request.input),
-              integrationId: 'claude',
-              integrationName: 'Claude',
-              summary: request.title ?? request.description ?? request.displayName ?? `Claude wants to use ${request.toolName}.`,
-              toolName: request.toolName,
-              allowConversation: request.allowConversation,
-              allowAlways: request.allowAlways,
-            },
-          },
-        };
+        },
+      };
+      this.pendingRequestOwners.set(request.id, activeTurn);
+      this.emit({
+        agentId: activeTurn.agentId,
+        backend: this.backend,
+        backendSessionId: activeTurn.sessionId ?? undefined,
+        turnId: activeTurn.turnId,
+        type: 'toolInput.requested',
+        payload,
+      });
+      return;
+    }
+    const payload: Extract<ClientRequest, { kind: 'confirm_tool' }> = {
+      id: request.id,
+      kind: 'confirm_tool',
+      payload: {
+        confirmation: {
+          argumentsPreview: formatPermissionArguments(request.input),
+          integrationId: 'claude',
+          integrationName: 'Claude',
+          summary: request.title ?? request.description ?? request.displayName ?? `Claude wants to use ${request.toolName}.`,
+          toolName: request.toolName,
+          allowConversation: request.allowConversation,
+          allowAlways: request.allowAlways,
+        },
+      },
+    };
     this.pendingRequestOwners.set(request.id, activeTurn);
     this.emit({
       agentId: activeTurn.agentId,
       backend: this.backend,
       backendSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
-      type: request.kind === 'ask_user' ? 'toolInput.requested' : 'approval.requested',
+      type: 'approval.requested',
       payload,
     });
   }

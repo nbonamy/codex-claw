@@ -184,7 +184,7 @@ describe('ClawBackendServer', () => {
         kind: 'confirm_tool',
         payload: { confirmation: { id: 'tool-1', title: 'Run tool', command: 'npm test' } },
       },
-    });
+    } as unknown as BackendEvent);
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',

@@ -394,12 +394,13 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 3,
       agentId: 'agent-jesse',
+      backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse-2',
       type: 'backendApproval.requested',
       payload: {},
       occurredAt: '2026-08-07T10:01:00.000Z',
-    });
+    } as unknown as MainToRendererEvent);
     expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
 
     state.setRendererWindowFocused(true);

@@ -294,9 +294,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
   }
 
   if (event.type === 'error') {
-    const payload = event.payload as { message?: unknown; willRetry?: unknown };
-    const message = typeof payload.message === 'string' ? payload.message : 'Backend error';
-    if (payload.willRetry === true) {
+    const message = typeof event.payload.message === 'string' ? event.payload.message : 'Backend error';
+    if (event.payload.willRetry === true) {
       setAgentStatus(snapshot, event.agentId, { type: 'working', detail: message });
       return;
     }

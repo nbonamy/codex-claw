@@ -169,6 +169,8 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
       type: 'backendApproval.requested',
       payload: { approval },
       occurredAt: '2026-06-05T00:00:01.000Z',
@@ -176,6 +178,8 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
       type: 'backendApproval.resolved',
       payload: { approval, decision: null, scope: null, reason: 'server' },
       occurredAt: '2026-06-05T00:00:02.000Z',
