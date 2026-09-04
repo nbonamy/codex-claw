@@ -244,8 +244,7 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
   }
 
   if ((event.type === 'item.started' || event.type === 'item.completed') && event.turnId) {
-    const payload = event.payload as { toolPart?: unknown };
-    const toolPart = rendererToolPart(payload.toolPart);
+    const toolPart = rendererToolPart(event.payload.toolPart);
     if (toolPart) {
       upsertAssistantToolPart(snapshot, event.agentId, event.turnId, toolPart, event.occurredAt);
     }

@@ -1,5 +1,17 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { Agent, BackendConnectionState, BrowserAnnotation, RendererMessage, SendPromptOptions, SubagentOperationChange } from '../contracts';
+import type {
+  Agent,
+  AgentFileActivity,
+  AgentGitStatus,
+  BackendConnectionState,
+  BrowserAnnotation,
+  RendererMessage,
+  RendererToolPart,
+  RendererToolPartUpdate,
+  SendPromptOptions,
+  SubagentOperationChange,
+  TurnGitDiff,
+} from '../contracts';
 import { createEmptySnapshot } from '../snapshot';
 import {
   backendDisplayName,
@@ -88,6 +100,27 @@ describe('backend driver helpers', () => {
         preserveKnownMessages?: boolean;
         hasOlderMessages?: boolean;
       }>();
+    type ItemStartedEvent = Extract<BackendEvent, { type: 'item.started' }>;
+    type ItemUpdatedEvent = Extract<BackendEvent, { type: 'item.updated' }>;
+    expectTypeOf<ItemStartedEvent['payload']>()
+      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
+    expectTypeOf<ItemUpdatedEvent['payload']>()
+      .toEqualTypeOf<RendererToolPartUpdate & { messageId?: string }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'item.completed' }>['payload']>()
+      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
+    expectTypeOf<Pick<ItemStartedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: Agent['backend']; threadId?: string; turnId: string }>();
+    type DiffUpdatedEvent = Extract<BackendEvent, { type: 'diff.updated' }>;
+    expectTypeOf<DiffUpdatedEvent['payload']>()
+      .toEqualTypeOf<Omit<TurnGitDiff, 'turnId' | 'updatedAt'>>();
+    expectTypeOf<Pick<DiffUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: Agent['backend']; threadId: string; turnId: string }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'file.activity' }>['payload']>()
+      .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
+    type GitStatusUpdatedEvent = Extract<BackendEvent, { type: 'git.statusUpdated' }>;
+    expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
+    expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend?: Agent['backend']; threadId?: string; turnId?: string }>();
     expectTypeOf<ConnectionEvent['seq']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ConnectionEvent['occurredAt']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<ConnectionEvent['source']>().toEqualTypeOf<'backend' | 'client' | undefined>();

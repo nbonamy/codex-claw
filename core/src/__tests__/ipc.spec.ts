@@ -5,6 +5,8 @@ import type {
   AgentBackend,
   AgentContextUsage,
   AgentCreationProgress,
+  AgentFileActivity,
+  AgentGitStatus,
   AgentGitOperationProgress,
   AgentStatus,
   AppCommand,
@@ -26,6 +28,8 @@ import type {
   OpenInApplication,
   PromptAttachment,
   RendererMessage,
+  RendererToolPart,
+  RendererToolPartUpdate,
   RendererSendPromptOptions,
   SendPromptOptions,
   SidePanelGitDiffRequest,
@@ -36,6 +40,7 @@ import type {
   SubagentStatusChange,
   ThreadGoal,
   ThreadPlanStep,
+  TurnGitDiff,
   WorkBacklogAssignment,
   WorkBacklogAssignmentPolicy,
   WorkBacklogAssignmentStatus,
@@ -553,6 +558,35 @@ describe('ipc channels', () => {
     type AgentPromptDequeuedEvent = Extract<MainToRendererEvent, { type: 'agent.promptDequeued' }>;
     expectTypeOf<AgentPromptDequeuedEvent['payload']>().toEqualTypeOf<{ ids: string[] }>();
     expectTypeOf<Pick<AgentPromptDequeuedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type ItemStartedEvent = Extract<MainToRendererEvent, { type: 'item.started' }>;
+    type ItemUpdatedEvent = Extract<MainToRendererEvent, { type: 'item.updated' }>;
+    type ItemCompletedEvent = Extract<MainToRendererEvent, { type: 'item.completed' }>;
+    expectTypeOf<ItemStartedEvent['payload']>()
+      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
+    expectTypeOf<ItemUpdatedEvent['payload']>()
+      .toEqualTypeOf<RendererToolPartUpdate & { messageId?: string }>();
+    expectTypeOf<ItemCompletedEvent['payload']>()
+      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
+    expectTypeOf<Pick<ItemStartedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    expectTypeOf<Pick<ItemUpdatedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    expectTypeOf<Pick<ItemCompletedEvent, keyof TurnEventContext>>()
+      .toEqualTypeOf<TurnEventContext>();
+    type DiffUpdatedEvent = Extract<MainToRendererEvent, { type: 'diff.updated' }>;
+    expectTypeOf<DiffUpdatedEvent['payload']>()
+      .toEqualTypeOf<Omit<TurnGitDiff, 'turnId' | 'updatedAt'>>();
+    expectTypeOf<Pick<DiffUpdatedEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type FileActivityEvent = Extract<MainToRendererEvent, { type: 'file.activity' }>;
+    expectTypeOf<FileActivityEvent['payload']>()
+      .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
+    expectTypeOf<Pick<FileActivityEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type GitStatusUpdatedEvent = Extract<MainToRendererEvent, { type: 'git.statusUpdated' }>;
+    expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
+    expectTypeOf<Pick<GitStatusUpdatedEvent, keyof AgentOnlyEventContext>>()
       .toEqualTypeOf<AgentOnlyEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();

@@ -582,7 +582,7 @@ describe('snapshot runtime reducer', () => {
           updatedAt: '2026-06-05T00:00:02.000Z',
         },
         occurredAt: '2026-06-05T00:00:02.000Z',
-      });
+      } as unknown as MainToRendererEvent);
 
       expect(snapshot.agents[0].updatedAt).toBe('2026-06-05T01:00:00.000Z');
       expect(snapshot.agentGitStatuses['unknown-agent']).toStrictEqual({

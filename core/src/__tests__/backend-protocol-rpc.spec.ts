@@ -1,5 +1,17 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AgentBackend, BackendConnectionState, BrowserAnnotation, ClientState, RendererMessage, SubagentStatusChange } from '../contracts';
+import type {
+  AgentBackend,
+  AgentFileActivity,
+  AgentGitStatus,
+  BackendConnectionState,
+  BrowserAnnotation,
+  ClientState,
+  RendererMessage,
+  RendererToolPart,
+  RendererToolPartUpdate,
+  SubagentStatusChange,
+  TurnGitDiff,
+} from '../contracts';
 import { createInitialSnapshot } from '../snapshot';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '../backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
@@ -89,6 +101,26 @@ describe('backend protocol guards', () => {
         preserveKnownMessages?: boolean;
         hasOlderMessages?: boolean;
       }>();
+    type ItemStartedEvent = Extract<ClawBackendEvent, { type: 'item.started' }>;
+    expectTypeOf<ItemStartedEvent['payload']>()
+      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'item.updated' }>['payload']>()
+      .toEqualTypeOf<RendererToolPartUpdate & { messageId?: string }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'item.completed' }>['payload']>()
+      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
+    expectTypeOf<Pick<ItemStartedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: AgentBackend; threadId?: string; turnId: string }>();
+    type DiffUpdatedEvent = Extract<ClawBackendEvent, { type: 'diff.updated' }>;
+    expectTypeOf<DiffUpdatedEvent['payload']>()
+      .toEqualTypeOf<Omit<TurnGitDiff, 'turnId' | 'updatedAt'>>();
+    expectTypeOf<Pick<DiffUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: AgentBackend; threadId: string; turnId: string }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'file.activity' }>['payload']>()
+      .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
+    type GitStatusUpdatedEvent = Extract<ClawBackendEvent, { type: 'git.statusUpdated' }>;
+    expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
+    expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend?: AgentBackend; threadId?: string; turnId?: string }>();
     expectTypeOf<AnnotationEvent['seq']>().toEqualTypeOf<number>();
     expectTypeOf<AnnotationEvent['occurredAt']>().toEqualTypeOf<string>();
     expectTypeOf<AnnotationEvent['clientState']>().toEqualTypeOf<ClientState | undefined>();

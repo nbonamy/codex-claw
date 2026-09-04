@@ -3,7 +3,7 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { MainToRendererEvent, RendererToolPart, RendererToolPartUpdate } from '../contracts';
 import {
   commandOutputDeltaToToolPartUpdate,
   commandToolPart,
@@ -24,6 +24,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -41,6 +42,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -50,6 +52,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
@@ -96,6 +99,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -110,6 +114,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -149,6 +154,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -204,6 +210,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -227,6 +234,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -267,6 +275,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -276,6 +285,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -285,6 +295,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -321,6 +332,72 @@ describe('snapshot reducer', () => {
     ]);
   });
 
+  it('preserves field presence, null values, body patches, and metadata merges', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      turnId: 'turn-patch',
+      type: 'item.started',
+      payload: {
+        messageId: 'message-patch',
+        toolPart: dynamicToolPart({
+          id: 'tool-patch',
+          title: 'Patchable tool',
+          status: 'running',
+          body: 'start',
+          input: { before: true },
+          output: { before: true },
+          metadata: { before: true },
+        }),
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      turnId: 'turn-patch',
+      type: 'item.updated',
+      payload: {
+        messageId: 'message-patch',
+        itemId: 'tool-patch',
+        bodyDelta: ' delta',
+        bodyAppend: 'append',
+        input: null,
+        metadata: { after: true },
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.messages.at(-1)?.parts.at(-1)).toMatchObject({
+      type: 'tool',
+      id: 'tool-patch',
+      body: 'start delta\nappend',
+      input: null,
+      output: { before: true },
+      metadata: { before: true, after: true },
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      turnId: 'turn-patch',
+      type: 'item.updated',
+      payload: { itemId: 'tool-patch', output: null },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    expect(snapshot.messages.at(-1)?.parts.at(-1)).toMatchObject({
+      type: 'tool',
+      id: 'tool-patch',
+      body: 'null',
+      output: null,
+    });
+  });
+
   it('preserves arbitrary tool kinds in renderer state', () => {
     const snapshot = createInitialSnapshot();
     const toolPart: RendererToolPart = {
@@ -334,6 +411,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-future',
       type: 'item.completed',
@@ -350,6 +428,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -364,6 +443,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -373,6 +453,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
@@ -404,6 +485,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -424,6 +506,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -457,6 +540,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -465,7 +549,7 @@ describe('snapshot reducer', () => {
         kind: 'unknown',
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.messages).toHaveLength(0);
 
@@ -505,6 +589,7 @@ describe('snapshot reducer', () => {
       applyMainEventToSnapshot(snapshot, {
         seq: index + 2,
         agentId: 'agent-dina',
+        backend: 'codex',
         threadId: 'thread-1',
         turnId: 'turn-1',
         type: 'item.updated',

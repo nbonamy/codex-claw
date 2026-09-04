@@ -3,7 +3,7 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { MainToRendererEvent, RendererToolPart, RendererToolPartUpdate } from '../contracts';
 import {
   commandOutputDeltaToToolPartUpdate,
   commandToolPart,
@@ -24,6 +24,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -46,6 +47,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
@@ -68,6 +70,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
@@ -140,6 +143,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -149,6 +153,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'diff.updated',
@@ -188,6 +193,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.completed',
@@ -256,27 +262,30 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
       payload: { toolPart: { type: 'ignored' } },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    });
+    } as unknown as MainToRendererEvent);
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
       payload: { itemId: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.messages).toHaveLength(0);
 
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -290,6 +299,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 4,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -308,6 +318,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 5,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -323,6 +334,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 6,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.started',
@@ -332,6 +344,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 7,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -341,6 +354,7 @@ describe('snapshot reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 8,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'item.updated',
@@ -379,5 +393,76 @@ describe('snapshot reducer', () => {
         body: 'update src/next.ts\n"raw change"',
       },
     ]);
+  });
+
+  it('preserves the asymmetric validation of coupled diff updates', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'item.started',
+      payload: toolPartPayload(fileChangeToolPart(
+        'patch-asymmetric',
+        [{ kind: 'update', path: 'src/app.ts' }],
+        'running',
+      )),
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      type: 'diff.updated',
+      payload: { addedLines: -2, removedLines: 3 },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.turnGitDiffs['turn-1']).toStrictEqual({
+      turnId: 'turn-1',
+      addedLines: 0,
+      removedLines: 3,
+      updatedAt: '2026-06-05T00:00:02.000Z',
+    });
+    const fileChange = snapshot.messages.at(-1)?.parts.at(-1);
+    expect(fileChange?.type === 'tool' && fileChange.statusText
+      ? JSON.parse(fileChange.statusText)
+      : null).toMatchObject({
+      params: { addedLines: -2, removedLines: 3 },
+    });
+  });
+
+  it('ignores tool and diff updates without a turn context', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      type: 'item.started',
+      payload: toolPartPayload(commandToolPart({
+        id: 'cmd-no-turn',
+        title: 'npm test',
+        status: 'running',
+      })),
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'diff.updated',
+      payload: { addedLines: 1, removedLines: 0 },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(snapshot.messages).toHaveLength(0);
+    expect(snapshot.turnGitDiffs).toStrictEqual({});
   });
 });

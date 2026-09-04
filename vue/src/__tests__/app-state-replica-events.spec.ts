@@ -110,6 +110,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-jesse',
+      backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse',
       type: 'file.activity',
@@ -134,12 +135,27 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-jesse',
+      backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse',
       type: 'file.activity',
       payload: { messageId: '', itemId: 'item-files', path: '/tmp/bad.ts', action: 'edit', status: 'running' },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    });
+    } as unknown as MainToRendererEvent);
+    expect(state.fileActivity.value).toMatchObject({ path: '/Users/nbonamy/src/other/src/main.ts' });
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-jesse',
+      backend: 'codex',
+      threadId: 'thread-jesse',
+      type: 'file.activity',
+      payload: {
+        messageId: 'message-without-turn', itemId: 'item-without-turn',
+        path: '/tmp/no-turn.ts', action: 'read', status: 'completed',
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    } as unknown as MainToRendererEvent);
     expect(state.fileActivity.value).toMatchObject({ path: '/Users/nbonamy/src/other/src/main.ts' });
   });
 

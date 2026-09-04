@@ -492,11 +492,11 @@ describe('AppController', () => {
 
     emitBackendEvent(controller, {
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-1',
       type: 'diff.updated',
       payload: {
-        turnId: 'turn-1',
         addedLines: 1,
         removedLines: 1,
         diff,

@@ -710,16 +710,25 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
     const toolPart = claudeToolPart(block, { cwd: activeTurn.cwd });
     const existing = activeTurn.toolPartsById.get(toolPart.id);
     activeTurn.toolPartsById.set(toolPart.id, toolPart);
-    this.emit({
-      agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
-      turnId: activeTurn.turnId,
-      type: existing ? 'item.updated' : 'item.started',
-      payload: existing
-        ? claudeToolPartInputUpdate(toolPart)
-        : { toolPart },
-    });
+    if (existing) {
+      this.emit({
+        agentId: activeTurn.agentId,
+        backend: this.backend,
+        backendSessionId: activeTurn.sessionId ?? undefined,
+        turnId: activeTurn.turnId,
+        type: 'item.updated',
+        payload: claudeToolPartInputUpdate(toolPart),
+      });
+    } else {
+      this.emit({
+        agentId: activeTurn.agentId,
+        backend: this.backend,
+        backendSessionId: activeTurn.sessionId ?? undefined,
+        turnId: activeTurn.turnId,
+        type: 'item.started',
+        payload: { toolPart },
+      });
+    }
     this.emitClaudeFileActivity(activeTurn, toolPart.id, 'running');
   }
 

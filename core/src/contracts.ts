@@ -1501,6 +1501,13 @@ type AgentPromptRetryScheduledPayload = {
   lastError: string;
   retryAt?: string;
 };
+type RendererToolPartEventPayload = {
+  messageId?: string;
+  toolPart: RendererToolPart;
+};
+type RendererToolPartUpdateEventPayload = RendererToolPartUpdate & {
+  messageId?: string;
+};
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
@@ -1544,7 +1551,13 @@ type TypedMainToRendererEventType =
   | 'message.steer'
   | 'agent.promptQueued'
   | 'agent.promptRetryScheduled'
-  | 'agent.promptDequeued';
+  | 'agent.promptDequeued'
+  | 'item.started'
+  | 'item.updated'
+  | 'item.completed'
+  | 'diff.updated'
+  | 'file.activity'
+  | 'git.statusUpdated';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1786,6 +1799,31 @@ export type MainToRendererEvent =
       type: 'agent.promptDequeued';
       agentId: string;
       payload: { ids: string[] };
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'item.started';
+      payload: RendererToolPartEventPayload;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'item.completed';
+      payload: RendererToolPartEventPayload;
+    }>
+  | MainToRendererEventWith<TurnEventContext & {
+      type: 'item.updated';
+      payload: RendererToolPartUpdateEventPayload;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'diff.updated';
+      payload: Omit<TurnGitDiff, 'turnId' | 'updatedAt'>;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'file.activity';
+      payload: Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'git.statusUpdated';
+      agentId: string;
+      payload: AgentGitStatus;
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;
