@@ -409,10 +409,19 @@ export type SubagentStatus =
   | 'shutdown'
   | 'notFound';
 
-export type SubagentOperationKind = 'spawnAgent' | 'sendInput' | 'resumeAgent' | 'wait' | 'closeAgent';
+export type SubagentOperationKind =
+  | 'spawnAgent'
+  | 'sendInput'
+  | 'resumeAgent'
+  | 'wait'
+  | 'closeAgent'
+  | 'sendMessage'
+  | 'followupTask'
+  | 'interruptAgent'
+  | 'listAgents';
 export type SubagentOperationLifecycle = 'started' | 'completed';
-export type SubagentOperationStatus = 'inProgress' | 'completed' | 'failed';
-export type SubagentActivityKind = 'started' | 'interacted' | 'interrupted';
+export type SubagentOperationStatus = 'inProgress' | 'completed' | 'failed' | 'interrupted';
+export type SubagentActivityKind = 'started' | 'interacted' | 'interrupted' | 'completed';
 
 export type SubagentNode = {
   conversationId: string;
@@ -1104,7 +1113,8 @@ export type RendererMessageMedia = {
 export type RendererMessagePart =
   | { type: 'attachment'; attachment: RendererMessageAttachment }
   | { type: 'media'; media: RendererMessageMedia; itemId?: string }
-  | { type: 'text'; text: string; itemId?: string }
+  | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
+  | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'final_answer' }
   | {
     type: 'tool';
     id: string;

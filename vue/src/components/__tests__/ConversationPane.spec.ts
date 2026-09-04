@@ -107,6 +107,43 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).toContain('Looking now.');
   });
 
+  it('renders Codex phased work while leaving unphased backend output flat', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([
+        {
+          id: 'message-codex-phased', agentId: agent.id, role: 'assistant', status: 'complete',
+          createdAt: '2026-09-04T00:00:00.000Z',
+          parts: [
+            {
+              type: 'reasoning', summary: 'Checked the adapter',
+              itemId: 'reasoning-1', summaryIndex: 0,
+            },
+            {
+              type: 'text', text: 'Still working',
+              itemId: 'commentary-1', phase: 'commentary',
+            },
+            {
+              type: 'text', text: 'Finished cleanly',
+              itemId: 'answer-1', phase: 'final_answer',
+            },
+          ],
+        },
+        {
+          id: 'message-claude-flat', agentId: agent.id, role: 'assistant', status: 'complete',
+          createdAt: '2026-09-04T00:00:01.000Z',
+          parts: [{ type: 'text', text: 'Unphased backend response' }],
+        },
+      ]),
+      agent,
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.findAll('.chat-message-block--text').map((block) => block.text()))
+      .toContain('Finished cleanly');
+    expect(wrapper.text()).toContain('Unphased backend response');
+    expect(wrapper.findAll('.chat-work-group')).toHaveLength(1);
+  });
+
   it('welcomes an empty unnamed quick chat without repeating its placeholder title', () => {
     const wrapper = mountPane({
       controller: controllerFor([]),

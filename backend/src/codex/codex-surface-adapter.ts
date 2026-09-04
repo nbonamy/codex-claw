@@ -861,7 +861,12 @@ export class CodexSurfaceAgentAdapter {
       case 'message.delta':
         this.emitThread(session, {
           type: 'message.delta', turnId: event.turnId,
-          payload: { messageId: event.payload.messageId, itemId: event.payload.itemId, delta: event.payload.delta },
+          payload: {
+            messageId: event.payload.messageId,
+            itemId: event.payload.itemId,
+            delta: event.payload.delta,
+            ...(event.payload.phase ? { phase: event.payload.phase } : {}),
+          },
           ...metadata,
         });
         return;
@@ -996,11 +1001,26 @@ export class CodexSurfaceAgentAdapter {
       this.emitHistory(session, session.handle.getSnapshot().messages, occurredAt);
       return;
     }
+    if (message.parts.some((part) => part.type === 'reasoning')) {
+      const [rendered] = surfaceMessages([message], session.agent.id);
+      if (rendered) {
+        this.emitThread(session, {
+          type: 'message.updated', turnId, payload: { message: rendered }, occurredAt,
+        });
+      }
+      return;
+    }
     for (const part of message.parts) {
       if (part.type === 'text' && part.text) {
         this.emitThread(session, {
           type: 'message.delta', turnId,
-          payload: { messageId: message.id, itemId: part.itemId, delta: part.text }, occurredAt,
+          payload: {
+            messageId: message.id,
+            itemId: part.itemId,
+            delta: part.text,
+            ...(part.phase ? { phase: part.phase } : {}),
+          },
+          occurredAt,
         });
       } else if (part.type === 'tool') {
         this.emitThread(session, {

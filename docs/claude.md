@@ -118,6 +118,12 @@ app-owned backend events:
 - `tool_result` blocks update those tool cards and their semantic lifecycle.
 - `result` completes the turn or emits an app error.
 
+Claude text currently has no equivalent explicit work/final phase in Claw's
+adapter. It therefore remains unphased and uses the shared SDK renderer's
+existing flat message layout. Claw does not guess a final-answer boundary or
+label every Claude message as final; if the provider exposes reliable phase
+semantics later, the driver can populate the same provider-neutral fields.
+
 This gives Claude agents local prompt send, persistent multi-turn sessions,
 streaming display, session resume, and interrupt through the same
 `AgentBackendDriver` seam as Codex. Agent SDK permission callbacks are

@@ -294,7 +294,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'message.delta',
-      payload: { delta: 'hello' },
+      payload: { delta: 'hello', itemId: 'commentary-1', phase: 'commentary' },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     expect(snapshot.messages).toBe(messages);
@@ -304,7 +304,7 @@ describe('snapshot reducer', () => {
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'message.delta',
-      payload: { delta: ' back' },
+      payload: { delta: ' back', itemId: 'commentary-1', phase: 'commentary' },
       occurredAt: '2026-06-05T00:00:04.000Z',
     });
 
@@ -315,7 +315,7 @@ describe('snapshot reducer', () => {
       agentId: 'agent-dina',
       role: 'assistant',
       status: 'streaming',
-      parts: [{ type: 'text', text: 'hello back' }],
+      parts: [{ type: 'text', text: 'hello back', itemId: 'commentary-1', phase: 'commentary' }],
     });
 
     applyMainEventToSnapshot(snapshot, {
@@ -357,7 +357,16 @@ describe('snapshot reducer', () => {
         message: {
           id: 'assistant-turn-1', agentId: 'agent-dina', role: 'assistant', status: 'streaming',
           turnId: 'turn-1', createdAt: '2026-06-05T00:00:01.000Z',
-          parts: [{ type: 'text', text: 'Rewritten response' }],
+          parts: [
+            {
+              type: 'reasoning', summary: 'Checked the relevant state',
+              itemId: 'reasoning-1', summaryIndex: 0,
+            },
+            {
+              type: 'text', text: 'Rewritten response',
+              itemId: 'answer-1', phase: 'final_answer',
+            },
+          ],
         },
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
@@ -367,7 +376,16 @@ describe('snapshot reducer', () => {
     expect(snapshot.messages).toHaveLength(2);
     expect(snapshot.messages[1]).toMatchObject({
       id: 'assistant-turn-1',
-      parts: [{ type: 'text', text: 'Rewritten response' }],
+      parts: [
+        {
+          type: 'reasoning', summary: 'Checked the relevant state',
+          itemId: 'reasoning-1', summaryIndex: 0,
+        },
+        {
+          type: 'text', text: 'Rewritten response',
+          itemId: 'answer-1', phase: 'final_answer',
+        },
+      ],
     });
   });
 

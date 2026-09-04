@@ -19,6 +19,13 @@ to the renderer, and owns only desktop-native callbacks.
 - adapt Codex events into app-owned events;
 - persist only app product state, not Codex transcripts.
 
+Codex assistant text keeps the app-server's optional `commentary` or
+`final_answer` phase through this adapter. Completed reasoning items contribute
+only their app-server-provided summaries; raw reasoning content is never copied
+into Claw state. The shared SDK Vue renderer uses those semantics to keep work
+expanded while a turn runs, then collapse it under `Done · View details` when
+the final answer begins.
+
 The local `codex-app-sdk` dependency owns Codex executable discovery, generated
 app-server protocol types, request/response inference, bidirectional request
 routing, and stdio JSONL framing. `clawd` remains the product adapter: it owns

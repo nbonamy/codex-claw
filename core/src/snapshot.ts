@@ -588,7 +588,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   }
 
   if (event.type === 'message.delta' && event.turnId) {
-    const payload = event.payload as { delta?: unknown; itemId?: unknown };
+    const payload = event.payload as { delta?: unknown; itemId?: unknown; phase?: unknown };
     appendAssistantDeltaWithPlanFilter(
       snapshot,
       event.agentId,
@@ -597,6 +597,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
       typeof payload.delta === 'string' ? payload.delta : '',
       typeof payload.itemId === 'string' ? payload.itemId : undefined,
       event.occurredAt,
+      payload.phase === 'commentary' || payload.phase === 'final_answer' ? payload.phase : undefined,
     );
     return;
   }
@@ -1146,19 +1147,20 @@ function appendAssistantDeltaWithPlanFilter(
   delta: string,
   itemId: string | undefined,
   updatedAt: string,
+  phase?: 'commentary' | 'final_answer',
 ): void {
   if (!delta) {
     return;
   }
 
   if (!threadId) {
-    appendAssistantDelta(snapshot, agentId, turnId, delta, updatedAt, itemId);
+    appendAssistantDelta(snapshot, agentId, turnId, delta, updatedAt, itemId, phase);
     return;
   }
 
   const agent = findAgent(snapshot, agentId);
   if (!agent) {
-    appendAssistantDelta(snapshot, agentId, turnId, delta, updatedAt, itemId);
+    appendAssistantDelta(snapshot, agentId, turnId, delta, updatedAt, itemId, phase);
     return;
   }
 
@@ -1200,13 +1202,13 @@ function appendAssistantDeltaWithPlanFilter(
 
     const openIndex = lowerIndexOf(remaining, '<proposed_plan>');
     if (openIndex < 0) {
-      appendAssistantDelta(snapshot, agentId, turnId, remaining, updatedAt, itemId);
+      appendAssistantDelta(snapshot, agentId, turnId, remaining, updatedAt, itemId, phase);
       return;
     }
 
     const visibleDelta = remaining.slice(0, openIndex);
     if (visibleDelta) {
-      appendAssistantDelta(snapshot, agentId, turnId, visibleDelta, updatedAt, itemId);
+      appendAssistantDelta(snapshot, agentId, turnId, visibleDelta, updatedAt, itemId, phase);
     }
 
     remaining = remaining.slice(openIndex + '<proposed_plan>'.length);
@@ -1673,7 +1675,19 @@ function isRendererMessagePart(value: unknown): value is RendererMessagePart {
   }
 
   if (value.type === 'text') {
-    return typeof value.text === 'string';
+    return typeof value.text === 'string'
+      && optionalString(value.itemId)
+      && (
+        value.phase === undefined
+        || value.phase === 'commentary'
+        || value.phase === 'final_answer'
+      );
+  }
+
+  if (value.type === 'reasoning') {
+    return typeof value.summary === 'string'
+      && typeof value.itemId === 'string'
+      && typeof value.summaryIndex === 'number';
   }
 
   if (value.type === 'status') {
@@ -2176,6 +2190,7 @@ function appendAssistantDelta(
   delta: string,
   createdAt: string,
   itemId?: string,
+  phase?: 'commentary' | 'final_answer',
 ): void {
   const message = ensureAssistantMessage(snapshot, agentId, turnId, assistantMessageId(turnId), createdAt);
   if (message.status !== 'complete') {
@@ -2185,8 +2200,14 @@ function appendAssistantDelta(
   const textPart = message.parts.at(-1);
   if (textPart?.type === 'text' && textPart.itemId === itemId) {
     textPart.text += delta;
+    if (phase) textPart.phase = phase;
   } else {
-    message.parts.push(itemId ? { type: 'text', text: delta, itemId } : { type: 'text', text: delta });
+    message.parts.push({
+      type: 'text',
+      text: delta,
+      ...(itemId ? { itemId } : {}),
+      ...(phase ? { phase } : {}),
+    });
   }
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }

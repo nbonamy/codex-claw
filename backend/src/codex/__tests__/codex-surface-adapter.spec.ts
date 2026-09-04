@@ -547,13 +547,23 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     const prefix = 'x'.repeat(12_000);
     transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-thread-a', startedAtMs: 1,
+        item: {
+          type: 'agentMessage', id: 'agent-a', text: '', phase: 'commentary',
+          memoryCitation: null, delivery: null,
+        },
+      },
+    });
+    transport.emit({
       method: 'item/agentMessage/delta',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: prefix },
     });
     expect(events.filter((event) => event.type === 'message.delta')).toStrictEqual([
       expect.objectContaining({
         agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
-        payload: expect.objectContaining({ itemId: 'agent-a', delta: prefix }),
+        payload: expect.objectContaining({ itemId: 'agent-a', delta: prefix, phase: 'commentary' }),
       }),
     ]);
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
@@ -566,7 +576,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events).toStrictEqual([
       expect.objectContaining({
         type: 'message.delta', agentId: 'agent-a', threadId: 'thread-a',
-        payload: expect.objectContaining({ itemId: 'agent-a', delta: ' suffix' }),
+        payload: expect.objectContaining({ itemId: 'agent-a', delta: ' suffix', phase: 'commentary' }),
       }),
     ]);
 
@@ -578,6 +588,42 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events).toStrictEqual([
       expect.objectContaining({ type: 'message.delta', agentId: 'agent-b', threadId: 'thread-b' }),
     ]);
+  });
+
+  it('projects completed reasoning summaries without raw reasoning content', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-reasoning', completedAtMs: 2,
+        item: {
+          type: 'reasoning',
+          id: 'reasoning-1',
+          summary: ['Inspecting the renderer flow'],
+          content: ['raw reasoning must stay private'],
+        },
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'message.updated',
+      payload: {
+        message: expect.objectContaining({
+          parts: [{
+            type: 'reasoning',
+            summary: 'Inspecting the renderer flow',
+            itemId: 'reasoning-1',
+            summaryIndex: 0,
+          }],
+        }),
+      },
+    }));
+    expect(JSON.stringify(events)).not.toContain('raw reasoning must stay private');
   });
 
   it('adapts SDK subagent events into app-owned tree events', async () => {
