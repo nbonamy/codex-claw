@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 10 active — type approvals, input requests, and errors.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 11 active — type snapshot metadata events.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -107,7 +107,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 7: type turn, plan, and compaction events.
 - [x] Phase 1.4 slice 8: type transcript and prompt events.
 - [x] Phase 1.4 slice 9: type tool lifecycle and workspace events.
-- [ ] Phase 1.4 slice 10: type approvals, input requests, and errors. **Active.**
+- [x] Phase 1.4 slice 10: type approvals, input requests, and errors.
+- [ ] Phase 1.4 slice 11: type snapshot metadata events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -147,7 +148,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 7: type turn, plan, and compaction events | Complete | core event agent / root integrator | Seven variants now discriminate turn start/completion, execution-plan update, proposed-plan delta/completion, and compaction start/completion with the audited context split and provider-compatible payload unions | Focused: Core 42, Backend 81, Electron 14, Vue 39, and Web 7 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 26.28s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.25s. Lint, CSS lint, and Knip: 25.93s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ce8257d304162a7048e2485a71132d5e8d5f723d` | Independent review found no defects. Optional completion diagnostics, normalized plan authority, proposed-plan whitespace and trimming, interrupted completion, compaction markers, malformed-start payload compatibility, missing-context no-ops, runtime guards, and deferred casts remain intact; all 13 fixture adaptations and five boundary casts were scoped |
 | 2026-09-04 | Phase 1.4 slice 8: type transcript and prompt events | Complete | core event agent / root integrator | Eight variants now discriminate history hydration, message delta/update/submission/steer, and prompt queue/retry/dequeue with their audited context split and cohesive private payload aliases | Focused: Core 74, Backend 105, Electron 14, and Vue 61 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 25.08s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.52s. Lint, CSS lint, and Knip: 25.53s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `52349cf6670f7c529234977866975c4c7b052717` | Independent review found no defects. Claude-optional thread/message/item IDs, strict message-update context, agent-only generic events, live history pagination flags, readonly attachments, queue semantics, message-agent filtering, source-less compatibility, runtime guards, and deferred casts remain intact; two indexed-access reducer edits are behavior-equivalent and all six boundary casts are deliberate |
 | 2026-09-04 | Phase 1.4 slice 9: type tool lifecycle and workspace events | Complete | core event agent / root integrator | Six variants now discriminate tool item start/update/completion, turn diff, file activity, and agent Git status using existing payload owners plus narrow private lifecycle/update aliases | Focused: Core 60, Backend 74, Electron 14, and Vue 9 tests. Full `npm run test:ai`: 270 files / 2,062 tests, real 25.17s (Core 251, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 21.78s. Lint, CSS lint, and Knip: 24.06s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `2d7718292cbcd77f262347b0de17a153bf14e3f2` | Independent review found no defects. Optional item `messageId` and thread context, arbitrary tool kinds, field/null/body/output/metadata patch semantics, coupled asymmetric diff validation, unknown-agent Git status, the legacy `branch: null` boundary case, renderer-only file-path trimming, missing-context no-ops, runtime guards, and deferred casts remain intact. Claude's conditional branch split and the reducer cast removal are behavior-equivalent; `output: null` → body `"null"` remains explicitly characterized |
-| 2026-09-04 | Phase 1.4 slice 10: type approvals, input requests, and errors | Active | root orchestrator | Five event types selected: provider-discriminated tool approval and user input, native backend approval request/resolution, and agent error | Existing `ClientRequest` and `BackendApprovalRequest` owners plus narrow private provider/resolution/error aliases inventoried; implementation and gates pending | — | Codex client requests require agent, Codex backend, and thread with optional turn; Claude client requests require agent, Claude backend, and turn with optional thread. Native approval events are Codex-scoped with agent/thread and optional turn; errors require only agent. Preserve dormant global resolution behavior without activating or deleting it, conditional producer branch splitting, retry-versus-terminal error behavior, missing-turn and malformed quirks, the registry's source-less approval fallback through a boundary cast, nested/flat approval parsing, guards, and deferred wire casts |
+| 2026-09-04 | Phase 1.4 slice 10: type approvals, input requests, and errors | Complete | core event agent / root integrator | Five event types now discriminate provider-specific tool approval and user input, native Codex approval request/resolution, and agent error with exact payload owners and contexts | Focused: Core 23, Backend 74, and Vue 56 tests. Full `npm run test:ai`: 270 files / 2,065 tests, real 24.77s (Core 254, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 22.42s. Lint, CSS lint, and Knip: 24.36s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `48e1875d257e071189c9239f66ce984611d8865e` | Independent review found no defects. Exact native resolution reasons, conditional producer splits, dormant global resolution, retry/terminal/error-fallback semantics, missing-turn and malformed status quirks, registry owning-agent fallback, nested/flat approval parsing, renderer narrowing, guards, and deferred casts remain intact. All ten casts are deliberate malformed, legacy, or source-less boundary characterizations; no hidden behavior expansion was introduced |
+| 2026-09-04 | Phase 1.4 slice 11: type snapshot metadata events | Active | root orchestrator | `snapshot.updated` selected as the final event contract before deep boundary decoding | `AppSnapshotMetadata` payload, inherited full-snapshot side channel, renderer/Electron/remote precedence, message retention, client metadata, and producer inventory complete; implementation and gates pending | — | Require no envelope context; keep inherited `snapshot?: AppSnapshot`, and keep `clientState` as `ClawBackendEvent` transport metadata rather than app-event payload. Preserve side-channel/full/metadata precedence, message replacement versus preservation/stripping, optimistic local selection, remote client-state recomputation, shallow guards until slice 12, legacy full internal producers, and malformed boundary cases |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -566,6 +568,8 @@ Completed in `2d7718292cbcd77f262347b0de17a153bf14e3f2`.
 
 #### Slice 10 — approvals, input requests, and errors
 
+Completed in `48e1875d257e071189c9239f66ce984611d8865e`.
+
 - Type `approval.requested` with payload
   `Extract<ClientRequest, { kind: 'confirm_tool' }>` and type
   `toolInput.requested` with payload
@@ -595,8 +599,9 @@ Completed in `2d7718292cbcd77f262347b0de17a153bf14e3f2`.
   cast. Do not require source, and do not introduce payload/envelope identity
   equality checks.
 - Type `error` with required envelope `agentId` only and a private payload
-  alias whose `message`, `willRetry`, and provider diagnostic data remain
-  optional. Do not require backend, thread, turn, or source context.
+  alias containing required `message: string`, optional `willRetry`, and
+  optional provider diagnostic data. Do not require backend, thread, turn, or
+  source context; malformed empty payload fallback remains a boundary case.
 - Preserve retryable errors as transient working status with no transcript
   message; preserve terminal errors as one system message plus error status,
   including the fallback `Backend error` for a malformed or empty payload.
@@ -604,6 +609,38 @@ Completed in `2d7718292cbcd77f262347b0de17a153bf14e3f2`.
   no-ops, malformed request/status quirks, and both nested and flat approval
   parsing. Keep runtime guards and generic/wire decoder casts deferred to their
   later boundary work.
+
+#### Slice 11 — snapshot metadata events
+
+- Type `snapshot.updated` with payload `AppSnapshotMetadata`. It requires no
+  envelope agent, backend, session, thread, turn, or source context.
+- Retain the inherited optional `snapshot?: AppSnapshot` envelope field as the
+  full-snapshot side channel. Keep `clientState` out of
+  `MainToRendererEvent`; it remains optional transport metadata added only by
+  `ClawBackendEvent`.
+- Preserve snapshot adoption precedence exactly: an envelope `snapshot` full
+  snapshot wins first, a legacy full snapshot payload is next, metadata payload
+  adoption is third, and only otherwise does ordinary event reduction run.
+- Preserve message semantics across each path. Full snapshot adoption replaces
+  the transcript; metadata adoption retains the current transcript;
+  `applySnapshotMetadata` continues stripping any accidentally supplied
+  `messages`; Electron's cached replica continues storing metadata-only state
+  after full-snapshot side-channel adoption.
+- Preserve optimistic renderer selection when the currently active agent still
+  exists in the incoming full or metadata snapshot. Do not let background
+  metadata overwrite that local selection, and keep unread pruning unchanged.
+- Preserve remote snapshot handling and client-state recomputation. Remote
+  full snapshots and metadata updates must continue projecting through local
+  team/agent identity, while `clientState` remains recomputed from the receiving
+  server snapshot rather than trusted as application payload.
+- Keep current shallow `isAppSnapshot` and `isAppSnapshotMetadata` guards for
+  this typing slice; their deep validation is slice 12. Preserve legacy full
+  snapshot internal producers and characterize their compatibility explicitly
+  at the boundary instead of broadening the new payload contract.
+- Preserve malformed snapshot events as their current handled no-ops and retain
+  explicit boundary cases for invalid payloads, side-channel precedence, full
+  payload compatibility, message stripping, and missing context. Do not bundle
+  decoder, selection, projection, or persistence behavior changes.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
