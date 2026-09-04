@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 5 active — type provider-discriminated agent and thread events.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 6 active — type subagent change events.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -102,7 +102,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 2: type backend status, catalogs, and pairing events.
 - [x] Phase 1.4 slice 3: type side-panel, celebration, creation, and Git progress events.
 - [x] Phase 1.4 slice 4: type backlog, routing, and client-resolution events.
-- [ ] Phase 1.4 slice 5: type provider-discriminated agent and thread events. **Active.**
+- [x] Phase 1.4 slice 5: type provider-discriminated agent and thread events.
+- [ ] Phase 1.4 slice 6: type subagent change events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -137,7 +138,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 2: type backend status, catalogs, and pairing events | Complete | core event agent / root integrator | Five event variants now discriminate backend runtime status, account rate limits, model catalog, skill catalog, and device pairing status; `emitThread` became distributive so typed payloads remain paired with their event variant | Focused: Core 30 tests; Backend 92; Electron 25; Vue 20. Full `npm run test:ai`: 270 files / 2,053 tests. All-workspace typecheck passed. Lint, CSS lint, and Knip passed with only the existing non-failing `lipo` hint. Diff and status checks were clean | `4fce85fee7b6c7d89f94f30dddd4e56a35ef0591` | Independent review found no defects. Runtime semantics and the deferred wire decoder remain unchanged: no agent/thread/source requirements were added; flat rate-limit normalization and catalog/pairing guards remain; envelope/payload backend equality is not enforced; existing boundary casts remain deferred |
 | 2026-09-04 | Phase 1.4 slice 3: type UI and operation progress events | Complete | core event agent / root integrator | Five agent-scoped variants now discriminate side-panel markdown, side-panel Git diff, celebration, agent creation progress, and Git operation progress; only envelope `agentId` is required | Focused: Core 18 tests; Backend 52; Electron 14; Vue 44. Full `npm run test:ai`: 270 files / 2,053 tests, real 26.89s with one slow Vue run. All-workspace typecheck: 19.72s. Lint, CSS lint, and Knip: 21.60s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `0c6db21a458fc06f3754d7758733d45dbe85e8a7` | Independent review found no defects. Nullable Git-diff `subtitle` is narrowly correct because `openDiff` already forwards `agent.folder: string \| null`; `AppText` and other event shapes remain strict. Malformed casts remain deliberate boundary tests. Caller-versus-created agent identity, source-less compatibility, snapshot no-op/unread behavior, producers, consumers, guards, and decoders are unchanged |
 | 2026-09-04 | Phase 1.4 slice 4: type backlog, routing, and client resolution events | Complete | core event agent / root integrator | Four variants now discriminate backlog-assignment compatibility, routing request, routing resolution, and client-request resolution; the first three remain global, while `clientRequest.resolved` requires `agentId` and `backend` | Focused: Core 19 tests; Vue 21. Full `npm run test:ai`: 270 files / 2,054 tests, real 49.32s with an anomalously slow 31.84s Vue run. All-workspace typecheck: 31.37s. Lint, CSS lint, and Knip: 34.22s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `e3b3caa4946944e306da2a07356fb16f1b976b1c` | Independent review found no defects. `working` → `inProgress`, optional policy defaults, trimmed notes and automation IDs, payload-owned routing agent identity, absence of `loopId`, malformed-event no-ops, runtime guards, and deferred decoder casts are preserved |
-| 2026-09-04 | Phase 1.4 slice 5: type provider-discriminated agent and thread events | Active | root orchestrator | Eight variants selected: agent update/status plus thread start, settings, mode, goal update/clear, and token usage | Read-only provider, payload, legacy compatibility, producer, consumer, and reducer audit complete; implementation and gates pending | — | Require only `agentId` for agent update/status. Split thread start, settings, mode, and token usage by provider while preserving flat/nested compatibility payloads, provider normalization, malformed-event behavior, existing runtime guards, backend-less started characterization, and deferred decoder casts |
+| 2026-09-04 | Phase 1.4 slice 5: type provider-discriminated agent and thread events | Complete | core event agent / root integrator | Eight variants now discriminate backend-neutral agent update/status plus provider-specific thread start, settings, mode, goal update/clear, and token usage; `CodexThreadSettings` is the cohesive payload owner | Focused: Core 19, Backend 74, Vue 30, Electron 14, and Web 7 tests. Full `npm run test:ai`: 270 files / 2,054 tests, real 33.97s with Vue at 22.78s. All-workspace typecheck: 38.72s. Lint, CSS lint, and Knip: 42.41s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `132609b8411cdff9b48a4642cac57fcb89647cfc` | Review tightened Codex start/settings/mode backend context, goal thread context, and token backend/thread context; explicitly characterized the legacy backend-less start at the runtime boundary; and removed the obsolete `AgentStatus` cast. Flat/nested normalization, null status-text deletion, malformed handled no-ops, runtime guards, and deferred wire casts remain intact |
+| 2026-09-04 | Phase 1.4 slice 6: type subagent change events | Active | root orchestrator | Four variants selected: operation, activity, identity, and status changes with their existing payload owners | Read-only payload, envelope, reducer-validator, normalization, deletion, and timestamp audit complete; implementation and gates pending | — | All four require `agentId`, `backend`, and `threadId`; `turnId` and `source` remain optional. Preserve payload/envelope identity independence, malformed owned no-ops, validators, the missing-agent gate, normalization/deletion/timestamp semantics, and deferred generic/wire casts |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -405,6 +407,8 @@ Completed in `e3b3caa4946944e306da2a07356fb16f1b976b1c`.
 
 #### Slice 5 — provider-discriminated agent and thread events
 
+Completed in `132609b8411cdff9b48a4642cac57fcb89647cfc`.
+
 - Type `agent.updated` and `agent.statusChanged`; both require only envelope
   `agentId`.
 - Type `thread.started` as a provider-discriminated event:
@@ -435,6 +439,24 @@ Completed in `e3b3caa4946944e306da2a07356fb16f1b976b1c`.
   no-ops, and existing runtime guards unchanged.
 - Do not bundle deeper decoding or behavior changes. Boundary and wire casts
   remain deferred to the corresponding transport-decoding slice.
+
+#### Slice 6 — subagent change events
+
+- Type `subagent.operationChanged` with payload `SubagentOperationChange`.
+- Type `subagent.activityChanged` with payload `SubagentActivityChange`.
+- Type `subagent.identityChanged` with payload `SubagentIdentityChange`.
+- Type `subagent.statusChanged` with payload `SubagentStatusChange`.
+- Require envelope `agentId`, `backend`, and `threadId` for all four events;
+  keep `turnId`, `source`, and the remaining generic envelope metadata optional.
+- Keep payload agent and conversation identities independent from envelope
+  identity. Do not introduce equality checks that reject currently valid
+  provider projections.
+- Preserve malformed owned events as handled no-ops, the existing structural
+  validators, and the legacy missing-agent gate.
+- Preserve operation/activity normalization, identity replacement and deletion,
+  status transition, and timestamp semantics exactly.
+- Keep generic and wire-boundary casts deferred to their later decoder work;
+  casts added in this slice may only characterize malformed boundary input.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
