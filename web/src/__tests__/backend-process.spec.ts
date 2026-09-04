@@ -42,7 +42,12 @@ describe('Claw web backend process', () => {
     child.send({
       jsonrpc: '2.0',
       method: backendMethods.backendEventNotify,
-      params: { seq: 4, type: 'snapshot.updated', payload: {}, occurredAt: 'now' },
+      params: {
+        seq: 4,
+        type: 'client.connectionChanged',
+        payload: { status: 'connected' },
+        occurredAt: 'now',
+      },
     });
     expect(eventListener).toHaveBeenCalledWith(expect.objectContaining({ seq: 4 }));
     unsubscribe();
@@ -55,6 +60,68 @@ describe('Claw web backend process', () => {
 
     await backend.close();
     expect(child.kill).toHaveBeenCalledOnce();
+  });
+
+  it('ignores malformed backend events and remains usable for later notifications', async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValueOnce(child);
+    const backend = new ClawWebBackendProcess({ command: 'clawd', args: [] });
+    const listener = vi.fn();
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const secret = 'secret-event-value';
+    backend.onEvent(listener);
+
+    const starting = backend.start();
+    child.send({ jsonrpc: '2.0', id: 1, result: { ok: true } });
+    await starting;
+    for (const params of [
+      {
+        seq: 1,
+        agentId: 'agent-1',
+        type: 'agent.statusChanged',
+        payload: { type: secret },
+        occurredAt: 'now',
+      },
+      {
+        seq: secret,
+        type: 'client.connectionChanged',
+        payload: { status: 'connected' },
+        occurredAt: 'now',
+      },
+      { seq: 2, type: secret, payload: {}, occurredAt: 'now' },
+    ]) {
+      child.send({
+        jsonrpc: '2.0',
+        method: backendMethods.backendEventNotify,
+        params,
+      });
+    }
+    child.send({
+      jsonrpc: '2.0',
+      method: backendMethods.backendEventNotify,
+      params: {
+        seq: 3,
+        type: 'client.connectionChanged',
+        payload: { status: 'connected' },
+        occurredAt: 'now',
+      },
+    });
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ seq: 3 }));
+    const malformedWarnings = stderr.mock.calls
+      .map(([value]) => String(value))
+      .filter((value) => value.includes('Ignored malformed clawd event notification'));
+    expect(malformedWarnings).toHaveLength(3);
+    expect(malformedWarnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('$.payload.type'),
+      expect.stringContaining('$.seq'),
+      expect.stringContaining('$.type'),
+    ]));
+    expect(malformedWarnings.join('\n')).not.toContain(secret);
+
+    stderr.mockRestore();
+    await backend.close();
   });
 
   it('rejects backend errors, pending requests on exit, and requests while stopped', async () => {
@@ -86,12 +153,14 @@ describe('Claw web backend process', () => {
     await starting;
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     child.stdout.emit('data', 'not json\n\n');
+    child.stdout.emit('data', '{"jsonrpc":"1.0","method":"invalid"}\n');
     child.send({ jsonrpc: '2.0', method: 'other/event', params: {} });
     child.send({ jsonrpc: '2.0', id: 999, result: 'ignored' });
     const pending = backend.request('thing/slow');
     const rejection = expect(pending).rejects.toThrow('clawd request timed out: thing/slow');
     await vi.advanceTimersByTimeAsync(5);
     await rejection;
+    expect(stderr).toHaveBeenCalledTimes(2);
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Ignored invalid clawd response'));
     stderr.mockRestore();
     vi.useRealTimers();

@@ -1,5 +1,9 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import {
+  decodeClawBackendEvent,
+  type ClawBackendEvent,
+} from '@codex-claw/core/backend-protocol/events';
+import {
   createClawRpcError,
   createClawRpcResult,
   clawRpcErrorCodes,
@@ -7,7 +11,6 @@ import {
   isClawRpcRequest,
   isClawRpcResponse,
   parseClawRpcMessage,
-  type ClawBackendEvent,
   type ClawRpcId,
   type ClawRpcRequest,
   type ClawRpcResponse,
@@ -183,11 +186,16 @@ export class BackendRpcSession {
       warnMain('clawd', 'ignored unknown backend notification', { method: message.method });
       return;
     }
-    if (!isRecord(message.params)) {
-      warnMain('clawd', 'ignored malformed backend event notification');
+    let event: ClawBackendEvent;
+    try {
+      event = decodeClawBackendEvent(message.params);
+    } catch (error) {
+      warnMain('clawd', 'ignored malformed backend event notification', {
+        detail: error instanceof Error ? error.message : 'Invalid backend event notification.',
+      });
       return;
     }
-    for (const listener of this.eventListeners) listener(message.params as ClawBackendEvent);
+    for (const listener of this.eventListeners) listener(event);
   }
 
   private rejectPending(error: Error): void {
@@ -205,8 +213,4 @@ export class BackendRpcSession {
   private writeResponse(response: ClawRpcResponse): void {
     this.write?.(`${JSON.stringify(response)}\n`);
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
