@@ -53,8 +53,8 @@ Codex Claw is free to use with the Codex subscription you already have.
 
 ## Built around your workflow
 
-Create agents from repositories or reusable Bench templates. Give each agent a
-prompt, then move freely between active conversations: drafts, attachments,
+Create agents from repositories and give each one a prompt, then move freely
+between active conversations: drafts, attachments,
 queues, model settings, browser tabs, and sidebar state stay with the agent.
 
 When a turn needs attention, steer it immediately. When it does not, queue the

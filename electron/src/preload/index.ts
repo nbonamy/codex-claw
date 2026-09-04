@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BenchLocation, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, CreateWorkItemInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -63,7 +63,6 @@ const api: CodexClawApi = {
   closeTeam: (teamId: string) => ipc.invoke(ipcChannels.closeTeam, teamId),
   disconnectTeam: (teamId: string) => ipc.invoke(ipcChannels.disconnectTeam, teamId),
   selectTeam: (teamId: string) => ipc.invoke(ipcChannels.selectTeam, teamId),
-  getBenchSnapshot: (location?: BenchLocation) => ipc.invoke(ipcChannels.getBenchSnapshot, location),
   getAutomationSnapshot: (location?: AutomationLocation) => ipc.invoke(ipcChannels.getAutomationSnapshot, location),
   createAutomation: (input: CreateAutomationInput, location?: AutomationLocation) => ipc.invoke(ipcChannels.createAutomation, input, location),
   updateAutomation: (input: UpdateAutomationInput, location?: AutomationLocation) => ipc.invoke(ipcChannels.updateAutomation, input, location),
@@ -84,9 +83,6 @@ const api: CodexClawApi = {
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipc.invoke(ipcChannels.moveAgentToTeam, input),
   reorderAgents: (input: ReorderAgentsInput) => ipc.invoke(ipcChannels.reorderAgents, input),
   reorderRepositories: (input: ReorderRepositoriesInput) => ipc.invoke(ipcChannels.reorderRepositories, input),
-  saveAgentToBench: (agentId: string) => ipc.invoke(ipcChannels.saveAgentToBench, agentId),
-  deployBenchTemplate: (templateId: string, teamId?: string, location?: BenchLocation) => ipc.invoke(ipcChannels.deployBenchTemplate, templateId, teamId, location),
-  removeBenchTemplate: (templateId: string, location?: BenchLocation) => ipc.invoke(ipcChannels.removeBenchTemplate, templateId, location),
   restartAgent: (agentId: string) => ipc.invoke(ipcChannels.restartAgent, agentId),
   hydrateAgentHistory: (agentId: string) => ipc.invoke(ipcChannels.hydrateAgentHistory, agentId),
   loadOlderAgentHistory: (agentId: string) => ipc.invoke(ipcChannels.loadOlderAgentHistory, agentId),

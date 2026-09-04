@@ -62,7 +62,6 @@ describe('backend JSON-RPC protocol', () => {
       expect(value).toMatch(/^[a-z][A-Za-z0-9]*(?:\/[a-z][A-Za-z0-9]*)+$/u);
       expect(value).not.toMatch(/\/(?:list|get|set|remove|add|save|open|update|read|create|delete)[A-Z]/u);
     }
-    expect(values).not.toContain('bench/snapshot');
     expect(values).not.toContain('agent/listFiles');
     expect(values).not.toContain('backend/event');
   });

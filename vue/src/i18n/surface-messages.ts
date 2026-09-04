@@ -72,7 +72,6 @@ export const surfaceMessages = {
   },
   "appShell": {
     "resizeRightWorkspace": "Resize right workspace",
-    "assignToBenchAgent": "Assign to Bench Agent",
     "assign": "Assign",
     "repositoryCloningIsNotAvailable": "Repository cloning is not available.",
     "filePreviewIsNotAvailable": "File preview is not available.",
@@ -123,17 +122,6 @@ export const surfaceMessages = {
     "previewUnavailableThisIsABinaryOrUnsupportedFile": "Preview unavailable: this is a binary or unsupported file.",
     "markdown": "Markdown"
   },
-  "benchAgentAssignmentDialog": {
-    "bench": "Bench",
-    "chooseTheSavedAgentToDeploy": "Choose the saved agent to deploy.",
-    "team": "Team",
-    "chooseWhereTheAgentShouldBeCreated": "Choose where the agent should be created.",
-    "newTeam": "New team",
-    "newTeamName": "New team name",
-    "enterTeamName": "Enter team name",
-    "cancel": "Cancel",
-    "assignToBenchAgent": "Assign to Bench Agent"
-  },
   "browserPanel": {
     "inAppBrowser": "In-app browser",
     "browserNavigation": "Browser navigation",
@@ -153,7 +141,6 @@ export const surfaceMessages = {
   },
   "cockpitAddAgentTile": {
     "assignToNewAgent": "Assign to New Agent",
-    "assignToBenchAgent": "Assign to Bench Agent",
     "addAgent": "Add Agent"
   },
   "cockpitAgentsView": {
@@ -442,7 +429,7 @@ export const surfaceMessages = {
     "automationsWelcome": "Automations welcome",
     "noAutomationsYet": "No automations yet",
     "automationsWatchForMatchingWork": "Select matching GitHub work and delegate it on your schedule.",
-    "startWithGitHubIssuesPickABenchAgentAndLetSkwadCreateThe": "Choose repositories, describe what to pick up, and tell each new agent what to do.",
+    "describePickupCriteriaAndAgentInstructions": "Choose repositories, describe what to pick up, and tell each new agent what to do.",
     "createAutomation": "Create Automation"
   },
   "automationsView": {
@@ -471,11 +458,6 @@ export const surfaceMessages = {
     "unableToLoadMarkdown": "Unable to load markdown."
   },
   "newAgentButton": {
-    "openBench": "Open Bench",
-    "newAgentOptions": "New agent options",
-    "createNewAgent": "Create New Agent",
-    "bench": "Bench",
-    "rightClickAnAgentSaveToBench": "Right-click an agent → Save to Bench",
     "newAgent": "New Agent"
   },
   "newSourceWorktreeDialog": {
@@ -847,7 +829,6 @@ export const surfaceMessages = {
     "showAgent": "Show agent",
     "clearAssignment": "Clear assignment",
     "assignToNewAgent": "Assign to New Agent",
-    "assignToBenchAgent": "Assign to Bench Agent",
     "agentUnavailable": "Agent unavailable",
     "me": "Me",
     "blocked": "Blocked",
@@ -878,8 +859,7 @@ export const surfaceMessages = {
     "gitMergeIsNotAvailable": "Git merge is not available.",
     "openInIsNotAvailable": "Open In is not available.",
     "devicePairingIsNotAvailable": "Device pairing is not available.",
-    "issueCreationIsNotAvailable": "Issue creation is not available.",
-    "benchIsNotAvailable": "Bench is not available."
+    "issueCreationIsNotAvailable": "Issue creation is not available."
   },
   "annotationPopup": {
     "annotationComment": "Annotation comment",

@@ -6,7 +6,7 @@
     <div class="automation-welcome__copy">
       <h3>{{ $t('surface.automationWelcome.noAutomationsYet') }}</h3>
       <p>{{ $t('surface.automationWelcome.automationsWatchForMatchingWork') }}</p>
-      <p>{{ $t('surface.automationWelcome.startWithGitHubIssuesPickABenchAgentAndLetSkwadCreateThe') }}</p>
+      <p>{{ $t('surface.automationWelcome.describePickupCriteriaAndAgentInstructions') }}</p>
     </div>
     <el-button
       type="primary"

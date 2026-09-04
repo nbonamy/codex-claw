@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -1054,121 +1054,6 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/quickChat/create', { input });
   });
 
-  it('routes bench mutations through clawd', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.sourceFolder.initialized = true;
-    const backendSnapshot = {
-      ...snapshot,
-      bench: [{
-        id: 'bench-dina',
-        name: 'Dina',
-        folder: '/Users/nbonamy/src/codex-claw',
-        backend: 'codex' as const,
-        createdAt: '2026-06-13T00:00:00.000Z',
-        updatedAt: '2026-06-13T00:00:00.000Z',
-      }],
-    };
-    const request = vi.fn().mockResolvedValue(backendSnapshot);
-    const controller = new AppController(snapshot, createBackendClient({ request }));
-
-    await controller.initialize();
-
-    await expect(saveAgentToBench(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
-    await expect(deployBenchTemplate(controller, 'bench-dina', 'team-codex-claw')).resolves.toBe(backendSnapshot);
-    await expect(removeBenchTemplate(controller, 'bench-dina')).resolves.toBe(backendSnapshot);
-
-    expect(request).toHaveBeenNthCalledWith(1, 'bench/agent/template/create', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(2, 'bench/template/deploy', { templateId: 'bench-dina', teamId: 'team-codex-claw' });
-    expect(request).toHaveBeenNthCalledWith(3, 'bench/template/delete', { templateId: 'bench-dina' });
-  });
-
-  it('keeps remote Bench snapshots out of the local desktop snapshot', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.sourceFolder.initialized = true;
-    snapshot.remoteConnections.connections = [{
-      id: 'connection-devbox',
-      kind: 'ssh',
-      name: 'devbox',
-      host: 'devbox',
-      status: 'ready',
-      createdAt: '2026-06-14T10:00:00.000Z',
-      updatedAt: '2026-06-14T10:00:00.000Z',
-    }];
-    snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
-    snapshot.teams[0]!.agentIds = ['agent-dina'];
-    snapshot.agents = [{
-      id: 'agent-dina',
-      teamId: 'team-codex-claw',
-      name: 'Dina',
-      folder: '/home/nicolas/src/codex-claw',
-      backend: 'codex',
-      status: { type: 'idle' },
-      createdAt: '2026-06-13T00:00:00.000Z',
-      updatedAt: '2026-06-13T00:00:00.000Z',
-    }];
-    const remoteLocation: BenchLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
-    const remoteBenchSnapshot = {
-      ...createInitialSnapshot(),
-      bench: [{
-        id: 'bench-remote-dina',
-        name: 'Remote Dina',
-        folder: '/home/nicolas/src/codex-claw',
-        backend: 'codex' as const,
-        createdAt: '2026-06-13T00:00:00.000Z',
-        updatedAt: '2026-06-13T00:00:00.000Z',
-      }],
-    };
-    const deployedLocalSnapshot = {
-      ...snapshot,
-      agents: [
-        ...snapshot.agents,
-        {
-          id: 'agent-from-remote-bench',
-          teamId: 'team-codex-claw',
-          name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
-          backend: 'codex' as const,
-          status: { type: 'idle' as const },
-          createdAt: '2026-06-13T00:00:00.000Z',
-          updatedAt: '2026-06-13T00:00:00.000Z',
-        },
-      ],
-    };
-    const request = vi.fn().mockImplementation((method: string) => {
-      if (method === 'bench/template/deploy') {
-        return Promise.resolve(deployedLocalSnapshot);
-      }
-      return Promise.resolve(remoteBenchSnapshot);
-    });
-    const controller = new AppController(snapshot, createBackendClient({ request }));
-
-    await controller.initialize();
-
-    await expect(getBenchSnapshot(controller, remoteLocation)).resolves.toBe(remoteBenchSnapshot);
-    await expect(saveAgentToBench(controller, 'agent-dina')).resolves.toBe(remoteBenchSnapshot);
-    await expect(getSnapshot(controller)).resolves.toMatchObject({
-      teams: [{ id: 'team-codex-claw', remoteConnectionId: 'connection-devbox' }],
-      bench: [],
-    });
-
-    await expect(removeBenchTemplate(controller, 'bench-remote-dina', remoteLocation)).resolves.toBe(remoteBenchSnapshot);
-    await expect(getSnapshot(controller)).resolves.toMatchObject({
-      teams: [{ id: 'team-codex-claw', remoteConnectionId: 'connection-devbox' }],
-      bench: [],
-    });
-
-    await expect(deployBenchTemplate(controller, 'bench-remote-dina', 'team-codex-claw', remoteLocation)).resolves.toBe(deployedLocalSnapshot);
-    await expect(getSnapshot(controller)).resolves.toStrictEqual({ ...deployedLocalSnapshot, messages: [] });
-
-    expect(request).toHaveBeenCalledWith('snapshot/bench/get', { location: remoteLocation });
-    expect(request).toHaveBeenCalledWith('bench/agent/template/create', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenCalledWith('bench/template/delete', { templateId: 'bench-remote-dina', location: remoteLocation });
-    expect(request).toHaveBeenCalledWith('bench/template/deploy', {
-      templateId: 'bench-remote-dina',
-      teamId: 'team-codex-claw',
-      location: remoteLocation,
-    });
-  });
 
   it('routes settings updates through clawd', async () => {
     const snapshot = createInitialSnapshot();
@@ -2613,29 +2498,6 @@ async function getSnapshot(controller: AppController): Promise<AppSnapshot> {
   }).getSnapshot();
 }
 
-async function getBenchSnapshot(controller: AppController, location?: BenchLocation): Promise<AppSnapshot> {
-  return (controller as unknown as {
-    getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot>;
-  }).getBenchSnapshot(location);
-}
-
-async function saveAgentToBench(controller: AppController, agentId: string): Promise<AppSnapshot> {
-  return (controller as unknown as {
-    saveAgentToBench(agentId: string): Promise<AppSnapshot>;
-  }).saveAgentToBench(agentId);
-}
-
-async function deployBenchTemplate(controller: AppController, templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot> {
-  return (controller as unknown as {
-    deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot>;
-  }).deployBenchTemplate(templateId, teamId, location);
-}
-
-async function removeBenchTemplate(controller: AppController, templateId: string, location?: BenchLocation): Promise<AppSnapshot> {
-  return (controller as unknown as {
-    removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;
-  }).removeBenchTemplate(templateId, location);
-}
 
 async function updateSettings(controller: AppController, input: UpdateSettingsInput): Promise<AppSnapshot> {
   return (controller as unknown as {

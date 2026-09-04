@@ -143,22 +143,17 @@
       <CockpitAgentsView
         v-else-if="activeSection === 'agents'"
         :agents="agents"
-        :bench="bench"
-        :bench-by-team-id="benchByTeamId"
         :forkable-agent-ids="forkableAgentIds"
         :repository-icons="repositoryIcons"
         :teams="teams"
         @add-agent="emit('add-agent', $event)"
         @close-agent="emit('close-agent', $event)"
-        @deploy-bench-template="emit('deploy-bench-template', $event)"
         @duplicate-agent="emit('duplicate-agent', $event)"
         @edit-agent="emit('edit-agent', $event)"
         @fork-agent="emit('fork-agent', $event)"
         @move-agent-to-team="emit('move-agent-to-team', $event)"
         @prompt-agent="emit('prompt-agent', $event)"
-        @remove-bench-template="emit('remove-bench-template', $event)"
         @restart-agent="emit('restart-agent', $event)"
-        @save-agent-to-bench="emit('save-agent-to-bench', $event)"
         @select-agent="emit('select-agent', $event)"
         @select-team="emit('select-team', $event)"
       />
@@ -172,7 +167,7 @@
 import { translate } from '../i18n';
 import { computed, ref } from 'vue';
 import { IconChevronDown, IconFolder, IconSearch, IconUser } from '@tabler/icons-vue';
-import type { Agent, BenchTemplate, DeployBenchTemplateInput, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { BacklogIcon, ExternalLinkIcon } from '../shared/icons/app-icons';
 import CockpitAgentsView from './CockpitAgentsView.vue';
@@ -204,8 +199,6 @@ type SummaryMetric = { count: number; filter: SummaryFilter; id: 'working' | 'bl
 
 const props = defineProps<{
   agents: Agent[];
-  bench?: BenchTemplate[];
-  benchByTeamId?: Record<string, BenchTemplate[]>;
   forkableAgentIds?: string[];
   repositoryIcons?: Record<string, string>;
   teams: Team[];
@@ -220,11 +213,9 @@ const startWorkItemsAction = props.startWorkItemsAction;
 
 const emit = defineEmits<{
   'add-agent': [teamId: string];
-  'assign-work-item-to-bench-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'close-agent': [agentId: string];
-  'deploy-bench-template': [input: DeployBenchTemplateInput];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
   'edit-agent': [agentId: string];
@@ -233,10 +224,8 @@ const emit = defineEmits<{
   'refresh-work-items': [repositoryId: string | null];
   'change-work-items-page': [page: number];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
-  'remove-bench-template': [input: { templateId: string; teamId?: string }];
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
-  'save-agent-to-bench': [agentId: string];
   'select-work-repository': [repositoryId: string | null];
   'select-work-assignee': [assigneeLogin: string | null];
   'select-work-tag': [tagName: string | null];

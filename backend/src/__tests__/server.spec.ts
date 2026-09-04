@@ -607,14 +607,11 @@ describe('ClawBackendServer', () => {
       [backendMethods.agentOpenInApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
       [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],
       [backendMethods.teamCreate, { input: { name: 'Team', color: 'transparent' } }, 'color'],
-      [backendMethods.benchTemplateCreate, { input: { name: 'Bench', folder: '/tmp', backend: 'other' } }, 'backend'],
-      [backendMethods.benchTemplateCreate, { input: { name: '', folder: '', backend: 'codex' } }, 'name'],
       [backendMethods.settingsCodexResourceSharingSet, { input: { enabled: false, mode: 'later' } }, 'sharing'],
       [backendMethods.sourceWorktreesList, { repoPath: '' }, 'repoPath'],
       [backendMethods.sourceRepositoryClone, { input: { url: '' } }, 'url'],
       [backendMethods.sourceWorktreeCreate, { input: { repoPath: '', branchName: '' } }, 'configured'],
       [backendMethods.workProviderConnect, { provider: 'linear' }, 'work integrations'],
-      [backendMethods.snapshotBenchGet, { location: { kind: 'elsewhere' } }, 'location'],
       [backendMethods.snapshotAutomationsGet, { location: { kind: 'elsewhere' } }, 'location'],
     ];
 
@@ -2109,7 +2106,7 @@ describe('ClawBackendServer', () => {
   it('does not accept legacy backend method names', async () => {
     const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
 
-    for (const method of ['bench/snapshot', 'agent/listFiles']) {
+    for (const method of ['agent/listFiles']) {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: method, method })).resolves.toStrictEqual({
         jsonrpc: '2.0',
         id: method,
@@ -6219,222 +6216,6 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('owns bench mutations and validates deployed template folders', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-bench-'));
-    const snapshot = createTestSnapshot();
-    snapshot.teams[0]!.agentIds = ['agent-dina'];
-    snapshot.agents = [{
-      id: 'agent-dina',
-      teamId: 'team-test',
-      name: 'Dina',
-      folder: tempDir,
-      backend: 'codex',
-      status: { type: 'idle' },
-      createdAt: '2026-06-13T00:00:00.000Z',
-      updatedAt: '2026-06-13T00:00:00.000Z',
-    }];
-    snapshot.activeAgentId = 'agent-dina';
-    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      pid: 123,
-      snapshot,
-      saveSnapshot,
-      driverRpc: new BackendDriverRpc(new Map()),
-    });
-
-    try {
-      await expect(server.handleMessage({
-        jsonrpc: '2.0',
-        id: 'save-bench',
-        method: 'bench/agent/template/create',
-        params: { agentId: 'agent-dina' },
-      })).resolves.toMatchObject({
-        result: {
-          bench: [{ name: 'Dina', folder: tempDir }],
-        },
-      });
-      const templateId = snapshot.bench[0]?.id ?? '';
-
-      await expect(server.handleMessage({
-        jsonrpc: '2.0',
-        id: 'deploy-bench',
-        method: 'bench/template/deploy',
-        params: { templateId, teamId: 'team-test' },
-      })).resolves.toMatchObject({
-        result: {
-          agents: [
-            { id: 'agent-dina' },
-            { name: 'Dina', folder: tempDir, teamId: 'team-test' },
-          ],
-        },
-      });
-      await expect(server.handleMessage({
-        jsonrpc: '2.0',
-        id: 'remove-bench',
-        method: 'bench/template/delete',
-        params: { templateId },
-      })).resolves.toMatchObject({
-        result: {
-          bench: [],
-        },
-      });
-
-      expect(saveSnapshot).toHaveBeenCalledTimes(3);
-    } finally {
-      await server.close();
-      await rm(tempDir, { recursive: true, force: true });
-    }
-  });
-
-  it('uses the team clawd Bench for remote team save deploy and remove', async () => {
-    const snapshot = createTestSnapshot();
-    snapshot.remoteConnections.connections = [readyRemoteConnection()];
-    snapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
-    snapshot.teams[0]!.remoteTeamId = 'team-remote';
-    snapshot.agents = [];
-    snapshot.activeAgentId = 'agent-dina';
-    const remoteAgent: AppSnapshot['agents'][number] = {
-      id: 'agent-dina',
-      teamId: 'team-remote',
-      name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
-      backend: 'codex' as const,
-      status: { type: 'idle' },
-      createdAt: '2026-06-13T00:00:00.000Z',
-      updatedAt: '2026-06-13T00:00:00.000Z',
-    };
-    const remoteTemplate = {
-      id: 'bench-remote-dina',
-      name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
-      backend: 'codex' as const,
-      createdAt: '2026-06-13T00:00:00.000Z',
-      updatedAt: '2026-06-13T00:00:00.000Z',
-    };
-    const remoteSnapshotWithAgent = createRemoteTeamSnapshot([remoteAgent]);
-    const remoteSnapshotWithBench = {
-      ...createRemoteTeamSnapshot([remoteAgent]),
-      bench: [remoteTemplate],
-    };
-    const remoteSnapshotWithoutBench = {
-      ...createRemoteTeamSnapshot([remoteAgent]),
-      bench: [],
-    };
-    const remoteSnapshotWithDeployedAgent = createRemoteTeamSnapshot([remoteAgent, {
-      ...createRemoteAgent(),
-      name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
-    }]);
-    const remoteClients = {
-      request: vi.fn().mockImplementation((_connection, method: string) => {
-        if (method === 'snapshot/get') {
-          return Promise.resolve({
-            snapshot: remoteSnapshotWithAgent,
-            lastEventSeq: 0,
-            clientState: {
-              sourceFolderPath: '',
-              shouldPreventDisplaySleep: false,
-            },
-          });
-        }
-        if (method === 'bench/agent/template/create' || method === 'snapshot/bench/get') {
-          return Promise.resolve(remoteSnapshotWithBench);
-        }
-        if (method === 'bench/template/deploy') {
-          return Promise.resolve(remoteSnapshotWithDeployedAgent);
-        }
-        if (method === 'bench/template/delete') {
-          return Promise.resolve(remoteSnapshotWithoutBench);
-        }
-        return Promise.resolve(null);
-      }),
-      close: vi.fn().mockResolvedValue(undefined),
-    };
-    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      pid: 123,
-      snapshot,
-      saveSnapshot,
-      remoteClients: remoteClients as never,
-    });
-
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'save-remote-bench',
-      method: 'bench/agent/template/create',
-      params: { agentId: 'agent-dina' },
-    })).resolves.toMatchObject({
-      result: {
-        bench: [{ id: 'bench-remote-dina' }],
-      },
-    });
-    expect(snapshot.bench).toStrictEqual([]);
-    expect(remoteClients.request).toHaveBeenCalledWith(
-      snapshot.remoteConnections.connections[0],
-      'bench/agent/template/create',
-      { agentId: 'agent-dina' },
-      expect.any(Function),
-    );
-
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'deploy-remote-bench',
-      method: 'bench/template/deploy',
-      params: {
-        templateId: 'bench-remote-dina',
-        teamId: 'team-test',
-        location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
-      },
-    })).resolves.toMatchObject({
-      result: {
-        agents: [
-          { id: 'agent-dina' },
-          { id: 'agent-remote', name: 'Remote Dina', folder: '/home/nicolas/src/codex-claw', teamId: 'team-test' },
-        ],
-        bench: [],
-      },
-    });
-    expect(remoteClients.request).toHaveBeenCalledWith(
-      snapshot.remoteConnections.connections[0],
-      'snapshot/bench/get',
-      undefined,
-      expect.any(Function),
-    );
-    expect(remoteClients.request).toHaveBeenCalledWith(
-      snapshot.remoteConnections.connections[0],
-      'bench/template/deploy',
-      {
-        templateId: 'bench-remote-dina',
-        teamId: 'team-remote',
-      },
-      expect.any(Function),
-    );
-
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'remove-remote-bench',
-      method: 'bench/template/delete',
-      params: {
-        templateId: 'bench-remote-dina',
-        location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
-      },
-    })).resolves.toMatchObject({
-      result: {
-        bench: [],
-      },
-    });
-    expect(remoteClients.request).toHaveBeenCalledWith(
-      snapshot.remoteConnections.connections[0],
-      'bench/template/delete',
-      { templateId: 'bench-remote-dina' },
-      expect.any(Function),
-    );
-    expect(saveSnapshot).toHaveBeenCalledOnce();
-
-    await server.close();
-  });
 
   it('owns settings updates', async () => {
     const snapshot = createTestSnapshot();
@@ -7190,7 +6971,6 @@ function createTestSnapshot(): AppSnapshot {
       agentIds: [],
     }],
     agents: [],
-    bench: [],
     automations: [],
     activeTeamId: 'team-test',
     activeAgentId: null,

@@ -284,7 +284,6 @@ const emit = defineEmits<{
   'resize-sidebar': [width: number];
   'resume-session': [agentId: string];
   'restart-agent': [agentId: string];
-  'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'start-work': [action: 'github' | 'local' | 'url'];
   'create-quick-chat': [];
@@ -519,9 +518,6 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'restart-agent':
       emit('restart-agent', agentId);
-      break;
-    case 'save-agent-to-bench':
-      emit('save-agent-to-bench', agentId);
       break;
   }
   closeContextMenu();

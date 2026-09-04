@@ -14,8 +14,6 @@ protocol/process communication and the renderer displays app-owned events.
 - Use `docs/codex.png` as a concrete visual reference for the native shell:
   left team/agent navigation, central conversation, and right-side
   document/artifact panes.
-- Treat Bench as a first-class product primitive: saved agent templates that
-  can be deployed into a team quickly.
 - Keep Codex as the primary implemented backend and preserve a narrow backend
   seam so coding backends such as Claude can be added without rewriting the UI.
 - Use the Codex app-server protocol as the long-term integration boundary.
@@ -72,17 +70,6 @@ type Agent = {
   updatedAt: string
 }
 
-type BenchTemplate = {
-  id: string
-  name: string
-  avatar?: string
-  folder: string
-  backend: "codex" | "claude"
-  backendDefaults?: BackendDefaults
-  createdAt: string
-  updatedAt: string
-}
-
 type BackendSession =
   | { kind: "codex"; threadId: string }
   | {
@@ -103,17 +90,10 @@ type AgentStatus =
 
 Codex app-server owns the conversation transcript and thread history in
 `CODEX_HOME`. Codex Claw owns only product state: teams, agents, selected
-folders, the global source folder, Bench templates, view preferences, theme
+folders, the global source folder, view preferences, theme
 preference, workspace identity, current-conversation display metadata, and
 backend session metadata such as the Codex thread id. Persisted Git remote
 identities are canonical and credential-free.
-
-Bench templates are reusable saved agents, not active sessions. Saving an agent
-to Bench captures the deployable shape: name, avatar, folder, backend, and
-backend defaults. Deploying from Bench creates a new active agent in the current
-team. Initially dedupe or update Bench entries by folder; later we may allow
-multiple templates for the same folder if the product needs different roles or
-model defaults.
 
 On a fresh install, create a default team when no teams exist. Do not create a
 default agent automatically; an empty team offers the same local folder,
@@ -462,9 +442,6 @@ type CodexClawApi = {
   duplicateAgent(agentId: string): Promise<AppSnapshot>
   forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>
-  saveAgentToBench(agentId: string): Promise<AppSnapshot>
-  deployBenchTemplate(templateId: string, teamId?: string): Promise<AppSnapshot>
-  removeBenchTemplate(templateId: string): Promise<AppSnapshot>
   restartAgent(agentId: string): Promise<AppSnapshot>
   closeAgent(agentId: string): Promise<AppSnapshot>
   selectAgent(agentId: string): Promise<AppSnapshot>
@@ -497,8 +474,6 @@ Renderer layers:
   over that area without forcing every artifact into the chat column. Opening
   the workspace before a tab exists shows a Claw-owned launcher for the
   currently supported surfaces;
-- Bench surface for saved agent templates, starting as a New Agent menu section
-  and eventually supporting faster deployment into any team;
 - chat state store that reduces `MainToRendererEvent` into message/tool/diff
   state;
 - the SDK `CodexConversationPane` for product-neutral message, tool, approval,
@@ -823,7 +798,6 @@ type PersistedStateV1 = {
   version: 1
   teams: Team[]
   agents: Agent[]
-  bench: BenchTemplate[]
   settings: AppSettings
 }
 ```
@@ -982,8 +956,8 @@ Implemented product surfaces:
 
 - Electron app boots to a native team/agent shell.
 - Teams can be created, edited, selected, cycled, and closed.
-- Agents can be created, edited, duplicated, moved between teams, saved to
-  Bench, restarted, closed, and selected.
+- Agents can be created, edited, duplicated, moved between teams, restarted,
+  closed, and selected.
 - Empty teams show a first-agent call to action instead of creating a default
   agent.
 - `clawd` starts/connects to Codex app-server, creates or resumes Codex
@@ -1028,9 +1002,6 @@ Still intentionally incomplete:
 ## Direction Set
 
 - Use "team" as the product term.
-- Bench is a first-class global set of saved agent templates that can be
-  deployed into teams. It should not be hidden as merely a create-agent
-  shortcut.
 - Local desktop builds bundle a pinned, checksum-verified Codex executable and
   pass it to local `clawd`. SSH-installed remote `clawd` continues to discover
   Codex on the remote host.

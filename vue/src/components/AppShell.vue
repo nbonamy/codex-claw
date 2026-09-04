@@ -71,7 +71,6 @@
       @resize-sidebar="setAgentSidebarWidth"
       @restart-agent="$emit('restart-agent', $event)"
       @resume-session="openResumeSession"
-      @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
       @select-agent="selectAgentFromShell"
       @select-team="selectTeamFromRail"
       @start-work="handleStartWorkAction"
@@ -149,30 +148,25 @@
         v-else-if="cockpitVisible"
         :agents="snapshot.agents"
         :forkable-agent-ids="forkableAgentIds"
-        :bench-by-team-id="benchByTeamId"
         :default-team-id="snapshot.activeTeamId"
         :repository-icons="snapshot.general.repositoryIcons"
         :start-work-items-action="startCockpitWorkItems"
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
         @add-agent="openNewAgent"
-        @assign-work-item-to-bench-agent="openBenchAgentAssignmentDialog"
         @assign-work-item-to-new-agent="openNewAgentForWorkItem"
         @assign-work-item="assignExistingAgentWorkItem"
         @close-agent="$emit('close-agent', $event)"
-        @deploy-bench-template="$emit('deploy-bench-template', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
-        @remove-bench-template="$emit('remove-bench-template', $event)"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @refresh-work-items="refreshWorkItems"
         @change-work-items-page="changeGlobalWorkItemsPage"
         @select-global-scope="selectGlobalBacklogScope"
         @restart-agent="$emit('restart-agent', $event)"
-        @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
         @select-work-tag="selectWorkTagForCockpit"
         @select-work-assignee="selectWorkAssigneeForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
@@ -314,18 +308,6 @@
       :show-team-field="showAgentDialogTeamSelector"
       @close="closeAgentDialog"
     />
-    <BenchAgentAssignmentDialog
-      :visible="benchAssignmentDialogVisible"
-      :title="$t('surface.appShell.assignToBenchAgent')"
-      :confirm-label="$t('surface.appShell.assign')"
-      :bench-templates="snapshot.bench"
-      :bench-templates-by-team-id="benchByTeamId"
-      :initial-new-team-name="pendingBenchAgentTeamName"
-      :initial-team-id="pendingBenchAgentTeamId ?? activeTeam?.id ?? snapshot.activeTeamId"
-      :teams="snapshot.teams"
-      @close="closeBenchAssignmentDialog"
-      @submit="assignWorkItemToBenchAgent"
-    />
     <TeamDialog
       :visible="teamDialogVisible"
       :mode="teamDialogMode"
@@ -379,7 +361,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BenchLocation, BenchTemplate, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RemoveBenchTemplateInput, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -400,7 +382,6 @@ import TeamDialog from './TeamDialog.vue';
 import AppShellNavigation from './AppShellNavigation.vue';
 import BackendConnectionBanner from './BackendConnectionBanner.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
-import BenchAgentAssignmentDialog from './BenchAgentAssignmentDialog.vue';
 import AgentWorkspace from './AgentWorkspace.vue';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
@@ -477,9 +458,6 @@ const props = withDefaults(defineProps<{
   assignedWorkItemsByProvider?: Partial<Record<WorkProviderKind, WorkItem[]>>;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   workBacklogError?: string | null;
-  remoteBenchByConnectionId?: Record<string, BenchTemplate[]>;
-  remoteBenchStatusByConnectionId?: Record<string, BenchLoadStatus>;
-  remoteBenchErrorByConnectionId?: Record<string, string | null>;
   daemonStatus?: ClawdDaemonStatus | null;
   daemonStatusError?: string | null;
   codexResourceSharingMigrationRequired?: boolean;
@@ -510,7 +488,6 @@ const props = withDefaults(defineProps<{
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
-  deployBenchTemplateAction?: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
@@ -545,7 +522,6 @@ const props = withDefaults(defineProps<{
   completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
-  loadBench?: (location?: BenchLocation) => Promise<BenchTemplate[] | void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
   loadGlobalWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery) => Promise<WorkItemPage>;
@@ -586,9 +562,6 @@ const props = withDefaults(defineProps<{
   assignedWorkItemsByProvider: () => ({}),
   workBacklogStatus: 'notLoaded',
   workBacklogError: null,
-  remoteBenchByConnectionId: () => ({}),
-  remoteBenchStatusByConnectionId: () => ({}),
-  remoteBenchErrorByConnectionId: () => ({}),
   daemonStatus: null,
   daemonStatusError: null,
   codexResourceSharingMigrationRequired: false,
@@ -624,7 +597,6 @@ const props = withDefaults(defineProps<{
   createAgent: async () => undefined,
   createQuickChat: async () => undefined,
   createTeam: async () => undefined,
-  deployBenchTemplateAction: async () => undefined,
   updateTeam: async () => undefined,
   updateAgent: async () => undefined,
   updateSettings: async () => undefined,
@@ -659,7 +631,6 @@ const props = withDefaults(defineProps<{
   completeWorkProviderConnection: async () => undefined,
   disconnectWorkProvider: async () => undefined,
   configureWorkBacklog: async () => undefined,
-  loadBench: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
   loadGlobalWorkItems: async (_provider, _location, query) => ({ items: [], page: query?.page ?? 1, pageSize: query?.pageSize ?? 50, totalItems: 0 }),
@@ -680,7 +651,6 @@ const emit = defineEmits<{
   'delete-message': [index: number];
   'delete-queued-prompt': [promptId: string];
   'debug-mark-unread': [];
-  'deploy-bench-template': [input: string | DeployBenchTemplateInput];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
   'fork-message': [index: number];
@@ -693,10 +663,8 @@ const emit = defineEmits<{
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
-  'remove-bench-template': [input: string | RemoveBenchTemplateInput];
   'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
   'retry-message': [index: number];
-  'save-agent-to-bench': [agentId: string];
   'send-agent-prompt': [payload: { agentId: string; prompt: string }];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
@@ -718,7 +686,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 type AppSurface = 'agent' | 'cockpit' | 'automations' | 'settings';
-type BenchLoadStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 const agentSidebarCollapsed = ref(false);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
@@ -808,7 +775,6 @@ const workItemRouting = useWorkItemRouting({
     createAgent: (input) => props.createAgent(input),
     createBranch: (agentId, input) => props.createAgentGitBranch(agentId, input),
     createWorktree: (input) => props.createSourceWorktree(input),
-    deployBenchTemplate: (input) => props.deployBenchTemplateAction(input),
     duplicateAgent: (agentId, options) => props.duplicateAgentAction(agentId, options),
     loadItems: (provider, repositoryId, query) => props.loadWorkItems(provider, repositoryId, undefined, query),
   },
@@ -840,7 +806,6 @@ const workItemRouting = useWorkItemRouting({
       void nextTick(() => agentWorkspace.value?.focusComposer());
     },
     openNewAgent: (teamId, repositoryName) => openNewAgent(teamId, repositoryName),
-    resolveTeam: resolveSelectedTeam,
     selectAgent: selectAgentFromShell,
     updateComposer: (agentId, text) => emit('update:composerState', {
       agentId,
@@ -853,20 +818,14 @@ const workItemRouting = useWorkItemRouting({
   },
 });
 const {
-  assignBenchAgent: assignWorkItemToBenchAgent,
   assignCreatedAgent: assignPendingWorkItemToCreatedAgent,
   assignExisting: assignExistingAgentWorkItem,
-  benchAgentTeamName: pendingBenchAgentTeamName,
-  benchAssignmentVisible: benchAssignmentDialogVisible,
   clearNewAgent: clearPendingNewAgentWorkItem,
-  closeBenchAgent: closeBenchAssignmentDialog,
   createIsolatedAgent: createIsolatedWorkItemAgent,
   newAgentItem: pendingNewAgentWorkItem,
   newAgentTeamName: pendingNewAgentTeamName,
   newAgentWorktreeBranchName: pendingWorkItemBranchName,
-  openBenchAgent: openBenchAgentAssignmentDialog,
   openNewAgent: openNewAgentForWorkItem,
-  pendingBenchAgentTeamId,
   prefill: prefillWorkItemForAgent,
   startInExistingSession: startWorkItemInExistingSession,
   startMany: startCockpitWorkItems,
@@ -1302,7 +1261,6 @@ const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
-  || benchAssignmentDialogVisible.value
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
@@ -1795,68 +1753,10 @@ async function quit(): Promise<void> {
   await props.quit();
 }
 
- function benchForTeam(team: Team | null | undefined): BenchTemplate[] {
-  const location = benchLocationForTeam(team);
-  if (!isRemoteBenchLocation(location)) {
-    return props.snapshot.bench;
-  }
-  return props.remoteBenchByConnectionId[location.remoteConnectionId] ?? [];
-}
-
-function benchLocationForTeam(team: Team | null | undefined): BenchLocation {
-  const remoteConnectionId = team?.remoteConnectionId?.trim() ?? '';
-  return remoteConnectionId ? { kind: 'remote', remoteConnectionId } : { kind: 'local' };
-}
-
-function isRemoteBenchLocation(location: BenchLocation): location is Extract<BenchLocation, { kind: 'remote' }> {
-  return location.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
-}
-
-function loadVisibleBenchCatalogs(): void {
-  const teams = cockpitVisible.value || benchAssignmentDialogVisible.value
-    ? props.snapshot.teams
-    : activeTeam.value ? [activeTeam.value] : [];
-  for (const team of teams) {
-    loadBenchForTeam(team);
-  }
-}
-
-function loadBenchForTeam(team: Team): void {
-  const location = benchLocationForTeam(team);
-  if (!isRemoteBenchLocation(location)) {
-    return;
-  }
-
-  const status = props.remoteBenchStatusByConnectionId[location.remoteConnectionId] ?? 'notLoaded';
-  if (status === 'loading' || status === 'loaded') {
-    return;
-  }
-
-  void props.loadBench(location);
-}
-
  const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
 const resumeSessionAgent = computed(() => (
   props.snapshot.agents.find((agent) => agent.id === resumeSessionAgentId.value) ?? null
 ));
-const benchByTeamId = computed<Record<string, BenchTemplate[]>>(() => {
-  const next: Record<string, BenchTemplate[]> = {};
-  for (const team of props.snapshot.teams) {
-    next[team.id] = benchForTeam(team);
-  }
-  return next;
-});
-
-watch(() => [
-  activeTeam.value?.id ?? '',
-  activeTeam.value?.remoteConnectionId ?? '',
-  cockpitVisible.value ? 'cockpit' : '',
-  benchAssignmentDialogVisible.value ? 'bench-dialog' : '',
-  props.snapshot.teams.map((team) => `${team.id}:${team.remoteConnectionId ?? ''}`).join('\0'),
-], () => {
-  loadVisibleBenchCatalogs();
-}, { immediate: true });
-
 watch(() => props.sidePanelRequest, (request) => {
   if (!request) {
     return;

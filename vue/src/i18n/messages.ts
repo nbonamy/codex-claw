@@ -34,7 +34,6 @@ export const messages = {
       },
       cockpit: {
         assign: 'Assign #{number}',
-        assignBenchAgent: 'Assign issue to a Bench agent in {team}',
         assignNewAgent: 'Assign issue to a new agent in {team}',
         assigned: '#{number} is already assigned',
         openRepository: 'Open {repository} on GitHub',
@@ -67,12 +66,6 @@ export const messages = {
       teamColor: 'Use color {color}',
       teamUnread: '{team}, unread activity',
       version: 'Version {version}',
-      bench: {
-        remove: 'Remove {name} from Bench',
-        removeConfirm: 'Remove {name} from Bench?',
-        removeDetail: '{name} will be removed from Bench. Existing agents stay unchanged.',
-        removeAction: 'Remove',
-      },
       misc: {
         assignAnyway: 'Assign Anyway',
         awaitingInput: 'Awaiting input',
@@ -109,7 +102,6 @@ export const messages = {
       noAgent: 'No agent',
       restart: 'Restart Agent',
       resumeSession: 'Resume Session',
-      saveToBench: 'Save to Bench',
       avatar: {
         change: 'Change avatar',
         choose: 'Choose avatar',

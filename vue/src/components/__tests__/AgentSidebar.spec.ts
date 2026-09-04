@@ -7,7 +7,7 @@ import type { Agent } from '@codex-claw/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
-  it('renders repository headers, branch sessions, statuses, and active selection without Bench chrome', () => {
+  it('renders repository headers, branch sessions, statuses, and active selection', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -20,7 +20,6 @@ describe('AgentSidebar sessions', () => {
     });
 
     expect(wrapper.get('.agent-sidebar__header').text()).toContain('Sessions');
-    expect(wrapper.text()).not.toContain('Bench');
     expect(wrapper.text()).toContain('id8');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('multi-llm-ts');

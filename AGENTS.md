@@ -18,7 +18,6 @@ Core product surfaces:
 - **Teams**: top-level grouping for agents.
 - **Agents**: named teammates with avatars, folders, backend sessions, and
   status.
-- **Bench**: saved deployable agent templates.
 - **Conversation**: native chat rendering for backend messages, tool calls,
   approvals, plans, command output, file changes, and diffs.
 - **Artifacts**: document, plan, diff, git, and file panes beside the active
@@ -53,9 +52,6 @@ Preserve the product and process boundaries:
   provider-aware.
 - Theme support must use semantic tokens and CSS variables. Do not hard-code
   product colors inside components.
-
-Bench is a first-class concept. Treat it as saved deployable agent templates,
-not a minor shortcut inside the New Agent button.
 
 ## Documentation Map
 

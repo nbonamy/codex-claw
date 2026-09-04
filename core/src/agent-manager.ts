@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, BackendSession, BenchTemplate, CreateBenchTemplateInput, DuplicateAgentOptions, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
+import type { Agent, AppSnapshot, BackendSession, DuplicateAgentOptions, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 import { agentDisplayName } from './agent-display';
@@ -73,103 +73,6 @@ export function attachForkedAgentInSnapshot(
   snapshot.activeTeamId = forked.teamId ?? snapshot.activeTeamId;
   snapshot.activeAgentId = forked.id;
   return forked;
-}
-
-export function saveAgentToBench(snapshot: AppSnapshot, agentId: string, createdAt = new Date().toISOString()): BenchTemplate | null {
-  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (!agent?.folder) {
-    return null;
-  }
-
-  return saveBenchTemplateToSnapshot(snapshot, {
-    name: agentDisplayName(agent),
-    avatar: agent.avatar,
-    folder: agent.folder,
-    backend: agent.backend,
-    backendDefaults: agent.backendDefaults ? { ...agent.backendDefaults } : undefined,
-  }, createdAt);
-}
-
-export function saveBenchTemplateToSnapshot(snapshot: AppSnapshot, input: CreateBenchTemplateInput, createdAt = new Date().toISOString()): BenchTemplate {
-  const name = input.name.trim();
-  const folder = input.folder.trim();
-
-  const template: BenchTemplate = {
-    id: uniqueBenchId(snapshot, name, createdAt),
-    name,
-    avatar: input.avatar,
-    folder,
-    backend: input.backend,
-    backendDefaults: input.backendDefaults ? { ...input.backendDefaults } : undefined,
-    createdAt,
-    updatedAt: createdAt,
-  };
-
-  snapshot.bench.push(template);
-  return template;
-}
-
-export function deployBenchTemplateInSnapshot(
-  snapshot: AppSnapshot,
-  templateId: string,
-  teamId?: string,
-  createdAt = new Date().toISOString(),
-  createId: IdGenerator = () => createEntityId('agent'),
-  options: { select?: boolean } = {},
-): Agent | null {
-  const template = snapshot.bench.find((candidate) => candidate.id === templateId);
-  if (!template) {
-    return null;
-  }
-
-  return deployBenchTemplateToSnapshot(snapshot, template, teamId, createdAt, createId, options);
-}
-
-export function deployBenchTemplateToSnapshot(
-  snapshot: AppSnapshot,
-  template: BenchTemplate,
-  teamId?: string,
-  createdAt = new Date().toISOString(),
-  createId: IdGenerator = () => createEntityId('agent'),
-  options: { select?: boolean } = {},
-): Agent | null {
-  const targetTeam = teamId
-    ? snapshot.teams.find((team) => team.id === teamId)
-    : snapshot.teams.find((team) => team.id === snapshot.activeTeamId) ?? snapshot.teams[0];
-  if (!targetTeam) {
-    return null;
-  }
-
-  const agent: Agent = {
-    id: uniqueAgentId(snapshot, createId),
-    teamId: targetTeam.id,
-    name: template.name,
-    avatar: template.avatar,
-    folder: template.folder,
-    backend: template.backend,
-    backendDefaults: template.backendDefaults ? { ...template.backendDefaults } : undefined,
-    status: { type: 'idle' },
-    createdAt,
-    updatedAt: createdAt,
-  };
-
-  snapshot.agents.push(agent);
-  attachAgentToTeam(snapshot, agent);
-  if (options.select !== false) {
-    snapshot.activeTeamId = targetTeam.id;
-    snapshot.activeAgentId = agent.id;
-  }
-  return agent;
-}
-
-export function removeBenchTemplateFromSnapshot(snapshot: AppSnapshot, templateId: string): BenchTemplate | null {
-  const template = snapshot.bench.find((candidate) => candidate.id === templateId);
-  if (!template) {
-    return null;
-  }
-
-  snapshot.bench = snapshot.bench.filter((candidate) => candidate.id !== templateId);
-  return template;
 }
 
 export type AssignWorkItemOptions = {
@@ -538,37 +441,9 @@ function uniqueAgentId(snapshot: AppSnapshot, createId: IdGenerator): string {
   return createUniqueEntityId('agent', snapshot.agents.map((agent) => agent.id), createId);
 }
 
-function uniqueBenchId(snapshot: AppSnapshot, name: string, createdAt: string): string {
-  return uniqueId(snapshot.bench.map((template) => template.id), `bench-${slug(name)}-${timestampSlug(createdAt)}`);
-}
-
-function uniqueId(existingIds: string[], baseId: string): string {
-  if (!existingIds.includes(baseId)) {
-    return baseId;
-  }
-
-  let counter = 2;
-  while (existingIds.includes(`${baseId}-${counter}`)) {
-    counter += 1;
-  }
-  return `${baseId}-${counter}`;
-}
-
 function reorderIdsByBeforeId(ids: string[], id: string, beforeId: string | null): string[] {
   const nextIds = ids.filter((candidate) => candidate !== id);
   const insertIndex = beforeId === null ? nextIds.length : nextIds.indexOf(beforeId);
   nextIds.splice(insertIndex, 0, id);
   return nextIds;
-}
-
-function slug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || 'agent';
-}
-
-function timestampSlug(value: string): string {
-  return value.replace(/\W/g, '').toLowerCase();
 }

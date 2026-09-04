@@ -118,12 +118,6 @@ Current implementation checkpoint:
   proxies team IPC to backend RPC and adopts the returned snapshot; renderer
   selection controls also wait for backend snapshots instead of mutating active
   team/agent ids locally.
-- Bench belongs to a `clawd` instance. Local teams see and mutate the local
-  Bench; remote team pointers see and mutate that remote `clawd` Bench.
-  Deploying a remote Bench template creates the agent on the remote `clawd`;
-  local `clawd` projects the remote team's agents/messages into the local team
-  pointer instead of copying the remote Bench catalog into local
-  `snapshot.bench`.
 - `clawd` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes. Renderer
   settings controls send update requests and adopt the backend snapshot instead
@@ -448,7 +442,7 @@ renderer.
 
 ### Moves To `clawd`
 
-- Durable product state: teams, agents, Bench templates, automations, work backlog,
+- Durable product state: teams, agents, automations, work backlog,
   source folder settings, backend sessions, backend defaults, goals, plans, and
   preferences that should follow a backend location.
 - Runtime state: active turns, queued prompts, steering, pending approvals,
@@ -540,8 +534,6 @@ names that describe backend ownership:
 - `agent/folder/validate`, `agent/models/list`, `agent/skills/list`,
   `agent/conversations/list`, `agent/conversation/resume`,
   `agent/conversation/messages/get`
-- `snapshot/bench/get`, `bench/agent/template/create`, `bench/template/create`,
-  `bench/template/deploy`, `bench/template/delete`
 - `snapshot/automations/get`, `automation/create`, `automation/update`,
   `automation/run`, `automation/delete`, `automation/history/clear`,
   `automation/execution/delete`
@@ -1060,12 +1052,6 @@ Remote migration path:
   run, history, work-provider repository/item, and history conversation reads
   to the selected remote. Remote snapshots are returned to the UI without
   replacing local `clawd`'s durable product snapshot.
-- Bench management is location-scoped by team. The active or target team's
-  `clawd` instance supplies the Bench catalog shown in New Agent and Bench
-  assignment flows. Saving a projected remote agent asks the remote `clawd` to
-  save its real agent as a template. Deploying a remote template creates the
-  real agent on the remote `clawd`; local `clawd` only returns the projected
-  snapshot for the remote-team pointer.
 - Cross-location sync is a separate product problem and should not block the
   process extraction.
 
@@ -1305,7 +1291,7 @@ Work:
   remote clients now prefer an existing remote daemon and fall back to one-shot
   stdio.
 - Make agent folders, source folders, repo discovery, git, files, and
-  artifacts location-aware. Source, git, files, Bench, and most agent-scoped
+  artifacts location-aware. Source, git, files, and most agent-scoped
   handlers are routed through `BackendLocation`, `AgentLocation`, and
   `BackendHandle`; keep collapsing remaining one-off routing branches into
   those helpers when the semantics are not genuinely special.

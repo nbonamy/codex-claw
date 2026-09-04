@@ -366,7 +366,7 @@ then passes the local Claw MCP server through each agent's thread config:
 The `agentId` query parameter is session-local caller identity for the MCP
 server, not a tool argument the model has to provide for itself. The same
 unique ID is injected into the agent's developer instructions and returned by
-`list-agents` so duplicated Bench agents can still coordinate precisely. The
+`list-agents` so duplicated agents can still coordinate precisely. The
 approval override is scoped to `codex_claw`; it does not put the entire Codex
 session into full-access/yolo mode.
 

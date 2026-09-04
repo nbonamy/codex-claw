@@ -753,8 +753,6 @@ Claude Driver Work".
 
 - Previously, `Agent.codexThreadId` stored the only persisted backend session
   id.
-- Previously, `BenchTemplate.backend` could only represent `'codex'`.
-- Previously, `BenchTemplate.codexDefaults` only modeled Codex settings.
 - Previously, `CodexModelOption`, `CodexSkillSummary`, and `ReasoningEffort`
   were shared renderer-facing types.
 - Previously, `SendPromptOptions` mixed Codex-specific `reasoningEffort`,

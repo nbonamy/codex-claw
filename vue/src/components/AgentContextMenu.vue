@@ -28,7 +28,6 @@ import {
   MessageCircleIcon,
   PencilIcon,
   RefreshIcon,
-  SaveToBenchIcon,
   SwitchHorizontalIcon,
   X,
 } from '../shared/icons/app-icons';
@@ -40,8 +39,7 @@ export type AgentContextMenuAction =
   | 'edit-agent'
   | 'fork-agent'
   | 'resume-session'
-  | 'restart-agent'
-  | 'save-agent-to-bench';
+  | 'restart-agent';
 
 const props = defineProps<{
   moveTargets?: Team[];
@@ -110,12 +108,6 @@ const menuItems = computed<AppMenuItem[]>(() => [
       label: team.name,
       leadingColor: team.color ?? defaultTeamColor,
     })),
-  },
-  {
-    id: 'save-agent-to-bench',
-    type: 'action',
-    label: t('agents.saveToBench'),
-    icon: SaveToBenchIcon,
   },
   { id: 'group-danger', type: 'separator' },
   {
@@ -218,8 +210,7 @@ function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAct
     itemId === 'edit-agent' ||
     itemId === 'fork-agent' ||
     itemId === 'resume-session' ||
-    itemId === 'restart-agent' ||
-    itemId === 'save-agent-to-bench';
+    itemId === 'restart-agent';
 }
 </script>
 

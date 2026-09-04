@@ -61,7 +61,6 @@
       @restart-agent="$emit('restart-agent', $event)"
       @resize-sidebar="setAgentSidebarWidth"
       @resume-session="openResumeSession"
-      @save-agent-to-bench="$emit('save-agent-to-bench', $event)"
       @select-agent="selectAgentFromShell"
       @start-work="handleStartWorkAction"
       @create-quick-chat="createQuickChat"
@@ -145,7 +144,6 @@ const emit = defineEmits<{
   'resize-sidebar': [width: number];
   'restart-agent': [agentId: string];
   'resume-session': [agentId: string];
-  'save-agent-to-bench': [agentId: string];
   'select-agent': [agentId: string];
   'select-team': [teamId: string];
   'start-work': [action: 'github' | 'local' | 'url'];

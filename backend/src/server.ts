@@ -3,12 +3,12 @@ import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createAgentInSnapshot, createEmptySnapshot, createQuickChatInSnapshot, selectAgent, snapshotMetadata, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/snapshot';
 import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateBenchTemplateInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitDiff, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitStatus, AgentGitWorkflow, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName, unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, deployBenchTemplateInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeBenchTemplateFromSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, saveAgentToBench, saveBenchTemplateToSnapshot } from '@codex-claw/core/agent-manager';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -1493,94 +1493,6 @@ export class ClawBackendServer {
         }
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
-      case backendMethods.snapshotBenchGet: {
-        return this.respondInLocation(
-          message.id,
-          this.benchLocationFromParams(message.params),
-          backendMethods.snapshotBenchGet,
-          undefined,
-          () => this.snapshot,
-        );
-      }
-      case backendMethods.benchTemplateCreate: {
-        const input = requireBenchTemplateCreateInput(message.params);
-        validateBenchTemplateInput(input);
-        saveBenchTemplateToSnapshot(this.snapshot, input);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
-      }
-      case backendMethods.benchAgentTemplateCreate: {
-        const agentId = requireAgentId(message.params);
-        const route = await this.locationForAgentId(agentId);
-        if (!route) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
-        }
-        if (route.kind === 'remote') {
-          const remoteSnapshot = await this.remoteTeams.request<AppSnapshot>(route.connectionId, backendMethods.benchAgentTemplateCreate, { agentId });
-          this.remoteTeams.rememberSnapshot(route.connectionId, remoteSnapshot);
-          return createClawRpcResult(message.id, remoteSnapshot);
-        }
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.benchAgentTemplateCreate, { agentId }, async () => {
-          const template = saveAgentToBench(this.snapshot, agentId);
-          if (!template) {
-            throw new Error(`Agent not found: ${agentId}`);
-          }
-          return this.persistAndEmitSnapshot();
-        });
-      }
-      case backendMethods.benchTemplateDeploy: {
-        const params = requireRecord(message.params);
-        const templateId = requireString(params.templateId, 'templateId');
-        const teamId = typeof params.teamId === 'string' && params.teamId.trim() ? params.teamId : undefined;
-        const targetTeam = this.remoteTeams.targetTeamForAgentInput({ teamId });
-        const remoteConnectionId = this.remoteTeams.connectionIdForTeam(targetTeam);
-        const requestedRemoteConnectionId = benchLocationRemoteConnectionId(params);
-        if (requestedRemoteConnectionId !== null && requestedRemoteConnectionId !== remoteConnectionId) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Bench location does not match target team.');
-        }
-        const template = remoteConnectionId
-          ? await this.remoteTeams.benchTemplate(remoteConnectionId, templateId)
-          : this.snapshot.bench.find((candidate) => candidate.id === templateId) ?? null;
-        if (!template) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Bench template not found: ${templateId}`);
-        }
-        if (remoteConnectionId) {
-          const pointer = this.remoteTeams.pointerForTeam(targetTeam);
-          if (!pointer) {
-            return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Remote target team is not connected.');
-          }
-          const remoteSnapshot = await this.remoteTeams.request<AppSnapshot>(remoteConnectionId, backendMethods.benchTemplateDeploy, {
-            templateId,
-            teamId: pointer.remoteTeamId,
-          });
-          this.remoteTeams.rememberSnapshot(remoteConnectionId, remoteSnapshot);
-          this.snapshot.activeTeamId = pointer.localTeamId;
-          this.snapshot.activeAgentId = remoteSnapshot.activeAgentId ?? null;
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
-        }
-        await this.validateAgentInput({ name: template.name, folder: template.folder }, null);
-        const agent = deployBenchTemplateInSnapshot(this.snapshot, templateId, teamId);
-        if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Bench template or team not found: ${templateId}`);
-        }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
-      }
-      case backendMethods.benchTemplateDelete: {
-        const params = requireRecord(message.params);
-        const templateId = requireString(params.templateId, 'templateId');
-        return this.respondInLocation(
-          message.id,
-          this.benchLocationFromParams(params),
-          backendMethods.benchTemplateDelete,
-          { templateId },
-          async () => {
-            const template = removeBenchTemplateFromSnapshot(this.snapshot, templateId);
-            if (!template) {
-              throw new Error(`Bench template not found: ${templateId}`);
-            }
-            return this.persistAndEmitSnapshot();
-          },
-        );
-      }
       case backendMethods.settingsUpdate:
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
@@ -2120,10 +2032,6 @@ export class ClawBackendServer {
 
   private automationLocationFromParams(params: unknown): BackendLocation {
     return this.locationFromRemoteConnectionId(automationLocationRemoteConnectionId(params));
-  }
-
-  private benchLocationFromParams(params: unknown): BackendLocation {
-    return this.locationFromRemoteConnectionId(benchLocationRemoteConnectionId(params));
   }
 
   private async requestInLocation<Result>(
@@ -2795,25 +2703,6 @@ function requireMessageId(params: unknown): string {
   return requireString(record.messageId, 'messageId');
 }
 
-function requireBenchTemplateCreateInput(params: unknown): CreateBenchTemplateInput {
-  const record = requireRecord(params);
-  const input = requireRecord(record.input);
-  const backend = requireString(input.backend, 'backend');
-  if (backend !== 'codex' && backend !== 'claude') {
-    throw new Error(`Unsupported backend: ${backend}`);
-  }
-
-  return {
-    name: requireString(input.name, 'name'),
-    ...(typeof input.avatar === 'string' ? { avatar: input.avatar } : {}),
-    folder: requireString(input.folder, 'folder'),
-    backend,
-    ...(input.backendDefaults && typeof input.backendDefaults === 'object' && !Array.isArray(input.backendDefaults)
-      ? { backendDefaults: input.backendDefaults as CreateBenchTemplateInput['backendDefaults'] }
-      : {}),
-  };
-}
-
 function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {
   const record = requireRecord(params);
   return requireRecord(record.input) as UpdateSettingsInput;
@@ -2921,10 +2810,6 @@ function automationLocationRemoteConnectionId(params: unknown): string | null {
   return locationRemoteConnectionId(params, 'automation');
 }
 
-function benchLocationRemoteConnectionId(params: unknown): string | null {
-  return locationRemoteConnectionId(params, 'Bench');
-}
-
 function locationRemoteConnectionId(params: unknown, label: string): string | null {
   if (params === undefined) {
     return null;
@@ -2978,16 +2863,6 @@ function validateTeamInput(input: CreateTeamInput): void {
 
   if (!teamColors.some((color) => color === input.color.trim().toUpperCase())) {
     throw new Error('Team color is invalid.');
-  }
-}
-
-function validateBenchTemplateInput(input: CreateBenchTemplateInput): void {
-  if (!input.name.trim()) {
-    throw new Error('Bench template name is required.');
-  }
-
-  if (!input.folder.trim()) {
-    throw new Error('Bench template folder is required.');
   }
 }
 

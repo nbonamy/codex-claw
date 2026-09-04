@@ -33,10 +33,7 @@
           :label="$t('surface.cockpitAgentsView.addAgent')"
           size="small"
           tone="ghost"
-          :bench="benchForTeam(section.team.id)"
-          @deploy-bench-template="emit('deploy-bench-template', { templateId: $event, teamId: section.team.id })"
           @new-agent="emit('add-agent', section.team.id)"
-          @remove-bench-template="emit('remove-bench-template', { templateId: $event, teamId: section.team.id })"
         />
       </header>
 
@@ -60,13 +57,9 @@
 
         <CockpitAddAgentTile
           v-if="section.showGridAdd"
-          :bench="benchForTeam(section.team.id)"
           :dragged-work-item="null"
           :team-id="section.team.id"
-          :team-name="section.team.name"
-          @deploy-bench-template="emit('deploy-bench-template', $event)"
           @new-agent="emit('add-agent', $event)"
-          @remove-bench-template="emit('remove-bench-template', { templateId: $event, teamId: section.team.id })"
         />
       </div>
     </section>
@@ -88,7 +81,7 @@
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, BenchTemplate, DeployBenchTemplateInput, Team } from '@codex-claw/core/contracts';
+import type { Agent, AgentStatus, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import AgentContextMenu from './AgentContextMenu.vue';
@@ -110,8 +103,6 @@ const DEFAULT_GRID_COLUMNS = 3;
 
 const props = defineProps<{
   agents: Agent[];
-  bench?: BenchTemplate[];
-  benchByTeamId?: Record<string, BenchTemplate[]>;
   forkableAgentIds?: string[];
   repositoryIcons?: Record<string, string>;
   teams: Team[];
@@ -122,15 +113,12 @@ const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 const emit = defineEmits<{
   'add-agent': [teamId: string];
   'close-agent': [agentId: string];
-  'deploy-bench-template': [input: DeployBenchTemplateInput];
   'duplicate-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'fork-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
-  'remove-bench-template': [input: { templateId: string; teamId?: string }];
   'restart-agent': [agentId: string];
-  'save-agent-to-bench': [agentId: string];
   'select-agent': [payload: { agentId: string; teamId: string }];
   'select-team': [teamId: string];
 }>();
@@ -186,10 +174,6 @@ onBeforeUnmount(() => {
 
 watch(() => props.teams.map((team) => team.id).join('\0'), () => void nextTick(measureAllGrids));
 
-function benchForTeam(teamId: string): BenchTemplate[] {
-  return props.benchByTeamId?.[teamId] ?? props.bench ?? [];
-}
-
 function setGridRef(teamId: string, element: Element | ComponentPublicInstance | null): void {
   const htmlElement = element instanceof HTMLElement
     ? element
@@ -234,7 +218,6 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
   else if (action === 'edit-agent') emit('edit-agent', agentId);
   else if (action === 'fork-agent') emit('fork-agent', agentId);
   else if (action === 'restart-agent') emit('restart-agent', agentId);
-  else emit('save-agent-to-bench', agentId);
   closeAgentMenu();
 }
 

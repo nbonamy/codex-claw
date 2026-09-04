@@ -251,21 +251,16 @@ describe('WorkBacklogPanel', () => {
     await nextTick();
 
     expect(menuText()).toContain('Assign to New Agent');
-    expect(menuText()).toContain('Assign to Bench Agent');
     expect(menuText()).not.toContain('Remove Assignment');
     expect(menuText()).not.toContain('Reset');
     expect(menuText()).toContain('View on GitHub');
-    expect(menuTextIndex('Assign to New Agent')).toBeLessThan(menuTextIndex('Assign to Bench Agent'));
-    expect(menuTextIndex('Assign to Bench Agent')).toBeLessThan(menuTextIndex('View on GitHub'));
+    expect(menuTextIndex('Assign to New Agent')).toBeLessThan(menuTextIndex('View on GitHub'));
 
     await clickMenuItem('Assign to New Agent');
-    await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
-    await clickMenuItem('Assign to Bench Agent');
     await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
     await clickMenuItem('View on GitHub');
 
     expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[workItem()]]);
-    expect(wrapper.emitted('assign-to-bench-agent')).toStrictEqual([[workItem()]]);
     expect(open).toHaveBeenCalledWith('https://github.com/nbonamy/codex-claw/issues/12', '_blank', 'noreferrer');
   });
 
@@ -279,7 +274,6 @@ describe('WorkBacklogPanel', () => {
     await nextTick();
 
     expect(menuText()).toContain('Assign to New Agent');
-    expect(menuText()).toContain('Assign to Bench Agent');
 
     await clickMenuItem('Assign to New Agent');
 
@@ -310,17 +304,6 @@ describe('WorkBacklogPanel', () => {
     expect(wrapper.emitted('select-assigned-agent')).toBeUndefined();
   });
 
-  it('disables Bench assignment when there are no Bench agents', async () => {
-    const wrapper = mountPanel({
-      canAssignToBench: false,
-      items: [workItem()],
-    });
-
-    await wrapper.get('[aria-label="Issue #12 actions"]').trigger('click');
-    await clickMenuItem('Assign to Bench Agent');
-
-    expect(wrapper.emitted('assign-to-bench-agent')).toBeUndefined();
-  });
 });
 
 function mountPanel(props: Record<string, unknown> = {}) {

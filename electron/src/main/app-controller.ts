@@ -14,7 +14,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendConversationRef, type BenchLocation, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendConversationRef, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -345,9 +345,6 @@ export class AppController {
       return this.selectTeam(teamId);
     });
 
-    ipc.handle(ipcChannels.getBenchSnapshot, async (_event, location?: BenchLocation) => {
-      return this.getBenchSnapshot(location);
-    });
 
     ipc.handle(ipcChannels.getAutomationSnapshot, async (_event, location?: AutomationLocation) => {
       return this.getAutomationSnapshot(location);
@@ -429,17 +426,6 @@ export class AppController {
       return this.reorderRepositories(input);
     });
 
-    ipc.handle(ipcChannels.saveAgentToBench, async (_event, agentId: string) => {
-      return this.saveAgentToBench(agentId);
-    });
-
-    ipc.handle(ipcChannels.deployBenchTemplate, async (_event, templateId: string, teamId?: string, location?: BenchLocation) => {
-      return this.deployBenchTemplate(templateId, teamId, location);
-    });
-
-    ipc.handle(ipcChannels.removeBenchTemplate, async (_event, templateId: string, location?: BenchLocation) => {
-      return this.removeBenchTemplate(templateId, location);
-    });
 
     ipc.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
       return this.restartAgent(agentId);
@@ -899,49 +885,6 @@ export class AppController {
 
   private async selectTeam(teamId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamSelect, { teamId }));
-  }
-
-  private async getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot> {
-    if (isRemoteBenchLocation(location)) {
-      return this.requireBackendClient().request<AppSnapshot>(backendMethods.snapshotBenchGet, { location });
-    }
-    return this.getSnapshot();
-  }
-
-  private async saveAgentToBench(agentId: string): Promise<AppSnapshot> {
-    const location = this.benchLocationForAgent(agentId);
-    const snapshot = await this.requireBackendClient().request<AppSnapshot>(backendMethods.benchAgentTemplateCreate, { agentId });
-    if (isRemoteBenchLocation(location)) {
-      return snapshot;
-    }
-    return this.adoptBackendSnapshot(snapshot);
-  }
-
-  private async deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.benchTemplateDeploy, {
-      templateId,
-      teamId,
-      ...(location ? { location } : {}),
-    }));
-  }
-
-  private async removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot> {
-    const snapshot = await this.requireBackendClient().request<AppSnapshot>(backendMethods.benchTemplateDelete, {
-      templateId,
-      ...(location ? { location } : {}),
-    });
-    if (isRemoteBenchLocation(location)) {
-      return snapshot;
-    }
-    return this.adoptBackendSnapshot(snapshot);
-  }
-
-  private benchLocationForAgent(agentId: string): BenchLocation | undefined {
-    const agent = this.snapshot?.agents.find((candidate) => candidate.id === agentId) ?? null;
-    const team = agent?.teamId
-      ? this.snapshot?.teams.find((candidate) => candidate.id === agent.teamId) ?? null
-      : null;
-    return benchLocationForRemoteConnectionId(team?.remoteConnectionId);
   }
 
   private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
@@ -1898,15 +1841,6 @@ function overwriteAppSnapshot(target: AppSnapshot, source: AppSnapshot): void {
 
 function isRemoteAutomationLocation(location: AutomationLocation | undefined): location is Extract<AutomationLocation, { kind: 'remote' }> {
   return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
-}
-
-function isRemoteBenchLocation(location: BenchLocation | undefined): location is Extract<BenchLocation, { kind: 'remote' }> {
-  return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
-}
-
-function benchLocationForRemoteConnectionId(remoteConnectionId: string | undefined): BenchLocation | undefined {
-  const normalized = remoteConnectionId?.trim() ?? '';
-  return normalized ? { kind: 'remote', remoteConnectionId: normalized } : { kind: 'local' };
 }
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {

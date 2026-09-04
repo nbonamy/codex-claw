@@ -84,16 +84,6 @@ describe('AutomationsView', () => {
         agentIds: [],
       },
     ];
-    remoteSnapshot.bench = [
-      {
-        id: 'bench-remote',
-        name: 'Remote Dina',
-        folder: '/home/nicolas/src/codex-claw',
-        backend: 'codex',
-        createdAt: '2026-06-09T10:00:00.000Z',
-        updatedAt: '2026-06-09T10:00:00.000Z',
-      },
-    ];
     remoteSnapshot.workBacklog.connections = [
       {
         provider: 'github',
@@ -558,17 +548,6 @@ function mountView(
   }> = {},
 ) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
-  snapshot.bench = [
-    {
-      id: 'bench-dina',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
-      createdAt: '2026-06-09T10:00:00.000Z',
-      updatedAt: '2026-06-09T10:00:00.000Z',
-    },
-  ];
   snapshot.workBacklog.connections = [
     {
       provider: 'github',

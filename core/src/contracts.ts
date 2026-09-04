@@ -541,8 +541,6 @@ export type AutomationLocation =
     remoteConnectionId: string;
   };
 
-export type BenchLocation = AutomationLocation;
-
 export type CreateAutomationInput = {
   name?: string;
   enabled?: boolean;
@@ -555,35 +553,6 @@ export type CreateAutomationInput = {
 
 export type UpdateAutomationInput = CreateAutomationInput & {
   id: string;
-};
-
-export type BenchTemplate = {
-  id: string;
-  name: string;
-  avatar?: string;
-  folder: string;
-  backend: AgentBackend;
-  backendDefaults?: BackendDefaults;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CreateBenchTemplateInput = {
-  name: string;
-  avatar?: string;
-  folder: string;
-  backend: AgentBackend;
-  backendDefaults?: BackendDefaults;
-};
-
-export type DeployBenchTemplateInput = {
-  templateId: string;
-  teamId?: string;
-};
-
-export type RemoveBenchTemplateInput = {
-  templateId: string;
-  teamId?: string;
 };
 
 export type ReasoningEffort = string;
@@ -1295,7 +1264,6 @@ export type TurnGitDiff = {
 export type AppSnapshot = {
   teams: Team[];
   agents: Agent[];
-  bench: BenchTemplate[];
   automations: Automation[];
   activeTeamId: string | null;
   activeAgentId: string | null;
@@ -1689,7 +1657,6 @@ export type CodexClawApi = {
   closeTeam(teamId: string): Promise<AppSnapshot>;
   disconnectTeam(teamId: string): Promise<AppSnapshot>;
   selectTeam(teamId: string): Promise<AppSnapshot>;
-  getBenchSnapshot(location?: BenchLocation): Promise<AppSnapshot>;
   getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot>;
   createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot>;
   updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot>;
@@ -1710,9 +1677,6 @@ export type CodexClawApi = {
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
-  saveAgentToBench(agentId: string): Promise<AppSnapshot>;
-  deployBenchTemplate(templateId: string, teamId?: string, location?: BenchLocation): Promise<AppSnapshot>;
-  removeBenchTemplate(templateId: string, location?: BenchLocation): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
   hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata>;
   loadOlderAgentHistory(agentId: string): Promise<AgentHistoryLoadResult>;

@@ -3,19 +3,14 @@ import {
   assignWorkItemToAgentInSnapshot,
   closeAgentInSnapshot,
   completeWorkItemAssignmentInSnapshot,
-  deployBenchTemplateInSnapshot,
-  deployBenchTemplateToSnapshot,
   duplicateAgentInSnapshot,
   forkAgentInSnapshot,
   moveAgentToTeamInSnapshot,
-  removeBenchTemplateFromSnapshot,
   removeWorkItemAssignmentFromSnapshot,
   reorderAgentInTeam,
   reorderRepositoryInTeam,
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
-  saveAgentToBench,
-  saveBenchTemplateToSnapshot,
   updateWorkItemAssignmentInSnapshot,
 } from '../agent-manager';
 import { appendUserPrompt, createInitialSnapshot } from '../snapshot';
@@ -75,19 +70,14 @@ describe('agent-manager', () => {
     expect(snapshot.activeAgentId).toBe('agent-dina');
   });
 
-  it('generates collision-safe ids for duplicated agents and bench templates', () => {
+  it('generates collision-safe ids for duplicated agents', () => {
     const snapshot = createInitialSnapshot();
 
     const duplicateIds = ['agent-duplicate-dina', 'agent-duplicate-dina', 'agent-duplicate-dina-2'];
     const firstDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => duplicateIds.shift() ?? 'agent-fallback');
     const secondDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => duplicateIds.shift() ?? 'agent-fallback');
-    const firstTemplate = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-    const secondTemplate = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-
     expect(firstDuplicate?.id).toBe('agent-duplicate-dina');
     expect(secondDuplicate?.id).toBe('agent-duplicate-dina-2');
-    expect(firstTemplate?.id).toBe('bench-dina-20260605t101112000z');
-    expect(secondTemplate?.id).toBe('bench-dina-20260605t101112000z-2');
   });
 
   it('forks an agent conversation directly below its source and selects it', () => {
@@ -122,142 +112,6 @@ describe('agent-manager', () => {
 
     expect(duplicate?.teamId).toBe('team-codex-claw');
     expect(snapshot.teams[0].agentIds).toContain(duplicate?.id);
-  });
-
-  it('saves an agent to Bench without changing the active agent', () => {
-    const snapshot = createInitialSnapshot();
-    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-
-    expect(template).toStrictEqual({
-      id: 'bench-dina-20260605t101112000z',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
-      backendDefaults: { kind: 'codex' },
-      createdAt: '2026-06-05T10:11:12.000Z',
-      updatedAt: '2026-06-05T10:11:12.000Z',
-    });
-    expect(snapshot.bench).toStrictEqual([template]);
-    expect(snapshot.activeAgentId).toBe('agent-dina');
-  });
-
-  it('deploys a Bench template as a fresh selected agent in the active team', () => {
-    const snapshot = createInitialSnapshot();
-    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-
-    const agent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina');
-
-    expect(agent).toStrictEqual({
-      id: 'agent-bench-dina',
-      teamId: 'team-codex-claw',
-      name: 'Dina',
-      avatar: 'DI',
-      folder: '~/src/codex-claw',
-      backend: 'codex',
-      backendDefaults: { kind: 'codex' },
-      status: { type: 'idle' },
-      createdAt: '2026-06-05T10:12:13.000Z',
-      updatedAt: '2026-06-05T10:12:13.000Z',
-    });
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
-    expect(snapshot.activeAgentId).toBe(agent?.id);
-    expect(snapshot.teams[0].agentIds).toContain(agent?.id);
-  });
-
-  it('deploys the same Bench template multiple times with distinct agent ids', () => {
-    const snapshot = createInitialSnapshot();
-    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-
-    const firstAgent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina-1');
-    const secondAgent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina-2');
-
-    expect(firstAgent?.id).toBe('agent-bench-dina-1');
-    expect(secondAgent?.id).toBe('agent-bench-dina-2');
-    expect(snapshot.agents.filter((agent) => agent.name === 'Dina')).toHaveLength(3);
-    expect(new Set(snapshot.agents.map((agent) => agent.id)).size).toBe(snapshot.agents.length);
-  });
-
-  it('supports non-selecting Bench deploys and completed assignments for removed agents', () => {
-    const snapshot = createInitialSnapshot();
-    const generatedDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina');
-    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-    snapshot.activeTeamId = 'team-codex-claw';
-    snapshot.activeAgentId = 'agent-dina';
-
-    const deployed = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', undefined, '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina', {
-      select: false,
-    });
-
-    const item = workItem(12, 'Fix cockpit drag target');
-    assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', item, '2026-06-09T13:00:00.000Z');
-    snapshot.agents = snapshot.agents.filter((agent) => agent.id !== 'agent-dina');
-
-    expect(generatedDuplicate?.id.startsWith('agent-')).toBe(true);
-    expect(deployed?.id).toBe('agent-bench-dina');
-    expect(snapshot.activeAgentId).toBe('agent-dina');
-    expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toMatchObject({
-      agentId: 'agent-dina',
-      status: 'completed',
-    });
-  });
-
-  it('deploys a Bench template into an explicit target team', () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.teams.push({
-      id: 'team-skwad',
-      name: 'Skwad',
-      avatar: 'SK',
-      color: '#46A857',
-      agentIds: [],
-    });
-    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-
-    const agent = deployBenchTemplateInSnapshot(snapshot, template?.id ?? '', 'team-skwad', '2026-06-05T10:12:13.000Z', () => 'agent-bench-dina');
-
-    expect(agent?.teamId).toBe('team-skwad');
-    expect(snapshot.teams[1].agentIds).toStrictEqual([agent?.id]);
-    expect(snapshot.teams[1].activeAgentId).toBe(agent?.id);
-    expect(snapshot.activeTeamId).toBe('team-skwad');
-    expect(snapshot.activeAgentId).toBe(agent?.id);
-  });
-
-  it('saves and deploys Bench template payloads without requiring a local Bench entry', () => {
-    const snapshot = createInitialSnapshot();
-    const template = saveBenchTemplateToSnapshot(snapshot, {
-      name: ' Remote Dina ',
-      folder: ' /home/nicolas/src/codex-claw ',
-      backend: 'codex',
-      backendDefaults: { kind: 'codex', model: 'gpt-5-codex' },
-    }, '2026-06-05T10:11:12.000Z');
-    const targetSnapshot = createInitialSnapshot();
-
-    const agent = deployBenchTemplateToSnapshot(targetSnapshot, template, 'team-codex-claw', '2026-06-05T10:12:13.000Z', () => 'agent-remote-bench');
-
-    expect(template).toMatchObject({
-      id: 'bench-remote-dina-20260605t101112000z',
-      name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
-    });
-    expect(targetSnapshot.bench).toStrictEqual([]);
-    expect(agent).toMatchObject({
-      id: 'agent-remote-bench',
-      teamId: 'team-codex-claw',
-      name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
-      backendDefaults: { kind: 'codex', model: 'gpt-5-codex' },
-    });
-  });
-
-  it('removes a Bench template without touching active agents', () => {
-    const snapshot = createInitialSnapshot();
-    const template = saveAgentToBench(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z');
-
-    expect(removeBenchTemplateFromSnapshot(snapshot, template?.id ?? '')).toStrictEqual(template);
-
-    expect(snapshot.bench).toStrictEqual([]);
-    expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-dina', 'agent-jesse']);
-    expect(snapshot.activeAgentId).toBe('agent-dina');
   });
 
   it('assigns each work item key to one agent at a time', () => {
@@ -621,10 +475,6 @@ describe('agent-manager', () => {
     const snapshot = createInitialSnapshot();
 
     expect(duplicateAgentInSnapshot(snapshot, 'missing-agent')).toBeNull();
-    expect(saveAgentToBench(snapshot, 'missing-agent')).toBeNull();
-    expect(deployBenchTemplateInSnapshot(snapshot, 'missing-template')).toBeNull();
-    expect(deployBenchTemplateInSnapshot(snapshot, 'bench-dina', 'missing-team')).toBeNull();
-    expect(removeBenchTemplateFromSnapshot(snapshot, 'missing-template')).toBeNull();
     expect(moveAgentToTeamInSnapshot(snapshot, 'missing-agent', 'team-codex-claw')).toBeNull();
     expect(moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'missing-team')).toBeNull();
     expect(restartAgentConversation(snapshot, 'missing-agent')).toBeNull();

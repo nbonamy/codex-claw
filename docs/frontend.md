@@ -71,14 +71,14 @@ reusable dialog workflows such as repository acquisition in composables so the
 shell only supplies product context and navigation callbacks.
 
 The renderer-state facade delegates provider catalogs and authorization,
-composer catalogs and selections, unread policy, history paging, remote Bench
-catalogs, and source-repository discovery to focused `*-state.ts` modules.
+composer catalogs and selections, unread policy, history paging, and
+source-repository discovery to focused `*-state.ts` modules.
 `AppShell` similarly delegates first-run onboarding, repository acquisition and
 session creation, issue and pull-request routing, Cockpit backlog state,
 per-agent right-workspace state, workspace preview request races, and image
 annotation to `use-*.ts` composables. Work-item routing owns branch resolution,
 worktree-backed agent creation, reassignment protection, prompt generation, and
-the pending new/Bench-agent assignment lifecycle. New multi-step state belongs
+the pending new-agent assignment lifecycle. New multi-step state belongs
 in the relevant module; keep simple navigation and one-step event forwarding in
 the facade or shell.
 

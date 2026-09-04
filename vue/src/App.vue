@@ -42,9 +42,6 @@
     :assigned-work-items-by-provider="assignedWorkItemsByProvider"
     :work-backlog-status="workBacklogStatus"
     :work-backlog-error="workBacklogError"
-    :remote-bench-by-connection-id="remoteBenchByConnectionId"
-    :remote-bench-status-by-connection-id="remoteBenchStatusByConnectionId"
-    :remote-bench-error-by-connection-id="remoteBenchErrorByConnectionId"
     :daemon-status="daemonStatus"
     :daemon-status-error="daemonStatusError"
     :codex-resource-sharing-migration-required="codexResourceSharingStatus.migrationRequired"
@@ -75,7 +72,6 @@
     :create-agent="createAgent"
     :create-quick-chat="createQuickChat"
     :create-team="createTeam"
-    :deploy-bench-template-action="deployBenchTemplate"
     :update-team="updateTeam"
     :update-agent="updateAgent"
     :update-settings="updateSettings"
@@ -98,7 +94,6 @@
     :open-work-provider-authorization="openWorkProviderAuthorization"
     :complete-work-provider-connection="completeWorkProviderConnection"
     :disconnect-work-provider="disconnectWorkProvider"
-    :load-bench="loadBench"
     :get-automation-snapshot="getAutomationSnapshot"
     :create-automation="createAutomation"
     :update-automation="updateAutomation"
@@ -132,10 +127,7 @@
     @reorder-teams="reorderTeams"
     @assign-work-item="assignWorkItemToAgent"
     @remove-work-item-assignment="removeWorkItemAssignment"
-    @deploy-bench-template="deployBenchTemplate"
-    @remove-bench-template="removeBenchTemplate"
     @restart-agent="restartAgent"
-    @save-agent-to-bench="saveAgentToBench"
     @select-agent="selectAgent"
     @select-team="selectTeam"
     @select-model="selectModel"
@@ -269,9 +261,6 @@ const {
   assignedWorkItemsByProvider,
   workBacklogStatus,
   workBacklogError,
-  remoteBenchByConnectionId,
-  remoteBenchStatusByConnectionId,
-  remoteBenchErrorByConnectionId,
   daemonStatus,
   daemonStatusError,
   codexResourceSharingStatus,
@@ -320,9 +309,6 @@ const {
   moveAgentToTeam,
   reorderAgents,
   reorderRepositories,
-  saveAgentToBench,
-  deployBenchTemplate,
-  removeBenchTemplate,
   restartAgent,
   closeAgent: closeAgentAction,
   updateSettings,
@@ -344,7 +330,6 @@ const {
   openWorkProviderAuthorization,
   completeWorkProviderConnection,
   disconnectWorkProvider,
-  loadBench,
   getAutomationSnapshot,
   createAutomation,
   updateAutomation,

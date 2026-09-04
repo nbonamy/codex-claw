@@ -194,7 +194,7 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { CircleXIcon, DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon, SaveToBenchIcon } from '../shared/icons/app-icons';
+import { CircleXIcon, DotsVerticalIcon, ExternalLinkIcon, GitHubIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
 
 type WorkBacklogItemRow = {
@@ -206,7 +206,6 @@ type WorkBacklogItemRow = {
 const props = withDefaults(defineProps<{
   assignedAgentsByWorkItemKey?: Record<string, Agent>;
   assignments?: Record<string, WorkBacklogAssignment>;
-  canAssignToBench?: boolean;
   connection: WorkIntegrationConnection;
   error: string | null;
   items: WorkItem[];
@@ -219,7 +218,6 @@ const props = withDefaults(defineProps<{
 }>(), {
   assignedAgentsByWorkItemKey: () => ({}),
   assignments: () => ({}),
-  canAssignToBench: true,
   repositoryIcons: () => ({}),
   selectedAssigneeLogin: null,
   selectedTagName: null,
@@ -228,7 +226,6 @@ const props = withDefaults(defineProps<{
 const repositoryIcons = computed(() => props.repositoryIcons);
 
 const emit = defineEmits<{
-  'assign-to-bench-agent': [item: WorkItem];
   'assign-to-new-agent': [item: WorkItem];
   refresh: [repositoryId: string | null];
   'remove-assignment': [item: WorkItem];
@@ -341,13 +338,6 @@ function menuItemsForRow(row: WorkBacklogItemRow): AppMenuItem[] {
       label: translate('surface.workBacklogPanel.assignToNewAgent'),
       icon: PlusCircleIcon,
     },
-    {
-      id: 'assign-to-bench',
-      type: 'action',
-      label: translate('surface.workBacklogPanel.assignToBenchAgent'),
-      icon: SaveToBenchIcon,
-      disabled: !props.canAssignToBench,
-    },
     { id: 'group-view', type: 'separator' },
     {
       id: 'open',
@@ -382,8 +372,6 @@ function selectMenuItem(item: WorkItem, itemId: string): void {
   openMenuItemId.value = null;
   if (itemId === 'assign-to-new-agent') {
     emit('assign-to-new-agent', item);
-  } else if (itemId === 'assign-to-bench' && props.canAssignToBench) {
-    emit('assign-to-bench-agent', item);
   } else if (itemId === 'show-agent') {
     const assignedAgent = props.assignedAgentsByWorkItemKey[workItemAssignmentKey(item)];
     if (assignedAgent) emit('select-assigned-agent', assignedAgent.id);

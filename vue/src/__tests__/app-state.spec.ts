@@ -2985,49 +2985,13 @@ describe('useAppState', () => {
         ? { ...agent, teamId: 'team-skwad-core' }
         : agent),
     };
-    const benchSnapshot = {
-      ...movedSnapshot,
-      bench: [
-        {
-          id: 'bench-jules-prime',
-          name: 'Jules Prime',
-          avatar: '🤖',
-          folder: '/Users/nbonamy/src/jules',
-          backend: 'codex' as const,
-          createdAt: '2026-06-05T00:00:00.000Z',
-          updatedAt: '2026-06-05T00:00:00.000Z',
-        },
-      ],
-    };
     const restartedSnapshot = {
-      ...benchSnapshot,
+      ...movedSnapshot,
       messages: [],
     };
-    const deployedBenchSnapshot = {
-      ...restartedSnapshot,
-      agents: [
-        ...restartedSnapshot.agents,
-        {
-          id: 'agent-jules-bench',
-          teamId: 'team-skwad-core',
-          name: 'Jules Prime',
-          avatar: '🤖',
-          folder: '/Users/nbonamy/src/jules',
-          status: { type: 'idle' as const },
-          createdAt: '2026-06-05T00:00:01.000Z',
-          updatedAt: '2026-06-05T00:00:01.000Z',
-        },
-      ],
-      activeTeamId: 'team-skwad-core',
-      activeAgentId: 'agent-jules-bench',
-    };
-    const removedBenchSnapshot = {
-      ...deployedBenchSnapshot,
-      bench: [],
-    };
     const closedSnapshot = {
-      ...removedBenchSnapshot,
-      agents: removedBenchSnapshot.agents.filter((agent) => agent.id !== 'agent-jules'),
+      ...restartedSnapshot,
+      agents: restartedSnapshot.agents.filter((agent) => agent.id !== 'agent-jules'),
       activeAgentId: 'agent-dina',
     };
     const closedTeamSnapshot = {
@@ -3047,10 +3011,7 @@ describe('useAppState', () => {
     const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
     const forkAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
     const moveAgentToTeam = vi.fn().mockResolvedValue(movedSnapshot);
-    const saveAgentToBench = vi.fn().mockResolvedValue(benchSnapshot);
     const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
-    const deployBenchTemplate = vi.fn().mockResolvedValue(deployedBenchSnapshot);
-    const removeBenchTemplate = vi.fn().mockResolvedValue(removedBenchSnapshot);
     const closeAgent = vi.fn().mockResolvedValue(closedSnapshot);
 
     stubElectronTestWindow({
@@ -3069,10 +3030,7 @@ describe('useAppState', () => {
         forkAgent,
         moveAgentToTeam,
         reorderAgents,
-        saveAgentToBench,
         restartAgent,
-        deployBenchTemplate,
-        removeBenchTemplate,
         closeAgent,
       } satisfies Partial<CodexClawApi>,
     });
@@ -3092,11 +3050,7 @@ describe('useAppState', () => {
     await state.duplicateAgent('agent-jules');
     await state.forkAgent('agent-jules');
     await state.moveAgentToTeam({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
-    await state.saveAgentToBench('agent-jules');
     await state.restartAgent('agent-jules');
-    await state.deployBenchTemplate('bench-jules-prime');
-    await state.deployBenchTemplate({ templateId: 'bench-jules-prime', teamId: 'team-codex-claw' });
-    await state.removeBenchTemplate('bench-jules-prime');
     await state.closeAgent('agent-jules');
     await state.closeTeam('team-skwad-core');
 
@@ -3111,102 +3065,12 @@ describe('useAppState', () => {
     expect(forkAgent).toHaveBeenNthCalledWith(1, 'agent-jules', 4);
     expect(forkAgent).toHaveBeenNthCalledWith(2, 'agent-jules');
     expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
-    expect(saveAgentToBench).toHaveBeenCalledWith('agent-jules');
     expect(restartAgent).toHaveBeenCalledWith('agent-jules');
-    expect(deployBenchTemplate).toHaveBeenNthCalledWith(1, 'bench-jules-prime', 'team-skwad-core');
-    expect(deployBenchTemplate).toHaveBeenNthCalledWith(2, 'bench-jules-prime', 'team-codex-claw');
-    expect(removeBenchTemplate).toHaveBeenCalledWith('bench-jules-prime');
     expect(closeAgent).toHaveBeenCalledWith('agent-jules');
     expect(closeTeam).toHaveBeenCalledWith('team-skwad-core');
     expect(state.snapshot.value).toStrictEqual(closedTeamSnapshot);
   });
 
-  it('keeps remote Bench catalogs cached separately from the local snapshot', async () => {
-    const localSnapshot = createInitialSnapshot();
-    localSnapshot.remoteConnections.connections = [{
-      id: 'connection-devbox',
-      kind: 'ssh',
-      name: 'devbox',
-      host: 'devbox',
-      status: 'ready',
-      createdAt: '2026-06-14T10:00:00.000Z',
-      updatedAt: '2026-06-14T10:00:00.000Z',
-    }];
-    localSnapshot.teams[0]!.remoteConnectionId = 'connection-devbox';
-    localSnapshot.teams[0]!.remoteTeamId = 'team-remote';
-    localSnapshot.agents[0]!.teamId = 'team-codex-claw';
-    localSnapshot.agents[0]!.folder = '/home/nicolas/src/codex-claw';
-    const remoteLocation = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
-    const remoteBenchSnapshot = {
-      ...createInitialSnapshot(),
-      bench: [{
-        id: 'bench-remote-dina',
-        name: 'Remote Dina',
-        folder: '/home/nicolas/src/codex-claw',
-        backend: 'codex' as const,
-        createdAt: '2026-06-13T00:00:00.000Z',
-        updatedAt: '2026-06-13T00:00:00.000Z',
-      }],
-    };
-    const remoteBenchRemovedSnapshot = {
-      ...createInitialSnapshot(),
-      bench: [],
-    };
-    const projectedRemoteTeamSnapshot = {
-      ...localSnapshot,
-      agents: [
-        ...localSnapshot.agents,
-        {
-          id: 'agent-from-remote-bench',
-          teamId: 'team-codex-claw',
-          name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
-          backend: 'codex' as const,
-          status: { type: 'idle' as const },
-          createdAt: '2026-06-13T00:00:00.000Z',
-          updatedAt: '2026-06-13T00:00:00.000Z',
-        },
-      ],
-    };
-    const getBenchSnapshot = vi.fn().mockResolvedValue(remoteBenchSnapshot);
-    const saveAgentToBench = vi.fn().mockResolvedValue(remoteBenchSnapshot);
-    const deployBenchTemplate = vi.fn().mockResolvedValue(projectedRemoteTeamSnapshot);
-    const removeBenchTemplate = vi.fn().mockResolvedValue(remoteBenchRemovedSnapshot);
-    stubElectronTestWindow({
-      codexClaw: {
-        getSnapshot: vi.fn().mockResolvedValue(localSnapshot),
-        onEvent: vi.fn(),
-        getBenchSnapshot,
-        saveAgentToBench,
-        deployBenchTemplate,
-        removeBenchTemplate,
-      } satisfies Partial<CodexClawApi>,
-    });
-
-    const state = useAppState();
-    await state.loadSnapshot();
-
-    await expect(state.loadBench(remoteLocation)).resolves.toStrictEqual(remoteBenchSnapshot.bench);
-    expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual(remoteBenchSnapshot.bench);
-
-    await state.saveAgentToBench('agent-dina');
-    expect(state.snapshot.value.bench).toStrictEqual([]);
-    expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual(remoteBenchSnapshot.bench);
-
-    await expect(state.deployBenchTemplate({ templateId: 'bench-remote-dina', teamId: 'team-codex-claw' })).resolves.toMatchObject({
-      id: 'agent-from-remote-bench',
-    });
-    expect(state.snapshot.value).toStrictEqual(projectedRemoteTeamSnapshot);
-
-    await state.removeBenchTemplate({ templateId: 'bench-remote-dina', teamId: 'team-codex-claw' });
-    expect(state.snapshot.value).toStrictEqual(projectedRemoteTeamSnapshot);
-    expect(state.remoteBenchByConnectionId.value['connection-devbox']).toStrictEqual([]);
-
-    expect(getBenchSnapshot).toHaveBeenCalledWith(remoteLocation);
-    expect(saveAgentToBench).toHaveBeenCalledWith('agent-dina');
-    expect(deployBenchTemplate).toHaveBeenCalledWith('bench-remote-dina', 'team-codex-claw', remoteLocation);
-    expect(removeBenchTemplate).toHaveBeenCalledWith('bench-remote-dina', remoteLocation);
-  });
 
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
     const remoteSnapshot = createInitialSnapshot();
@@ -3244,9 +3108,6 @@ describe('useAppState', () => {
     await state.duplicateAgent('agent-dina');
     await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-codex-claw' });
     await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-dina', beforeAgentId: null });
-    await state.saveAgentToBench('agent-dina');
-    await state.deployBenchTemplate('missing-template');
-    await state.removeBenchTemplate('missing-template');
     await state.restartAgent('agent-dina');
     await state.closeAgent('agent-dina');
     await state.disconnectTeam('team-codex-claw');
@@ -3284,8 +3145,6 @@ describe('useAppState', () => {
     await expect(state.loadWorkRepositories('github')).resolves.toStrictEqual([]);
     await expect(state.loadWorkItems('github', '')).resolves.toStrictEqual([]);
     await state.configureWorkBacklog({} as never);
-    await expect(state.getBenchSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toStrictEqual(createEmptySnapshot());
-    await expect(state.loadBench({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toStrictEqual([]);
     await state.assignWorkItemToAgent({ agentId: 'agent-dina', item: workItem() });
     await state.removeWorkItemAssignment(workItem());
     await state.forkAgent('agent-dina');
@@ -3386,7 +3245,6 @@ describe('useAppState', () => {
       revokePairedDevice: vi.fn().mockResolvedValue(undefined),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus),
       setDaemonEnabled: vi.fn().mockResolvedValue(daemonStatus),
-      getBenchSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
       loadOlderAgentHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
     } satisfies Partial<CodexClawApi>;
     stubElectronTestWindow({ codexClaw: api });
@@ -3414,9 +3272,6 @@ describe('useAppState', () => {
     await state.revokePairedDevice('environment-1', 'client-1');
     await state.loadDaemonStatus();
     await state.setDaemonEnabled(true);
-    await expect(state.getBenchSnapshot()).resolves.toBe(state.snapshot.value);
-    await expect(state.getBenchSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
-    await expect(state.loadBench()).resolves.toBe(state.snapshot.value.bench);
     await state.loadOlderAgentHistory('agent-dina');
 
     expect(api.listSourceRepositories).toHaveBeenCalledWith('ssh-1');
@@ -3441,7 +3296,6 @@ describe('useAppState', () => {
       getDaemonStatus,
       setDaemonEnabled: vi.fn().mockRejectedValue(new Error('cannot stop daemon')),
       openWorkProviderAuthorization: vi.fn().mockRejectedValue('authorization unavailable'),
-      getBenchSnapshot: vi.fn().mockRejectedValue('remote bench unavailable'),
       listBackendSkills: vi.fn().mockRejectedValue('skills unavailable'),
       listAgentFiles: vi.fn().mockRejectedValue(new Error('files unavailable')),
       loadOlderAgentHistory: vi.fn().mockReturnValue(history.promise),
@@ -3464,9 +3318,6 @@ describe('useAppState', () => {
     await expect(state.openWorkProviderAuthorization('github')).rejects.toBe('authorization unavailable');
     expect(state.workBacklogStatus.value).toBe('error');
     expect(state.workBacklogError.value).toBe('authorization unavailable');
-    await expect(state.loadBench({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toStrictEqual([]);
-    expect(state.remoteBenchStatusByConnectionId.value['ssh-1']).toBe('error');
-    expect(state.remoteBenchErrorByConnectionId.value['ssh-1']).toBe('remote bench unavailable');
 
     await state.loadBackendSkills();
     expect(state.skillCatalogStatus.value).toBe('error');
@@ -3486,14 +3337,6 @@ describe('useAppState', () => {
 
   it('creates, updates, and deletes automations through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.bench.push({
-      id: 'bench-dina',
-      name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
-      createdAt: '2026-06-09T10:00:00.000Z',
-      updatedAt: '2026-06-09T10:00:00.000Z',
-    });
     const automationInput = {
       name: 'GitHub bugs',
       repositories: [{

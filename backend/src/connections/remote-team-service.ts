@@ -2,7 +2,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { Agent, AppSnapshot, BenchTemplate, CreateAgentInput, CreateTeamInput, RemoteConnection, Team } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, RemoteConnection, Team } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
 import type { RemoteClawdClientManager } from './remote-clawd-client';
 
@@ -119,12 +119,6 @@ export class RemoteTeamService {
     const cached = this.snapshots.get(pointer.connectionId);
     if (cached && remoteTeamHasAgents(cached, pointer.remoteTeamId)) return true;
     return remoteTeamHasAgents(await this.snapshot(pointer.connectionId), pointer.remoteTeamId);
-  }
-
-  async benchTemplate(connectionId: string, templateId: string): Promise<BenchTemplate | null> {
-    const snapshot = await this.request<AppSnapshot>(connectionId, backendMethods.snapshotBenchGet);
-    if (!snapshot || !Array.isArray(snapshot.bench)) throw new Error('Remote Bench snapshot is invalid.');
-    return snapshot.bench.find((candidate) => candidate.id === templateId) ?? null;
   }
 
   async agentOwner(agentId: string): Promise<RemoteAgentOwner | null> {

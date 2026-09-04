@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
@@ -12,7 +12,6 @@ import { appText } from '@codex-claw/core/app-text';
 type PersistedState = {
   teams: Team[];
   agents: PersistedAgent[];
-  bench: BenchTemplate[];
   automations?: Automation[];
   activeTeamId: string | null;
   activeAgentId: string | null;
@@ -123,7 +122,6 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
   return {
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
     agents: snapshot.agents.map(persistedAgentFromSnapshot),
-    bench: snapshot.bench.map((template) => ({ ...template })),
     automations: snapshot.automations.map(cloneAutomation),
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
@@ -196,9 +194,6 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     ...seed,
     teams: teams.length > 0 ? teams : seed.teams,
     agents,
-    bench: Array.isArray(value.bench)
-      ? value.bench.map(sanitizeBenchTemplate).filter((template): template is BenchTemplate => Boolean(template))
-      : seed.bench,
     automations: persistedAutomations
       .map(sanitizeAutomation)
       .filter((automation): automation is Automation => Boolean(automation)),
@@ -1237,33 +1232,6 @@ function assignmentsForAgents(assignments: WorkBacklogState['assignments'], agen
   return Object.fromEntries(
     Object.entries(assignments).filter(([, assignment]) => agentIds.has(assignment.agentId)),
   );
-}
-
-function sanitizeBenchTemplate(value: unknown): BenchTemplate | null {
-  const backend = isRecord(value) ? sanitizeBackend(value.backend) : null;
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    typeof value.name !== 'string' ||
-    typeof value.folder !== 'string' ||
-    !backend ||
-    typeof value.createdAt !== 'string' ||
-    typeof value.updatedAt !== 'string'
-  ) {
-    return null;
-  }
-
-  const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
-  return {
-    id: value.id,
-    name: value.name,
-    avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
-    folder: value.folder,
-    backend,
-    ...(backendDefaults ? { backendDefaults } : {}),
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt,
-  };
 }
 
 function cloneBackendSession(session: BackendSession): BackendSession {

@@ -3,7 +3,7 @@ import { translate } from './i18n';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DeployBenchTemplateInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RemoveBenchTemplateInput, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
@@ -18,7 +18,6 @@ import { createWorkProviderState, isRemoteAutomationLocation } from './work-prov
 import { createAgentComposerState } from './agent-composer-state';
 import { createAgentUnreadState } from './agent-unread-state';
 import { createAgentHistoryState } from './agent-history-state';
-import { createRemoteBenchState } from './remote-bench-state';
 import { createSourceRepositoryState } from './source-repository-state';
 import { workspaceSidebarRepositoryRootForAgent } from '@codex-claw/core/workspace-sidebar';
 
@@ -128,20 +127,6 @@ const {
   loadOlder: loadOlderAgentHistory,
   markHydrating: markAgentHistoryHydrating,
 } = agentHistory;
-const remoteBench = createRemoteBenchState({ getSnapshot: () => snapshot.value });
-const {
-  benchForLocation,
-  cacheSnapshot: cacheRemoteBenchSnapshot,
-  errorByConnectionId: remoteBenchErrorByConnectionId,
-  getSnapshot: getBenchSnapshot,
-  isRemote: isRemoteBenchLocation,
-  load: loadBench,
-  locationForAgent: benchLocationForAgent,
-  locationForTeamId: benchLocationForTeamId,
-  prune: pruneRemoteBenchCache,
-  remoteBenchByConnectionId,
-  statusByConnectionId: remoteBenchStatusByConnectionId,
-} = remoteBench;
 const sourceRepositoryState = createSourceRepositoryState({ getSnapshot: () => snapshot.value });
 const {
   clone: cloneSourceRepository,
@@ -283,7 +268,6 @@ export function useAppState() {
     try {
       await synchronizeRendererSnapshot(false);
       if (snapshot.value.activeAgentId) restoreComposerConfiguration(snapshot.value.activeAgentId);
-      pruneRemoteBenchCache();
       // The SDK publishes a bounded initial page immediately. Older pages stay
       // behind the conversation's demand-paging cursor until the user reaches
       // the top of the transcript.
@@ -1142,58 +1126,6 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.reorderRepositories(input));
   }
 
-  async function saveAgentToBench(agentId: string): Promise<void> {
-    if (!codexClawApi?.saveAgentToBench) {
-      return;
-    }
-
-    const location = benchLocationForAgent(agentId);
-    const nextSnapshot = await codexClawApi.saveAgentToBench(agentId);
-    if (isRemoteBenchLocation(location)) {
-      cacheRemoteBenchSnapshot(location, nextSnapshot);
-      return;
-    }
-
-    adoptBackgroundSnapshot(nextSnapshot);
-  }
-
-  async function deployBenchTemplate(input: string | DeployBenchTemplateInput): Promise<Agent | null> {
-    const templateId = typeof input === 'string' ? input : input.templateId;
-    const teamId = typeof input === 'string' ? snapshot.value.activeTeamId ?? undefined : input.teamId;
-    const location = benchLocationForTeamId(teamId);
-    const bench = await benchForLocation(location);
-    if (!codexClawApi?.deployBenchTemplate || !bench.some((template) => template.id === templateId)) {
-      return null;
-    }
-
-    const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
-    snapshot.value = isRemoteBenchLocation(location)
-      ? await codexClawApi.deployBenchTemplate(templateId, teamId, location)
-      : await codexClawApi.deployBenchTemplate(templateId, teamId);
-    await loadActiveAgentCatalogs();
-    return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
-  }
-
-  async function removeBenchTemplate(input: string | RemoveBenchTemplateInput): Promise<void> {
-    const templateId = typeof input === 'string' ? input : input.templateId;
-    const teamId = typeof input === 'string' ? snapshot.value.activeTeamId ?? undefined : input.teamId;
-    const location = benchLocationForTeamId(teamId);
-    const bench = await benchForLocation(location);
-    if (!codexClawApi?.removeBenchTemplate || !bench.some((template) => template.id === templateId)) {
-      return;
-    }
-
-    const nextSnapshot = isRemoteBenchLocation(location)
-      ? await codexClawApi.removeBenchTemplate(templateId, location)
-      : await codexClawApi.removeBenchTemplate(templateId);
-    if (isRemoteBenchLocation(location)) {
-      cacheRemoteBenchSnapshot(location, nextSnapshot);
-      return;
-    }
-
-    adoptBackgroundSnapshot(nextSnapshot);
-  }
-
   async function restartAgent(agentId: string): Promise<void> {
     if (!codexClawApi?.restartAgent) {
       return;
@@ -1326,9 +1258,6 @@ export function useAppState() {
     assignedWorkItemsByProvider,
     workBacklogStatus,
     workBacklogError,
-    remoteBenchByConnectionId,
-    remoteBenchStatusByConnectionId,
-    remoteBenchErrorByConnectionId,
     sourceRepositories,
     openInApplications,
     sourceRepositoryStatus,
@@ -1402,8 +1331,6 @@ export function useAppState() {
     disconnectWorkProvider,
     openWorkProviderAuthorization,
     configureWorkBacklog,
-    getBenchSnapshot,
-    loadBench,
     getAutomationSnapshot,
     createAutomation,
     updateAutomation,
@@ -1422,9 +1349,6 @@ export function useAppState() {
     moveAgentToTeam,
     reorderAgents,
     reorderRepositories,
-    saveAgentToBench,
-    deployBenchTemplate,
-    removeBenchTemplate,
     restartAgent,
     closeAgent,
     resolveBackendApproval,
@@ -1676,7 +1600,6 @@ function recoverRendererAfterBackendConnection(): Promise<void> {
       await synchronizeRendererSnapshotRequest?.();
       const activeAgentId = snapshot.value.activeAgentId;
       if (activeAgentId) restoreComposerConfiguration(activeAgentId);
-      pruneRemoteBenchCache();
       await Promise.all([
         hydrateActiveAgentHistory(),
         loadActiveAgentCatalogs(activeAgentId),

@@ -359,7 +359,6 @@ describe('AgentSidebar actions', () => {
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
-      'Save to Bench',
       'Resume Session',
       'Restart Agent',
       'Close Agent',
@@ -372,7 +371,6 @@ describe('AgentSidebar actions', () => {
 
     const expectedActions = [
       ['Duplicate Agent', 'duplicate-agent'],
-      ['Save to Bench', 'save-agent-to-bench'],
       ['Resume Session', 'resume-session'],
       ['Restart Agent', 'restart-agent'],
       ['Close Agent', 'close-agent'],

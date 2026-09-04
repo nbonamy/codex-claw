@@ -56,11 +56,10 @@ Team scope:
 - Shows only the current team's agents.
 - Still uses the exact same `CockpitView`, `CockpitAgentCard`,
   `CockpitAddAgentTile`, `WorkBacklogPanel`, and assignment flows.
-- Hides team selectors in create/deploy dialogs because the target team is
-  known: the current team.
+- Hides team selectors in creation dialogs because the target team is known:
+  the current team.
 - Sends assignments to existing agents in that team.
 - Creates new agents in that team by default.
-- Deploys Bench agents into that team by default.
 
 The scope should be applied before building the view model. Avoid conditionals
 spread through child components. The parent or `CockpitView` should derive a
@@ -188,11 +187,9 @@ extend. The work-provider drivers do not need to know about cockpit scope.
 When the Cockpit is team-scoped:
 
 - `Assign to new agent` should open `AgentDialog` with the team already fixed.
-- `Assign to Bench agent` should open `BenchAgentAssignmentDialog` with the team
-  already fixed.
-- Those dialogs should hide team controls in this flow.
-- The resulting create/deploy call should still use the normal app-owned
-  create/deploy APIs with a concrete `teamId`.
+- The dialog should hide team controls in this flow.
+- The resulting create call should still use the normal app-owned create API
+  with a concrete `teamId`.
 
 When the Cockpit is global:
 

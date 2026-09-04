@@ -36,8 +36,8 @@ lower camel case, and the action belongs at the end of the path. Method values
 are centralized in `shared/src/backend-protocol/methods.ts`.
 
 This protocol version is a breaking dev-mode cleanup. There are no legacy
-aliases for older names such as `bench/snapshot`, `agent/listFiles`, or
-`backend/event`; stale local or remote `clawd` daemons must be restarted or
+aliases for older names such as `agent/listFiles` or `backend/event`; stale
+local or remote `clawd` daemons must be restarted or
 synced after this change.
 
 ## Direction Rules
@@ -70,9 +70,6 @@ synced after this change.
   deliberately excluded from synchronization frames.
 - `AutomationLocation`: optional automation/work-provider location selector:
   `{ kind: "local" }` or `{ kind: "remote", remoteConnectionId }`.
-- `BenchLocation`: optional Bench catalog location selector with the same
-  shape as `AutomationLocation`. Bench locations are derived from the active or
-  target team in the desktop UI.
 - `ClawBackendEvent`: event sent to clients:
   `{ seq, type, payload, occurredAt, agentId?, backend?, backendSessionId?,
   threadId?, turnId?, clientState?, snapshot? }`.
@@ -158,7 +155,7 @@ the synchronization barrier bounded even for very long threads.
 | `agent/goal/clear` | `{ agentId }` | `AppSnapshot` | Clears provider goal metadata and agent goal state. |
 | `agent/approvalPreset/update` | `{ agentId, preset: ApprovalPreset }` | `AppSnapshot` | Applies app-owned approval preset through the backend driver. |
 
-## Client To `clawd`: Teams And Bench
+## Client To `clawd`: Teams
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
@@ -168,16 +165,6 @@ the synchronization barrier bounded even for very long threads.
 | `team/delete` | `{ teamId }` | `AppSnapshot` | Deletes the team in its owning backend location. For remote pointers, this calls remote `team/delete` for `remoteTeamId`, then removes the local pointer. If that pointer is the only local team, local `clawd` creates an empty Local fallback first. |
 | `team/disconnect` | `{ teamId }` | `AppSnapshot` | Removes only the local remote-team pointer and leaves the remote team/agents running. If that pointer is the only local team, local `clawd` creates an empty Local fallback first. Local teams use `team/delete`. |
 | `team/select` | `{ teamId }` | `AppSnapshot` | Selects team and active agent. |
-| `snapshot/bench/get` | `{ location? }` | `AppSnapshot` | Returns the selected `clawd` Bench catalog. Remote Bench snapshots are not adopted as the local product snapshot. |
-| `bench/agent/template/create` | `{ agentId }` | `AppSnapshot` | Saves the agent as a deployable template in the agent team's `clawd` Bench. Remote agents are saved by the remote `clawd`; local `clawd` does not serialize a proxy copy. |
-| `bench/template/create` | `{ input: CreateBenchTemplateInput }` | `AppSnapshot` | Creates a template directly in the receiving `clawd` Bench. Clients should prefer `bench/agent/template/create` when saving an existing agent. |
-| `bench/template/deploy` | `{ templateId, teamId?, location? }` | `AppSnapshot` | Resolves and deploys the template in the target team's backend location. Remote deployment creates the agent on the remote `clawd`; local `clawd` returns a projected snapshot for the local team pointer. |
-| `bench/template/delete` | `{ templateId, location? }` | `AppSnapshot` | Removes template from the selected `clawd` Bench. Remote removes return the remote snapshot without replacing local product state. |
-
-Bench belongs to a `clawd` instance, not to Electron globally. Local teams can
-deploy only from local Bench; teams with `Team.remoteConnectionId` can deploy
-only from that remote `clawd` Bench. Cross-location template copy is not part
-of the current protocol.
 
 ## Client To `clawd`: Settings And Source Repositories
 
@@ -225,7 +212,7 @@ fallback spawns one one-shot stdio backend for that SSH session.
 Remote teams store a local pointer with `Team.remoteConnectionId` and
 `Team.remoteTeamId`. Local `clawd` owns the connection list and the user's local
 navigation pointers; the remote `clawd` owns the actual remote team composition,
-agents, messages, sessions, MCP-visible membership, and remote Bench catalog.
+agents, messages, sessions, and MCP-visible membership.
 `Team.id` is the local pointer id. `Team.remoteTeamId` is only the remote lookup
 key and must not be used for local membership, active-agent repair, assignment
 cleanup, or migrations because remote team ids can collide with local team ids.
@@ -236,11 +223,6 @@ Remote backend events use the same boundary: local `clawd` forwards agent events
 only when the remote agent belongs to a connected remote-team pointer.
 Slash-command interception remains local-only for now; ordinary prompts route
 remotely.
-
-Bench follows the same team-owned `clawd` selection for catalogs, saves, and
-removes. Deploying a remote Bench template creates the agent in the remote team;
-local `clawd` projects the remote team's agents/messages into the local pointer
-snapshot for clients.
 
 The Automations surface selects its backend location independently. When the
 client omits `location`, automation and work-provider calls operate on local `clawd`.

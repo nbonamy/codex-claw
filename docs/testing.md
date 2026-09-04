@@ -23,7 +23,7 @@ Rules:
 - Do not lower coverage thresholds to land a change.
 - Do not leave broad untested areas around IPC, protocol adapters,
   persistence, reducers, agent status, tool rendering, approvals, diffs,
-  filesystem behavior, git behavior, Bench, or teams.
+  filesystem behavior, git behavior, or teams.
 - Prefer small focused tests during implementation.
 - Run the relevant full gate before handoff.
 - If a test cannot be run, say exactly why and what should be run next.
@@ -98,7 +98,7 @@ Cover:
   interrupt, status updates, and event routing by agent/thread.
 - Codex event adaptation into app-owned events and `RendererMessage` state.
 - Approval and user-input request coordination.
-- Persistence, migrations, settings, teams, agents, Bench templates, selected
+- Persistence, migrations, settings, teams, agents, selected
   team/agent, and window state.
 - Filesystem and git operations at the app boundary.
 
@@ -173,7 +173,7 @@ components, stores, router state, and IPC events.
 
 High-priority renderer coverage:
 
-- Agent list, team rail, Bench menu/surface, and status indicators.
+- Agent list, team rail, and status indicators.
 - Provider capability mapping and the thin `CodexConversationPane` integration.
 - Active-agent/conversation switching without draft or scroll leakage.
 - Plan updates, reasoning summaries, command output, file changes, and diffs.

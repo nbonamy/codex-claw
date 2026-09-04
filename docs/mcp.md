@@ -105,7 +105,7 @@ The agent id in the MCP URL is the app's session-local caller identity. Tool
 calls infer the caller from the URL instead of asking the model to provide its
 own `agentId` or `from`. The same unique ID is also injected into the agent's
 developer instructions and returned by `list-agents`, so agents can coordinate
-with duplicates created from the same Bench template.
+precisely.
 
 The scoped `mcp_servers.codex_claw.default_tools_approval_mode = "approve"`
 override authorizes only Claw's own collaboration tools; it does not authorize

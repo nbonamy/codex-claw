@@ -72,27 +72,6 @@ describe('useWorkItemRouting', () => {
     expect(harness.routing.newAgentItem.value).toBeNull();
   });
 
-  it('owns the Bench assignment lifecycle through team resolution and UI assignment', async () => {
-    const harness = createHarness();
-
-    await harness.routing.openBenchAgent({ item: harness.item, teamId: harness.teamId });
-    expect(harness.routing.benchAssignmentVisible.value).toBe(true);
-    expect(harness.routing.benchAgentTeamName.value).toBe('GitHub #12');
-
-    await harness.routing.assignBenchAgent({ benchTemplateId: 'bench-reviewer', newTeamName: 'Review' });
-
-    expect(harness.resolveTeam).toHaveBeenCalledWith(null, 'Review');
-    expect(harness.deployBenchTemplate).toHaveBeenCalledWith({
-      templateId: 'bench-reviewer',
-      teamId: harness.teamId,
-    });
-    expect(harness.assignFromUi).toHaveBeenCalledWith({
-      agentId: harness.createdAgent.id,
-      item: harness.item,
-    });
-    expect(harness.routing.benchAssignmentVisible.value).toBe(false);
-  });
-
   it('prefills the active agent composer and returns focus to it', () => {
     const harness = createHarness({ composerText: 'Please handle this carefully.' });
 
@@ -149,13 +128,11 @@ function createHarness(input: {
     name: 'feature/fix-routing',
     path: '/workspace/codex-claw-feature',
   }));
-  const deployBenchTemplate = vi.fn(async () => createdAgent);
   const duplicateAgent = vi.fn(async () => createdAgent);
   const loadItems = vi.fn(async () => input.loadItemsResult);
   const confirmReassignment = vi.fn(async () => input.confirmReassignment ?? true);
   const focusComposer = vi.fn();
   const openNewAgent = vi.fn();
-  const resolveTeam = vi.fn(async () => team.id);
   const selectAgent = vi.fn();
   const updateComposer = vi.fn();
 
@@ -166,7 +143,6 @@ function createHarness(input: {
       createAgent,
       createBranch,
       createWorktree,
-      deployBenchTemplate,
       duplicateAgent,
       loadItems,
     },
@@ -181,7 +157,6 @@ function createHarness(input: {
       confirmReassignment,
       focusComposer,
       openNewAgent,
-      resolveTeam,
       selectAgent,
       updateComposer,
     },
@@ -196,12 +171,10 @@ function createHarness(input: {
     createBranch,
     createdAgent,
     createWorktree,
-    deployBenchTemplate,
     focusComposer,
     item: listedItem,
     loadItems,
     openNewAgent,
-    resolveTeam,
     routing,
     selectAgent,
     teamId: team.id,

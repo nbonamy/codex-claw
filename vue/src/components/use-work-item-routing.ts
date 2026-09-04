@@ -5,7 +5,6 @@ import type {
   AppSnapshot,
   CreateAgentInput,
   CreateSourceWorktreeInput,
-  DeployBenchTemplateInput,
   DuplicateAgentOptions,
   SourceRepository,
   SourceWorktree,
@@ -42,7 +41,6 @@ type WorkItemRoutingActions = {
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createBranch: (agentId: string, input: AgentGitBranchInput) => Promise<unknown>;
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
-  deployBenchTemplate: (input: DeployBenchTemplateInput) => Promise<Agent | null | void>;
   duplicateAgent: (agentId: string, options: DuplicateAgentOptions) => Promise<Agent | null>;
   loadItems: (
     provider: WorkItem['provider'],
@@ -55,7 +53,6 @@ type WorkItemRoutingUi = {
   confirmReassignment: (message: string) => Promise<boolean>;
   focusComposer: () => void;
   openNewAgent: (teamId: string | undefined, sourceRepositoryName: string) => void;
-  resolveTeam: (teamId: string | null | undefined, newTeamName?: string) => Promise<string | null>;
   selectAgent: (agentId: string) => void;
   updateComposer: (agentId: string, text: string) => void;
 };
@@ -66,9 +63,6 @@ export function useWorkItemRouting(options: {
   ui: WorkItemRoutingUi;
 }) {
   const pendingNewAgentItem = ref<WorkItem | null>(null);
-  const pendingBenchAgentItem = ref<WorkItem | null>(null);
-  const pendingBenchAgentTeamId = ref<string | null>(null);
-  const benchAssignmentVisible = ref(false);
 
   const newAgentTeamName = computed(() => (
     pendingNewAgentItem.value ? workItemTeamName(pendingNewAgentItem.value) : ''
@@ -80,9 +74,6 @@ export function useWorkItemRouting(options: {
       ? item.branchName?.trim() || `review/gh-${item.number}`
       : `fix/gh-${item.number}`;
   });
-  const benchAgentTeamName = computed(() => (
-    pendingBenchAgentItem.value ? workItemTeamName(pendingBenchAgentItem.value) : ''
-  ));
 
   async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {
     const sourceAgent = findAgent(agentId);
@@ -218,35 +209,6 @@ export function useWorkItemRouting(options: {
     await assignWithPrompt(agent.id, item, action);
   }
 
-  async function openBenchAgent(intent: WorkItemAssignmentIntent): Promise<void> {
-    if (!await confirmAssignedOverride(intent.item, 'a Bench agent')) return;
-    pendingBenchAgentItem.value = intent.item;
-    pendingBenchAgentTeamId.value = intent.teamId ?? null;
-    benchAssignmentVisible.value = true;
-  }
-
-  function closeBenchAgent(): void {
-    benchAssignmentVisible.value = false;
-    pendingBenchAgentItem.value = null;
-    pendingBenchAgentTeamId.value = null;
-  }
-
-  async function assignBenchAgent(input: {
-    benchTemplateId?: string;
-    newTeamName?: string;
-    teamId?: string;
-  }): Promise<void> {
-    const item = pendingBenchAgentItem.value;
-    if (!item || !input.benchTemplateId) return;
-    const targetTeamId = await options.ui.resolveTeam(input.teamId ?? null, input.newTeamName);
-    const agent = await options.actions.deployBenchTemplate({
-      templateId: input.benchTemplateId,
-      ...(targetTeamId ? { teamId: targetTeamId } : {}),
-    });
-    if (agent) options.actions.assignFromUi({ agentId: agent.id, item });
-    closeBenchAgent();
-  }
-
   async function assignExisting(payload: { agentId: string; item: WorkItem }): Promise<void> {
     const targetAgent = findAgent(payload.agentId);
     if (!await confirmAssignedOverride(payload.item, targetAgent?.name ?? 'this agent', payload.agentId)) return;
@@ -295,20 +257,14 @@ export function useWorkItemRouting(options: {
   }
 
   return {
-    assignBenchAgent,
     assignCreatedAgent,
     assignExisting,
-    benchAgentTeamName,
-    benchAssignmentVisible,
     clearNewAgent,
-    closeBenchAgent,
     createIsolatedAgent,
     newAgentItem: pendingNewAgentItem,
     newAgentTeamName,
     newAgentWorktreeBranchName,
-    openBenchAgent,
     openNewAgent,
-    pendingBenchAgentTeamId,
     prefill,
     startInExistingSession,
     startMany,

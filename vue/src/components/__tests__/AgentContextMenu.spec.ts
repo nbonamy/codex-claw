@@ -24,7 +24,6 @@ describe('AgentContextMenu', () => {
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
-      'Save to Bench',
       'Resume Session',
       'Restart Agent',
       'Close Agent',
@@ -57,9 +56,9 @@ describe('AgentContextMenu', () => {
   it('emits the selected action', async () => {
     const wrapper = mountMenu();
 
-    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Save to Bench')?.trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Duplicate Agent')?.trigger('click');
 
-    expect(wrapper.emitted('action')).toStrictEqual([['save-agent-to-bench']]);
+    expect(wrapper.emitted('action')).toStrictEqual([['duplicate-agent']]);
   });
 
   it('places fork directly after duplicate and disables it when unavailable', () => {

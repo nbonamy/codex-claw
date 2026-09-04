@@ -12,7 +12,6 @@ export {
   IconArrowsHorizontal as ArrowsHorizontalIcon,
   IconArrowsVertical as ArrowsVerticalIcon,
   IconBolt as BoltIcon,
-  IconBookmark as SaveToBenchIcon,
   IconBrandOpenai as BrandOpenaiIcon,
   IconBrandSpeedtest as BrandSpeedTest,
   IconCheck as CheckIcon,

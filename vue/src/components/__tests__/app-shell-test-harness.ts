@@ -10,7 +10,7 @@ import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BenchTemplate, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, DeployBenchTemplateInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
@@ -59,7 +59,6 @@ const AgentSidebarStub = defineComponent({
     'resize-sidebar',
     'restart-agent',
     'resume-session',
-    'save-agent-to-bench',
     'select-agent',
     'start-work',
     'update-collapsed-repositories',
@@ -103,7 +102,6 @@ export function mountShell(overrides: Partial<{
   listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceBranch[]>;
   sourceRepositories: SourceRepository[];
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
-  deployBenchTemplateAction: (input: string | DeployBenchTemplateInput) => Promise<Agent | null | void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   updateSettings: (input: UpdateSettingsInput) => Promise<void>;
@@ -125,10 +123,7 @@ export function mountShell(overrides: Partial<{
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
-  loadBench: (location?: BenchLocation) => Promise<void>;
   getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
-  remoteBenchByConnectionId: Record<string, BenchTemplate[]>;
-  remoteBenchStatusByConnectionId: Record<string, 'notLoaded' | 'loading' | 'loaded' | 'error'>;
   quit: () => Promise<void>;
   workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkRepository[]>>;
   workItemsByRepository: Record<string, WorkItem[]>;
@@ -158,7 +153,6 @@ export function mountShell(overrides: Partial<{
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createQuickChat: overrides.createQuickChat ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
-      deployBenchTemplateAction: overrides.deployBenchTemplateAction ?? vi.fn().mockResolvedValue(undefined),
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
       updateAgent: overrides.updateAgent ?? vi.fn().mockResolvedValue(undefined),
       updateSettings: overrides.updateSettings ?? vi.fn().mockResolvedValue(undefined),
@@ -181,10 +175,7 @@ export function mountShell(overrides: Partial<{
       createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),
       duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
       assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),
-      loadBench: overrides.loadBench ?? vi.fn().mockResolvedValue(undefined),
       getAutomationSnapshot: overrides.getAutomationSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),
-      remoteBenchByConnectionId: overrides.remoteBenchByConnectionId ?? {},
-      remoteBenchStatusByConnectionId: overrides.remoteBenchStatusByConnectionId ?? {},
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {},
       workItemsByRepository: overrides.workItemsByRepository ?? {},
       quit: overrides.quit ?? vi.fn().mockResolvedValue(undefined),

@@ -106,7 +106,7 @@ summary/title changes, resume, and applicable rename. Never invoke
 - `projectWorkspaceSidebar`: framework-independent repository/session grouping,
   ordering, kind, and label projection.
 
-Keep the agent context menu, resize, shortcuts, and Bench behavior. Conversation
+Keep the agent context menu, resize, and shortcuts. Conversation
 history opens on demand through **Resume session** in the agent menu. The
 sidebar-level creation entry point is **Add project**, offering the same local,
 GitHub, and explicit-URL sources shown inline for an empty team. Agent editing
@@ -236,7 +236,7 @@ lint, typecheck, Vue style checks, diff check, and desktop visual smoke.
 ## Migration and non-goals
 
 Existing agents require no destructive migration. Preserve agent IDs, names,
-avatars, teams, sessions, Bench templates, unread state, and ordering. Legacy
+avatars, teams, sessions, unread state, and ordering. Legacy
 repository icon keys and workspace remotes are normalized to credential-free
 canonical identities while loading. The superseded flat sidebar is removed;
 compact mode changes row density rather than restoring avatars.

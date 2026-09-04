@@ -75,9 +75,6 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   moveAgentToTeam: [backendMethods.agentTeamMove, named('input')],
   reorderAgents: [backendMethods.agentReorder, named('input')],
   reorderRepositories: [backendMethods.repositoryReorder, named('input')],
-  saveAgentToBench: [backendMethods.benchAgentTemplateCreate, named('agentId')],
-  deployBenchTemplate: [backendMethods.benchTemplateDeploy, namedOptional('templateId', 'teamId', 'location')],
-  removeBenchTemplate: [backendMethods.benchTemplateDelete, namedOptional('templateId', 'location')],
   restartAgent: [backendMethods.agentRestart, named('agentId')],
   hydrateAgentHistory: [backendMethods.agentHistoryHydrate, named('agentId')],
   loadOlderAgentHistory: [backendMethods.agentHistoryLoadOlder, named('agentId')],
@@ -131,9 +128,6 @@ export async function invokeClawWebOperation(
       lastBackendEventSeq: state.lastEventSeq,
       connection: { status: 'connected' },
     };
-  }
-  if (operation === 'getBenchSnapshot') {
-    return snapshotForLocation(backend, backendMethods.snapshotBenchGet, args[0]);
   }
   if (operation === 'getAutomationSnapshot') {
     return snapshotForLocation(backend, backendMethods.snapshotAutomationsGet, args[0]);
