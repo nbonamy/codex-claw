@@ -206,8 +206,20 @@ describe('BrowserPanel', () => {
     await wrapper.setProps({ visible: false });
     await wrapper.setProps({ visible: true });
     window.dispatchEvent(new Event('resize'));
-    emitEvent({ seq: 10, type: 'snapshot.updated', payload: {}, occurredAt: 'now' } as MainToRendererEvent);
-    emitEvent({ seq: 11, type: 'browser.annotationCreated', payload: [], occurredAt: 'now' } as MainToRendererEvent);
+    emitEvent({ seq: 10, type: 'snapshot.updated', payload: {}, occurredAt: 'now' });
+    emitEvent({
+      seq: 11,
+      type: 'browser.annotationCreated',
+      payload: {
+        id: 'annotation-resize',
+        agentId: 'agent-2',
+        browserId: 'primary',
+        url: 'https://example.com/',
+        kind: 'element',
+        rect: { x: 0, y: 0, width: 1, height: 1 },
+      },
+      occurredAt: 'now',
+    });
     await flushPromises();
 
     expect(api.browserGoBack).toHaveBeenCalledWith('agent-1', 'primary');

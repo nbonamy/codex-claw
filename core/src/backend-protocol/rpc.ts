@@ -65,19 +65,11 @@ export type ClawSnapshotGetResult = {
   clientState: ClientState;
 };
 
-export type ClawBackendEvent = {
-  seq: number;
-  type: MainToRendererEvent['type'];
-  agentId?: string;
-  backend?: MainToRendererEvent extends { backend?: infer Backend } ? Backend : never;
-  backendSessionId?: string;
-  threadId?: string;
-  turnId?: string;
-  payload: unknown;
-  occurredAt: string;
-  clientState?: ClientState;
-  snapshot?: AppSnapshot;
-};
+type ClawBackendEventFrom<Event extends MainToRendererEvent> = Event extends MainToRendererEvent
+  ? Omit<Event, 'source'> & { clientState?: ClientState }
+  : never;
+
+export type ClawBackendEvent = ClawBackendEventFrom<MainToRendererEvent>;
 
 export type ClawBackendRequestMap = {
   [backendMethods.backendHealthGet]: {

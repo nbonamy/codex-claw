@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserAnnotation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -123,6 +123,34 @@ describe('AppController', () => {
       '/tmp/backlog-icon-candidates.html',
       'Backlog icon candidates',
     );
+  });
+
+  it('emits native browser annotations as client-scoped renderer events', () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    const send = vi.fn();
+    const annotation: BrowserAnnotation = {
+      id: 'annotation-one',
+      agentId: 'agent-dina',
+      browserId: 'primary',
+      url: 'https://example.com/',
+      kind: 'element',
+      selector: '#save',
+      comment: 'Keep this compact.',
+      rect: { x: 30, y: 40, width: 100, height: 30 },
+    };
+    setMainWindowSend(controller, send);
+
+    (controller as unknown as {
+      emitBrowserAnnotation(annotation: BrowserAnnotation): void;
+    }).emitBrowserAnnotation(annotation);
+
+    expect(send).toHaveBeenCalledWith(ipcChannels.event, {
+      seq: 1,
+      source: 'client',
+      type: 'browser.annotationCreated',
+      payload: annotation,
+      occurredAt: expect.any(String),
+    });
   });
 
   it('tracks concurrent browser opens independently by agent and browser id', async () => {

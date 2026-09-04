@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { BackendConnectionState, BrowserAnnotation, ClientState } from '../contracts';
 import { createInitialSnapshot } from '../snapshot';
-import { isClawSnapshotGetResult } from '../backend-protocol/rpc';
+import { isClawSnapshotGetResult, type ClawBackendEvent } from '../backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
 describe('backend protocol guards', () => {
@@ -49,5 +50,16 @@ describe('backend protocol guards', () => {
       snapshot: createInitialSnapshot(),
       lastEventSeq: 17,
     })).toBe(false);
+  });
+
+  it('preserves typed payloads through the clawd event envelope', () => {
+    type AnnotationEvent = Extract<ClawBackendEvent, { type: 'browser.annotationCreated' }>;
+
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'client.connectionChanged' }>['payload']>()
+      .toEqualTypeOf<BackendConnectionState>();
+    expectTypeOf<AnnotationEvent['payload']>().toEqualTypeOf<BrowserAnnotation>();
+    expectTypeOf<AnnotationEvent['seq']>().toEqualTypeOf<number>();
+    expectTypeOf<AnnotationEvent['occurredAt']>().toEqualTypeOf<string>();
+    expectTypeOf<AnnotationEvent['clientState']>().toEqualTypeOf<ClientState | undefined>();
   });
 });

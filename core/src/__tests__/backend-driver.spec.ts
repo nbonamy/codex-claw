@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import type { Agent, SendPromptOptions } from '../contracts';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { Agent, BackendConnectionState, BrowserAnnotation, SendPromptOptions } from '../contracts';
 import { createEmptySnapshot } from '../snapshot';
 import {
   backendDisplayName,
   backendRuntimeFromSnapshot,
   codexPromptOptions,
   unsupportedBackendFeature,
+  type BackendEvent,
 } from '../backend-driver';
 
 describe('backend driver helpers', () => {
@@ -46,6 +47,18 @@ describe('backend driver helpers', () => {
     expect(codexPromptOptions(codexOptions)).toBe(codexOptions.backendOptions);
     expect(codexPromptOptions(claudeOptions)).toBeUndefined();
     expect(codexPromptOptions(undefined)).toBeUndefined();
+  });
+
+  it('preserves typed payloads through the backend event input envelope', () => {
+    type ConnectionEvent = Extract<BackendEvent, { type: 'client.connectionChanged' }>;
+
+    expectTypeOf<ConnectionEvent['payload']>()
+      .toEqualTypeOf<BackendConnectionState>();
+    expectTypeOf<Extract<BackendEvent, { type: 'browser.annotationCreated' }>['payload']>()
+      .toEqualTypeOf<BrowserAnnotation>();
+    expectTypeOf<ConnectionEvent['seq']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<ConnectionEvent['occurredAt']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<ConnectionEvent['source']>().toEqualTypeOf<'backend' | 'client' | undefined>();
   });
 });
 

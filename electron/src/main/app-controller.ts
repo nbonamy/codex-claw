@@ -34,6 +34,9 @@ type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
 type StartupMaintenance = () => Promise<void>;
 type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue' | 'queueWithCompletion'>;
+type ClientEventInput<Event extends MainToRendererEvent = MainToRendererEvent> = Event extends MainToRendererEvent
+  ? Omit<Event, 'seq' | 'source' | 'occurredAt'>
+  : never;
 type PendingBrowserOpen = {
   agentId: string;
   browserId: string;
@@ -1163,7 +1166,10 @@ export class AppController {
   }
 
   private emitBrowserAnnotation(annotation: BrowserAnnotation): void {
-    this.emitClientEvent('browser.annotationCreated', annotation);
+    this.emitClientEvent({
+      type: 'browser.annotationCreated',
+      payload: annotation,
+    });
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
@@ -1626,28 +1632,37 @@ export class AppController {
 
   private setConnectionState(state: BackendConnectionState): void {
     this.connectionState = state;
-    this.emitClientEvent('client.connectionChanged', state);
+    this.emitClientEvent({
+      type: 'client.connectionChanged',
+      payload: state,
+    });
   }
 
   private emitSnapshotToRenderer(snapshot?: AppSnapshot): void {
     if (snapshot) {
-      this.emitClientEvent('snapshot.updated', snapshotMetadata(snapshot), snapshot);
+      this.emitClientEvent({
+        type: 'snapshot.updated',
+        payload: snapshotMetadata(snapshot),
+        snapshot,
+      });
     } else if (this.snapshot) {
-      this.emitClientEvent('snapshot.updated', snapshotMetadata(this.snapshot));
+      this.emitClientEvent({
+        type: 'snapshot.updated',
+        payload: snapshotMetadata(this.snapshot),
+      });
     }
   }
 
-  private emitClientEvent(type: MainToRendererEvent['type'], payload: unknown, snapshot?: AppSnapshot): void {
+  private emitClientEvent(event: ClientEventInput): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
     this.clientEventSeq += 1;
-    sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls({
+    const rendererEvent: MainToRendererEvent = {
+      ...event,
       seq: this.clientEventSeq,
       source: 'client',
-      type,
-      payload,
       occurredAt: new Date().toISOString(),
-      ...(snapshot ? { snapshot } : {}),
-    }, this.localMediaRegistry));
+    };
+    sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls(rendererEvent, this.localMediaRegistry));
   }
 
   private syncPowerSaveBlocker(): void {

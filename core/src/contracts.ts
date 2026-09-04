@@ -1322,7 +1322,7 @@ export type RendererSnapshotState = {
   connection: BackendConnectionState;
 };
 
-export type MainToRendererEvent = {
+type MainToRendererEventShape = {
   seq: number;
   source?: 'backend' | 'client';
   agentId?: string;
@@ -1390,6 +1390,24 @@ export type MainToRendererEvent = {
   payload: unknown;
   occurredAt: string;
 };
+
+type MainToRendererEventEnvelope = Omit<MainToRendererEventShape, 'type' | 'payload'>;
+type MainToRendererEventWith<Variant> = MainToRendererEventEnvelope & Variant;
+type TypedMainToRendererEventType = 'client.connectionChanged' | 'browser.annotationCreated';
+
+export type MainToRendererEvent =
+  | MainToRendererEventWith<{
+      type: 'client.connectionChanged';
+      payload: BackendConnectionState;
+    }>
+  | MainToRendererEventWith<{
+      type: 'browser.annotationCreated';
+      payload: BrowserAnnotation;
+    }>
+  | MainToRendererEventWith<{
+      type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;
+      payload: unknown;
+    }>;
 
 export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
 

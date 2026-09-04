@@ -25,7 +25,11 @@ import type {
   ThreadGoal,
 } from './contracts';
 
-export type BackendEvent = Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>;
+type BackendEventFrom<Event extends MainToRendererEvent> = Event extends MainToRendererEvent
+  ? Omit<Event, 'seq' | 'occurredAt'> & Partial<Pick<Event, 'seq' | 'occurredAt'>>
+  : never;
+
+export type BackendEvent = BackendEventFrom<MainToRendererEvent>;
 
 export type BackendSendResult = {
   backendSession: BackendSession;

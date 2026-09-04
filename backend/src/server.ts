@@ -2100,7 +2100,6 @@ export class ClawBackendServer {
       ...event,
       seq: this.nextEventSeq(),
       occurredAt: event.occurredAt ?? new Date().toISOString(),
-      payload: event.payload,
     };
   }
 

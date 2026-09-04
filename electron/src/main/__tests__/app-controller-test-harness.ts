@@ -3,6 +3,7 @@ import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } fr
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
 import type { OpenInProvider } from '../open-in';
@@ -13,7 +14,7 @@ export function callPrivate<Result>(controller: AppController, method: string): 
 
 export function emitBackendEvent(
   controller: AppController,
-  event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
+  event: BackendEvent,
 ): void {
   const fullEvent: MainToRendererEvent = {
     ...event,

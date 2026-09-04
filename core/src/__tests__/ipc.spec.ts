@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AppCommand, AppSnapshot, AppSnapshotMetadata, DesktopUpdateStatus, LaunchChatGptAppInput, LaunchChatGptAppResult, MainToRendererEvent, OpenInApplication, RendererSendPromptOptions } from '../contracts';
+import type { AppCommand, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BrowserAnnotation, DesktopUpdateStatus, LaunchChatGptAppInput, LaunchChatGptAppResult, MainToRendererEvent, OpenInApplication, RendererSendPromptOptions } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
@@ -147,6 +147,10 @@ describe('ipc channels', () => {
       .toEqualTypeOf<AppSnapshotMetadata>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()
       .toEqualTypeOf<MainToRendererEvent>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'client.connectionChanged' }>['payload']>()
+      .toEqualTypeOf<BackendConnectionState>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'browser.annotationCreated' }>['payload']>()
+      .toEqualTypeOf<BrowserAnnotation>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()

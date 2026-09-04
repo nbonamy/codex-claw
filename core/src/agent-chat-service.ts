@@ -1,12 +1,12 @@
 import {
   appendUserPrompt,
 } from './snapshot';
-import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from './contracts';
-import type { AgentBackendDriver, BackendSendResult } from './backend-driver';
+import type { AgentStatus, AppSnapshot, SendPromptOptions } from './contracts';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from './backend-driver';
 import { backendDisplayName } from './backend-driver';
 
 export type AgentChatEventEmitter = (
-  event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
+  event: BackendEvent,
 ) => void;
 
 export type SendAgentPromptHooks = {
