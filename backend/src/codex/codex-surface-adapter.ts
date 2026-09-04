@@ -22,6 +22,7 @@ import type {
   PairedDevice,
   SendPromptOptions,
   CodexAuthentication,
+  CodexThreadSettings,
   SubagentActivityChange,
   SubagentIdentityChange,
   SubagentOperationChange,
@@ -1687,7 +1688,7 @@ function runtimeStatus(snapshot: CodexSurfaceSnapshot): BackendRuntimeStatus {
   return { backend: 'codex', status: 'notConfigured', detail: { key: 'backend.codexNotConnected' } };
 }
 
-function threadSettingsForPreset(preset: ApprovalPreset): Record<string, unknown> {
+function threadSettingsForPreset(preset: ApprovalPreset): CodexThreadSettings {
   if (preset === 'full-access') {
     return {
       approvalPolicy: 'never', approvalsReviewer: 'user',

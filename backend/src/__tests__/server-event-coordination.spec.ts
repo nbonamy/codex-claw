@@ -327,7 +327,7 @@ describe('ClawBackendServer', () => {
       turnId: 'turn-dina',
       type: 'thread.tokenUsageUpdated',
       payload: { contextUsage: { totalTokens: 100 } },
-    });
+    } as unknown as BackendEvent);
     server.emitEvent({
       agentId: 'agent-dina',
       threadId: 'thread-dina',

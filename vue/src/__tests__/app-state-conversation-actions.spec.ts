@@ -870,6 +870,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       type: 'thread.settingsUpdated',
       payload: { threadSettings: { model: 'gpt-5.4', reasoningEffort: 'high', serviceTier: 'fast' } },
@@ -878,6 +879,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       type: 'thread.modeUpdated',
       payload: { mode: 'plan' },
@@ -925,6 +927,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 4,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       type: 'thread.modeUpdated',
       payload: { mode: 'default' },
@@ -946,6 +949,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 6,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       type: 'thread.settingsUpdated',
       payload: { threadSettings: { serviceTier: null } },

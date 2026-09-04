@@ -1,9 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
   AccountRateLimits,
+  Agent,
   AgentBackend,
+  AgentContextUsage,
   AgentCreationProgress,
   AgentGitOperationProgress,
+  AgentStatus,
   AppCommand,
   AppSnapshot,
   AppSnapshotMetadata,
@@ -14,6 +17,7 @@ import type {
   BrowserAnnotation,
   CelebrationKind,
   ClientRequest,
+  CodexThreadSettings,
   DesktopUpdateStatus,
   DevicePairingStatus,
   LaunchChatGptAppInput,
@@ -23,6 +27,7 @@ import type {
   RendererSendPromptOptions,
   SidePanelGitDiffRequest,
   SidePanelMarkdownRequest,
+  ThreadGoal,
   WorkBacklogAssignment,
   WorkBacklogAssignmentPolicy,
   WorkBacklogAssignmentStatus,
@@ -194,6 +199,60 @@ describe('ipc channels', () => {
       turnId?: string;
       source?: 'backend' | 'client';
     };
+    type AgentOnlyEventContext = {
+      agentId: string;
+      backend?: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type CodexThreadEventContext = {
+      agentId: string;
+      backend: 'codex';
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type AgentThreadEventContext = {
+      agentId: string;
+      backend?: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type BackendThreadEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type ClaudeSessionEventContext = {
+      agentId: string;
+      backend: 'claude';
+      backendSessionId: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type ClaudeModeEventContext = {
+      agentId: string;
+      backend: 'claude';
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId: string;
+      source?: 'backend' | 'client';
+    };
 
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
@@ -284,6 +343,67 @@ describe('ipc channels', () => {
     expectTypeOf<ClientRequestResolvedEvent['payload']>().toEqualTypeOf<Pick<ClientRequest, 'id'>>();
     expectTypeOf<Pick<ClientRequestResolvedEvent, keyof ClientRequestResolvedEventContext>>()
       .toEqualTypeOf<ClientRequestResolvedEventContext>();
+    type AgentUpdatedEvent = Extract<MainToRendererEvent, { type: 'agent.updated' }>;
+    expectTypeOf<AgentUpdatedEvent['payload']>()
+      .toEqualTypeOf<
+        Omit<Partial<Agent>, 'id' | 'statusText'> & {
+          id: string;
+          statusText?: string | null;
+        }
+      >();
+    expectTypeOf<Pick<AgentUpdatedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentStatusChangedEvent = Extract<MainToRendererEvent, { type: 'agent.statusChanged' }>;
+    expectTypeOf<AgentStatusChangedEvent['payload']>().toEqualTypeOf<AgentStatus>();
+    expectTypeOf<Pick<AgentStatusChangedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type ThreadStartedEvent = Extract<MainToRendererEvent, { type: 'thread.started' }>;
+    type ClaudeThreadStartedEvent = Extract<ThreadStartedEvent, { backend: 'claude' }>;
+    type CodexThreadStartedEvent = Exclude<ThreadStartedEvent, ClaudeThreadStartedEvent>;
+    expectTypeOf<CodexThreadStartedEvent['payload']>().toEqualTypeOf<{ cwd?: string }>();
+    expectTypeOf<Pick<CodexThreadStartedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    expectTypeOf<ClaudeThreadStartedEvent['payload']>().toEqualTypeOf<{
+      sessionId: string;
+      transport: 'stdio';
+      model?: string;
+      reasoningEffort?: string;
+    }>();
+    expectTypeOf<Pick<ClaudeThreadStartedEvent, keyof ClaudeSessionEventContext>>()
+      .toEqualTypeOf<ClaudeSessionEventContext>();
+    type ThreadSettingsUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.settingsUpdated' }>;
+    expectTypeOf<ThreadSettingsUpdatedEvent['payload']>()
+      .toEqualTypeOf<{ threadSettings: CodexThreadSettings }>();
+    expectTypeOf<Pick<ThreadSettingsUpdatedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    type ThreadModeUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.modeUpdated' }>;
+    type ClaudeThreadModeUpdatedEvent = Extract<ThreadModeUpdatedEvent, { backend: 'claude' }>;
+    type CodexThreadModeUpdatedEvent = Exclude<ThreadModeUpdatedEvent, ClaudeThreadModeUpdatedEvent>;
+    expectTypeOf<CodexThreadModeUpdatedEvent['payload']>()
+      .toEqualTypeOf<{ mode: 'default' | 'plan' }>();
+    expectTypeOf<Pick<CodexThreadModeUpdatedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    expectTypeOf<ClaudeThreadModeUpdatedEvent['payload']>().toEqualTypeOf<{
+      mode: 'default' | 'plan';
+      provider: 'claude';
+      permissionMode: string;
+    }>();
+    expectTypeOf<Pick<ClaudeThreadModeUpdatedEvent, keyof ClaudeModeEventContext>>()
+      .toEqualTypeOf<ClaudeModeEventContext>();
+    type ThreadGoalUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.goalUpdated' }>;
+    expectTypeOf<ThreadGoalUpdatedEvent['payload']>()
+      .toEqualTypeOf<ThreadGoal | { goal: ThreadGoal }>();
+    expectTypeOf<Pick<ThreadGoalUpdatedEvent, keyof AgentThreadEventContext>>()
+      .toEqualTypeOf<AgentThreadEventContext>();
+    type ThreadGoalClearedEvent = Extract<MainToRendererEvent, { type: 'thread.goalCleared' }>;
+    expectTypeOf<ThreadGoalClearedEvent['payload']>().toEqualTypeOf<Record<string, never>>();
+    expectTypeOf<Pick<ThreadGoalClearedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type ThreadTokenUsageUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.tokenUsageUpdated' }>;
+    expectTypeOf<ThreadTokenUsageUpdatedEvent['payload']>()
+      .toEqualTypeOf<AgentContextUsage | { contextUsage: AgentContextUsage }>();
+    expectTypeOf<Pick<ThreadTokenUsageUpdatedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()

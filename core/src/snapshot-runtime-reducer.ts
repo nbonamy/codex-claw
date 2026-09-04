@@ -2,7 +2,6 @@ import type {
   AccountRateLimits,
   AgentContextUsage,
   AgentGitStatus,
-  AgentStatus,
   ApprovalPreset,
   AppSnapshot,
   AppSnapshotMetadata,
@@ -97,14 +96,14 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
   }
 
   if (event.type === 'agent.statusChanged') {
-    setAgentStatus(snapshot, event.agentId, event.payload as AgentStatus);
+    setAgentStatus(snapshot, event.agentId, event.payload);
     return true;
   }
 
   if (event.type === 'thread.started') {
     const agent = findAgent(snapshot, event.agentId);
     if (agent && event.backend === 'claude' && typeof event.backendSessionId === 'string') {
-      const payload = isRecord(event.payload) ? event.payload : {};
+      const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
       const model = typeof payload.model === 'string' && payload.model.trim() ? payload.model : undefined;
       const reasoningEffort = typeof payload.reasoningEffort === 'string' && payload.reasoningEffort.trim()
         ? payload.reasoningEffort
@@ -145,7 +144,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
       if (agent) {
         agent.backend = 'codex';
         agent.backendSession = { kind: 'codex', threadId: event.threadId };
-        const payload = isRecord(event.payload) ? event.payload : {};
+        const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
         const approvalPreset = codexApprovalPresetFromThreadSettings(payload.threadSettings);
         if (approvalPreset) {
           agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, approvalPreset);

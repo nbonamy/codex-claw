@@ -340,6 +340,7 @@ describe('AppController', () => {
     await controller.initialize();
     emitBackendEvent(controller, {
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-1',
       type: 'thread.tokenUsageUpdated',

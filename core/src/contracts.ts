@@ -96,6 +96,17 @@ export type BackendDefaults =
     };
   };
 
+export type CodexThreadSettings = {
+  cwd?: string;
+  model?: string;
+  reasoningEffort?: string;
+  serviceTier?: string | null;
+  approvalPolicy?: string;
+  approvalsReviewer?: CodexApprovalsReviewer;
+  sandboxPolicy?: { type: string };
+  activePermissionProfile?: { id: string };
+};
+
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
 export type ThreadGoal = {
@@ -1397,6 +1408,17 @@ type WorkBacklogAssignmentUpdatedPayload = Omit<WorkBacklogAssignment, 'policy' 
   policy?: WorkBacklogAssignmentPolicy;
   status: WorkBacklogAssignmentStatus | 'working';
 };
+type AgentUpdatedPayload = Omit<Partial<Agent>, 'id' | 'statusText'> & {
+  id: string;
+  statusText?: string | null;
+};
+type ClaudeThreadStartedPayload = {
+  sessionId: string;
+  transport: 'stdio';
+  model?: string;
+  reasoningEffort?: string;
+};
+type ThreadMode = 'default' | 'plan';
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
@@ -1413,7 +1435,15 @@ type TypedMainToRendererEventType =
   | 'workBacklog.assignmentUpdated'
   | 'workRouting.requested'
   | 'workRouting.resolved'
-  | 'clientRequest.resolved';
+  | 'clientRequest.resolved'
+  | 'agent.updated'
+  | 'agent.statusChanged'
+  | 'thread.started'
+  | 'thread.settingsUpdated'
+  | 'thread.modeUpdated'
+  | 'thread.goalUpdated'
+  | 'thread.goalCleared'
+  | 'thread.tokenUsageUpdated';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1494,6 +1524,73 @@ export type MainToRendererEvent =
       agentId: string;
       backend: AgentBackend;
       payload: Pick<ClientRequest, 'id'>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.updated';
+      agentId: string;
+      payload: AgentUpdatedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.statusChanged';
+      agentId: string;
+      payload: AgentStatus;
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.started';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: { cwd?: string };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.started';
+      agentId: string;
+      backend: 'claude';
+      backendSessionId: string;
+      payload: ClaudeThreadStartedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.settingsUpdated';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: { threadSettings: CodexThreadSettings };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.modeUpdated';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: { mode: ThreadMode };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.modeUpdated';
+      agentId: string;
+      backend: 'claude';
+      turnId: string;
+      payload: {
+        mode: ThreadMode;
+        provider: 'claude';
+        permissionMode: string;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.goalUpdated';
+      agentId: string;
+      threadId: string;
+      payload: ThreadGoal | { goal: ThreadGoal };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.goalCleared';
+      agentId: string;
+      payload: Record<string, never>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.tokenUsageUpdated';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: AgentContextUsage | { contextUsage: AgentContextUsage };
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;

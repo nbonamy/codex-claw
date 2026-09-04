@@ -8,7 +8,7 @@ import { applyRuntimeEventToSnapshot as applyMainEventToSnapshot } from '../snap
 
 describe('snapshot runtime reducer', () => {
 
-  it('records thread starts and payload-owned backend runtime status updates', () => {
+  it('records legacy backend-less Codex thread starts and payload-owned backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -18,7 +18,7 @@ describe('snapshot runtime reducer', () => {
       type: 'thread.started',
       payload: { cwd: '/Users/nbonamy/src/codex-claw' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    });
+    } as unknown as MainToRendererEvent);
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       type: 'backend.statusChanged',
@@ -86,6 +86,25 @@ describe('snapshot runtime reducer', () => {
       model: 'haiku',
       reasoningEffort: 'low',
     });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      backendSessionId: 'claude-session-2',
+      type: 'thread.started',
+      payload: {
+        sessionId: 'claude-session-2',
+        transport: 'stdio',
+        model: 'sonnet',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.agents[0].backendDefaults).toStrictEqual({
+      kind: 'claude',
+      model: 'sonnet',
+    });
   });
 
   it('records thread settings updates as durable agent thread mappings', () => {
@@ -95,6 +114,7 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       type: 'thread.settingsUpdated',
       payload: {
@@ -123,6 +143,29 @@ describe('snapshot runtime reducer', () => {
       sandboxMode: 'workspace-write',
       reasoningEffort: 'high',
       serviceTier: 'fast',
+    });
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'thread.settingsUpdated',
+      payload: {
+        threadSettings: {
+          serviceTier: null,
+          approvalPolicy: 'never',
+          approvalsReviewer: 'user',
+          sandboxPolicy: { type: 'dangerFullAccess' },
+        },
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.agents[0].backendDefaults).toMatchObject({
+      kind: 'codex',
+      approvalPreset: 'full-access',
+      serviceTier: null,
     });
   });
 
@@ -170,6 +213,26 @@ describe('snapshot runtime reducer', () => {
     });
 
     expect(snapshot.agents[0].goal).toBeUndefined();
+
+    const flatGoal = {
+      threadId: 'thread-2',
+      objective: 'Preserve flat goal compatibility',
+      status: 'paused' as const,
+      tokenBudget: 10_000,
+      tokensUsed: 2_000,
+      timeUsedSeconds: 45,
+      createdAt: 1_780_000_100,
+      updatedAt: 1_780_000_145,
+    };
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      threadId: 'thread-2',
+      type: 'thread.goalUpdated',
+      payload: flatGoal,
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+    expect(snapshot.agents[0].goal).toStrictEqual(flatGoal);
   });
 
   it('records token usage updates as transient agent context usage', () => {
@@ -178,6 +241,7 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
       type: 'thread.tokenUsageUpdated',
@@ -206,6 +270,27 @@ describe('snapshot runtime reducer', () => {
       modelContextWindow: 200_000,
       usedPercent: 25,
     });
+
+    const flatContextUsage = {
+      totalTokens: 60_000,
+      inputTokens: 45_000,
+      cachedInputTokens: 12_000,
+      outputTokens: 10_000,
+      reasoningOutputTokens: 3_000,
+      lastTotalTokens: 4_000,
+      modelContextWindow: null,
+      usedPercent: null,
+    };
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'thread.tokenUsageUpdated',
+      payload: flatContextUsage,
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    expect(snapshot.agents[0].contextUsage).toStrictEqual(flatContextUsage);
   });
 
   it('records account rate-limit updates as global app state', () => {
@@ -650,15 +735,41 @@ describe('snapshot runtime reducer', () => {
       type: 'thread.settingsUpdated',
       payload: { threadSettings: { model: 'ignored-without-thread' } },
       occurredAt: '2026-06-05T00:00:03.000Z',
-    })).toBe(true);
+    } as unknown as MainToRendererEvent)).toBe(true);
     expect(snapshot.agents[0].backendSession).toBeUndefined();
 
+    const goal = snapshot.agents[0].goal;
+    const contextUsage = snapshot.agents[0].contextUsage;
     expect(applyMainEventToSnapshot(snapshot, {
       seq: 4,
       agentId: 'agent-dina',
+      type: 'thread.goalUpdated',
+      payload: { goal: { objective: 'missing fields' } },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    } as unknown as MainToRendererEvent)).toBe(true);
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 5,
+      agentId: 'agent-dina',
+      type: 'thread.tokenUsageUpdated',
+      payload: { contextUsage: { totalTokens: 10 } },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    } as unknown as MainToRendererEvent)).toBe(true);
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 6,
+      agentId: 'agent-dina',
+      type: 'thread.modeUpdated',
+      payload: { mode: 'unsupported' },
+      occurredAt: '2026-06-05T00:00:06.000Z',
+    } as unknown as MainToRendererEvent)).toBe(true);
+    expect(snapshot.agents[0].goal).toBe(goal);
+    expect(snapshot.agents[0].contextUsage).toBe(contextUsage);
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 7,
+      agentId: 'agent-dina',
       type: 'message.delta',
       payload: { delta: 'conversation-owned' },
-      occurredAt: '2026-06-05T00:00:04.000Z',
+      occurredAt: '2026-06-05T00:00:07.000Z',
     })).toBe(false);
   });
 
