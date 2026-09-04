@@ -53,6 +53,22 @@ describe('backend protocol guards', () => {
     })).toBe(false);
   });
 
+  it('rejects snapshot/get results with malformed nested snapshot state', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.backendRuntimes[0]!.capabilities = {
+      planMode: 'automatic',
+    } as never;
+
+    expect(isClawSnapshotGetResult({
+      snapshot,
+      lastEventSeq: 17,
+      clientState: {
+        sourceFolderPath: '/Users/nbonamy/src',
+        shouldPreventDisplaySleep: false,
+      },
+    })).toBe(false);
+  });
+
   it('requires backend-derived client state in snapshot/get results', () => {
     expect(isClientState({
       sourceFolderPath: '/Users/nbonamy/src',

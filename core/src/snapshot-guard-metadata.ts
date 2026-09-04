@@ -1,0 +1,531 @@
+import { isAppTextDescriptor } from './app-text';
+import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
+import { spokenAnnouncementVoices } from './contracts';
+import {
+  isSubagentActivityKind,
+  isSubagentOperationKind,
+  isSubagentOperationLifecycle,
+  isSubagentOperationStatus,
+  isSubagentStatus,
+} from './subagent-values';
+import {
+  includes,
+  isAgentBackend,
+  isArrayOf,
+  isBoolean,
+  isNullableNumber,
+  isNullableString,
+  isNumber,
+  isRecord,
+  isRecordMapOf,
+  isString,
+  optional,
+} from './snapshot-guard-primitives';
+import {
+  isAccountRateLimits,
+  isAgentGitStatus,
+  isQueuedPrompt,
+  isTurnGitDiff,
+  isWorkRoutingRequest,
+} from './snapshot-guard-collections';
+
+export function isSnapshotMetadata(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) &&
+    isArrayOf(value.teams, isTeam) &&
+    isArrayOf(value.agents, isAgent) &&
+    isArrayOf(value.automations, isAutomation) &&
+    isNullableString(value.activeTeamId) &&
+    isNullableString(value.activeAgentId) &&
+    optional(value, 'queuedPrompts', (candidate) => isArrayOf(candidate, isQueuedPrompt)) &&
+    optional(value, 'workRoutingRequests', (candidate) => isArrayOf(candidate, isWorkRoutingRequest)) &&
+    isRecordMapOf(value.backendApprovals, (candidate) => isArrayOf(candidate, isBackendApprovalRequest)) &&
+    isRecordMapOf(value.agentGitStatuses, isAgentGitStatus) &&
+    isRecordMapOf(value.turnGitDiffs, isTurnGitDiff) &&
+    isRecordMapOf(value.subagentTrees, isSubagentTree) &&
+    isArrayOf(value.backendRuntimes, isBackendRuntimeStatus) &&
+    optional(value, 'accountRateLimits', isAccountRateLimits) &&
+    isWorkBacklog(value.workBacklog) &&
+    isRemoteConnections(value.remoteConnections) &&
+    isGeneralSettings(value.general) &&
+    isSourceFolder(value.sourceFolder) &&
+    isTheme(value.theme);
+}
+
+function isTeam(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    optional(value, 'avatar', isString) &&
+    optional(value, 'color', isString) &&
+    optional(value, 'remoteConnectionId', isString) &&
+    optional(value, 'remoteTeamId', isString) &&
+    isArrayOf(value.agentIds, isString) &&
+    optional(value, 'activeAgentId', isString);
+}
+
+function isAgent(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    optional(value, 'teamId', isString) &&
+    optional(value, 'delegatedByAgentId', isString) &&
+    optional(value, 'pullRequest', isAgentPullRequestTracking) &&
+    optional(value, 'sessionKind', (candidate) => candidate === 'quickChat') &&
+    isNullableString(value.name) &&
+    optional(value, 'conversationTitle', isString) &&
+    optional(value, 'avatar', isString) &&
+    isNullableString(value.folder) &&
+    optional(value, 'workspace', isAgentWorkspaceIdentity) &&
+    isAgentBackend(value.backend) &&
+    optional(value, 'backendSession', isBackendSession) &&
+    optional(value, 'backendDefaults', isBackendDefaults) &&
+    optional(value, 'openInApplication', isOpenInApplication) &&
+    optional(value, 'contextUsage', isAgentContextUsage) &&
+    optional(value, 'plan', isThreadPlan) &&
+    optional(value, 'goal', isThreadGoal) &&
+    optional(value, 'isRegistered', isBoolean) &&
+    optional(value, 'mcpSessionId', isString) &&
+    optional(value, 'statusText', isString) &&
+    isAgentStatus(value.status) &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string';
+}
+
+function isAgentStatus(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  switch (value.type) {
+    case 'idle':
+    case 'starting':
+      return true;
+    case 'working':
+    case 'awaitingInput':
+      return optional(value, 'detail', isAppText);
+    case 'error':
+      return isAppText(value.message);
+    default:
+      return false;
+  }
+}
+
+function isAppText(value: unknown): boolean {
+  return typeof value === 'string' || isAppTextDescriptor(value);
+}
+
+function isAgentPullRequestTracking(value: unknown): boolean {
+  return isRecord(value) &&
+    value.provider === 'github' &&
+    typeof value.repository === 'string' &&
+    typeof value.branch === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string' &&
+    isAgentGitPullRequest(value);
+}
+
+function isAgentGitPullRequest(value: Record<string, unknown>): boolean {
+  return typeof value.number === 'number' &&
+    typeof value.title === 'string' &&
+    typeof value.url === 'string' &&
+    typeof value.draft === 'boolean' &&
+    typeof value.headSha === 'string' &&
+    includes(['open', 'merged', 'closed'], value.state) &&
+    optional(value, 'mergedAt', isString);
+}
+
+function isAgentWorkspaceIdentity(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.folder !== 'string' || typeof value.updatedAt !== 'string') return false;
+  if (value.kind === 'folder') return typeof value.label === 'string';
+  return value.kind === 'git' &&
+    typeof value.repositoryName === 'string' &&
+    typeof value.repositoryRoot === 'string' &&
+    isNullableString(value.branch) &&
+    typeof value.isLinkedWorktree === 'boolean' &&
+    typeof value.primaryWorktreeRoot === 'string' &&
+    optional(value, 'originUrl', isString);
+}
+
+function isBackendSession(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'codex') return typeof value.threadId === 'string';
+  return value.kind === 'claude' &&
+    typeof value.sessionId === 'string' &&
+    includes(['stdio', 'websocket'], value.transport) &&
+    optional(value, 'transcriptSessionId', isString) &&
+    optional(value, 'serverUrl', isString) &&
+    optional(value, 'model', isString) &&
+    optional(value, 'reasoningEffort', isString);
+}
+
+function isBackendDefaults(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'codex') {
+    return optional(value, 'model', isString) &&
+      optional(value, 'approvalPreset', isApprovalPreset) &&
+      optional(value, 'approvalPolicy', isString) &&
+      optional(value, 'approvalsReviewer', isApprovalsReviewer) &&
+      optional(value, 'sandboxMode', isString) &&
+      optional(value, 'reasoningEffort', isString) &&
+      optional(value, 'serviceTier', isNullableString);
+  }
+  return value.kind === 'claude' &&
+    optional(value, 'model', isString) &&
+    optional(value, 'reasoningEffort', isString) &&
+    optional(value, 'permissionMode', isString) &&
+    optional(value, 'thinking', isThinkingDefaults);
+}
+
+function isThinkingDefaults(value: unknown): boolean {
+  return isRecord(value) &&
+    includes(['enabled', 'disabled'], value.type) &&
+    optional(value, 'budgetTokens', isNumber);
+}
+
+function isOpenInApplication(value: unknown): boolean {
+  return includes(['vscode', 'finder', 'terminal', 'iterm2', 'ghostty', 'xcode', 'android-studio', 'jetbrains'], value);
+}
+
+function isAgentContextUsage(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.totalTokens === 'number' &&
+    typeof value.inputTokens === 'number' &&
+    typeof value.cachedInputTokens === 'number' &&
+    typeof value.outputTokens === 'number' &&
+    typeof value.reasoningOutputTokens === 'number' &&
+    typeof value.lastTotalTokens === 'number' &&
+    isNullableNumber(value.modelContextWindow) &&
+    isNullableNumber(value.usedPercent);
+}
+
+function isThreadPlan(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.threadId === 'string' &&
+    typeof value.turnId === 'string' &&
+    includes(['execution', 'proposed'], value.kind) &&
+    includes(['inProgress', 'completed', 'incomplete', 'interrupted', 'failed'], value.status) &&
+    typeof value.explanation === 'string' &&
+    isArrayOf(value.steps, isThreadPlanStep) &&
+    typeof value.markdown === 'string' &&
+    typeof value.updatedAt === 'string';
+}
+
+function isThreadPlanStep(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.step === 'string' &&
+    includes(['pending', 'inProgress', 'completed'], value.status);
+}
+
+function isThreadGoal(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.threadId === 'string' &&
+    typeof value.objective === 'string' &&
+    includes(['active', 'paused', 'blocked', 'usageLimited', 'budgetLimited', 'complete'], value.status) &&
+    isNullableNumber(value.tokenBudget) &&
+    typeof value.tokensUsed === 'number' &&
+    typeof value.timeUsedSeconds === 'number' &&
+    typeof value.createdAt === 'number' &&
+    typeof value.updatedAt === 'number';
+}
+
+function isAutomation(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.enabled === 'boolean' &&
+    isArrayOf(value.repositories, isAutomationRepository) &&
+    typeof value.teamId === 'string' &&
+    optional(value, 'selectionPrompt', isString) &&
+    optional(value, 'assignmentPrompt', isString) &&
+    isAutomationSchedule(value.schedule) &&
+    isArrayOf(value.executionLog, isAutomationExecution) &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string' &&
+    optional(value, 'lastRunAt', isString) &&
+    optional(value, 'lastError', isString) &&
+    optional(value, 'lastCreatedCount', isNumber);
+}
+
+function isAutomationRepository(value: unknown): boolean {
+  return isRecord(value) &&
+    value.provider === 'github' &&
+    typeof value.repositoryId === 'string' &&
+    typeof value.sourceRepositoryPath === 'string';
+}
+
+function isAutomationSchedule(value: unknown): boolean {
+  return isRecord(value) && typeof value.intervalMinutes === 'number';
+}
+
+function isAutomationExecution(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.automationId === 'string' &&
+    typeof value.startedAt === 'string' &&
+    optional(value, 'completedAt', isString) &&
+    includes(['working', 'completed', 'failed'], value.status) &&
+    typeof value.createdCount === 'number' &&
+    isArrayOf(value.createdAgents, isAutomationCreatedAgent) &&
+    optional(value, 'error', isString);
+}
+
+function isAutomationCreatedAgent(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.agentId === 'string' &&
+    typeof value.agentName === 'string' &&
+    typeof value.workItemId === 'string' &&
+    typeof value.workItemTitle === 'string' &&
+    typeof value.workItemUrl === 'string' &&
+    optional(value, 'conversationRef', isBackendConversationRef);
+}
+
+function isBackendConversationRef(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.backend === 'codex') return typeof value.threadId === 'string';
+  return value.backend === 'claude' && typeof value.folder === 'string' && typeof value.sessionId === 'string';
+}
+
+function isBackendRuntimeStatus(value: unknown): boolean {
+  return isRecord(value) &&
+    isAgentBackend(value.backend) &&
+    includes(['notConfigured', 'starting', 'running', 'error'], value.status) &&
+    optional(value, 'detail', isAppText) &&
+    optional(value, 'capabilities', isBackendCapabilities);
+}
+
+function isBackendCapabilities(value: unknown): boolean {
+  return isRecord(value) &&
+    optional(value, 'attachments', isBoolean) &&
+    optional(value, 'models', isBoolean) &&
+    optional(value, 'skills', isBoolean) &&
+    optional(value, 'reasoningEffort', isBoolean) &&
+    optional(value, 'serviceTier', isBoolean) &&
+    optional(value, 'thinkingBudget', isBoolean) &&
+    optional(value, 'planMode', (candidate) => includes(['native', 'prompted', 'unsupported'], candidate)) &&
+    optional(value, 'goals', isBoolean) &&
+    optional(value, 'steerPrompt', isBoolean) &&
+    optional(value, 'interrupt', isBoolean) &&
+    optional(value, 'history', isBoolean) &&
+    optional(value, 'conversationFork', isBoolean) &&
+    optional(value, 'rollback', isBoolean) &&
+    optional(value, 'editMessage', isBoolean) &&
+    optional(value, 'retryMessage', isBoolean) &&
+    optional(value, 'approvals', isBoolean) &&
+    optional(value, 'approvalPresets', (candidate) => isArrayOf(candidate, isApprovalPreset)) &&
+    optional(value, 'permissionModes', (candidate) => isArrayOf(candidate, isPermissionModeOption));
+}
+
+function isPermissionModeOption(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    isAppText(value.label) &&
+    isAppText(value.description) &&
+    optional(value, 'dangerous', isBoolean);
+}
+
+function isBackendApprovalRequest(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    includes(['command', 'file-change', 'permissions'], value.kind) &&
+    typeof value.conversationId === 'string' &&
+    optional(value, 'turnId', isString) &&
+    typeof value.itemId === 'string' &&
+    typeof value.title === 'string' &&
+    optional(value, 'description', isString) &&
+    optional(value, 'command', isString) &&
+    optional(value, 'cwd', isString) &&
+    optional(value, 'requestedPermissions', (candidate) => isArrayOf(candidate, isRequestedPermission)) &&
+    optional(value, 'allowedScopes', (candidate) => isArrayOf(candidate, (scope) => includes(['once', 'session'], scope))) &&
+    optional(value, 'canDeny', isBoolean);
+}
+
+function isRequestedPermission(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'filesystem') {
+    return includes(['read', 'write', 'deny'], value.access) && typeof value.path === 'string';
+  }
+  return value.kind === 'network' &&
+    typeof value.enabled === 'boolean' &&
+    optional(value, 'host', isString) &&
+    optional(value, 'protocol', isString);
+}
+
+function isSubagentTree(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.rootConversationId === 'string' &&
+    isRecordMapOf(value.nodes, isSubagentNode) &&
+    isRecordMapOf(value.operations, isSubagentOperation) &&
+    isRecordMapOf(value.activities, isSubagentActivity);
+}
+
+function isSubagentNode(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.conversationId === 'string' &&
+    typeof value.parentConversationId === 'string' &&
+    typeof value.createdAt === 'string' &&
+    isSubagentStatus(value.status) &&
+    optional(value, 'statusMessage', isString) &&
+    optional(value, 'agentPath', isString) &&
+    optional(value, 'agentNickname', isString) &&
+    optional(value, 'agentRole', isString) &&
+    optional(value, 'prompt', isString) &&
+    optional(value, 'model', isString) &&
+    optional(value, 'reasoningEffort', isString) &&
+    typeof value.updatedAt === 'string';
+}
+
+function isSubagentOperation(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    optional(value, 'turnId', isString) &&
+    isSubagentOperationLifecycle(value.lifecycle) &&
+    isSubagentOperationKind(value.kind) &&
+    isSubagentOperationStatus(value.status) &&
+    typeof value.senderConversationId === 'string' &&
+    isArrayOf(value.receiverConversationIds, isString) &&
+    optional(value, 'prompt', isString) &&
+    optional(value, 'model', isString) &&
+    optional(value, 'reasoningEffort', isString) &&
+    typeof value.occurredAt === 'string';
+}
+
+function isSubagentActivity(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    optional(value, 'turnId', isString) &&
+    isSubagentOperationLifecycle(value.lifecycle) &&
+    isSubagentActivityKind(value.kind) &&
+    typeof value.conversationId === 'string' &&
+    typeof value.agentPath === 'string' &&
+    typeof value.occurredAt === 'string';
+}
+
+function isWorkBacklog(value: unknown): boolean {
+  return isRecord(value) &&
+    isArrayOf(value.connections, isWorkIntegrationConnection) &&
+    isProviderConfigurations(value.providerConfigurations) &&
+    isProviderSettings(value.providerSettings) &&
+    isRecordMapOf(value.assignments, isWorkBacklogAssignment);
+}
+
+function isWorkIntegrationConnection(value: unknown): boolean {
+  return isRecord(value) &&
+    value.provider === 'github' &&
+    includes(['notConfigured', 'disconnected', 'connecting', 'connected', 'error'], value.status) &&
+    optional(value, 'accountLabel', isString) &&
+    optional(value, 'detail', isAppText) &&
+    optional(value, 'connectedAt', isString);
+}
+
+function isProviderConfigurations(value: unknown): boolean {
+  return isRecord(value) && optional(value, 'github', isGitHubProviderConfiguration);
+}
+
+function isGitHubProviderConfiguration(value: unknown): boolean {
+  return isRecord(value) &&
+    optional(value, 'repositoryId', isString) &&
+    optional(value, 'assigneeLogin', isString) &&
+    optional(value, 'tagName', isString);
+}
+
+function isProviderSettings(value: unknown): boolean {
+  return isRecord(value) && optional(value, 'github', isWorkProviderSettings);
+}
+
+function isWorkProviderSettings(value: unknown): boolean {
+  return isRecord(value) && optional(value, 'oauthClientId', isString);
+}
+
+function isWorkBacklogAssignment(value: unknown): boolean {
+  return isRecord(value) &&
+    value.provider === 'github' &&
+    typeof value.itemId === 'string' &&
+    typeof value.agentId === 'string' &&
+    typeof value.assignedAt === 'string' &&
+    includes(['complete', 'review'], value.policy) &&
+    includes(['blocked', 'completed', 'inProgress', 'readyForReview'], value.status) &&
+    optional(value, 'completedAt', isString) &&
+    optional(value, 'note', isString) &&
+    optional(value, 'updatedAt', isString) &&
+    optional(value, 'automationId', isString) &&
+    optional(value, 'automationExecutionId', isString) &&
+    optional(value, 'completionInstructionsDeliveredAt', isString);
+}
+
+function isRemoteConnections(value: unknown): boolean {
+  return isRecord(value) && isArrayOf(value.connections, isRemoteConnection);
+}
+
+function isRemoteConnection(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    value.kind === 'ssh' &&
+    typeof value.name === 'string' &&
+    typeof value.host === 'string' &&
+    optional(value, 'hostName', isString) &&
+    optional(value, 'user', isString) &&
+    optional(value, 'port', isNumber) &&
+    optional(value, 'identityFile', isString) &&
+    includes(['saved', 'checking', 'ready', 'error'], value.status) &&
+    optional(value, 'detail', isString) &&
+    optional(value, 'sourceFolderPath', isString) &&
+    optional(value, 'transport', isRemoteConnectionTransport) &&
+    optional(value, 'installedAt', isString) &&
+    optional(value, 'lastCheckedAt', isString) &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string';
+}
+
+function isRemoteConnectionTransport(value: unknown): boolean {
+  return isRecord(value) &&
+    value.type === 'ssh-stdio' &&
+    value.command === 'ssh' &&
+    isArrayOf(value.args, isString);
+}
+
+function isGeneralSettings(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.preventSleepWhenAgentsRun === 'boolean' &&
+    typeof value.preventSleepWhenRemoteAccessEnabled === 'boolean' &&
+    typeof value.celebrationsEnabled === 'boolean' &&
+    typeof value.spokenAnnouncementsEnabled === 'boolean' &&
+    typeof value.spokenAnnouncementsMuted === 'boolean' &&
+    typeof value.spokenAnnouncementsOnlyForDictatedPrompts === 'boolean' &&
+    typeof value.spokenAnnouncementsOnlyWhenFocused === 'boolean' &&
+    includes(['selected', 'all'], value.spokenAnnouncementScope) &&
+    includes(spokenAnnouncementVoices, value.spokenAnnouncementVoice) &&
+    typeof value.codexBinaryPath === 'string' &&
+    typeof value.claudeCodeEnabled === 'boolean' &&
+    typeof value.agentListCompact === 'boolean' &&
+    isArrayOf(value.collapsedRepositoryKeys, isString) &&
+    typeof value.shareCodexSkillsAndPlugins === 'boolean' &&
+    includes(['automatic', 'repository', 'off'], value.worktreeInitializationMode) &&
+    isRecordMapOf(value.repositoryIcons, isString) &&
+    isAppshotSettings(value.appshots) &&
+    optional(value, 'plugins', isPluginSettings);
+}
+
+function isAppshotSettings(value: unknown): boolean {
+  return isRecord(value) &&
+    includes(['command', 'option', 'shift', 'none'], value.hotkey) &&
+    value.destination === 'active-agent' &&
+    typeof value.playSound === 'boolean';
+}
+
+function isPluginSettings(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.computerUseEnabled === 'boolean' &&
+    typeof value.chromeEnabled === 'boolean';
+}
+
+function isSourceFolder(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.path === 'string' &&
+    typeof value.initialized === 'boolean' &&
+    isArrayOf(value.recentRepoNames, isString);
+}
+
+function isTheme(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === 'string' &&
+    includes(['dark', 'light', 'system'], value.mode) &&
+    typeof value.uiFontSize === 'number' &&
+    typeof value.chatFontSize === 'number' &&
+    typeof value.codeFontSize === 'number';
+}

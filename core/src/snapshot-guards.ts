@@ -1,34 +1,32 @@
 import type { AppSnapshot, AppSnapshotMetadata, ClientState } from './contracts';
+import { isRendererMessage } from './snapshot-guard-collections';
+import { isSnapshotMetadata } from './snapshot-guard-metadata';
+import { hasOwn, isArrayOf, isBoolean, isRecord, optional } from './snapshot-guard-primitives';
+
+export type DecodedAppSnapshot =
+  | { kind: 'full'; value: AppSnapshot }
+  | { kind: 'metadata'; value: AppSnapshotMetadata };
+
+export function decodeAppSnapshot(value: unknown): DecodedAppSnapshot | null {
+  if (!isSnapshotMetadata(value)) return null;
+  if (hasOwn(value, 'messages')) {
+    if (!isArrayOf(value.messages, isRendererMessage)) return null;
+    return { kind: 'full', value: value as AppSnapshot };
+  }
+  return { kind: 'metadata', value: value as AppSnapshotMetadata };
+}
 
 export function isAppSnapshot(value: unknown): value is AppSnapshot {
-  return isAppSnapshotMetadata(value) &&
-    'messages' in value &&
-    Array.isArray(value.messages);
+  return decodeAppSnapshot(value)?.kind === 'full';
 }
 
 export function isAppSnapshotMetadata(value: unknown): value is AppSnapshotMetadata {
-  return isRecord(value) &&
-    Array.isArray(value.teams) &&
-    Array.isArray(value.agents) &&
-    Array.isArray(value.automations) &&
-    isRecord(value.subagentTrees) &&
-    isRecord(value.backendApprovals) &&
-    Array.isArray(value.backendRuntimes) &&
-    isRecord(value.workBacklog) &&
-    isRecord(value.remoteConnections) &&
-    isRecord(value.sourceFolder) &&
-    isRecord(value.general) &&
-    isRecord(value.theme);
+  return decodeAppSnapshot(value) !== null;
 }
 
 export function isClientState(value: unknown): value is ClientState {
   return isRecord(value) &&
     typeof value.sourceFolderPath === 'string' &&
     typeof value.shouldPreventDisplaySleep === 'boolean' &&
-    (value.shouldPreventDisplaySleepForRemoteAccess === undefined ||
-      typeof value.shouldPreventDisplaySleepForRemoteAccess === 'boolean');
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+    optional(value, 'shouldPreventDisplaySleepForRemoteAccess', isBoolean);
 }
