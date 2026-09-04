@@ -547,9 +547,23 @@ describe('snapshot runtime reducer', () => {
         agentId: 'agent-dina',
         assignedAt: '2026-06-05T00:00:02.000Z',
         status: 'working',
-        automationId: 'automation-global',
+        automationId: ' automation-global ',
+        automationExecutionId: ' execution-global ',
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      type: 'workBacklog.assignmentUpdated',
+      payload: {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#review',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-05T00:00:03.000Z',
+        status: 'readyForReview',
+        note: ' Waiting for review ',
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
     expect(snapshot.workRoutingRequests).toStrictEqual([request]);
@@ -561,6 +575,16 @@ describe('snapshot runtime reducer', () => {
       policy: 'complete',
       status: 'inProgress',
       automationId: 'automation-global',
+      automationExecutionId: 'execution-global',
+    });
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#review']).toStrictEqual({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#review',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-05T00:00:03.000Z',
+      policy: 'review',
+      status: 'readyForReview',
+      note: 'Waiting for review',
     });
   });
 
@@ -636,5 +660,56 @@ describe('snapshot runtime reducer', () => {
       payload: { delta: 'conversation-owned' },
       occurredAt: '2026-06-05T00:00:04.000Z',
     })).toBe(false);
+  });
+
+  it('ignores malformed work-routing and backlog payloads at the runtime boundary', () => {
+    const snapshot = createInitialSnapshot();
+    const routingRequests = snapshot.workRoutingRequests;
+    const assignments = snapshot.workBacklog.assignments;
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      type: 'workRouting.requested',
+      payload: {
+        id: 'malformed-request',
+        kind: 'work_routing',
+        payload: { request: { agentId: 'agent-dina' } },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent)).toBe(true);
+    expect(snapshot.workRoutingRequests).toBe(routingRequests);
+
+    snapshot.workRoutingRequests = [{
+      id: 'work-routing-1',
+      kind: 'work_routing',
+      payload: {
+        request: {
+          agentId: 'agent-dina',
+          task: 'Keep this request',
+          suggestedBranchName: 'test/keep-request',
+          sharedFolderAgentNames: [],
+        },
+      },
+    }];
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      type: 'workRouting.resolved',
+      payload: { id: 42 },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    } as unknown as MainToRendererEvent)).toBe(true);
+    expect(snapshot.workRoutingRequests).toHaveLength(1);
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      type: 'workBacklog.assignmentUpdated',
+      payload: {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#malformed',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-05T00:00:03.000Z',
+      },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    } as unknown as MainToRendererEvent)).toBe(true);
+    expect(snapshot.workBacklog.assignments).toBe(assignments);
   });
 });

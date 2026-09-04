@@ -1393,6 +1393,10 @@ type MainToRendererEventShape = {
 
 type MainToRendererEventEnvelope = Omit<MainToRendererEventShape, 'type' | 'payload'>;
 type MainToRendererEventWith<Variant> = MainToRendererEventEnvelope & Variant;
+type WorkBacklogAssignmentUpdatedPayload = Omit<WorkBacklogAssignment, 'policy' | 'status'> & {
+  policy?: WorkBacklogAssignmentPolicy;
+  status: WorkBacklogAssignmentStatus | 'working';
+};
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
@@ -1405,7 +1409,11 @@ type TypedMainToRendererEventType =
   | 'celebration.requested'
   | 'agentCreation.progress'
   | 'git.operationProgress'
-  | 'browser.annotationCreated';
+  | 'browser.annotationCreated'
+  | 'workBacklog.assignmentUpdated'
+  | 'workRouting.requested'
+  | 'workRouting.resolved'
+  | 'clientRequest.resolved';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1468,6 +1476,24 @@ export type MainToRendererEvent =
   | MainToRendererEventWith<{
       type: 'browser.annotationCreated';
       payload: BrowserAnnotation;
+    }>
+  | MainToRendererEventWith<{
+      type: 'workBacklog.assignmentUpdated';
+      payload: WorkBacklogAssignmentUpdatedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'workRouting.requested';
+      payload: WorkRoutingRequest;
+    }>
+  | MainToRendererEventWith<{
+      type: 'workRouting.resolved';
+      payload: Pick<WorkRoutingRequest, 'id'>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'clientRequest.resolved';
+      agentId: string;
+      backend: AgentBackend;
+      payload: Pick<ClientRequest, 'id'>;
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;

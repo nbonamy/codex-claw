@@ -183,14 +183,24 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 3,
       agentId: 'agent-dina',
+      backend: 'codex',
       type: 'clientRequest.resolved',
       payload: { id: 'question-1' },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      type: 'clientRequest.resolved',
+      payload: { id: 42 },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    } as unknown as MainToRendererEvent);
 
     expect(state.activeBackendApprovals.value).toStrictEqual([]);
     expect(state.answeredClientRequestIds.value.has('approval-server')).toBe(true);
     expect(state.answeredClientRequestIds.value.has('question-1')).toBe(true);
+    expect(state.answeredClientRequestIds.value.has('42')).toBe(false);
   });
 
   it('sets the active approval preset through the preload bridge', async () => {

@@ -13,6 +13,7 @@ import type {
   BackendSkillSummary,
   BrowserAnnotation,
   CelebrationKind,
+  ClientRequest,
   DesktopUpdateStatus,
   DevicePairingStatus,
   LaunchChatGptAppInput,
@@ -22,6 +23,10 @@ import type {
   RendererSendPromptOptions,
   SidePanelGitDiffRequest,
   SidePanelMarkdownRequest,
+  WorkBacklogAssignment,
+  WorkBacklogAssignmentPolicy,
+  WorkBacklogAssignmentStatus,
+  WorkRoutingRequest,
 } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
@@ -171,6 +176,24 @@ describe('ipc channels', () => {
       turnId?: string;
       source?: 'backend' | 'client';
     };
+    type OptionalEventContext = {
+      agentId?: string;
+      backend?: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type ClientRequestResolvedEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
 
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
@@ -236,6 +259,31 @@ describe('ipc channels', () => {
     >>().toEqualTypeOf<AgentScopedEventContext>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'browser.annotationCreated' }>['payload']>()
       .toEqualTypeOf<BrowserAnnotation>();
+    type WorkBacklogAssignmentUpdatedEvent = Extract<
+      MainToRendererEvent,
+      { type: 'workBacklog.assignmentUpdated' }
+    >;
+    expectTypeOf<WorkBacklogAssignmentUpdatedEvent['payload']>()
+      .toEqualTypeOf<
+        Omit<WorkBacklogAssignment, 'policy' | 'status'> & {
+          policy?: WorkBacklogAssignmentPolicy;
+          status: WorkBacklogAssignmentStatus | 'working';
+        }
+      >();
+    expectTypeOf<Pick<WorkBacklogAssignmentUpdatedEvent, keyof OptionalEventContext>>()
+      .toEqualTypeOf<OptionalEventContext>();
+    type WorkRoutingRequestedEvent = Extract<MainToRendererEvent, { type: 'workRouting.requested' }>;
+    expectTypeOf<WorkRoutingRequestedEvent['payload']>().toEqualTypeOf<WorkRoutingRequest>();
+    expectTypeOf<Pick<WorkRoutingRequestedEvent, keyof OptionalEventContext>>()
+      .toEqualTypeOf<OptionalEventContext>();
+    type WorkRoutingResolvedEvent = Extract<MainToRendererEvent, { type: 'workRouting.resolved' }>;
+    expectTypeOf<WorkRoutingResolvedEvent['payload']>().toEqualTypeOf<Pick<WorkRoutingRequest, 'id'>>();
+    expectTypeOf<Pick<WorkRoutingResolvedEvent, keyof OptionalEventContext>>()
+      .toEqualTypeOf<OptionalEventContext>();
+    type ClientRequestResolvedEvent = Extract<MainToRendererEvent, { type: 'clientRequest.resolved' }>;
+    expectTypeOf<ClientRequestResolvedEvent['payload']>().toEqualTypeOf<Pick<ClientRequest, 'id'>>();
+    expectTypeOf<Pick<ClientRequestResolvedEvent, keyof ClientRequestResolvedEventContext>>()
+      .toEqualTypeOf<ClientRequestResolvedEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()
