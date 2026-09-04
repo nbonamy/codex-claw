@@ -6,25 +6,25 @@ import { describe, expect, it } from 'vitest';
 import UpdateAvailableBadge from '../UpdateAvailableBadge.vue';
 
 describe('UpdateAvailableBadge', () => {
-  it('stays hidden when no update is ready', () => {
-    const wrapper = mount(UpdateAvailableBadge, {
-      props: { status: { state: 'idle' } },
-    });
+  it.each(['disabled', 'idle', 'checking', 'error'] as const)(
+    'stays hidden while the update state is %s',
+    (state) => {
+      const wrapper = mount(UpdateAvailableBadge, {
+        props: { status: { state } },
+      });
 
-    expect(wrapper.find('button').exists()).toBe(false);
-    expect(wrapper.find('[role="status"]').exists()).toBe(false);
-  });
+      expect(wrapper.find('button').exists()).toBe(false);
+      expect(wrapper.find('[role="status"]').exists()).toBe(false);
+    },
+  );
 
-  it.each([
-    ['checking', 'Checking…'],
-    ['downloading', 'Downloading…'],
-  ] as const)('shows %s progress as a blue status badge', (state, label) => {
+  it('shows download progress as a blue status badge', () => {
     const wrapper = mount(UpdateAvailableBadge, {
-      props: { status: { state } },
+      props: { status: { state: 'downloading' } },
     });
 
     const badge = wrapper.get('[role="status"]');
-    expect(badge.text()).toBe(label);
+    expect(badge.text()).toBe('Downloading…');
     expect(badge.classes()).toContain('update-status-badge--busy');
     expect(wrapper.find('button').exists()).toBe(false);
   });

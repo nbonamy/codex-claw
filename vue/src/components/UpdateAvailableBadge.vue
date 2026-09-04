@@ -14,14 +14,8 @@ function isVisible(): boolean {
   return props.status.state === 'downloaded';
 }
 
-function isBusy(): boolean {
-  return props.status.state === 'checking' || props.status.state === 'downloading';
-}
-
-function busyLabel(): string {
-  return props.status.state === 'downloading'
-    ? translate('surface.updateAvailableBadge.downloadingUpdate')
-    : translate('surface.updateAvailableBadge.checkingForUpdates');
+function isDownloading(): boolean {
+  return props.status.state === 'downloading';
 }
 
 function title(): string {
@@ -34,7 +28,7 @@ function title(): string {
 
 <template>
   <span
-    v-if="isBusy()"
+    v-if="isDownloading()"
     class="update-status-badge--busy"
     role="status"
     aria-live="polite"
@@ -43,7 +37,7 @@ function title(): string {
       class="update-status-badge__spinner"
       aria-hidden="true"
     />
-    {{ busyLabel() }}
+    {{ $t('surface.updateAvailableBadge.downloadingUpdate') }}
   </span>
   <button
     v-else-if="isVisible()"
