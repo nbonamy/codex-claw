@@ -1,6 +1,7 @@
 import type {
   Agent,
   AgentBackend,
+  AgentStatus,
   AppSnapshot,
   BackendDefaults,
   BackendSession,
@@ -201,9 +202,22 @@ function normalizedOptionalString(value: string | null | undefined): string | un
   return normalized || undefined;
 }
 
+function setAgentStatus(snapshot: AppSnapshot, agentId: string, status: AgentStatus): void {
+  const agent = findAgent(snapshot, agentId);
+  if (agent) {
+    agent.status = status;
+    agent.updatedAt = new Date().toISOString();
+  }
+}
+
 function findAgent(snapshot: AppSnapshot, agentId: string): Agent | undefined {
   return snapshot.agents.find((agent) => agent.id === agentId);
 }
+
+export {
+  findAgent as findAgentInSnapshot,
+  setAgentStatus as setAgentStatusInSnapshot,
+};
 
 export function duplicateAgentInSnapshot(
   snapshot: AppSnapshot,

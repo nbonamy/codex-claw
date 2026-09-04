@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  applyMainEventToSnapshot,
   createInitialSnapshot,
   snapshotMetadata,
 } from '../snapshot';
+import { applyRuntimeEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-runtime-reducer';
 
-describe('snapshot reducer', () => {
+describe('snapshot runtime reducer', () => {
 
   it('records thread starts and backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
@@ -415,5 +415,176 @@ describe('snapshot reducer', () => {
       state: 'dirty',
       updatedAt: '2026-06-05T00:00:03.000Z',
     });
+  });
+
+  it('preserves wall-clock status timestamps and git status for unknown agents', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-06-05T01:00:00.000Z'));
+      const snapshot = createInitialSnapshot();
+
+      applyMainEventToSnapshot(snapshot, {
+        seq: 1,
+        agentId: 'agent-dina',
+        type: 'agent.statusChanged',
+        payload: { type: 'working', detail: 'Reviewing' },
+        occurredAt: '2026-06-05T00:00:01.000Z',
+      });
+      applyMainEventToSnapshot(snapshot, {
+        seq: 2,
+        agentId: 'unknown-agent',
+        type: 'git.statusUpdated',
+        payload: {
+          folder: '/tmp/unknown',
+          branch: null,
+          ahead: 0,
+          behind: 0,
+          changedFiles: 0,
+          addedLines: 0,
+          removedLines: 0,
+          hasUntracked: false,
+          state: 'clean',
+          updatedAt: '2026-06-05T00:00:02.000Z',
+        },
+        occurredAt: '2026-06-05T00:00:02.000Z',
+      });
+
+      expect(snapshot.agents[0].updatedAt).toBe('2026-06-05T01:00:00.000Z');
+      expect(snapshot.agentGitStatuses['unknown-agent']).toStrictEqual({
+        folder: '/tmp/unknown',
+        branch: null,
+        ahead: 0,
+        behind: 0,
+        changedFiles: 0,
+        addedLines: 0,
+        removedLines: 0,
+        hasUntracked: false,
+        state: 'clean',
+        updatedAt: '2026-06-05T00:00:02.000Z',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('processes routing and backlog updates without an envelope agent id', () => {
+    const snapshot = createInitialSnapshot();
+    const request = {
+      id: 'work-routing-global',
+      kind: 'work_routing' as const,
+      payload: {
+        request: {
+          agentId: 'agent-dina',
+          task: 'Route globally',
+          suggestedBranchName: 'chore/route-globally',
+          sharedFolderAgentNames: [],
+        },
+      },
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      type: 'workRouting.requested',
+      payload: request,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      type: 'workBacklog.assignmentUpdated',
+      payload: {
+        provider: 'github',
+        itemId: 'nbonamy/codex-claw#global',
+        agentId: 'agent-dina',
+        assignedAt: '2026-06-05T00:00:02.000Z',
+        status: 'working',
+        automationId: 'automation-global',
+      },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
+    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#global']).toStrictEqual({
+      provider: 'github',
+      itemId: 'nbonamy/codex-claw#global',
+      agentId: 'agent-dina',
+      assignedAt: '2026-06-05T00:00:02.000Z',
+      policy: 'complete',
+      status: 'inProgress',
+      automationId: 'automation-global',
+    });
+  });
+
+  it('tracks app-owned work-routing requests outside the transcript', () => {
+    const snapshot = createInitialSnapshot();
+    const request = {
+      id: 'work-routing-1',
+      kind: 'work_routing' as const,
+      payload: {
+        request: {
+          agentId: 'agent-dina',
+          task: 'Add queue retries',
+          suggestedBranchName: 'feat/queue-retries',
+          sharedFolderAgentNames: [],
+        },
+      },
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      type: 'workRouting.requested',
+      payload: request,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
+    expect(snapshot.messages).toHaveLength(0);
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'workRouting.resolved',
+      payload: { id: 'work-routing-1' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    });
+
+    expect(snapshot.workRoutingRequests).toStrictEqual([]);
+  });
+
+  it('reports owned no-ops and the legacy missing-agent gate as handled', () => {
+    const snapshot = createInitialSnapshot();
+    const backendRuntimes = snapshot.backendRuntimes;
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      type: 'backend.statusChanged',
+      payload: { backend: 'invalid', status: 'running' },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    })).toBe(true);
+    expect(snapshot.backendRuntimes).toBe(backendRuntimes);
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      type: 'message.delta',
+      payload: { delta: 'missing agent' },
+      occurredAt: '2026-06-05T00:00:02.000Z',
+    })).toBe(true);
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 3,
+      agentId: 'agent-dina',
+      type: 'thread.settingsUpdated',
+      payload: { threadSettings: { model: 'ignored-without-thread' } },
+      occurredAt: '2026-06-05T00:00:03.000Z',
+    })).toBe(true);
+    expect(snapshot.agents[0].backendSession).toBeUndefined();
+
+    expect(applyMainEventToSnapshot(snapshot, {
+      seq: 4,
+      agentId: 'agent-dina',
+      type: 'message.delta',
+      payload: { delta: 'conversation-owned' },
+      occurredAt: '2026-06-05T00:00:04.000Z',
+    })).toBe(false);
   });
 });

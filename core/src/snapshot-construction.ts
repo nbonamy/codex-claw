@@ -1,9 +1,19 @@
-import type { Agent, AppSnapshot } from './contracts';
+import type { Agent, AppSnapshot, AppSnapshotMetadata } from './contracts';
 import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
 import { seedTeamId } from './seed-ids';
 import { defaultTeamColor } from './team-colors';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
+
+export function snapshotMetadata(snapshot: AppSnapshot): AppSnapshotMetadata {
+  const { messages: _messages, ...metadata } = snapshot;
+  return metadata;
+}
+
+export function applySnapshotMetadata(snapshot: AppSnapshot, metadata: AppSnapshotMetadata): void {
+  const { messages: _messages, ...safeMetadata } = metadata as AppSnapshotMetadata & { messages?: AppSnapshot['messages'] };
+  Object.assign(snapshot, safeMetadata);
+}
 
 export function createEmptySnapshot(): AppSnapshot {
   return {
