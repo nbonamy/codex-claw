@@ -2,6 +2,8 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
   AccountRateLimits,
   AgentBackend,
+  AgentCreationProgress,
+  AgentGitOperationProgress,
   AppCommand,
   AppSnapshot,
   AppSnapshotMetadata,
@@ -10,6 +12,7 @@ import type {
   BackendRuntimeStatus,
   BackendSkillSummary,
   BrowserAnnotation,
+  CelebrationKind,
   DesktopUpdateStatus,
   DevicePairingStatus,
   LaunchChatGptAppInput,
@@ -17,6 +20,8 @@ import type {
   MainToRendererEvent,
   OpenInApplication,
   RendererSendPromptOptions,
+  SidePanelGitDiffRequest,
+  SidePanelMarkdownRequest,
 } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
@@ -159,6 +164,14 @@ describe('ipc channels', () => {
   });
 
   it('derives request and event payloads from the preload API contract', () => {
+    type AgentScopedEventContext = {
+      agentId: string;
+      backend?: AgentBackend;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
@@ -191,6 +204,36 @@ describe('ipc channels', () => {
       .toEqualTypeOf<DevicePairingStatus>();
     expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'devicePairing.statusChanged' }>, 'backend'>>()
       .toEqualTypeOf<{ backend?: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'sidePanel.markdownRequested' }>['payload']>()
+      .toEqualTypeOf<SidePanelMarkdownRequest>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'sidePanel.markdownRequested' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'sidePanel.gitDiffRequested' }>['payload']>()
+      .toEqualTypeOf<SidePanelGitDiffRequest>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'sidePanel.gitDiffRequested' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'celebration.requested' }>['payload']>()
+      .toEqualTypeOf<{ kind: CelebrationKind }>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'celebration.requested' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'agentCreation.progress' }>['payload']>()
+      .toEqualTypeOf<AgentCreationProgress>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'agentCreation.progress' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'git.operationProgress' }>['payload']>()
+      .toEqualTypeOf<AgentGitOperationProgress>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'git.operationProgress' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'browser.annotationCreated' }>['payload']>()
       .toEqualTypeOf<BrowserAnnotation>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()

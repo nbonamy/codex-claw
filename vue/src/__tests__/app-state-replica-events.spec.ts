@@ -400,28 +400,28 @@ describe('useAppState', () => {
       type: 'sidePanel.markdownRequested',
       payload: null,
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as MainToRendererEvent);
+    } as unknown as MainToRendererEvent);
     listeners[0]?.({
       seq: 3,
       agentId: 'agent-dina',
       type: 'sidePanel.markdownRequested',
       payload: { kind: 'diff', content: '# Wrong kind' },
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as MainToRendererEvent);
+    } as unknown as MainToRendererEvent);
     listeners[0]?.({
       seq: 4,
       agentId: 'agent-dina',
       type: 'sidePanel.markdownRequested',
       payload: { kind: 'markdown', content: 123 },
       occurredAt: '2026-06-05T00:00:04.000Z',
-    } as MainToRendererEvent);
+    } as unknown as MainToRendererEvent);
     listeners[0]?.({
       seq: 5,
       agentId: 'agent-dina',
       type: 'sidePanel.gitDiffRequested',
       payload: { kind: 'gitDiff', diff: 123 },
       occurredAt: '2026-06-05T00:00:05.000Z',
-    } as MainToRendererEvent);
+    } as unknown as MainToRendererEvent);
 
     expect(state.sidePanelRequest.value).toBeNull();
 
@@ -436,7 +436,7 @@ describe('useAppState', () => {
         content: '# Valid',
       },
       occurredAt: '2026-06-05T00:00:05.000Z',
-    } as MainToRendererEvent);
+    } as unknown as MainToRendererEvent);
 
     expect(state.sidePanelRequest.value).toStrictEqual({
       kind: 'markdown',

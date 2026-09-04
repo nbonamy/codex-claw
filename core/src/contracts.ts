@@ -875,7 +875,7 @@ export type SidePanelGitDiffRequest = {
   kind: 'gitDiff';
   scope?: 'workingTree' | 'turn';
   title?: AppText;
-  subtitle?: AppText;
+  subtitle?: AppText | null;
   diff: string;
   sections?: AgentGitDiffSection[];
   state?: 'idle' | 'error';
@@ -1400,6 +1400,11 @@ type TypedMainToRendererEventType =
   | 'devicePairing.statusChanged'
   | 'models.changed'
   | 'skills.changed'
+  | 'sidePanel.markdownRequested'
+  | 'sidePanel.gitDiffRequested'
+  | 'celebration.requested'
+  | 'agentCreation.progress'
+  | 'git.operationProgress'
   | 'browser.annotationCreated';
 
 export type MainToRendererEvent =
@@ -1434,6 +1439,31 @@ export type MainToRendererEvent =
         status: 'loaded';
         skills: BackendSkillSummary[];
       };
+    }>
+  | MainToRendererEventWith<{
+      type: 'sidePanel.markdownRequested';
+      agentId: string;
+      payload: SidePanelMarkdownRequest;
+    }>
+  | MainToRendererEventWith<{
+      type: 'sidePanel.gitDiffRequested';
+      agentId: string;
+      payload: SidePanelGitDiffRequest;
+    }>
+  | MainToRendererEventWith<{
+      type: 'celebration.requested';
+      agentId: string;
+      payload: { kind: CelebrationKind };
+    }>
+  | MainToRendererEventWith<{
+      type: 'agentCreation.progress';
+      agentId: string;
+      payload: AgentCreationProgress;
+    }>
+  | MainToRendererEventWith<{
+      type: 'git.operationProgress';
+      agentId: string;
+      payload: AgentGitOperationProgress;
     }>
   | MainToRendererEventWith<{
       type: 'browser.annotationCreated';
