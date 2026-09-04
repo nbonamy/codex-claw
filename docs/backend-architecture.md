@@ -76,7 +76,7 @@ Current implementation checkpoint:
   backend work, and `clawd` can request client-owned effects. Runtime client
   handlers include `client/external/open` for backend-owned work integrations
   and `client/systemPermissions/*` for native permission prompts/settings.
-- Work integration token types now live in `shared`, and `clawd` owns token
+- Work integration token types now live in `core`, and `clawd` owns token
   persistence through a backend token-store port. The current runtime uses an
   owner-readable JSON file under `~/.codex-claw`, so desktop and future clients
   do not read or write provider tokens.
@@ -88,8 +88,8 @@ Current implementation checkpoint:
   app-owned backend events.
 - Electron main no longer contains backend orchestration implementation modules
   for automations, work integrations, MCP, source scanning, git worktrees, agent file
-  reads, or state persistence. Those live under `backend/src`; `shared/src`
-  stays limited to app contracts and pure cross-process helpers.
+  reads, or state persistence. Those live under `backend/src`; `core/src`
+  stays limited to platform-neutral contracts, reducers, managers, and helpers.
 - Electron main still owns native desktop affordances and selected adapters:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, native system-permission prompts/settings, packaged
@@ -471,8 +471,8 @@ renderer.
   mobile client connected to a remote backend. Renderer-side normalization is
   only for turning displayed links into backend-relative preview requests, never
   for granting arbitrary filesystem access.
-- Durable snapshot JSON persistence lives in `backend/src`, not `shared/src`,
-  because it is a Node filesystem concern. `shared` must remain usable by
+- Durable snapshot JSON persistence lives in `backend/src`, not `core/src`,
+  because it is a Node filesystem concern. `core` must remain usable by
   desktop, mobile, and web clients without carrying local file-read authority.
 - Automation CRUD, scheduler, and runner.
 - Work-provider drivers where possible, with desktop-only services injected
@@ -524,7 +524,7 @@ client callback method is `client/external/open`.
 
 `clawd` method names use the path-style convention
 `resource[/subresource]/verb`, with values centralized in
-`shared/src/backend-protocol/methods.ts`. This is a breaking dev protocol
+`core/src/backend-protocol/methods.ts`. This is a breaking dev protocol
 surface: old method names are not aliased, so stale local and remote daemons
 must be restarted or synced after a rename.
 
@@ -654,7 +654,7 @@ The exact script names can change, but the shape should stay:
   an installed background daemon with the same package version.
 - `start:electron` runs only the `electron` workspace's Electron Forge/Vite
   flow, for cases where the backend is already managed separately.
-- `dev:backend` watches `backend/src` and `shared/src`, then writes a bundled
+- `dev:backend` watches `backend/src` and `core/src`, then writes a bundled
   file such as `backend/dist/clawd-dev.mjs`.
 - `dev:backend:run` supervises `node backend/dist/clawd-dev.mjs --stdio`.
 - Electron main receives the dev backend command from config or environment,
@@ -1146,11 +1146,11 @@ Goal: make the backend boundary real without adding a process boundary.
 
 Work:
 
-- Create the npm workspace layout: `shared`, `backend`, and `electron`.
+- Create the npm workspace layout: `core`, `backend`, and `electron`.
 - Move the current Electron app package into `electron/` while preserving the
   existing Forge/Vite behavior.
-- Move shared contracts and pure helpers from `src/shared` into
-  `shared/src`.
+- Move platform-neutral contracts and pure helpers from `src/shared` into
+  `core/src`.
 - Add backend core modules under `backend/src` with no `electron` imports.
 - Define a `ClawCore` interface shaped around app-owned requests and events.
 - Move snapshot ownership, backend driver registry, MCP server ownership,
@@ -1166,14 +1166,14 @@ Tests:
 
 - Unit-test core request handlers without Electron.
 - Keep existing `AppController` tests passing by injecting an in-process core.
-- Add seam tests proving no `backend/src` or `shared/src` file imports
+- Add seam tests proving no `backend/src` or `core/src` file imports
   `electron`.
 
 Commit checkpoints:
 
 - `chore: split repo into npm workspaces`
 - `feat: add backend core interface`
-- `feat: move shared contracts into workspace`
+- `feat: move core contracts into workspace`
 - `feat: move snapshot ownership into backend core`
 - `feat: route agent backend operations through core`
 - `feat: route source file git and automation services through core`
@@ -1184,7 +1184,7 @@ Goal: make process communication testable while still running in-process.
 
 Work:
 
-- Add shared protocol contracts under `shared/src/backend-protocol` with
+- Add shared protocol contracts under `core/src/backend-protocol` with
   JSON-RPC envelope types, request/event maps, error codes, and schema
   validation.
 - Add an in-process transport/client adapter that speaks the same request names
@@ -1344,7 +1344,7 @@ Coverage areas:
 - State migration and persistence.
 - Capability checks in the backend.
 - Codex/Claude driver behavior behind the core seam.
-- No Electron imports in `backend` or `shared`.
+- No Electron imports in `backend` or `core`.
 - No provider protocol imports in renderer.
 
 Docs-only exploration, like this file, does not require Vitest. Run markdown
@@ -1369,7 +1369,7 @@ and diff hygiene checks instead.
 
 Start with the workspace reorg, then Phase 1 and Phase 2. The reorg is the
 foundation: root becomes orchestration-only, `electron` stays the desktop
-client, `backend` becomes `clawd`, and `shared` becomes the only compile-time
+client, `backend` becomes `clawd`, and `core` becomes the only compile-time
 contract bridge. Once Electron main talks to a `ClawBackendClient` and the
 backend package has no Electron imports, add stdio in Phase 3 and run the
 packaging spike with real evidence.

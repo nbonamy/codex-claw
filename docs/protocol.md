@@ -28,12 +28,12 @@ or:
 ```
 
 Supported error codes are defined in
-`shared/src/backend-protocol/rpc.ts`: parse error, invalid request, method not
+`core/src/backend-protocol/rpc.ts`: parse error, invalid request, method not
 found, invalid params, internal error, backend unavailable, and timeout.
 
 Method names use `resource[/subresource]/verb`. Multiword path segments are
 lower camel case, and the action belongs at the end of the path. Method values
-are centralized in `shared/src/backend-protocol/methods.ts`.
+are centralized in `core/src/backend-protocol/methods.ts`.
 The shared request map is being adopted one product domain at a time; all
 app-level `agent/git/*` methods currently have compile-time parameter and result
 contracts used by the Electron adapter and backend routing seam.
@@ -325,7 +325,7 @@ metadata-only acknowledgements so those hot paths never echo the full cached
 transcript back through stdio and Electron IPC.
 
 Event `type` values are the app-owned `MainToRendererEvent['type']` union from
-`shared/src/contracts.ts`. Current emitted examples include:
+`core/src/contracts.ts`. Current emitted examples include:
 
 - backend and agent status: `backend.statusChanged`, `agent.updated`,
   `snapshot.updated`, `agent.statusChanged`;
