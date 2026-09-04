@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { selectAgent } from '../agent-manager';
 import {
   appendUserPrompt,
-  applyMainEventToSnapshot,
   createInitialSnapshot,
 } from '../snapshot';
+import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
 import type { RendererMessage } from '../contracts';
 import {
   commandToolPart,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyMainEventToSnapshot,
   createInitialSnapshot,
 } from '../snapshot';
+import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
 import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
 import {
   commandOutputDeltaToToolPartUpdate,

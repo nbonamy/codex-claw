@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendUserPrompt,
-  applyMainEventToSnapshot,
   createInitialSnapshot,
   selectAgent,
 } from '../snapshot';
+import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
 import type { RendererMessage } from '../contracts';
 import {
   commandToolPart,
