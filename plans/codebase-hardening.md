@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 9 active — type tool lifecycle and workspace events.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 10 active — type approvals, input requests, and errors.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -106,7 +106,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 6: type subagent change events.
 - [x] Phase 1.4 slice 7: type turn, plan, and compaction events.
 - [x] Phase 1.4 slice 8: type transcript and prompt events.
-- [ ] Phase 1.4 slice 9: type tool lifecycle and workspace events. **Active.**
+- [x] Phase 1.4 slice 9: type tool lifecycle and workspace events.
+- [ ] Phase 1.4 slice 10: type approvals, input requests, and errors. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -145,7 +146,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 6: type subagent change events | Complete | core event agent / root integrator | Four variants now discriminate operation, activity, identity, and status changes with their existing payload owners; all require `agentId`, `backend`, and `threadId`, while `turnId` and `source` remain optional | Focused: Core 14, Backend 47, and Vue 18 tests. Full `npm run test:ai`: 270 files / 2,056 tests, real 25.82s (Core 245, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 24.30s. Lint, CSS lint, and Knip: 26.25s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ac4dda653c167798627880a0cf2ad4ce519b1050` | Independent review found no defects. Payload/envelope identity independence, validators, malformed owned no-ops, the missing-agent gate, root ignore, receiver cloning, identity/status deletion and timestamps, and unread exclusion are preserved. Runtime producers, reducers, decoders, and deferred generic/wire casts remain unchanged; the sole new cast characterizes malformed boundary input |
 | 2026-09-04 | Phase 1.4 slice 7: type turn, plan, and compaction events | Complete | core event agent / root integrator | Seven variants now discriminate turn start/completion, execution-plan update, proposed-plan delta/completion, and compaction start/completion with the audited context split and provider-compatible payload unions | Focused: Core 42, Backend 81, Electron 14, Vue 39, and Web 7 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 26.28s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.25s. Lint, CSS lint, and Knip: 25.93s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ce8257d304162a7048e2485a71132d5e8d5f723d` | Independent review found no defects. Optional completion diagnostics, normalized plan authority, proposed-plan whitespace and trimming, interrupted completion, compaction markers, malformed-start payload compatibility, missing-context no-ops, runtime guards, and deferred casts remain intact; all 13 fixture adaptations and five boundary casts were scoped |
 | 2026-09-04 | Phase 1.4 slice 8: type transcript and prompt events | Complete | core event agent / root integrator | Eight variants now discriminate history hydration, message delta/update/submission/steer, and prompt queue/retry/dequeue with their audited context split and cohesive private payload aliases | Focused: Core 74, Backend 105, Electron 14, and Vue 61 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 25.08s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.52s. Lint, CSS lint, and Knip: 25.53s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `52349cf6670f7c529234977866975c4c7b052717` | Independent review found no defects. Claude-optional thread/message/item IDs, strict message-update context, agent-only generic events, live history pagination flags, readonly attachments, queue semantics, message-agent filtering, source-less compatibility, runtime guards, and deferred casts remain intact; two indexed-access reducer edits are behavior-equivalent and all six boundary casts are deliberate |
-| 2026-09-04 | Phase 1.4 slice 9: type tool lifecycle and workspace events | Active | root orchestrator | Six variants selected: tool item start/update/completion, turn diff, file activity, and agent Git status | Existing `RendererToolPart`, `RendererToolPartUpdate`, `AgentFileActivity`, and `AgentGitStatus` owners plus narrow private lifecycle/diff payload aliases inventoried; implementation and gates pending | — | Item lifecycle requires `agentId`, `backend`, and `turnId`, with optional `threadId`; diff and file activity require `agentId`, `backend`, `threadId`, and `turnId`; Git status requires only `agentId`. Preserve optional `messageId`, arbitrary tool kinds and patch mutation semantics, coupled/asymmetrically validated diff updates, unknown-agent Git status and the legacy-null boundary cast, renderer-only path trimming, missing-context no-ops, branch-based narrowing rather than reducer casts, and deferred wire decoding |
+| 2026-09-04 | Phase 1.4 slice 9: type tool lifecycle and workspace events | Complete | core event agent / root integrator | Six variants now discriminate tool item start/update/completion, turn diff, file activity, and agent Git status using existing payload owners plus narrow private lifecycle/update aliases | Focused: Core 60, Backend 74, Electron 14, and Vue 9 tests. Full `npm run test:ai`: 270 files / 2,062 tests, real 25.17s (Core 251, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 21.78s. Lint, CSS lint, and Knip: 24.06s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `2d7718292cbcd77f262347b0de17a153bf14e3f2` | Independent review found no defects. Optional item `messageId` and thread context, arbitrary tool kinds, field/null/body/output/metadata patch semantics, coupled asymmetric diff validation, unknown-agent Git status, the legacy `branch: null` boundary case, renderer-only file-path trimming, missing-context no-ops, runtime guards, and deferred casts remain intact. Claude's conditional branch split and the reducer cast removal are behavior-equivalent; `output: null` → body `"null"` remains explicitly characterized |
+| 2026-09-04 | Phase 1.4 slice 10: type approvals, input requests, and errors | Active | root orchestrator | Five event types selected: provider-discriminated tool approval and user input, native backend approval request/resolution, and agent error | Existing `ClientRequest` and `BackendApprovalRequest` owners plus narrow private provider/resolution/error aliases inventoried; implementation and gates pending | — | Codex client requests require agent, Codex backend, and thread with optional turn; Claude client requests require agent, Claude backend, and turn with optional thread. Native approval events are Codex-scoped with agent/thread and optional turn; errors require only agent. Preserve dormant global resolution behavior without activating or deleting it, conditional producer branch splitting, retry-versus-terminal error behavior, missing-turn and malformed quirks, the registry's source-less approval fallback through a boundary cast, nested/flat approval parsing, guards, and deferred wire casts |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -530,6 +532,8 @@ Completed in `52349cf6670f7c529234977866975c4c7b052717`.
 
 #### Slice 9 — tool lifecycle and workspace events
 
+Completed in `2d7718292cbcd77f262347b0de17a153bf14e3f2`.
+
 - Type `item.started` and `item.completed` with a private lifecycle payload
   alias containing `toolPart: RendererToolPart` and optional `messageId`.
   Type `item.updated` with a private update payload alias composed from
@@ -552,13 +556,54 @@ Completed in `52349cf6670f7c529234977866975c4c7b052717`.
   the running file-change tool descriptor. Retain their existing asymmetric
   malformed-payload validation rather than silently tightening either path.
 - Preserve Git status storage for unknown agents and the deliberate boundary
-  cast that characterizes a legacy `null` payload. Preserve renderer-only
+  cast that characterizes a legacy `branch: null` payload. Preserve renderer-only
   trimming of file-activity paths; do not move that behavior into the contract
   or backend producer.
 - Missing required context must retain its current no-op behavior. Split
   reducer branches where needed so TypeScript narrows each event variant; do
   not replace narrowing with reducer casts. Keep wire decoding and generic
   transport casts deferred to their later boundary work.
+
+#### Slice 10 — approvals, input requests, and errors
+
+- Type `approval.requested` with payload
+  `Extract<ClientRequest, { kind: 'confirm_tool' }>` and type
+  `toolInput.requested` with payload
+  `Extract<ClientRequest, { kind: 'ask_user' }>`. Model each as two provider
+  variants rather than weakening the shared context:
+  - Codex requires envelope `agentId`, `backend: 'codex'`, and `threadId`, with
+    optional `turnId` because SDK client requests may be conversation-scoped.
+  - Claude requires envelope `agentId`, `backend: 'claude'`, and `turnId`, with
+    optional `threadId` because its active turn may not yet have a session ID.
+- Split the conditional Codex and Claude request producers into explicit
+  approval and input branches so the event discriminant stays paired with its
+  exact payload. Do not add producer casts to bypass the new contracts.
+- Type `backendApproval.requested` as a Codex-native event with required
+  `agentId`, `backend: 'codex'`, and `threadId`, optional `turnId`, and the
+  existing nested `{ approval: BackendApprovalRequest }` payload. Type
+  `backendApproval.resolved` with the same context and a nested payload
+  containing the approval plus nullable `BackendApprovalDecision`, nullable
+  `BackendApprovalScope`, and the existing host/server/lifecycle resolution
+  reason.
+- Preserve the approval parser's accepted nested and legacy flat
+  `BackendApprovalRequest` shapes at runtime. The reducer's source-less,
+  agent-less resolution-across-all-agents branch is dormant under current
+  producers; characterize it through an explicit boundary cast without
+  deleting it or turning this typing slice into a hidden behavior fix.
+- Preserve the client-request registry's source-less approval fallback, which
+  derives the backend from the owning agent, through a deliberate boundary
+  cast. Do not require source, and do not introduce payload/envelope identity
+  equality checks.
+- Type `error` with required envelope `agentId` only and a private payload
+  alias whose `message`, `willRetry`, and provider diagnostic data remain
+  optional. Do not require backend, thread, turn, or source context.
+- Preserve retryable errors as transient working status with no transcript
+  message; preserve terminal errors as one system message plus error status,
+  including the fallback `Backend error` for a malformed or empty payload.
+- Preserve approval and input events missing `turnId` as their current handled
+  no-ops, malformed request/status quirks, and both nested and flat approval
+  parsing. Keep runtime guards and generic/wire decoder casts deferred to their
+  later boundary work.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
