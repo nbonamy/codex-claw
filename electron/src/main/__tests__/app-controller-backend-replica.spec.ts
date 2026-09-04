@@ -12,6 +12,16 @@ describe('AppController', () => {
 
   it('returns the latest event-applied snapshot after refreshing client state', async () => {
     const staleSnapshot = createInitialSnapshot();
+    const replacementSnapshot = createInitialSnapshot();
+    replacementSnapshot.agents[0]!.status = { type: 'working' };
+    replacementSnapshot.messages = [{
+      id: 'message-replacement',
+      agentId: 'agent-dina',
+      role: 'assistant',
+      status: 'complete',
+      parts: [{ type: 'text', text: 'Replacement transcript' }],
+      createdAt: '2026-08-02T14:00:00.000Z',
+    }];
     let resolveClientState!: (state: ClientState) => void;
     const clientState = new Promise<ClientState>((resolve) => {
       resolveClientState = resolve;
@@ -30,10 +40,8 @@ describe('AppController', () => {
     const adoption = adoptBackendSnapshot(controller, staleSnapshot);
     await vi.waitFor(() => expect(request).toHaveBeenCalledWith(backendMethods.clientStateGet));
     emitBackendEvent(controller, {
-      seq: 1,
-      agentId: 'agent-dina',
-      type: 'agent.statusChanged',
-      payload: { type: 'working' },
+      type: 'snapshot.updated',
+      payload: replacementSnapshot,
       occurredAt: '2026-08-02T14:00:00.000Z',
     });
     resolveClientState({ sourceFolderPath: '', shouldPreventDisplaySleep: true });
@@ -42,6 +50,7 @@ describe('AppController', () => {
     expect(currentSnapshot(controller)).not.toBe(staleSnapshot);
     expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
+    expect(staleSnapshot.messages).toBe(replacementSnapshot.messages);
   });
 
   it('hydrates its metadata cache from clawd snapshot state', async () => {
@@ -296,10 +305,13 @@ describe('AppController', () => {
     expect(media?.type === 'media' ? media.media.url : null).not.toBe(generatedImageUrl);
   });
 
-  it('ignores malformed backend event snapshot fields', async () => {
+  it('ignores backend event snapshots with malformed nested state', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     const send = vi.fn();
+    const malformedSnapshot = structuredClone(snapshot);
+    malformedSnapshot.agents[0]!.status = { type: 'working' };
+    (malformedSnapshot.general.appshots as unknown as Record<string, unknown>).hotkey = 42;
 
     setMainWindowSend(controller, send);
     await controller.initialize();
@@ -310,14 +322,24 @@ describe('AppController', () => {
       type: 'snapshot.updated',
       payload: snapshotMetadata(snapshot),
       occurredAt: '2026-06-13T00:00:00.000Z',
-      snapshot: {
-        teams: [],
-        agents: [],
-      } as unknown as AppSnapshot,
+      snapshot: malformedSnapshot as unknown as AppSnapshot,
     });
+    const malformedPayload = structuredClone(snapshot);
+    malformedPayload.agents[0]!.name = 'Malformed payload';
+    (malformedPayload as unknown as Record<string, unknown>).messages = {};
+    (controller as unknown as {
+      emitBackendEvent(event: ClawBackendEvent): void;
+    }).emitBackendEvent({
+      seq: 2,
+      type: 'snapshot.updated',
+      payload: malformedPayload,
+      occurredAt: '2026-06-13T00:00:01.000Z',
+    } as unknown as ClawBackendEvent);
 
     expect(currentSnapshot(controller)).not.toBe(snapshot);
     expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'idle' });
+    expect(currentSnapshot(controller).agents[0]?.name).toBe('Dina');
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 1,
       type: 'snapshot.updated',

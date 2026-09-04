@@ -16,13 +16,14 @@ import {
 import { appText } from './app-text';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { applySnapshotMetadata } from './snapshot-construction';
+import { decodeAppSnapshot } from './snapshot-guards';
 import { workItemAssignmentKey } from './work-assignments';
 
 export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): boolean {
   if (event.type === 'snapshot.updated') {
-    const nextSnapshot = event.payload;
-    if (isRecord(nextSnapshot) && Array.isArray(nextSnapshot.teams) && Array.isArray(nextSnapshot.agents)) {
-      applySnapshotMetadata(snapshot, nextSnapshot);
+    const decodedSnapshot = decodeAppSnapshot(event.payload);
+    if (decodedSnapshot) {
+      applySnapshotMetadata(snapshot, decodedSnapshot.value);
     }
     return true;
   }

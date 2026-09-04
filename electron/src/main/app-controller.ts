@@ -12,7 +12,7 @@ import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './ba
 import { getClawdDaemonStatus, refreshClawdDaemon, setClawdDaemonEnabled } from './daemon-launch-agent';
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
+import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
 import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendConversationRef, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
@@ -1421,8 +1421,10 @@ export class AppController {
           break;
         }
         const rendererEvent = eventForRenderer(event);
-        if (isAppSnapshot(event.snapshot)) synchronizedSnapshot = event.snapshot;
-        else applyMainEventToSnapshot(synchronizedSnapshot, rendererEvent);
+        const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
+        if (decodedSnapshot?.kind === 'full') synchronizedSnapshot = decodedSnapshot.value;
+        else if (decodedSnapshot?.kind === 'metadata') applySnapshotMetadata(synchronizedSnapshot, decodedSnapshot.value);
+        else if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(synchronizedSnapshot, rendererEvent);
         this.applyBackendEvent(event, true);
       }
       if (!gap) {
@@ -1567,14 +1569,18 @@ export class AppController {
 
   private applyBackendEvent(event: ClawBackendEvent, notifyRenderer: boolean): void {
     const rendererEvent = eventForRenderer(event);
+    const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
     for (const snapshot of this.transientSnapshots) {
-      if (isAppSnapshot(event.snapshot)) overwriteAppSnapshot(snapshot, event.snapshot);
-      else applyMainEventToSnapshot(snapshot, rendererEvent);
+      if (decodedSnapshot?.kind === 'full') overwriteAppSnapshot(snapshot, decodedSnapshot.value);
+      else if (decodedSnapshot?.kind === 'metadata') applySnapshotMetadata(snapshot, decodedSnapshot.value);
+      else if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(snapshot, rendererEvent);
     }
-    if (isAppSnapshot(event.snapshot)) {
-      this.snapshot = metadataOnlySnapshot(event.snapshot);
+    if (decodedSnapshot?.kind === 'full') {
+      this.snapshot = metadataOnlySnapshot(decodedSnapshot.value);
+    } else if (decodedSnapshot?.kind === 'metadata') {
+      if (this.snapshot) applySnapshotMetadata(this.snapshot, decodedSnapshot.value);
     } else if (this.snapshot) {
-      applyMainEventToSnapshot(this.snapshot, rendererEvent);
+      if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(this.snapshot, rendererEvent);
       this.snapshot.messages = [];
     }
     this.policyAwareSpokenAnnouncements.refresh();
@@ -1847,4 +1853,11 @@ function isRemoteAutomationLocation(location: AutomationLocation | undefined): l
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
   return { ...event, source: 'backend' };
+}
+
+function decodeSnapshotFromBackendEvent(event: ClawBackendEvent): DecodedAppSnapshot | null {
+  const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
+  if (sideChannelSnapshot?.kind === 'full') return sideChannelSnapshot;
+  if (event.type !== 'snapshot.updated') return null;
+  return decodeAppSnapshot(event.payload);
 }

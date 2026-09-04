@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
-import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
+import { applyMainEventToSnapshot, applySnapshotMetadata } from '@codex-claw/core/snapshot';
+import { decodeAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, RemoteConnection, Team } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
 import type { RemoteClawdClientManager } from './remote-clawd-client';
@@ -208,11 +208,13 @@ export class RemoteTeamService {
   }
 
   private applyEvent(connectionId: string, event: ClawBackendEvent): void {
-    if (isAppSnapshot(event.snapshot)) {
-      this.snapshots.set(connectionId, event.snapshot);
-    } else if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
-      this.snapshots.set(connectionId, event.payload);
-    } else {
+    const decodedSnapshot = decodeSnapshotFromRemoteEvent(event);
+    if (decodedSnapshot?.kind === 'full') {
+      this.snapshots.set(connectionId, decodedSnapshot.value);
+    } else if (decodedSnapshot?.kind === 'metadata') {
+      const remoteSnapshot = this.snapshots.get(connectionId);
+      if (remoteSnapshot) applySnapshotMetadata(remoteSnapshot, decodedSnapshot.value);
+    } else if (event.type !== 'snapshot.updated') {
       const remoteSnapshot = this.snapshots.get(connectionId);
       if (remoteSnapshot) applyMainEventToSnapshot(remoteSnapshot, event);
     }
@@ -240,6 +242,13 @@ export class RemoteTeamService {
       team.remoteConnectionId === connectionId && Boolean(team.remoteTeamId)
     ));
   }
+}
+
+function decodeSnapshotFromRemoteEvent(event: ClawBackendEvent) {
+  const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
+  if (sideChannelSnapshot?.kind === 'full') return sideChannelSnapshot;
+  if (event.type !== 'snapshot.updated') return null;
+  return decodeAppSnapshot(event.payload);
 }
 
 function cloneAppSnapshot(snapshot: AppSnapshot): AppSnapshot {

@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem, WorkRoutingRequest } from '@codex-claw/core/contracts';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import { snapshotMetadata } from '@codex-claw/core/snapshot';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import {
   createTestSnapshot,
@@ -488,6 +489,97 @@ describe('ClawBackendServer', () => {
       expect.any(Function),
     );
     expect(snapshot.agents).toStrictEqual([]);
+  });
+
+  it('rejects malformed remote full and metadata snapshots without adopting them', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    const remoteAgent = createRemoteAgent();
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    const malformedFullSnapshot = structuredClone(remoteSnapshot);
+    malformedFullSnapshot.agents[0]!.name = 'Malformed full snapshot';
+    (malformedFullSnapshot.general.appshots as unknown as Record<string, unknown>).hotkey = 42;
+    const malformedMetadata = snapshotMetadata(structuredClone(remoteSnapshot));
+    malformedMetadata.agents[0]!.name = 'Malformed metadata snapshot';
+    (malformedMetadata.general.plugins as unknown as Record<string, unknown>).computerUseEnabled = 'yes';
+    const validMetadata = snapshotMetadata(structuredClone(remoteSnapshot));
+    validMetadata.agents[0]!.name = 'Metadata event update';
+    const validFullSnapshot = structuredClone(remoteSnapshot);
+    validFullSnapshot.messages = [createTextMessage('message-remote-event', remoteAgent.id, 'Remote event')];
+    const remoteClients = {
+      request: vi.fn(async (_connection, method: string, _params, onEvent?: (event: unknown) => void) => {
+        if (method === 'snapshot/get') {
+          return {
+            snapshot: remoteSnapshot,
+            lastEventSeq: 0,
+            clientState: {
+              sourceFolderPath: '',
+              shouldPreventDisplaySleep: false,
+            },
+          };
+        }
+        if (method === 'agent/select') return malformedFullSnapshot;
+        if (method === 'agent/prompt/send') {
+          onEvent?.({
+            seq: 1,
+            type: 'snapshot.updated',
+            payload: validFullSnapshot,
+            occurredAt: '2026-06-13T00:00:00.000Z',
+          });
+          onEvent?.({
+            seq: 2,
+            type: 'snapshot.updated',
+            payload: validMetadata,
+            occurredAt: '2026-06-13T00:00:01.000Z',
+          });
+          onEvent?.({
+            seq: 3,
+            type: 'snapshot.updated',
+            payload: malformedFullSnapshot,
+            occurredAt: '2026-06-13T00:00:02.000Z',
+          });
+          return malformedMetadata;
+        }
+        throw new Error(`Unexpected remote method: ${method}`);
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'snapshot',
+      method: 'snapshot/get',
+    });
+    const selection = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'select',
+      method: 'agent/select',
+      params: { agentId: remoteAgent.id },
+    });
+    const prompt = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'prompt',
+      method: 'agent/prompt/send',
+      params: { agentId: remoteAgent.id, prompt: 'hello' },
+    });
+
+    expect(selection).toMatchObject({ result: { agents: [{ name: 'Dina' }] } });
+    expect(prompt).toMatchObject({ result: { agents: [{ name: 'Metadata event update' }] } });
+    await server.close();
   });
 
   it('projects and removes remote work item assignments through the owning remote clawd', async () => {

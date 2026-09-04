@@ -12,7 +12,7 @@ import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
 import { type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
-import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
+import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
 import { clawHostCapabilities, codexClawApi } from './platform-api';
@@ -1647,12 +1647,16 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
     adoptBackgroundSnapshot(event.snapshot);
     return;
   }
-  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
-    adoptBackgroundSnapshot(event.payload);
-    return;
-  }
-  if (event.type === 'snapshot.updated' && isAppSnapshotMetadata(event.payload)) {
-    adoptBackgroundSnapshotMetadata(event.payload);
+  if (event.type === 'snapshot.updated') {
+    const decodedSnapshot = decodeAppSnapshot(event.payload);
+    if (decodedSnapshot?.kind === 'full') {
+      adoptBackgroundSnapshot(decodedSnapshot.value);
+      return;
+    }
+    if (decodedSnapshot?.kind === 'metadata') {
+      adoptBackgroundSnapshotMetadata(decodedSnapshot.value);
+      return;
+    }
     return;
   }
   applyMainEventToSnapshot(snapshot.value, event);

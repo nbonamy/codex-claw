@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AppSnapshotMetadata, MainToRendererEvent } from '../contracts';
+import type { MainToRendererEvent } from '../contracts';
 import {
   createInitialSnapshot,
   snapshotMetadata,
@@ -431,16 +431,28 @@ describe('snapshot runtime reducer', () => {
     expect(snapshot.messages).toBe(messages);
   });
 
-  it('ignores snapshot metadata payloads that fail the existing shallow root guard', () => {
+  it('ignores deeply malformed snapshot payloads without downgrading full snapshots', () => {
     const snapshot = createInitialSnapshot();
     const teams = snapshot.teams;
     const agents = snapshot.agents;
+    const malformedMetadata = snapshotMetadata(createInitialSnapshot());
+    (malformedMetadata.general.plugins as unknown as Record<string, unknown>).computerUseEnabled = 'yes';
 
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       type: 'snapshot.updated',
-      payload: { teams: 'invalid', agents: [] } as unknown as AppSnapshotMetadata,
+      payload: malformedMetadata,
       occurredAt: '2026-06-09T10:00:00.000Z',
+    });
+
+    const malformedFullSnapshot = createInitialSnapshot();
+    malformedFullSnapshot.agents[0]!.name = 'Malformed';
+    (malformedFullSnapshot as unknown as Record<string, unknown>).messages = {};
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      type: 'snapshot.updated',
+      payload: malformedFullSnapshot,
+      occurredAt: '2026-06-09T10:00:01.000Z',
     });
 
     expect(snapshot.teams).toBe(teams);

@@ -315,6 +315,39 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-ellie');
   });
 
+  it('rejects malformed full snapshot payloads without downgrading them to metadata', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const initialSnapshot = createInitialSnapshot();
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+        onEvent: vi.fn((nextListener) => {
+          listeners.push(nextListener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    const rendererSnapshot = state.snapshot.value;
+    const messages = rendererSnapshot.messages;
+    const malformedSnapshot = structuredClone(initialSnapshot);
+    malformedSnapshot.agents[0]!.name = 'Malformed snapshot';
+    (malformedSnapshot as unknown as Record<string, unknown>).messages = {};
+
+    listeners[0]?.({
+      seq: 1,
+      type: 'snapshot.updated',
+      payload: malformedSnapshot,
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    } as unknown as MainToRendererEvent);
+
+    expect(state.snapshot.value).toBe(rendererSnapshot);
+    expect(state.snapshot.value.messages).toBe(messages);
+    expect(state.activeAgent.value?.name).toBe('Dina');
+  });
+
   it('does not let a stale snapshot event steal the current agent selection', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const initialSnapshot = createInitialSnapshot();

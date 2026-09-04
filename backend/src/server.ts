@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
+import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
@@ -582,11 +582,12 @@ export class ClawBackendServer {
         let snapshot: AppSnapshot;
         if (route.kind === 'remote') {
           const result = await this.remoteTeams.request<AppSnapshot | AppSnapshotMetadata>(route.connectionId, backendMethods.agentSelect, { agentId });
-          const remoteSnapshot = isAppSnapshot(result)
-            ? result
+          const decodedSnapshot = decodeAppSnapshot(result);
+          const remoteSnapshot = decodedSnapshot?.kind === 'full'
+            ? decodedSnapshot.value
             : this.remoteTeams.knownSnapshot(route.connectionId) ?? createEmptySnapshot();
-          if (isAppSnapshotMetadata(result) && !isAppSnapshot(result)) {
-            applySnapshotMetadata(remoteSnapshot, result);
+          if (decodedSnapshot?.kind === 'metadata') {
+            applySnapshotMetadata(remoteSnapshot, decodedSnapshot.value);
           }
           this.remoteTeams.rememberSnapshot(route.connectionId, remoteSnapshot);
           this.snapshot.activeTeamId = route.localTeamId;
@@ -1790,11 +1791,12 @@ export class ClawBackendServer {
       params,
       () => localHandler(route.agent),
     );
-    if (isAppSnapshot(result)) {
-      this.remoteTeams.rememberSnapshot(route.connectionId, result);
-    } else if (isAppSnapshotMetadata(result)) {
+    const decodedSnapshot = decodeAppSnapshot(result);
+    if (decodedSnapshot?.kind === 'full') {
+      this.remoteTeams.rememberSnapshot(route.connectionId, decodedSnapshot.value);
+    } else if (decodedSnapshot?.kind === 'metadata') {
       const remoteSnapshot = this.remoteTeams.knownSnapshot(route.connectionId) ?? createEmptySnapshot();
-      applySnapshotMetadata(remoteSnapshot, result);
+      applySnapshotMetadata(remoteSnapshot, decodedSnapshot.value);
       this.remoteTeams.rememberSnapshot(route.connectionId, remoteSnapshot);
     }
     this.snapshot.activeTeamId = route.localTeamId;

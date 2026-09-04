@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/core/settings';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
 
@@ -83,6 +84,7 @@ describe('AppStatePersistence', () => {
       name: null,
       folder: null,
     });
+    expect(isAppSnapshot(restored)).toBe(true);
   });
 
   it('round-trips the agent that delegated a worker', () => {
