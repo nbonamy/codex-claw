@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 11 active — type snapshot metadata events.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 12 active — deepen snapshot decoding and classify adoption.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -108,7 +108,10 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 8: type transcript and prompt events.
 - [x] Phase 1.4 slice 9: type tool lifecycle and workspace events.
 - [x] Phase 1.4 slice 10: type approvals, input requests, and errors.
-- [ ] Phase 1.4 slice 11: type snapshot metadata events. **Active.**
+- [x] Phase 1.4 slice 11: type snapshot metadata events.
+- [ ] Phase 1.4 slice 12: deepen snapshot decoding and classify adoption. **Active.**
+- [ ] Phase 1.4 slice 12a: add the deep snapshot decoder and Core characterizations. **Active.**
+- [ ] Phase 1.4 slice 12b: migrate mixed snapshot callers and add boundary regressions.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -149,7 +152,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 8: type transcript and prompt events | Complete | core event agent / root integrator | Eight variants now discriminate history hydration, message delta/update/submission/steer, and prompt queue/retry/dequeue with their audited context split and cohesive private payload aliases | Focused: Core 74, Backend 105, Electron 14, and Vue 61 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 25.08s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.52s. Lint, CSS lint, and Knip: 25.53s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `52349cf6670f7c529234977866975c4c7b052717` | Independent review found no defects. Claude-optional thread/message/item IDs, strict message-update context, agent-only generic events, live history pagination flags, readonly attachments, queue semantics, message-agent filtering, source-less compatibility, runtime guards, and deferred casts remain intact; two indexed-access reducer edits are behavior-equivalent and all six boundary casts are deliberate |
 | 2026-09-04 | Phase 1.4 slice 9: type tool lifecycle and workspace events | Complete | core event agent / root integrator | Six variants now discriminate tool item start/update/completion, turn diff, file activity, and agent Git status using existing payload owners plus narrow private lifecycle/update aliases | Focused: Core 60, Backend 74, Electron 14, and Vue 9 tests. Full `npm run test:ai`: 270 files / 2,062 tests, real 25.17s (Core 251, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 21.78s. Lint, CSS lint, and Knip: 24.06s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `2d7718292cbcd77f262347b0de17a153bf14e3f2` | Independent review found no defects. Optional item `messageId` and thread context, arbitrary tool kinds, field/null/body/output/metadata patch semantics, coupled asymmetric diff validation, unknown-agent Git status, the legacy `branch: null` boundary case, renderer-only file-path trimming, missing-context no-ops, runtime guards, and deferred casts remain intact. Claude's conditional branch split and the reducer cast removal are behavior-equivalent; `output: null` → body `"null"` remains explicitly characterized |
 | 2026-09-04 | Phase 1.4 slice 10: type approvals, input requests, and errors | Complete | core event agent / root integrator | Five event types now discriminate provider-specific tool approval and user input, native Codex approval request/resolution, and agent error with exact payload owners and contexts | Focused: Core 23, Backend 74, and Vue 56 tests. Full `npm run test:ai`: 270 files / 2,065 tests, real 24.77s (Core 254, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 22.42s. Lint, CSS lint, and Knip: 24.36s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `48e1875d257e071189c9239f66ce984611d8865e` | Independent review found no defects. Exact native resolution reasons, conditional producer splits, dormant global resolution, retry/terminal/error-fallback semantics, missing-turn and malformed status quirks, registry owning-agent fallback, nested/flat approval parsing, renderer narrowing, guards, and deferred casts remain intact. All ten casts are deliberate malformed, legacy, or source-less boundary characterizations; no hidden behavior expansion was introduced |
-| 2026-09-04 | Phase 1.4 slice 11: type snapshot metadata events | Active | root orchestrator | `snapshot.updated` selected as the final event contract before deep boundary decoding | `AppSnapshotMetadata` payload, inherited full-snapshot side channel, renderer/Electron/remote precedence, message retention, client metadata, and producer inventory complete; implementation and gates pending | — | Require no envelope context; keep inherited `snapshot?: AppSnapshot`, and keep `clientState` as `ClawBackendEvent` transport metadata rather than app-event payload. Preserve side-channel/full/metadata precedence, message replacement versus preservation/stripping, optimistic local selection, remote client-state recomputation, shallow guards until slice 12, legacy full internal producers, and malformed boundary cases |
+| 2026-09-04 | Phase 1.4 slice 11: type snapshot metadata events | Complete | core event agent / root integrator | `snapshot.updated` now carries `AppSnapshotMetadata` with no required envelope context; the inherited full-snapshot side channel and `ClawBackendEvent`-only client state remain distinct | Focused: Core 28, Backend 23, Electron 14, Vue 43, and Web 10 tests. Full `npm run test:ai`: 270 files / 2,066 tests, real 24.98s (Core 255, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 22.17s. Lint, CSS lint, and Knip: 23.89s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ad873e85cf138ceda1577f38e451f4afe0692260` | Independent review found no defects. The fallback now becomes actual `never` once every event is typed, preventing an impossible catch-all member from widening `Extract` payloads back to `unknown`. Side-channel/full/metadata precedence, transcript replacement or retention, optimistic selection, unread pruning, legacy full producers, remote projection and local client-state recomputation, shallow guards, and malformed boundary cases remain unchanged; the sole new cast characterizes malformed metadata |
+| 2026-09-04 | Phase 1.4 slice 12: deep snapshot decoding and classified adoption | Active | root orchestrator | Current shallow root guards can accept malformed nested live snapshots and can downgrade a value with malformed `messages` to metadata | Read-only decoder, structural-domain, caller, and regression audit complete; slice 12a implementation and Core characterizations active, followed by slice 12b caller migration and boundary regressions | — | Add one identity-preserving, linear Core decoder for full-versus-metadata classification without importing persistence policy. Reject rather than downgrade any record that owns malformed `messages`; keep persistence migration/defaulting separate; allow unknown additive fields and avoid cloning, normalization, or relational validation |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -612,6 +616,8 @@ Completed in `48e1875d257e071189c9239f66ce984611d8865e`.
 
 #### Slice 11 — snapshot metadata events
 
+Completed in `ad873e85cf138ceda1577f38e451f4afe0692260`.
+
 - Type `snapshot.updated` with payload `AppSnapshotMetadata`. It requires no
   envelope agent, backend, session, thread, turn, or source context.
 - Retain the inherited optional `snapshot?: AppSnapshot` envelope field as the
@@ -641,6 +647,101 @@ Completed in `48e1875d257e071189c9239f66ce984611d8865e`.
   explicit boundary cases for invalid payloads, side-channel precedence, full
   payload compatibility, message stripping, and missing context. Do not bundle
   decoder, selection, projection, or persistence behavior changes.
+
+#### Slice 12 — deep snapshot decoding and classified adoption
+
+Execute this in two commits so deep validation lands independently from caller
+adoption changes.
+
+##### Slice 12a — decoder and Core characterizations
+
+- Replace the shallow root checks in `core/src/snapshot-guards.ts` with this
+  exact interface:
+
+  ```ts
+  export type DecodedAppSnapshot =
+    | { kind: 'full'; value: AppSnapshot }
+    | { kind: 'metadata'; value: AppSnapshotMetadata };
+
+  export function decodeAppSnapshot(value: unknown): DecodedAppSnapshot | null;
+  export function isAppSnapshot(value: unknown): value is AppSnapshot;
+  export function isAppSnapshotMetadata(value: unknown): value is AppSnapshotMetadata;
+  export function isClientState(value: unknown): value is ClientState;
+  ```
+
+- `decodeAppSnapshot` deeply validates all common metadata before classifying
+  the value. If the record owns `messages`, validate it as a complete
+  `RendererMessage[]` and return `kind: 'full'`; if that field is malformed,
+  reject the value instead of retrying it as metadata. Return `kind:
+  'metadata'` only when `messages` is absent. This fixes the current
+  no-downgrade bug while `isAppSnapshotMetadata` continues accepting valid full
+  snapshots for compatibility.
+- Validate every structural domain: teams; agents including status, `AppText`,
+  pull request, workspace, backend session/defaults, application, context,
+  plan, goal, and registration; automations including repositories, schedule,
+  logs, created agents, and conversation references; backend runtime status,
+  capabilities, approval presets, and permission descriptors; approvals;
+  subagent trees, nodes, operations, activity, identity, and status; work
+  backlog connections, provider configuration/settings, and assignments;
+  remote connections; general settings, plugins, appshots, repository icons,
+  source-folder state, and theme; transcript and runtime collections including
+  messages and parts, queued prompts/options/attachments, work routing, Git
+  status, turn diffs, and rate limits; and all active IDs plus root maps and
+  arrays.
+- Validate `ClientState` through the same Core-owned guard: require its source
+  folder and display-sleep scalar fields and validate the optional remote-access
+  display-sleep flag.
+- Keep strict live/wire decoding separate from persistence restoration.
+  `snapshotFromPersistedState` continues accepting partial and legacy saved
+  state, applying defaults, normalization, repair, and migrations; the strict
+  decoder must not import or duplicate that policy.
+- Reuse only acyclic Core-owned leaf validators. The decoder must not import
+  snapshot construction, reducers, or backend persistence. Keep private
+  structural validators local unless an existing Core leaf already owns the
+  domain invariant.
+- Return the original object identity after validation. Allow unknown additive
+  fields on records, but do not clone, normalize, default, repair relationships,
+  or add cross-record relational validation. Traverse each array and record map
+  once so decoding remains linear in the total number of entries and nested
+  message parts.
+- Add Core characterizations for every structural domain, full and metadata
+  identity, unknown additive fields, full-as-metadata compatibility, malformed
+  nested fields, `ClientState`, and especially a record with otherwise valid
+  metadata plus present malformed `messages` returning `null` from the decoder
+  and `false` from both compatibility guards.
+
+Commit checkpoint: `chore: deepen snapshot decoding`
+
+##### Slice 12b — classified mixed-caller adoption
+
+- Migrate snapshot boundaries to call `decodeAppSnapshot` once and branch on
+  its discriminant instead of composing full and metadata predicates. Cover
+  backend remote results and outbound compaction, remote-team cache and
+  projection, Electron synchronization/transient/cached replicas, renderer
+  snapshot adoption, and protocol snapshot-get validation. Preserve web/stdio
+  transport framing while validating at the application ownership seam.
+- Preserve the established order and semantics: envelope full snapshot first,
+  then a legacy full payload, then metadata payload, then ordinary event
+  reduction; full values replace transcripts where that caller owns a full
+  replica, metadata values retain them, and Electron keeps its cache
+  metadata-only. Preserve optimistic renderer selection, unread pruning,
+  remote identity projection, and receiving-server `clientState`
+  recomputation.
+- Add boundary regressions for mixed full/metadata callers, malformed nested
+  side channels and payloads, no-downgrade handling, source-less events,
+  transcript identity/replacement, local selection, remote projection, and
+  untrusted remote client state. Remove only casts made obsolete by the deep
+  decoder; keep deliberate malformed-boundary casts explicit.
+
+Commit checkpoint: `chore: classify snapshot adoption`
+
+Slice 12 exits only when one Core decoder owns strict snapshot classification;
+all full/metadata application boundaries use its discriminant; a present
+malformed `messages` field can never downgrade to metadata; valid values retain
+identity and unknown additive fields; persistence restoration remains separate;
+validation stays acyclic and linear; all structural-domain and mixed-caller
+regressions pass; and full tests, typecheck, lint, Knip, and diff checks are
+green.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
