@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 12b active — adopt classified snapshot decoding at mixed boundaries.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 13a active — add typed wire-event decoding.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -109,9 +109,13 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 9: type tool lifecycle and workspace events.
 - [x] Phase 1.4 slice 10: type approvals, input requests, and errors.
 - [x] Phase 1.4 slice 11: type snapshot metadata events.
-- [ ] Phase 1.4 slice 12: deepen snapshot decoding and classify adoption.
+- [x] Phase 1.4 slice 12: deepen snapshot decoding and classify adoption.
 - [x] Phase 1.4 slice 12a: add the deep snapshot decoder and Core characterizations.
-- [ ] Phase 1.4 slice 12b: migrate mixed snapshot callers and add boundary regressions. **Active.**
+- [x] Phase 1.4 slice 12b: migrate mixed snapshot callers and add boundary regressions.
+- [ ] Phase 1.4 slice 13: add typed decoding at every backend-event wire ingress.
+- [ ] Phase 1.4 slice 13a: add the Core wire-event decoder and characterizations. **Active.**
+- [ ] Phase 1.4 slice 13b: decode local Electron and Web backend events.
+- [ ] Phase 1.4 slice 13c: decode remote backend events.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -154,9 +158,11 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 10: type approvals, input requests, and errors | Complete | core event agent / root integrator | Five event types now discriminate provider-specific tool approval and user input, native Codex approval request/resolution, and agent error with exact payload owners and contexts | Focused: Core 23, Backend 74, and Vue 56 tests. Full `npm run test:ai`: 270 files / 2,065 tests, real 24.77s (Core 254, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 22.42s. Lint, CSS lint, and Knip: 24.36s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `48e1875d257e071189c9239f66ce984611d8865e` | Independent review found no defects. Exact native resolution reasons, conditional producer splits, dormant global resolution, retry/terminal/error-fallback semantics, missing-turn and malformed status quirks, registry owning-agent fallback, nested/flat approval parsing, renderer narrowing, guards, and deferred casts remain intact. All ten casts are deliberate malformed, legacy, or source-less boundary characterizations; no hidden behavior expansion was introduced |
 | 2026-09-04 | Phase 1.4 slice 11: type snapshot metadata events | Complete | core event agent / root integrator | `snapshot.updated` now carries `AppSnapshotMetadata` with no required envelope context; the inherited full-snapshot side channel and `ClawBackendEvent`-only client state remain distinct | Focused: Core 28, Backend 23, Electron 14, Vue 43, and Web 10 tests. Full `npm run test:ai`: 270 files / 2,066 tests, real 24.98s (Core 255, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 22.17s. Lint, CSS lint, and Knip: 23.89s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ad873e85cf138ceda1577f38e451f4afe0692260` | Independent review found no defects. The fallback now becomes actual `never` once every event is typed, preventing an impossible catch-all member from widening `Extract` payloads back to `unknown`. Side-channel/full/metadata precedence, transcript replacement or retention, optimistic selection, unread pruning, legacy full producers, remote projection and local client-state recomputation, shallow guards, and malformed boundary cases remain unchanged; the sole new cast characterizes malformed metadata |
 | 2026-09-04 | Phase 1.4 slice 12a: deep snapshot decoder | Complete | core snapshot agent / root integrator | Public façade: 32 lines; private metadata/collection/primitive leaves: 531 / 180 / 51 lines; exactly five façade exports and no dependency cycles | 51 malformed nested cases; focused 16 tests and Core 263 tests passed; full `npm run test:ai`: 271 files / 2,074 tests in 24.92s; all-workspace typecheck and lint/Knip passed; guard coverage 100% lines/functions and 97.97% branches | `22c6f7e9eb3a5ccd3e1fdf8fdd2dfda55584dbe9` | One identity-preserving, linear decoder now classifies full versus metadata snapshots, rejects present malformed `messages` without downgrade, permits additive fields, and remains separate from persistence restoration |
-| 2026-09-04 | Phase 1.4 slice 12b: classified snapshot adoption | Active | root orchestrator | Deep decoder complete; mixed snapshot boundaries still compose compatibility predicates and require one classified adoption path | Approved scope: migrate backend remote/outbound, remote-team projection, Electron replica, renderer adoption, and protocol snapshot-get boundaries; add full/metadata, malformed side-channel/payload, transcript identity, selection, projection, and untrusted-client-state regressions | — | Preserve full side-channel → legacy full payload → metadata payload → ordinary reduction precedence, transcript replace/retain behavior, metadata-only Electron caching, optimistic selection, unread pruning, remote identity projection, receiving-server client-state recomputation, transport framing, and persistence separation |
+| 2026-09-04 | Phase 1.4 slice 12b: classified snapshot adoption | Complete | snapshot boundary agent / root integrator | All mixed boundaries now decode once and branch on classification: backend remote results, remote-team events, Core runtime reduction, Electron synchronization/transient/cache replicas, and Vue adoption; full-only guards remain where only a complete snapshot is valid | Focused: Core 30, Backend 54, Electron 14, and Vue 18 tests. Full `npm run test:ai`: 272 files / 2,077 tests in 28.02s. All-workspace typecheck and lint/Knip passed | `79572a0db1d821ed30ca3a7a5fc4f998aca889b0` | Review found and fixed an invalid full snapshot downgrading to metadata. Persistence remains separate and permissive; full/metadata precedence, transcript replacement/retention, cache behavior, selection, unread state, remote projection, and receiving-server client-state recomputation remain intact |
+| 2026-09-04 | Phase 1.4 slice 13a: typed wire-event decoder | Active | root orchestrator | Wire ingress still relies on typed casts; target owner is `core/src/backend-protocol/events.ts` with an exhaustive 55-key registry and one throwing unknown-input decoder | Add decoder and exhaustive direct Core characterizations with structural path/reason errors that never expose payload values; mechanically move the event envelope types with compatibility re-exports and no transport changes | — | Preserve behavior and validate structure only, without normalization or cross-field equality. Approved follow-ups migrate local Electron/Web ingress, then remote backend ingress; every relocation uses `lossless-code-moves` with byte/AST fidelity |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
+| 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
 
 For each future row, include:
 
@@ -745,6 +751,39 @@ validation stays acyclic and linear; all structural-domain and mixed-caller
 regressions pass; and full tests, typecheck, lint, Knip, and diff checks are
 green.
 
+#### Slice 13 — typed wire-event decoding
+
+Create the wire owner at `core/src/backend-protocol/events.ts`. Mechanically
+move `ClawBackendEventFrom` and `ClawBackendEvent` from `rpc.ts`, retaining
+compatibility re-exports while callers migrate. Private leaves may separate
+shared event validation, runtime payloads, agent payloads, and conversation
+payloads without widening the public surface.
+
+Add an exhaustive 55-key registry and a throwing
+`decodeClawBackendEvent(unknown): ClawBackendEvent`. Decoder failures must
+identify a structural path and reason without including payload values. The
+decoder validates structure only: do not add cross-field semantic equality,
+normalization, or application behavior changes.
+
+Execute in three checkpoints:
+
+1. `chore: add typed wire event decoder` — add the decoder and exhaustive
+   direct Core characterizations; do not change transports.
+2. `chore: decode local backend events` — migrate Electron
+   `backend-rpc-session` and Web `backend-process`. Ignore and log malformed
+   decoded event notifications, while malformed JSON or RPC framing remains
+   fatal.
+3. `chore: decode remote backend events` — migrate backend
+   `remote-clawd-client` and the Web protocol, then update the relevant docs.
+   Decode failures must not terminate the transport or reject pending
+   requests.
+
+Every relocation follows `lossless-code-moves` with byte/AST fidelity. Slice
+13 exits when all four wire ingress seams decode `unknown` exactly once, no
+transport cast remains, all 55 event keys are coupled exhaustively, malformed
+event notifications cannot mutate state or kill a live transport, and Core,
+transport, full-suite, typecheck, lint/Knip, cycle, and diff checks are green.
+
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
 - Record intentionally ignored events explicitly.
@@ -860,7 +899,29 @@ coordinator coverage proves the preserved ordering and side effects.
 - Retain the existing load/save façade while consumers migrate.
 - Keep schema compatibility and corrupt-state recovery explicit.
 
-Commit checkpoint: `chore: modularize state persistence`
+The prepared baseline is `backend/src/state-persistence.ts` at 1,357 lines,
+71 functions, and 81 `if` statements, with a 1,269-line / 32-test persistence
+spec plus seven related state-spec tests. Split ownership into app-state,
+agent, subagent, work, topology, and codec-values modules while retaining the
+existing load/save façade.
+
+Preserve shape-based migrations, semantic recovery, and the current
+propagation of invalid JSON. Hash moved declarations and test bodies before
+and after every substantial relocation so mechanical fidelity is explicit.
+
+Execute in seven checkpoints:
+
+1. `test: characterize state persistence recovery`
+2. `chore: extract agent persistence codec`
+3. `chore: extract subagent persistence codec`
+4. `chore: extract work persistence codec`
+5. `chore: extract persistence topology`
+6. `chore: compose modular state codec`
+7. `test: move persistence codec specifications`
+
+Exit when the load/save façade is at most 140 lines, the app-state codec at
+most 200, agent and work codecs at most 450 each, topology at most 220,
+subagent at most 150, and every persistence spec at most 600 lines.
 
 ### Phase 2 exit criteria
 
