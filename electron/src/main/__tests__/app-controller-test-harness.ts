@@ -77,7 +77,7 @@ export function createBackendClient(overrides: {
   };
 }
 
-export async function getSnapshot(controller: AppController): Promise<AppSnapshot> {
+async function getSnapshot(controller: AppController): Promise<AppSnapshot> {
   return (controller as unknown as {
     getSnapshot(): Promise<AppSnapshot>;
   }).getSnapshot();
