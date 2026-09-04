@@ -53,6 +53,9 @@ import type {
 } from '@codex-app-sdk/core/surface';
 
 type AdapterListener = (event: BackendEvent) => void;
+type ThreadBackendEvent<Event extends BackendEvent = BackendEvent> = Event extends BackendEvent
+  ? Omit<Event, 'agentId' | 'backend' | 'threadId'>
+  : never;
 
 const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
 
@@ -1323,7 +1326,7 @@ export class CodexSurfaceAgentAdapter {
 
   private emitThread(
     session: AgentConversation,
-    event: Omit<BackendEvent, 'agentId' | 'backend' | 'threadId'>,
+    event: ThreadBackendEvent,
   ): void {
     this.emit({
       ...event,

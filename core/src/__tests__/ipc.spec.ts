@@ -1,5 +1,23 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AppCommand, AppSnapshot, AppSnapshotMetadata, BackendConnectionState, BrowserAnnotation, DesktopUpdateStatus, LaunchChatGptAppInput, LaunchChatGptAppResult, MainToRendererEvent, OpenInApplication, RendererSendPromptOptions } from '../contracts';
+import type {
+  AccountRateLimits,
+  AgentBackend,
+  AppCommand,
+  AppSnapshot,
+  AppSnapshotMetadata,
+  BackendConnectionState,
+  BackendModelOption,
+  BackendRuntimeStatus,
+  BackendSkillSummary,
+  BrowserAnnotation,
+  DesktopUpdateStatus,
+  DevicePairingStatus,
+  LaunchChatGptAppInput,
+  LaunchChatGptAppResult,
+  MainToRendererEvent,
+  OpenInApplication,
+  RendererSendPromptOptions,
+} from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
@@ -149,6 +167,30 @@ describe('ipc channels', () => {
       .toEqualTypeOf<MainToRendererEvent>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'backend.statusChanged' }>['payload']>()
+      .toEqualTypeOf<BackendRuntimeStatus>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'backend.statusChanged' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'account.rateLimitsUpdated' }>['payload']>()
+      .toEqualTypeOf<AccountRateLimits | { rateLimits: AccountRateLimits }>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'account.rateLimitsUpdated' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'models.changed' }>['payload']>()
+      .toEqualTypeOf<{ models: BackendModelOption[] }>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'models.changed' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'skills.changed' }>['payload']>()
+      .toEqualTypeOf<{
+        cwd: string | null;
+        status: 'loaded';
+        skills: BackendSkillSummary[];
+      }>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'skills.changed' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'devicePairing.statusChanged' }>['payload']>()
+      .toEqualTypeOf<DevicePairingStatus>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'devicePairing.statusChanged' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend?: AgentBackend }>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'browser.annotationCreated' }>['payload']>()
       .toEqualTypeOf<BrowserAnnotation>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()

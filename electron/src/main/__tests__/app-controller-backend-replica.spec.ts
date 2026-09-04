@@ -375,6 +375,7 @@ describe('AppController', () => {
     await controller.initialize();
     emitBackendEvent(controller, {
       type: 'account.rateLimitsUpdated',
+      backend: 'codex',
       payload: { rateLimits },
     });
     await flushMicrotasks();

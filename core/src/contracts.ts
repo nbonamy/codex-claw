@@ -1393,12 +1393,47 @@ type MainToRendererEventShape = {
 
 type MainToRendererEventEnvelope = Omit<MainToRendererEventShape, 'type' | 'payload'>;
 type MainToRendererEventWith<Variant> = MainToRendererEventEnvelope & Variant;
-type TypedMainToRendererEventType = 'client.connectionChanged' | 'browser.annotationCreated';
+type TypedMainToRendererEventType =
+  | 'backend.statusChanged'
+  | 'client.connectionChanged'
+  | 'account.rateLimitsUpdated'
+  | 'devicePairing.statusChanged'
+  | 'models.changed'
+  | 'skills.changed'
+  | 'browser.annotationCreated';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
+      type: 'backend.statusChanged';
+      backend: AgentBackend;
+      payload: BackendRuntimeStatus;
+    }>
+  | MainToRendererEventWith<{
       type: 'client.connectionChanged';
       payload: BackendConnectionState;
+    }>
+  | MainToRendererEventWith<{
+      type: 'account.rateLimitsUpdated';
+      backend: AgentBackend;
+      payload: AccountRateLimits | { rateLimits: AccountRateLimits };
+    }>
+  | MainToRendererEventWith<{
+      type: 'devicePairing.statusChanged';
+      payload: DevicePairingStatus;
+    }>
+  | MainToRendererEventWith<{
+      type: 'models.changed';
+      backend: AgentBackend;
+      payload: { models: BackendModelOption[] };
+    }>
+  | MainToRendererEventWith<{
+      type: 'skills.changed';
+      backend: AgentBackend;
+      payload: {
+        cwd: string | null;
+        status: 'loaded';
+        skills: BackendSkillSummary[];
+      };
     }>
   | MainToRendererEventWith<{
       type: 'browser.annotationCreated';

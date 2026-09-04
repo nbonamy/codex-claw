@@ -164,6 +164,7 @@ describe('ClawBackendProcessClient', () => {
       params: {
         seq: 1,
         type: 'backend.statusChanged',
+        backend: 'codex',
         payload: { backend: 'codex', status: 'running' },
         occurredAt: '2026-06-13T00:00:00.000Z',
       },

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { MainToRendererEvent } from '../contracts';
 import {
   createInitialSnapshot,
   snapshotMetadata,
@@ -7,7 +8,7 @@ import { applyRuntimeEventToSnapshot as applyMainEventToSnapshot } from '../snap
 
 describe('snapshot runtime reducer', () => {
 
-  it('records thread starts and backend runtime status updates', () => {
+  it('records thread starts and payload-owned backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -21,7 +22,7 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       type: 'backend.statusChanged',
-      backend: 'codex',
+      backend: 'claude',
       payload: {
         backend: 'codex',
         status: 'running',
@@ -37,7 +38,7 @@ describe('snapshot runtime reducer', () => {
         },
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    });
+    } as unknown as MainToRendererEvent);
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
     expect(snapshot.backendRuntimes).toContainEqual({
@@ -213,6 +214,7 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       type: 'account.rateLimitsUpdated',
+      backend: 'codex',
       payload: {
         rateLimits: {
           limitId: 'codex',
@@ -232,6 +234,54 @@ describe('snapshot runtime reducer', () => {
           planType: 'pro',
           rateLimitReachedType: null,
         },
+      },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.accountRateLimits).toStrictEqual({
+      limitId: 'codex',
+      limitName: 'Codex',
+      primary: {
+        usedPercent: 25,
+        windowDurationMins: 15,
+        resetsAt: 1_780_000_000,
+      },
+      secondary: null,
+      credits: {
+        hasCredits: true,
+        unlimited: false,
+        balance: '10.00',
+      },
+      individualLimit: null,
+      planType: 'pro',
+      rateLimitReachedType: null,
+    });
+  });
+
+  it('also accepts the legacy flat account rate-limit payload', () => {
+    const snapshot = createInitialSnapshot();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      type: 'account.rateLimitsUpdated',
+      backend: 'codex',
+      payload: {
+        limitId: 'codex',
+        limitName: 'Codex',
+        primary: {
+          usedPercent: 25,
+          windowDurationMins: 15,
+          resetsAt: 1_780_000_000,
+        },
+        secondary: null,
+        credits: {
+          hasCredits: true,
+          unlimited: false,
+          balance: '10.00',
+        },
+        individualLimit: null,
+        planType: 'pro',
+        rateLimitReachedType: null,
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
@@ -560,7 +610,7 @@ describe('snapshot runtime reducer', () => {
       type: 'backend.statusChanged',
       payload: { backend: 'invalid', status: 'running' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    })).toBe(true);
+    } as unknown as MainToRendererEvent)).toBe(true);
     expect(snapshot.backendRuntimes).toBe(backendRuntimes);
 
     expect(applyMainEventToSnapshot(snapshot, {

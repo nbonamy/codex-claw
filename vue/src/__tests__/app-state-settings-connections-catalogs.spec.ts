@@ -522,6 +522,7 @@ describe('useAppState', () => {
       seq: 1,
       type: 'skills.changed',
       agentId: 'agent-dina',
+      backend: 'codex',
       payload: {
         cwd: '/Users/nbonamy/src/codex-claw',
         status: 'loaded',
@@ -544,6 +545,7 @@ describe('useAppState', () => {
       seq: 2,
       agentId: 'agent-dina',
       type: 'skills.changed',
+      backend: 'codex',
       payload: {
         cwd: '/Users/nbonamy/src/codex-claw',
         status: 'loaded',
