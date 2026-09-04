@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { BackendConnectionState, BrowserAnnotation, ClientState } from '../contracts';
+import type { BackendConnectionState, BrowserAnnotation, ClientState, SubagentStatusChange } from '../contracts';
 import { createInitialSnapshot } from '../snapshot';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '../backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
@@ -58,6 +58,15 @@ describe('backend protocol guards', () => {
     expectTypeOf<Extract<ClawBackendEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
     expectTypeOf<AnnotationEvent['payload']>().toEqualTypeOf<BrowserAnnotation>();
+    type SubagentStatusEvent = Extract<ClawBackendEvent, { type: 'subagent.statusChanged' }>;
+    expectTypeOf<SubagentStatusEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
+    expectTypeOf<Pick<SubagentStatusEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{
+        agentId: string;
+        backend: 'codex' | 'claude';
+        threadId: string;
+        turnId?: string;
+      }>();
     expectTypeOf<AnnotationEvent['seq']>().toEqualTypeOf<number>();
     expectTypeOf<AnnotationEvent['occurredAt']>().toEqualTypeOf<string>();
     expectTypeOf<AnnotationEvent['clientState']>().toEqualTypeOf<ClientState | undefined>();

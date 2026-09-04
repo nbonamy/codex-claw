@@ -355,6 +355,7 @@ describe('ClawBackendServer', () => {
 
     server.emitEvent({
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-root',
       turnId: 'turn-1',
       type: 'subagent.operationChanged',
@@ -379,6 +380,7 @@ describe('ClawBackendServer', () => {
 
     server.emitEvent({
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-root',
       type: 'subagent.identityChanged',
       payload: {
@@ -398,6 +400,7 @@ describe('ClawBackendServer', () => {
 
     server.emitEvent({
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-root',
       type: 'subagent.statusChanged',
       payload: {

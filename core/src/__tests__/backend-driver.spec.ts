@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { Agent, BackendConnectionState, BrowserAnnotation, SendPromptOptions } from '../contracts';
+import type { Agent, BackendConnectionState, BrowserAnnotation, SendPromptOptions, SubagentOperationChange } from '../contracts';
 import { createEmptySnapshot } from '../snapshot';
 import {
   backendDisplayName,
@@ -56,6 +56,16 @@ describe('backend driver helpers', () => {
       .toEqualTypeOf<BackendConnectionState>();
     expectTypeOf<Extract<BackendEvent, { type: 'browser.annotationCreated' }>['payload']>()
       .toEqualTypeOf<BrowserAnnotation>();
+    type SubagentOperationEvent = Extract<BackendEvent, { type: 'subagent.operationChanged' }>;
+    expectTypeOf<SubagentOperationEvent['payload']>().toEqualTypeOf<SubagentOperationChange>();
+    expectTypeOf<Pick<SubagentOperationEvent, 'agentId' | 'backend' | 'threadId' | 'turnId' | 'source'>>()
+      .toEqualTypeOf<{
+        agentId: string;
+        backend: Agent['backend'];
+        threadId: string;
+        turnId?: string;
+        source?: 'backend' | 'client';
+      }>();
     expectTypeOf<ConnectionEvent['seq']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ConnectionEvent['occurredAt']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<ConnectionEvent['source']>().toEqualTypeOf<'backend' | 'client' | undefined>();

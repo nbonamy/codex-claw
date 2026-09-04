@@ -376,6 +376,23 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-jesse',
+      backend: 'codex',
+      threadId: 'thread-jesse',
+      type: 'subagent.statusChanged',
+      payload: {
+        rootConversationId: 'thread-jesse',
+        conversationId: 'thread-child',
+        status: 'completed',
+      },
+      occurredAt: '2026-08-07T10:00:30.000Z',
+    });
+    expect(state.unreadAgentIds.value).toStrictEqual([]);
+    expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);
+    expect(setDockBadgeCount).toHaveBeenCalledTimes(1);
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-jesse',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse-2',
       type: 'backendApproval.requested',

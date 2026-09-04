@@ -27,6 +27,10 @@ import type {
   RendererSendPromptOptions,
   SidePanelGitDiffRequest,
   SidePanelMarkdownRequest,
+  SubagentActivityChange,
+  SubagentIdentityChange,
+  SubagentOperationChange,
+  SubagentStatusChange,
   ThreadGoal,
   WorkBacklogAssignment,
   WorkBacklogAssignmentPolicy,
@@ -403,6 +407,22 @@ describe('ipc channels', () => {
     expectTypeOf<ThreadTokenUsageUpdatedEvent['payload']>()
       .toEqualTypeOf<AgentContextUsage | { contextUsage: AgentContextUsage }>();
     expectTypeOf<Pick<ThreadTokenUsageUpdatedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentOperationChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.operationChanged' }>;
+    expectTypeOf<SubagentOperationChangedEvent['payload']>().toEqualTypeOf<SubagentOperationChange>();
+    expectTypeOf<Pick<SubagentOperationChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentActivityChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.activityChanged' }>;
+    expectTypeOf<SubagentActivityChangedEvent['payload']>().toEqualTypeOf<SubagentActivityChange>();
+    expectTypeOf<Pick<SubagentActivityChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentIdentityChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.identityChanged' }>;
+    expectTypeOf<SubagentIdentityChangedEvent['payload']>().toEqualTypeOf<SubagentIdentityChange>();
+    expectTypeOf<Pick<SubagentIdentityChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentStatusChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.statusChanged' }>;
+    expectTypeOf<SubagentStatusChangedEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
+    expectTypeOf<Pick<SubagentStatusChangedEvent, keyof BackendThreadEventContext>>()
       .toEqualTypeOf<BackendThreadEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();

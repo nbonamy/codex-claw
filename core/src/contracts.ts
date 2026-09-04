@@ -1443,7 +1443,11 @@ type TypedMainToRendererEventType =
   | 'thread.modeUpdated'
   | 'thread.goalUpdated'
   | 'thread.goalCleared'
-  | 'thread.tokenUsageUpdated';
+  | 'thread.tokenUsageUpdated'
+  | 'subagent.operationChanged'
+  | 'subagent.activityChanged'
+  | 'subagent.identityChanged'
+  | 'subagent.statusChanged';
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1591,6 +1595,34 @@ export type MainToRendererEvent =
       backend: AgentBackend;
       threadId: string;
       payload: AgentContextUsage | { contextUsage: AgentContextUsage };
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.operationChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentOperationChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.activityChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentActivityChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.identityChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentIdentityChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.statusChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentStatusChange;
     }>
   | MainToRendererEventWith<{
       type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;
