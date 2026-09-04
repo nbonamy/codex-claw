@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 8 active — type transcript and prompt events.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 9 active — type tool lifecycle and workspace events.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -105,7 +105,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 5: type provider-discriminated agent and thread events.
 - [x] Phase 1.4 slice 6: type subagent change events.
 - [x] Phase 1.4 slice 7: type turn, plan, and compaction events.
-- [ ] Phase 1.4 slice 8: type transcript and prompt events. **Active.**
+- [x] Phase 1.4 slice 8: type transcript and prompt events.
+- [ ] Phase 1.4 slice 9: type tool lifecycle and workspace events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -143,7 +144,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 5: type provider-discriminated agent and thread events | Complete | core event agent / root integrator | Eight variants now discriminate backend-neutral agent update/status plus provider-specific thread start, settings, mode, goal update/clear, and token usage; `CodexThreadSettings` is the cohesive payload owner | Focused: Core 19, Backend 74, Vue 30, Electron 14, and Web 7 tests. Full `npm run test:ai`: 270 files / 2,054 tests, real 33.97s with Vue at 22.78s. All-workspace typecheck: 38.72s. Lint, CSS lint, and Knip: 42.41s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `132609b8411cdff9b48a4642cac57fcb89647cfc` | Review tightened Codex start/settings/mode backend context, goal thread context, and token backend/thread context; explicitly characterized the legacy backend-less start at the runtime boundary; and removed the obsolete `AgentStatus` cast. Flat/nested normalization, null status-text deletion, malformed handled no-ops, runtime guards, and deferred wire casts remain intact |
 | 2026-09-04 | Phase 1.4 slice 6: type subagent change events | Complete | core event agent / root integrator | Four variants now discriminate operation, activity, identity, and status changes with their existing payload owners; all require `agentId`, `backend`, and `threadId`, while `turnId` and `source` remain optional | Focused: Core 14, Backend 47, and Vue 18 tests. Full `npm run test:ai`: 270 files / 2,056 tests, real 25.82s (Core 245, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 24.30s. Lint, CSS lint, and Knip: 26.25s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ac4dda653c167798627880a0cf2ad4ce519b1050` | Independent review found no defects. Payload/envelope identity independence, validators, malformed owned no-ops, the missing-agent gate, root ignore, receiver cloning, identity/status deletion and timestamps, and unread exclusion are preserved. Runtime producers, reducers, decoders, and deferred generic/wire casts remain unchanged; the sole new cast characterizes malformed boundary input |
 | 2026-09-04 | Phase 1.4 slice 7: type turn, plan, and compaction events | Complete | core event agent / root integrator | Seven variants now discriminate turn start/completion, execution-plan update, proposed-plan delta/completion, and compaction start/completion with the audited context split and provider-compatible payload unions | Focused: Core 42, Backend 81, Electron 14, Vue 39, and Web 7 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 26.28s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.25s. Lint, CSS lint, and Knip: 25.93s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `ce8257d304162a7048e2485a71132d5e8d5f723d` | Independent review found no defects. Optional completion diagnostics, normalized plan authority, proposed-plan whitespace and trimming, interrupted completion, compaction markers, malformed-start payload compatibility, missing-context no-ops, runtime guards, and deferred casts remain intact; all 13 fixture adaptations and five boundary casts were scoped |
-| 2026-09-04 | Phase 1.4 slice 8: type transcript and prompt events | Active | root orchestrator | Eight variants selected: history hydration, message delta/update/submission/steer, and prompt queue/retry/dequeue | Read-only payload, provider, reducer-guard, queue-option, and producer inventory complete; implementation and gates pending | — | History requires only `agentId`; delta requires `agentId`, `backend`, and `turnId` with optional `threadId`; updated requires `agentId`, `backend`, `threadId`, and `turnId`; submission, steer, queue, retry, and dequeue require only `agentId`. Preserve optional Claude message/thread metadata, runtime message-agent equality, ignored legacy history fields, readonly attachments, queue option semantics, source-less compatibility, guards, and deferred casts |
+| 2026-09-04 | Phase 1.4 slice 8: type transcript and prompt events | Complete | core event agent / root integrator | Eight variants now discriminate history hydration, message delta/update/submission/steer, and prompt queue/retry/dequeue with their audited context split and cohesive private payload aliases | Focused: Core 74, Backend 105, Electron 14, and Vue 61 tests. Full `npm run test:ai`: 270 files / 2,059 tests, real 25.08s (Core 248, Backend 611, Vue 896, Electron 283, Web 21). All-workspace typecheck: 23.52s. Lint, CSS lint, and Knip: 25.53s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `52349cf6670f7c529234977866975c4c7b052717` | Independent review found no defects. Claude-optional thread/message/item IDs, strict message-update context, agent-only generic events, live history pagination flags, readonly attachments, queue semantics, message-agent filtering, source-less compatibility, runtime guards, and deferred casts remain intact; two indexed-access reducer edits are behavior-equivalent and all six boundary casts are deliberate |
+| 2026-09-04 | Phase 1.4 slice 9: type tool lifecycle and workspace events | Active | root orchestrator | Six variants selected: tool item start/update/completion, turn diff, file activity, and agent Git status | Existing `RendererToolPart`, `RendererToolPartUpdate`, `AgentFileActivity`, and `AgentGitStatus` owners plus narrow private lifecycle/diff payload aliases inventoried; implementation and gates pending | — | Item lifecycle requires `agentId`, `backend`, and `turnId`, with optional `threadId`; diff and file activity require `agentId`, `backend`, `threadId`, and `turnId`; Git status requires only `agentId`. Preserve optional `messageId`, arbitrary tool kinds and patch mutation semantics, coupled/asymmetrically validated diff updates, unknown-agent Git status and the legacy-null boundary cast, renderer-only path trimming, missing-context no-ops, branch-based narrowing rather than reducer casts, and deferred wire decoding |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -494,9 +496,11 @@ Completed in `ce8257d304162a7048e2485a71132d5e8d5f723d`.
 
 #### Slice 8 — transcript and prompt events
 
+Completed in `52349cf6670f7c529234977866975c4c7b052717`.
+
 - Type `thread.historyLoaded` with required envelope `agentId` only. Its
-  payload contains `messages: readonly RendererMessage[]` plus optional
-  `replace`, `preserveKnownTurns`, and `preserveKnownMessages` flags.
+  payload contains `messages: RendererMessage[]` plus optional `replace`,
+  `preserveKnownTurns`, `preserveKnownMessages`, and `hasOlderMessages` flags.
 - Type `message.delta` with required `agentId`, `backend`, and `turnId`, while
   keeping `threadId` optional for Claude. Its payload requires `delta` and
   keeps `messageId`, `itemId`, and commentary/final-answer `phase` optional.
@@ -510,18 +514,51 @@ Completed in `ce8257d304162a7048e2485a71132d5e8d5f723d`.
   prompt `id`, `text`, optional `SendPromptOptions`, and optional `submitted`.
   Type `agent.promptRetryScheduled` with prompt `id`, retry `attempts`,
   `lastError`, and optional `retryAt`; type `agent.promptDequeued` with prompt
-  payload `{ ids: readonly string[] }`. These three queue events require no
+  payload `{ ids: string[] }`. These three queue events require no
   provider, thread, or turn context.
 - Keep renderer-message `agentId` validation at runtime rather than enforcing
   envelope/payload equality in the static contract.
-- Exclude ignored legacy history fields from the owned payload contract; retain
-  an explicit boundary cast only where a legacy producer or fixture must prove
-  that ignored compatibility behavior.
+- Retain the live `hasOlderMessages` pagination flag. Exclude only ignored
+  legacy history fields such as `direction` and `evictedTurnIds` from the owned
+  payload contract; retain an explicit boundary cast only where a legacy
+  producer or fixture must prove that ignored compatibility behavior.
 - Preserve readonly attachment inputs and all queue-option behavior, including
   model, plan mode, reasoning, service tier, skills, input method, backend
   options, submitted state, attempts, retry metadata, and dequeue filtering.
 - Preserve source-less compatibility and current runtime guards. Keep generic
   and wire-decoder casts deferred to their later boundary work.
+
+#### Slice 9 — tool lifecycle and workspace events
+
+- Type `item.started` and `item.completed` with a private lifecycle payload
+  alias containing `toolPart: RendererToolPart` and optional `messageId`.
+  Type `item.updated` with a private update payload alias composed from
+  `RendererToolPartUpdate` plus optional `messageId`.
+- Require envelope `agentId`, `backend`, and `turnId` for all three item
+  lifecycle events; keep `threadId` optional because Claude does not always
+  provide it.
+- Type `diff.updated` with a private payload alias carrying non-negative
+  `addedLines` and `removedLines` plus optional `diff`. Require envelope
+  `agentId`, `backend`, `threadId`, and `turnId`.
+- Type `file.activity` from the existing `AgentFileActivity` owner, omitting
+  envelope-owned `agentId`, `turnId`, and event-owned `occurredAt` from its
+  payload. Require envelope `agentId`, `backend`, `threadId`, and `turnId`.
+- Type `git.statusUpdated` with payload `AgentGitStatus` and require only
+  envelope `agentId`; do not add provider, thread, turn, or source context.
+- Preserve optional item `messageId`, arbitrary tool kinds, fallback tool
+  insertion, field-patch and null-deletion behavior, body delta/append rules,
+  output-derived body fallback, and metadata merging.
+- Preserve the coupled diff update: one event updates both `turnGitDiffs` and
+  the running file-change tool descriptor. Retain their existing asymmetric
+  malformed-payload validation rather than silently tightening either path.
+- Preserve Git status storage for unknown agents and the deliberate boundary
+  cast that characterizes a legacy `null` payload. Preserve renderer-only
+  trimming of file-activity paths; do not move that behavior into the contract
+  or backend producer.
+- Missing required context must retain its current no-op behavior. Split
+  reducer branches where needed so TypeScript narrows each event variant; do
+  not replace narrowing with reducer casts. Keep wire decoding and generic
+  transport casts deferred to their later boundary work.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
