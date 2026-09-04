@@ -9,11 +9,10 @@ import type {
   WorkItem,
   WorkProviderKind,
 } from '@codex-claw/core/contracts';
-import { assignWorkItemToAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { assignWorkItemToAgentInSnapshot, createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { recordAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { createEntityId, type IdGenerator } from '@codex-claw/core/ids';
-import { createAgentInSnapshot } from '@codex-claw/core/snapshot';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt, workProviderLabel } from '@codex-claw/core/work-item-prompts';
 import { logMain, warnMain } from '../log';

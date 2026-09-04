@@ -28,9 +28,8 @@ import type {
   WorkBacklogAssignmentStatus,
   WorkRoutingRequest,
 } from '@codex-claw/core/contracts';
-import { updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
+import { createAgentInSnapshot, updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
-import { createAgentInSnapshot, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';

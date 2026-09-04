@@ -3,7 +3,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { createAgentFromInput } from '@codex-claw/core/snapshot';
+import { createAgentFromInput } from '@codex-claw/core/agent-manager';
 import { updateAutomationExecutionAgentConversationInSnapshot } from '@codex-claw/core/automation-manager';
 import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@codex-claw/core/automation-prompts';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';

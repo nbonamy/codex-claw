@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createAgentFromInput,
   createAgentInSnapshot,
-  createInitialSnapshot,
+  createQuickChatInSnapshot,
+  restartAgentConversation,
+  resumeAgentConversationInSnapshot,
   selectAgent,
   updateAgentFromInput,
   updateAgentFolder,
+  updateAgentOpenInApplication,
   updateAgentWorkspace,
-} from '../snapshot';
+} from '../agent-manager';
+import { createInitialSnapshot } from '../snapshot';
 
-describe('snapshot reducer', () => {
+describe('agent-manager lifecycle', () => {
   it('updates the agent folder and clears the old thread mapping', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
@@ -84,6 +89,65 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].pullRequest).toBeUndefined();
   });
 
+  it('preserves the conversation title on folder changes but clears it on restart and resume', () => {
+    const folderSnapshot = createInitialSnapshot();
+    folderSnapshot.agents[0].conversationTitle = 'Keep this title';
+
+    updateAgentFolder(folderSnapshot, 'agent-dina', '/Users/nbonamy/src/id8');
+
+    expect(folderSnapshot.agents[0].conversationTitle).toBe('Keep this title');
+
+    const restartSnapshot = createInitialSnapshot();
+    restartSnapshot.agents[0].conversationTitle = 'Clear on restart';
+    restartAgentConversation(restartSnapshot, 'agent-dina');
+    expect(restartSnapshot.agents[0].conversationTitle).toBeUndefined();
+
+    const resumeSnapshot = createInitialSnapshot();
+    resumeSnapshot.agents[0].conversationTitle = 'Clear on resume';
+    resumeAgentConversationInSnapshot(
+      resumeSnapshot,
+      'agent-dina',
+      { kind: 'codex', threadId: 'thread-resumed' },
+      [],
+    );
+    expect(resumeSnapshot.agents[0].conversationTitle).toBeUndefined();
+  });
+
+  it('normalizes agent creation input and clones matching backend defaults', () => {
+    const thinking = { type: 'enabled' as const, budgetTokens: 12_000 };
+    const input = {
+      name: ' Claude agent ',
+      avatar: ' CA ',
+      folder: ' /Users/nbonamy/src/claude-agent ',
+      backend: 'claude' as const,
+      backendDefaults: { kind: 'claude' as const, thinking },
+      delegatedByAgentId: ' agent-dina ',
+    };
+
+    const agent = createAgentFromInput(
+      input,
+      '2026-06-05T10:11:12.000Z',
+      'team-claude',
+      'agent-claude',
+    );
+
+    expect(agent).toStrictEqual({
+      id: 'agent-claude',
+      teamId: 'team-claude',
+      delegatedByAgentId: 'agent-dina',
+      name: 'Claude agent',
+      avatar: 'CA',
+      folder: '/Users/nbonamy/src/claude-agent',
+      backend: 'claude',
+      backendDefaults: { kind: 'claude', thinking: { type: 'enabled', budgetTokens: 12_000 } },
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T10:11:12.000Z',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+    expect(agent.backendDefaults).not.toBe(input.backendDefaults);
+    expect(agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults.thinking : undefined).not.toBe(thinking);
+  });
+
   it('creates agents in the active team and selects the new agent', () => {
     const snapshot = createInitialSnapshot();
 
@@ -138,6 +202,88 @@ describe('snapshot reducer', () => {
       name: 'Abby',
       folder: '/Users/nbonamy/src/skwad',
     });
+  });
+
+  it('falls back from a stale active team to the active agent team when creating', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      color: '#46A857',
+      agentIds: ['agent-jesse'],
+      activeAgentId: 'agent-jesse',
+    });
+    snapshot.teams[0].agentIds = ['agent-dina'];
+    snapshot.agents[1].teamId = 'team-skwad';
+    snapshot.activeTeamId = 'team-missing';
+    snapshot.activeAgentId = 'agent-jesse';
+
+    const result = createAgentInSnapshot(snapshot, {
+      name: 'Abby',
+      folder: '/Users/nbonamy/src/skwad',
+    }, '2026-06-05T10:11:12.000Z', 'agent-new-abby');
+
+    expect(result).toBe(snapshot);
+    expect(snapshot.agents.at(-1)?.teamId).toBe('team-skwad');
+    expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-jesse', 'agent-new-abby']);
+    expect(snapshot.activeTeamId).toBe('team-skwad');
+    expect(snapshot.activeAgentId).toBe('agent-new-abby');
+  });
+
+  it('appends an unselected agent without changing active selection', () => {
+    const snapshot = createInitialSnapshot();
+
+    const result = createAgentInSnapshot(snapshot, {
+      name: 'Background agent',
+      folder: '/Users/nbonamy/src/background',
+    }, '2026-06-05T10:11:12.000Z', 'agent-background', { select: false });
+
+    expect(result).toBe(snapshot);
+    expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual([
+      'agent-dina',
+      'agent-jesse',
+      'agent-background',
+    ]);
+    expect(snapshot.teams[0].agentIds).toStrictEqual([
+      'agent-dina',
+      'agent-jesse',
+      'agent-background',
+    ]);
+    expect(snapshot.teams[0].activeAgentId).toBe('agent-background');
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeAgentId).toBe('agent-dina');
+  });
+
+  it('creates selected quick chats without a folder in the requested team', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      color: '#46A857',
+      agentIds: [],
+    });
+
+    const result = createQuickChatInSnapshot(snapshot, {
+      teamId: 'team-skwad',
+    }, '2026-06-05T10:11:12.000Z', 'agent-quick-chat');
+
+    expect(result).toBe(snapshot);
+    expect(snapshot.agents.at(-1)).toStrictEqual({
+      id: 'agent-quick-chat',
+      teamId: 'team-skwad',
+      name: null,
+      avatar: undefined,
+      folder: null,
+      backend: 'codex',
+      backendDefaults: { kind: 'codex' },
+      sessionKind: 'quickChat',
+      status: { type: 'idle' },
+      createdAt: '2026-06-05T10:11:12.000Z',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+    expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-quick-chat']);
+    expect(snapshot.activeTeamId).toBe('team-skwad');
+    expect(snapshot.activeAgentId).toBe('agent-quick-chat');
   });
 
   it('creates agents without storing execution connection on the agent', () => {
@@ -249,6 +395,22 @@ describe('snapshot reducer', () => {
       id: 'agent-missing',
       name: 'Missing',
     })).toBeNull();
+  });
+
+  it('updates the preferred application and returns null for a missing agent', () => {
+    const snapshot = createInitialSnapshot();
+
+    expect(updateAgentOpenInApplication(
+      snapshot,
+      'agent-dina',
+      'vscode',
+      '2026-06-05T10:11:12.000Z',
+    )).toMatchObject({
+      id: 'agent-dina',
+      openInApplication: 'vscode',
+      updatedAt: '2026-06-05T10:11:12.000Z',
+    });
+    expect(updateAgentOpenInApplication(snapshot, 'agent-missing', 'finder')).toBeNull();
   });
 
   it('selects the active agent on its team when switching agents', () => {

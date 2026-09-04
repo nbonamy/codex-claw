@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { updateAgentFolder } from '../agent-manager';
 import {
   applyMainEventToSnapshot,
   createInitialSnapshot,
-  updateAgentFolder,
 } from '../snapshot';
 
 describe('snapshot reducer', () => {

@@ -1,10 +1,8 @@
 import type {
   Agent,
   AgentSubagentTree,
-  AgentBackend,
   AgentContextUsage,
   ApprovalPreset,
-  BackendDefaults,
   BackendApprovalRequest,
   AgentGitStatus,
   AgentStatus,
@@ -12,8 +10,6 @@ import type {
   AppSnapshot,
   AppSnapshotMetadata,
   ClientRequest,
-  CreateAgentInput,
-  CreateQuickChatInput,
   MainToRendererEvent,
   PromptAttachment,
   RendererMessage,
@@ -30,17 +26,26 @@ import type {
   TurnGitDiff,
   ThreadPlan,
   ThreadPlanStep,
-  UpdateAgentInput,
   WorkBacklogAssignment,
 } from './contracts';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from './subagent-values';
 import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
-import { createEntityId } from './ids';
 import { defaultTeamColor } from './team-colors';
 import { toolOutputText } from './tool-output';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { workItemAssignmentKey } from './work-assignments';
 import { appText } from './app-text';
+
+export {
+  createAgentFromInput,
+  createAgentInSnapshot,
+  createQuickChatInSnapshot,
+  selectAgent,
+  updateAgentFolder,
+  updateAgentFromInput,
+  updateAgentOpenInApplication,
+  updateAgentWorkspace,
+} from './agent-manager';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 const seedTeamId = 'team-codex-claw';
@@ -135,80 +140,6 @@ export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnec
   };
 }
 
-export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
-  const name = normalizedOptionalString(input.name) ?? null;
-  const backend = normalizedBackend(input.backend);
-  const delegatedByAgentId = normalizedOptionalString(input.delegatedByAgentId);
-
-  return {
-    id,
-    teamId,
-    ...(delegatedByAgentId ? { delegatedByAgentId } : {}),
-    name,
-    avatar: normalizedOptionalString(input.avatar),
-    folder: normalizedFolder(input.folder),
-    backend,
-    backendDefaults: normalizedBackendDefaults(input.backendDefaults, backend) ?? defaultBackendDefaults(backend),
-    status: { type: 'idle' },
-    createdAt,
-    updatedAt: createdAt,
-  };
-}
-
-export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString(), id = createEntityId('agent'), options: { select?: boolean } = {}): AppSnapshot {
-  const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
-  return insertAgentInSnapshot(snapshot, agent, options.select);
-}
-
-export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQuickChatInput, createdAt = new Date().toISOString(), id = createEntityId('agent')): AppSnapshot {
-  const agent = createAgentFromInput({
-    name: null,
-    folder: '',
-    backend: 'codex',
-    ...(input.teamId ? { teamId: input.teamId } : {}),
-  }, createdAt, targetTeamId(snapshot, input.teamId), id);
-  agent.folder = null;
-  agent.sessionKind = 'quickChat';
-  return insertAgentInSnapshot(snapshot, agent);
-}
-
-function insertAgentInSnapshot(snapshot: AppSnapshot, agent: Agent, select = true): AppSnapshot {
-  snapshot.agents.push(agent);
-  attachAgentToTeam(snapshot, agent);
-  if (select) {
-    snapshot.activeTeamId = agent.teamId ?? snapshot.activeTeamId;
-    snapshot.activeAgentId = agent.id;
-  }
-  return snapshot;
-}
-
-export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentInput, updatedAt = new Date().toISOString()): Agent | null {
-  const agent = findAgent(snapshot, input.id);
-  if (!agent) {
-    return null;
-  }
-  agent.name = normalizedOptionalString(input.name) ?? null;
-  agent.updatedAt = updatedAt;
-
-  return agent;
-}
-
-export function updateAgentOpenInApplication(
-  snapshot: AppSnapshot,
-  agentId: string,
-  application: Agent['openInApplication'],
-  updatedAt = new Date().toISOString(),
-): Agent | null {
-  const agent = findAgent(snapshot, agentId);
-  if (!agent) {
-    return null;
-  }
-
-  agent.openInApplication = application;
-  agent.updatedAt = updatedAt;
-  return agent;
-}
-
 export function appendUserPrompt(
   snapshot: AppSnapshot,
   agentId: string,
@@ -265,56 +196,6 @@ export function appendSystemMessage(snapshot: AppSnapshot, agentId: string, text
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 
   return message;
-}
-
-export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder: string, updatedAt = new Date().toISOString()): Agent | null {
-  const agent = findAgent(snapshot, agentId);
-  if (!agent) {
-    return null;
-  }
-
-  const nextFolder = normalizedFolder(folder);
-  if (nextFolder !== agent.folder) {
-    delete agent.workspace;
-    delete agent.pullRequest;
-  }
-  agent.folder = nextFolder;
-  clearAgentRuntimeState(agent);
-  agent.updatedAt = updatedAt;
-
-  return agent;
-}
-
-export function updateAgentWorkspace(
-  snapshot: AppSnapshot,
-  agentId: string,
-  workspace: Agent['workspace'],
-  updatedAt = new Date().toISOString(),
-): Agent | null {
-  const agent = findAgent(snapshot, agentId);
-  if (!agent) return null;
-
-  if (workspace) {
-    agent.workspace = { ...workspace };
-  } else {
-    delete agent.workspace;
-  }
-  agent.updatedAt = updatedAt;
-  return agent;
-}
-
-export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot {
-  const agent = findAgent(snapshot, agentId);
-  if (agent) {
-    snapshot.activeAgentId = agentId;
-    const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId);
-    if (team) {
-      snapshot.activeTeamId = team.id;
-      team.activeAgentId = agentId;
-    }
-  }
-
-  return snapshot;
 }
 
 export function snapshotMetadata(snapshot: AppSnapshot): AppSnapshotMetadata {
@@ -2430,80 +2311,8 @@ function findAgent(snapshot: AppSnapshot, agentId: string): Agent | undefined {
   return snapshot.agents.find((agent) => agent.id === agentId);
 }
 
-function activeTeamId(snapshot: AppSnapshot): string {
-  if (snapshot.activeTeamId && snapshot.teams.some((team) => team.id === snapshot.activeTeamId)) {
-    return snapshot.activeTeamId;
-  }
-
-  const activeAgent = snapshot.activeAgentId ? findAgent(snapshot, snapshot.activeAgentId) : undefined;
-  if (activeAgent?.teamId) {
-    return activeAgent.teamId;
-  }
-
-  const activeTeam = snapshot.teams.find((team) => activeAgent && team.agentIds.includes(activeAgent.id));
-  return activeTeam?.id ?? snapshot.teams[0]?.id ?? seedTeamId;
-}
-
-function targetTeamId(snapshot: AppSnapshot, teamId: string | undefined): string {
-  if (teamId && snapshot.teams.some((team) => team.id === teamId)) {
-    return teamId;
-  }
-
-  return activeTeamId(snapshot);
-}
-
-function attachAgentToTeam(snapshot: AppSnapshot, agent: Agent): void {
-  let team = snapshot.teams.find((candidate) => candidate.id === agent.teamId);
-  if (!team) {
-    team = snapshot.teams[0];
-  }
-
-  if (!team) {
-    return;
-  }
-
-  agent.teamId = team.id;
-  if (!team.agentIds.includes(agent.id)) {
-    team.agentIds.push(agent.id);
-  }
-  team.activeAgentId = agent.id;
-}
-
-function clearAgentRuntimeState(agent: Agent): void {
-  delete agent.backendSession;
-  delete agent.contextUsage;
-  delete agent.plan;
-  delete agent.goal;
-  delete agent.isRegistered;
-  delete agent.mcpSessionId;
-  delete agent.statusText;
-}
-
-function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
-  return value === 'claude' ? 'claude' : 'codex';
-}
-
-function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {
-  return backend === 'claude' ? { kind: 'claude' } : { kind: 'codex' };
-}
-
-function normalizedBackendDefaults(defaults: BackendDefaults | undefined, backend: AgentBackend): Agent['backendDefaults'] {
-  if (!defaults || defaults.kind !== backend) {
-    return undefined;
-  }
-
-  return defaults.kind === 'claude' && defaults.thinking
-    ? { ...defaults, thinking: { ...defaults.thinking } }
-    : { ...defaults };
-}
-
 function normalizedFolder(folder: string): string {
   return folder.trim();
-}
-
-function normalizedOptionalString(value: string | null | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized || undefined;
 }
 
 function folderBasename(folder: string): string {

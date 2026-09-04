@@ -1,8 +1,7 @@
-import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { closeAgentInSnapshot, updateAgentFolder } from '@codex-claw/core/agent-manager';
 import { backendDisplayName, unsupportedBackendFeature, type BackendEvent } from '@codex-claw/core/backend-driver';
 import { agentGitBackendMethods, backendMethods, type AgentGitBackendMethod } from '@codex-claw/core/backend-protocol/methods';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { updateAgentFolder } from '@codex-claw/core/snapshot';
 import type {
   Agent,
   AgentGitDiff,

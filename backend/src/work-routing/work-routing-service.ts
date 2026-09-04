@@ -1,9 +1,8 @@
 import { AppError } from '@codex-claw/core/app-error';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { duplicateAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { duplicateAgentInSnapshot, updateAgentFolder } from '@codex-claw/core/agent-manager';
 import type { AppSnapshot, ClientRequestResponse, WorkRoutingResult } from '@codex-claw/core/contracts';
-import { updateAgentFolder } from '@codex-claw/core/snapshot';
 import type { AgentGitService } from '../git/agent-git-service';
 
 export type WorkRoutingPort = {

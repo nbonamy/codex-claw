@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { selectAgent } from '../agent-manager';
 import {
   appendUserPrompt,
   applyMainEventToSnapshot,
   createInitialSnapshot,
-  selectAgent,
 } from '../snapshot';
 import type { RendererMessage } from '../contracts';
 import {
