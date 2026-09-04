@@ -268,7 +268,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       type: 'snapshot.updated',
-      payload: {},
+      payload: snapshotMetadata(remoteSnapshot),
       occurredAt: '2026-06-05T00:00:01.000Z',
       snapshot: eventSnapshot,
     });

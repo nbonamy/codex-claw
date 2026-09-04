@@ -954,6 +954,11 @@ describe('ClawBackendServer', () => {
           payload: { type: 'working' },
           occurredAt: '2026-06-13T00:00:01.000Z',
           snapshot: remoteSnapshot,
+          clientState: {
+            sourceFolderPath: '/remote/source',
+            shouldPreventDisplaySleep: true,
+            shouldPreventDisplaySleepForRemoteAccess: true,
+          },
         });
         return {
           snapshot: remoteSnapshot,
@@ -986,6 +991,11 @@ describe('ClawBackendServer', () => {
         type: 'agent.statusChanged',
         agentId: remoteAgent.id,
         payload: { type: 'working' },
+        clientState: {
+          sourceFolderPath: '',
+          shouldPreventDisplaySleep: false,
+          shouldPreventDisplaySleepForRemoteAccess: false,
+        },
       }),
     ]);
   });

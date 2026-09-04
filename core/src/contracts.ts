@@ -1534,6 +1534,7 @@ type BackendErrorPayload = {
 type TypedMainToRendererEventType =
   | 'backend.statusChanged'
   | 'client.connectionChanged'
+  | 'snapshot.updated'
   | 'account.rateLimitsUpdated'
   | 'devicePairing.statusChanged'
   | 'models.changed'
@@ -1586,6 +1587,13 @@ type TypedMainToRendererEventType =
   | 'backendApproval.requested'
   | 'backendApproval.resolved'
   | 'error';
+type UntypedMainToRendererEventType = Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;
+type UntypedMainToRendererEvent = [UntypedMainToRendererEventType] extends [never]
+  ? never
+  : MainToRendererEventWith<{
+      type: UntypedMainToRendererEventType;
+      payload: unknown;
+    }>;
 
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
@@ -1596,6 +1604,10 @@ export type MainToRendererEvent =
   | MainToRendererEventWith<{
       type: 'client.connectionChanged';
       payload: BackendConnectionState;
+    }>
+  | MainToRendererEventWith<{
+      type: 'snapshot.updated';
+      payload: AppSnapshotMetadata;
     }>
   | MainToRendererEventWith<{
       type: 'account.rateLimitsUpdated';
@@ -1895,10 +1907,7 @@ export type MainToRendererEvent =
       agentId: string;
       payload: BackendErrorPayload;
     }>
-  | MainToRendererEventWith<{
-      type: Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;
-      payload: unknown;
-    }>;
+  | UntypedMainToRendererEvent;
 
 export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
 

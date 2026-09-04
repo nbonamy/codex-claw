@@ -403,6 +403,19 @@ describe('useAppState', () => {
     } as unknown as MainToRendererEvent);
     expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
 
+    const snapshotWithoutJesse = structuredClone(remoteSnapshot);
+    snapshotWithoutJesse.agents = snapshotWithoutJesse.agents.filter((agent) => agent.id !== 'agent-jesse');
+    for (const team of snapshotWithoutJesse.teams) {
+      team.agentIds = team.agentIds.filter((agentId) => agentId !== 'agent-jesse');
+    }
+    listeners[0]?.({
+      seq: 4,
+      type: 'snapshot.updated',
+      payload: snapshotMetadata(snapshotWithoutJesse),
+      occurredAt: '2026-08-07T10:02:00.000Z',
+    });
+    expect(state.unreadAgentIds.value).toStrictEqual([]);
+
     state.setRendererWindowFocused(true);
     expect(state.unreadAgentIds.value).toStrictEqual([]);
     expect(setDockBadgeCount).toHaveBeenLastCalledWith(0);

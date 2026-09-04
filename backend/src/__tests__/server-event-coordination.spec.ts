@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { snapshotMetadata } from '@codex-claw/core/snapshot';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { CodexBackendDriver } from '../codex/codex-driver';
@@ -307,7 +308,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
       type: 'snapshot.updated',
-      payload: expect.not.objectContaining({ messages: expect.anything() }),
+      payload: snapshotMetadata(snapshot),
     }));
   });
 

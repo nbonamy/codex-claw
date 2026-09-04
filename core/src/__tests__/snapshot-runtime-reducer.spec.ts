@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { MainToRendererEvent } from '../contracts';
+import type { AppSnapshotMetadata, MainToRendererEvent } from '../contracts';
 import {
   createInitialSnapshot,
   snapshotMetadata,
@@ -429,6 +429,22 @@ describe('snapshot runtime reducer', () => {
     });
 
     expect(snapshot.messages).toBe(messages);
+  });
+
+  it('ignores snapshot metadata payloads that fail the existing shallow root guard', () => {
+    const snapshot = createInitialSnapshot();
+    const teams = snapshot.teams;
+    const agents = snapshot.agents;
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      type: 'snapshot.updated',
+      payload: { teams: 'invalid', agents: [] } as unknown as AppSnapshotMetadata,
+      occurredAt: '2026-06-09T10:00:00.000Z',
+    });
+
+    expect(snapshot.teams).toBe(teams);
+    expect(snapshot.agents).toBe(agents);
   });
 
   it('merges agent updates from main-process collaboration tools', () => {

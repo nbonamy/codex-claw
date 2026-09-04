@@ -4,7 +4,6 @@ import type {
   AgentGitStatus,
   ApprovalPreset,
   AppSnapshot,
-  AppSnapshotMetadata,
   ClientRequest,
   MainToRendererEvent,
   ThreadGoal,
@@ -21,7 +20,7 @@ import { workItemAssignmentKey } from './work-assignments';
 
 export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): boolean {
   if (event.type === 'snapshot.updated') {
-    const nextSnapshot = event.payload as AppSnapshotMetadata;
+    const nextSnapshot = event.payload;
     if (isRecord(nextSnapshot) && Array.isArray(nextSnapshot.teams) && Array.isArray(nextSnapshot.agents)) {
       applySnapshotMetadata(snapshot, nextSnapshot);
     }

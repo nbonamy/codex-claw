@@ -308,7 +308,7 @@ describe('AppController', () => {
     }).emitBackendEvent({
       seq: 1,
       type: 'snapshot.updated',
-      payload: {},
+      payload: snapshotMetadata(snapshot),
       occurredAt: '2026-06-13T00:00:00.000Z',
       snapshot: {
         teams: [],

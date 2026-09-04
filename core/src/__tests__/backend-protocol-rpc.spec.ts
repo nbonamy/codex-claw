@@ -3,6 +3,8 @@ import type {
   AgentBackend,
   AgentFileActivity,
   AgentGitStatus,
+  AppSnapshot,
+  AppSnapshotMetadata,
   BackendApprovalDecision,
   BackendApprovalRequest,
   BackendApprovalScope,
@@ -73,6 +75,16 @@ describe('backend protocol guards', () => {
 
     expectTypeOf<Extract<ClawBackendEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
+    type SnapshotUpdatedEvent = Extract<ClawBackendEvent, { type: 'snapshot.updated' }>;
+    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshotMetadata>();
+    expectTypeOf<Pick<SnapshotUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{
+        agentId?: string;
+        backend?: AgentBackend;
+        threadId?: string;
+        turnId?: string;
+      }>();
+    expectTypeOf<SnapshotUpdatedEvent['snapshot']>().toEqualTypeOf<AppSnapshot | undefined>();
     expectTypeOf<AnnotationEvent['payload']>().toEqualTypeOf<BrowserAnnotation>();
     type SubagentStatusEvent = Extract<ClawBackendEvent, { type: 'subagent.statusChanged' }>;
     expectTypeOf<SubagentStatusEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();

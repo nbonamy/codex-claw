@@ -296,6 +296,12 @@ describe('ipc channels', () => {
       .toEqualTypeOf<MainToRendererEvent>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
+    type SnapshotUpdatedEvent = Extract<MainToRendererEvent, { type: 'snapshot.updated' }>;
+    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshotMetadata>();
+    expectTypeOf<Pick<
+      SnapshotUpdatedEvent,
+      keyof OptionalEventContext
+    >>().toEqualTypeOf<OptionalEventContext>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'backend.statusChanged' }>['payload']>()
       .toEqualTypeOf<BackendRuntimeStatus>();
     expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'backend.statusChanged' }>, 'backend'>>()

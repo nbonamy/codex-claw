@@ -3,6 +3,7 @@ import type {
   Agent,
   AgentFileActivity,
   AgentGitStatus,
+  AppSnapshotMetadata,
   BackendApprovalDecision,
   BackendApprovalRequest,
   BackendApprovalScope,
@@ -70,6 +71,8 @@ describe('backend driver helpers', () => {
 
     expectTypeOf<ConnectionEvent['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
+    expectTypeOf<Extract<BackendEvent, { type: 'snapshot.updated' }>['payload']>()
+      .toEqualTypeOf<AppSnapshotMetadata>();
     expectTypeOf<Extract<BackendEvent, { type: 'browser.annotationCreated' }>['payload']>()
       .toEqualTypeOf<BrowserAnnotation>();
     type SubagentOperationEvent = Extract<BackendEvent, { type: 'subagent.operationChanged' }>;
