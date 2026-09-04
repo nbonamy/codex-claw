@@ -77,6 +77,14 @@ synced after this change.
   `{ seq, type, payload, occurredAt, agentId?, backend?, backendSessionId?,
   threadId?, turnId?, clientState?, snapshot? }`.
 
+Every transport treats a received event value as untrusted. Local stdio/socket,
+remote SSH stdio, and browser WebSocket ingress decode the complete typed event
+before publishing it to application state. A malformed event notification is
+logged with structural path/reason diagnostics and dropped; its payload values
+are never logged, the connection remains open, and unrelated pending requests
+continue normally. Malformed JSON or JSON-RPC framing retains the transport's
+existing error and reconnection policy.
+
 State-mutating public methods generally return `AppSnapshot`. The returned
 snapshot is authoritative. Between snapshots, clients replay only sequenced
 clawd-authored app events through the shared deterministic reducer.

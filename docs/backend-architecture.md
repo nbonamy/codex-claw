@@ -72,6 +72,11 @@ Current implementation checkpoint:
   the Claw MCP HTTP server used by agent collaboration tools, source repository
   discovery, git worktree creation, agent file listing/previewing, GitHub work
   integrations, and system permission API calls.
+- Backend-event wire ingress is validated by the Core-owned typed decoder before
+  events reach application state. Local, remote SSH stdio, and browser WebSocket
+  adapters drop malformed event notifications with safe structural diagnostics
+  without closing the transport or disturbing pending RPC requests; JSON and
+  JSON-RPC framing errors keep their existing transport-specific policy.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
   backend work, and `clawd` can request client-owned effects. Runtime client
   handlers include `client/external/open` for backend-owned work integrations
