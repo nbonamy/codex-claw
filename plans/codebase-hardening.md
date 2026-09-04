@@ -91,14 +91,15 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 1 active — type connection and annotation events.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 2 active — type backend status, catalogs, and pairing events.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
 - [x] Phase 1.3a: extract the subagent reducer.
 - [x] Phase 1.3b: extract the runtime/global reducer.
 - [x] Phase 1.3c: extract the conversation reducer.
-- [ ] Phase 1.4 slice 1: type connection and annotation events. **Active.**
+- [x] Phase 1.4 slice 1: type connection and annotation events.
+- [ ] Phase 1.4 slice 2: type backend status, catalogs, and pairing events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -128,8 +129,9 @@ row is not complete.
 | 2026-09-04 | Phase 1.3a: extract subagent reducer | Complete | core reducer agent / root integrator | `snapshot.ts` 2,240 → 2,046 lines; extracted a 220-line reducer with one exported function; mixed façade spec 272 → 113 lines plus a 164-line direct reducer spec; five tests preserved across the split | Four dispatcher branches, five helpers, and all five original test bodies verified byte-for-byte. Focused: 2 files / 5 tests passed in 166ms; full core: 38 files / 236 tests passed in 611ms; core typecheck, lint, Knip, acyclic dependency check, and staged diff check passed | `5c8b7bd60b82782ee6fda5370dfe7e9937b90ce2` | Neutral subagent enum/value validators remain in `subagent-values.ts`; reducer-local structural validation stays private. `thread.started` remains the explicit façade bridge that clears a stale root tree before future runtime reduction |
 | 2026-09-04 | Phase 1.3b: extract runtime/global reducer | Complete | core reducer agent / root integrator | `snapshot.ts` 2,046 → 1,591 lines; extracted a 468-line reducer with one exported handled-result function; runtime spec 419 → 590 lines and 11 → 15 tests; interaction spec 443 → 406 lines; core 236 → 239 tests; metadata helpers moved to construction and two shared agent helpers moved to `agent-manager.ts` | Focused runtime/façade coverage: 4 files / 28 tests passed in 191ms; full core: 38 files / 239 tests passed in 631ms; core typecheck, lint, Knip, fidelity review, acyclic dependency review, and staged/diff checks passed | `1518dfe8a29bf6d8ec4f59456538c540fe7223f9` | Review fixed two routing regressions before commit: `thread.settingsUpdated` is now reported handled even without a thread ID, and stale subagent-tree invalidation was restored to the façade before runtime delegation. Wall-clock agent-status timestamps, agentless global events, owned no-ops, and the legacy missing-agent gate now have direct characterization coverage |
 | 2026-09-04 | Phase 1.3c: extract conversation reducer | Complete | core reducer agent / root integrator | `snapshot.ts` 1,591 → 64 lines; extracted payloads 273, transcript 413, tools 317, plans 305, and reducer 307 lines; largest private module 413 lines; one reducer entrypoint owns 24 conversation event types | Focused owners: 8 files / 55 runtime tests passed in 238ms, comprising 51 declared test bodies with four additional parameterized cases; full core at the boundary: 39 files / 239 tests passed in 649ms; core typecheck, lint, Knip, move-fidelity review, acyclic dependency review, and diff checks passed | `e03dd5da636a1545677fcf888ad67bb6bcd0d2bc` | The architecture review moved agent resolution to the reducer and passes the `Agent` into plan helpers, so plans do not import `agent-manager`; the dependency graph remains payloads → transcript → tools → plans → reducer. Temporary façade exports preserve callers, and frozen semantic risks move to 1.4 rather than contaminating the extraction |
-| 2026-09-04 | Phase 1.3 boundary qualification | Complete | plan steward / root orchestrator | Three deep reducers complete; `snapshot.ts` 2,240 at the start of 1.3 → 64 lines; total suite 270 files / 2,049 tests | `npm run test:ai`: core 39 files / 239 tests in 649ms; backend 61 / 611 in 1.64s; Vue 124 / 896 in 13.76s; Electron 40 / 282 in 3.58s; Web 6 / 21 in 453ms; wall 21.57s, 3.44s faster than the 25.01s program baseline | `chore: record snapshot reducer extraction` (this commit) | Phase 1.3 exit is qualified; Phase 1.4 slice 1 is active |
-| 2026-09-04 | Phase 1.4 slice 1: type connection and annotation events | Active | root orchestrator | Two events selected from the permissive event surface: `client.connectionChanged` with `BackendConnectionState`, and `browser.annotationCreated` with `BrowserAnnotation` | Exact type-flow and compile-pressure audit prepared; implementation and gates pending | — | Preserve optional envelope/source fields and source-less legacy/test fallback classification. Annotation identity remains in the payload, so do not require envelope `agentId`. Keep `BackendEvent` and `ClawBackendEvent` distributive without excluding client-local events; expect compile pressure at `nextMainEvent`, `eventForRenderer`, remote forwarding, and the Electron test harness. Runtime guards stay unchanged until a later slice; bundle no behavior changes |
+| 2026-09-04 | Phase 1.3 boundary qualification | Complete | plan steward / root orchestrator | Three deep reducers complete; `snapshot.ts` 2,240 at the start of 1.3 → 64 lines; total suite 270 files / 2,049 tests | `npm run test:ai`: core 39 files / 239 tests in 649ms; backend 61 / 611 in 1.64s; Vue 124 / 896 in 13.76s; Electron 40 / 282 in 3.58s; Web 6 / 21 in 453ms; wall 21.57s, 3.44s faster than the 25.01s program baseline | `681b8b4cdd8ba0f95164fb750dd5beab6228b111` | Phase 1.3 exit is qualified; Phase 1.4 slice 1 is active |
+| 2026-09-04 | Phase 1.4 slice 1: type connection and annotation events | Complete | core event agent / root integrator | Two client-local event variants now discriminate `client.connectionChanged` with `BackendConnectionState` and `browser.annotationCreated` with `BrowserAnnotation`; `BackendEvent`, `ClawBackendEvent`, and the Electron client emitter remain distributive | Focused: core 3 files / 10 tests; backend 1 / 8; Electron 2 / 21; Vue 1 / 8. Full `npm run test:ai`: 270 files / 2,052 tests, real 21.12s. All-workspace typecheck: 18.15s. Lint and Knip: 19.95s. Diff checks passed | `02510448b0b02517f3a89736d4a0b8c48f8a0d7a` | Independent review replaced an impossible annotation payload hidden behind a double cast with a valid source-less `BrowserAnnotation` and removed an adjacent unnecessary cast. Optional envelope/source fields, source-less fallback, payload-owned annotation `agentId`, broad transport compatibility, and existing runtime guards are preserved; no decoding or behavior change was bundled |
+| 2026-09-04 | Phase 1.4 slice 2: type backend status, catalogs, and pairing events | Active | root orchestrator | Five event variants selected: backend runtime status, account rate limits, model catalog, skill catalog, and device pairing status | Read-only payload/context and consumer audit complete; implementation and gates pending | — | Require envelope `backend` for backend status, rate limits, models, and skills, but not pairing. Require no agent, thread, or source fields. Preserve flat rate-limit normalization; do not enforce equality between envelope and payload backend values. Keep catalog/pairing guards and deferred wire casts unchanged |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -317,6 +319,8 @@ path are deliberately deferred to 1.4 so the move remains lossless.
 
 #### Slice 1 — connection and annotation events
 
+Completed in `02510448b0b02517f3a89736d4a0b8c48f8a0d7a`.
+
 - Type `client.connectionChanged` with payload `BackendConnectionState`.
 - Type `browser.annotationCreated` with payload `BrowserAnnotation`.
 - Preserve optional envelope and source fields, including the source-less
@@ -330,6 +334,24 @@ path are deliberately deferred to 1.4 so the move remains lossless.
   changing behavior.
 - Keep existing runtime guards unchanged. Deep boundary decoding belongs to a
   later slice.
+
+#### Slice 2 — backend status, catalogs, and pairing events
+
+- Type `backend.statusChanged` with payload `BackendRuntimeStatus` and require
+  the envelope `backend` field.
+- Type `account.rateLimitsUpdated` with its accepted flat or nested payload and
+  require the envelope `backend` field.
+- Type `models.changed` with a `models` array payload and require the envelope
+  `backend` field.
+- Type `skills.changed` with `cwd`, `status: 'loaded'`, and a `skills` array,
+  and require the envelope `backend` field.
+- Type `devicePairing.statusChanged` with payload `DevicePairingStatus`; it does
+  not require an envelope `backend` field.
+- Do not add agent, thread, or source requirements to any of these events.
+- Preserve flat rate-limit normalization and do not enforce equality between
+  envelope and payload backend values.
+- Keep the existing catalog and pairing guards unchanged. Existing wire casts
+  remain deferred until the corresponding transport-decoding slice.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
