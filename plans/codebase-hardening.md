@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 3 active — type side-panel, celebration, creation, and Git progress events.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 4 active — type backlog, routing, and client-resolution events.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -100,7 +100,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.3c: extract the conversation reducer.
 - [x] Phase 1.4 slice 1: type connection and annotation events.
 - [x] Phase 1.4 slice 2: type backend status, catalogs, and pairing events.
-- [ ] Phase 1.4 slice 3: type side-panel, celebration, creation, and Git progress events. **Active.**
+- [x] Phase 1.4 slice 3: type side-panel, celebration, creation, and Git progress events.
+- [ ] Phase 1.4 slice 4: type backlog, routing, and client-resolution events. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -133,7 +134,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.3 boundary qualification | Complete | plan steward / root orchestrator | Three deep reducers complete; `snapshot.ts` 2,240 at the start of 1.3 → 64 lines; total suite 270 files / 2,049 tests | `npm run test:ai`: core 39 files / 239 tests in 649ms; backend 61 / 611 in 1.64s; Vue 124 / 896 in 13.76s; Electron 40 / 282 in 3.58s; Web 6 / 21 in 453ms; wall 21.57s, 3.44s faster than the 25.01s program baseline | `681b8b4cdd8ba0f95164fb750dd5beab6228b111` | Phase 1.3 exit is qualified; Phase 1.4 slice 1 is active |
 | 2026-09-04 | Phase 1.4 slice 1: type connection and annotation events | Complete | core event agent / root integrator | Two client-local event variants now discriminate `client.connectionChanged` with `BackendConnectionState` and `browser.annotationCreated` with `BrowserAnnotation`; `BackendEvent`, `ClawBackendEvent`, and the Electron client emitter remain distributive | Focused: core 3 files / 10 tests; backend 1 / 8; Electron 2 / 21; Vue 1 / 8. Full `npm run test:ai`: 270 files / 2,052 tests, real 21.12s. All-workspace typecheck: 18.15s. Lint and Knip: 19.95s. Diff checks passed | `02510448b0b02517f3a89736d4a0b8c48f8a0d7a` | Independent review replaced an impossible annotation payload hidden behind a double cast with a valid source-less `BrowserAnnotation` and removed an adjacent unnecessary cast. Optional envelope/source fields, source-less fallback, payload-owned annotation `agentId`, broad transport compatibility, and existing runtime guards are preserved; no decoding or behavior change was bundled |
 | 2026-09-04 | Phase 1.4 slice 2: type backend status, catalogs, and pairing events | Complete | core event agent / root integrator | Five event variants now discriminate backend runtime status, account rate limits, model catalog, skill catalog, and device pairing status; `emitThread` became distributive so typed payloads remain paired with their event variant | Focused: Core 30 tests; Backend 92; Electron 25; Vue 20. Full `npm run test:ai`: 270 files / 2,053 tests. All-workspace typecheck passed. Lint, CSS lint, and Knip passed with only the existing non-failing `lipo` hint. Diff and status checks were clean | `4fce85fee7b6c7d89f94f30dddd4e56a35ef0591` | Independent review found no defects. Runtime semantics and the deferred wire decoder remain unchanged: no agent/thread/source requirements were added; flat rate-limit normalization and catalog/pairing guards remain; envelope/payload backend equality is not enforced; existing boundary casts remain deferred |
-| 2026-09-04 | Phase 1.4 slice 3: type UI and operation progress events | Active | root orchestrator | Five agent-scoped variants selected: side-panel markdown, side-panel Git diff, celebration, agent creation progress, and Git operation progress | Read-only event/payload/context audit complete; implementation and gates pending | — | Require only envelope `agentId`; do not require backend, thread, turn, or source. Preserve exact markdown versus Git-diff subtype mapping, snapshot no-op and unread behavior, and source-less fixtures/runtime guards. For creation progress, envelope `agentId` identifies the caller while payload `agentId` identifies the newly created agent. Malformed fixtures may use explicit casts only at the boundary under test |
+| 2026-09-04 | Phase 1.4 slice 3: type UI and operation progress events | Complete | core event agent / root integrator | Five agent-scoped variants now discriminate side-panel markdown, side-panel Git diff, celebration, agent creation progress, and Git operation progress; only envelope `agentId` is required | Focused: Core 18 tests; Backend 52; Electron 14; Vue 44. Full `npm run test:ai`: 270 files / 2,053 tests, real 26.89s with one slow Vue run. All-workspace typecheck: 19.72s. Lint, CSS lint, and Knip: 21.60s with only the existing non-failing `lipo` hint. Diff and status checks were clean | `0c6db21a458fc06f3754d7758733d45dbe85e8a7` | Independent review found no defects. Nullable Git-diff `subtitle` is narrowly correct because `openDiff` already forwards `agent.folder: string \| null`; `AppText` and other event shapes remain strict. Malformed casts remain deliberate boundary tests. Caller-versus-created agent identity, source-less compatibility, snapshot no-op/unread behavior, producers, consumers, guards, and decoders are unchanged |
+| 2026-09-04 | Phase 1.4 slice 4: type backlog, routing, and client resolution events | Active | root orchestrator | Four variants selected: backlog assignment, routing request, routing resolution, and client-request resolution | Read-only compatibility payload, context, normalization, and consumer audit complete; implementation and gates pending | — | The first three are global and require no envelope context; `clientRequest.resolved` requires `agentId` and `backend`. Preserve `working` → `inProgress`, optional policy defaults, trimmed notes and automation IDs, request-payload agent identity independent of envelope identity, absence of `loopId`, malformed-event no-ops and guards, and deferred decoder casts |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 
 For each future row, include:
@@ -359,6 +361,8 @@ Completed in `4fce85fee7b6c7d89f94f30dddd4e56a35ef0591`.
 
 #### Slice 3 — side-panel, celebration, creation, and Git progress events
 
+Completed in `0c6db21a458fc06f3754d7758733d45dbe85e8a7`.
+
 - Type `sidePanel.markdownRequested` with payload
   `SidePanelMarkdownRequest`.
 - Type `sidePanel.gitDiffRequested` with payload
@@ -375,6 +379,25 @@ Completed in `4fce85fee7b6c7d89f94f30dddd4e56a35ef0591`.
 - Malformed fixtures may require an explicit cast only at the boundary whose
   rejection or compatibility behavior they exercise; do not weaken ordinary
   fixtures to satisfy the new types.
+
+#### Slice 4 — backlog, routing, and client-resolution events
+
+- Type `workBacklog.assignmentUpdated` with the compatibility payload
+  `Omit<WorkBacklogAssignment, 'policy' | 'status'> & {
+  policy?: WorkBacklogAssignmentPolicy; status: WorkBacklogAssignmentStatus |
+  'working' }`.
+- Type `workRouting.requested` with payload `WorkRoutingRequest`.
+- Type `workRouting.resolved` with payload
+  `Pick<WorkRoutingRequest, 'id'>`.
+- These first three events are global and require no envelope context.
+- Type `clientRequest.resolved` with payload `Pick<ClientRequest, 'id'>`; it
+  requires envelope `agentId` and `backend`.
+- Preserve `working` → `inProgress` normalization, optional policy defaults,
+  and trimming of notes and automation IDs.
+- Keep a routing request's payload `agentId` independent from any envelope
+  identity, and do not introduce `loopId`.
+- Preserve malformed-event no-ops and existing runtime guards. Decoder casts
+  remain deferred to their transport-decoding slice.
 
 - Replace permissive event handling with discriminated events.
 - Use exhaustive handling where the application owns the event union.
