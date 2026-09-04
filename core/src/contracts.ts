@@ -362,47 +362,14 @@ export type CreateWorkItemInput = {
   description: string;
 };
 
-export type AutomationSourceConfiguration =
-  | {
-    provider: 'github';
-    repositoryId: string;
-    assigneeLogin?: string;
-    tagName?: string;
-  };
-
-export type AutomationTeamTarget =
-  | {
-    mode: 'existing';
-    teamId: string;
-  }
-  | {
-    mode: 'dedicated';
-  };
-
-export type AutomationAction =
-  | {
-    type: 'create-agent';
-    sourceRepositoryPath: string;
-    backend?: AgentBackend;
-    backendDefaults?: BackendDefaults;
-    teamTarget: AutomationTeamTarget;
-    cleanup?: AutomationCleanup;
-  }
-  | {
-    type: 'create-agent-from-bench';
-    benchTemplateId: string;
-    teamTarget: AutomationTeamTarget;
-    cleanup?: AutomationCleanup;
-  };
-
-export type AutomationCleanup = {
-  deleteAgent?: boolean;
-  deleteTeam?: boolean;
+export type AutomationRepositoryTarget = {
+  provider: 'github';
+  repositoryId: string;
+  sourceRepositoryPath: string;
 };
 
-export type AutomationInstructions = {
-  assignment?: string;
-  beforeCompletion?: string;
+export type AutomationSchedule = {
+  intervalMinutes: number;
 };
 
 export type AutomationExecutionStatus = 'working' | 'completed' | 'failed';
@@ -543,9 +510,11 @@ export type Automation = {
   id: string;
   name: string;
   enabled: boolean;
-  source: AutomationSourceConfiguration;
-  action: AutomationAction;
-  instructions: AutomationInstructions;
+  repositories: AutomationRepositoryTarget[];
+  teamId: string;
+  selectionPrompt?: string;
+  assignmentPrompt?: string;
+  schedule: AutomationSchedule;
   executionLog: AutomationExecutionLogEntry[];
   createdAt: string;
   updatedAt: string;
@@ -568,9 +537,11 @@ export type BenchLocation = AutomationLocation;
 export type CreateAutomationInput = {
   name?: string;
   enabled?: boolean;
-  source: AutomationSourceConfiguration;
-  action: AutomationAction;
-  instructions?: AutomationInstructions;
+  repositories: AutomationRepositoryTarget[];
+  teamId: string;
+  selectionPrompt?: string;
+  assignmentPrompt?: string;
+  schedule: AutomationSchedule;
 };
 
 export type UpdateAutomationInput = CreateAutomationInput & {

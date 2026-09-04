@@ -1,13 +1,10 @@
 import type {
   AppSnapshot,
-  BackendDefaults,
   CreateAutomationInput,
   Automation,
-  AutomationAction,
   BackendConversationRef,
   AutomationExecutionLogEntry,
-  AutomationSourceConfiguration,
-  AutomationTeamTarget,
+  AutomationRepositoryTarget,
   UpdateAutomationInput,
 } from './contracts';
 import { createEntityId, type IdGenerator } from './ids';
@@ -34,9 +31,11 @@ export function createAutomationInSnapshot(
     id: uniqueAutomationId(snapshot, normalized.name, createdAt, createId),
     name: normalized.name,
     enabled: normalized.enabled,
-    source: normalized.source,
-    action: normalized.action,
-    instructions: normalized.instructions,
+    repositories: normalized.repositories,
+    teamId: normalized.teamId,
+    ...(normalized.selectionPrompt ? { selectionPrompt: normalized.selectionPrompt } : {}),
+    ...(normalized.assignmentPrompt ? { assignmentPrompt: normalized.assignmentPrompt } : {}),
+    schedule: normalized.schedule,
     executionLog: [],
     createdAt,
     updatedAt: createdAt,
@@ -59,9 +58,19 @@ export function updateAutomationInSnapshot(
 
   automation.name = normalized.name;
   automation.enabled = normalized.enabled;
-  automation.source = normalized.source;
-  automation.action = normalized.action;
-  automation.instructions = normalized.instructions;
+  automation.repositories = normalized.repositories;
+  automation.teamId = normalized.teamId;
+  automation.schedule = normalized.schedule;
+  if (normalized.selectionPrompt) {
+    automation.selectionPrompt = normalized.selectionPrompt;
+  } else {
+    delete automation.selectionPrompt;
+  }
+  if (normalized.assignmentPrompt) {
+    automation.assignmentPrompt = normalized.assignmentPrompt;
+  } else {
+    delete automation.assignmentPrompt;
+  }
   automation.updatedAt = updatedAt;
   delete automation.lastError;
 
@@ -196,20 +205,34 @@ export function updateAutomationExecutionAgentConversationInSnapshot(
   return automation;
 }
 
-function normalizeAutomationInput(snapshot: AppSnapshot, input: CreateAutomationInput): Omit<Automation, 'createdAt' | 'id' | 'lastCreatedCount' | 'lastError' | 'lastRunAt' | 'updatedAt'> | null {
-  const source = normalizeAutomationSource(input.source);
-  const action = normalizeAutomationAction(snapshot, input.action);
-  if (!source || !action) {
+function normalizeAutomationInput(
+  snapshot: AppSnapshot,
+  input: CreateAutomationInput,
+): Omit<Automation, 'createdAt' | 'id' | 'lastCreatedCount' | 'lastError' | 'lastRunAt' | 'updatedAt'> | null {
+  const repositories = normalizeAutomationRepositories(input.repositories);
+  const teamId = input.teamId.trim();
+  const intervalMinutes = Math.floor(input.schedule.intervalMinutes);
+  if (
+    repositories.length === 0 ||
+    !teamId ||
+    !snapshot.teams.some((team) => team.id === teamId) ||
+    !Number.isFinite(intervalMinutes) ||
+    intervalMinutes < 1
+  ) {
     return null;
   }
 
-  const name = input.name?.trim() || defaultAutomationName(source);
+  const name = input.name?.trim() || defaultAutomationName(repositories);
+  const selectionPrompt = input.selectionPrompt?.trim();
+  const assignmentPrompt = input.assignmentPrompt?.trim();
   return {
     name,
     enabled: input.enabled !== false,
-    source,
-    action,
-    instructions: normalizeAutomationInstructions(input.instructions),
+    repositories,
+    teamId,
+    ...(selectionPrompt ? { selectionPrompt } : {}),
+    ...(assignmentPrompt ? { assignmentPrompt } : {}),
+    schedule: { intervalMinutes },
     executionLog: [],
   };
 }
@@ -217,141 +240,33 @@ function normalizeAutomationInput(snapshot: AppSnapshot, input: CreateAutomation
 function cloneAutomationExecutionEntry(entry: AutomationExecutionLogEntry): AutomationExecutionLogEntry {
   return {
     ...entry,
-    createdAgents: entry.createdAgents.map((createdAgent) => ({ ...createdAgent })),
+    createdAgents: entry.createdAgents.map((createdAgent) => ({
+      ...createdAgent,
+    })),
   };
 }
 
-function normalizeAutomationSource(source: AutomationSourceConfiguration): AutomationSourceConfiguration | null {
-  if (source.provider !== 'github') {
-    return null;
-  }
-
-  const repositoryId = source.repositoryId.trim();
-  if (!repositoryId) {
-    return null;
-  }
-
-  const assigneeLogin = source.assigneeLogin?.trim();
-  const tagName = source.tagName?.trim();
-  return {
-    provider: 'github',
-    repositoryId,
-    ...(assigneeLogin ? { assigneeLogin } : {}),
-    ...(tagName ? { tagName } : {}),
-  };
-}
-
-function normalizeAutomationInstructions(instructions: CreateAutomationInput['instructions']): Automation['instructions'] {
-  const assignment = instructions?.assignment?.trim();
-  const beforeCompletion = instructions?.beforeCompletion?.trim();
-  return {
-    ...(assignment ? { assignment } : {}),
-    ...(beforeCompletion ? { beforeCompletion } : {}),
-  };
-}
-
-function normalizeAutomationAction(snapshot: AppSnapshot, action: AutomationAction): AutomationAction | null {
-  const teamTarget = normalizeTeamTarget(snapshot, action.teamTarget);
-  if (!teamTarget) {
-    return null;
-  }
-
-  if (action.type === 'create-agent') {
-    const sourceRepositoryPath = action.sourceRepositoryPath.trim();
-    if (!sourceRepositoryPath) {
-      return null;
+function normalizeAutomationRepositories(repositories: AutomationRepositoryTarget[]): AutomationRepositoryTarget[] {
+  const seen = new Set<string>();
+  const normalized: AutomationRepositoryTarget[] = [];
+  for (const repository of repositories) {
+    const repositoryId = repository.repositoryId.trim();
+    const sourceRepositoryPath = repository.sourceRepositoryPath.trim();
+    const key = `${repository.provider}:${repositoryId}`;
+    if (repository.provider !== 'github' || !repositoryId || !sourceRepositoryPath || seen.has(key)) {
+      continue;
     }
-    const backend = action.backend === 'claude' ? 'claude' : 'codex';
-    const backendDefaults = normalizeBackendDefaults(action.backendDefaults, backend);
-
-    return {
-      type: 'create-agent',
-      sourceRepositoryPath,
-      backend,
-      ...(backendDefaults ? { backendDefaults } : {}),
-      teamTarget,
-      cleanup: normalizeAutomationCleanup(action.cleanup, teamTarget),
-    };
+    seen.add(key);
+    normalized.push({ provider: 'github', repositoryId, sourceRepositoryPath });
   }
-
-  if (action.type === 'create-agent-from-bench') {
-    const benchTemplateId = action.benchTemplateId.trim();
-    if (!benchTemplateId || !snapshot.bench.some((template) => template.id === benchTemplateId)) {
-      return null;
-    }
-
-    return {
-      type: 'create-agent-from-bench',
-      benchTemplateId,
-      teamTarget,
-      cleanup: normalizeAutomationCleanup(action.cleanup, teamTarget),
-    };
-  }
-
-  return null;
+  return normalized;
 }
 
-function normalizeBackendDefaults(defaults: BackendDefaults | undefined, backend: 'codex' | 'claude'): BackendDefaults | undefined {
-  if (!defaults || defaults.kind !== backend) {
-    return { kind: backend };
+function defaultAutomationName(repositories: AutomationRepositoryTarget[]): string {
+  if (repositories.length === 1) {
+    return repositories[0]!.repositoryId;
   }
-
-  if (defaults.kind === 'codex') {
-    const model = defaults.model?.trim();
-    const reasoningEffort = defaults.reasoningEffort?.trim();
-    return {
-      kind: 'codex',
-      ...(model ? { model } : {}),
-      ...(defaults.approvalPreset ? { approvalPreset: defaults.approvalPreset } : {}),
-      ...(defaults.approvalPolicy ? { approvalPolicy: defaults.approvalPolicy } : {}),
-      ...(defaults.approvalsReviewer ? { approvalsReviewer: defaults.approvalsReviewer } : {}),
-      ...(defaults.sandboxMode ? { sandboxMode: defaults.sandboxMode } : {}),
-      ...(reasoningEffort ? { reasoningEffort } : {}),
-    };
-  }
-
-  const model = defaults.model?.trim();
-  return {
-    kind: 'claude',
-    ...(model ? { model } : {}),
-    ...(defaults.permissionMode ? { permissionMode: defaults.permissionMode } : {}),
-    ...(defaults.thinking ? { thinking: { ...defaults.thinking } } : {}),
-  };
-}
-
-function normalizeAutomationCleanup(cleanup: AutomationAction['cleanup'] | undefined, teamTarget: AutomationTeamTarget): AutomationAction['cleanup'] {
-  if (teamTarget.mode === 'dedicated') {
-    return {
-      deleteTeam: cleanup?.deleteTeam !== false,
-    };
-  }
-
-  return {
-    deleteAgent: cleanup?.deleteAgent !== false,
-  };
-}
-
-function normalizeTeamTarget(snapshot: AppSnapshot, target: AutomationTeamTarget): AutomationTeamTarget | null {
-  if (target.mode === 'dedicated') {
-    return { mode: 'dedicated' };
-  }
-
-  if (target.mode === 'existing') {
-    const teamId = target.teamId.trim();
-    return teamId && snapshot.teams.some((team) => team.id === teamId)
-      ? { mode: 'existing', teamId }
-      : null;
-  }
-
-  return null;
-}
-
-function defaultAutomationName(source: AutomationSourceConfiguration): string {
-  if (source.provider === 'github') {
-    const filters = [source.assigneeLogin, source.tagName].filter(Boolean);
-    return filters.length > 0 ? `${source.repositoryId} / ${filters.join(' / ')}` : source.repositoryId;
-  }
-  return 'Automation';
+  return `${repositories[0]!.repositoryId} +${repositories.length - 1}`;
 }
 
 function uniqueAutomationId(snapshot: AppSnapshot, name: string, createdAt: string, createId: IdGenerator): string {
@@ -373,9 +288,11 @@ function uniqueAutomationId(snapshot: AppSnapshot, name: string, createdAt: stri
 }
 
 function slug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || 'automation';
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'automation'
+  );
 }

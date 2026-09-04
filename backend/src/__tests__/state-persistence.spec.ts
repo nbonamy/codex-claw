@@ -701,38 +701,19 @@ describe('AppStatePersistence', () => {
       id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
-      source: {
+      repositories: [{
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
-        tagName: 'bug',
-      },
-      action: {
-        type: 'create-agent',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-        backend: 'claude',
-        backendDefaults: {
-          kind: 'claude',
-          model: 'claude-opus-4.1',
-          thinking: {
-            type: 'enabled',
-            budgetTokens: 4096,
-          },
-        },
-        teamTarget: {
-          mode: 'dedicated',
-        },
-        cleanup: {
-          deleteTeam: true,
-        },
-      },
+      }],
+      teamId: 'team-codex-claw',
+      selectionPrompt: 'Pick regressions that are ready to fix.',
+      assignmentPrompt: 'Start by reproducing the issue.',
+      schedule: { intervalMinutes: 60 },
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:01:00.000Z',
       lastRunAt: '2026-06-09T10:02:00.000Z',
       lastCreatedCount: 1,
-      instructions: {
-        assignment: 'Start by reproducing the issue.',
-        beforeCompletion: 'Remove the bug tag before completing.',
-      },
       executionLog: [{
         id: 'automation-exec-1',
         automationId: 'automation-bugs',
@@ -771,19 +752,6 @@ describe('AppStatePersistence', () => {
     expect(persisted).not.toHaveProperty('loops');
     expect(restored.automations).toStrictEqual(snapshot.automations);
 
-    const legacyPersisted = JSON.parse(JSON.stringify(persisted)) as Record<string, unknown>;
-    legacyPersisted.loops = [{
-      ...snapshot.automations[0],
-      processedWorkItemIds: ['github:nbonamy/codex-claw#12'],
-      executionLog: snapshot.automations[0]!.executionLog.map(({ automationId, ...entry }) => ({
-        ...entry,
-        loopId: automationId,
-      })),
-    }];
-    delete legacyPersisted.automations;
-    const restoredLegacy = snapshotFromPersistedState(legacyPersisted);
-    expect(restoredLegacy.automations).toStrictEqual(snapshot.automations);
-    expect(restoredLegacy.automations[0]).not.toHaveProperty('processedWorkItemIds');
   });
 
   it('sanitizes invalid work integration metadata', () => {

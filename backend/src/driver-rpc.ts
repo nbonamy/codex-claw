@@ -22,7 +22,6 @@ export type BackendDriverRegistryOptions = {
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
-  spokenAnnouncementsEnabled?: () => boolean;
 };
 
 type CodexClawLoadingStrategy = 'eager' | 'lazy';
@@ -41,7 +40,6 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
       clawMcpServerUrl: options.clawMcpServerUrl ?? null,
       pluginSettings: options.pluginSettings,
       celebrationsEnabled: options.celebrationsEnabled,
-      spokenAnnouncementsEnabled: options.spokenAnnouncementsEnabled,
     })],
   ]);
 }
@@ -69,7 +67,6 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
             options.pluginSettings?.() ?? options.generalSettings?.plugins,
             {
               celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
-              spokenAnnouncementsEnabled: options.spokenAnnouncementsEnabled?.() ?? options.generalSettings?.spokenAnnouncementsEnabled,
             },
           )
           : {}

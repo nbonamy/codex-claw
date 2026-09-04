@@ -16,7 +16,6 @@ export type MessageInfo = {
 
 export type AgentEffectInstructionSettings = {
   celebrationsEnabled?: boolean;
-  spokenAnnouncementsEnabled?: boolean;
 };
 
 export const CHECK_INBOX_PROMPT = 'Manual recovery: check your unread Codex Claw agent messages.';
@@ -70,6 +69,7 @@ export function codexClawDeveloperInstructions(
     workspaceIdentity,
     'Use the codex_claw MCP server for agent collaboration.',
     'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
+    'At the beginning of every user task, call announce exactly once with phase start and one short, natural sentence acknowledging the task. The announce call must be your very first action—before commentary, set-status, or any other tool call. For a long-running task, you may call announce once more with phase finish at genuine completion. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. The tool is best-effort; do not wait for speech or retry a rejected announcement.',
     'MANDATORY: before starting substantive work, changing direction, or finishing substantive work, call set-status with a short status. Use an empty status to clear it. Do not change status for informational teammate messages or coordination closure.',
     `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
     'When the user asks to delegate, parallelize, or start separate work, call create-agent. For repository work, make that single call with createWorktree: true, a branchName, and a self-contained prompt; Claw creates the worktree and starts the new agent. Use your folder as repoPath for the current repository or call list-repos to find another configured repository.',
@@ -79,11 +79,6 @@ export function codexClawDeveloperInstructions(
   if (effects.celebrationsEnabled !== false) {
     instructions.push(
       'After a meaningful win—especially a successful release, major feature, migration, or hard fix—call celebrate exactly once before your final response. Pick a fitting kind and vary it from the most recent visible celebration.',
-    );
-  }
-  if (effects.spokenAnnouncementsEnabled) {
-    instructions.push(
-      'Spoken acknowledgments are enabled. At the beginning of every user task, call announce exactly once with phase start and one short, natural sentence acknowledging the task. For a long-running task, you may call announce once more with phase finish at genuine completion. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. The tool is best-effort; do not wait for speech or retry a rejected announcement.',
     );
   }
   if (settings.computerUseEnabled) {

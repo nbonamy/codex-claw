@@ -668,53 +668,6 @@ describe('ClawMcpService', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
   });
 
-  it('requires automation completion instructions before confirming work completion', async () => {
-    const snapshot = createAutomationSnapshot({
-      teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
-      createdAgents: [{
-        agentId: 'agent-one',
-        agentName: 'One',
-        workItemId: 'github:nbonamy/codex-claw#5',
-        workItemTitle: 'Fix first issue',
-        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
-      }],
-    });
-    snapshot.automations[0]!.instructions.beforeCompletion = 'Remove the bug label first.';
-    const events: any[] = [];
-    service = new ClawMcpService({
-      snapshot,
-      now: () => new Date('2026-06-15T01:30:48.802Z'),
-      onEvent: (event) => events.push(event),
-    });
-    const url = await service.start();
-
-    const first = await callTool(url, 'agent-one', 'update-work-item', {
-      workItemId: 'github:nbonamy/codex-claw#5',
-      status: 'completed',
-    });
-    expect(first.result.structuredContent).toMatchObject({
-      status: 'completion-instructions-required',
-      instructions: 'Remove the bug label first.',
-      repeatUpdateRequired: true,
-    });
-    const completed = await callTool(url, 'agent-one', 'update-work-item', {
-      workItemId: 'github:nbonamy/codex-claw#5',
-      status: 'completed',
-    });
-    expect(completed.result.structuredContent).toMatchObject({ status: 'completed' });
-    expect(events.filter((event) => event.type === 'workBacklog.assignmentUpdated')).toHaveLength(2);
-
-    const missing = await fetch(agentUrl(url, 'agent-one'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 'missing-work-item', method: 'tools/call',
-        params: { name: 'update-work-item', arguments: { workItemId: 'missing', status: 'completed' } },
-      }),
-    });
-    expect(missing.status).toBe(500);
-  });
-
   it('updates only the caller-owned assignment and requires blocked context', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12'] = {
@@ -756,9 +709,8 @@ describe('ClawMcpService', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'workBacklog.assignmentUpdated' }));
   });
 
-  it('completes existing-team automation executions only after every created assignment is done and deletes the created agents', async () => {
+  it('completes automation executions only after every created assignment is done and keeps the created agents', async () => {
     const snapshot = createAutomationSnapshot({
-      teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
       createdAgents: [{
         agentId: 'agent-one',
         agentName: 'One',
@@ -800,41 +752,8 @@ describe('ClawMcpService', () => {
         }),
       ],
     });
-    expect(snapshot.agents.map((agent) => agent.id)).not.toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.teams[0]?.agentIds).not.toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.teams.map((team) => team.id)).toContain('team-codex-claw');
-  });
-
-  it('deletes the dedicated team when a dedicated-team automation execution completes', async () => {
-    const snapshot = createAutomationSnapshot({
-      teamTarget: { mode: 'dedicated' },
-      dedicatedTeamId: 'team-github-5',
-      createdAgents: [{
-        agentId: 'agent-work-item',
-        agentName: 'Work Item',
-        workItemId: 'github:nbonamy/codex-claw#5',
-        workItemTitle: 'Fix issue',
-        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
-      }],
-    });
-    service = new ClawMcpService({
-      snapshot,
-      now: () => new Date('2026-06-15T01:30:48.802Z'),
-    });
-    const url = await service.start();
-
-    await markWorkItemCompleted(url, 'agent-work-item', 'github:nbonamy/codex-claw#5');
-
-    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({
-      status: 'completed',
-      completedAt: '2026-06-15T01:30:48.802Z',
-      createdAgents: [{
-        agentId: 'agent-work-item',
-        conversationRef: { backend: 'codex', threadId: 'thread-agent-work-item' },
-      }],
-    });
-    expect(snapshot.teams.map((team) => team.id)).not.toContain('team-github-5');
-    expect(snapshot.agents.map((agent) => agent.id)).not.toContain('agent-work-item');
+    expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
+    expect(snapshot.teams[0]?.agentIds).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
     expect(snapshot.teams.map((team) => team.id)).toContain('team-codex-claw');
   });
 });
@@ -914,27 +833,15 @@ function callTool(url: string, agentId: string, name: string, arguments_: Record
 
 function createAutomationSnapshot(input: {
   createdAgents: Automation['executionLog'][number]['createdAgents'];
-  dedicatedTeamId?: string;
-  teamTarget: Automation['action']['teamTarget'];
 }): AppSnapshot {
   const snapshot = createEmptySnapshot();
-  const targetTeamId = input.teamTarget.mode === 'dedicated'
-    ? input.dedicatedTeamId ?? 'team-github-item'
-    : input.teamTarget.teamId;
+  const targetTeamId = 'team-codex-claw';
   const createdAgentIds = input.createdAgents.map((createdAgent) => createdAgent.agentId);
   snapshot.teams[0] = {
     ...snapshot.teams[0]!,
-    agentIds: input.teamTarget.mode === 'existing' ? createdAgentIds : [],
-    activeAgentId: input.teamTarget.mode === 'existing' ? createdAgentIds[0] : undefined,
+    agentIds: createdAgentIds,
+    activeAgentId: createdAgentIds[0],
   };
-  if (input.teamTarget.mode === 'dedicated') {
-    snapshot.teams.push({
-      id: targetTeamId,
-      name: 'GitHub work item',
-      agentIds: createdAgentIds,
-      activeAgentId: createdAgentIds[0],
-    });
-  }
   snapshot.agents = input.createdAgents.map((createdAgent) => createTestAgent(createdAgent.agentId, targetTeamId, createdAgent.agentName));
   snapshot.activeTeamId = targetTeamId;
   snapshot.activeAgentId = createdAgentIds[0] ?? null;
@@ -944,13 +851,13 @@ function createAutomationSnapshot(input: {
     enabled: true,
     createdAt: '2026-06-15T01:00:00.000Z',
     updatedAt: '2026-06-15T01:00:00.000Z',
-    source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
-    action: {
-      type: 'create-agent',
+    repositories: [{
+      provider: 'github',
+      repositoryId: 'nbonamy/codex-claw',
       sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-      teamTarget: input.teamTarget,
-    },
-    instructions: {},
+    }],
+    teamId: targetTeamId,
+    schedule: { intervalMinutes: 60 },
     executionLog: [{
       id: 'automation-exec-1',
       automationId: 'automation-bugs',

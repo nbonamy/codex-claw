@@ -3,7 +3,9 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { createAgentFromInput } from '@codex-claw/core/snapshot';
 import { updateAutomationExecutionAgentConversationInSnapshot } from '@codex-claw/core/automation-manager';
+import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@codex-claw/core/automation-prompts';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
@@ -85,7 +87,6 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     generalSettings: snapshot.general,
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
-    spokenAnnouncementsEnabled: () => snapshot.general.spokenAnnouncementsEnabled,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
   let server: ClawBackendServer;
@@ -100,11 +101,28 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const automationRunner = new AutomationRunner({
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,
+    createWorktree: async (input) => (await worktreeManager.create(input)).worktree,
     notifySnapshotUpdated: () => server.emitEvent({
       type: 'snapshot.updated',
       payload: snapshot,
     }),
     saveSnapshot: () => saveBackendSnapshot(snapshot),
+    selectWorkItems: async (automation, candidates) => {
+      const folder = automation.repositories[0]?.sourceRepositoryPath ?? '';
+      const pickerAgent = snapshot.agents.find((agent) => agent.teamId === automation.teamId && agent.backend === 'codex')
+        ?? createAgentFromInput({ name: null, folder, backend: 'codex', teamId: automation.teamId });
+      const driver = requireBackendDriver(backendDrivers, pickerAgent);
+      if (!driver.generateText) {
+        throw new Error('The selected automation backend cannot evaluate work item criteria.');
+      }
+      const result = await driver.generateText(pickerAgent, {
+        cwd: folder,
+        prompt: automationSelectionPrompt(automation, candidates),
+        developerInstructions: 'Return only the IDs of eligible work items that match the supplied criteria. Never invent an ID or include an item outside the supplied candidate list.',
+        outputSchema: automationSelectionOutputSchema,
+      });
+      return parseAutomationSelection(result.text, candidates);
+    },
     sendPrompt: (agentId, prompt, context) => {
       const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
       if (!agent) {

@@ -125,17 +125,12 @@
       />
       <AutomationsView
         v-else-if="automationsVisible"
-        :backend-models="backendModels"
-        :bench="snapshot.bench"
-        :choose-agent-folder="chooseAgentFolder"
         :clear-automation-history="clearAutomationHistory"
         :create-automation="createAutomation"
         :delete-automation-execution="deleteAutomationExecution"
         :delete-automation="deleteAutomation"
         :get-automation-snapshot="getAutomationSnapshot"
-        :load-work-items="loadWorkItems"
         :load-work-repositories="loadWorkRepositories"
-        :list-source-folders="listSourceFolders"
         :list-source-repositories="listSourceRepositories"
         :automations="snapshot.automations"
         :messages="snapshot.messages"
@@ -148,7 +143,6 @@
         :work-backlog="snapshot.workBacklog"
         :work-backlog-error="workBacklogError"
         :work-backlog-status="workBacklogStatus"
-        :work-items-by-repository="workItemsByRepository"
         :work-repositories-by-provider="workRepositoriesByProvider"
       />
       <CockpitView

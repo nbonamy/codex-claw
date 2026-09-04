@@ -209,6 +209,7 @@ type AutomationRunnerOptions = {
   notifySnapshotUpdated(): void;
   saveSnapshot(): Promise<unknown>;
   sendPrompt(agentId: string, prompt: string, context: { automationId: string; executionId: string }): Promise<unknown>;
+  selectWorkItems(automation: import('@codex-claw/core/contracts').Automation, candidates: import('@codex-claw/core/contracts').WorkItem[]): Promise<import('@codex-claw/core/contracts').WorkItem[]>;
 };
 
 type SchedulerOptions = { onError(taskId: string, error: unknown): void };
@@ -227,6 +228,7 @@ type RemoteOptions = {
 
 describe('clawd runtime', () => {
   const driver = {
+    generateText: vi.fn(),
     setConversationTitle: vi.fn(),
   };
   const emitEvent = vi.fn();
@@ -260,6 +262,7 @@ describe('clawd runtime', () => {
     mocks.runtimeGitHubOAuthClientId.mockReturnValue('github-client');
     requestClient.mockImplementation(async (method: string, params?: unknown) => ({ method, params }));
     mocks.automationRunAll.mockResolvedValue(undefined);
+    driver.generateText.mockResolvedValue({ text: '{"workItemIds":["github:nbonamy/codex-claw#12"]}' });
   });
 
   it('constructs the runtime services and forwards client-owned operations', async () => {
@@ -273,7 +276,6 @@ describe('clawd runtime', () => {
       clawMcpServerUrl: 'http://127.0.0.1:4242/mcp',
       generalSettings: mocks.snapshot.general,
       pluginSettings: expect.any(Function),
-      spokenAnnouncementsEnabled: expect.any(Function),
     }));
     expect(mocks.hydrateConnections).toHaveBeenCalledOnce();
     expect(mocks.schedulerStart).toHaveBeenCalledOnce();
@@ -460,6 +462,51 @@ describe('clawd runtime', () => {
       type: 'snapshot.updated',
       payload: mocks.snapshot,
     });
+  });
+
+  it('uses hidden structured generation to select automation work across all repositories', async () => {
+    await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
+    const item = {
+      provider: 'github' as const,
+      id: 'nbonamy/codex-claw#12',
+      repositoryId: 'nbonamy/codex-claw',
+      repositoryFullName: 'nbonamy/codex-claw',
+      number: 12,
+      title: 'Fix the picker',
+      url: 'https://github.com/nbonamy/codex-claw/issues/12',
+      state: 'open' as const,
+      assignees: [],
+      labels: [],
+      createdAt: '2026-09-04T00:00:00.000Z',
+      updatedAt: '2026-09-04T00:00:00.000Z',
+    };
+    const automation = {
+      id: 'automation-1',
+      name: 'Ready work',
+      enabled: true,
+      repositories: [
+        { provider: 'github' as const, repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/src/claw' },
+        { provider: 'github' as const, repositoryId: 'nbonamy/witsy', sourceRepositoryPath: '/src/witsy' },
+      ],
+      teamId: 'team-claw',
+      selectionPrompt: 'Only ready bugs.',
+      schedule: { intervalMinutes: 60 },
+      executionLog: [],
+      createdAt: '2026-09-04T00:00:00.000Z',
+      updatedAt: '2026-09-04T00:00:00.000Z',
+    };
+
+    await expect(automations.selectWorkItems(automation, [item])).resolves.toStrictEqual([item]);
+
+    expect(driver.generateText).toHaveBeenCalledWith(
+      mocks.snapshot.agents[0],
+      expect.objectContaining({
+        cwd: '/src/claw',
+        prompt: expect.stringContaining('nbonamy/witsy (local clone: /src/witsy)'),
+        outputSchema: expect.objectContaining({ type: 'object' }),
+      }),
+    );
   });
 
   it('handles lifecycle shutdown and nonfatal scheduler/title failures', async () => {

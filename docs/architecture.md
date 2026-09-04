@@ -323,9 +323,11 @@ routes permission status through the app-owned backend protocol and delivers
 the resulting PNG to the active renderer composer as a normal SDK attachment.
 
 Spoken agent acknowledgments are another native desktop effect. `clawd` owns
-the provider-neutral MCP semantics and persisted enablement, mute, and
-selected-agent policy, then asks the connected client to queue a bounded
-phrase. Electron rechecks selected-agent and foreground policy at playback,
+the always-exposed provider-neutral MCP tool and applies persisted enablement,
+dictated-input, mute, and selected-agent policy before asking the connected
+client to queue a bounded phrase. Stable developer instructions require the
+tool call as the first action of every task. Electron rechecks selected-agent
+and foreground policy at playback,
 cancels speech that becomes ineligible, and owns the global no-overlap queue
 and signed Swift helper lifecycle. The helper synthesizes Kokoro audio through
 FluidAudio and plays the resulting waveform. Vue owns the settings, rail mute
@@ -942,17 +944,21 @@ state is local and provider-neutral: newly assigned items are `inProgress`, and
 agents update them to `blocked`, `readyForReview`, or `completed` through the
 `update-work-item` Claw MCP tool using the exact work item id from that prompt.
 Blocked updates include a user-facing note explaining what help is needed.
-Automation-created assignments
-also store automation origin metadata so automation completion instructions can be shown at
-completion time without polluting the initial work context. Assigning the same
+Automation-created assignments also store automation origin metadata so one
+execution can be completed after all of its work items finish. Assigning the same
 work item to another agent overwrites that key and resets it to `inProgress`.
+An automation run first gathers eligible open, unassigned work from every
+configured repository. When selection criteria are present, backend-owned
+ephemeral structured generation receives the complete repository scope and
+candidate inventory and returns exact work item ids. The runner validates those
+ids against the candidate set before creating worktrees. Per-agent assignment
+instructions are added only to the selected workers' normal assignment prompts.
 Assignment status belongs to the backlog record, so it is preserved even when
 the stored agent id no longer exists; only the live assignee navigation/avatar
 depends on the agent still being present. Resetting an assignment clears Codex
 Claw's local assignment metadata and lifecycle state.
-Automations may also clean up their generated workspace after confirmed completion:
-existing-team automations can delete the generated agent, while dedicated-team automations
-can delete the generated team.
+Automations keep their generated agents and isolated worktrees after completion so
+the user can review or continue the work explicitly.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.

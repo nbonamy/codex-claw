@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Automation, AutomationAction, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationSourceConfiguration, AutomationTeamTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, BenchTemplate, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
@@ -187,9 +187,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   const remotePointerTeamIds = localRemoteTeamPointerIds(teams);
   const agents = allAgents.filter((agent) => !agent.teamId || !remotePointerTeamIds.has(agent.teamId));
   const localAgentIds = new Set(agents.map((agent) => agent.id));
-  const persistedAutomations = Array.isArray(value.automations)
-    ? value.automations
-    : Array.isArray(value.loops) ? value.loops : [];
+  const persistedAutomations = Array.isArray(value.automations) ? value.automations : [];
   workBacklog.assignments = assignmentsForAgents({
     ...legacyWorkBacklogAssignments(value.agents, agents),
     ...workBacklog.assignments,
@@ -989,9 +987,8 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
 function cloneAutomation(automation: Automation): Automation {
   return {
     ...automation,
-    source: { ...automation.source },
-    action: cloneAutomationAction(automation.action),
-    instructions: { ...(automation.instructions ?? {}) },
+    repositories: automation.repositories.map((repository) => ({ ...repository })),
+    schedule: { ...automation.schedule },
     executionLog: (automation.executionLog ?? []).map(cloneAutomationExecutionEntry),
   };
 }
@@ -1006,29 +1003,6 @@ function cloneAutomationExecutionEntry(entry: AutomationExecutionLogEntry): Auto
   };
 }
 
-function cloneAutomationAction(action: AutomationAction): AutomationAction {
-  if (action.type === 'create-agent') {
-    return {
-      type: action.type,
-      sourceRepositoryPath: action.sourceRepositoryPath,
-      ...(action.backend ? { backend: action.backend } : {}),
-      ...(action.backendDefaults ? { backendDefaults: cloneBackendDefaults(action.backendDefaults) } : {}),
-      teamTarget: { ...action.teamTarget },
-      ...(action.cleanup ? { cleanup: { ...action.cleanup } } : {}),
-    };
-  }
-
-  if (action.type === 'create-agent-from-bench') {
-    return {
-      type: action.type,
-      benchTemplateId: action.benchTemplateId,
-      teamTarget: { ...action.teamTarget },
-      ...(action.cleanup ? { cleanup: { ...action.cleanup } } : {}),
-    };
-  }
-  return action;
-}
-
 function sanitizeAutomation(value: unknown): Automation | null {
   if (
     !isRecord(value) ||
@@ -1040,9 +1014,15 @@ function sanitizeAutomation(value: unknown): Automation | null {
     return null;
   }
 
-  const source = sanitizeAutomationSource(value.source);
-  const action = sanitizeAutomationAction(value.action);
-  if (!source || !action) {
+  const repositories = Array.isArray(value.repositories)
+    ? value.repositories.map(sanitizeAutomationRepository).filter((repository): repository is AutomationRepositoryTarget => Boolean(repository))
+    : [];
+  const teamId = optionalTrimmedString(value.teamId);
+  const rawIntervalMinutes = isRecord(value.schedule) ? value.schedule.intervalMinutes : null;
+  const intervalMinutes = typeof rawIntervalMinutes === 'number' && Number.isFinite(rawIntervalMinutes)
+    ? Math.max(1, Math.floor(rawIntervalMinutes))
+    : null;
+  if (repositories.length === 0 || !teamId || !intervalMinutes) {
     return null;
   }
 
@@ -1058,28 +1038,17 @@ function sanitizeAutomation(value: unknown): Automation | null {
     id: value.id,
     name: value.name.trim() || 'Automation',
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
-    source,
-    action,
-    instructions: sanitizeAutomationInstructions(value.instructions),
+    repositories,
+    teamId,
+    ...(optionalTrimmedString(value.selectionPrompt) ? { selectionPrompt: optionalTrimmedString(value.selectionPrompt)! } : {}),
+    ...(optionalTrimmedString(value.assignmentPrompt) ? { assignmentPrompt: optionalTrimmedString(value.assignmentPrompt)! } : {}),
+    schedule: { intervalMinutes },
     executionLog,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(typeof value.lastRunAt === 'string' ? { lastRunAt: value.lastRunAt } : {}),
     ...(typeof value.lastError === 'string' && value.lastError.trim() ? { lastError: value.lastError } : {}),
     ...(lastCreatedCount !== undefined ? { lastCreatedCount } : {}),
-  };
-}
-
-function sanitizeAutomationInstructions(value: unknown): Automation['instructions'] {
-  if (!isRecord(value)) {
-    return {};
-  }
-
-  const assignment = optionalTrimmedString(value.assignment);
-  const beforeCompletion = optionalTrimmedString(value.beforeCompletion);
-  return {
-    ...(assignment ? { assignment } : {}),
-    ...(beforeCompletion ? { beforeCompletion } : {}),
   };
 }
 
@@ -1184,98 +1153,15 @@ function isAutomationExecutionStatus(value: unknown): value is AutomationExecuti
   return value === 'working' || value === 'completed' || value === 'failed';
 }
 
-function sanitizeAutomationSource(value: unknown): AutomationSourceConfiguration | null {
+function sanitizeAutomationRepository(value: unknown): AutomationRepositoryTarget | null {
   if (!isRecord(value) || value.provider !== 'github') {
     return null;
   }
-
   const repositoryId = optionalTrimmedString(value.repositoryId);
-  if (!repositoryId) {
-    return null;
-  }
-
-  const assigneeLogin = optionalTrimmedString(value.assigneeLogin);
-  const tagName = optionalTrimmedString(value.tagName);
-  return {
-    provider: 'github',
-    repositoryId,
-    ...(assigneeLogin ? { assigneeLogin } : {}),
-    ...(tagName ? { tagName } : {}),
-  };
-}
-
-function sanitizeAutomationAction(value: unknown): AutomationAction | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const teamTarget = sanitizeAutomationTeamTarget(value.teamTarget);
-  if (!teamTarget) {
-    return null;
-  }
-
-  if (value.type === 'create-agent') {
-    const sourceRepositoryPath = optionalTrimmedString(value.sourceRepositoryPath);
-    if (!sourceRepositoryPath) {
-      return null;
-    }
-    const backend = sanitizeBackend(value.backend) ?? 'codex';
-    const backendDefaults = sanitizeBackendDefaults(value.backendDefaults, backend);
-
-    return {
-      type: 'create-agent',
-      sourceRepositoryPath,
-      backend,
-      ...(backendDefaults ? { backendDefaults } : {}),
-      teamTarget,
-      cleanup: sanitizeAutomationCleanup(value.cleanup, teamTarget),
-    };
-  }
-
-  if (value.type === 'create-agent-from-bench') {
-    const benchTemplateId = optionalTrimmedString(value.benchTemplateId);
-    if (!benchTemplateId) {
-      return null;
-    }
-
-    return {
-      type: 'create-agent-from-bench',
-      benchTemplateId,
-      teamTarget,
-      cleanup: sanitizeAutomationCleanup(value.cleanup, teamTarget),
-    };
-  }
-
-  return null;
-}
-
-function sanitizeAutomationCleanup(value: unknown, teamTarget: AutomationTeamTarget): AutomationAction['cleanup'] {
-  if (teamTarget.mode === 'dedicated') {
-    return {
-      deleteTeam: !isRecord(value) || value.deleteTeam !== false,
-    };
-  }
-
-  return {
-    deleteAgent: !isRecord(value) || value.deleteAgent !== false,
-  };
-}
-
-function sanitizeAutomationTeamTarget(value: unknown): AutomationTeamTarget | null {
-  if (!isRecord(value) || typeof value.mode !== 'string') {
-    return null;
-  }
-
-  if (value.mode === 'dedicated') {
-    return { mode: 'dedicated' };
-  }
-
-  if (value.mode === 'existing') {
-    const teamId = optionalTrimmedString(value.teamId);
-    return teamId ? { mode: 'existing', teamId } : null;
-  }
-
-  return null;
+  const sourceRepositoryPath = optionalTrimmedString(value.sourceRepositoryPath);
+  return repositoryId && sourceRepositoryPath
+    ? { provider: 'github', repositoryId, sourceRepositoryPath }
+    : null;
 }
 
 function optionalTrimmedString(value: unknown): string | null {

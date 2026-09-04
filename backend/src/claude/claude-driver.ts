@@ -90,7 +90,6 @@ type ClaudeBackendDriverOptions = {
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
-  spokenAnnouncementsEnabled?: () => boolean;
 };
 
 export class ClaudeBackendDriver implements AgentBackendDriver {
@@ -175,7 +174,6 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
         this.driverOptions.pluginSettings?.(),
         {
           celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
-          spokenAnnouncementsEnabled: this.driverOptions.spokenAnnouncementsEnabled?.(),
         },
       );
       const handle = this.transport.startTurn(
@@ -527,7 +525,6 @@ export class ClaudeBackendDriver implements AgentBackendDriver {
           this.driverOptions.pluginSettings?.(),
           {
             celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
-            spokenAnnouncementsEnabled: this.driverOptions.spokenAnnouncementsEnabled?.(),
           },
         );
         const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;

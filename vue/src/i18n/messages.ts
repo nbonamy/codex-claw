@@ -49,6 +49,8 @@ export const messages = {
       },
       automations: {
         deleteExecution: 'Delete execution for {ticket}',
+        everyHours: 'Every {count} hours',
+        everyMinutes: 'Every {count} minutes',
         noExecutions: 'No executions yet.',
         run: 'Run {automation}',
         viewConversation: 'View conversation for {ticket}',

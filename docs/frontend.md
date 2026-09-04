@@ -115,6 +115,7 @@ component is single-use.
 | Product glyphs, including GitHub | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
 | Dialog chrome and footer actions | `.claw-dialog`, `.claw-button` | `vue/src/styles/base.css` |
 | Form dialog structure and fields | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
+| Voice-enabled multiline input | `VoiceTextarea` | `vue/src/shared/VoiceTextarea.vue` |
 
 ### Reusable product components
 

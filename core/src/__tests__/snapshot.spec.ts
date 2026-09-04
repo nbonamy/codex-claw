@@ -1291,18 +1291,13 @@ describe('snapshot reducer', () => {
       id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
-      source: {
+      repositories: [{
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'dedicated',
-        },
-      },
-      instructions: {},
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      }],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
       executionLog: [],
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:00:00.000Z',

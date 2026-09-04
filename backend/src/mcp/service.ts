@@ -17,7 +17,6 @@ import type {
   CelebrationKind,
   CreateAgentInput,
   CreateSourceWorktreeInput,
-  AutomationAction,
   AutomationExecutionLogEntry,
   MainToRendererEvent,
   SpokenAnnouncementRequest,
@@ -29,10 +28,9 @@ import type {
   WorkBacklogAssignmentStatus,
   WorkRoutingRequest,
 } from '@codex-claw/core/contracts';
-import { closeAgentInSnapshot, markWorkItemCompletionInstructionsDeliveredInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
+import { updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { createAgentInSnapshot, updateAgentWorkspace } from '@codex-claw/core/snapshot';
-import { closeTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
@@ -356,18 +354,6 @@ export class ClawMcpService {
       throw new McpToolError(`Work item '${workItemId}' is assigned to ${assignedAgent ? agentDisplayName(assignedAgent) : assignment.agentId}, not ${agentDisplayName(agent)}.`);
     }
 
-    const completionInstructions = status === 'completed' ? this.automationCompletionInstructionsForAssignment(assignment.automationId) : '';
-    if (completionInstructions) {
-      if (!assignment.completionInstructionsDeliveredAt) {
-        const deliveredAssignment = markWorkItemCompletionInstructionsDeliveredInSnapshot(this.snapshot, agent.id, workItemId, this.now().toISOString());
-        if (!deliveredAssignment) {
-          throw new McpToolError(`Completion instructions for work item '${workItemId}' could not be recorded.`);
-        }
-        this.emitWorkAssignmentUpdated(agent.id, deliveredAssignment);
-        return completionInstructionsResponse(workItemId, completionInstructions);
-      }
-    }
-
     const updatedAt = this.now().toISOString();
     const updatedAssignment = updateWorkItemAssignmentInSnapshot(this.snapshot, agent.id, workItemId, status, updatedAt, note);
     if (!updatedAssignment) {
@@ -411,7 +397,6 @@ export class ClawMcpService {
       return;
     }
 
-    this.applyCompletedAutomationCleanup(completedAutomation.action, execution);
     this.emitSnapshotUpdated(agentId);
   }
 
@@ -425,37 +410,6 @@ export class ClawMcpService {
       if (conversationRef) {
         createdAgent.conversationRef = conversationRef;
       }
-    }
-  }
-
-  private applyCompletedAutomationCleanup(action: AutomationAction, execution: AutomationExecutionLogEntry): void {
-    if (action.teamTarget.mode === 'dedicated') {
-      if (action.cleanup?.deleteTeam === false) {
-        return;
-      }
-
-      const teamIds = new Set<string>();
-      for (const createdAgent of execution.createdAgents) {
-        const agent = this.snapshot.agents.find((candidate) => candidate.id === createdAgent.agentId);
-        if (agent?.teamId) {
-          teamIds.add(agent.teamId);
-        }
-      }
-
-      for (const teamId of teamIds) {
-        if (this.snapshot.teams.length > 1) {
-          closeTeamInSnapshot(this.snapshot, teamId);
-        }
-      }
-      return;
-    }
-
-    if (action.cleanup?.deleteAgent === false) {
-      return;
-    }
-
-    for (const createdAgent of execution.createdAgents) {
-      closeAgentInSnapshot(this.snapshot, createdAgent.agentId);
     }
   }
 
@@ -660,15 +614,6 @@ export class ClawMcpService {
     });
   }
 
-  private automationCompletionInstructionsForAssignment(automationId?: string): string {
-    if (!automationId) {
-      return '';
-    }
-
-    const automation = this.snapshot.automations.find((candidate) => candidate.id === automationId);
-    return automation?.instructions.beforeCompletion?.trim() ?? '';
-  }
-
   private emitWorkAssignmentUpdated(agentId: string, assignment: WorkBacklogAssignment): void {
     this.emit({
       agentId,
@@ -693,17 +638,6 @@ function suggestedWorkBranch(task: string): string {
     .slice(0, 48)
     .replace(/-+$/gu, '');
   return `work/${slug || 'task'}`;
-}
-
-function completionInstructionsResponse(workItemId: string, instructions: string): UpdateWorkItemResponse {
-  return {
-    success: true,
-    workItemId,
-    status: 'completion-instructions-required',
-    instructions,
-    message: 'Follow these completion instructions, then call update-work-item again with status completed.',
-    repeatUpdateRequired: true,
-  };
 }
 
 function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {

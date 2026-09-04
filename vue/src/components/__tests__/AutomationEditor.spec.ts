@@ -1,115 +1,61 @@
 import { describe, expect, it } from 'vitest';
-
-import { automation, models, mountEditor } from './automation-editor-test-harness';
+import { automation, mountEditor } from './automation-editor-test-harness';
 
 describe('AutomationEditor submission', () => {
-  it('emits a automation configuration with repo, assignee, tag, new agent, and team target', async () => {
+  it('emits repositories, team, schedule, both prompts, and enabled state', async () => {
     const wrapper = mountEditor();
-
-    await wrapper.findAllComponents({ name: 'ElSelect' })[2]?.vm.$emit('update:modelValue', 'nbonamy');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[3]?.vm.$emit('update:modelValue', 'bug');
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' });
+    await selects[0]!.vm.$emit('update:modelValue', ['github:nbonamy/codex-claw', 'github:nbonamy/witsy']);
+    await selects[2]!.vm.$emit('update:modelValue', 360);
+    const textareas = wrapper.findAll('textarea');
+    await textareas[0]!.setValue('  Pick bugs labeled ready.  ');
+    await textareas[1]!.setValue('  Triage the issue and verify the fix.  ');
     await wrapper.find('form').trigger('submit');
 
-    expect(wrapper.emitted('submit')).toStrictEqual([[
-      {
-        name: '',
-        enabled: true,
-        source: {
+    expect(wrapper.emitted('submit')).toStrictEqual([
+      [
+        {
+          enabled: true,
+          repositories: [
+            {
+              provider: 'github',
+              repositoryId: 'nbonamy/codex-claw',
+              sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+            },
+            {
+              provider: 'github',
+              repositoryId: 'nbonamy/witsy',
+              sourceRepositoryPath: '/Users/nbonamy/src/witsy',
+            },
+          ],
+          teamId: 'team-codex-claw',
+          selectionPrompt: 'Pick bugs labeled ready.',
+          assignmentPrompt: 'Triage the issue and verify the fix.',
+          schedule: { intervalMinutes: 360 },
+        },
+      ],
+    ]);
+  });
+
+  it('preserves the name and values when editing', async () => {
+    const wrapper = mountEditor({ automation: automation() });
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toStrictEqual({
+      name: 'GitHub bugs',
+      enabled: true,
+      repositories: [
+        {
           provider: 'github',
           repositoryId: 'nbonamy/codex-claw',
-          assigneeLogin: 'nbonamy',
-          tagName: 'bug',
-        },
-        instructions: {
-          assignment: '',
-          beforeCompletion: 'Before marking this work item complete, remove the "bug" tag from the GitHub issue.',
-        },
-        action: {
-          type: 'create-agent',
           sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-          backend: 'codex',
-          backendDefaults: {
-            kind: 'codex',
-          },
-          teamTarget: {
-            mode: 'existing',
-            teamId: 'team-codex-claw',
-          },
-          cleanup: {
-            deleteAgent: true,
-          },
         },
-      },
-    ]]);
-  });
-
-  it('can select a Bench agent from the agent selector', async () => {
-    const wrapper = mountEditor();
-
-    await wrapper.findAllComponents({ name: 'ElSelect' })[4]?.vm.$emit('update:modelValue', 'bench:bench-dina');
-    await wrapper.find('form').trigger('submit');
-
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-      },
-    });
-  });
-
-  it('emits selected Codex model and thinking defaults for new agents', async () => {
-    const wrapper = mountEditor({ backendModels: models() });
-
-    await wrapper.findAllComponents({ name: 'ElSelect' })[8]?.vm.$emit('update:modelValue', 'codex');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[9]?.vm.$emit('update:modelValue', 'gpt-5.1-codex-max');
-    await wrapper.findAllComponents({ name: 'ElSelect' })[10]?.vm.$emit('update:modelValue', 'high');
-    await wrapper.find('form').trigger('submit');
-
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
-      action: {
-        type: 'create-agent',
-        backend: 'codex',
-        backendDefaults: {
-          kind: 'codex',
-          model: 'gpt-5.1-codex-max',
-          reasoningEffort: 'high',
-        },
-      },
-    });
-  });
-
-  it('keeps Claude unavailable in the automation backend selector', () => {
-    const wrapper = mountEditor();
-    const backendSelect = wrapper.findAllComponents({ name: 'ElSelect' })
-      .find((select) => select.find('[aria-label="Automation backend"]').exists());
-
-    expect(backendSelect).toBeDefined();
-    expect(backendSelect?.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
-      .toStrictEqual(['Codex']);
-  });
-
-  it('normalizes a legacy Claude automation to the only available Codex backend', async () => {
-    const wrapper = mountEditor({
-      automation: automation({
-        action: {
-          type: 'create-agent',
-          sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-          backend: 'claude',
-          backendDefaults: { kind: 'claude', model: 'haiku' },
-          teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
-          cleanup: { deleteAgent: true },
-        },
-      }),
-    });
-
-    await wrapper.find('form').trigger('submit');
-
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
-      action: {
-        type: 'create-agent',
-        backend: 'codex',
-        backendDefaults: { kind: 'codex' },
-      },
+      ],
+      teamId: 'team-codex-claw',
+      selectionPrompt: 'Pick ready bugs.',
+      assignmentPrompt: 'Fix the issue and run tests.',
+      schedule: { intervalMinutes: 60 },
     });
   });
 });

@@ -4186,13 +4186,13 @@ describe('ClawBackendServer', () => {
       enabled: true,
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
-      source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
-      action: {
-        type: 'create-agent',
+      repositories: [{
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-        teamTarget: { mode: 'existing', teamId: 'team-test' },
-      },
-      instructions: {},
+      }],
+      teamId: 'team-test',
+      schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'automation-exec-1',
         automationId: 'automation-bugs',
@@ -4375,13 +4375,13 @@ describe('ClawBackendServer', () => {
       enabled: true,
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
-      source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
-      action: {
-        type: 'create-agent',
+      repositories: [{
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-        teamTarget: { mode: 'existing', teamId: 'team-test' },
-      },
-      instructions: {},
+      }],
+      teamId: 'team-test',
+      schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'automation-exec-1',
         automationId: 'automation-bugs',
@@ -4446,13 +4446,13 @@ describe('ClawBackendServer', () => {
       id: 'automation-remote',
       name: 'Remote bugs',
       enabled: true,
-      source: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-remote',
-        teamTarget: { mode: 'existing', teamId: 'team-remote' },
-      },
-      instructions: {},
+      repositories: [{
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        sourceRepositoryPath: '/home/nicolas/src/codex-claw',
+      }],
+      teamId: 'team-remote',
+      schedule: { intervalMinutes: 60 },
       executionLog: [],
       createdAt: '2026-06-14T10:00:00.000Z',
       updatedAt: '2026-06-14T10:00:00.000Z',
@@ -4490,12 +4490,9 @@ describe('ClawBackendServer', () => {
     });
     const location = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
     const createInput = {
-      source: { provider: 'github' as const, repositoryId: 'nbonamy/codex-claw' },
-      action: {
-        type: 'create-agent-from-bench' as const,
-        benchTemplateId: 'bench-remote',
-        teamTarget: { mode: 'existing' as const, teamId: 'team-remote' },
-      },
+      repositories: [{ provider: 'github' as const, repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/home/nicolas/src/codex-claw' }],
+      teamId: 'team-remote',
+      schedule: { intervalMinutes: 60 },
     };
 
     await expect(server.handleMessage({
@@ -7102,19 +7099,13 @@ describe('ClawBackendServer', () => {
     const input = {
       name: 'GitHub bugs',
       enabled: true,
-      source: {
+      repositories: [{
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent',
         sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-test',
-        },
-      },
-      instructions: {},
+      }],
+      teamId: 'team-test',
+      schedule: { intervalMinutes: 60 },
     };
 
     const created = await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'automation/create', params: { input } });

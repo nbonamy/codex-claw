@@ -198,15 +198,16 @@ app event, not from the result text.
 
 `announce` follows the transient-effect path without changing agent state:
 
-- developer instructions advertise it only when spoken acknowledgments are
-  enabled, require one short sentence at the start of every user task, and
-  permit one additional short completion sentence only for long-running work;
+- the tool is always exposed and stable developer instructions require one
+  short sentence as the agent's very first action on every user task, with one
+  additional completion sentence permitted only for long-running work;
 - the MCP schema accepts `phase: start | finish` and trims text to 1–160
   characters;
 - the coordinator validates the caller and delegates without touching
   `agent.statusText`;
-- the service applies persisted enablement, mute, and selected-agent policy,
-  then sends the provider-neutral `client/spokenAnnouncement/queue` request;
+- the service applies persisted enablement, dictated-input, mute, and
+  selected-agent policy, then sends the provider-neutral
+  `client/spokenAnnouncement/queue` request;
 - Electron rechecks selected-agent and foreground eligibility when accepting
   playback and cancels active or pending speech when it becomes ineligible;
 - Electron returns as soon as its bounded global queue accepts the request,

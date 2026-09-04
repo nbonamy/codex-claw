@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationCleanup, AutomationLocation, AutomationTeamTarget, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BenchLocation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
@@ -1457,29 +1457,16 @@ describe('AppController', () => {
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
       ...snapshot,
-      automations: [automationFixture({
-        cleanup: { deleteAgent: false },
-        teamTarget: { mode: 'existing', teamId: 'team-codex-claw' },
-      })],
+      automations: [automationFixture()],
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const createInput: CreateAutomationInput = {
       name: 'GitHub bugs',
       enabled: true,
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-codex-claw',
-        },
-      },
-      instructions: {},
+      repositories: [{ provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/repo' }],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
     };
     const updateInput: UpdateAutomationInput = {
       ...createInput,
@@ -1508,10 +1495,7 @@ describe('AppController', () => {
     const remoteSnapshot = {
       ...createInitialSnapshot(),
       activeTeamId: 'team-remote',
-      automations: [automationFixture({
-        cleanup: { deleteAgent: false },
-        teamTarget: { mode: 'existing', teamId: 'team-remote' },
-      })],
+      automations: [automationFixture('team-remote')],
     };
     const request = vi.fn().mockResolvedValue(remoteSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -1519,19 +1503,9 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'Remote bugs',
       enabled: true,
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-remote',
-        },
-      },
-      instructions: {},
+      repositories: [{ provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/repo' }],
+      teamId: 'team-remote',
+      schedule: { intervalMinutes: 60 },
     };
 
     await controller.initialize();
@@ -2265,23 +2239,14 @@ describe('AppController', () => {
   });
 });
 
-function automationFixture(input: { cleanup: AutomationCleanup; teamTarget: AutomationTeamTarget }): Automation {
+function automationFixture(teamId = 'team-codex-claw'): Automation {
   return {
     id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
-    source: {
-      provider: 'github',
-      repositoryId: 'nbonamy/codex-claw',
-      tagName: 'bug',
-    },
-    action: {
-      type: 'create-agent-from-bench',
-      benchTemplateId: 'bench-dina',
-      teamTarget: input.teamTarget,
-      cleanup: input.cleanup,
-    },
-    instructions: {},
+    repositories: [{ provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/repo' }],
+    teamId,
+    schedule: { intervalMinutes: 60 },
     executionLog: [],
     createdAt: '2026-06-09T12:00:00.000Z',
     updatedAt: '2026-06-09T12:00:00.000Z',

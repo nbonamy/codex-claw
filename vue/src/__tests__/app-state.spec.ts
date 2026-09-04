@@ -3496,25 +3496,19 @@ describe('useAppState', () => {
     });
     const automationInput = {
       name: 'GitHub bugs',
-      source: {
+      repositories: [{
         provider: 'github' as const,
         repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench' as const,
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing' as const,
-          teamId: 'team-codex-claw',
-        },
-      },
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      }],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
     };
     const createdSnapshot = {
       ...remoteSnapshot,
       automations: [{
         id: 'automation-bugs',
         enabled: true,
-        instructions: {},
         executionLog: [],
         createdAt: '2026-06-09T10:01:00.000Z',
         updatedAt: '2026-06-09T10:01:00.000Z',

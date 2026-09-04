@@ -86,9 +86,10 @@ describe('agent prompts', () => {
   });
 
   it('requires a short start acknowledgment and reserves finish speech for long-running tasks', () => {
-    const instructions = codexClawDeveloperInstructions(agent(), undefined, { spokenAnnouncementsEnabled: true });
+    const instructions = codexClawDeveloperInstructions(agent());
 
     expect(instructions).toContain('At the beginning of every user task, call announce exactly once');
+    expect(instructions).toContain('must be your very first action');
     expect(instructions).toContain('one short, natural sentence');
     expect(instructions).toContain('For a long-running task, you may call announce once more');
     expect(instructions).toContain('Never announce intermediate progress or reasoning');

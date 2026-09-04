@@ -401,14 +401,10 @@ Input:
 Effects:
 
 - verifies that the work item is currently assigned to the caller;
-- if the assignment came from an automation with before-completion instructions, the
-  first `completed` update records that those instructions were delivered and
-  returns them without completing the work item; after following them, the
-  agent repeats the same `completed` update;
 - updates `workBacklog.assignments[workItemId]` with the requested status,
   timestamp, and optional note;
-- applies any automation cleanup configured for the assignment after confirmed
-  completion;
+- completes the owning automation execution after all of its assignments finish,
+  while preserving the created agents and worktrees for review;
 - emits `workBacklog.assignmentUpdated` so the cockpit backlog reflects the
   lifecycle state;
 - persists the updated assignment.

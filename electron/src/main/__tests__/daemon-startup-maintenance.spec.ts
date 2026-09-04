@@ -147,18 +147,13 @@ function activeAutomationSnapshot() {
     id: 'automation-bugs',
     name: 'Bugs',
     enabled: true,
-    source: {
+    repositories: [{
       provider: 'github',
       repositoryId: 'nabocorp/codex-claw',
-    },
-    action: {
-      type: 'create-agent',
       sourceRepositoryPath: '/Users/nicolas/src/codex-claw',
-      teamTarget: {
-        mode: 'dedicated',
-      },
-    },
-    instructions: {},
+    }],
+    teamId: 'team-codex-claw',
+    schedule: { intervalMinutes: 60 },
     executionLog: [{
       id: 'execution-1',
       automationId: 'automation-bugs',

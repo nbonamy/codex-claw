@@ -1,26 +1,25 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElButton, ElDialog, ElInput, ElMessageBox, ElOption, ElPopover, ElSelect } from 'element-plus';
+import { ElButton, ElDialog, ElInput, ElMessageBox, ElOption, ElPopover, ElSelect, ElSwitch } from 'element-plus';
 import { defineComponent } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendConversationRef, CreateAutomationInput, Automation, AutomationLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type {
+  AppSnapshot,
+  BackendConversationRef,
+  CreateAutomationInput,
+  Automation,
+  AutomationLocation,
+  RemoteConnection,
+  RendererMessage,
+  SourceRepository,
+  WorkRepository,
+} from '@codex-claw/core/contracts';
 import AutomationsView from '../AutomationsView.vue';
 
 const AutomationEditorStub = defineComponent({
   name: 'AutomationEditor',
-  props: [
-    'automation',
-    'backendModels',
-    'benchTemplates',
-    'chooseAgentFolder',
-    'connection',
-    'itemsByRepository',
-    'mode',
-    'repositories',
-    'sourceRepositories',
-    'teams',
-  ],
-  emits: ['cancel', 'load-items', 'load-repositories', 'submit'],
+  props: ['automation', 'connection', 'mode', 'repositories', 'sourceRepositories', 'teams'],
+  emits: ['cancel', 'load-repositories', 'submit'],
   template: '<section class="automation-editor" />',
 });
 
@@ -35,7 +34,7 @@ describe('AutomationsView', () => {
 
     expect(wrapper.text()).toContain('Automations');
     expect(wrapper.text()).not.toContain('Loops');
-    expect(wrapper.text()).toContain('Automations watch for matching work and start the right agent automatically.');
+    expect(wrapper.text()).toContain('Select matching GitHub work and delegate it on your schedule.');
 
     await wrapper.find('.automation-welcome__button').trigger('click');
 
@@ -48,34 +47,28 @@ describe('AutomationsView', () => {
 
     await wrapper.find('.automation-welcome__button').trigger('click');
     wrapper.findComponent({ name: 'AutomationEditor' }).vm.$emit('submit', {
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-codex-claw',
+      repositories: [
+        {
+          provider: 'github',
+          repositoryId: 'nbonamy/codex-claw',
+          sourceRepositoryPath: '/src/codex-claw',
         },
-      },
+      ],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
     });
     await flushPromises();
 
     expect(createAutomation).toHaveBeenCalledWith({
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-codex-claw',
+      repositories: [
+        {
+          provider: 'github',
+          repositoryId: 'nbonamy/codex-claw',
+          sourceRepositoryPath: '/src/codex-claw',
         },
-      },
+      ],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
     });
   });
 
@@ -83,59 +76,59 @@ describe('AutomationsView', () => {
     const localSnapshot = createInitialSnapshot();
     localSnapshot.automations = [automation({ name: 'Local bugs' })];
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.teams = [{
-      id: 'team-remote',
-      name: 'Remote Team',
-      color: '#46A857',
-      agentIds: [],
-    }];
-    remoteSnapshot.bench = [{
-      id: 'bench-remote',
-      name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
-      backend: 'codex',
-      createdAt: '2026-06-09T10:00:00.000Z',
-      updatedAt: '2026-06-09T10:00:00.000Z',
-    }];
-    remoteSnapshot.workBacklog.connections = [{
-      provider: 'github',
-      status: 'connected',
-      accountLabel: 'mnmt',
-    }];
-    remoteSnapshot.automations = [automation({
-      id: 'automation-remote',
-      name: 'Remote bugs',
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-remote',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-remote',
-        },
+    remoteSnapshot.teams = [
+      {
+        id: 'team-remote',
+        name: 'Remote Team',
+        color: '#46A857',
+        agentIds: [],
       },
-    })];
-    const location: AutomationLocation = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    ];
+    remoteSnapshot.bench = [
+      {
+        id: 'bench-remote',
+        name: 'Remote Dina',
+        folder: '/home/nicolas/src/codex-claw',
+        backend: 'codex',
+        createdAt: '2026-06-09T10:00:00.000Z',
+        updatedAt: '2026-06-09T10:00:00.000Z',
+      },
+    ];
+    remoteSnapshot.workBacklog.connections = [
+      {
+        provider: 'github',
+        status: 'connected',
+        accountLabel: 'mnmt',
+      },
+    ];
+    remoteSnapshot.automations = [
+      automation({
+        id: 'automation-remote',
+        name: 'Remote bugs',
+        teamId: 'team-remote',
+      }),
+    ];
+    const location: AutomationLocation = {
+      kind: 'remote',
+      remoteConnectionId: 'connection-devbox',
+    };
     const getAutomationSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
     const createAutomation = vi.fn().mockResolvedValue(remoteSnapshot);
     const deleteAutomation = vi.fn().mockResolvedValue(remoteSnapshot);
     const listSourceRepositories = vi.fn().mockResolvedValue([remoteSourceRepository()]);
-    const listSourceFolders = vi.fn().mockResolvedValue({
-      path: '/home/nicolas/src',
-      parentPath: '/home/nicolas',
-      entries: [{ name: 'codex-claw', path: '/home/nicolas/src/codex-claw' }],
-    } satisfies SourceFolderListing);
-    const loadWorkRepositories = vi.fn().mockResolvedValue([repository({
-      id: 'nbonamy/remote',
-      fullName: 'nbonamy/remote',
-      name: 'remote',
-    })]);
+    const loadWorkRepositories = vi.fn().mockResolvedValue([
+      repository({
+        id: 'nbonamy/remote',
+        fullName: 'nbonamy/remote',
+        name: 'remote',
+      }),
+    ]);
     const runAutomation = vi.fn().mockResolvedValue(remoteSnapshot);
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
       createAutomation,
       deleteAutomation,
       getAutomationSnapshot,
-      listSourceFolders,
       listSourceRepositories,
       loadWorkRepositories,
       remoteConnections: [readyRemoteConnection()],
@@ -163,40 +156,27 @@ describe('AutomationsView', () => {
 
     const editor = wrapper.findComponent({ name: 'AutomationEditor' });
     expect(editor.props('teams')).toStrictEqual(remoteSnapshot.teams);
-    expect(editor.props('benchTemplates')).toStrictEqual(remoteSnapshot.bench);
     expect(editor.props('sourceRepositories')).toStrictEqual([remoteSourceRepository()]);
 
-    const chooseFolder = editor.props('chooseAgentFolder') as () => Promise<string | null>;
-    const choosePromise = chooseFolder();
-    await flushPromises();
-    wrapper.findComponent({ name: 'RemoteFolderPickerDialog' }).vm.$emit('select', '/home/nicolas/src/codex-claw');
-    await expect(choosePromise).resolves.toBe('/home/nicolas/src/codex-claw');
-    expect(listSourceFolders).toHaveBeenCalledWith(expect.objectContaining({
-      remoteConnectionId: 'connection-devbox',
-    }));
-
     editor.vm.$emit('submit', {
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/remote',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-remote',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-remote',
+      repositories: [
+        {
+          provider: 'github',
+          repositoryId: 'nbonamy/remote',
+          sourceRepositoryPath: '/home/nicolas/src/codex-claw',
         },
-      },
+      ],
+      teamId: 'team-remote',
+      schedule: { intervalMinutes: 60 },
     });
     await flushPromises();
 
-    expect(createAutomation).toHaveBeenCalledWith(expect.objectContaining({
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/remote',
-      },
-    }), location);
+    expect(createAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repositories: [expect.objectContaining({ repositoryId: 'nbonamy/remote' })],
+      }),
+      location,
+    );
 
     await wrapper.get('[aria-label="Remote bugs actions"]').trigger('click');
     await flushPromises();
@@ -220,15 +200,11 @@ describe('AutomationsView', () => {
     deleteButton.click();
     await flushPromises();
 
-    expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      'Automation "GitHub bugs" will stop creating agents.',
-      'Delete automation?',
-      {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Delete Automation',
-        type: 'warning',
-      },
-    );
+    expect(ElMessageBox.confirm).toHaveBeenCalledWith('Automation "GitHub bugs" will stop creating agents.', 'Delete automation?', {
+      cancelButtonText: 'Cancel',
+      confirmButtonText: 'Delete Automation',
+      type: 'warning',
+    });
     expect(deleteAutomation).toHaveBeenCalledWith('automation-bugs');
   });
 
@@ -248,23 +224,24 @@ describe('AutomationsView', () => {
     expect(editor.props('mode')).toBe('edit');
     expect(editor.props('automation')).toMatchObject({ id: 'automation-bugs' });
     editor.vm.$emit('submit', {
-      source: {
-        provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent',
-        sourceRepositoryPath: '/tmp/fresh-agent',
-        backend: 'codex',
-        teamTarget: { mode: 'dedicated' },
-      },
+      repositories: [
+        {
+          provider: 'github',
+          repositoryId: 'nbonamy/codex-claw',
+          sourceRepositoryPath: '/tmp/fresh-agent',
+        },
+      ],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
     });
     await flushPromises();
 
-    expect(updateAutomation).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'automation-bugs',
-      action: expect.objectContaining({ type: 'create-agent' }),
-    }));
+    expect(updateAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'automation-bugs',
+        repositories: [expect.objectContaining({ sourceRepositoryPath: '/tmp/fresh-agent' })],
+      }),
+    );
     expect(wrapper.findComponent({ name: 'AutomationEditor' }).exists()).toBe(false);
   });
 
@@ -274,17 +251,24 @@ describe('AutomationsView', () => {
     const deleteAutomationExecution = vi.fn();
     vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancelled'));
     const populatedAutomation = automation({
-      executionLog: [{
-        id: 'automation-exec-1',
-        automationId: 'automation-bugs',
-        startedAt: '2026-06-09T10:00:00.000Z',
-        completedAt: '2026-06-09T10:01:00.000Z',
-        status: 'completed',
-        createdCount: 0,
-        createdAgents: [],
-      }],
+      executionLog: [
+        {
+          id: 'automation-exec-1',
+          automationId: 'automation-bugs',
+          startedAt: '2026-06-09T10:00:00.000Z',
+          completedAt: '2026-06-09T10:01:00.000Z',
+          status: 'completed',
+          createdCount: 0,
+          createdAgents: [],
+        },
+      ],
     });
-    const wrapper = mountView({ clearAutomationHistory, deleteAutomation, deleteAutomationExecution, automations: [populatedAutomation] });
+    const wrapper = mountView({
+      clearAutomationHistory,
+      deleteAutomation,
+      deleteAutomationExecution,
+      automations: [populatedAutomation],
+    });
 
     await wrapper.get('[aria-label="GitHub bugs actions"]').trigger('click');
     await flushPromises();
@@ -305,23 +289,27 @@ describe('AutomationsView', () => {
   it('renders compact automation rows and runs a automation from the row action', async () => {
     const runAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountView({
-      automations: [automation({
-        executionLog: [{
-          id: 'automation-exec-1',
-          automationId: 'automation-bugs',
-          startedAt: '2026-06-09T10:00:00.000Z',
-          completedAt: '2026-06-09T10:01:00.000Z',
-          status: 'completed',
-          createdCount: 1,
-          createdAgents: [],
-        }],
-        lastRunAt: '2026-06-09T10:00:00.000Z',
-      })],
+      automations: [
+        automation({
+          executionLog: [
+            {
+              id: 'automation-exec-1',
+              automationId: 'automation-bugs',
+              startedAt: '2026-06-09T10:00:00.000Z',
+              completedAt: '2026-06-09T10:01:00.000Z',
+              status: 'completed',
+              createdCount: 1,
+              createdAgents: [],
+            },
+          ],
+          lastRunAt: '2026-06-09T10:00:00.000Z',
+        }),
+      ],
       runAutomation,
     });
 
     expect(wrapper.text()).toContain('GitHub bugs');
-    expect(wrapper.text()).toContain('Dina @ nbonamy/codex-claw / bug');
+    expect(wrapper.text()).toContain('Codex Claw · nbonamy/codex-claw · Every hour');
     expect(wrapper.text()).toContain('Jun 9');
     expect(wrapper.text()).toContain('1 execution');
     expect(wrapper.text()).not.toContain('Every few minutes');
@@ -333,50 +321,63 @@ describe('AutomationsView', () => {
   });
 
   it('shows execution logs from the automation row action', async () => {
-    const conversationMessages: RendererMessage[] = [{
-      id: 'message-dina-user',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-09T10:00:02.000Z',
-      parts: [{ type: 'text', text: 'Please fix the cockpit issue.' }],
-    }, {
-      id: 'message-dina-assistant',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'complete',
-      createdAt: '2026-06-09T10:00:45.000Z',
-      parts: [{ type: 'text', text: 'The cockpit issue is fixed.' }],
-    }];
+    const conversationMessages: RendererMessage[] = [
+      {
+        id: 'message-dina-user',
+        agentId: 'agent-dina',
+        role: 'user',
+        status: 'complete',
+        createdAt: '2026-06-09T10:00:02.000Z',
+        parts: [{ type: 'text', text: 'Please fix the cockpit issue.' }],
+      },
+      {
+        id: 'message-dina-assistant',
+        agentId: 'agent-dina',
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-09T10:00:45.000Z',
+        parts: [{ type: 'text', text: 'The cockpit issue is fixed.' }],
+      },
+    ];
     const readConversationMessages = vi.fn().mockResolvedValue(conversationMessages);
     const wrapper = mountView({
-      automations: [automation({
-        executionLog: [{
-          id: 'automation-exec-1',
-          automationId: 'automation-bugs',
-          startedAt: '2026-06-09T10:00:00.000Z',
-          completedAt: '2026-06-09T10:01:00.000Z',
-          status: 'completed',
-          createdCount: 1,
-          createdAgents: [{
-            agentId: 'agent-dina',
-            agentName: 'Dina',
-            workItemId: 'github:nbonamy/codex-claw#12',
-            workItemTitle: 'Fix cockpit',
-            workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-            conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-          }],
-        }, {
-          id: 'automation-exec-0',
-          automationId: 'automation-bugs',
-          startedAt: '2026-06-09T09:00:00.000Z',
-          completedAt: '2026-06-09T09:00:03.000Z',
-          status: 'failed',
-          createdCount: 0,
-          createdAgents: [],
-          error: 'GitHub failed',
-        }],
-      })],
+      automations: [
+        automation({
+          executionLog: [
+            {
+              id: 'automation-exec-1',
+              automationId: 'automation-bugs',
+              startedAt: '2026-06-09T10:00:00.000Z',
+              completedAt: '2026-06-09T10:01:00.000Z',
+              status: 'completed',
+              createdCount: 1,
+              createdAgents: [
+                {
+                  agentId: 'agent-dina',
+                  agentName: 'Dina',
+                  workItemId: 'github:nbonamy/codex-claw#12',
+                  workItemTitle: 'Fix cockpit',
+                  workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+                  conversationRef: {
+                    backend: 'codex',
+                    threadId: 'thread-dina',
+                  },
+                },
+              ],
+            },
+            {
+              id: 'automation-exec-0',
+              automationId: 'automation-bugs',
+              startedAt: '2026-06-09T09:00:00.000Z',
+              completedAt: '2026-06-09T09:00:03.000Z',
+              status: 'failed',
+              createdCount: 0,
+              createdAgents: [],
+              error: 'GitHub failed',
+            },
+          ],
+        }),
+      ],
       readConversationMessages,
     });
 
@@ -412,39 +413,44 @@ describe('AutomationsView', () => {
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
       deleteAutomationExecution,
-      automations: [automation({
-        executionLog: [{
-          id: 'automation-exec-1',
-          automationId: 'automation-bugs',
-          startedAt: '2026-06-09T10:00:00.000Z',
-          completedAt: '2026-06-09T10:01:00.000Z',
-          status: 'completed',
-          createdCount: 1,
-          createdAgents: [{
-            agentId: 'agent-dina',
-            agentName: 'Dina',
-            workItemId: 'github:nbonamy/codex-claw#12',
-            workItemTitle: 'Fix cockpit',
-            workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
-            conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-          }],
-        }],
-      })],
+      automations: [
+        automation({
+          executionLog: [
+            {
+              id: 'automation-exec-1',
+              automationId: 'automation-bugs',
+              startedAt: '2026-06-09T10:00:00.000Z',
+              completedAt: '2026-06-09T10:01:00.000Z',
+              status: 'completed',
+              createdCount: 1,
+              createdAgents: [
+                {
+                  agentId: 'agent-dina',
+                  agentName: 'Dina',
+                  workItemId: 'github:nbonamy/codex-claw#12',
+                  workItemTitle: 'Fix cockpit',
+                  workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+                  conversationRef: {
+                    backend: 'codex',
+                    threadId: 'thread-dina',
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      ],
     });
 
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
     await wrapper.get('[aria-label="Delete execution for github:nbonamy/codex-claw#12"]').trigger('click');
     await flushPromises();
 
-    expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      'This execution will be removed from the automation history.',
-      'Delete execution?',
-      {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Delete Execution',
-        type: 'warning',
-      },
-    );
+    expect(ElMessageBox.confirm).toHaveBeenCalledWith('This execution will be removed from the automation history.', 'Delete execution?', {
+      cancelButtonText: 'Cancel',
+      confirmButtonText: 'Delete Execution',
+      type: 'warning',
+    });
     expect(deleteAutomationExecution).toHaveBeenCalledWith('automation-bugs', 'automation-exec-1');
   });
 
@@ -453,17 +459,21 @@ describe('AutomationsView', () => {
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountView({
       clearAutomationHistory,
-      automations: [automation({
-        executionLog: [{
-          id: 'automation-exec-1',
-          automationId: 'automation-bugs',
-          startedAt: '2026-06-09T10:00:00.000Z',
-          completedAt: '2026-06-09T10:01:00.000Z',
-          status: 'completed',
-          createdCount: 0,
-          createdAgents: [],
-        }],
-      })],
+      automations: [
+        automation({
+          executionLog: [
+            {
+              id: 'automation-exec-1',
+              automationId: 'automation-bugs',
+              startedAt: '2026-06-09T10:00:00.000Z',
+              completedAt: '2026-06-09T10:01:00.000Z',
+              status: 'completed',
+              createdCount: 0,
+              createdAgents: [],
+            },
+          ],
+        }),
+      ],
     });
 
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
@@ -472,23 +482,17 @@ describe('AutomationsView', () => {
     await clearButton!.trigger('click');
     await flushPromises();
 
-    expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      'Execution history for "GitHub bugs" will be cleared.',
-      'Clear history?',
-      {
-        cancelButtonText: 'Cancel',
-        confirmButtonText: 'Clear History',
-        type: 'warning',
-      },
-    );
+    expect(ElMessageBox.confirm).toHaveBeenCalledWith('Execution history for "GitHub bugs" will be cleared.', 'Clear history?', {
+      cancelButtonText: 'Cancel',
+      confirmButtonText: 'Clear History',
+      type: 'warning',
+    });
     expect(clearAutomationHistory).toHaveBeenCalledWith('automation-bugs');
   });
 
-  it('loads local repositories and delegates local agent-folder selection', async () => {
-    const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/new-agent');
+  it('loads local repositories', async () => {
     const loadWorkRepositories = vi.fn().mockResolvedValue([repository()]);
     const wrapper = mountView({
-      chooseAgentFolder,
       loadWorkRepositories,
       workRepositoriesByProvider: {},
     });
@@ -496,9 +500,7 @@ describe('AutomationsView', () => {
 
     expect(loadWorkRepositories).toHaveBeenCalledWith('github');
     await wrapper.find('.automation-welcome__button').trigger('click');
-    const editor = wrapper.findComponent({ name: 'AutomationEditor' });
-    await expect((editor.props('chooseAgentFolder') as () => Promise<string | null>)()).resolves.toBe('/Users/nbonamy/src/new-agent');
-    expect(chooseAgentFolder).toHaveBeenCalledOnce();
+    expect(wrapper.findComponent({ name: 'AutomationEditor' }).exists()).toBe(true);
   });
 
   it('shows remote loading errors and returns to local when the connection disappears', async () => {
@@ -518,106 +520,71 @@ describe('AutomationsView', () => {
     expect(wrapper.text()).toContain('Local bugs');
   });
 
-  it('cancels the remote folder picker and loads remote work items', async () => {
-    const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.automations = [automation({ name: 'Remote bugs' })];
-    remoteSnapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }];
-    const loadWorkItems = vi.fn().mockResolvedValue([workItem()]);
+  it('labels repository, team, schedule, and invalid dates', () => {
     const wrapper = mountView({
-      getAutomationSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-      listSourceRepositories: vi.fn().mockResolvedValue([]),
-      loadWorkItems,
-      loadWorkRepositories: vi.fn().mockResolvedValue([repository()]),
-      remoteConnections: [readyRemoteConnection()],
+      automations: [
+        automation({
+          lastRunAt: 'not-a-date',
+        }),
+      ],
     });
 
-    wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox');
-    await flushPromises();
-    const newAutomationButton = wrapper.findAll('button').find((button) => button.text() === 'New Automation');
-    await newAutomationButton!.trigger('click');
-    const editor = wrapper.findComponent({ name: 'AutomationEditor' });
-    editor.vm.$emit('load-items', 'nbonamy/codex-claw');
-    const folderPromise = (editor.props('chooseAgentFolder') as () => Promise<string | null>)();
-    await flushPromises();
-    wrapper.findComponent({ name: 'RemoteFolderPickerDialog' }).vm.$emit('close');
-
-    await expect(folderPromise).resolves.toBeNull();
-    await flushPromises();
-    expect(loadWorkItems).toHaveBeenCalledWith(
-      'github',
-      'nbonamy/codex-claw',
-      { kind: 'remote', remoteConnectionId: 'connection-devbox' },
-    );
-  });
-
-  it('labels non-GitHub and direct-agent automations without assuming valid dates', () => {
-    const wrapper = mountView({
-      automations: [automation({
-        lastRunAt: 'not-a-date',
-        source: { provider: 'linear' as never, repositoryId: 'workspace' },
-        action: {
-          type: 'create-agent',
-          sourceRepositoryPath: '/tmp/fresh',
-          backend: 'codex',
-          teamTarget: { mode: 'dedicated' },
-        },
-      })],
-    });
-
-    expect(wrapper.text()).toContain('New Agent @ Work provider');
+    expect(wrapper.text()).toContain('Codex Claw · nbonamy/codex-claw · Every hour');
     expect(wrapper.text()).toContain('Unknown');
   });
 });
 
-function mountView(overrides: Partial<{
-  chooseAgentFolder: () => Promise<string | null>;
-  clearAutomationHistory: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  createAutomation: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  deleteAutomationExecution: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  deleteAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
-  listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
-  listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-  loadWorkItems: (provider: 'github', repositoryId: string, location?: AutomationLocation) => Promise<WorkItem[] | void>;
-  loadWorkRepositories: (provider: 'github', location?: AutomationLocation) => Promise<WorkRepository[] | void>;
-  automations: Automation[];
-  messages: RendererMessage[];
-  readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
-  remoteConnections: RemoteConnection[];
-  runAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  snapshot: AppSnapshot;
-  updateAutomation: (input: Parameters<NonNullable<InstanceType<typeof AutomationsView>['$props']['updateAutomation']>>[0], location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  workRepositoriesByProvider: Partial<Record<'github', WorkRepository[]>>;
-  realAutomationEditor: boolean;
-}> = {}) {
+function mountView(
+  overrides: Partial<{
+    clearAutomationHistory: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    createAutomation: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    deleteAutomationExecution: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    deleteAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
+    listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+    loadWorkRepositories: (provider: 'github', location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+    automations: Automation[];
+    messages: RendererMessage[];
+    readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
+    remoteConnections: RemoteConnection[];
+    runAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    snapshot: AppSnapshot;
+    updateAutomation: (
+      input: Parameters<NonNullable<InstanceType<typeof AutomationsView>['$props']['updateAutomation']>>[0],
+      location?: AutomationLocation,
+    ) => Promise<AppSnapshot | void>;
+    workRepositoriesByProvider: Partial<Record<'github', WorkRepository[]>>;
+    realAutomationEditor: boolean;
+  }> = {},
+) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
-  snapshot.bench = [{
-    id: 'bench-dina',
-    name: 'Dina',
-    avatar: 'DI',
-    folder: '/Users/nbonamy/src/codex-claw',
-    backend: 'codex',
-    createdAt: '2026-06-09T10:00:00.000Z',
-    updatedAt: '2026-06-09T10:00:00.000Z',
-  }];
-  snapshot.workBacklog.connections = [{
-    provider: 'github',
-    status: 'connected',
-  }];
+  snapshot.bench = [
+    {
+      id: 'bench-dina',
+      name: 'Dina',
+      avatar: 'DI',
+      folder: '/Users/nbonamy/src/codex-claw',
+      backend: 'codex',
+      createdAt: '2026-06-09T10:00:00.000Z',
+      updatedAt: '2026-06-09T10:00:00.000Z',
+    },
+  ];
+  snapshot.workBacklog.connections = [
+    {
+      provider: 'github',
+      status: 'connected',
+    },
+  ];
 
   return mount(AutomationsView, {
     props: {
       agents: snapshot.agents,
-      bench: snapshot.bench,
-      chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       clearAutomationHistory: overrides.clearAutomationHistory ?? vi.fn().mockResolvedValue(undefined),
       createAutomation: overrides.createAutomation ?? vi.fn().mockResolvedValue(undefined),
       deleteAutomationExecution: overrides.deleteAutomationExecution ?? vi.fn().mockResolvedValue(undefined),
       deleteAutomation: overrides.deleteAutomation ?? vi.fn().mockResolvedValue(undefined),
       getAutomationSnapshot: overrides.getAutomationSnapshot ?? vi.fn().mockResolvedValue(snapshot),
-      listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
-      loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       automations: overrides.automations ?? [],
       messages: overrides.messages ?? snapshot.messages,
@@ -627,15 +594,20 @@ function mountView(overrides: Partial<{
       teams: snapshot.teams,
       updateAutomation: overrides.updateAutomation ?? vi.fn().mockResolvedValue(undefined),
       workBacklog: snapshot.workBacklog,
-      workItemsByRepository: {
-        'github:nbonamy/codex-claw': [workItem()],
-      },
       workRepositoriesByProvider: overrides.workRepositoriesByProvider ?? {
         github: [repository()],
       },
     },
     global: {
-      components: { ElButton, ElDialog, ElInput, ElOption, ElPopover, ElSelect },
+      components: {
+        ElButton,
+        ElDialog,
+        ElInput,
+        ElOption,
+        ElPopover,
+        ElSelect,
+        ElSwitch,
+      },
       stubs: {
         AutomationEditor: overrides.realAutomationEditor ? false : AutomationEditorStub,
       },
@@ -644,8 +616,7 @@ function mountView(overrides: Partial<{
 }
 
 function bodyButton(label: string): HTMLButtonElement {
-  const button = Array.from(document.body.querySelectorAll('button'))
-    .find((candidate) => candidate.textContent?.trim() === label);
+  const button = Array.from(document.body.querySelectorAll('button')).find((candidate) => candidate.textContent?.trim() === label);
   expect(button).toBeDefined();
   return button as HTMLButtonElement;
 }
@@ -655,20 +626,15 @@ function automation(overrides: Partial<Automation> = {}): Automation {
     id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
-    source: {
-      provider: 'github',
-      repositoryId: 'nbonamy/codex-claw',
-      tagName: 'bug',
-    },
-    action: {
-      type: 'create-agent-from-bench',
-      benchTemplateId: 'bench-dina',
-      teamTarget: {
-        mode: 'existing',
-        teamId: 'team-codex-claw',
+    repositories: [
+      {
+        provider: 'github',
+        repositoryId: 'nbonamy/codex-claw',
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
       },
-    },
-    instructions: {},
+    ],
+    teamId: 'team-codex-claw',
+    schedule: { intervalMinutes: 60 },
     executionLog: [],
     createdAt: '2026-06-09T10:00:00.000Z',
     updatedAt: '2026-06-09T10:00:00.000Z',
@@ -693,10 +659,13 @@ function remoteSourceRepository(): SourceRepository {
   return {
     name: 'codex-claw',
     path: '/home/nicolas/src/codex-claw',
-    worktrees: [{
-      name: 'main',
-      path: '/home/nicolas/src/codex-claw',
-    }],
+    remoteIdentity: 'github.com/nbonamy/codex-claw',
+    worktrees: [
+      {
+        name: 'main',
+        path: '/home/nicolas/src/codex-claw',
+      },
+    ],
   };
 }
 
@@ -715,21 +684,5 @@ function readyRemoteConnection(): RemoteConnection {
     },
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',
-  };
-}
-
-function workItem(): WorkItem {
-  return {
-    provider: 'github',
-    id: 'nbonamy/codex-claw#12',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
-    number: 12,
-    title: 'Fix cockpit',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
-    state: 'open',
-    labels: [{ name: 'bug' }],
-    createdAt: '2026-06-09T10:00:00.000Z',
-    updatedAt: '2026-06-09T10:00:00.000Z',
   };
 }

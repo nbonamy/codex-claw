@@ -1,9 +1,10 @@
-import type { AutomationInstructions, WorkBacklogAssignmentPolicy, WorkItem } from './contracts';
+import type { WorkBacklogAssignmentPolicy, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
 
 export type WorkItemAssignmentAction = 'addressFeedback' | 'fix' | 'investigate' | 'review';
 
-type WorkItemPromptOptions = Pick<AutomationInstructions, 'assignment'> & {
+type WorkItemPromptOptions = {
+  assignment?: string;
   action?: WorkItemAssignmentAction;
   completionPolicy?: WorkBacklogAssignmentPolicy;
 };

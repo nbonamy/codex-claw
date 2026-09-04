@@ -75,13 +75,13 @@ describe('AgentConversationService', () => {
       id: 'automation-1',
       name: 'Automation',
       enabled: true,
-      source: { provider: 'github', repositoryId: 'openai/codex-claw' },
-      action: {
-        type: 'create-agent',
+      repositories: [{
+        provider: 'github',
+        repositoryId: 'openai/codex-claw',
         sourceRepositoryPath: '/repo',
-        teamTarget: { mode: 'existing', teamId: 'team-1' },
-      },
-      instructions: {},
+      }],
+      teamId: 'team-1',
+      schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'execution-1',
         automationId: 'automation-1',

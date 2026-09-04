@@ -49,17 +49,11 @@ describe('codex-config', () => {
     expect(config.config?.['mcp_servers.node_repl.enabled']).toBe(true);
   });
 
-  it('adds spoken acknowledgment policy only when the setting is enabled', () => {
-    const disabled = buildCodexClawThreadConfig(agent, 'http://127.0.0.1:8767/mcp');
-    const enabled = buildCodexClawThreadConfig(
-      agent,
-      'http://127.0.0.1:8767/mcp',
-      undefined,
-      { spokenAnnouncementsEnabled: true },
-    );
+  it('always adds spoken acknowledgment policy', () => {
+    const config = buildCodexClawThreadConfig(agent, 'http://127.0.0.1:8767/mcp');
 
-    expect(disabled.developerInstructions).not.toContain('Spoken acknowledgments are enabled');
-    expect(enabled.developerInstructions).toContain('call announce exactly once');
+    expect(config.developerInstructions).toContain('call announce exactly once');
+    expect(config.developerInstructions).toContain('must be your very first action');
   });
 
   it('adds celebration policy only when the setting is enabled', () => {

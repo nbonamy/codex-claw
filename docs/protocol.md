@@ -276,9 +276,14 @@ without adopting it as the local product snapshot.
 | `automation/delete` | `{ automationId, location? }` | `AppSnapshot` | Deletes scheduler configuration in local `clawd` or the selected remote automation location. |
 
 The Electron renderer exposes this as `Automations > Local|<remote>`. Create/edit
-forms use the selected location's teams, bench templates, source repositories,
-work-provider repositories, work items, and remote folder picker data. Automation
-history conversation previews pass the same location to
+forms use the selected location's teams, source repositories, and work-provider
+repositories. `CreateAutomationInput` contains one or more repository targets,
+one team id, optional selection criteria, optional per-agent instructions, an
+enabled flag, and an interval schedule. Each due run gathers open unassigned
+issues and pull requests, uses hidden structured generation to select the items
+matching the criteria, then creates an isolated worktree and agent in the selected
+team for each selected item. Blank criteria select every eligible item without a
+model call. Automation history conversation previews pass the same location to
 `agent/conversation/messages/get`.
 
 ## Client To `clawd`: Backend-Internal Driver RPC

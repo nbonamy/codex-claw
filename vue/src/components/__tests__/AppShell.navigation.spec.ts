@@ -365,7 +365,7 @@ describe('AppShell navigation and teams', () => {
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
-    expect(wrapper.text()).toContain('Automations watch for matching work and start the right agent automatically.');
+    expect(wrapper.text()).toContain('Select matching GitHub work and delegate it on your schedule.');
   });
 
   it('opens a automation execution conversation from the logs view', async () => {
@@ -374,19 +374,13 @@ describe('AppShell navigation and teams', () => {
       id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
-      source: {
+      repositories: [{
         provider: 'github',
         repositoryId: 'nbonamy/codex-claw',
-      },
-      action: {
-        type: 'create-agent-from-bench',
-        benchTemplateId: 'bench-dina',
-        teamTarget: {
-          mode: 'existing',
-          teamId: 'team-codex-claw',
-        },
-      },
-      instructions: {},
+        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      }],
+      teamId: 'team-codex-claw',
+      schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'automation-exec-1',
         automationId: 'automation-bugs',

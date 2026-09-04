@@ -1,21 +1,11 @@
 <template>
-  <section
-    class="automations-view"
-    :aria-label="$t('surface.automationsView.automations')"
-  >
-
+  <section class="automations-view" :aria-label="$t('surface.automationsView.automations')">
     <div class="automations-view__header" />
 
     <main class="automations-view__content">
       <div class="automations-view__panel">
-        <SettingsPanelFrame
-          :title="$t('surface.automationsView.automations')"
-          title-id="automations-title"
-        >
-          <div
-            v-if="!editorVisible && !logAutomation"
-            class="automations-view__list-header"
-          >
+        <SettingsPanelFrame :title="$t('surface.automationsView.automations')" title-id="automations-title">
+          <div v-if="!editorVisible && !logAutomation" class="automations-view__list-header">
             <div class="automations-view__location-heading">
               <h3>{{ $t('surface.automationsView.automations') }}</h3>
               <ChevronRightIcon aria-hidden="true" />
@@ -25,10 +15,7 @@
                 :aria-label="$t('surface.automationsView.automationLocation')"
                 size="small"
               >
-                <el-option
-                  :label="$t('surface.automationsView.local')"
-                  value="local"
-                />
+                <el-option :label="$t('surface.automationsView.local')" value="local" />
                 <el-option
                   v-for="connection in readyRemoteConnections"
                   :key="connection.id"
@@ -37,28 +24,21 @@
                 />
               </el-select>
             </div>
-            <el-button
-              v-if="locationAutomations.length > 0"
-              type="primary"
-              @click="openCreate"
-            > {{ $t('surface.automationsView.newAutomation') }} </el-button>
+            <el-button v-if="locationAutomations.length > 0" type="primary" @click="openCreate">
+              {{ $t('surface.automationsView.newAutomation') }}
+            </el-button>
           </div>
 
           <AutomationEditor
             v-if="editorVisible"
             :key="editorKey"
-            :backend-models="backendModels"
-            :bench-templates="locationBench"
-            :choose-agent-folder="chooseAutomationAgentFolder"
             :connection="locationGithubConnection"
-            :items-by-repository="locationWorkItemsByRepository"
             :automation="editingAutomation"
             :mode="editorMode"
             :repositories="locationGithubRepositories"
             :source-repositories="locationSourceRepositories"
             :teams="locationTeams"
             @cancel="closeEditor"
-            @load-items="loadGitHubItems"
             @load-repositories="loadGitHubRepositories"
             @submit="saveAutomation"
           />
@@ -73,38 +53,21 @@
             @delete-execution="confirmDeleteAutomationExecution"
           />
 
-          <div
-            v-else-if="locationStatus === 'loading'"
-            class="automations-view__location-state"
-          > {{ $t('surface.automationsView.loadingAutomations') }} </div>
+          <div v-else-if="locationStatus === 'loading'" class="automations-view__location-state">
+            {{ $t('surface.automationsView.loadingAutomations') }}
+          </div>
 
-          <div
-            v-else-if="locationStatus === 'error'"
-            class="automations-view__error"
-          >
+          <div v-else-if="locationStatus === 'error'" class="automations-view__error">
             {{ locationError }}
           </div>
 
-          <AutomationWelcome
-            v-else-if="locationAutomations.length === 0"
-            @create="openCreate"
-          />
+          <AutomationWelcome v-else-if="locationAutomations.length === 0" @create="openCreate" />
 
-          <div
-            v-else
-            class="automations-view__list"
-          >
-            <AppDataList
-              :aria-label="$t('surface.automationsView.automations')"
-              :columns="automationColumns"
-              :rows="automationRows"
-            >
+          <div v-else class="automations-view__list">
+            <AppDataList :aria-label="$t('surface.automationsView.automations')" :columns="automationColumns" :rows="automationRows">
               <template #cell-automation="{ row }">
                 <div class="automations-view__automation-cell">
-                  <span
-                    class="automations-view__status"
-                    :data-enabled="row.enabled"
-                  />
+                  <span class="automations-view__status" :data-enabled="row.enabled" />
                   <div class="automations-view__info">
                     <strong>{{ row.name }}</strong>
                     <span>{{ row.sourceLine }}</span>
@@ -132,7 +95,11 @@
                   </button>
                   <button
                     type="button"
-                    :aria-label="$t('dynamic.automations.viewLogs', { automation: row.name })"
+                    :aria-label="
+                      $t('dynamic.automations.viewLogs', {
+                        automation: row.name,
+                      })
+                    "
                     @click="openLog(row.id)"
                   >
                     <LogsIcon aria-hidden="true" />
@@ -167,25 +134,13 @@
               </template>
             </AppDataList>
 
-            <div
-              v-if="workBacklogStatus === 'error' && workBacklogError"
-              class="automations-view__error"
-            >
+            <div v-if="workBacklogStatus === 'error' && workBacklogError" class="automations-view__error">
               {{ workBacklogError }}
             </div>
           </div>
         </SettingsPanelFrame>
       </div>
     </main>
-
-    <RemoteFolderPickerDialog
-      :initial-path="remoteFolderPickerInitialPath"
-      :list-source-folders="listAutomationSourceFolders"
-      :remote-connection-id="selectedRemoteConnectionId ?? ''"
-      :visible="remoteFolderPickerVisible"
-      @close="cancelRemoteFolderPicker"
-      @select="selectRemoteFolder"
-    />
   </section>
 </template>
 
@@ -193,7 +148,19 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref, watch } from 'vue';
-import type { AppSnapshot, BackendConversationRef, BackendModelOption, CreateAutomationInput, Automation, AutomationLocation, RemoteConnection, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, UpdateAutomationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type {
+  AppSnapshot,
+  BackendConversationRef,
+  CreateAutomationInput,
+  Automation,
+  AutomationLocation,
+  RemoteConnection,
+  RendererMessage,
+  SourceRepository,
+  UpdateAutomationInput,
+  WorkProviderKind,
+  WorkRepository,
+} from '@codex-claw/core/contracts';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
@@ -202,59 +169,50 @@ import type { AppMenuItem } from '../shared/menu/app-menu';
 import AutomationEditor from './AutomationEditor.vue';
 import AutomationExecutionLog from './AutomationExecutionLog.vue';
 import AutomationWelcome from './AutomationWelcome.vue';
-import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import { ChevronRightIcon, DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
 
-const props = withDefaults(defineProps<{
-  backendModels?: BackendModelOption[];
-  bench: AppSnapshot['bench'];
-  chooseAgentFolder?: () => Promise<string | null>;
-  clearAutomationHistory?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  deleteAutomationExecution?: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
-  listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
-  listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-  loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation) => Promise<WorkItem[] | void>;
-  loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
-  automations: Automation[];
-  messages?: RendererMessage[];
-  remoteConnections?: RemoteConnection[];
-  runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
-  sourceRepositories?: SourceRepository[];
-  teams: AppSnapshot['teams'];
-  updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-  workBacklog: AppSnapshot['workBacklog'];
-  workBacklogError?: string | null;
-  workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  workItemsByRepository?: Record<string, WorkItem[]>;
-  workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
-}>(), {
-  backendModels: () => [],
-  clearAutomationHistory: async () => undefined,
-  chooseAgentFolder: async () => null,
-  createAutomation: async () => undefined,
-  deleteAutomationExecution: async () => undefined,
-  deleteAutomation: async () => undefined,
-  getAutomationSnapshot: async () => createEmptySnapshot(),
-  listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
-  listSourceRepositories: async () => [],
-  loadWorkItems: async () => undefined,
-  loadWorkRepositories: async () => undefined,
-  messages: () => [],
-  readConversationMessages: async () => [],
-  remoteConnections: () => [],
-  runAutomation: async () => undefined,
-  sourceRepositories: () => [],
-  updateAutomation: async () => undefined,
-  workBacklogError: null,
-  workBacklogStatus: 'notLoaded',
-  workItemsByRepository: () => ({}),
-  workRepositoriesByProvider: () => ({}),
-});
+const props = withDefaults(
+  defineProps<{
+    clearAutomationHistory?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    deleteAutomationExecution?: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
+    listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
+    loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+    automations: Automation[];
+    messages?: RendererMessage[];
+    remoteConnections?: RemoteConnection[];
+    runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
+    sourceRepositories?: SourceRepository[];
+    teams: AppSnapshot['teams'];
+    updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
+    workBacklog: AppSnapshot['workBacklog'];
+    workBacklogError?: string | null;
+    workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+    workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
+  }>(),
+  {
+    clearAutomationHistory: async () => undefined,
+    createAutomation: async () => undefined,
+    deleteAutomationExecution: async () => undefined,
+    deleteAutomation: async () => undefined,
+    getAutomationSnapshot: async () => createEmptySnapshot(),
+    listSourceRepositories: async () => [],
+    loadWorkRepositories: async () => undefined,
+    messages: () => [],
+    readConversationMessages: async () => [],
+    remoteConnections: () => [],
+    runAutomation: async () => undefined,
+    sourceRepositories: () => [],
+    updateAutomation: async () => undefined,
+    workBacklogError: null,
+    workBacklogStatus: 'notLoaded',
+    workRepositoriesByProvider: () => ({}),
+  },
+);
 
 type EditorMode = 'create' | 'edit';
 type LocationStatus = 'idle' | 'loading' | 'error';
@@ -267,86 +225,89 @@ const selectedLocationValue = ref('local');
 const remoteSnapshot = ref<AppSnapshot | null>(null);
 const remoteSourceRepositories = ref<SourceRepository[]>([]);
 const remoteWorkRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
-const remoteWorkItemsByRepository = ref<Record<string, WorkItem[]>>({});
 const locationStatus = ref<LocationStatus>('idle');
 const locationError = ref<string | null>(null);
-const remoteFolderPickerVisible = ref(false);
-const remoteFolderPickerInitialPath = ref('');
-let remoteFolderPickerResolve: ((path: string | null) => void) | null = null;
 let locationLoadId = 0;
 const emptyLocationSnapshot = createEmptySnapshot();
 
-const editorVisible = computed(() => editorMode.value === 'create' ? creating.value : Boolean(editingAutomation.value));
+const editorVisible = computed(() => (editorMode.value === 'create' ? creating.value : Boolean(editingAutomation.value)));
 const creating = ref(false);
-const readyRemoteConnections = computed(() => props.remoteConnections.filter((connection) => (
-  connection.status === 'ready' && Boolean(connection.transport)
-)));
-const selectedRemoteConnectionId = computed(() => (
-  selectedLocationValue.value.startsWith('remote:')
-    ? selectedLocationValue.value.slice('remote:'.length)
-    : null
-));
-const selectedRemoteConnection = computed(() => (
-  selectedRemoteConnectionId.value
-    ? readyRemoteConnections.value.find((connection) => connection.id === selectedRemoteConnectionId.value) ?? null
-    : null
-));
-const selectedLocation = computed<AutomationLocation>(() => (
-  selectedRemoteConnectionId.value
-    ? { kind: 'remote', remoteConnectionId: selectedRemoteConnectionId.value }
-    : { kind: 'local' }
-));
+const readyRemoteConnections = computed(() =>
+  props.remoteConnections.filter((connection) => connection.status === 'ready' && Boolean(connection.transport)),
+);
+const selectedRemoteConnectionId = computed(() =>
+  selectedLocationValue.value.startsWith('remote:') ? selectedLocationValue.value.slice('remote:'.length) : null,
+);
+const selectedLocation = computed<AutomationLocation>(() =>
+  selectedRemoteConnectionId.value ? { kind: 'remote', remoteConnectionId: selectedRemoteConnectionId.value } : { kind: 'local' },
+);
 const isRemoteLocation = computed(() => selectedLocation.value.kind === 'remote');
-const locationAutomations = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.automations ?? [] : props.automations);
-const locationBench = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.bench ?? [] : props.bench);
-const locationTeams = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.teams ?? [] : props.teams);
-const locationWorkBacklog = computed(() => isRemoteLocation.value ? remoteSnapshot.value?.workBacklog ?? emptyLocationSnapshot.workBacklog : props.workBacklog);
-const locationSourceRepositories = computed(() => isRemoteLocation.value ? remoteSourceRepositories.value : props.sourceRepositories);
-const locationWorkRepositoriesByProvider = computed(() => isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : props.workRepositoriesByProvider);
-const locationWorkItemsByRepository = computed(() => isRemoteLocation.value ? remoteWorkItemsByRepository.value : props.workItemsByRepository);
-const editingAutomation = computed(() => editingAutomationId.value ? locationAutomations.value.find((automation) => automation.id === editingAutomationId.value) ?? null : null);
-const logAutomation = computed(() => logAutomationId.value ? locationAutomations.value.find((automation) => automation.id === logAutomationId.value) ?? null : null);
+const locationAutomations = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.automations ?? []) : props.automations));
+const locationTeams = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.teams ?? []) : props.teams));
+const locationWorkBacklog = computed(() =>
+  isRemoteLocation.value ? (remoteSnapshot.value?.workBacklog ?? emptyLocationSnapshot.workBacklog) : props.workBacklog,
+);
+const locationSourceRepositories = computed(() => (isRemoteLocation.value ? remoteSourceRepositories.value : props.sourceRepositories));
+const locationWorkRepositoriesByProvider = computed(() =>
+  isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : props.workRepositoriesByProvider,
+);
+const editingAutomation = computed(() =>
+  editingAutomationId.value ? (locationAutomations.value.find((automation) => automation.id === editingAutomationId.value) ?? null) : null,
+);
+const logAutomation = computed(() =>
+  logAutomationId.value ? (locationAutomations.value.find((automation) => automation.id === logAutomationId.value) ?? null) : null,
+);
 const editorKey = computed(() => editingAutomation.value?.id ?? `create-${creating.value ? 'open' : 'closed'}`);
-const locationGithubConnection = computed(() => locationWorkBacklog.value.connections.find((connection) => connection.provider === 'github') ?? null);
+const locationGithubConnection = computed(
+  () => locationWorkBacklog.value.connections.find((connection) => connection.provider === 'github') ?? null,
+);
 const locationGithubRepositories = computed(() => locationWorkRepositoriesByProvider.value.github ?? []);
-const automationColumns: AppDataListColumn[] = [{
-  id: 'automation',
-  label: translate('surface.automationsView.automation'),
-  width: 'minmax(220px, 1fr)',
-}, {
-  id: 'lastExecution',
-  label: translate('surface.automationsView.lastExecution'),
-  width: 'max-content',
-  align: 'end',
-}, {
-  id: 'executionCount',
-  label: translate('surface.automationsView.executions'),
-  width: 'max-content',
-  align: 'end',
-}];
-const automationMenuItems: AppMenuItem[] = [{
-  id: 'edit',
-  type: 'action',
-  label: translate('surface.automationsView.edit'),
-  icon: PencilIcon,
-}, {
-  id: 'delete',
-  type: 'action',
-  label: translate('surface.automationsView.delete'),
-  icon: Trash2Icon,
-  danger: true,
-}];
-const automationRows = computed<AppDataListRow[]>(() => locationAutomations.value.map((automation) => ({
-  agentName: automationAgentName(automation),
-  executionCount: automationExecutionCountLabel(automation),
-  id: automation.id,
-  enabled: automation.enabled,
-  error: automation.lastError ?? '',
-  lastExecution: automationLastExecutionLabel(automation),
-  name: automation.name,
-  source: automationSourceLabel(automation),
-  sourceLine: `${automationAgentName(automation)} @ ${automationSourceLabel(automation)}`,
-})));
+const automationColumns: AppDataListColumn[] = [
+  {
+    id: 'automation',
+    label: translate('surface.automationsView.automation'),
+    width: 'minmax(220px, 1fr)',
+  },
+  {
+    id: 'lastExecution',
+    label: translate('surface.automationsView.lastExecution'),
+    width: 'max-content',
+    align: 'end',
+  },
+  {
+    id: 'executionCount',
+    label: translate('surface.automationsView.executions'),
+    width: 'max-content',
+    align: 'end',
+  },
+];
+const automationMenuItems: AppMenuItem[] = [
+  {
+    id: 'edit',
+    type: 'action',
+    label: translate('surface.automationsView.edit'),
+    icon: PencilIcon,
+  },
+  {
+    id: 'delete',
+    type: 'action',
+    label: translate('surface.automationsView.delete'),
+    icon: Trash2Icon,
+    danger: true,
+  },
+];
+const automationRows = computed<AppDataListRow[]>(() =>
+  locationAutomations.value.map((automation) => ({
+    executionCount: automationExecutionCountLabel(automation),
+    id: automation.id,
+    enabled: automation.enabled,
+    error: automation.lastError ?? '',
+    lastExecution: automationLastExecutionLabel(automation),
+    name: automation.name,
+    source: automationSourceLabel(automation),
+    sourceLine: `${automationTeamName(automation)} · ${automationSourceLabel(automation)} · ${automationScheduleLabel(automation)}`,
+  })),
+);
 
 onMounted(() => {
   if (locationGithubConnection.value?.status === 'connected' && locationGithubRepositories.value.length === 0) {
@@ -358,7 +319,6 @@ watch(selectedLocationValue, () => {
   closeEditor();
   closeLog();
   remoteWorkRepositoriesByProvider.value = {};
-  remoteWorkItemsByRepository.value = {};
   void loadSelectedLocation();
 });
 
@@ -403,12 +363,13 @@ function closeLog(): void {
 }
 
 async function saveAutomation(input: CreateAutomationInput): Promise<void> {
-  const nextSnapshot = editorMode.value === 'edit' && editingAutomation.value
-    ? await updateLocationAutomation({
-      ...input,
-      id: editingAutomation.value.id,
-    })
-    : await createLocationAutomation(input);
+  const nextSnapshot =
+    editorMode.value === 'edit' && editingAutomation.value
+      ? await updateLocationAutomation({
+          ...input,
+          id: editingAutomation.value.id,
+        })
+      : await createLocationAutomation(input);
   refreshLocationFromSnapshot(nextSnapshot);
   closeEditor();
 }
@@ -506,9 +467,7 @@ async function confirmDeleteAutomationExecution(payload: { executionId: string; 
 
 async function loadGitHubRepositories(): Promise<void> {
   const location = requestLocation();
-  const repositories = location
-    ? await props.loadWorkRepositories('github', location)
-    : await props.loadWorkRepositories('github');
+  const repositories = location ? await props.loadWorkRepositories('github', location) : await props.loadWorkRepositories('github');
   if (location?.kind === 'remote' && selectedLocationValue.value === remoteLocationValue(location.remoteConnectionId) && repositories) {
     remoteWorkRepositoriesByProvider.value = {
       ...remoteWorkRepositoriesByProvider.value,
@@ -517,56 +476,9 @@ async function loadGitHubRepositories(): Promise<void> {
   }
 }
 
-async function loadGitHubItems(repositoryId: string): Promise<void> {
-  const location = requestLocation();
-  const items = location
-    ? await props.loadWorkItems('github', repositoryId, location)
-    : await props.loadWorkItems('github', repositoryId);
-  if (location?.kind === 'remote' && selectedLocationValue.value === remoteLocationValue(location.remoteConnectionId) && items) {
-    remoteWorkItemsByRepository.value = {
-      ...remoteWorkItemsByRepository.value,
-      [workItemsKey('github', repositoryId)]: items,
-    };
-  }
-}
-
 async function readLocationConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
   const location = requestLocation();
-  return location
-    ? props.readConversationMessages(ref, agentId, location)
-    : props.readConversationMessages(ref, agentId);
-}
-
-async function chooseAutomationAgentFolder(): Promise<string | null> {
-  if (!isRemoteLocation.value || !selectedRemoteConnection.value) {
-    return props.chooseAgentFolder();
-  }
-
-  remoteFolderPickerInitialPath.value = selectedRemoteConnection.value.sourceFolderPath ?? '';
-  remoteFolderPickerVisible.value = true;
-  return new Promise((resolve) => {
-    remoteFolderPickerResolve = resolve;
-  });
-}
-
-function listAutomationSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
-  const remoteConnectionId = selectedRemoteConnectionId.value;
-  return props.listSourceFolders({
-    ...(input ?? {}),
-    ...(remoteConnectionId ? { remoteConnectionId } : {}),
-  });
-}
-
-function selectRemoteFolder(path: string): void {
-  remoteFolderPickerVisible.value = false;
-  remoteFolderPickerResolve?.(path);
-  remoteFolderPickerResolve = null;
-}
-
-function cancelRemoteFolderPicker(): void {
-  remoteFolderPickerVisible.value = false;
-  remoteFolderPickerResolve?.(null);
-  remoteFolderPickerResolve = null;
+  return location ? props.readConversationMessages(ref, agentId, location) : props.readConversationMessages(ref, agentId);
 }
 
 async function loadSelectedLocation(): Promise<void> {
@@ -589,9 +501,7 @@ async function loadSelectedLocation(): Promise<void> {
       return;
     }
     remoteSnapshot.value = snapshot;
-    const sourceRepositories = selectedRemoteConnectionId.value
-      ? await props.listSourceRepositories(selectedRemoteConnectionId.value)
-      : [];
+    const sourceRepositories = selectedRemoteConnectionId.value ? await props.listSourceRepositories(selectedRemoteConnectionId.value) : [];
     if (loadId !== locationLoadId) {
       return;
     }
@@ -646,7 +556,9 @@ function clearLocationAutomationHistory(automationId: string): Promise<AppSnapsh
 
 function deleteLocationAutomationExecution(automationId: string, executionId: string): Promise<AppSnapshot | void> {
   const location = requestLocation();
-  return location ? props.deleteAutomationExecution(automationId, executionId, location) : props.deleteAutomationExecution(automationId, executionId);
+  return location
+    ? props.deleteAutomationExecution(automationId, executionId, location)
+    : props.deleteAutomationExecution(automationId, executionId);
 }
 
 function deleteLocationAutomation(automationId: string): Promise<AppSnapshot | void> {
@@ -658,27 +570,21 @@ function requestLocation(): AutomationLocation | undefined {
   return isRemoteLocation.value ? selectedLocation.value : undefined;
 }
 
-function workItemsKey(provider: WorkProviderKind, repositoryId: string): string {
-  return `${provider}:${repositoryId}`;
-}
-
 function automationSourceLabel(automation: Automation): string {
-  if (automation.source.provider === 'github') {
-    return automation.source.tagName
-      ? `${automation.source.repositoryId} / ${automation.source.tagName}`
-      : automation.source.repositoryId;
-  }
-  return translate('surface.automationsView.workProvider');
+  const names = automation.repositories.map((repository) => repository.repositoryId);
+  return names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
 }
 
-function automationAgentName(automation: Automation): string {
-  const action = automation.action;
-  if (action.type === 'create-agent') {
-    return translate('surface.automationsView.newAgent');
-  }
+function automationTeamName(automation: Automation): string {
+  return locationTeams.value.find((team) => team.id === automation.teamId)?.name ?? translate('surface.automationsView.missingTeam');
+}
 
-  const template = locationBench.value.find((candidate) => candidate.id === action.benchTemplateId);
-  return template ? template.name : translate('surface.automationsView.missingBenchAgent');
+function automationScheduleLabel(automation: Automation): string {
+  const minutes = automation.schedule.intervalMinutes;
+  if (minutes < 60) return translate('dynamic.automations.everyMinutes', { count: minutes });
+  if (minutes === 60) return translate('surface.automationEditor.everyHour');
+  if (minutes < 1_440) return translate('dynamic.automations.everyHours', { count: minutes / 60 });
+  return translate('surface.automationEditor.everyDay');
 }
 
 function automationLastExecutionLabel(automation: Automation): string {
