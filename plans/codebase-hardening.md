@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 13c active — decode remote backend-event transports.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 14a active — close the backend event union.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -112,10 +112,15 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 12: deepen snapshot decoding and classify adoption.
 - [x] Phase 1.4 slice 12a: add the deep snapshot decoder and Core characterizations.
 - [x] Phase 1.4 slice 12b: migrate mixed snapshot callers and add boundary regressions.
-- [ ] Phase 1.4 slice 13: add typed decoding at every backend-event wire ingress.
+- [x] Phase 1.4 slice 13: add typed decoding at every backend-event wire ingress.
 - [x] Phase 1.4 slice 13a: add the Core wire-event decoder and characterizations.
 - [x] Phase 1.4 slice 13b: decode local Electron and Web backend events.
-- [ ] Phase 1.4 slice 13c: decode remote backend events. **Active.**
+- [x] Phase 1.4 slice 13c: decode remote backend events.
+- [ ] Phase 1.4 slice 14: close event ownership and remove redundant guards.
+- [ ] Phase 1.4 slice 14a: close the backend event union. **Active.**
+- [ ] Phase 1.4 slice 14b: route backend events exhaustively.
+- [ ] Phase 1.4 slice 14c: trust decoded backend events downstream.
+- [ ] Phase 1.4 slice 14d: simplify renderer event handling.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -161,11 +166,13 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 12b: classified snapshot adoption | Complete | snapshot boundary agent / root integrator | All mixed boundaries now decode once and branch on classification: backend remote results, remote-team events, Core runtime reduction, Electron synchronization/transient/cache replicas, and Vue adoption; full-only guards remain where only a complete snapshot is valid | Focused: Core 30, Backend 54, Electron 14, and Vue 18 tests. Full `npm run test:ai`: 272 files / 2,077 tests in 28.02s. All-workspace typecheck and lint/Knip passed | `79572a0db1d821ed30ca3a7a5fc4f998aca889b0` | Review found and fixed an invalid full snapshot downgrading to metadata. Persistence remains separate and permissive; full/metadata precedence, transcript replacement/retention, cache behavior, selection, unread state, remote projection, and receiving-server client-state recomputation remain intact |
 | 2026-09-04 | Phase 1.4 slice 13a: typed wire-event decoder | Complete | core event decoder agent / root integrator | Public API: two symbols; 225-line façade plus private leaves from 85 to 479 lines; exhaustive 55-key compile-time/runtime registry; moved event type block remained byte-identical | Decoder preserves valid event identity and reports safe structural path/reason diagnostics without payload values. Focused coverage: 94.79% statements / 90.24% branches / 95.67% functions / 95.52% lines. Core: 42 files / 275 tests. Full `npm run test:ai`: 274 files / 2,089 tests. All-workspace typecheck, lint, stylelint, Knip, and diff checks passed; Madge found no cycles across 95 files | `96151235f08d9e26c1e64f0324eabf3992f817de` | Structure-only decoding landed without normalization, semantic cross-field checks, or transport changes. Compatibility re-exports preserve the prior RPC import surface while transport adoption proceeds |
 | 2026-09-04 | Phase 1.4 slice 13b: local transport decoder adoption | Complete | local transport agent / root integrator | Electron `backend-rpc-session` and Web `backend-process` typed casts → one decode from `unknown` at each local notification ingress | 34 focused tests passed. Full `npm run test:ai`: 274 files / 2,092 tests in 26.48s (Core 275, Backend 613, Vue 897, Electron 285, Web 22). All-workspace typecheck, Stylelint, Knip, and diff checks passed | `b1058b2da5874955342703f87389f22635cccdb6` | Independent review found no defects. Malformed events are safely logged and dropped without publication; each transport remains usable for subsequent valid events. Existing malformed JSON and JSON-RPC framing behavior is unchanged |
-| 2026-09-04 | Phase 1.4 slice 13c: remote transport decoder adoption | Active | root orchestrator | Backend `remote-clawd-client` and the Web protocol still trust backend-event notification casts | Decode remote event notifications exactly once; prove malformed decoded events do not terminate transport or reject pending requests, and that subsequent valid events recover normally; retain current malformed JSON/RPC framing behavior; update protocol documentation | — | Sole active checkpoint. Preserve request/event ordering and transport lifecycle; remove only obsolete event casts |
+| 2026-09-04 | Phase 1.4 slice 13c: remote transport decoder adoption | Complete | remote transport agent / root integrator | All four production ingress seams now decode backend events exactly once; no shallow ingress guard or raw `ClawBackendEvent` cast remains except the decoder's validated return and one deliberate malformed fixture | Full `npm run test:ai`: 274 files / 2,095 tests in 24.97s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `0779e2a558713d29b6d10890daec5ded6a66d2ce` | Malformed remote events are safely logged and dropped while connections and pending requests survive; malformed framing behavior is unchanged. Review fixed Web parsing to preserve both outer-envelope and inner-event identity. Protocol and backend-architecture docs now describe all transport boundaries |
+| 2026-09-04 | Phase 1.4 slice 14a: close the backend event union | Active | root orchestrator | Ownership audit classifies all 55 event types: 14 runtime/global, 24 conversation, four subagent, and 13 explicit renderer-only no-ops | Replace the legacy fallback, remove `TypedMainToRendererEventType`, close the owned union, and directly characterize intentional no-ops; run focused, façade, full-suite, typecheck, lint/Knip, cycle, and diff gates | — | Sole active checkpoint. This is ownership/type cleanup only; preserve behavior and use `lossless-code-moves` for every relocation |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
 | 2026-09-04 | Phase 3.1: Electron backend replica manifest | Pending / prepared | root orchestrator | `AppController` 1,863 lines; replica responsibility about 205 lines / 29 conditionals; 47 full-snapshot and four metadata callers | Read-only snapshot/event replication and test-ownership audit complete; target owner is `electron-backend-replica.ts` | — | Execute three exact commits: `test: characterize electron backend replication`, `chore: extract electron backend replica`, `test: move electron backend replica specifications`. Preserve raw/transient identity, metadata-only cache, three-attempt sequence barrier, event/client-state/publication ordering, and renderer-only media projection; remote automation remains outside |
+| 2026-09-04 | Phase 3.2: Electron IPC registrar manifest | Pending / prepared | root orchestrator | `AppController` 1,863 lines / 155 methods; `registerIpcHandlers` 393 lines with 120 inline registrations plus nine existing Git registrations, for 129 total; preload 150 lines with 129 invokes and three subscriptions; six specs total 2,860 lines / 72 tests | Read-only registration, preload bridge, helper, and test-ownership audit complete; exact 129 invoke channels plus three subscriptions must remain covered | — | Execute seven exact commits: `test: characterize electron ipc surface`; `chore: extract connection work and source ipc`; `chore: extract agent and automation ipc`; `chore: extract native electron ipc registrars`; `chore: split electron ipc adapters`; `chore: compose typed preload bridge`; `test: move electron ipc ownership specifications`. Exclude private `updateAgentFolder`. Target registration composition at most 35 lines with zero inline handlers, `AppController` after 3.1+3.2 at most 650 lines, each registrar at most 22 channels / four ports / 300 lines, preload index at most 30 lines and modules at most 90, specs at most 400, with lossless handler/helper/test fidelity |
 
 For each future row, include:
 
@@ -778,12 +785,14 @@ Execute in three checkpoints:
    `backend-rpc-session` and Web `backend-process` decode exactly once, ignore
    and safely log malformed decoded event notifications, and retain their
    existing malformed JSON and JSON-RPC framing behavior.
-3. `chore: decode remote backend events` — active; migrate backend
-   `remote-clawd-client` and the Web protocol, then update the relevant docs.
-   Decode failures must not terminate the transport or reject pending
-   requests. Tests must prove recovery through subsequent valid events and
-   continued pending-request resolution while current malformed JSON/RPC
-   framing behavior remains unchanged.
+3. `chore: decode remote backend events` — completed in
+   `0779e2a558713d29b6d10890daec5ded6a66d2ce`; backend
+   `remote-clawd-client` and the Web protocol now decode once at ingress.
+   Decode failures do not terminate the transport or reject pending requests,
+   and tests prove recovery through subsequent valid events and continued
+   pending-request resolution while malformed JSON/RPC framing behavior stays
+   unchanged. The Web parser preserves both outer-envelope and inner-event
+   identity after an independent review correction.
 
 Every relocation follows `lossless-code-moves` with byte/AST fidelity. Slice
 13 exits when all four wire ingress seams decode `unknown` exactly once, no
@@ -791,12 +800,36 @@ transport cast remains, all 55 event keys are coupled exhaustively, malformed
 event notifications cannot mutate state or kill a live transport, and Core,
 transport, full-suite, typecheck, lint/Knip, cycle, and diff checks are green.
 
-- Replace permissive event handling with discriminated events.
-- Use exhaustive handling where the application owns the event union.
-- Record intentionally ignored events explicitly.
-- Replace broad casts and false guards with honest boundary validation.
+#### Slice 14 — close event ownership and remove redundant guards
 
-Commit checkpoint: `chore: type snapshot event reduction`
+Finish the ownership work now that typed wire decoding is the sole transport
+trust boundary. This is a behavior-preserving cleanup: semantic fixes remain
+separate, and every relocation must follow `lossless-code-moves` before imports,
+interfaces, or ownership boundaries change.
+
+Execute four small commits:
+
+1. `chore: close backend event union` — active. Classify the complete owned
+   event set as 14 runtime/global events, 24 conversation events, four subagent
+   events, and 13 explicit renderer-only no-ops. Replace the legacy generic
+   fallback, remove `TypedMainToRendererEventType`, make the backend-owned union
+   closed, and record every intentional no-op directly.
+2. `chore: route backend events exhaustively` — make the top-level dispatcher
+   and deep reducers exhaustive without handled booleans. Preserve the global
+   `backendApproval.resolved` explicit no-op. Remove its misleading all-agent
+   loop only as ownership cleanup; do not bundle a behavior fix.
+3. `chore: trust decoded backend events` — remove redundant downstream Core and
+   backend structural guards and stale casts after decoding. Retain business,
+   identity, normalization, and application-policy checks.
+4. `chore: simplify renderer event handling` — make renderer dispatch
+   exhaustive, remove redundant renderer guards and casts, and list ignored
+   renderer events explicitly.
+
+Each checkpoint requires direct-owner and façade tests, then the full suite,
+typecheck, lint/Knip, dependency-cycle inspection, and diff checks. Slice 14
+exits when there is no legacy generic fallback; every owned event is handled or
+exhaustively ignored; no stale broad cast or false structural guard remains;
+and `decodeClawBackendEvent` remains the sole wire trust boundary.
 
 ### 1.5 Split contract domains
 
@@ -980,6 +1013,34 @@ Commit checkpoint: `chore: extract electron backend replica`
 - Use a typed preload bridge backed by focused registrars.
 - Keep Electron-only responsibilities—windows, dialogs, lifecycle, native
   capability adapters—in the composition root.
+
+The prepared baseline is `AppController` at 1,863 lines / 155 methods,
+including a 393-line `registerIpcHandlers` with 120 inline registrations. Nine
+Git registrations already live outside that method, making 129 invoke channels
+in total. The 150-line preload bridge exposes those 129 invokes plus three
+subscriptions. Six current specifications total 2,860 lines / 72 tests.
+
+Execute seven exact checkpoints:
+
+1. `test: characterize electron ipc surface`
+2. `chore: extract connection work and source ipc`
+3. `chore: extract agent and automation ipc`
+4. `chore: extract native electron ipc registrars`
+5. `chore: split electron ipc adapters`
+6. `chore: compose typed preload bridge`
+7. `test: move electron ipc ownership specifications`
+
+Preserve exact coverage of all 129 invoke channels and three subscriptions.
+Every handler, helper, and test relocation follows `lossless-code-moves` with
+source and test-body fidelity proved before dependency rewiring. Keep private
+`updateAgentFolder` out of this checkpoint; it is not an IPC registration.
+
+Exit when registration composition is at most 35 lines with zero inline
+handlers; `AppController` is at most 650 lines after Phases 3.1 and 3.2; each
+registrar owns no more than 22 channels, four ports, and 300 lines; the preload
+index is at most 30 lines and each preload module at most 90; every resulting
+spec is at most 400 lines; and exact 129-invoke plus three-subscription coverage
+remains green.
 
 Commit checkpoint: `chore: split electron ipc adapters`
 
