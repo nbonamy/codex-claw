@@ -120,6 +120,9 @@ describe('ConversationPane', () => {
     expect(wrapper.find('[aria-label="Prompt composer"]').exists()).toBe(false);
     await wrapper.get('button').trigger('click');
     expect(wrapper.emitted('retry-history')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ historyLoadFailed: false });
+    expect(wrapper.find('[aria-label="Prompt composer"]').exists()).toBe(true);
   });
 
   it('preserves visible messages when a later history hydration fails', () => {

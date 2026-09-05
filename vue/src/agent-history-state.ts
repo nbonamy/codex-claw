@@ -78,6 +78,24 @@ export function createAgentHistoryState(options: {
     hydratingAgentIds.value = next;
   }
 
+  function reset(agentId: string): void {
+    const hydrating = new Set(hydratingAgentIds.value);
+    hydrating.delete(agentId);
+    hydratingAgentIds.value = hydrating;
+
+    const failed = new Set(failedAgentIds.value);
+    failed.delete(agentId);
+    failedAgentIds.value = failed;
+
+    const loadingOlder = new Set(loadingOlderAgentIds.value);
+    loadingOlder.delete(agentId);
+    loadingOlderAgentIds.value = loadingOlder;
+
+    const hasOlder = { ...hasOlderByAgentId.value };
+    delete hasOlder[agentId];
+    hasOlderByAgentId.value = hasOlder;
+  }
+
   function handleMainEvent(event: Extract<MainToRendererEvent, {
     type: 'thread.historyLoaded' | 'thread.historyHydrationFailed';
   }>): void {
@@ -106,5 +124,6 @@ export function createAgentHistoryState(options: {
     isLoadingOlderHistory,
     loadOlder,
     markHydrating,
+    reset,
   };
 }

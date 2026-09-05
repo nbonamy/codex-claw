@@ -586,6 +586,7 @@ describe('useAppState', () => {
   });
 
   it('lists and resumes active agent conversations through preload', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     const resumedSnapshot = {
       ...remoteSnapshot,
@@ -615,7 +616,10 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        onEvent: vi.fn(),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
         listAgentConversations,
         resumeAgentConversation,
       } satisfies Partial<CodexClawApi>,
@@ -624,6 +628,14 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
     await expect(state.listAgentConversations('agent-dina')).resolves.toStrictEqual(conversations);
+    listeners[0]?.({
+      seq: 1,
+      occurredAt: '2026-09-05T00:00:00.000Z',
+      agentId: 'agent-dina',
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    });
+    expect(state.isActiveAgentHistoryFailed.value).toBe(true);
 
     const reactiveConversationRef = reactive({
       backend: 'codex' as const,
@@ -635,6 +647,7 @@ describe('useAppState', () => {
     expect(resumeAgentConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-dina' });
     expect(resumeAgentConversation.mock.calls.at(-1)?.[1]).not.toBe(reactiveConversationRef);
     expect(state.snapshot.value).toStrictEqual(resumedSnapshot);
+    expect(state.isActiveAgentHistoryFailed.value).toBe(false);
   });
 
   it('switches the Claude composer selection when a different conversation is resumed', async () => {

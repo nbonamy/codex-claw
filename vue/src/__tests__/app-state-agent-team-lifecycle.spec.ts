@@ -721,6 +721,43 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toBe(before);
   });
 
+  it('clears a failed history state when the agent is restarted', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const restartedSnapshot = structuredClone(remoteSnapshot);
+    delete restartedSnapshot.agents[0]!.backendSession;
+    restartedSnapshot.messages = [];
+    const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+        restartAgent,
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    listeners[0]?.({
+      seq: 1,
+      occurredAt: '2026-09-05T00:00:00.000Z',
+      agentId: 'agent-dina',
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    });
+    expect(state.isActiveAgentHistoryFailed.value).toBe(true);
+
+    await state.restartAgent('agent-dina');
+
+    expect(restartAgent).toHaveBeenCalledWith('agent-dina');
+    expect(state.snapshot.value).toStrictEqual(restartedSnapshot);
+    expect(state.isActiveAgentHistoryFailed.value).toBe(false);
+  });
+
   it('keeps the current agent selected when duplicating in the background', async () => {
     const initialSnapshot = createInitialSnapshot();
     const copy = {

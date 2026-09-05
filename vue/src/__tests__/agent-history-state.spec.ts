@@ -39,6 +39,18 @@ describe('createAgentHistoryState', () => {
     expect(state.isActiveAgentHistoryFailed.value).toBe(true);
     expect(state.isHydratingActiveAgentHistory.value).toBe(false);
 
+    state.reset('agent-dina');
+    expect(state.isActiveAgentHistoryFailed.value).toBe(false);
+    expect(state.isHydratingActiveAgentHistory.value).toBe(false);
+
+    state.handleMainEvent({
+      seq: 2,
+      occurredAt: '2026-09-05T00:00:00.500Z',
+      agentId: 'agent-dina',
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    });
+
     const retry = state.retryActive();
     void state.retryActive();
     expect(state.isActiveAgentHistoryFailed.value).toBe(false);
@@ -46,7 +58,7 @@ describe('createAgentHistoryState', () => {
     expect(hydrateAgentHistory).toHaveBeenCalledTimes(2);
 
     state.handleMainEvent({
-      seq: 2,
+      seq: 3,
       occurredAt: '2026-09-05T00:00:01.000Z',
       agentId: 'agent-dina',
       type: 'thread.historyLoaded',

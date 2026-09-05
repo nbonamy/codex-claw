@@ -130,6 +130,7 @@ const {
   isLoadingOlderHistory,
   loadOlder: loadOlderAgentHistory,
   markHydrating: markAgentHistoryHydrating,
+  reset: resetAgentHistory,
 } = agentHistory;
 const sourceRepositoryState = createSourceRepositoryState({ getSnapshot: () => snapshot.value });
 const {
@@ -860,6 +861,7 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.resumeAgentConversation(agentId, plainConversationRef(ref)));
+    resetAgentHistory(agentId);
     synchronizeComposerSelectionForAgent(agentId);
     await loadActiveAgentCatalogs();
   }
@@ -1136,6 +1138,7 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.restartAgent(agentId));
+    resetAgentHistory(agentId);
   }
 
   async function closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<void> {
