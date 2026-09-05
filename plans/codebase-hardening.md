@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.5 checkpoint 5 active — extract interaction and settings contracts.**
+- [ ] Phase 1: harden core state and contracts. **Implementation paused after the mid-phase review; checkpoint 5 is structurally reviewed but intentionally uncommitted pending Nicolas's decision.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -121,19 +121,79 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 14b: route backend events exhaustively.
 - [x] Phase 1.4 slice 14c: trust decoded backend events downstream.
 - [x] Phase 1.4 slice 14d: simplify renderer event handling.
-- [ ] Phase 1.5: split contract domains. **Checkpoint 5 active — extract interaction and settings contracts.**
+- [ ] Phase 1.5: split contract domains. **Paused before checkpoint 5 integration pending Nicolas's decision.**
 - [x] Phase 1.5 checkpoint 1: extract shared repository contracts.
 - [x] Phase 1.5 checkpoint 2: extract backend contracts.
 - [x] Phase 1.5 checkpoint 3: extract conversation contracts.
 - [x] Phase 1.5 checkpoint 4: extract work contracts.
 - [ ] Phase 1.5 checkpoint 5: extract interaction and settings contracts.
-- [ ] Phase 1 decision gate: review Phase 1 outcomes with Nicolas and obtain explicit approval before any Phase 2 implementation.
+- [ ] Phase 1 decision gate: review the mid-phase verdict `reduce, then decide` with Nicolas and obtain explicit approval before resuming Phase 1 or beginning Phase 2.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
 - [ ] Phase 5: deepen the four large feature modules.
 - [ ] Phase 6: deepen provider internals without premature unification.
 - [ ] Phase 7: remove transitional debt and run final qualification.
+
+### 2026-09-04 mid-Phase 1 review — reduce, then decide
+
+Implementation is paused. The review compared the exact Phase 1 foundation
+baseline `6eb9cecaa961a1462176b82002d6dba3acfa2b69` with committed HEAD
+`66e1f28a692ea589b1e60ea1f1e08038f4cc2731` and the preserved, uncommitted
+checkpoint 5 working diff. Nicolas must explicitly decide whether to continue,
+reduce, or stop before any more Phase 1 integration or any Phase 2 code begins.
+
+The quantitative comparison includes the current checkpoint 5 working diff:
+
+| Measure | Phase 1 baseline | Reviewed working tree |
+| --- | ---: | ---: |
+| Production files / lines | 303 / 78,213 | 330 / 81,247 |
+| Test and support files / lines | 274 / 64,052 | 284 / 69,585 |
+| Runtime test files / cases | 267 / 2,036 | 277 / 2,104 |
+| Core import edges | 58 | 132 |
+| Decisions per function | 2.529 | 1.989 |
+| Largest Core file | 2,558 lines | 1,255 lines |
+| Dependency cycles | 0 | 0 |
+| Full-suite duration | Phase 0 median 20.58s; original baseline 25.01s | Latest committed boundary 26.44s |
+
+Proven gains: snapshot reduction is now split across deep owner modules; the
+55-key backend event surface is closed and exhaustively partitioned; every raw
+backend-event ingress decodes once; malformed event notifications recover
+without killing transports; direct reducer, construction, snapshot-decoder,
+and event-decoder tests own detailed behavior; dependency cycles remain zero;
+and independent review found and fixed real defects rather than merely
+confirming mechanical moves.
+
+The contract migration remains incomplete. With checkpoint 5 applied only in
+the working tree, the compatibility barrel is 1,255 lines with 214 exports and
+318 consumers, far from its exit target. Repository-wide coverage also remains
+known debt: Core clears the threshold, while Backend branch coverage, Vue
+branch coverage, and Electron coverage remain below 85% in previously recorded
+measurements. These gates must not be described as globally green.
+
+Residual cleanup and coupling to resolve or explicitly accept before the final
+decision:
+
+- remove two dead snapshot façade helpers;
+- remove duplicated snapshot default assembly;
+- reduce the exhaustive coupling between decoder context and the event registry;
+- retire unreachable compatibility paths;
+- make renderer secondary-effect ownership explicit in the event partition;
+- replace wildcard Core package exports with an enforceable public surface.
+
+Checkpoint 5's interaction/settings extraction was structurally reviewed and
+is intentionally uncommitted. Preserve exactly these four working-tree paths
+until Nicolas decides: `core/src/contracts.ts`,
+`core/src/contracts/interaction.ts`, `core/src/contracts/settings.ts`, and
+`core/src/__tests__/contract-domains.spec.ts`. Do not mark checkpoint 5
+complete and do not activate another implementation checkpoint.
+
+Before deciding, measure the full suite three times under quiet conditions and
+use the median as the performance gate:
+
+- median at or below 25.01s: **continue**;
+- median above 25.01s and at or below 28.76s: **reduce** scope before continuing;
+- median above 28.76s: **stop** and reassess or roll back the lowest-value work.
 
 ## Progress ledger
 
@@ -178,11 +238,12 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Complete | event routing agent / root integrator | The exact 55-key ownership partition routes 14 runtime, 24 conversation, four subagent, and 13 renderer-only events once; reducer inputs are exact owned subsets, return `void`, and close with compile-time `never`; façade invalidation and dispatch ordering remain unchanged | Focused 11 files / 89 tests; Core 44 / 279. Full `npm run test:ai`: 276 files / 2,099 tests in 26.09s. Core coverage: 91.48% statements / 85.83% branches / 93.28% functions / 93.25% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `6e14cfe3c72b8948dca3f341162c39e9d346fbef` | Independent review found no defects. The removed `thread.modeUpdated` runtime branch was unreachable behind renderer ownership; agent-less `backendApproval.resolved` remains an explicit no-op, while agent-scoped resolution still removes only that agent's approval |
 | 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Complete | downstream event agent / root integrator | Production downstream handling: 5,462 → 5,033 lines, net -429; 23 redundant structural helpers removed; 63 / 63 runtime cases retained | Full `npm run test:ai`: 276 files / 2,099 tests in 24.81s. Core coverage: 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. Backend's known coverage debt remains explicit at 83.78% / 73.57% / 87.95% / 85.70% across 614 tests. All-workspace typecheck, lint, Knip, Madge, and diff checks passed | `3bc7ca4af524ad69ea891e900b0d5a7591deadee` | All audited policy, security, identity, normalization, malformed-input, and compatibility gates remain. Only post-decoder structural duplication and stale casts were removed; renderer simplification is the sole active checkpoint |
 | 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Complete | renderer event agent / root integrator | Renderer event production 4,330 → 4,291 lines, net -39; ten redundant validators removed; exact 13 / 13 renderer event switch retained; the typed client bypass remains the only non-decoded application boundary | Full `npm run test:ai`: 276 files / 2,099 tests in 26.44s. Vue's known global coverage debt remains explicit at 88.19% statements / 79.83% branches / 89.42% functions / 90.51% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `34d439bb8942922917f51e8bac92e1b299cf66a0` | Renderer dispatch is exhaustive and decoded event payloads are trusted without redundant structural guards. Ordering, state policy, source-less compatibility, typed client bypass behavior, and ignored renderer events remain unchanged; Phase 1.5 contract extraction followed |
-| 2026-09-04 | Phase 1.5: contract-domain manifest | Active / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Checkpoints 1 through 4 are complete; checkpoint 5, `chore: extract interaction and settings contracts`, is active. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
+| 2026-09-04 | Phase 1.5: contract-domain manifest | Paused / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Checkpoints 1 through 4 are complete; checkpoint 5, `chore: extract interaction and settings contracts`, is structurally reviewed but intentionally uncommitted. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
 | 2026-09-04 | Phase 1.5 checkpoint 1: extract shared repository contracts | Complete | contract-domain agent / root integrator | Exact ownership: shared five declarations / 12 lines, Git 19 / 112, workspace 12 / 86, connections 10 / 75; compatibility barrel 2,140 → 1,961 lines | All 46 moved declarations retained byte-identical source and normalized AST hashes; all 196 remaining declarations and 28 private aliases stayed exact; the barrel retained the same 214 exports and all 317 audited consumers remained untouched. Focused 3 tests and Core 45 files / 282 tests passed. Full `npm run test:ai`: 277 files / 2,102 tests. All-workspace typecheck, lint, Stylelint, Knip, static import inventory, Madge, and diff checks passed | `469d19aaf44d6fc2ff4cd383e61d3460bc8d3e0d` | Independent review found no defects. All four owners are type-only acyclic leaves with exact assigned export surfaces; no runtime value moved and compatibility imports/re-exports remain honest. Checkpoint 2 is now the sole active checkpoint |
 | 2026-09-04 | Phase 1.5 checkpoint 2: extract backend contracts | Complete | contract-domain agent / root integrator | Backend owner: 21 exact exports / 201 lines with `shared` as its only dependency; compatibility barrel 1,961 → 1,802 lines | All 21 moved declarations, all 175 retained declarations, and all 28 private declarations remained byte- and AST-identical. Moved source SHA-256 `9a52be69a3388d91f36c8143798e1f65888dd7cc99fe5139562c7fe56e348d6d`; moved AST SHA-256 `407e848886e8eed89304b8ebf717afaea74519eadc7601092ffe923c1d30ca9e`; retained source SHA-256 `b5d722df3a1383eadf4d2ea00d950f1b59623ddd5060b97d68f6f5ec381e54a5`. The barrel retained all 214 public exports. Focused contract/backend/event/snapshot: 22 files / 131 tests; Core: 45 / 282. Full `npm run test:ai`: 277 files / 2,102 tests. All-workspace typecheck, lint, Stylelint, Knip, consumer inventory, Madge, and diff checks passed | `a3992ed47cdf819e2fecb44776846f19c90397c4` | Independent review found no defects, domain leakage, runtime-value movement, or consumer edits. Checkpoint 3 is now the sole active checkpoint |
 | 2026-09-04 | Phase 1.5 checkpoint 3: extract conversation contracts | Complete | contract-domain agent / root integrator | Conversation owner: 43 exact exports / 334 lines with `shared` as its only dependency; compatibility barrel 1,802 → 1,545 lines | Exact categories: seven goal/plan, two conversation reference/summary, 18 subagent including five runtime arrays, the complete six-type prompt cluster, and ten renderer-message/file/queue/history symbols. All 43 moved and 132 retained declarations remained byte- and AST-identical in source order; the barrel retained all 214 public exports and all five moved runtime arrays preserved owner-to-barrel reference identity. Focused domain: four tests; Core: 45 files / 283 tests. Full `npm run test:ai`: 277 files / 2,103 tests. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `f37512ab56c4fd82b43393b63ed4ef42094b34bf` | Independent review found no defects, consumer changes, private leakage, or cycles. Checkpoint 4 is now the sole active checkpoint |
-| 2026-09-04 | Phase 1.5 checkpoint 4: extract work contracts | Complete | contract-domain agent / root integrator | Work owner: 34 exact exports / 230 lines, grouped as 13 provider/backlog, nine repository/item, nine automation, and three routing contracts; dependencies are limited to `conversation` and `shared`; compatibility barrel 1,545 → 1,389 lines | All 34 moved declarations, all 98 retained declarations, and all 28 private declarations remained byte- and AST-identical. Moved source SHA-256 `c3b4ce4ee71d27d25457b2fb22c7b7a5e354bfc189104d8b23be2e74ad0947ca`; moved AST SHA-256 `17583a34ba186d7f7179184c45b8a4c927a4407a924e2fd9bd9dfc36ca4e0b52`; retained source SHA-256 `ed4368ff0dfc99cb9b78764bffd3d0cd0b57b6258d4395e1bd53d3d06c2a623e`; retained AST SHA-256 `228ac5d8fbfafd10c662b73e6bd62727912dae218687e62344e552bce0d58e58`. `WorkProviderConnectResult` remained byte- and AST-identical in the barrel for host-API ownership, and the barrel retained all 214 public exports. Focused domain: one file / four tests; Core: 45 / 283. Full `npm run test:ai`: 277 files / 2,103 tests. Core coverage was 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `42738b90b3cbb3d6d86e4e47d0a57e8043a5f5f7` | Independent review found no defects, consumer changes, runtime-value moves, host snapshot leakage, or cycles. Checkpoint 5 is now the sole active checkpoint |
+| 2026-09-04 | Phase 1.5 checkpoint 4: extract work contracts | Complete | contract-domain agent / root integrator | Work owner: 34 exact exports / 230 lines, grouped as 13 provider/backlog, nine repository/item, nine automation, and three routing contracts; dependencies are limited to `conversation` and `shared`; compatibility barrel 1,545 → 1,389 lines | All 34 moved declarations, all 98 retained declarations, and all 28 private declarations remained byte- and AST-identical. Moved source SHA-256 `c3b4ce4ee71d27d25457b2fb22c7b7a5e354bfc189104d8b23be2e74ad0947ca`; moved AST SHA-256 `17583a34ba186d7f7179184c45b8a4c927a4407a924e2fd9bd9dfc36ca4e0b52`; retained source SHA-256 `ed4368ff0dfc99cb9b78764bffd3d0cd0b57b6258d4395e1bd53d3d06c2a623e`; retained AST SHA-256 `228ac5d8fbfafd10c662b73e6bd62727912dae218687e62344e552bce0d58e58`. `WorkProviderConnectResult` remained byte- and AST-identical in the barrel for host-API ownership, and the barrel retained all 214 public exports. Focused domain: one file / four tests; Core: 45 / 283. Full `npm run test:ai`: 277 files / 2,103 tests. Core coverage was 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `42738b90b3cbb3d6d86e4e47d0a57e8043a5f5f7` | Independent review found no defects, consumer changes, runtime-value moves, host snapshot leakage, or cycles. Checkpoint 5 was prepared next, then paused before integration by the mid-Phase 1 review |
+| 2026-09-04 | Mid-Phase 1 decision review | Paused / Nicolas decision required | plan steward / root orchestrator | Baseline `6eb9cecaa961a1462176b82002d6dba3acfa2b69` → committed HEAD `66e1f28a692ea589b1e60ea1f1e08038f4cc2731`, plus preserved uncommitted checkpoint 5; production 303 / 78,213 → 330 / 81,247; test/support 274 / 64,052 → 284 / 69,585 | Runtime 267 / 2,036 → 277 / 2,104; latest committed full suite 26.44s versus Phase 0 median 20.58s and original 25.01s; cycles 0 → 0; review verdict `reduce, then decide` | `chore: record phase one review` | Implementation paused. Checkpoint 5 remains reviewed but uncommitted; no subsequent checkpoint is active and Phase 2 is forbidden until Nicolas explicitly decides |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
@@ -944,14 +1005,15 @@ exact; prompt, host-API, decoder, and ownership boundaries remain intact; and
 focused contract/runtime tests, full tests, all-workspace typecheck,
 lint/Stylelint/Knip, Madge, and diff checks are green.
 
-Active commit checkpoint: `chore: extract interaction and settings contracts`
+Next possible commit checkpoint after explicit approval:
+`chore: extract interaction and settings contracts`
 
 ### Phase 1 exit criteria
 
 - `snapshot.ts` is approximately 300 lines and primarily composes deep modules.
 - The contracts barrel is approximately 100 lines.
 - Every owned event is exhaustive or explicitly ignored.
-- Agent mutation policy has one owner.
+- Agent lifecycle and topology policy has one owner.
 - Direct module tests own detailed behavior; façade tests cover composition.
 - `npm run test:ai` passes.
 
