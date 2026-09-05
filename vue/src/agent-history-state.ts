@@ -68,10 +68,9 @@ export function createAgentHistoryState(options: {
     hydratingAgentIds.value = next;
   }
 
-  function handleMainEvent(event: MainToRendererEvent): void {
-    if (event.type !== 'thread.historyLoaded' || !event.agentId || !isRecord(event.payload)) return;
+  function handleMainEvent(event: Extract<MainToRendererEvent, { type: 'thread.historyLoaded' }>): void {
     const hasOlder = event.payload.hasOlderMessages;
-    if (typeof hasOlder !== 'boolean') return;
+    if (hasOlder === undefined) return;
     hasOlderByAgentId.value = { ...hasOlderByAgentId.value, [event.agentId]: hasOlder };
   }
 
@@ -84,8 +83,4 @@ export function createAgentHistoryState(options: {
     loadOlder,
     markHydrating,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

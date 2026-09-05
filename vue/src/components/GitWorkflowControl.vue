@@ -955,16 +955,10 @@ let unsubscribeMainEvents: (() => void) | null = null;
 
 function handleMainEvent(event: MainToRendererEvent): void {
   if (event.type !== 'git.operationProgress' || event.agentId !== props.agent.id) return;
-  const progress = agentGitOperationProgress(event.payload);
-  if (progress) gitOperationProgress.value = progress;
-}
-
-function agentGitOperationProgress(value: unknown): AgentGitOperationProgress | null {
-  if (!value || typeof value !== 'object') return null;
-  const candidate = value as Partial<AgentGitOperationProgress>;
-  if (candidate.operation !== 'pullRequest' && candidate.operation !== 'merge') return null;
-  if (candidate.phase !== 'handoff' && candidate.phase !== 'delivery') return null;
-  return { operation: candidate.operation, phase: candidate.phase };
+  gitOperationProgress.value = {
+    operation: event.payload.operation,
+    phase: event.payload.phase,
+  };
 }
 
 </script>

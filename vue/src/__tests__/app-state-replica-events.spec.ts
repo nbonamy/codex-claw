@@ -9,6 +9,7 @@ import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
 import { configureClawClient } from '../platform-api';
 import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+import { snapshotEventOwnership } from '@codex-claw/core/snapshot-event-ownership';
 describe('useAppState', () => {
   afterEach(() => {
     clearConfetti();
@@ -387,7 +388,7 @@ describe('useAppState', () => {
     ]);
   });
 
-  it('ignores malformed side panel events', async () => {
+  it('routes the complete renderer-owned event subset and keeps delegated events as app-state no-ops', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
 
@@ -404,61 +405,62 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
     state.sidePanelRequest.value = null;
+    state.fileActivity.value = null;
+    state.agentCreationProgress.value = null;
+    state.answeredClientRequestIds.value = new Set();
+    const originalSnapshot = state.snapshot.value;
+
+    expect(Object.entries(snapshotEventOwnership)
+      .filter(([, owner]) => owner === 'renderer')
+      .map(([type]) => type)
+      .sort()).toStrictEqual([
+      'agentCreation.progress',
+      'browser.annotationCreated',
+      'celebration.requested',
+      'client.connectionChanged',
+      'clientRequest.resolved',
+      'devicePairing.statusChanged',
+      'file.activity',
+      'git.operationProgress',
+      'models.changed',
+      'sidePanel.gitDiffRequested',
+      'sidePanel.markdownRequested',
+      'skills.changed',
+      'thread.modeUpdated',
+    ]);
 
     listeners[0]?.({
       seq: 1,
-      agentId: 'agent-dina',
-      type: 'thread.statusChanged',
-      payload: { kind: 'markdown', content: '# Wrong event' },
+      type: 'devicePairing.statusChanged',
+      payload: { status: 'connected', serverName: 'Claw test' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    });
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-dina',
-      type: 'sidePanel.markdownRequested',
-      payload: null,
+      type: 'git.operationProgress',
+      payload: { operation: 'merge', phase: 'handoff' },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    });
     listeners[0]?.({
       seq: 3,
-      agentId: 'agent-dina',
-      type: 'sidePanel.markdownRequested',
-      payload: { kind: 'diff', content: '# Wrong kind' },
-      occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as MainToRendererEvent);
-    listeners[0]?.({
-      seq: 4,
-      agentId: 'agent-dina',
-      type: 'sidePanel.markdownRequested',
-      payload: { kind: 'markdown', content: 123 },
-      occurredAt: '2026-06-05T00:00:04.000Z',
-    } as unknown as MainToRendererEvent);
-    listeners[0]?.({
-      seq: 5,
-      agentId: 'agent-dina',
-      type: 'sidePanel.gitDiffRequested',
-      payload: { kind: 'gitDiff', diff: 123 },
-      occurredAt: '2026-06-05T00:00:05.000Z',
-    } as unknown as MainToRendererEvent);
-
-    expect(state.sidePanelRequest.value).toBeNull();
-
-    listeners[0]?.({
-      seq: 6,
-      agentId: 'agent-dina',
-      type: 'sidePanel.markdownRequested',
+      type: 'browser.annotationCreated',
       payload: {
-        kind: 'markdown',
-        title: 123,
-        path: false,
-        content: '# Valid',
+        id: 'annotation-1',
+        agentId: 'agent-dina',
+        browserId: 'primary',
+        url: 'https://example.com',
+        kind: 'element',
+        rect: { x: 1, y: 2, width: 3, height: 4 },
       },
-      occurredAt: '2026-06-05T00:00:05.000Z',
-    } as unknown as MainToRendererEvent);
-
-    expect(state.sidePanelRequest.value).toStrictEqual({
-      kind: 'markdown',
-      content: '# Valid',
+      occurredAt: '2026-06-05T00:00:03.000Z',
     });
+
+    expect(state.snapshot.value).toBe(originalSnapshot);
+    expect(state.sidePanelRequest.value).toBeNull();
+    expect(state.fileActivity.value).toBeNull();
+    expect(state.agentCreationProgress.value).toBeNull();
+    expect(state.answeredClientRequestIds.value).toEqual(new Set());
+    expect(useConfetti().bursts.value).toStrictEqual([]);
   });
 });

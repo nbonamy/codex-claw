@@ -22,6 +22,7 @@ import { createAgentUnreadState } from './agent-unread-state';
 import { createAgentHistoryState } from './agent-history-state';
 import { createSourceRepositoryState } from './source-repository-state';
 import { workspaceSidebarRepositoryRootForAgent } from '@codex-claw/core/workspace-sidebar';
+import { isSnapshotEventOwnedBy, type RendererOnlySnapshotEvent } from '@codex-claw/core/snapshot-event-ownership';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -1560,7 +1561,7 @@ function subscribeToMainEvents(): void {
 }
 
 function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void {
-  if (event.type === 'client.connectionChanged' && isBackendConnectionState(event.payload)) {
+  if (event.type === 'client.connectionChanged') {
     const wasConnected = connectionState.value.status === 'connected';
     connectionState.value = event.payload;
     if (!wasConnected && event.payload.status === 'connected') {
@@ -1569,25 +1570,70 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   }
   if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
   syncUnreadStateFromMainEvent(event);
-  syncAnsweredClientRequestsFromMainEvent(event);
-  syncComposerStateFromMainEvent(event);
-  syncSidePanelFromMainEvent(event);
-  syncCelebrationFromMainEvent(event);
-  syncAgentCreationProgressFromMainEvent(event);
-  syncFileActivityFromMainEvent(event);
-  syncHistoryPageStateFromMainEvent(event);
+  if (isSnapshotEventOwnedBy(event, 'renderer')) {
+    handleRendererOwnedMainEvent(event);
+    return;
+  }
+  handleSnapshotOwnedRendererEffect(event);
 }
 
-function syncCelebrationFromMainEvent(event: MainToRendererEvent): void {
+function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
+  switch (event.type) {
+    case 'client.connectionChanged':
+    case 'devicePairing.statusChanged':
+    case 'git.operationProgress':
+    case 'browser.annotationCreated':
+      return;
+    case 'models.changed':
+    case 'skills.changed':
+    case 'thread.modeUpdated':
+      syncComposerStateFromMainEvent(event);
+      return;
+    case 'sidePanel.markdownRequested':
+    case 'sidePanel.gitDiffRequested':
+      syncSidePanelFromMainEvent(event);
+      return;
+    case 'celebration.requested':
+      syncCelebrationFromMainEvent(event);
+      return;
+    case 'agentCreation.progress':
+      syncAgentCreationProgressFromMainEvent(event);
+      return;
+    case 'clientRequest.resolved':
+      syncAnsweredClientRequestsFromMainEvent(event);
+      return;
+    case 'file.activity':
+      syncFileActivityFromMainEvent(event);
+      return;
+    default: {
+      const exhaustive: never = event;
+      void exhaustive;
+    }
+  }
+}
+
+function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, RendererOnlySnapshotEvent>): void {
+  switch (event.type) {
+    case 'backendApproval.resolved':
+      syncAnsweredClientRequestsFromMainEvent(event);
+      return;
+    case 'thread.settingsUpdated':
+      syncComposerStateFromMainEvent(event);
+      return;
+    case 'thread.historyLoaded':
+      syncHistoryPageStateFromMainEvent(event);
+      return;
+    default:
+      return;
+  }
+}
+
+function syncCelebrationFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'celebration.requested' }>): void {
   if (snapshot.value.general.celebrationsEnabled === false) return;
-  if (event.type !== 'celebration.requested' || !isRecord(event.payload)) return;
-  const kind = event.payload.kind;
-  if (kind !== 'confetti' && kind !== 'stars' && kind !== 'shapes' && kind !== 'schoolPride') return;
-  useConfetti().celebrate({ kind });
+  useConfetti().celebrate({ kind: event.payload.kind });
 }
 
-function syncAgentCreationProgressFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'agentCreation.progress' || !isAgentCreationProgress(event.payload)) return;
+function syncAgentCreationProgressFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'agentCreation.progress' }>): void {
   if (event.payload.state === 'running') {
     if (event.agentId === snapshot.value.activeAgentId) agentCreationProgress.value = event.payload;
     return;
@@ -1626,19 +1672,10 @@ function isBackendMainEvent(event: MainToRendererEvent): boolean {
   );
 }
 
-function isBackendConnectionState(value: unknown): value is BackendConnectionState {
-  return isRecord(value) &&
-    (value.status === 'connecting' || value.status === 'connected' || value.status === 'reconnecting' || value.status === 'error') &&
-    (value.detail === undefined || appText(value.detail) !== undefined);
-}
-
-function syncAnsweredClientRequestsFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'clientRequest.resolved' && event.type !== 'backendApproval.resolved') return;
-  const payload: unknown = event.payload;
-  if (!isRecord(payload)) return;
+function syncAnsweredClientRequestsFromMainEvent(event: Extract<MainToRendererEvent, { type: 'clientRequest.resolved' | 'backendApproval.resolved' }>): void {
   const id = event.type === 'backendApproval.resolved'
-    ? (isRecord(payload.approval) ? payload.approval.id : payload.id)
-    : payload.id;
+    ? event.payload.approval.id
+    : event.payload.id;
   if (typeof id === 'string' && id) markClientRequestAnswered(id);
 }
 
@@ -1695,35 +1732,23 @@ function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
   }
 }
 
-function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
-  if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
-    return;
-  }
-  if ((event.type !== 'sidePanel.markdownRequested' && event.type !== 'sidePanel.gitDiffRequested') || !isRecord(event.payload)) {
+function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'sidePanel.markdownRequested' | 'sidePanel.gitDiffRequested' }>): void {
+  if (event.agentId !== snapshot.value.activeAgentId) {
     return;
   }
 
   if (event.type === 'sidePanel.markdownRequested') {
-    if (event.payload.kind !== 'markdown' || typeof event.payload.content !== 'string') {
-      return;
-    }
-
     sidePanelRequest.value = {
       kind: 'markdown',
       content: event.payload.content,
       ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
       ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
-      ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
+      ...(event.payload.path !== undefined ? { path: event.payload.path } : {}),
     };
     return;
   }
 
-  if (event.payload.kind !== 'gitDiff' || typeof event.payload.diff !== 'string') {
-    return;
-  }
-
-  const sections = parseGitDiffSections(event.payload.sections);
-  if (event.payload.sections !== undefined && !sections) return;
+  const sections = event.payload.sections?.map((section) => ({ scope: section.scope, diff: section.diff })) ?? null;
 
   sidePanelRequest.value = {
     kind: 'gitDiff',
@@ -1733,32 +1758,17 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
     ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
     ...(appText(event.payload.subtitle) ? { subtitle: appText(event.payload.subtitle)! } : {}),
     ...(event.payload.state === 'error' ? { state: 'error' } : {}),
-    ...(typeof event.payload.error === 'string' ? { error: event.payload.error } : {}),
+    ...(event.payload.error !== undefined && event.payload.error !== null ? { error: event.payload.error } : {}),
   };
 }
 
-function parseGitDiffSections(value: unknown): Array<{ scope: 'staged' | 'unstaged' | 'untracked'; diff: string }> | null {
-  if (value === undefined) return null;
-  if (!Array.isArray(value)) return null;
-  const sections: Array<{ scope: 'staged' | 'unstaged' | 'untracked'; diff: string }> = [];
-  for (const item of value) {
-    if (!isRecord(item) || (item.scope !== 'staged' && item.scope !== 'unstaged' && item.scope !== 'untracked') || typeof item.diff !== 'string') {
-      return null;
-    }
-    sections.push({ scope: item.scope, diff: item.diff });
-  }
-  return sections;
-}
-
-function syncFileActivityFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'file.activity' || !event.agentId || !event.turnId || !isRecord(event.payload)) return;
+function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'file.activity' }>): void {
+  if (!event.agentId || !event.turnId) return;
   const { action, itemId, messageId, path, status } = event.payload;
   if (
-    (action !== 'read' && action !== 'edit' && action !== 'create') ||
-    (status !== 'running' && status !== 'completed' && status !== 'failed') ||
-    typeof itemId !== 'string' || !itemId ||
-    typeof messageId !== 'string' || !messageId ||
-    typeof path !== 'string' || !path.trim()
+    !itemId ||
+    !messageId ||
+    !path.trim()
   ) return;
 
   fileActivity.value = {
@@ -1819,24 +1829,4 @@ function markClientRequestAnswered(requestId: string): void {
   const next = new Set(answeredClientRequestIds.value);
   next.add(requestId);
   answeredClientRequestIds.value = next;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
-function isAgentCreationProgress(value: unknown): value is AgentCreationProgress {
-  if (!isRecord(value)) return false;
-  return typeof value.id === 'string' &&
-    (value.state === 'running' || value.state === 'success' || value.state === 'error') &&
-    (value.backend === 'codex' || value.backend === 'claude') &&
-    typeof value.repositoryName === 'string' &&
-    typeof value.createWorktree === 'boolean' &&
-    typeof value.hasPrompt === 'boolean' &&
-    (value.phase === undefined || value.phase === 'creatingWorktree' || value.phase === 'initializingWorktree' || value.phase === 'creatingAgent' || value.phase === 'startingPrompt') &&
-    (value.initializationDetail === undefined || typeof value.initializationDetail === 'string') &&
-    (value.branchName === undefined || typeof value.branchName === 'string') &&
-    (value.agentId === undefined || typeof value.agentId === 'string') &&
-    (value.agentName === undefined || typeof value.agentName === 'string') &&
-    (value.error === undefined || typeof value.error === 'string');
 }

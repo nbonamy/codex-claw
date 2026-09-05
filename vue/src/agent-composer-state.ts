@@ -37,6 +37,12 @@ type AgentComposerConfiguration = {
   planMode: boolean;
 };
 
+type ComposerMainEvent = Extract<
+  MainToRendererEvent,
+  { type: 'models.changed' | 'skills.changed' | 'thread.modeUpdated' | 'thread.settingsUpdated' }
+>;
+type ComposerModeEvent = Extract<ComposerMainEvent, { type: 'thread.modeUpdated' | 'thread.settingsUpdated' }>;
+
 export function createAgentComposerState(options: { getSnapshot: () => AppSnapshot }) {
   const backendModels = ref<BackendModelOption[]>([]);
   const modelCatalogStatus = ref<AsyncCatalogStatus>('notLoaded');
@@ -331,10 +337,23 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     };
   }
 
-  function handleMainEvent(event: MainToRendererEvent): void {
-    syncMode(event);
-    applySkillsChanged(event);
-    applyModelsChanged(event);
+  function handleMainEvent(event: ComposerMainEvent): void {
+    switch (event.type) {
+      case 'models.changed':
+        applyModelsChanged(event);
+        return;
+      case 'skills.changed':
+        applySkillsChanged(event);
+        return;
+      case 'thread.modeUpdated':
+      case 'thread.settingsUpdated':
+        syncMode(event);
+        return;
+      default: {
+        const exhaustive: never = event;
+        void exhaustive;
+      }
+    }
   }
 
   function synchronizeAgentSelection(agentId: string | undefined): void {
@@ -389,11 +408,9 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
   }
 
-  function applySkillsChanged(event: MainToRendererEvent): void {
-    if (event.type !== 'skills.changed' || !isRecord(event.payload) || !Array.isArray(event.payload.skills)) return;
+  function applySkillsChanged(event: Extract<ComposerMainEvent, { type: 'skills.changed' }>): void {
     const cwd = event.payload.cwd;
-    if (cwd !== null && typeof cwd !== 'string') return;
-    const skills = event.payload.skills.filter(isBackendSkillSummary).map((skill) => ({ ...skill }));
+    const skills = event.payload.skills.map((skill) => ({ ...skill }));
     const agents = snapshot().agents.filter((agent) => (
       agent.backend === 'codex' &&
       (event.agentId === agent.id || (!event.agentId && (cwd === null || agent.folder === cwd)))
@@ -407,9 +424,8 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     }
   }
 
-  function applyModelsChanged(event: MainToRendererEvent): void {
-    if (event.type !== 'models.changed' || !event.backend || !isRecord(event.payload) || !Array.isArray(event.payload.models)) return;
-    const models = event.payload.models.filter(isBackendModelOption).map((model) => ({ ...model }));
+  function applyModelsChanged(event: Extract<ComposerMainEvent, { type: 'models.changed' }>): void {
+    const models = event.payload.models.map((model) => ({ ...model }));
     const cache = modelCache.entry(event.backend);
     if (cache.status === 'loaded' && JSON.stringify(cache.value) === JSON.stringify(models)) return;
     modelCache.replace(event.backend, models);
@@ -420,24 +436,23 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     }
   }
 
-  function syncMode(event: MainToRendererEvent): void {
-    if (event.type === 'thread.settingsUpdated' && isRecord(event.payload)) {
+  function syncMode(event: ComposerModeEvent): void {
+    if (event.type === 'thread.settingsUpdated') {
       const agentId = event.agentId ?? snapshot().activeAgentId;
-      const settings = isRecord(event.payload.threadSettings) ? event.payload.threadSettings : null;
-      if (!agentId || !settings) return;
+      const settings = event.payload.threadSettings;
+      if (!agentId) return;
       const current = configuration(agentId);
-      if (typeof settings.model === 'string') current.selectedModelId = settings.model;
-      if (typeof settings.reasoningEffort === 'string') current.selectedReasoningEffort = settings.reasoningEffort;
-      if ('serviceTier' in settings && (typeof settings.serviceTier === 'string' || settings.serviceTier === null)) {
+      if (settings.model !== undefined) current.selectedModelId = settings.model;
+      if (settings.reasoningEffort !== undefined) current.selectedReasoningEffort = settings.reasoningEffort;
+      if ('serviceTier' in settings && settings.serviceTier !== undefined) {
         current.selectedServiceTier = settings.serviceTier;
       }
       if (agentId === snapshot().activeAgentId) restore(agentId);
       return;
     }
-    if (event.type !== 'thread.modeUpdated' || !isRecord(event.payload)) return;
     const agentId = event.agentId ?? snapshot().activeAgentId;
     const mode = event.payload.mode;
-    if (!agentId || (mode !== 'plan' && mode !== 'default')) return;
+    if (!agentId) return;
     configuration(agentId).planMode = mode === 'plan';
     if (agentId === snapshot().activeAgentId) restore(agentId);
   }
@@ -578,25 +593,6 @@ function defaultReasoningEffort(model: BackendModelOption): ReasoningEffort | nu
 
 function defaultServiceTier(model: BackendModelOption): string | null {
   return model.defaultServiceTier ?? null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
-function isBackendModelOption(value: unknown): value is BackendModelOption {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.model !== 'string' || typeof value.displayName !== 'string') {
-    return false;
-  }
-  return value.supportedReasoningEfforts === undefined || (
-    Array.isArray(value.supportedReasoningEfforts) && value.supportedReasoningEfforts.every((option) => (
-      isRecord(option) && typeof option.reasoningEffort === 'string' && typeof option.description === 'string'
-    ))
-  );
-}
-
-function isBackendSkillSummary(value: unknown): value is BackendSkillSummary {
-  return isRecord(value) && typeof value.name === 'string' && typeof value.path === 'string' && typeof value.enabled === 'boolean';
 }
 
 function sameBackendSkills(left: readonly BackendSkillSummary[], right: readonly BackendSkillSummary[]): boolean {
