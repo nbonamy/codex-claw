@@ -11,6 +11,7 @@ import type * as WorkspaceContracts from '../contracts/workspace';
 import type * as ConnectionContracts from '../contracts/connections';
 import type * as BackendContracts from '../contracts/backend';
 import type * as ConversationContracts from '../contracts/conversation';
+import type * as WorkContracts from '../contracts/work';
 
 const contractModules = {
   shared: {
@@ -159,6 +160,46 @@ const contractModules = {
       'subagentStatuses',
     ],
   },
+  work: {
+    path: fileURLToPath(new URL('../contracts/work.ts', import.meta.url)),
+    dependencies: ['./conversation', './shared'],
+    exports: [
+      'Automation',
+      'AutomationExecutionCreatedAgent',
+      'AutomationExecutionLogEntry',
+      'AutomationExecutionStatus',
+      'AutomationLocation',
+      'AutomationRepositoryTarget',
+      'AutomationSchedule',
+      'CreateAutomationInput',
+      'CreateWorkItemInput',
+      'GitHubWorkBacklogConfiguration',
+      'GitHubWorkBacklogConfigurationInput',
+      'GlobalWorkItemQuery',
+      'UpdateAutomationInput',
+      'WorkBacklogAssignment',
+      'WorkBacklogAssignmentPolicy',
+      'WorkBacklogAssignmentStatus',
+      'WorkBacklogConfigurationInput',
+      'WorkBacklogProviderConfigurations',
+      'WorkBacklogState',
+      'WorkIntegrationConnection',
+      'WorkIntegrationStatus',
+      'WorkItem',
+      'WorkItemKind',
+      'WorkItemLabel',
+      'WorkItemPage',
+      'WorkItemQuery',
+      'WorkItemState',
+      'WorkProviderAuthorization',
+      'WorkProviderKind',
+      'WorkProviderSettings',
+      'WorkRepository',
+      'WorkRoutingMode',
+      'WorkRoutingRequest',
+      'WorkRoutingResult',
+    ],
+  },
 } as const;
 
 function moduleExports(paths: string[]): Map<string, string[]> {
@@ -208,6 +249,7 @@ describe('contract domain ownership', () => {
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());
     }
+    expect(exportsByPath.get(contractModules.work.path)).not.toContain('WorkProviderConnectResult');
   });
 
   it('keeps the extracted domain dependency graph explicit and acyclic', () => {
@@ -327,6 +369,41 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.ConversationFileLink>().toEqualTypeOf<ConversationContracts.ConversationFileLink>();
     expectTypeOf<Contracts.AgentQueuedPrompt>().toEqualTypeOf<ConversationContracts.AgentQueuedPrompt>();
     expectTypeOf<Contracts.AgentHistoryLoadResult>().toEqualTypeOf<ConversationContracts.AgentHistoryLoadResult>();
+
+    expectTypeOf<Contracts.WorkProviderKind>().toEqualTypeOf<WorkContracts.WorkProviderKind>();
+    expectTypeOf<Contracts.WorkIntegrationStatus>().toEqualTypeOf<WorkContracts.WorkIntegrationStatus>();
+    expectTypeOf<Contracts.WorkIntegrationConnection>().toEqualTypeOf<WorkContracts.WorkIntegrationConnection>();
+    expectTypeOf<Contracts.WorkProviderSettings>().toEqualTypeOf<WorkContracts.WorkProviderSettings>();
+    expectTypeOf<Contracts.WorkBacklogAssignmentPolicy>().toEqualTypeOf<WorkContracts.WorkBacklogAssignmentPolicy>();
+    expectTypeOf<Contracts.WorkBacklogAssignmentStatus>().toEqualTypeOf<WorkContracts.WorkBacklogAssignmentStatus>();
+    expectTypeOf<Contracts.WorkBacklogAssignment>().toEqualTypeOf<WorkContracts.WorkBacklogAssignment>();
+    expectTypeOf<Contracts.GitHubWorkBacklogConfiguration>().toEqualTypeOf<WorkContracts.GitHubWorkBacklogConfiguration>();
+    expectTypeOf<Contracts.GitHubWorkBacklogConfigurationInput>().toEqualTypeOf<WorkContracts.GitHubWorkBacklogConfigurationInput>();
+    expectTypeOf<Contracts.WorkBacklogProviderConfigurations>().toEqualTypeOf<WorkContracts.WorkBacklogProviderConfigurations>();
+    expectTypeOf<Contracts.WorkBacklogConfigurationInput>().toEqualTypeOf<WorkContracts.WorkBacklogConfigurationInput>();
+    expectTypeOf<Contracts.WorkBacklogState>().toEqualTypeOf<WorkContracts.WorkBacklogState>();
+    expectTypeOf<Contracts.WorkProviderAuthorization>().toEqualTypeOf<WorkContracts.WorkProviderAuthorization>();
+    expectTypeOf<Contracts.WorkRepository>().toEqualTypeOf<WorkContracts.WorkRepository>();
+    expectTypeOf<Contracts.WorkItemLabel>().toEqualTypeOf<WorkContracts.WorkItemLabel>();
+    expectTypeOf<Contracts.WorkItemState>().toEqualTypeOf<WorkContracts.WorkItemState>();
+    expectTypeOf<Contracts.WorkItemKind>().toEqualTypeOf<WorkContracts.WorkItemKind>();
+    expectTypeOf<Contracts.WorkItemQuery>().toEqualTypeOf<WorkContracts.WorkItemQuery>();
+    expectTypeOf<Contracts.GlobalWorkItemQuery>().toEqualTypeOf<WorkContracts.GlobalWorkItemQuery>();
+    expectTypeOf<Contracts.WorkItemPage>().toEqualTypeOf<WorkContracts.WorkItemPage>();
+    expectTypeOf<Contracts.WorkItem>().toEqualTypeOf<WorkContracts.WorkItem>();
+    expectTypeOf<Contracts.CreateWorkItemInput>().toEqualTypeOf<WorkContracts.CreateWorkItemInput>();
+    expectTypeOf<Contracts.AutomationRepositoryTarget>().toEqualTypeOf<WorkContracts.AutomationRepositoryTarget>();
+    expectTypeOf<Contracts.AutomationSchedule>().toEqualTypeOf<WorkContracts.AutomationSchedule>();
+    expectTypeOf<Contracts.AutomationExecutionStatus>().toEqualTypeOf<WorkContracts.AutomationExecutionStatus>();
+    expectTypeOf<Contracts.AutomationExecutionCreatedAgent>().toEqualTypeOf<WorkContracts.AutomationExecutionCreatedAgent>();
+    expectTypeOf<Contracts.AutomationExecutionLogEntry>().toEqualTypeOf<WorkContracts.AutomationExecutionLogEntry>();
+    expectTypeOf<Contracts.Automation>().toEqualTypeOf<WorkContracts.Automation>();
+    expectTypeOf<Contracts.AutomationLocation>().toEqualTypeOf<WorkContracts.AutomationLocation>();
+    expectTypeOf<Contracts.CreateAutomationInput>().toEqualTypeOf<WorkContracts.CreateAutomationInput>();
+    expectTypeOf<Contracts.UpdateAutomationInput>().toEqualTypeOf<WorkContracts.UpdateAutomationInput>();
+    expectTypeOf<Contracts.WorkRoutingMode>().toEqualTypeOf<WorkContracts.WorkRoutingMode>();
+    expectTypeOf<Contracts.WorkRoutingResult>().toEqualTypeOf<WorkContracts.WorkRoutingResult>();
+    expectTypeOf<Contracts.WorkRoutingRequest>().toEqualTypeOf<WorkContracts.WorkRoutingRequest>();
   });
 
   it('preserves conversation runtime constants through the compatibility barrel', () => {
