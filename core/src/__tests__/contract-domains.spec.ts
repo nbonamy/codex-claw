@@ -2,12 +2,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import * as ContractValues from '../contracts';
+import * as ConversationValues from '../contracts/conversation';
 import type * as Contracts from '../contracts';
 import type * as SharedContracts from '../contracts/shared';
 import type * as GitContracts from '../contracts/git';
 import type * as WorkspaceContracts from '../contracts/workspace';
 import type * as ConnectionContracts from '../contracts/connections';
 import type * as BackendContracts from '../contracts/backend';
+import type * as ConversationContracts from '../contracts/conversation';
 
 const contractModules = {
   shared: {
@@ -105,6 +108,55 @@ const contractModules = {
       'CodexAuthentication',
       'CodexChatGptLogin',
       'CodexThreadSettings',
+    ],
+  },
+  conversation: {
+    path: fileURLToPath(new URL('../contracts/conversation.ts', import.meta.url)),
+    dependencies: ['./shared'],
+    exports: [
+      'AgentFileActivity',
+      'AgentHistoryLoadResult',
+      'AgentQueuedPrompt',
+      'AgentSubagentTree',
+      'BackendConversationRef',
+      'BackendPromptOptions',
+      'ConversationFileLink',
+      'ConversationSummary',
+      'PromptAttachment',
+      'PromptSkillInput',
+      'RendererMessage',
+      'RendererMessageAttachment',
+      'RendererMessageMedia',
+      'RendererMessagePart',
+      'RendererPromptAttachment',
+      'RendererSendPromptOptions',
+      'RendererToolPart',
+      'RendererToolPartUpdate',
+      'SendPromptOptions',
+      'SubagentActivity',
+      'SubagentActivityChange',
+      'SubagentActivityKind',
+      'SubagentIdentityChange',
+      'SubagentNode',
+      'SubagentOperation',
+      'SubagentOperationChange',
+      'SubagentOperationKind',
+      'SubagentOperationLifecycle',
+      'SubagentOperationStatus',
+      'SubagentStatus',
+      'SubagentStatusChange',
+      'ThreadGoal',
+      'ThreadGoalStatus',
+      'ThreadPlan',
+      'ThreadPlanKind',
+      'ThreadPlanStatus',
+      'ThreadPlanStep',
+      'ThreadPlanStepStatus',
+      'subagentActivityKinds',
+      'subagentOperationKinds',
+      'subagentOperationLifecycles',
+      'subagentOperationStatuses',
+      'subagentStatuses',
     ],
   },
 } as const;
@@ -236,5 +288,52 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.BackendCommandSummary>().toEqualTypeOf<BackendContracts.BackendCommandSummary>();
     expectTypeOf<Contracts.BackendRuntimeStatus>().toEqualTypeOf<BackendContracts.BackendRuntimeStatus>();
     expectTypeOf<Contracts.BackendConnectionState>().toEqualTypeOf<BackendContracts.BackendConnectionState>();
+
+    expectTypeOf<Contracts.ThreadGoalStatus>().toEqualTypeOf<ConversationContracts.ThreadGoalStatus>();
+    expectTypeOf<Contracts.ThreadGoal>().toEqualTypeOf<ConversationContracts.ThreadGoal>();
+    expectTypeOf<Contracts.ThreadPlanStepStatus>().toEqualTypeOf<ConversationContracts.ThreadPlanStepStatus>();
+    expectTypeOf<Contracts.ThreadPlanKind>().toEqualTypeOf<ConversationContracts.ThreadPlanKind>();
+    expectTypeOf<Contracts.ThreadPlanStatus>().toEqualTypeOf<ConversationContracts.ThreadPlanStatus>();
+    expectTypeOf<Contracts.ThreadPlanStep>().toEqualTypeOf<ConversationContracts.ThreadPlanStep>();
+    expectTypeOf<Contracts.ThreadPlan>().toEqualTypeOf<ConversationContracts.ThreadPlan>();
+    expectTypeOf<Contracts.BackendConversationRef>().toEqualTypeOf<ConversationContracts.BackendConversationRef>();
+    expectTypeOf<Contracts.ConversationSummary>().toEqualTypeOf<ConversationContracts.ConversationSummary>();
+    expectTypeOf<Contracts.SubagentStatus>().toEqualTypeOf<ConversationContracts.SubagentStatus>();
+    expectTypeOf<Contracts.SubagentOperationKind>().toEqualTypeOf<ConversationContracts.SubagentOperationKind>();
+    expectTypeOf<Contracts.SubagentOperationLifecycle>().toEqualTypeOf<ConversationContracts.SubagentOperationLifecycle>();
+    expectTypeOf<Contracts.SubagentOperationStatus>().toEqualTypeOf<ConversationContracts.SubagentOperationStatus>();
+    expectTypeOf<Contracts.SubagentActivityKind>().toEqualTypeOf<ConversationContracts.SubagentActivityKind>();
+    expectTypeOf<Contracts.SubagentNode>().toEqualTypeOf<ConversationContracts.SubagentNode>();
+    expectTypeOf<Contracts.SubagentOperation>().toEqualTypeOf<ConversationContracts.SubagentOperation>();
+    expectTypeOf<Contracts.SubagentOperationChange>().toEqualTypeOf<ConversationContracts.SubagentOperationChange>();
+    expectTypeOf<Contracts.SubagentActivity>().toEqualTypeOf<ConversationContracts.SubagentActivity>();
+    expectTypeOf<Contracts.SubagentActivityChange>().toEqualTypeOf<ConversationContracts.SubagentActivityChange>();
+    expectTypeOf<Contracts.SubagentStatusChange>().toEqualTypeOf<ConversationContracts.SubagentStatusChange>();
+    expectTypeOf<Contracts.SubagentIdentityChange>().toEqualTypeOf<ConversationContracts.SubagentIdentityChange>();
+    expectTypeOf<Contracts.AgentSubagentTree>().toEqualTypeOf<ConversationContracts.AgentSubagentTree>();
+    expectTypeOf<Contracts.PromptSkillInput>().toEqualTypeOf<ConversationContracts.PromptSkillInput>();
+    expectTypeOf<Contracts.PromptAttachment>().toEqualTypeOf<ConversationContracts.PromptAttachment>();
+    expectTypeOf<Contracts.RendererPromptAttachment>().toEqualTypeOf<ConversationContracts.RendererPromptAttachment>();
+    expectTypeOf<Contracts.SendPromptOptions>().toEqualTypeOf<ConversationContracts.SendPromptOptions>();
+    expectTypeOf<Contracts.RendererSendPromptOptions>().toEqualTypeOf<ConversationContracts.RendererSendPromptOptions>();
+    expectTypeOf<Contracts.BackendPromptOptions>().toEqualTypeOf<ConversationContracts.BackendPromptOptions>();
+    expectTypeOf<Contracts.RendererMessageAttachment>().toEqualTypeOf<ConversationContracts.RendererMessageAttachment>();
+    expectTypeOf<Contracts.RendererMessageMedia>().toEqualTypeOf<ConversationContracts.RendererMessageMedia>();
+    expectTypeOf<Contracts.RendererMessagePart>().toEqualTypeOf<ConversationContracts.RendererMessagePart>();
+    expectTypeOf<Contracts.RendererToolPart>().toEqualTypeOf<ConversationContracts.RendererToolPart>();
+    expectTypeOf<Contracts.RendererToolPartUpdate>().toEqualTypeOf<ConversationContracts.RendererToolPartUpdate>();
+    expectTypeOf<Contracts.RendererMessage>().toEqualTypeOf<ConversationContracts.RendererMessage>();
+    expectTypeOf<Contracts.AgentFileActivity>().toEqualTypeOf<ConversationContracts.AgentFileActivity>();
+    expectTypeOf<Contracts.ConversationFileLink>().toEqualTypeOf<ConversationContracts.ConversationFileLink>();
+    expectTypeOf<Contracts.AgentQueuedPrompt>().toEqualTypeOf<ConversationContracts.AgentQueuedPrompt>();
+    expectTypeOf<Contracts.AgentHistoryLoadResult>().toEqualTypeOf<ConversationContracts.AgentHistoryLoadResult>();
+  });
+
+  it('preserves conversation runtime constants through the compatibility barrel', () => {
+    expect(ContractValues.subagentStatuses).toBe(ConversationValues.subagentStatuses);
+    expect(ContractValues.subagentOperationKinds).toBe(ConversationValues.subagentOperationKinds);
+    expect(ContractValues.subagentOperationLifecycles).toBe(ConversationValues.subagentOperationLifecycles);
+    expect(ContractValues.subagentOperationStatuses).toBe(ConversationValues.subagentOperationStatuses);
+    expect(ContractValues.subagentActivityKinds).toBe(ConversationValues.subagentActivityKinds);
   });
 });

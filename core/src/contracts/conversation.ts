@@ -1,0 +1,334 @@
+import type { ReasoningEffort } from './shared';
+
+export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
+
+export type ThreadGoal = {
+  threadId: string;
+  objective: string;
+  status: ThreadGoalStatus;
+  tokenBudget: number | null;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type ThreadPlanStepStatus = 'pending' | 'inProgress' | 'completed';
+
+export type ThreadPlanKind = 'execution' | 'proposed';
+
+export type ThreadPlanStatus = 'inProgress' | 'completed' | 'incomplete' | 'interrupted' | 'failed';
+
+export type ThreadPlanStep = {
+  step: string;
+  status: ThreadPlanStepStatus;
+};
+
+export type ThreadPlan = {
+  threadId: string;
+  turnId: string;
+  kind: ThreadPlanKind;
+  status: ThreadPlanStatus;
+  explanation: string;
+  steps: ThreadPlanStep[];
+  markdown: string;
+  updatedAt: string;
+};
+
+export type BackendConversationRef =
+  | {
+    backend: 'codex';
+    threadId: string;
+  }
+  | {
+    backend: 'claude';
+    folder: string;
+    sessionId: string;
+  };
+
+export type ConversationSummary = {
+  id: string;
+  sessionId?: string;
+  parentConversationId?: string;
+  agentNickname?: string;
+  agentRole?: string;
+  title: string;
+  preview?: string;
+  status?: 'idle' | 'active' | 'error';
+  createdAt?: string;
+  updatedAt: string;
+  messageCount: number;
+  ref: BackendConversationRef;
+};
+
+export const subagentStatuses = [
+  'pendingInit',
+  'running',
+  'interrupted',
+  'completed',
+  'errored',
+  'shutdown',
+  'notFound',
+] as const;
+
+export type SubagentStatus = typeof subagentStatuses[number];
+
+export const subagentOperationKinds = [
+  'spawnAgent',
+  'sendInput',
+  'resumeAgent',
+  'wait',
+  'closeAgent',
+  'sendMessage',
+  'followupTask',
+  'interruptAgent',
+  'listAgents',
+] as const;
+
+export type SubagentOperationKind = typeof subagentOperationKinds[number];
+
+export const subagentOperationLifecycles = ['started', 'completed'] as const;
+
+export type SubagentOperationLifecycle = typeof subagentOperationLifecycles[number];
+
+export const subagentOperationStatuses = ['inProgress', 'completed', 'failed', 'interrupted'] as const;
+
+export type SubagentOperationStatus = typeof subagentOperationStatuses[number];
+
+export const subagentActivityKinds = ['started', 'interacted', 'interrupted', 'completed'] as const;
+
+export type SubagentActivityKind = typeof subagentActivityKinds[number];
+
+export type SubagentNode = {
+  conversationId: string;
+  parentConversationId: string;
+  createdAt: string;
+  status: SubagentStatus;
+  statusMessage?: string;
+  agentPath?: string;
+  agentNickname?: string;
+  agentRole?: string;
+  prompt?: string;
+  model?: string;
+  reasoningEffort?: string;
+  updatedAt: string;
+};
+
+export type SubagentOperation = {
+  id: string;
+  turnId?: string;
+  lifecycle: SubagentOperationLifecycle;
+  kind: SubagentOperationKind;
+  status: SubagentOperationStatus;
+  senderConversationId: string;
+  receiverConversationIds: string[];
+  prompt?: string;
+  model?: string;
+  reasoningEffort?: string;
+  occurredAt: string;
+};
+
+export type SubagentOperationChange = {
+  rootConversationId: string;
+  operation: SubagentOperation;
+  agentStates: Record<string, { status: SubagentStatus; message?: string }>;
+};
+
+export type SubagentActivity = {
+  id: string;
+  turnId?: string;
+  lifecycle: SubagentOperationLifecycle;
+  kind: SubagentActivityKind;
+  conversationId: string;
+  agentPath: string;
+  occurredAt: string;
+};
+
+export type SubagentActivityChange = {
+  rootConversationId: string;
+  parentConversationId: string;
+  activity: SubagentActivity;
+};
+
+export type SubagentStatusChange = {
+  rootConversationId: string;
+  conversationId: string;
+  status: SubagentStatus;
+  statusMessage?: string;
+};
+
+export type SubagentIdentityChange = {
+  rootConversationId: string;
+  conversationId: string;
+  agentNickname?: string;
+  agentRole?: string;
+};
+
+export type AgentSubagentTree = {
+  rootConversationId: string;
+  nodes: Record<string, SubagentNode>;
+  operations: Record<string, SubagentOperation>;
+  activities: Record<string, SubagentActivity>;
+};
+
+export type PromptSkillInput = {
+  name: string;
+  path: string;
+};
+
+export type PromptAttachment =
+  | {
+    type: 'image';
+    path: string;
+    detail?: 'auto' | 'low' | 'high' | 'original';
+    name?: string;
+    mimeType?: string;
+    previewUrl?: string;
+  }
+  | {
+    type: 'file';
+    path: string;
+    name?: string;
+    mimeType?: string;
+  };
+
+export type RendererPromptAttachment =
+  | {
+    type: 'image';
+    reference: string;
+    detail?: 'auto' | 'low' | 'high' | 'original';
+  }
+  | {
+    type: 'file';
+    reference: string;
+  };
+
+export type SendPromptOptions = {
+  attachments?: readonly PromptAttachment[];
+  model?: string | null;
+  planMode?: boolean;
+  reasoningEffort?: ReasoningEffort | null;
+  serviceTier?: string | null;
+  skills?: PromptSkillInput[];
+  inputMethod?: 'typed' | 'dictated';
+  backendOptions?: BackendPromptOptions;
+};
+
+export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments'> & {
+  attachments?: readonly RendererPromptAttachment[];
+};
+
+export type BackendPromptOptions =
+  | {
+    kind: 'codex';
+    reasoningEffort?: ReasoningEffort | null;
+    serviceTier?: string | null;
+    skills?: PromptSkillInput[];
+  }
+  | {
+    kind: 'claude';
+    thinkingBudgetTokens?: number | null;
+    permissionMode?: string | null;
+  };
+
+export type RendererMessageAttachment = {
+  kind: 'file' | 'image';
+  name: string;
+  path?: string;
+  url?: string;
+  mimeType?: string;
+};
+
+export type RendererMessageMedia = {
+  url: string;
+  alt?: string;
+  mimeType?: string;
+  prompt?: string;
+  title?: string;
+};
+
+export type RendererMessagePart =
+  | { type: 'attachment'; attachment: RendererMessageAttachment }
+  | { type: 'media'; media: RendererMessageMedia; itemId?: string }
+  | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
+  | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'final_answer' }
+  | {
+    type: 'tool';
+    id: string;
+    kind: string;
+    title: string;
+    status: 'running' | 'completed' | 'failed';
+    statusText?: string;
+    body?: string;
+    input?: unknown;
+    output?: unknown;
+    metadata?: Record<string, unknown>;
+  }
+  | { type: 'status'; text: string };
+
+export type RendererToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
+
+export type RendererToolPartUpdate = {
+  itemId: string;
+  title?: string;
+  status?: RendererToolPart['status'];
+  statusText?: string | null;
+  body?: string;
+  bodyDelta?: string;
+  bodyAppend?: string;
+  input?: unknown;
+  output?: unknown;
+  metadata?: Record<string, unknown>;
+  fallbackToolPart?: RendererToolPart;
+};
+
+export type RendererMessage = {
+  id: string;
+  agentId: string;
+  kind?: 'compaction' | 'steer';
+  role: 'user' | 'assistant' | 'system';
+  status: 'complete' | 'streaming' | 'error';
+  turnId?: string;
+  parts: RendererMessagePart[];
+  createdAt: string;
+};
+
+export type AgentFileActivity = {
+  agentId: string;
+  turnId: string;
+  messageId: string;
+  itemId: string;
+  path: string;
+  action: 'read' | 'edit' | 'create';
+  status: 'running' | 'completed' | 'failed';
+  occurredAt: string;
+};
+
+export type ConversationFileLink = {
+  kind: 'file';
+  href: string;
+  path: string;
+  filepath?: string;
+  action?: 'read' | 'edit' | 'create';
+  line?: number;
+  column?: number;
+  turnId?: string;
+  messageId?: string;
+  itemId?: string;
+};
+
+export type AgentQueuedPrompt = {
+  id: string;
+  agentId: string;
+  text: string;
+  createdAt: string;
+  options?: SendPromptOptions;
+  attempts?: number;
+  lastError?: string;
+  retryAt?: string;
+  submitted?: boolean;
+};
+
+export type AgentHistoryLoadResult = {
+  hasOlder: boolean;
+};
