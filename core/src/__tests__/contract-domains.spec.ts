@@ -7,10 +7,12 @@ import type * as SharedContracts from '../contracts/shared';
 import type * as GitContracts from '../contracts/git';
 import type * as WorkspaceContracts from '../contracts/workspace';
 import type * as ConnectionContracts from '../contracts/connections';
+import type * as BackendContracts from '../contracts/backend';
 
 const contractModules = {
   shared: {
     path: fileURLToPath(new URL('../contracts/shared.ts', import.meta.url)),
+    dependencies: [],
     exports: [
       'AgentBackend',
       'AppText',
@@ -21,6 +23,7 @@ const contractModules = {
   },
   git: {
     path: fileURLToPath(new URL('../contracts/git.ts', import.meta.url)),
+    dependencies: [],
     exports: [
       'AgentCloseInput',
       'AgentGitBranchInput',
@@ -45,6 +48,7 @@ const contractModules = {
   },
   workspace: {
     path: fileURLToPath(new URL('../contracts/workspace.ts', import.meta.url)),
+    dependencies: [],
     exports: [
       'AgentFilePreviewResult',
       'AgentFileSearchItem',
@@ -62,6 +66,7 @@ const contractModules = {
   },
   connections: {
     path: fileURLToPath(new URL('../contracts/connections.ts', import.meta.url)),
+    dependencies: [],
     exports: [
       'AddSshConnectionInput',
       'DevicePairingSession',
@@ -73,6 +78,33 @@ const contractModules = {
       'RemoteConnectionsState',
       'SshHostCandidate',
       'UpdateRemoteConnectionInput',
+    ],
+  },
+  backend: {
+    path: fileURLToPath(new URL('../contracts/backend.ts', import.meta.url)),
+    dependencies: ['./shared'],
+    exports: [
+      'AccountRateLimitWindow',
+      'AccountRateLimits',
+      'BackendCapabilities',
+      'BackendCommandSummary',
+      'BackendConnectionState',
+      'BackendDefaults',
+      'BackendModelOption',
+      'BackendPermissionModeOption',
+      'BackendPlanModeSupport',
+      'BackendPluginSummary',
+      'BackendReasoningEffortOption',
+      'BackendRuntimeStatus',
+      'BackendServiceTier',
+      'BackendSession',
+      'BackendSkillSummary',
+      'CodexAccount',
+      'CodexApprovalPreset',
+      'CodexApprovalsReviewer',
+      'CodexAuthentication',
+      'CodexChatGptLogin',
+      'CodexThreadSettings',
     ],
   },
 } as const;
@@ -111,7 +143,7 @@ function domainDependencies(path: string): string[] {
 }
 
 describe('contract domain ownership', () => {
-  it('keeps the four leaf domain export surfaces exact and barrel-compatible', () => {
+  it('keeps extracted domain export surfaces exact and barrel-compatible', () => {
     const barrelPath = fileURLToPath(new URL('../contracts.ts', import.meta.url));
     const paths = [barrelPath, ...Object.values(contractModules).map((module) => module.path)];
     const exportsByPath = moduleExports(paths);
@@ -126,9 +158,9 @@ describe('contract domain ownership', () => {
     }
   });
 
-  it('keeps the extracted leaf domain graph acyclic', () => {
+  it('keeps the extracted domain dependency graph explicit and acyclic', () => {
     for (const module of Object.values(contractModules)) {
-      expect(domainDependencies(module.path)).toEqual([]);
+      expect(domainDependencies(module.path)).toEqual(module.dependencies);
     }
   });
 
@@ -182,5 +214,27 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.PairedDevice>().toEqualTypeOf<ConnectionContracts.PairedDevice>();
     expectTypeOf<Contracts.AddSshConnectionInput>().toEqualTypeOf<ConnectionContracts.AddSshConnectionInput>();
     expectTypeOf<Contracts.UpdateRemoteConnectionInput>().toEqualTypeOf<ConnectionContracts.UpdateRemoteConnectionInput>();
+
+    expectTypeOf<Contracts.CodexApprovalPreset>().toEqualTypeOf<BackendContracts.CodexApprovalPreset>();
+    expectTypeOf<Contracts.CodexApprovalsReviewer>().toEqualTypeOf<BackendContracts.CodexApprovalsReviewer>();
+    expectTypeOf<Contracts.BackendSession>().toEqualTypeOf<BackendContracts.BackendSession>();
+    expectTypeOf<Contracts.BackendDefaults>().toEqualTypeOf<BackendContracts.BackendDefaults>();
+    expectTypeOf<Contracts.CodexThreadSettings>().toEqualTypeOf<BackendContracts.CodexThreadSettings>();
+    expectTypeOf<Contracts.AccountRateLimitWindow>().toEqualTypeOf<BackendContracts.AccountRateLimitWindow>();
+    expectTypeOf<Contracts.AccountRateLimits>().toEqualTypeOf<BackendContracts.AccountRateLimits>();
+    expectTypeOf<Contracts.BackendPlanModeSupport>().toEqualTypeOf<BackendContracts.BackendPlanModeSupport>();
+    expectTypeOf<Contracts.BackendCapabilities>().toEqualTypeOf<BackendContracts.BackendCapabilities>();
+    expectTypeOf<Contracts.BackendPermissionModeOption>().toEqualTypeOf<BackendContracts.BackendPermissionModeOption>();
+    expectTypeOf<Contracts.CodexAccount>().toEqualTypeOf<BackendContracts.CodexAccount>();
+    expectTypeOf<Contracts.CodexAuthentication>().toEqualTypeOf<BackendContracts.CodexAuthentication>();
+    expectTypeOf<Contracts.CodexChatGptLogin>().toEqualTypeOf<BackendContracts.CodexChatGptLogin>();
+    expectTypeOf<Contracts.BackendReasoningEffortOption>().toEqualTypeOf<BackendContracts.BackendReasoningEffortOption>();
+    expectTypeOf<Contracts.BackendServiceTier>().toEqualTypeOf<BackendContracts.BackendServiceTier>();
+    expectTypeOf<Contracts.BackendModelOption>().toEqualTypeOf<BackendContracts.BackendModelOption>();
+    expectTypeOf<Contracts.BackendSkillSummary>().toEqualTypeOf<BackendContracts.BackendSkillSummary>();
+    expectTypeOf<Contracts.BackendPluginSummary>().toEqualTypeOf<BackendContracts.BackendPluginSummary>();
+    expectTypeOf<Contracts.BackendCommandSummary>().toEqualTypeOf<BackendContracts.BackendCommandSummary>();
+    expectTypeOf<Contracts.BackendRuntimeStatus>().toEqualTypeOf<BackendContracts.BackendRuntimeStatus>();
+    expectTypeOf<Contracts.BackendConnectionState>().toEqualTypeOf<BackendContracts.BackendConnectionState>();
   });
 });

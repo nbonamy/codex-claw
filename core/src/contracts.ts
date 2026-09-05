@@ -43,6 +43,19 @@ import type {
   SshHostCandidate,
   UpdateRemoteConnectionInput,
 } from './contracts/connections';
+import type {
+  AccountRateLimits,
+  BackendConnectionState,
+  BackendDefaults,
+  BackendModelOption,
+  BackendPluginSummary,
+  BackendRuntimeStatus,
+  BackendSession,
+  BackendSkillSummary,
+  CodexAuthentication,
+  CodexChatGptLogin,
+  CodexThreadSettings,
+} from './contracts/backend';
 
 export type {
   AgentBackend,
@@ -98,6 +111,29 @@ export type {
   SshHostCandidate,
   UpdateRemoteConnectionInput,
 } from './contracts/connections';
+export type {
+  AccountRateLimitWindow,
+  AccountRateLimits,
+  BackendCapabilities,
+  BackendCommandSummary,
+  BackendConnectionState,
+  BackendDefaults,
+  BackendModelOption,
+  BackendPermissionModeOption,
+  BackendPlanModeSupport,
+  BackendPluginSummary,
+  BackendReasoningEffortOption,
+  BackendRuntimeStatus,
+  BackendServiceTier,
+  BackendSession,
+  BackendSkillSummary,
+  CodexAccount,
+  CodexApprovalPreset,
+  CodexApprovalsReviewer,
+  CodexAuthentication,
+  CodexChatGptLogin,
+  CodexThreadSettings,
+} from './contracts/backend';
 
 export type AgentStatus =
   | { type: 'idle' }
@@ -144,58 +180,6 @@ export type BackendApprovalRequest = {
   requestedPermissions?: BackendRequestedPermission[];
   allowedScopes?: BackendApprovalScope[];
   canDeny?: boolean;
-};
-
-export type CodexApprovalPreset = ApprovalPreset;
-
-export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
-
-export type BackendSession =
-  | {
-    kind: 'codex';
-    threadId: string;
-  }
-  | {
-    kind: 'claude';
-    sessionId: string;
-    transport: 'stdio' | 'websocket';
-    transcriptSessionId?: string;
-    serverUrl?: string;
-    model?: string;
-    reasoningEffort?: ReasoningEffort;
-  };
-
-export type BackendDefaults =
-  | {
-    kind: 'codex';
-    model?: string;
-    approvalPreset?: CodexApprovalPreset;
-    approvalPolicy?: string;
-    approvalsReviewer?: CodexApprovalsReviewer;
-    sandboxMode?: string;
-    reasoningEffort?: string;
-    serviceTier?: string | null;
-  }
-  | {
-    kind: 'claude';
-    model?: string;
-    reasoningEffort?: ReasoningEffort;
-    permissionMode?: string;
-    thinking?: {
-      type: 'enabled' | 'disabled';
-      budgetTokens?: number;
-    };
-  };
-
-export type CodexThreadSettings = {
-  cwd?: string;
-  model?: string;
-  reasoningEffort?: string;
-  serviceTier?: string | null;
-  approvalPolicy?: string;
-  approvalsReviewer?: CodexApprovalsReviewer;
-  sandboxPolicy?: { type: string };
-  activePermissionProfile?: { id: string };
 };
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
@@ -287,23 +271,6 @@ export type AgentContextUsage = {
   lastTotalTokens: number;
   modelContextWindow: number | null;
   usedPercent: number | null;
-};
-
-export type AccountRateLimitWindow = {
-  usedPercent: number;
-  windowDurationMins: number | null;
-  resetsAt: number | null;
-};
-
-export type AccountRateLimits = {
-  limitId: string | null;
-  limitName: string | null;
-  primary: AccountRateLimitWindow | null;
-  secondary: AccountRateLimitWindow | null;
-  credits: unknown;
-  individualLimit: unknown;
-  planType: string | null;
-  rateLimitReachedType: string | null;
 };
 
 export type WorkProviderKind = 'github';
@@ -648,36 +615,6 @@ export type UpdateAutomationInput = CreateAutomationInput & {
   id: string;
 };
 
-export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
-
-export type BackendCapabilities = {
-  attachments: boolean;
-  models: boolean;
-  skills: boolean;
-  reasoningEffort: boolean;
-  serviceTier?: boolean;
-  thinkingBudget: boolean;
-  planMode: BackendPlanModeSupport;
-  goals: boolean;
-  steerPrompt: boolean;
-  interrupt: boolean;
-  history: boolean;
-  conversationFork?: boolean;
-  rollback: boolean;
-  editMessage: boolean;
-  retryMessage: boolean;
-  approvals: boolean;
-  approvalPresets?: ApprovalPreset[];
-  permissionModes?: BackendPermissionModeOption[];
-};
-
-export type BackendPermissionModeOption = {
-  id: string;
-  label: AppText;
-  description: AppText;
-  dangerous?: boolean;
-};
-
 export type AppearanceMode = 'dark' | 'light' | 'system';
 
 export type AppThemeSettings = {
@@ -762,96 +699,12 @@ export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugi
   plugins?: Partial<AppPluginSettings>;
 };
 
-export type CodexAccount =
-  | { type: 'apiKey' }
-  | { type: 'chatgpt'; email: string | null; planType: string }
-  | { type: 'amazonBedrock'; credentialSource: 'codexManaged' | 'awsManaged' };
-
-export type CodexAuthentication = {
-  account: CodexAccount | null;
-  requiresOpenaiAuth: boolean;
-  login: {
-    status: 'idle' | 'starting' | 'pending' | 'completed' | 'cancelled' | 'error';
-    error: string | null;
-  };
-};
-
-export type CodexChatGptLogin = {
-  loginId: string;
-  authUrl: string;
-};
-
 export type ClientState = {
   sourceFolderPath: string;
   /** Agent activity requires sleep prevention regardless of power source. */
   shouldPreventDisplaySleep: boolean;
   /** Remote access requires sleep prevention only while connected to AC power. */
   shouldPreventDisplaySleepForRemoteAccess?: boolean;
-};
-
-export type BackendReasoningEffortOption = {
-  reasoningEffort: ReasoningEffort;
-  description: string;
-};
-
-export type BackendServiceTier = {
-  id: string;
-  name: string;
-  description: string;
-};
-
-export type BackendModelOption = {
-  id: string;
-  model: string;
-  displayName: string;
-  description?: string;
-  hidden?: boolean;
-  supportedReasoningEfforts?: BackendReasoningEffortOption[];
-  defaultReasoningEffort?: ReasoningEffort | null;
-  serviceTiers?: BackendServiceTier[];
-  defaultServiceTier?: string | null;
-  isDefault?: boolean;
-  capabilities?: Partial<BackendCapabilities>;
-  providerMetadata?: Record<string, unknown>;
-};
-
-export type BackendSkillSummary = {
-  id?: string;
-  name: string;
-  description?: string;
-  shortDescription?: string;
-  displayName?: string;
-  iconSmall?: string;
-  iconLarge?: string;
-  brandColor?: string;
-  defaultPrompt?: string;
-  path: string;
-  scope?: string;
-  enabled: boolean;
-  providerMetadata?: Record<string, unknown>;
-};
-
-export type BackendPluginSummary = {
-  id: string;
-  name: string;
-  displayName: string;
-  shortDescription?: string;
-  longDescription?: string;
-  brandColor?: string;
-  iconUrl?: string;
-  iconUrlDark?: string;
-  enabled: boolean;
-};
-
-export type BackendCommandSummary = {
-  id: string;
-  backend: AgentBackend;
-  name: string;
-  displayName?: string;
-  description?: string;
-  slashName?: string;
-  submitOnSelect?: boolean;
-  providerMetadata?: Record<string, unknown>;
 };
 
 export type SidePanelMarkdownRequest = {
@@ -1139,18 +992,6 @@ export type AppSnapshotMetadata = Omit<AppSnapshot, 'messages'>;
 
 export type AgentHistoryLoadResult = {
   hasOlder: boolean;
-};
-
-export type BackendRuntimeStatus = {
-  backend: AgentBackend;
-  status: 'notConfigured' | 'starting' | 'running' | 'error';
-  detail?: AppText;
-  capabilities?: Partial<BackendCapabilities>;
-};
-
-export type BackendConnectionState = {
-  status: 'connecting' | 'connected' | 'reconnecting' | 'error';
-  detail?: AppText;
 };
 
 export type RendererSnapshotState = {
