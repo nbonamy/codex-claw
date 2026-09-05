@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 14c active — trust decoded backend events downstream.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 14d active — simplify renderer event handling.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -119,8 +119,8 @@ backend request and event boundaries are stable.
 - [ ] Phase 1.4 slice 14: close event ownership and remove redundant guards.
 - [x] Phase 1.4 slice 14a: close the backend event union.
 - [x] Phase 1.4 slice 14b: route backend events exhaustively.
-- [ ] Phase 1.4 slice 14c: trust decoded backend events downstream. **Active.**
-- [ ] Phase 1.4 slice 14d: simplify renderer event handling.
+- [x] Phase 1.4 slice 14c: trust decoded backend events downstream.
+- [ ] Phase 1.4 slice 14d: simplify renderer event handling. **Active.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -169,7 +169,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 13c: remote transport decoder adoption | Complete | remote transport agent / root integrator | All four production ingress seams now decode backend events exactly once; no shallow ingress guard or raw `ClawBackendEvent` cast remains except the decoder's validated return and one deliberate malformed fixture | Full `npm run test:ai`: 274 files / 2,095 tests in 24.97s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `0779e2a558713d29b6d10890daec5ded6a66d2ce` | Malformed remote events are safely logged and dropped while connections and pending requests survive; malformed framing behavior is unchanged. Review fixed Web parsing to preserve both outer-envelope and inner-event identity. Protocol and backend-architecture docs now describe all transport boundaries |
 | 2026-09-04 | Phase 1.4 slice 14a: close the backend event union | Complete | event ownership agent / root integrator | `contracts.ts` 2,263 → 2,140 lines; AST inventory proves 59 discriminated members / 55 unique keys with four provider duplicates and an exact disjoint 14 runtime + 24 conversation + four subagent + 13 renderer-only partition; typed union and envelope are byte-identical after removing only the fallback (`4b340028…`) | Full `npm run test:ai`: 275 files / 2,097 tests in 25.677s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed. Core coverage: 91.84% statements / 86.15% branches / 93.28% functions / 93.46% lines; ownership module: 100% | `06583fb3eabb3eed9f96b9bcf4c07d82d18e3e03` | No generic fallback, duplicate event-name union, obsolete typed/untyped alias, hidden cast, or weakened type remains; renderer-only events are explicit state-preserving no-ops and the dormant global approval-resolution no-op remains characterized. Repository-wide coverage remains pre-existing red and is not reported green: Backend 83.76% statements / 73.64% branches; Vue 88.12% statements / 79.87% branches; Electron 68.33% statements / 67.11% branches / 62.69% functions / 70.89% lines |
 | 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Complete | event routing agent / root integrator | The exact 55-key ownership partition routes 14 runtime, 24 conversation, four subagent, and 13 renderer-only events once; reducer inputs are exact owned subsets, return `void`, and close with compile-time `never`; façade invalidation and dispatch ordering remain unchanged | Focused 11 files / 89 tests; Core 44 / 279. Full `npm run test:ai`: 276 files / 2,099 tests in 26.09s. Core coverage: 91.48% statements / 85.83% branches / 93.28% functions / 93.25% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `6e14cfe3c72b8948dca3f341162c39e9d346fbef` | Independent review found no defects. The removed `thread.modeUpdated` runtime branch was unreachable behind renderer ownership; agent-less `backendApproval.resolved` remains an explicit no-op, while agent-scoped resolution still removes only that agent's approval |
-| 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Active | root orchestrator | Typed wire decoding is established at every ingress; downstream Core and backend handling still contains redundant structural guards and stale casts | Remove only redundant downstream Core/backend structural guards and stale casts after the decoder. Retain business, identity, normalization, and application-policy checks; prove direct-owner and façade behavior, then run full-suite, typecheck, lint/Knip, cycle, and diff gates | — | Sole active checkpoint. Preserve behavior and keep semantic fixes separate |
+| 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Complete | downstream event agent / root integrator | Production downstream handling: 5,462 → 5,033 lines, net -429; 23 redundant structural helpers removed; 63 / 63 runtime cases retained | Full `npm run test:ai`: 276 files / 2,099 tests in 24.81s. Core coverage: 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. Backend's known coverage debt remains explicit at 83.78% / 73.57% / 87.95% / 85.70% across 614 tests. All-workspace typecheck, lint, Knip, Madge, and diff checks passed | `3bc7ca4af524ad69ea891e900b0d5a7591deadee` | All audited policy, security, identity, normalization, malformed-input, and compatibility gates remain. Only post-decoder structural duplication and stale casts were removed; renderer simplification is the sole active checkpoint |
+| 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Active | root orchestrator | Renderer dispatch still carries redundant guards and casts after the exhaustive Core/backend cleanup | Make renderer dispatch exhaustive, remove only redundant renderer structural checks and casts, and list ignored renderer events explicitly. Preserve renderer ordering, state policy, compatibility behavior, and the decoder as the sole wire trust boundary | — | Sole active checkpoint; keep semantic fixes separate |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
@@ -177,6 +178,8 @@ row is not complete.
 | 2026-09-04 | Phase 3.2: Electron IPC registrar manifest | Pending / prepared | root orchestrator | `AppController` 1,863 lines / 155 methods; `registerIpcHandlers` 393 lines with 120 inline registrations plus nine existing Git registrations, for 129 total; preload 150 lines with 129 invokes and three subscriptions; six specs total 2,860 lines / 72 tests | Read-only registration, preload bridge, helper, and test-ownership audit complete; exact 129 invoke channels plus three subscriptions must remain covered | — | Execute seven exact commits: `test: characterize electron ipc surface`; `chore: extract connection work and source ipc`; `chore: extract agent and automation ipc`; `chore: extract native electron ipc registrars`; `chore: split electron ipc adapters`; `chore: compose typed preload bridge`; `test: move electron ipc ownership specifications`. Exclude private `updateAgentFolder`. Target registration composition at most 35 lines with zero inline handlers, `AppController` after 3.1+3.2 at most 650 lines, each registrar at most 22 channels / four ports / 300 lines, preload index at most 30 lines and modules at most 90, specs at most 400, with lossless handler/helper/test fidelity |
 | 2026-09-04 | Phase 4.1: constructible renderer state manifest | Pending / prepared | root orchestrator | `app-state.ts` 1,842 lines / 27 module-state bindings / 164 façade members; child stores total 1,215 lines; seven specs total 4,932 lines / 116 runtime cases, with 112 singleton imports and 111 global mutations | Read-only dependency, singleton, lifecycle, façade, and test-ownership audit complete; target owner is `createAppState(deps)` with seven ports for API, host, platform, celebration, onboarding, scheduler, and random behavior | — | Execute three exact commits: `chore: inject renderer state dependencies`; `chore: make renderer state constructible`; `test: isolate renderer state specifications`. Preserve fixed dependency identity and all 164 existing façade keys plus `dispose`; `dispose` cleans subscriptions and timers only. Prove AST/body fidelity and all 115 declarations / 116 runtime cases. Exit with a thin singleton wrapper at most 35 lines and zero singleton imports or global mutations in tests; defer domain splitting to Phase 4.2 |
 | 2026-09-04 | Phase 4.2: renderer state ownership manifest | Pending / prepared | root orchestrator | `app-state.ts` 1,842 lines / 164 façade members; function baselines: app 204, composer 76, history 14, unread 30, source 8, work 27; seven specs total 4,932 lines / 115 declarations / 116 runtime cases | Read-only state, command, projection, dependency, and test-ownership audit complete; target is eight acyclic domain namespaces plus `dispose`, with the replica as the sole writable snapshot and synchronization owner | — | Execute six exact commits: `chore: extract renderer replica state`; `chore: extract renderer conversation state`; `chore: extract renderer agent and workspace state`; `chore: extract renderer support state`; `test: move renderer state ownership specifications`; `chore: modularize renderer application state`. Preserve all 164 members with lossless AST/body/test hashes; temporary flat aliases exist only in commits 1–5 and disappear in commit 6. Target composition at 350–600 lines; replica four members / at most 400 lines, agents 24 / 450, conversation 58 / 650, workspace 20 / 350, Git nine / 110, work 18 / 400, automations seven / 180, system 24 / 300. No state module may exceed 700 lines, no spec 700 lines, and the composition spec stays at most 250. Domain modules do not import each other, use narrow ports, keep `isRemoteAutomationLocation` neutral, reuse the post-14d dispatcher, and do not touch AppShell |
+| 2026-09-04 | Phase 4.3: AppShell controller coverage manifest | Pending / prepared | root orchestrator | `AppShell.vue`: 1,798 lines / 112 props / 39 emits / 95 top-level declarations; five AppShell specs: 4,414 lines / 108 tests / 109 mounts / 469 assertions in 5.91s | Read-only controller and test-seam audit complete. Preserve all 108 test names and callbacks plus all 469 assertion ASTs while moving at least 75 cases to direct controller ownership; reduce shell mounts to at most 30 | — | Execute four test-only commits: `test: cover shell command controller`; `test: cover shell workflow controllers`; `test: characterize shell controller seams`; `test: cover app shell controllers`. Keep exactly eight real-composition cases: active-agent shell composition; SDK conversation controller wiring; resume-session dialog wiring; active team/agent keyboard shortcuts; deterministic Markdown/approval Debug commands; Cockpit navigation and return; Automations navigation without a team; and Settings General/remembered-pane/appearance/quit composition. Target controller tests ≤250ms, specs ≤700 lines, temporary test files ≤500, final composition spec ≤250 lines / ≤2.5s, and zero production diff |
+| 2026-09-04 | Phase 4.4: AppShell orchestration manifest | Pending / prepared | root orchestrator | `AppShell.vue`: 1,798 lines / 112 props / 39 emits / 95 declarations / 45 imports; `App.vue`: 627 lines with 153 AppShell bindings | Read-only production ownership and extraction audit complete. Final AppShell surface is nine domain props (`replica`, `agents`, `conversation`, `workspace`, `git`, `work`, `automations`, `system`, `updateStatus`) and three semantic emits (`closeAgent`, `pullRequestCleanup`, `installUpdate`) | — | Execute the eight recorded commits in order. Owners: conversation ≤320 lines, debug previews ≤220, agent/team dialogs ≤250 plus a repository-session owner, resource migration ≤90, commands ≤500. Exit with AppShell 650–850 lines, hard maximum 900, nine props, three emits, ≤35 declarations, ≤25 imports; App.vue ≤500 lines and 12 bindings; retain the eight composition smokes. Hash all 95 declarations, template subtrees, and the style block, and maintain a complete prop/emit ledger. Temporary dual props are allowed only in commits five through seven |
 
 For each future row, include:
 
@@ -828,10 +831,12 @@ Execute four small commits:
    returns `void`, and closes with compile-time `never`. The global
    `backendApproval.resolved` no-op and agent-scoped resolution behavior remain
    unchanged after removing the misleading all-agent loop.
-3. `chore: trust decoded backend events` — active. Remove redundant downstream
-   Core and backend structural guards and stale casts after decoding. Retain
-   business, identity, normalization, and application-policy checks.
-4. `chore: simplify renderer event handling` — make renderer dispatch
+3. `chore: trust decoded backend events` — completed in
+   `3bc7ca4af524ad69ea891e900b0d5a7591deadee`. Production downstream handling
+   shrank from 5,462 to 5,033 lines, removing 23 redundant structural helpers
+   while retaining all 63 runtime cases and every audited policy, security,
+   identity, normalization, malformed-input, and compatibility gate.
+4. `chore: simplify renderer event handling` — active. Make renderer dispatch
    exhaustive, remove redundant renderer guards and casts, and list ignored
    renderer events explicitly.
 
@@ -1145,6 +1150,36 @@ Commit checkpoint: `chore: modularize renderer application state`
 - Keep a small number of real-composition shell tests.
 - Avoid remounting already-owned child behavior through AppShell.
 
+The prepared baseline is `AppShell.vue` at 1,798 lines with 112 props, 39
+emits, and 95 top-level declarations. Its five AppShell specifications total
+4,414 lines, 108 tests, 109 mounts, and 469 assertions, completing in 5.91s.
+This checkpoint is test-only: production code must remain byte-identical.
+
+Execute four exact commits:
+
+1. `test: cover shell command controller`
+2. `test: cover shell workflow controllers`
+3. `test: characterize shell controller seams`
+4. `test: cover app shell controllers`
+
+Preserve all 108 test names and callback bodies and all 469 assertion ASTs.
+Move at least 75 cases to direct controller ownership and reduce AppShell
+mounts to at most 30. Retain exactly these eight real-composition cases:
+
+1. active-agent shell composition;
+2. SDK conversation-controller state and action wiring;
+3. resume-session dialog wiring for the selected sidebar agent;
+4. active team and agent keyboard shortcuts;
+5. deterministic Markdown and approval Debug commands;
+6. Cockpit navigation and return to an agent;
+7. Automations navigation without retaining an active team;
+8. Settings General navigation, remembered pane, appearance update, and quit.
+
+Exit when controller tests complete in at most 250ms, every permanent spec is
+at most 700 lines, temporary migration specs are at most 500 lines, the final
+real-composition spec is at most 250 lines and 2.5s, and no production diff
+exists.
+
 Commit checkpoint: `test: cover app shell controllers`
 
 ### 4.4 Slim AppShell orchestration
@@ -1153,6 +1188,57 @@ Commit checkpoint: `test: cover app shell controllers`
   ownership behind focused controllers and components.
 - Remove the giant controller/prop bag rather than renaming it.
 - Make AppShell responsible for page selection and composition.
+
+After Phase 4.3, replace the flat shell surface with exactly nine cohesive
+namespace props: `replica`, `agents`, `conversation`, `workspace`, `git`,
+`work`, `automations`, `system`, and `updateStatus`. Retain only three semantic
+emits for root-owned workflows: `closeAgent`, `pullRequestCleanup`, and
+`installUpdate`. The other 36 current emits become direct calls into their
+authoritative namespace owners; do not hide the existing giant interface
+inside one renamed controller bag or use a catch-all provide/inject object.
+
+Extract deep owners with narrow acyclic ports:
+
+- conversation mapping, transcript, composer, prompt/steer, approval, and SDK
+  controller composition in a controller of at most 320 lines;
+- deterministic debug previews, timers, progress, approval consumption, and
+  cleanup in a controller of at most 220 lines;
+- agent, team, and history dialogs in a controller of at most 250 lines, with
+  repository session acquisition in a separate owner;
+- resource-sharing migration in a controller of at most 90 lines;
+- keyboard and application commands behind seven cohesive ports, in a
+  controller of at most 500 lines.
+
+AppShell continues to own page selection, active-team and navigation
+projection, sidebar layout, agent/Cockpit/Automations/Settings composition,
+Cockpit one-time initialization, settings-tab memory, workspace watches, and
+the dialog component tags. `App.vue` retains root confirmation and update
+workflows, renderer focus and visibility lifecycle, system theme, and restart
+overlay behavior.
+
+Execute eight exact commits:
+
+1. `chore: extract shell conversation controller`
+2. `chore: extract shell debug previews`
+3. `chore: extract shell dialog workflows`
+4. `chore: narrow shell command ports`
+5. `chore: pass renderer agent and conversation state to shell`
+6. `chore: pass renderer workspace and work state to shell`
+7. `chore: pass renderer system state to shell`
+8. `chore: slim app shell orchestration`
+
+Use `lossless-code-moves` for every substantial relocation. Hash all 95
+declaration bodies, the template subtrees including directives/modifiers and
+attribute order, and the existing style block. Maintain a ledger mapping all
+112 props and 39 emits to a namespace member or one of the three retained
+emits. Temporary dual props are allowed only in commits five through seven and
+must be gone in commit eight.
+
+Exit with `AppShell.vue` between 650 and 850 lines, hard maximum 900, exactly
+nine props and three emits, at most 35 top-level declarations and 25 imports;
+`App.vue` at most 500 lines with 12 AppShell bindings; the eight Phase 4.3
+composition cases retained; no new production controller above 500 lines; and
+no dependency cycles.
 
 Commit checkpoint: `chore: slim app shell orchestration`
 
