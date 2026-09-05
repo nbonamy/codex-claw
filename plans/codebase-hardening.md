@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 14d active — simplify renderer event handling.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.5 checkpoint 1 active — extract shared repository contracts.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -116,11 +116,12 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 13a: add the Core wire-event decoder and characterizations.
 - [x] Phase 1.4 slice 13b: decode local Electron and Web backend events.
 - [x] Phase 1.4 slice 13c: decode remote backend events.
-- [ ] Phase 1.4 slice 14: close event ownership and remove redundant guards.
+- [x] Phase 1.4 slice 14: close event ownership and remove redundant guards.
 - [x] Phase 1.4 slice 14a: close the backend event union.
 - [x] Phase 1.4 slice 14b: route backend events exhaustively.
 - [x] Phase 1.4 slice 14c: trust decoded backend events downstream.
-- [ ] Phase 1.4 slice 14d: simplify renderer event handling. **Active.**
+- [x] Phase 1.4 slice 14d: simplify renderer event handling.
+- [ ] Phase 1.5: split contract domains. **Checkpoint 1 active — extract shared repository contracts.**
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -170,7 +171,8 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 14a: close the backend event union | Complete | event ownership agent / root integrator | `contracts.ts` 2,263 → 2,140 lines; AST inventory proves 59 discriminated members / 55 unique keys with four provider duplicates and an exact disjoint 14 runtime + 24 conversation + four subagent + 13 renderer-only partition; typed union and envelope are byte-identical after removing only the fallback (`4b340028…`) | Full `npm run test:ai`: 275 files / 2,097 tests in 25.677s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed. Core coverage: 91.84% statements / 86.15% branches / 93.28% functions / 93.46% lines; ownership module: 100% | `06583fb3eabb3eed9f96b9bcf4c07d82d18e3e03` | No generic fallback, duplicate event-name union, obsolete typed/untyped alias, hidden cast, or weakened type remains; renderer-only events are explicit state-preserving no-ops and the dormant global approval-resolution no-op remains characterized. Repository-wide coverage remains pre-existing red and is not reported green: Backend 83.76% statements / 73.64% branches; Vue 88.12% statements / 79.87% branches; Electron 68.33% statements / 67.11% branches / 62.69% functions / 70.89% lines |
 | 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Complete | event routing agent / root integrator | The exact 55-key ownership partition routes 14 runtime, 24 conversation, four subagent, and 13 renderer-only events once; reducer inputs are exact owned subsets, return `void`, and close with compile-time `never`; façade invalidation and dispatch ordering remain unchanged | Focused 11 files / 89 tests; Core 44 / 279. Full `npm run test:ai`: 276 files / 2,099 tests in 26.09s. Core coverage: 91.48% statements / 85.83% branches / 93.28% functions / 93.25% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `6e14cfe3c72b8948dca3f341162c39e9d346fbef` | Independent review found no defects. The removed `thread.modeUpdated` runtime branch was unreachable behind renderer ownership; agent-less `backendApproval.resolved` remains an explicit no-op, while agent-scoped resolution still removes only that agent's approval |
 | 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Complete | downstream event agent / root integrator | Production downstream handling: 5,462 → 5,033 lines, net -429; 23 redundant structural helpers removed; 63 / 63 runtime cases retained | Full `npm run test:ai`: 276 files / 2,099 tests in 24.81s. Core coverage: 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. Backend's known coverage debt remains explicit at 83.78% / 73.57% / 87.95% / 85.70% across 614 tests. All-workspace typecheck, lint, Knip, Madge, and diff checks passed | `3bc7ca4af524ad69ea891e900b0d5a7591deadee` | All audited policy, security, identity, normalization, malformed-input, and compatibility gates remain. Only post-decoder structural duplication and stale casts were removed; renderer simplification is the sole active checkpoint |
-| 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Active | root orchestrator | Renderer dispatch still carries redundant guards and casts after the exhaustive Core/backend cleanup | Make renderer dispatch exhaustive, remove only redundant renderer structural checks and casts, and list ignored renderer events explicitly. Preserve renderer ordering, state policy, compatibility behavior, and the decoder as the sole wire trust boundary | — | Sole active checkpoint; keep semantic fixes separate |
+| 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Complete | renderer event agent / root integrator | Renderer event production 4,330 → 4,291 lines, net -39; ten redundant validators removed; exact 13 / 13 renderer event switch retained; the typed client bypass remains the only non-decoded application boundary | Full `npm run test:ai`: 276 files / 2,099 tests in 26.44s. Vue's known global coverage debt remains explicit at 88.19% statements / 79.83% branches / 89.42% functions / 90.51% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `34d439bb8942922917f51e8bac92e1b299cf66a0` | Renderer dispatch is exhaustive and decoded event payloads are trusted without redundant structural guards. Ordering, state policy, source-less compatibility, typed client bypass behavior, and ignored renderer events remain unchanged; Phase 1.5 checkpoint one is now the sole active checkpoint |
+| 2026-09-04 | Phase 1.5: contract-domain manifest | Active / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Execute the 14 exact commits in the Phase 1.5 section, beginning with `chore: extract shared repository contracts`. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
@@ -180,6 +182,7 @@ row is not complete.
 | 2026-09-04 | Phase 4.2: renderer state ownership manifest | Pending / prepared | root orchestrator | `app-state.ts` 1,842 lines / 164 façade members; function baselines: app 204, composer 76, history 14, unread 30, source 8, work 27; seven specs total 4,932 lines / 115 declarations / 116 runtime cases | Read-only state, command, projection, dependency, and test-ownership audit complete; target is eight acyclic domain namespaces plus `dispose`, with the replica as the sole writable snapshot and synchronization owner | — | Execute six exact commits: `chore: extract renderer replica state`; `chore: extract renderer conversation state`; `chore: extract renderer agent and workspace state`; `chore: extract renderer support state`; `test: move renderer state ownership specifications`; `chore: modularize renderer application state`. Preserve all 164 members with lossless AST/body/test hashes; temporary flat aliases exist only in commits 1–5 and disappear in commit 6. Target composition at 350–600 lines; replica four members / at most 400 lines, agents 24 / 450, conversation 58 / 650, workspace 20 / 350, Git nine / 110, work 18 / 400, automations seven / 180, system 24 / 300. No state module may exceed 700 lines, no spec 700 lines, and the composition spec stays at most 250. Domain modules do not import each other, use narrow ports, keep `isRemoteAutomationLocation` neutral, reuse the post-14d dispatcher, and do not touch AppShell |
 | 2026-09-04 | Phase 4.3: AppShell controller coverage manifest | Pending / prepared | root orchestrator | `AppShell.vue`: 1,798 lines / 112 props / 39 emits / 95 top-level declarations; five AppShell specs: 4,414 lines / 108 tests / 109 mounts / 469 assertions in 5.91s | Read-only controller and test-seam audit complete. Preserve all 108 test names and callbacks plus all 469 assertion ASTs while moving at least 75 cases to direct controller ownership; reduce shell mounts to at most 30 | — | Execute four test-only commits: `test: cover shell command controller`; `test: cover shell workflow controllers`; `test: characterize shell controller seams`; `test: cover app shell controllers`. Keep exactly eight real-composition cases: active-agent shell composition; SDK conversation controller wiring; resume-session dialog wiring; active team/agent keyboard shortcuts; deterministic Markdown/approval Debug commands; Cockpit navigation and return; Automations navigation without a team; and Settings General/remembered-pane/appearance/quit composition. Target controller tests ≤250ms, specs ≤700 lines, temporary test files ≤500, final composition spec ≤250 lines / ≤2.5s, and zero production diff |
 | 2026-09-04 | Phase 4.4: AppShell orchestration manifest | Pending / prepared | root orchestrator | `AppShell.vue`: 1,798 lines / 112 props / 39 emits / 95 declarations / 45 imports; `App.vue`: 627 lines with 153 AppShell bindings | Read-only production ownership and extraction audit complete. Final AppShell surface is nine domain props (`replica`, `agents`, `conversation`, `workspace`, `git`, `work`, `automations`, `system`, `updateStatus`) and three semantic emits (`closeAgent`, `pullRequestCleanup`, `installUpdate`) | — | Execute the eight recorded commits in order. Owners: conversation ≤320 lines, debug previews ≤220, agent/team dialogs ≤250 plus a repository-session owner, resource migration ≤90, commands ≤500. Exit with AppShell 650–850 lines, hard maximum 900, nine props, three emits, ≤35 declarations, ≤25 imports; App.vue ≤500 lines and 12 bindings; retain the eight composition smokes. Hash all 95 declarations, template subtrees, and the style block, and maintain a complete prop/emit ledger. Temporary dual props are allowed only in commits five through seven |
+| 2026-09-04 | Phase 5.1: Automations lane manifest | Pending / prepared | root orchestrator | `AutomationsView.vue`: 804 lines / 19 props / about 64 declarations; `AutomationEditor.vue`: 340 lines / 11 declarations; six specs: 889 lines / 24 tests / 87 assertions / 24 mounts in 3.32s | Read-only location, editor, workflow, renderer-state, backend-policy, contract, and test-ownership audit complete | — | After Phase 4, compose five renderer namespace props and extract location state ≤260 lines, editor model ≤220, and workflow controller ≤280; target the view at 430–500 lines and editor at 230–260. Preserve interval scheduling rather than inventing cron; target 10–12 mounts, component time ≤1.5s, direct model/controller tests ≤250ms, and specs ≤500 lines. Execute the six exact commits in Phase 5.1 with lossless declaration, template, style, test-name, callback, and assertion fidelity |
 
 For each future row, include:
 
@@ -848,13 +851,87 @@ and `decodeClawBackendEvent` remains the sole wire trust boundary.
 
 ### 1.5 Split contract domains
 
-- Split `contracts.ts` into cohesive domains such as agents, conversations,
-  teams, worktrees/git, automations, artifacts, settings, and transport.
-- Retain a compatibility barrel while consumers migrate.
-- Prevent circular domain ownership and provider-specific leakage.
-- Delete the compatibility barrel's obsolete exports before final completion.
+The refreshed baseline after event cleanup is `core/src/contracts.ts` at 2,140
+lines. Its public surface contains 214 exports plus 28 private declarations,
+for 242 declarations total. `CodexClawApi` contains 132 members and the closed
+event registry contains 55 keys. There are 317 consumers: Core 62, Backend 73,
+Electron 27, Vue 152, and Web three.
 
-Commit checkpoint: `chore: split core contract domains`
+Split those 242 declarations into these exact ownership domains while
+preserving every public name and all private helpers during migration:
+
+| Domain | Declaration count | Size target |
+| --- | ---: | ---: |
+| shared | 5 | ≤30 lines |
+| git | 19 | ≤150 lines |
+| workspace | 12 | ≤125 lines |
+| connections | 10 | ≤110 lines |
+| interaction | 12 | ≤140 lines |
+| desktop | 20 | ≤200 lines |
+| backend | 21 | ≤250 lines |
+| conversation | 43 | ≤425 lines |
+| agent | 15 | ≤190 lines |
+| work | 34 | ≤300 lines |
+| settings | 15 | ≤135 lines |
+| snapshot | 4 | ≤90 lines |
+| events | 29 | ≤550 lines |
+| host API | 3 | ≤230 lines |
+| **Total** | **242** | compatibility barrel <30 lines |
+
+Keep the complete prompt cluster in the conversation domain rather than
+splitting prompt options, attachments, queues, and interaction payloads across
+convenience files. `WorkProviderConnectResult` and `AppCommand` belong to the
+host-API domain. The backend-protocol event decoder and event ownership modules
+remain separate from contract declaration ownership; do not move their
+runtime registries or decoder policy back into the contracts tree.
+
+Move declarations leaf-first and retain `contracts.ts` as a compatibility
+barrel until consumers migrate. New contract modules may import only their
+recorded lower-level dependencies; they must never import the compatibility
+barrel. The migration order is intentionally acyclic: shared repository
+values first; backend and conversation foundations next; work, interaction,
+settings, desktop, agent, and snapshot domains after their leaves; renderer
+events after their payload owners; host API last after all member signatures
+exist. Consumer migrations then proceed Core → Backend → Electron/Web → Vue,
+followed by closing the barrel. Run Madge and an internal-import inventory at
+every dependency-boundary checkpoint.
+
+Execute these exact commits:
+
+1. `chore: extract shared repository contracts`
+2. `chore: extract backend contracts`
+3. `chore: extract conversation contracts`
+4. `chore: extract work contracts`
+5. `chore: extract interaction and settings contracts`
+6. `chore: extract desktop contracts`
+7. `chore: extract agent and snapshot contracts`
+8. `chore: extract renderer event contracts`
+9. `chore: extract host api contracts`
+10. `chore: migrate core contract imports`
+11. `chore: migrate backend contract imports`
+12. `chore: migrate electron and web contract imports`
+13. `chore: migrate vue contract imports`
+14. `chore: close core contracts barrel`
+
+Before every move, record source SHA-256 and normalized declaration AST/body
+hashes. The corresponding target declaration must match before import edits.
+Preserve the exact 214-export surface, all 28 private declarations, all 132
+`CodexClawApi` signatures, and the 55-key event registry throughout the staged
+migration. Preserve reference identity for the seven runtime constants:
+`subagentStatuses`, `subagentOperationKinds`,
+`subagentOperationLifecycles`, `subagentOperationStatuses`,
+`subagentActivityKinds`, `spokenAnnouncementVoices`, and
+`PRIMARY_BROWSER_ID`.
+
+Exit when the compatibility barrel is below 30 lines; all target modules meet
+their size bounds; no Core, Backend, Electron, Vue, or Web implementation
+imports the barrel internally; the 214 exports, 28 private declarations, seven
+runtime constant identities, 132 API signatures, and 55 event keys remain
+exact; prompt, host-API, decoder, and ownership boundaries remain intact; and
+focused contract/runtime tests, full tests, all-workspace typecheck,
+lint/Stylelint/Knip, Madge, and diff checks are green.
+
+Active commit checkpoint: `chore: extract shared repository contracts`
 
 ### Phase 1 exit criteria
 
@@ -1261,15 +1338,106 @@ independently.
 
 ### 5.1 Automations lane
 
-- Separate automation location state from editing state.
-- Introduce a focused view model for validation, scheduling, and execution
-  intent.
-- Keep the view responsible for rendering and user interaction.
+The prepared baseline is `AutomationsView.vue` at 804 lines, 19 props, and
+about 64 top-level declarations, plus `AutomationEditor.vue` at 340 lines and
+11 declarations. Six renderer component specs total 889 lines, 24 tests, 87
+assertions, and 24 logical mounts, completing in 3.32 seconds.
+
+Run this lane only after Phase 4 has established renderer namespaces and
+slimmed AppShell. `AutomationsView` then composes exactly five narrow namespace
+props: `replica`, `automations`, `workspace`, `work`, and `conversation`.
+AppShell keeps page selection and composition; it does not regain automation
+state or policy.
+
+Extract three acyclic renderer owners:
+
+- `use-automation-location-state.ts`, at most 260 lines, owns local/remote
+  selection, eligible connection projection, isolated remote snapshot/source/
+  work catalogs, ordered loading, stale-request suppression, location-aware
+  repository loading, and location-aware conversation reads;
+- `use-automation-editor-model.ts`, at most 220 lines, owns draft/default/edit
+  state, canonical multi-repository matching, stored-but-unavailable targets,
+  display schedule options, presentational submit eligibility, independent
+  dictation-busy state, prompt trimming, and construction of create/update
+  intent;
+- `use-automations-controller.ts`, at most 280 lines, owns mutually exclusive
+  create/edit/log panels, row and menu projection, create/update/run/delete/
+  history workflows, confirmation requests, and remote refresh after
+  successful mutations.
+
+Keep `AutomationsView.vue` responsible for rendering and composition, targeting
+430–500 lines, and `AutomationEditor.vue` responsible for form rendering,
+targeting 230–260 lines. Existing execution-log, welcome, conversation-overlay,
+and execution-status components remain their current presentation owners. New
+renderer modules depend on narrow namespace or confirmation ports and must not
+import AppShell, the production state singleton, Electron/backend adapters, or
+one another in a cycle.
+
+Core and Backend remain authoritative for domain policy. Preserve the existing
+`AutomationSchedule` shape `{ intervalMinutes: number }`; there is no current
+cron model or parser, so this behavior-preserving lane must not invent one.
+Core continues to own team validation, repository normalization and dedupe,
+interval flooring and minimums, and execution history. Backend continues to
+own due/enabled selection, pickup across repositories, already-assigned
+filtering, selection and assignment prompts, worktrees, agent creation,
+assignment, persistence, and publication.
+
+Preserve these behavior groups exactly:
+
+- remote locations require ready status plus transport; disappearing remotes
+  fall back to local; local transport calls omit the location argument while
+  remote calls pass the exact remote location object;
+- location switches close editor/log state, isolate and clear remote catalogs,
+  load snapshot → source repositories → GitHub work repositories, and ignore
+  stale successes and failures without mutating local catalogs;
+- local mutations are adopted by renderer state while returned snapshots are
+  ignored by the view; remote mutation snapshots refresh only the isolated
+  remote view; remote conversation reads alone receive the location argument;
+- multi-repository options require matching work and source repositories using
+  canonical Git remote identity, preserve SSH/HTTPS equivalence, retain stored
+  targets missing from current catalogs, remain label-sorted, and emit in the
+  sorted option order;
+- the UI gate remains GitHub connected, at least one repository, nonblank team,
+  finite interval at least one, and neither dictation field busy. Do not add
+  Core's stronger team or interval policy to the renderer;
+- selection and assignment prompts trim and omit blanks independently; the two
+  dictation fields retain independent busy signals; enabled defaults to true,
+  interval to 60, and the current interval presets remain unchanged;
+- create/edit/log panels and loading/error/welcome/list rendering retain their
+  precedence; a missing edit ID does not become create mode; a successful save
+  closes the editor even when no snapshot is returned;
+- disabled automations cannot run from the UI; missing entities remain no-ops;
+  exact delete/history confirmation and cancel behavior, active-log deletion,
+  row source truncation, missing-team and unknown-date labels, and execution-log
+  live/stale message behavior remain intact; mutation errors keep propagating.
+
+Execute these exact commits:
+
+1. `test: characterize automation orchestration`
+2. `chore: extract automation editor model`
+3. `chore: extract automation location state`
+4. `chore: extract automation workflow controller`
+5. `test: move automation ownership specifications`
+6. `chore: simplify automation orchestration`
+
+Before each substantial move, rebaseline against the post-Phase-4 tree and
+record source bytes plus normalized AST/body hashes. Preserve template node,
+directive, modifier, and attribute order except for explicitly recorded event
+wiring; preserve style blocks byte-for-byte. Preserve all 24 test names and
+callbacks plus all 87 assertion ASTs before moving behavior to direct owner
+specs; change only harness, construction, and action wiring. Do not remove a
+component case until its direct-owner equivalent is green.
+
+Exit with the location owner at most 260 lines, editor model at most 220,
+workflow controller at most 280, view at 430–500, and editor at 230–260;
+`AutomationsView` has the five renderer namespace props; component mounts fall
+from 24 to 10–12; component aggregate time is at most 1.5 seconds; direct
+model/controller tests total at most 250ms; every automation spec is at most
+500 lines; Core/backend scheduling policy has no semantic or ownership drift;
+and focused, Vue, full-suite, typecheck, lint/Stylelint/Knip, cycle, and diff
+checks are green.
 
 Commit checkpoint: `chore: simplify automation orchestration`
-
-Exit: the automation view is approximately 450–500 lines and domain policy has
-direct tests.
 
 ### 5.2 Git workflow lane
 
