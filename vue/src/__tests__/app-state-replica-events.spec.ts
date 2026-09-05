@@ -247,7 +247,7 @@ describe('useAppState', () => {
     });
   });
 
-  it('plays app-owned celebration events without adding conversation content', async () => {
+  it('plays app-owned celebration events only for the selected agent without adding conversation content', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     stubElectronTestWindow({
@@ -265,6 +265,16 @@ describe('useAppState', () => {
 
     listeners[0]?.({
       seq: 1,
+      agentId: 'agent-jesse',
+      type: 'celebration.requested',
+      payload: { kind: 'confetti' },
+      occurredAt: '2026-06-05T00:00:00.500Z',
+    });
+
+    expect(useConfetti().bursts.value).toStrictEqual([]);
+
+    listeners[0]?.({
+      seq: 2,
       agentId: 'agent-dina',
       type: 'celebration.requested',
       payload: { kind: 'stars' },

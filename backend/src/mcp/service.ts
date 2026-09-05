@@ -292,6 +292,14 @@ export class ClawMcpService {
         message: 'Celebrations are disabled in General settings.',
       };
     }
+    if (this.snapshot.activeAgentId !== agent.id) {
+      return {
+        success: true,
+        displayed: false,
+        kind,
+        message: 'Celebrations only play for the selected agent.',
+      };
+    }
     this.emit({
       agentId: agent.id,
       type: 'celebration.requested',

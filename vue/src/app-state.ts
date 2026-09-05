@@ -1638,6 +1638,7 @@ function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, R
 
 function syncCelebrationFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'celebration.requested' }>): void {
   if (snapshot.value.general.celebrationsEnabled === false) return;
+  if (event.agentId !== snapshot.value.activeAgentId) return;
   useConfetti().celebrate({ kind: event.payload.kind });
 }
 

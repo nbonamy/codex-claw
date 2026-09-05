@@ -537,6 +537,24 @@ describe('ClawMcpService', () => {
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
   });
 
+  it('does not emit celebration events for an agent that is not selected', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.activeAgentId = 'agent-dina';
+    const events: Array<{ type?: string }> = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const response = await callTool(url, 'agent-jesse', 'celebrate', { kind: 'stars' });
+
+    expect(response.result.structuredContent).toStrictEqual({
+      success: true,
+      displayed: false,
+      kind: 'stars',
+      message: 'Celebrations only play for the selected agent.',
+    });
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+  });
+
   it('queues spoken announcements only when enabled and selected', async () => {
     const snapshot = createInitialSnapshot();
     const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
