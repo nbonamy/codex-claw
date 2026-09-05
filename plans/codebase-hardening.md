@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.5 checkpoint 4 active — extract work contracts.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.5 checkpoint 5 active — extract interaction and settings contracts.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -121,11 +121,12 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 14b: route backend events exhaustively.
 - [x] Phase 1.4 slice 14c: trust decoded backend events downstream.
 - [x] Phase 1.4 slice 14d: simplify renderer event handling.
-- [ ] Phase 1.5: split contract domains. **Checkpoint 4 active — extract work contracts.**
+- [ ] Phase 1.5: split contract domains. **Checkpoint 5 active — extract interaction and settings contracts.**
 - [x] Phase 1.5 checkpoint 1: extract shared repository contracts.
 - [x] Phase 1.5 checkpoint 2: extract backend contracts.
 - [x] Phase 1.5 checkpoint 3: extract conversation contracts.
-- [ ] Phase 1.5 checkpoint 4: extract work contracts.
+- [x] Phase 1.5 checkpoint 4: extract work contracts.
+- [ ] Phase 1.5 checkpoint 5: extract interaction and settings contracts.
 - [ ] Phase 1 decision gate: review Phase 1 outcomes with Nicolas and obtain explicit approval before any Phase 2 implementation.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
@@ -177,10 +178,11 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Complete | event routing agent / root integrator | The exact 55-key ownership partition routes 14 runtime, 24 conversation, four subagent, and 13 renderer-only events once; reducer inputs are exact owned subsets, return `void`, and close with compile-time `never`; façade invalidation and dispatch ordering remain unchanged | Focused 11 files / 89 tests; Core 44 / 279. Full `npm run test:ai`: 276 files / 2,099 tests in 26.09s. Core coverage: 91.48% statements / 85.83% branches / 93.28% functions / 93.25% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `6e14cfe3c72b8948dca3f341162c39e9d346fbef` | Independent review found no defects. The removed `thread.modeUpdated` runtime branch was unreachable behind renderer ownership; agent-less `backendApproval.resolved` remains an explicit no-op, while agent-scoped resolution still removes only that agent's approval |
 | 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Complete | downstream event agent / root integrator | Production downstream handling: 5,462 → 5,033 lines, net -429; 23 redundant structural helpers removed; 63 / 63 runtime cases retained | Full `npm run test:ai`: 276 files / 2,099 tests in 24.81s. Core coverage: 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. Backend's known coverage debt remains explicit at 83.78% / 73.57% / 87.95% / 85.70% across 614 tests. All-workspace typecheck, lint, Knip, Madge, and diff checks passed | `3bc7ca4af524ad69ea891e900b0d5a7591deadee` | All audited policy, security, identity, normalization, malformed-input, and compatibility gates remain. Only post-decoder structural duplication and stale casts were removed; renderer simplification is the sole active checkpoint |
 | 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Complete | renderer event agent / root integrator | Renderer event production 4,330 → 4,291 lines, net -39; ten redundant validators removed; exact 13 / 13 renderer event switch retained; the typed client bypass remains the only non-decoded application boundary | Full `npm run test:ai`: 276 files / 2,099 tests in 26.44s. Vue's known global coverage debt remains explicit at 88.19% statements / 79.83% branches / 89.42% functions / 90.51% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `34d439bb8942922917f51e8bac92e1b299cf66a0` | Renderer dispatch is exhaustive and decoded event payloads are trusted without redundant structural guards. Ordering, state policy, source-less compatibility, typed client bypass behavior, and ignored renderer events remain unchanged; Phase 1.5 contract extraction followed |
-| 2026-09-04 | Phase 1.5: contract-domain manifest | Active / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Checkpoints 1 through 3 are complete; checkpoint 4, `chore: extract work contracts`, is active. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
+| 2026-09-04 | Phase 1.5: contract-domain manifest | Active / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Checkpoints 1 through 4 are complete; checkpoint 5, `chore: extract interaction and settings contracts`, is active. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
 | 2026-09-04 | Phase 1.5 checkpoint 1: extract shared repository contracts | Complete | contract-domain agent / root integrator | Exact ownership: shared five declarations / 12 lines, Git 19 / 112, workspace 12 / 86, connections 10 / 75; compatibility barrel 2,140 → 1,961 lines | All 46 moved declarations retained byte-identical source and normalized AST hashes; all 196 remaining declarations and 28 private aliases stayed exact; the barrel retained the same 214 exports and all 317 audited consumers remained untouched. Focused 3 tests and Core 45 files / 282 tests passed. Full `npm run test:ai`: 277 files / 2,102 tests. All-workspace typecheck, lint, Stylelint, Knip, static import inventory, Madge, and diff checks passed | `469d19aaf44d6fc2ff4cd383e61d3460bc8d3e0d` | Independent review found no defects. All four owners are type-only acyclic leaves with exact assigned export surfaces; no runtime value moved and compatibility imports/re-exports remain honest. Checkpoint 2 is now the sole active checkpoint |
 | 2026-09-04 | Phase 1.5 checkpoint 2: extract backend contracts | Complete | contract-domain agent / root integrator | Backend owner: 21 exact exports / 201 lines with `shared` as its only dependency; compatibility barrel 1,961 → 1,802 lines | All 21 moved declarations, all 175 retained declarations, and all 28 private declarations remained byte- and AST-identical. Moved source SHA-256 `9a52be69a3388d91f36c8143798e1f65888dd7cc99fe5139562c7fe56e348d6d`; moved AST SHA-256 `407e848886e8eed89304b8ebf717afaea74519eadc7601092ffe923c1d30ca9e`; retained source SHA-256 `b5d722df3a1383eadf4d2ea00d950f1b59623ddd5060b97d68f6f5ec381e54a5`. The barrel retained all 214 public exports. Focused contract/backend/event/snapshot: 22 files / 131 tests; Core: 45 / 282. Full `npm run test:ai`: 277 files / 2,102 tests. All-workspace typecheck, lint, Stylelint, Knip, consumer inventory, Madge, and diff checks passed | `a3992ed47cdf819e2fecb44776846f19c90397c4` | Independent review found no defects, domain leakage, runtime-value movement, or consumer edits. Checkpoint 3 is now the sole active checkpoint |
 | 2026-09-04 | Phase 1.5 checkpoint 3: extract conversation contracts | Complete | contract-domain agent / root integrator | Conversation owner: 43 exact exports / 334 lines with `shared` as its only dependency; compatibility barrel 1,802 → 1,545 lines | Exact categories: seven goal/plan, two conversation reference/summary, 18 subagent including five runtime arrays, the complete six-type prompt cluster, and ten renderer-message/file/queue/history symbols. All 43 moved and 132 retained declarations remained byte- and AST-identical in source order; the barrel retained all 214 public exports and all five moved runtime arrays preserved owner-to-barrel reference identity. Focused domain: four tests; Core: 45 files / 283 tests. Full `npm run test:ai`: 277 files / 2,103 tests. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `f37512ab56c4fd82b43393b63ed4ef42094b34bf` | Independent review found no defects, consumer changes, private leakage, or cycles. Checkpoint 4 is now the sole active checkpoint |
+| 2026-09-04 | Phase 1.5 checkpoint 4: extract work contracts | Complete | contract-domain agent / root integrator | Work owner: 34 exact exports / 230 lines, grouped as 13 provider/backlog, nine repository/item, nine automation, and three routing contracts; dependencies are limited to `conversation` and `shared`; compatibility barrel 1,545 → 1,389 lines | All 34 moved declarations, all 98 retained declarations, and all 28 private declarations remained byte- and AST-identical. Moved source SHA-256 `c3b4ce4ee71d27d25457b2fb22c7b7a5e354bfc189104d8b23be2e74ad0947ca`; moved AST SHA-256 `17583a34ba186d7f7179184c45b8a4c927a4407a924e2fd9bd9dfc36ca4e0b52`; retained source SHA-256 `ed4368ff0dfc99cb9b78764bffd3d0cd0b57b6258d4395e1bd53d3d06c2a623e`; retained AST SHA-256 `228ac5d8fbfafd10c662b73e6bd62727912dae218687e62344e552bce0d58e58`. `WorkProviderConnectResult` remained byte- and AST-identical in the barrel for host-API ownership, and the barrel retained all 214 public exports. Focused domain: one file / four tests; Core: 45 / 283. Full `npm run test:ai`: 277 files / 2,103 tests. Core coverage was 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `42738b90b3cbb3d6d86e4e47d0a57e8043a5f5f7` | Independent review found no defects, consumer changes, runtime-value moves, host snapshot leakage, or cycles. Checkpoint 5 is now the sole active checkpoint |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
@@ -193,6 +195,7 @@ row is not complete.
 | 2026-09-04 | Phase 5.1: Automations lane manifest | Pending / prepared | root orchestrator | `AutomationsView.vue`: 804 lines / 19 props / about 64 declarations; `AutomationEditor.vue`: 340 lines / 11 declarations; six specs: 889 lines / 24 tests / 87 assertions / 24 mounts in 3.32s | Read-only location, editor, workflow, renderer-state, backend-policy, contract, and test-ownership audit complete | — | After Phase 4, compose five renderer namespace props and extract location state ≤260 lines, editor model ≤220, and workflow controller ≤280; target the view at 430–500 lines and editor at 230–260. Preserve interval scheduling rather than inventing cron; target 10–12 mounts, component time ≤1.5s, direct model/controller tests ≤250ms, and specs ≤500 lines. Execute the six exact commits in Phase 5.1 with lossless declaration, template, style, test-name, callback, and assertion fidelity |
 | 2026-09-04 | Phase 5.2: Git workflow lane manifest | Pending / prepared | root orchestrator | `GitWorkflowControl.vue`: 1,326 lines; target parent approximately 350 lines with operation detail owned and tested below it | Read-only ownership and invariant audit complete. Merge, squash, pull request, cleanup, handoff, and background progress become operation-owned workflows; dialogs present typed state only while Backend remains the mutation authority | — | Preserve progress, cancellation and background continuation, worktree and branch cleanup safety, agent closure, handoff timing with authoritative PR or direct-merge context, and push-failure recovery. Phase 4's Git namespace must expose the operation-progress subscription consumed here. Rebaseline after Phase 4 before assigning detailed module size or intermediate commit targets; do not invent an unaudited sequence |
 | 2026-09-04 | Phase 5.3: repository backlog lane manifest | Pending / prepared | root orchestrator | Active parents: `RepositoryBacklogPanel.vue` 1,310 lines, `CockpitWorkInbox.vue` 1,087, and `CockpitView.vue` 709; active specifications: 41 tests / 199 assertions / 45 mounts in 3.30s; active plus legacy and routing coverage: 63 tests. Orphan `WorkBacklogPanel.vue` remains a separate 668-line retirement decision | Read-only component, projection, workflow, row, selection, routing, and test audit complete. Repository and Cockpit semantics differ, so share contracts and routing seams rather than rows or projections | — | Execute the nine exact commits recorded in Phase 5.3. Target each backlog parent at 450–500 lines, `CockpitView.vue` at most 500, component mounts at most 14, and aggregate component time at most 1.5s. Preserve fixed-height behavior and loading, empty/error, scope, and list parity without moving routing, Core, Backend, persistence, or remote policy. Carry five explicit debts: unused `createIssueAction` gate, unused remove-assignment chain, unmanaged 1,200ms timer, partial `Promise.all` effects, and unqualified item IDs |
+| 2026-09-04 | Phase 5.4: annotation lane manifest | Pending / prepared | root orchestrator | `ImageAnnotationDialog.vue`: 1,298 lines (template 207 / script 708 / style 383), 44 functions, 19 refs; main spec: 648 lines / 19 tests / 101 assertions / 18 mounts; geometry spec: 273 / 11 / 20; focused total: 30 tests in 471ms | Read-only session, DOM, geometry, history, export, and test-ownership audit complete. A pure `image-annotation-session` owner will hold shapes, comments, numbering, history, and export; DOM adapters retain capture, coordinate conversion, zoom, scroll, pixel sampling, rendering, popup placement, and raster work | — | Execute the five exact commits recorded in Phase 5.4 and move the 383-line style block byte-identically. Preserve image-relative coordinates, comment editing, and last-annotation undo. There is no current general selection, text tool, or redo; adding redo requires Nicolas's explicit approval. Browser hiding remains in AppShell and `use-image-annotation` stays outside the session. Target the model at most 320 lines, the SFC at 450–500, at least 18 direct tests in at most 150ms, seven to eight dialog mounts, and each spec at most 350 lines |
 
 For each future row, include:
 
@@ -941,7 +944,7 @@ exact; prompt, host-API, decoder, and ownership boundaries remain intact; and
 focused contract/runtime tests, full tests, all-workspace typecheck,
 lint/Stylelint/Knip, Madge, and diff checks are green.
 
-Active commit checkpoint: `chore: extract work contracts`
+Active commit checkpoint: `chore: extract interaction and settings contracts`
 
 ### Phase 1 exit criteria
 
@@ -1558,15 +1561,43 @@ persistence, or remote-policy drift.
 
 ### 5.4 Annotation lane
 
-- Extract a DOM-free annotation session model.
-- Move shape creation, selection, editing, history, and export transitions into
-  that model.
-- Keep canvas and pointer adapters at the component boundary.
+The current `ImageAnnotationDialog.vue` is 1,298 lines: 207 template, 708
+script, and 383 style. Its script has 44 functions and 19 refs. The main spec
+is 648 lines with 19 tests, 101 assertions, and 18 mounts; the geometry spec is
+273 lines with 11 tests and 20 assertions. The 30 focused tests run in 471ms.
 
-Commit checkpoint: `chore: extract annotation session state`
+Extract a pure `image-annotation-session` model that owns shapes, comments,
+numbering, history, and export transitions. Keep capture, coordinate conversion,
+zoom, scroll, pixel sampling, rendering, popup placement, and raster work in
+DOM adapters at the component boundary. Preserve image-relative coordinates.
+Browser hiding remains an AppShell responsibility, and
+`use-image-annotation` remains outside the session model.
 
-Exit: the annotation view is approximately 450–500 lines and state transitions
-are testable without mounting a canvas.
+Preserve the behavior that exists today: comment editing and undoing the last
+annotation. There is no general selection workflow, text tool, or redo. Adding
+redo is a product change and requires Nicolas's explicit approval rather than
+being smuggled into the extraction.
+
+Execute these exact commits:
+
+1. `test: characterize annotation session behavior`
+2. `chore: isolate image annotation canvas adapters`
+3. `chore: extract annotation session state`
+4. `test: move annotation session specifications`
+5. `chore: simplify image annotation dialog`
+
+Move the 383-line style block byte-identically. Target the pure model at no
+more than 320 lines, the final SFC at approximately 450–500 lines, at least 18
+direct session tests in at most 150ms, seven to eight dialog mounts, and every
+annotation spec at no more than 350 lines.
+
+Commit checkpoints: the five commits above, in order.
+
+Exit: the annotation view is approximately 450–500 lines, the pure model is at
+most 320 lines, annotation transitions are directly testable without mounting
+a canvas, direct coverage includes at least 18 tests in at most 150ms, dialog
+mounts fall to seven or eight, every spec is at most 350 lines, and DOM,
+session, AppShell, and composable ownership remain distinct.
 
 ### Phase 5 exit criteria
 
