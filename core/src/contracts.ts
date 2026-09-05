@@ -1333,7 +1333,7 @@ export type RendererSnapshotState = {
   connection: BackendConnectionState;
 };
 
-type MainToRendererEventShape = {
+type MainToRendererEventEnvelope = {
   seq: number;
   source?: 'backend' | 'client';
   agentId?: string;
@@ -1342,67 +1342,9 @@ type MainToRendererEventShape = {
   snapshot?: AppSnapshot;
   threadId?: string;
   turnId?: string;
-  type:
-    | 'backend.statusChanged'
-    | 'client.connectionChanged'
-    | 'agent.updated'
-    | 'snapshot.updated'
-    | 'agent.statusChanged'
-    | 'thread.started'
-    | 'thread.historyLoaded'
-    | 'thread.settingsUpdated'
-    | 'thread.modeUpdated'
-    | 'thread.goalUpdated'
-    | 'thread.goalCleared'
-    | 'thread.tokenUsageUpdated'
-    | 'subagent.operationChanged'
-    | 'subagent.activityChanged'
-    | 'subagent.identityChanged'
-    | 'subagent.statusChanged'
-    | 'turn.started'
-    | 'turn.planUpdated'
-    | 'turn.proposedPlanDelta'
-    | 'turn.proposedPlanCompleted'
-    | 'turn.completed'
-    | 'message.userSubmitted'
-    | 'message.steer'
-    | 'agent.promptQueued'
-    | 'agent.promptRetryScheduled'
-    | 'agent.promptDequeued'
-    | 'context.compactionStarted'
-    | 'context.compactionCompleted'
-    | 'account.rateLimitsUpdated'
-    | 'devicePairing.statusChanged'
-    | 'workBacklog.assignmentUpdated'
-    | 'models.changed'
-    | 'skills.changed'
-    | 'sidePanel.markdownRequested'
-    | 'sidePanel.gitDiffRequested'
-    | 'celebration.requested'
-    | 'agentCreation.progress'
-    | 'message.delta'
-    | 'message.updated'
-    | 'item.started'
-    | 'item.updated'
-    | 'item.completed'
-    | 'file.activity'
-    | 'diff.updated'
-    | 'git.statusUpdated'
-    | 'git.operationProgress'
-    | 'approval.requested'
-    | 'backendApproval.requested'
-    | 'backendApproval.resolved'
-    | 'clientRequest.resolved'
-    | 'toolInput.requested'
-    | 'workRouting.requested'
-    | 'workRouting.resolved'
-    | 'browser.annotationCreated'
-    | 'error';
-  payload: unknown;
   occurredAt: string;
 };
 
-type MainToRendererEventEnvelope = Omit<MainToRendererEventShape, 'type' | 'payload'>;
 type MainToRendererEventWith<Variant> = MainToRendererEventEnvelope & Variant;
 type WorkBacklogAssignmentUpdatedPayload = Omit<WorkBacklogAssignment, 'policy' | 'status'> & {
   policy?: WorkBacklogAssignmentPolicy;
@@ -1531,70 +1473,6 @@ type BackendErrorPayload = {
   willRetry?: boolean;
   error?: unknown;
 };
-type TypedMainToRendererEventType =
-  | 'backend.statusChanged'
-  | 'client.connectionChanged'
-  | 'snapshot.updated'
-  | 'account.rateLimitsUpdated'
-  | 'devicePairing.statusChanged'
-  | 'models.changed'
-  | 'skills.changed'
-  | 'sidePanel.markdownRequested'
-  | 'sidePanel.gitDiffRequested'
-  | 'celebration.requested'
-  | 'agentCreation.progress'
-  | 'git.operationProgress'
-  | 'browser.annotationCreated'
-  | 'workBacklog.assignmentUpdated'
-  | 'workRouting.requested'
-  | 'workRouting.resolved'
-  | 'clientRequest.resolved'
-  | 'agent.updated'
-  | 'agent.statusChanged'
-  | 'thread.started'
-  | 'thread.settingsUpdated'
-  | 'thread.modeUpdated'
-  | 'thread.goalUpdated'
-  | 'thread.goalCleared'
-  | 'thread.tokenUsageUpdated'
-  | 'thread.historyLoaded'
-  | 'subagent.operationChanged'
-  | 'subagent.activityChanged'
-  | 'subagent.identityChanged'
-  | 'subagent.statusChanged'
-  | 'turn.started'
-  | 'turn.planUpdated'
-  | 'turn.proposedPlanDelta'
-  | 'turn.proposedPlanCompleted'
-  | 'turn.completed'
-  | 'context.compactionStarted'
-  | 'context.compactionCompleted'
-  | 'message.delta'
-  | 'message.updated'
-  | 'message.userSubmitted'
-  | 'message.steer'
-  | 'agent.promptQueued'
-  | 'agent.promptRetryScheduled'
-  | 'agent.promptDequeued'
-  | 'item.started'
-  | 'item.updated'
-  | 'item.completed'
-  | 'diff.updated'
-  | 'file.activity'
-  | 'git.statusUpdated'
-  | 'approval.requested'
-  | 'toolInput.requested'
-  | 'backendApproval.requested'
-  | 'backendApproval.resolved'
-  | 'error';
-type UntypedMainToRendererEventType = Exclude<MainToRendererEventShape['type'], TypedMainToRendererEventType>;
-type UntypedMainToRendererEvent = [UntypedMainToRendererEventType] extends [never]
-  ? never
-  : MainToRendererEventWith<{
-      type: UntypedMainToRendererEventType;
-      payload: unknown;
-    }>;
-
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
       type: 'backend.statusChanged';
@@ -1906,8 +1784,7 @@ export type MainToRendererEvent =
       type: 'error';
       agentId: string;
       payload: BackendErrorPayload;
-    }>
-  | UntypedMainToRendererEvent;
+    }>;
 
 export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
 

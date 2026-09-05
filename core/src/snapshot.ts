@@ -1,5 +1,6 @@
 import type { AppSnapshot, MainToRendererEvent } from './contracts';
 import { applyConversationEventToSnapshot } from './snapshot-conversation-reducer';
+import { isRendererOnlySnapshotEvent } from './snapshot-event-ownership';
 import { applyRuntimeEventToSnapshot } from './snapshot-runtime-reducer';
 import { applySubagentEventToSnapshot } from './snapshot-subagent-reducer';
 
@@ -39,6 +40,7 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
   ) {
     delete snapshot.subagentTrees[event.agentId];
   }
+  if (isRendererOnlySnapshotEvent(event)) return;
   if (applyRuntimeEventToSnapshot(snapshot, event)) return;
   if (!event.agentId) return;
 
