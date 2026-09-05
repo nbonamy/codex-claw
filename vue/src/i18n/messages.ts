@@ -321,6 +321,9 @@ export const messages = {
         sourceFolderMissing: 'Source folder is not configured.',
         urlRequired: 'Repository URL is required.',
       },
+      git: {
+        pullRequestChangesRequired: 'This branch has no committed changes. Commit your work before creating a pull request.',
+      },
     },
     agentCreationProgress: {
       eyebrow: 'Delegating work',

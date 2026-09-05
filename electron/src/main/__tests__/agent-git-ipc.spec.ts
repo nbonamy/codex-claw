@@ -3,6 +3,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
 import { registerAgentGitIpcHandlers } from '../agent-git-ipc';
 import type { ClawBackendClientPort } from '../backend-client';
+import { decodeAppErrorDescriptor } from '@codex-claw/core/app-error';
 
 describe('agent Git IPC', () => {
   it.each([
@@ -33,6 +34,36 @@ describe('agent Git IPC', () => {
     expect(backend.request).toHaveBeenCalledWith(method, {
       agentId: 'agent-1',
       ...(inputArguments.length > 0 ? { input: inputArguments[0] } : {}),
+    });
+  });
+
+  it.each([
+    ipcChannels.generateAgentGitMessage,
+    ipcChannels.createAgentGitPullRequest,
+  ])('preserves structured app errors through %s', async (channel) => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const ipc = {
+      handle: vi.fn((registeredChannel: string, handler: (...args: unknown[]) => unknown) => {
+        handlers.set(registeredChannel, handler);
+      }),
+    } as unknown as Parameters<typeof registerAgentGitIpcHandlers>[0];
+    const backend = {
+      request: vi.fn().mockRejectedValue(Object.assign(new Error('Commit your work first.'), {
+        data: { kind: 'appError', code: 'git.pullRequestChangesRequired' },
+      })),
+    } as unknown as ClawBackendClientPort;
+    registerAgentGitIpcHandlers(ipc, () => backend);
+
+    const handler = handlers.get(channel);
+    const input = channel === ipcChannels.generateAgentGitMessage
+      ? { kind: 'pullRequest' }
+      : { title: 'Title', body: '', confirmed: true };
+    expect(handler).toBeDefined();
+    const rejection = await Promise.resolve(handler!({}, 'agent-1', input)).catch((error: unknown) => error);
+
+    expect(decodeAppErrorDescriptor(rejection)).toStrictEqual({
+      kind: 'appError',
+      code: 'git.pullRequestChangesRequired',
     });
   });
 });

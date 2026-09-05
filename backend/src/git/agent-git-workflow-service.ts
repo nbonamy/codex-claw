@@ -239,6 +239,7 @@ export class AgentGitWorkflowService {
     if (!workflow.remote || !workflow.remoteUrl) throw new Error('Add a GitHub remote before creating a pull request.');
     if (workflow.githubError) throw new Error(`Could not verify existing pull requests: ${workflow.githubError}`);
     if (workflow.existingPullRequest) throw new Error(`Pull request #${workflow.existingPullRequest.number} already exists for this branch.`);
+    await this.options.git.assertPullRequestChanges(folder);
     if (input.reportBack === true) this.emitOperationProgress(agentId, 'pullRequest', 'handoff');
     const handoff = input.reportBack === true
       ? await this.options.delegatedWorkReports.prepare(agent, {

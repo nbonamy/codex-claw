@@ -190,6 +190,10 @@
         </button>
       </div>
       <p v-if="generationError && generationErrorKind === 'pullRequest'" class="git-workflow-control__generation-error">{{ generationError }}</p>
+      <p v-if="workflow?.files.length" class="git-workflow-control__uncommitted-warning">
+        <AlertTriangleIcon aria-hidden="true" />
+        <span>{{ $t('surface.gitWorkflowControl.uncommittedChangesWillNotBeIncludedInThisPullRequest') }}</span>
+      </p>
       <label v-if="reportBackAgentName" class="git-workflow-control__check git-workflow-control__report-back">
         <el-switch v-model="reportBack" size="small" />
         <span>{{ $t('surface.gitWorkflowControl.reportBackTo', { name: reportBackAgentName }) }}</span>
@@ -260,6 +264,10 @@
         :aria-label="$t('surface.gitWorkflowControl.squashCommitMessage')"
         :placeholder="$t('surface.gitWorkflowControl.squashCommitMessage2')"
       />
+      <p v-if="workflow?.files.length" class="git-workflow-control__uncommitted-warning">
+        <AlertTriangleIcon aria-hidden="true" />
+        <span>{{ $t('surface.gitWorkflowControl.uncommittedChangesWillNotBeIncludedInThisMerge') }}</span>
+      </p>
       <label v-if="reportBackAgentName" class="git-workflow-control__check git-workflow-control__report-back">
         <el-switch v-model="reportBack" size="small" />
         <span>{{ $t('surface.gitWorkflowControl.reportBackTo', { name: reportBackAgentName }) }}</span>
@@ -295,8 +303,9 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
-import { ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
+import { AlertTriangleIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
 import { codexClawApi } from '../platform-api';
+import { localizedErrorMessage } from '../i18n/errors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
@@ -627,7 +636,7 @@ async function generateCommitMessage(): Promise<void> {
     commitMessage.value = result.message;
   } catch (error) {
     if (requestId !== generationRequestId) return;
-    generationError.value = error instanceof Error ? error.message : String(error);
+    generationError.value = localizedErrorMessage(error, translate);
     generationErrorKind.value = 'commit';
   } finally {
     if (requestId === generationRequestId) {
@@ -703,7 +712,7 @@ async function createPullRequest(): Promise<void> {
       }, 1500);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = localizedErrorMessage(error, translate);
     workflowError.value = message;
     pullRequestOperation.value = { status: 'error', message };
     if (pullRequestBackgrounded.value) {
@@ -728,7 +737,7 @@ async function generatePullRequestMessage(): Promise<void> {
     pullRequestBody.value = result.body;
   } catch (error) {
     if (requestId !== generationRequestId) return;
-    generationError.value = error instanceof Error ? error.message : String(error);
+    generationError.value = localizedErrorMessage(error, translate);
     generationErrorKind.value = 'pullRequest';
   } finally {
     if (requestId === generationRequestId) {
@@ -1148,6 +1157,23 @@ function handleMainEvent(event: MainToRendererEvent): void {
   margin: 0 0 var(--space-4);
   color: var(--color-error);
   font-size: var(--font-size-13);
+}
+
+.git-workflow-control__uncommitted-warning {
+  display: grid;
+  grid-template-columns: var(--icon-sm) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  color: var(--color-warning);
+  font-size: var(--font-size-13);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.git-workflow-control__uncommitted-warning svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .git-workflow-control__branch,

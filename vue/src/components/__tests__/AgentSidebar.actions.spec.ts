@@ -13,6 +13,12 @@ import {
   teams,
 } from './agent-sidebar-test-harness';
 
+const ElTooltipStub = {
+  name: 'ElTooltip',
+  props: ['content'],
+  template: '<span class="tooltip-stub" :data-content="content"><slot /></span>',
+};
+
 describe('AgentSidebar actions', () => {
   const id8Agents = [
     agents[0]!,
@@ -68,11 +74,12 @@ describe('AgentSidebar actions', () => {
         activeAgentId: closedAgent.id,
         teamName: 'Codex Claw',
       },
-      global: { components: { ElPopover } },
+      global: { components: { ElPopover, ElTooltip: ElTooltipStub } },
     });
 
     const attention = wrapper.get('.agent-sidebar__pull-request-attention');
     expect(attention.attributes('aria-label')).toContain('#7 was closed');
+    expect(wrapper.get('.tooltip-stub').attributes('data-content')).toContain('#7 was closed');
     expect(wrapper.find('.agent-sidebar__status').exists()).toBe(false);
     await attention.trigger('click');
 

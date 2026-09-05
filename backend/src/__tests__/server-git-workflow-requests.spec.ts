@@ -269,6 +269,7 @@ describe('ClawBackendServer', () => {
       unstagedFiles: [],
     });
     const findPullRequest = vi.fn().mockResolvedValue(null);
+    const assertPullRequestChanges = vi.fn().mockResolvedValue(undefined);
     const push = vi.fn().mockResolvedValue(undefined);
     const createPullRequest = vi.fn().mockResolvedValue({
       number: 12,
@@ -286,7 +287,7 @@ describe('ClawBackendServer', () => {
       version: 'test-version',
       snapshot,
       onEvent: (event) => events.push(event),
-      agentGitService: { workflow, push } as unknown as AgentGitService,
+      agentGitService: { workflow, assertPullRequestChanges, push } as unknown as AgentGitService,
       workIntegrations: {
         githubConnected: vi.fn().mockResolvedValue(true),
         findPullRequest,
@@ -314,6 +315,9 @@ describe('ClawBackendServer', () => {
 
     expect(findPullRequest).toHaveBeenCalledOnce();
     expect(findPullRequest).toHaveBeenCalledWith('owner/repo', 'feature/demo');
+    expect(assertPullRequestChanges).toHaveBeenCalledWith('/repo');
+    expect(assertPullRequestChanges.mock.invocationCallOrder[0]).toBeLessThan(push.mock.invocationCallOrder[0]!);
+    expect(assertPullRequestChanges.mock.invocationCallOrder[0]).toBeLessThan(createPullRequest.mock.invocationCallOrder[0]!);
     expect(push).toHaveBeenCalledWith('/repo', 'origin', 'feature/demo', true);
     expect(createPullRequest).toHaveBeenCalledOnce();
     expect(createPullRequest).toHaveBeenCalledWith('owner/repo', {

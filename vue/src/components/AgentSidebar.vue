@@ -175,17 +175,22 @@
               :aria-label="session.isUnread ? t('sidebar.unread') : statusLabel(session.status.type)"
             />
           </button>
-          <button
+          <el-tooltip
             v-if="isPullRequestFinished(session)"
-            v-show="!isWorkspaceCollapsed(group)"
-            class="agent-sidebar__pull-request-attention"
-            type="button"
-            :aria-label="pullRequestAttentionLabel(session)"
-            :title="pullRequestAttentionLabel(session)"
-            @click.stop="emit('cleanup-pull-request', session.agentId)"
+            :content="pullRequestAttentionLabel(session)"
+            placement="right"
+            :show-after="300"
           >
-            <AlertTriangleIcon aria-hidden="true" />
-          </button>
+            <button
+              v-show="!isWorkspaceCollapsed(group)"
+              class="agent-sidebar__pull-request-attention"
+              type="button"
+              :aria-label="pullRequestAttentionLabel(session)"
+              @click.stop="emit('cleanup-pull-request', session.agentId)"
+            >
+              <AlertTriangleIcon aria-hidden="true" />
+            </button>
+          </el-tooltip>
         </div>
       </section>
     </nav>
@@ -877,7 +882,11 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__pull-request-attention {
   position: absolute;
   top: 50%;
-  right: var(--space-6);
+  right: calc(
+    var(--space-6) +
+      (var(--agent-sidebar-status-column-width) - var(--agent-status-dot-size)) / 2 +
+      1px
+  );
   display: grid;
   place-items: center;
   width: var(--agent-sidebar-status-column-width);
