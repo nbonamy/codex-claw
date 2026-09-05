@@ -431,10 +431,14 @@ export class CodexSurfaceAgentAdapter {
         // This adapter already owns the live session and receives its events in
         // the background. Keep that richer in-memory transcript authoritative
         // instead of replacing it with load's five-turn bootstrap page.
+        this.emitHistory(existing, currentSnapshot.messages, undefined, { preserveKnownTurns: true });
         return threadId;
       }
       const hydratedAt = this.historyHydratedAtByAgentId.get(agent.id) ?? 0;
-      if (Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) return threadId;
+      if (Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) {
+        this.emitHistory(existing, currentSnapshot.messages, undefined, { preserveKnownTurns: true });
+        return threadId;
+      }
 
       const wasSuppressingEvents = existing.suppressEvents;
       existing.suppressEvents = true;

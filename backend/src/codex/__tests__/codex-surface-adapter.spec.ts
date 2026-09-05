@@ -1366,7 +1366,12 @@ describe('CodexSurfaceAgentAdapter', () => {
       'method' in message && message.method === 'thread/resume'
     ))).toHaveLength(1);
     expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
-    expect(events).toHaveLength(0);
+    expect(events).toStrictEqual([
+      expect.objectContaining({
+        type: 'thread.historyLoaded',
+        payload: expect.objectContaining({ preserveKnownTurns: true, replace: false }),
+      }),
+    ]);
 
     transport.emit({
       method: 'turn/completed',
@@ -1384,7 +1389,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       turnId: 'turn-thread-a',
       payload: expect.objectContaining({ status: 'interrupted' }),
     }));
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
   });
 
   it('publishes full persisted turn items from the initial history page', async () => {
@@ -1675,7 +1680,10 @@ describe('CodexSurfaceAgentAdapter', () => {
     events.length = 0;
 
     await adapter.hydrateAgent(agentA);
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toStrictEqual([
+      expect.objectContaining({ payload: expect.objectContaining({ preserveKnownTurns: true, replace: false }) }),
+    ]);
+    events.length = 0;
 
     await adapter.setThreadGoal(agentA, 'Ship it');
     await adapter.clearThreadGoal(agentA);
@@ -1825,10 +1833,43 @@ describe('CodexSurfaceAgentAdapter', () => {
       ))).toHaveLength(2);
       expect(events.filter((event) => event.type === 'thread.historyLoaded')).toStrictEqual([
         expect.objectContaining({ payload: expect.objectContaining({ preserveKnownTurns: true, replace: false }) }),
+        expect.objectContaining({ payload: expect.objectContaining({ preserveKnownTurns: true, replace: false }) }),
       ]);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('replays cached history when a fresh renderer hydrates the same agent', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-cached', 'completed', [agentMessage('message-cached', 'Cached answer')]),
+    ]);
+    adapter.onEvent((event) => events.push(event));
+
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    await adapter.hydrateAgent(agentA);
+
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/resume'
+    ))).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toStrictEqual([
+      expect.objectContaining({
+        agentId: agentA.id,
+        payload: expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              parts: [expect.objectContaining({ type: 'text', text: 'Cached answer' })],
+            }),
+          ]),
+          preserveKnownTurns: true,
+          replace: false,
+        }),
+      }),
+    ]);
   });
 
   it('maps notification-only compaction completion once and ignores speculative action starts', async () => {
