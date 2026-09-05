@@ -1,9 +1,103 @@
-export type AppTextDescriptor = {
-  key: string;
-  params?: Record<string, string | number>;
-};
+import type {
+  AgentBackend,
+  AppText,
+  ApprovalPreset,
+  ReasoningEffort,
+} from './contracts/shared';
+import type {
+  AgentCloseInput,
+  AgentGitBranchInput,
+  AgentGitCommitInput,
+  AgentGitDiffSection,
+  AgentGitMergeInput,
+  AgentGitMessageGenerationInput,
+  AgentGitMessageGenerationResult,
+  AgentGitOperationProgress,
+  AgentGitPullRequestInput,
+  AgentGitPushInput,
+  AgentGitStageInput,
+  AgentGitStatus,
+  AgentGitWorkflow,
+  AgentPullRequestTracking,
+  TurnGitDiff,
+} from './contracts/git';
+import type {
+  AgentFilePreviewResult,
+  AgentFileSearchItem,
+  AgentWorkspaceIdentity,
+  CloneSourceRepositoryInput,
+  CreateSourceWorktreeInput,
+  SourceBranch,
+  SourceFolderListInput,
+  SourceFolderListing,
+  SourceFolderState,
+  SourceRepository,
+  SourceWorktree,
+} from './contracts/workspace';
+import type {
+  AddSshConnectionInput,
+  DevicePairingSession,
+  DevicePairingStatus,
+  PairedDevice,
+  RemoteConnectionsState,
+  SshHostCandidate,
+  UpdateRemoteConnectionInput,
+} from './contracts/connections';
 
-export type AppText = string | AppTextDescriptor;
+export type {
+  AgentBackend,
+  AppText,
+  AppTextDescriptor,
+  ApprovalPreset,
+  ReasoningEffort,
+} from './contracts/shared';
+export type {
+  AgentCloseInput,
+  AgentGitBranchInput,
+  AgentGitCommitInput,
+  AgentGitDiff,
+  AgentGitDiffScope,
+  AgentGitDiffSection,
+  AgentGitFile,
+  AgentGitMergeInput,
+  AgentGitMessageGenerationInput,
+  AgentGitMessageGenerationResult,
+  AgentGitOperationProgress,
+  AgentGitPullRequest,
+  AgentGitPullRequestInput,
+  AgentGitPushInput,
+  AgentGitStageInput,
+  AgentGitStatus,
+  AgentGitWorkflow,
+  AgentPullRequestTracking,
+  TurnGitDiff,
+} from './contracts/git';
+export type {
+  AgentFilePreviewResult,
+  AgentFileSearchItem,
+  AgentWorkspaceIdentity,
+  CloneSourceRepositoryInput,
+  CreateSourceWorktreeInput,
+  SourceBranch,
+  SourceFolderEntry,
+  SourceFolderListInput,
+  SourceFolderListing,
+  SourceFolderState,
+  SourceRepository,
+  SourceWorktree,
+} from './contracts/workspace';
+export type {
+  AddSshConnectionInput,
+  DevicePairingSession,
+  DevicePairingStatus,
+  PairedDevice,
+  RemoteConnection,
+  RemoteConnectionStatus,
+  RemoteConnectionTransport,
+  RemoteConnectionsState,
+  SshHostCandidate,
+  UpdateRemoteConnectionInput,
+} from './contracts/connections';
 
 export type AgentStatus =
   | { type: 'idle' }
@@ -23,9 +117,6 @@ export type Team = {
   activeAgentId?: string;
 };
 
-export type AgentBackend = 'codex' | 'claude';
-
-export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 export type BackendApprovalDecision = 'approve' | 'deny';
 export type BackendApprovalScope = 'once' | 'session';
 export type BackendRequestedPermission =
@@ -160,25 +251,6 @@ export type OpenInApplicationCatalog = {
   defaultApplication: OpenInApplication;
   applications: OpenInApplicationOption[];
 };
-
-export type AgentWorkspaceIdentity =
-  | {
-      kind: 'git';
-      folder: string;
-      repositoryName: string;
-      repositoryRoot: string;
-      branch: string | null;
-      isLinkedWorktree: boolean;
-      primaryWorktreeRoot: string;
-      originUrl?: string;
-      updatedAt: string;
-    }
-  | {
-      kind: 'folder';
-      folder: string;
-      label: string;
-      updatedAt: string;
-    };
 
 export type Agent = {
   id: string;
@@ -576,8 +648,6 @@ export type UpdateAutomationInput = CreateAutomationInput & {
   id: string;
 };
 
-export type ReasoningEffort = string;
-
 export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
 
 export type BackendCapabilities = {
@@ -719,82 +789,6 @@ export type ClientState = {
   shouldPreventDisplaySleepForRemoteAccess?: boolean;
 };
 
-export type SshHostCandidate = {
-  host: string;
-  hostName?: string;
-  user?: string;
-  port?: number;
-  identityFile?: string;
-  configPath?: string;
-  line?: number;
-};
-
-export type RemoteConnectionStatus = 'saved' | 'checking' | 'ready' | 'error';
-
-export type RemoteConnectionTransport = {
-  type: 'ssh-stdio';
-  command: 'ssh';
-  args: string[];
-};
-
-export type RemoteConnection = {
-  id: string;
-  kind: 'ssh';
-  name: string;
-  host: string;
-  hostName?: string;
-  user?: string;
-  port?: number;
-  identityFile?: string;
-  status: RemoteConnectionStatus;
-  detail?: string;
-  sourceFolderPath?: string;
-  transport?: RemoteConnectionTransport;
-  installedAt?: string;
-  lastCheckedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type RemoteConnectionsState = {
-  connections: RemoteConnection[];
-};
-
-export type DevicePairingStatus = {
-  status: 'disabled' | 'connecting' | 'connected' | 'errored';
-  serverName?: string;
-  installationId?: string;
-  environmentId?: string | null;
-  allowRemoteControl?: boolean | null;
-  detail?: string;
-};
-
-export type DevicePairingSession = {
-  pairingCode: string;
-  manualPairingCode?: string | null;
-  environmentId: string;
-  expiresAt: string;
-};
-
-export type PairedDevice = {
-  clientId: string;
-  displayName?: string | null;
-  deviceType?: string | null;
-  platform?: string | null;
-  osVersion?: string | null;
-  deviceModel?: string | null;
-  appVersion?: string | null;
-  lastSeenAt?: string | null;
-};
-
-export type AddSshConnectionInput = SshHostCandidate & {
-  name?: string;
-};
-
-export type UpdateRemoteConnectionInput = {
-  sourceFolderPath?: string;
-};
-
 export type BackendReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
@@ -858,20 +852,6 @@ export type BackendCommandSummary = {
   slashName?: string;
   submitOnSelect?: boolean;
   providerMetadata?: Record<string, unknown>;
-};
-
-export type AgentFileSearchItem = {
-  name: string;
-  path: string;
-};
-
-export type AgentFilePreviewResult = {
-  path: string;
-  size: number;
-  kind: 'text' | 'image' | 'binary' | 'tooLarge';
-  content?: string;
-  dataUrl?: string;
-  mimeType?: string;
 };
 
 export type SidePanelMarkdownRequest = {
@@ -1014,60 +994,6 @@ export type ClawdDaemonStatus = {
   detail?: string;
 };
 
-export type SourceWorktree = {
-  name: string;
-  path: string;
-};
-
-export type SourceBranch = {
-  name: string;
-  isDefault: boolean;
-  worktreePath?: string;
-};
-
-export type SourceRepository = {
-  name: string;
-  path: string;
-  remoteIdentity?: string;
-  worktrees: SourceWorktree[];
-};
-
-export type CloneSourceRepositoryInput = {
-  url: string;
-  remoteConnectionId?: string;
-};
-
-export type SourceFolderEntry = {
-  name: string;
-  path: string;
-};
-
-export type SourceFolderListing = {
-  path: string;
-  parentPath: string | null;
-  entries: SourceFolderEntry[];
-};
-
-export type SourceFolderListInput = {
-  path?: string;
-  remoteConnectionId?: string;
-};
-
-export type SourceFolderState = {
-  path: string;
-  initialized: boolean;
-  recentRepoNames: string[];
-};
-
-export type CreateSourceWorktreeInput = {
-  repoPath: string;
-  branchName: string;
-  baseBranch?: string;
-  destinationPath?: string;
-  reuseExisting?: boolean;
-  remoteConnectionId?: string;
-};
-
 export type UpdateSettingsInput = {
   general?: UpdateGeneralSettingsInput;
   sourceFolder?: Partial<Pick<SourceFolderState, 'path' | 'recentRepoNames'>>;
@@ -1180,106 +1106,6 @@ export type AgentQueuedPrompt = {
   lastError?: string;
   retryAt?: string;
   submitted?: boolean;
-};
-
-export type AgentGitStatus = {
-  folder: string;
-  repository?: string;
-  githubRepository?: string;
-  branch?: string;
-  upstream?: string;
-  ahead: number;
-  behind: number;
-  changedFiles: number;
-  addedLines: number;
-  removedLines: number;
-  hasUntracked: boolean;
-  state: 'clean' | 'dirty' | 'unknown';
-  updatedAt: string;
-  error?: string;
-};
-
-export type AgentGitDiffScope = 'staged' | 'unstaged' | 'untracked';
-
-export type AgentGitDiffSection = {
-  scope: AgentGitDiffScope;
-  diff: string;
-};
-
-export type AgentGitDiff = {
-  diff: string;
-  sections: AgentGitDiffSection[];
-};
-
-export type AgentGitFile = {
-  path: string;
-  indexStatus: string;
-  worktreeStatus: string;
-};
-
-export type AgentGitPullRequest = {
-  number: number;
-  title: string;
-  url: string;
-  draft: boolean;
-  headSha: string;
-  state: 'open' | 'merged' | 'closed';
-  mergedAt?: string;
-};
-
-export type AgentPullRequestTracking = AgentGitPullRequest & {
-  provider: 'github';
-  repository: string;
-  branch: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type AgentGitWorkflow = {
-  repository: string;
-  folder: string;
-  isLinkedWorktree: boolean;
-  branch?: string;
-  detached: boolean;
-  remote?: string;
-  remoteUrl?: string;
-  upstream?: string;
-  ahead: number;
-  behind: number;
-  stagedAddedLines?: number;
-  stagedRemovedLines?: number;
-  unstagedAddedLines?: number;
-  unstagedRemovedLines?: number;
-  untrackedAddedLines?: number;
-  untrackedRemovedLines?: number;
-  files: AgentGitFile[];
-  stagedFiles: string[];
-  unstagedFiles: string[];
-  existingPullRequest?: AgentGitPullRequest;
-  githubConnected: boolean;
-  githubError?: string;
-};
-
-export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
-export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
-export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget'; closeAgentAfterPush?: boolean };
-export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
-export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
-export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
-export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
-export type AgentGitMessageGenerationInput =
-  | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }
-  | { kind: 'pullRequest' };
-export type AgentGitMessageGenerationResult =
-  | { kind: 'commit'; message: string }
-  | { kind: 'pullRequest'; title: string; body: string };
-
-export type TurnGitDiff = {
-  turnId: string;
-  addedLines: number;
-  removedLines: number;
-  diff?: string;
-  updatedAt: string;
 };
 
 export type AppSnapshot = {
@@ -1801,11 +1627,6 @@ export type AgentCreationProgress = {
   agentId?: string;
   agentName?: string;
   error?: string;
-};
-
-export type AgentGitOperationProgress = {
-  operation: 'pullRequest' | 'merge';
-  phase: 'handoff' | 'delivery';
 };
 
 export type AppCommand =
