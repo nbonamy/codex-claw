@@ -5,6 +5,7 @@ import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { CodexAppServerClient, type RpcMessage, type RpcTransport } from '@codex-app-sdk/backend/protocol';
 import { CodexSurface } from '@codex-app-sdk/backend';
+import { decodeClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
 import { CodexBackendDriver } from '../codex-driver';
 import { CodexSurfaceAgentAdapter } from '../codex-surface-adapter';
 
@@ -12,6 +13,7 @@ class FakeTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];
   readonly close = vi.fn(async () => undefined);
   readonly start = vi.fn(async () => undefined);
+  skillBrandColor: unknown;
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
@@ -74,7 +76,8 @@ class FakeTransport implements RpcTransport {
               name: `skill-${this.skillVersion}-${cwd}`,
               description: `Skill ${this.skillVersion} for ${cwd}`,
               path: `${cwd}/skill-${this.skillVersion}/SKILL.md`,
-              scope: 'repo', enabled: true, interface: null,
+              scope: 'repo', enabled: true,
+              interface: this.skillBrandColor === undefined ? null : { brandColor: this.skillBrandColor },
             }],
             errors: [],
           }],
@@ -1006,6 +1009,35 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.listSkills(agentB)).resolves.toMatchObject([{
       name: 'skill-2-/workspace/b', path: '/workspace/b/skill-2/SKILL.md',
     }]);
+  });
+
+  it('emits a decodable skill update when the provider returns a null brand color', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.skillBrandColor = null;
+    transport.skillVersion = 2;
+    transport.emit({ method: 'skills/changed', params: {} });
+
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'skills.changed')).toBe(true));
+    const event = events.find((candidate): candidate is Extract<BackendEvent, { type: 'skills.changed' }> => (
+      candidate.type === 'skills.changed'
+    ))!;
+    const notification = {
+      ...event,
+      seq: 1,
+      occurredAt: event.occurredAt ?? '2026-09-05T00:00:00.000Z',
+    };
+    expect(decodeClawBackendEvent(notification)).toBe(notification);
+    expect(event.payload.skills[0]).not.toHaveProperty('brandColor');
+
+    transport.skillBrandColor = '#123abc';
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.objectContaining({ brandColor: '#123abc' }),
+    ]);
   });
 
   it('preserves image and file attachments through send and steer SDK turn input', async () => {
