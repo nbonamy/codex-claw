@@ -25,7 +25,7 @@ import {
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
-} from './cli-transport';
+} from './transport';
 import { claudeMessageSessionId, type ClaudeSdkMessage } from './protocol';
 
 export type ClaudeAgentSdkTransportOptions = {

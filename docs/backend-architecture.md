@@ -174,9 +174,9 @@ Current implementation checkpoint:
   resolution, and provider title synchronization live in
   `AgentConversationService`. This keeps conversation mutation policy together
   while the server remains the protocol and local/remote routing boundary.
-- Work-routing branch/worktree policy lives in `WorkRoutingService`, pending
-  client-request ownership in `ClientRequestRegistry`, and deduplicated agent
-  workspace identity/git refreshes in `AgentWorkspaceService`.
+- Pending provider request ownership lives in `ClientRequestRegistry`, and
+  deduplicated agent workspace identity/git refreshes live in
+  `AgentWorkspaceService`.
   `AgentGitWorkflowService` owns the app-level Git workflow from validation
   through staging, commits, pushes, pull requests, merge handoffs, and cleanup;
   `ClawBackendServer` only resolves local/remote ownership and routes the typed

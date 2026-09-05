@@ -187,8 +187,6 @@ function expectEventContext(event: EventRecord): void {
     case 'devicePairing.statusChanged':
     case 'browser.annotationCreated':
     case 'workBacklog.assignmentUpdated':
-    case 'workRouting.requested':
-    case 'workRouting.resolved':
       return;
   }
 }

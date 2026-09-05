@@ -58,7 +58,6 @@ export const backendMethods = {
   clientComputerUseRequestAccessibility: 'client/computerUse/requestAccessibility',
   clientComputerUseStatusGet: 'client/computerUse/status/get',
   clientRequestRespond: 'client/request/respond',
-  mcpWorkRoutingRespond: 'mcp/workRouting/respond',
   clientStateGet: 'client/state/get',
   clientSystemPermissionsAccessibilityOpen: 'client/system/permissions/accessibility/open',
   clientSystemPermissionsGet: 'client/system/permissions/get',
@@ -153,7 +152,6 @@ export const backendMethods = {
   workProviderGlobalItemsList: 'workProvider/globalItems/list',
   workProviderAssignedItemsList: 'workProvider/assignedItems/list',
   workProviderItemsList: 'workProvider/items/list',
-  workProviderItemCreate: 'workProvider/item/create',
   workProviderRepositoriesList: 'workProvider/repositories/list',
 } as const;
 

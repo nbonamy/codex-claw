@@ -57,7 +57,6 @@ describe('snapshot construction', () => {
     expect(first.automations).not.toBe(second.automations);
     expect(first.messages).not.toBe(second.messages);
     expect(first.queuedPrompts).not.toBe(second.queuedPrompts);
-    expect(first.workRoutingRequests).not.toBe(second.workRoutingRequests);
     expect(first.backendApprovals).not.toBe(second.backendApprovals);
     expect(first.agentGitStatuses).not.toBe(second.agentGitStatuses);
     expect(first.turnGitDiffs).not.toBe(second.turnGitDiffs);
@@ -140,7 +139,6 @@ function expectedEmptySnapshot(): AppSnapshot {
     activeAgentId: null,
     messages: [],
     queuedPrompts: [],
-    workRoutingRequests: [],
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},

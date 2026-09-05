@@ -55,7 +55,7 @@ Team scope:
 - Used by the fake team Cockpit row in `AgentSidebar`.
 - Shows only the current team's agents.
 - Still uses the exact same `CockpitView`, `CockpitAgentCard`,
-  `CockpitAddAgentTile`, `WorkBacklogPanel`, and assignment flows.
+  `CockpitAddAgentTile`, `CockpitWorkInbox`, and assignment flows.
 - Hides team selectors in creation dialogs because the target team is known:
   the current team.
 - Sends assignments to existing agents in that team.

@@ -129,13 +129,6 @@ export type WorkItem = {
   updatedAt: string;
 };
 
-export type CreateWorkItemInput = {
-  agentId: string;
-  provider: WorkProviderKind;
-  repositoryId: string;
-  description: string;
-};
-
 export type AutomationRepositoryTarget = {
   provider: 'github';
   repositoryId: string;
@@ -206,25 +199,4 @@ export type CreateAutomationInput = {
 
 export type UpdateAutomationInput = CreateAutomationInput & {
   id: string;
-};
-
-export type WorkRoutingMode = 'current' | 'branch' | 'delegate';
-
-export type WorkRoutingResult =
-  | { mode: 'cancelled' }
-  | { mode: 'current'; folder: string }
-  | { mode: 'branch'; branchName: string; folder: string }
-  | { mode: 'delegated'; agentId: string; agentName: string; branchName: string; folder: string };
-
-export type WorkRoutingRequest = {
-  id: string;
-  kind: 'work_routing';
-  payload: {
-    request: {
-      agentId: string;
-      task: string;
-      suggestedBranchName: string;
-      sharedFolderAgentNames: string[];
-    };
-  };
 };

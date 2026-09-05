@@ -17,8 +17,6 @@ export const snapshotEventOwnership = {
   'git.operationProgress': 'renderer',
   'browser.annotationCreated': 'renderer',
   'workBacklog.assignmentUpdated': 'runtime',
-  'workRouting.requested': 'runtime',
-  'workRouting.resolved': 'runtime',
   'clientRequest.resolved': 'renderer',
   'agent.updated': 'runtime',
   'agent.statusChanged': 'runtime',

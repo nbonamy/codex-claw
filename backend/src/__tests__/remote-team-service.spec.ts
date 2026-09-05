@@ -58,7 +58,6 @@ describe('RemoteTeamService', () => {
       getSnapshot: () => snapshot,
       onForwardedEvent: vi.fn(),
       onProjectedSnapshotChanged,
-      recordProjectedWorkRouting: vi.fn(),
     });
     service.rememberSnapshot('connection-devbox', initialRemoteSnapshot);
 

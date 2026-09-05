@@ -87,7 +87,6 @@ import type {
   AutomationRepositoryTarget,
   AutomationSchedule,
   CreateAutomationInput,
-  CreateWorkItemInput,
   GitHubWorkBacklogConfiguration,
   GitHubWorkBacklogConfigurationInput,
   GlobalWorkItemQuery,
@@ -110,8 +109,6 @@ import type {
   WorkProviderKind,
   WorkProviderSettings,
   WorkRepository,
-  WorkRoutingMode,
-  WorkRoutingRequest,
 } from './contracts/work';
 
 export type {
@@ -247,7 +244,6 @@ export type {
   AutomationRepositoryTarget,
   AutomationSchedule,
   CreateAutomationInput,
-  CreateWorkItemInput,
   GitHubWorkBacklogConfiguration,
   GitHubWorkBacklogConfigurationInput,
   GlobalWorkItemQuery,
@@ -270,9 +266,6 @@ export type {
   WorkProviderKind,
   WorkProviderSettings,
   WorkRepository,
-  WorkRoutingMode,
-  WorkRoutingRequest,
-  WorkRoutingResult,
 } from './contracts/work';
 
 export type AgentStatus =
@@ -581,7 +574,6 @@ export type AppSnapshot = {
   activeAgentId: string | null;
   messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
-  workRoutingRequests?: WorkRoutingRequest[];
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
@@ -817,14 +809,6 @@ export type MainToRendererEvent =
   | MainToRendererEventWith<{
       type: 'workBacklog.assignmentUpdated';
       payload: WorkBacklogAssignmentUpdatedPayload;
-    }>
-  | MainToRendererEventWith<{
-      type: 'workRouting.requested';
-      payload: WorkRoutingRequest;
-    }>
-  | MainToRendererEventWith<{
-      type: 'workRouting.resolved';
-      payload: Pick<WorkRoutingRequest, 'id'>;
     }>
   | MainToRendererEventWith<{
       type: 'clientRequest.resolved';
@@ -1223,8 +1207,7 @@ export type ClientRequest =
     payload: {
       request: AskUserRequest;
     };
-  }
-  | WorkRoutingRequest;
+  };
 
 export type ClientRequestResponse = {
   id: string;
@@ -1232,10 +1215,6 @@ export type ClientRequestResponse = {
     answers?: AskUserAnswers;
     cancelled?: boolean;
     decision?: ToolConfirmationDecision | null;
-    workRouting?: {
-      mode: WorkRoutingMode;
-      branchName?: string;
-    };
   };
 };
 
@@ -1277,7 +1256,6 @@ export type CodexClawApi = {
   listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
   listAssignedWorkItems?(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
-  createWorkItem(input: CreateWorkItemInput): Promise<WorkItem>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;

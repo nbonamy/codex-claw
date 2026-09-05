@@ -29,21 +29,6 @@ export function applyRuntimeEventToSnapshot(
     return;
   }
 
-  if (event.type === 'workRouting.requested') {
-    const request = event.payload;
-    snapshot.workRoutingRequests = [
-      ...(snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== request.id),
-      request,
-    ];
-    return;
-  }
-
-  if (event.type === 'workRouting.resolved') {
-    snapshot.workRoutingRequests = (snapshot.workRoutingRequests ?? [])
-      .filter((candidate) => candidate.id !== event.payload.id);
-    return;
-  }
-
   if (event.type === 'backend.statusChanged') {
     const payload = event.payload;
     setBackendRuntimeStatus(snapshot, {

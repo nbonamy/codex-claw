@@ -197,7 +197,6 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       return pluginStatus;
     },
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),
-    workRouting: mcpService,
     onPromptStarting: (agentId, promptOptions) => {
       mcpService.recordPromptInputMethod(agentId, promptOptions?.inputMethod);
     },

@@ -13,7 +13,6 @@ describe('backendRequestTimeoutMs', () => {
     expect(backendRequestTimeoutMs(backendMethods.agentGitMessageGenerate, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitMerge, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitPullRequestCreate, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.workProviderItemCreate, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.snapshotGet, 5_000)).toBe(5_000);
   });
 });

@@ -3,11 +3,7 @@ export type AppErrorCode =
   | 'clone.discoveryFailed'
   | 'clone.invalidName'
   | 'clone.sourceFolderMissing'
-  | 'clone.urlRequired'
-  | 'workRouting.branchRequired'
-  | 'workRouting.dirtyCheckout'
-  | 'workRouting.dirtyCheckoutUnknown'
-  | 'workRouting.sharedFolder';
+  | 'clone.urlRequired';
 
 export const appErrorCodes: readonly AppErrorCode[] = [
   'clone.alreadyExists',
@@ -15,10 +11,6 @@ export const appErrorCodes: readonly AppErrorCode[] = [
   'clone.invalidName',
   'clone.sourceFolderMissing',
   'clone.urlRequired',
-  'workRouting.branchRequired',
-  'workRouting.dirtyCheckout',
-  'workRouting.dirtyCheckoutUnknown',
-  'workRouting.sharedFolder',
 ];
 
 export type AppErrorDescriptor = {

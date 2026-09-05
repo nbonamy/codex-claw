@@ -1,8 +1,5 @@
 import { isAppTextDescriptor } from '../app-text';
-import {
-  isAccountRateLimits,
-  isWorkRoutingRequest,
-} from '../snapshot-guard-collections';
+import { isAccountRateLimits } from '../snapshot-guard-collections';
 import { decodeAppSnapshot } from '../snapshot-guards';
 import {
   expectArray,
@@ -353,8 +350,5 @@ export const runtimePayloadValidators = {
   },
   'browser.annotationCreated': expectBrowserAnnotation,
   'workBacklog.assignmentUpdated': expectWorkBacklogAssignment,
-  'workRouting.requested': (value, path) =>
-    expectKnownShape(value, path, isWorkRoutingRequest, 'work routing request'),
-  'workRouting.resolved': expectId,
   'clientRequest.resolved': expectId,
 } satisfies Record<string, EventValueValidator>;

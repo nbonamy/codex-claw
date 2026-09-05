@@ -47,7 +47,6 @@ import type {
   WorkBacklogAssignment,
   WorkBacklogAssignmentPolicy,
   WorkBacklogAssignmentStatus,
-  WorkRoutingRequest,
 } from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
@@ -77,7 +76,6 @@ describe('ipc channels', () => {
       listAssignedWorkItems: 'work-provider:assigned-items:list',
       listGlobalWorkItems: 'work-provider:global-items:list',
       listWorkItems: 'work-provider:items:list',
-      createWorkItem: 'work-provider:item:create',
       listBackendModels: 'backend:models:list',
       listBackendPlugins: 'backend:plugins:list',
       listBackendSkills: 'backend:skills:list',
@@ -370,14 +368,6 @@ describe('ipc channels', () => {
         }
       >();
     expectTypeOf<Pick<WorkBacklogAssignmentUpdatedEvent, keyof OptionalEventContext>>()
-      .toEqualTypeOf<OptionalEventContext>();
-    type WorkRoutingRequestedEvent = Extract<MainToRendererEvent, { type: 'workRouting.requested' }>;
-    expectTypeOf<WorkRoutingRequestedEvent['payload']>().toEqualTypeOf<WorkRoutingRequest>();
-    expectTypeOf<Pick<WorkRoutingRequestedEvent, keyof OptionalEventContext>>()
-      .toEqualTypeOf<OptionalEventContext>();
-    type WorkRoutingResolvedEvent = Extract<MainToRendererEvent, { type: 'workRouting.resolved' }>;
-    expectTypeOf<WorkRoutingResolvedEvent['payload']>().toEqualTypeOf<Pick<WorkRoutingRequest, 'id'>>();
-    expectTypeOf<Pick<WorkRoutingResolvedEvent, keyof OptionalEventContext>>()
       .toEqualTypeOf<OptionalEventContext>();
     type ClientRequestResolvedEvent = Extract<MainToRendererEvent, { type: 'clientRequest.resolved' }>;
     expectTypeOf<ClientRequestResolvedEvent['payload']>().toEqualTypeOf<Pick<ClientRequest, 'id'>>();

@@ -35,21 +35,6 @@ describe('ClawMcpService', () => {
     }));
   });
 
-  it('does not expose the parked prepare-work tool', async () => {
-    service = new ClawMcpService({ snapshot: createInitialSnapshot() });
-    const url = await service.start();
-
-    const response = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 2, method: 'tools/call',
-      params: {
-        name: 'prepare-work',
-        arguments: { task: 'Add queue retries', branchName: 'feat/queue-retries' },
-      },
-    });
-
-    expect(response.result).toMatchObject({ isError: true });
-  });
-
   it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
     service = new ClawMcpService({ snapshot: createInitialSnapshot() });
     const mcpUrl = await service.start();

@@ -19,7 +19,6 @@ export type RemoteTeamServiceOptions = {
   getSnapshot: () => AppSnapshot;
   onForwardedEvent: (connectionId: string, event: ClawBackendEvent) => void;
   onProjectedSnapshotChanged: () => void;
-  recordProjectedWorkRouting: (connectionId: string, remoteSnapshot: AppSnapshot, remoteTeamId: string) => void;
 };
 
 /** Owns remote clawd snapshot caching, team projection, and remote ownership lookup. */
@@ -168,7 +167,6 @@ export class RemoteTeamService {
       try {
         const remoteSnapshot = await this.snapshot(pointer.connectionId);
         projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
-        this.options.recordProjectedWorkRouting(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
       } catch {
         team.agentIds = [];
         delete team.activeAgentId;
@@ -188,7 +186,6 @@ export class RemoteTeamService {
       const remoteSnapshot = this.snapshots.get(pointer.connectionId);
       if (remoteSnapshot) {
         projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
-        this.options.recordProjectedWorkRouting(pointer.connectionId, remoteSnapshot, pointer.remoteTeamId);
       } else {
         team.agentIds = [];
         delete team.activeAgentId;
@@ -278,10 +275,6 @@ function projectRemoteTeam(target: AppSnapshot, localTeam: Team, remoteSnapshot:
   const projectedMessages = remoteSnapshot.messages.filter((message) => projectedAgentIds.has(message.agentId));
   const projectedTurnIds = new Set(projectedMessages.map((message) => message.turnId).filter((id): id is string => Boolean(id)));
   target.agents = [...target.agents.filter((agent) => !projectedAgentIds.has(agent.id)), ...remoteAgents];
-  target.workRoutingRequests = [
-    ...(target.workRoutingRequests ?? []).filter((request) => !projectedAgentIds.has(request.payload.request.agentId)),
-    ...(remoteSnapshot.workRoutingRequests ?? []).filter((request) => projectedAgentIds.has(request.payload.request.agentId)),
-  ];
   target.messages = [...target.messages.filter((message) => !projectedAgentIds.has(message.agentId)), ...projectedMessages];
   target.agentGitStatuses = {
     ...target.agentGitStatuses,

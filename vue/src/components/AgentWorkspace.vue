@@ -88,7 +88,6 @@
       :close-repository-work-agent="(agentId) => $emit('close-agent', agentId)"
       :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
       :show-repository-work-agent="selectAgentFromShell"
-      :create-repository-issue="(description) => createRepositoryIssue(agent.id, description)"
       @close-tab="closeRightWorkspaceTab(agent.id, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
@@ -130,7 +129,6 @@ import type {
   AutomationLocation,
   BackendConversationRef,
   BackendRuntimeStatus,
-  CreateWorkItemInput,
   ConversationFileLink,
   DesktopUpdateStatus,
   OpenInApplication,
@@ -179,7 +177,6 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   conversationPaneController: CodexConversationPaneController;
-  createWorkItem: (input: CreateWorkItemInput) => Promise<WorkItem>;
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
@@ -607,22 +604,6 @@ async function loadRepositoryBacklog(agentId: string): Promise<void> {
     workspace.backlogStatus = 'error';
     workspace.backlogError = error instanceof Error ? error.message : String(error);
   }
-}
-
-async function createRepositoryIssue(agentId: string, description: string): Promise<WorkItem> {
-  const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
-  if (!repositoryId) throw new Error(translate('surface.appShell.thisRepositoryIsNotConnectedToGitHub'));
-  const item = await props.createWorkItem({
-    agentId,
-    provider: 'github',
-    repositoryId,
-    description,
-  });
-  const workspace = rightWorkspaceFor(agentId);
-  workspace.backlogItems = [item, ...workspace.backlogItems.filter((candidate) => candidate.id !== item.id)];
-  workspace.backlogStatus = 'loaded';
-  workspace.backlogError = null;
-  return item;
 }
 
 function prefillRepositoryWork(agentId: string, item: WorkItem): void {

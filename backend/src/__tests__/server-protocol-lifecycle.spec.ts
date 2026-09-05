@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem, WorkRoutingRequest } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -9,13 +9,24 @@ import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
 import {
   createTestSnapshot,
-  workRoutingSnapshot,
   createTextMessage,
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
   it('backfills missing workspace identity before returning the startup snapshot', async () => {
-    const snapshot = workRoutingSnapshot();
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
     const identity = vi.fn().mockResolvedValue({
       kind: 'git',
       folder: '/repo',

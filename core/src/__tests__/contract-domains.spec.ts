@@ -172,7 +172,6 @@ const contractModules = {
       'AutomationRepositoryTarget',
       'AutomationSchedule',
       'CreateAutomationInput',
-      'CreateWorkItemInput',
       'GitHubWorkBacklogConfiguration',
       'GitHubWorkBacklogConfigurationInput',
       'GlobalWorkItemQuery',
@@ -195,9 +194,6 @@ const contractModules = {
       'WorkProviderKind',
       'WorkProviderSettings',
       'WorkRepository',
-      'WorkRoutingMode',
-      'WorkRoutingRequest',
-      'WorkRoutingResult',
     ],
   },
 } as const;
@@ -244,7 +240,7 @@ describe('contract domain ownership', () => {
       .flatMap((module) => [...module.exports])
       .sort();
 
-    expect(exportsByPath.get(barrelPath)).toHaveLength(214);
+    expect(exportsByPath.get(barrelPath)).toHaveLength(210);
     expect(exportsByPath.get(barrelPath)).toEqual(expect.arrayContaining(expectedMovedExports));
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());
@@ -391,7 +387,6 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.GlobalWorkItemQuery>().toEqualTypeOf<WorkContracts.GlobalWorkItemQuery>();
     expectTypeOf<Contracts.WorkItemPage>().toEqualTypeOf<WorkContracts.WorkItemPage>();
     expectTypeOf<Contracts.WorkItem>().toEqualTypeOf<WorkContracts.WorkItem>();
-    expectTypeOf<Contracts.CreateWorkItemInput>().toEqualTypeOf<WorkContracts.CreateWorkItemInput>();
     expectTypeOf<Contracts.AutomationRepositoryTarget>().toEqualTypeOf<WorkContracts.AutomationRepositoryTarget>();
     expectTypeOf<Contracts.AutomationSchedule>().toEqualTypeOf<WorkContracts.AutomationSchedule>();
     expectTypeOf<Contracts.AutomationExecutionStatus>().toEqualTypeOf<WorkContracts.AutomationExecutionStatus>();
@@ -401,9 +396,6 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.AutomationLocation>().toEqualTypeOf<WorkContracts.AutomationLocation>();
     expectTypeOf<Contracts.CreateAutomationInput>().toEqualTypeOf<WorkContracts.CreateAutomationInput>();
     expectTypeOf<Contracts.UpdateAutomationInput>().toEqualTypeOf<WorkContracts.UpdateAutomationInput>();
-    expectTypeOf<Contracts.WorkRoutingMode>().toEqualTypeOf<WorkContracts.WorkRoutingMode>();
-    expectTypeOf<Contracts.WorkRoutingResult>().toEqualTypeOf<WorkContracts.WorkRoutingResult>();
-    expectTypeOf<Contracts.WorkRoutingRequest>().toEqualTypeOf<WorkContracts.WorkRoutingRequest>();
   });
 
   it('preserves conversation runtime constants through the compatibility barrel', () => {

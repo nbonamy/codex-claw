@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem, WorkRoutingRequest } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 
 export function createTestSnapshot(): AppSnapshot {
@@ -67,67 +67,6 @@ export function createTestSnapshot(): AppSnapshot {
       chatFontSize: 15,
       codeFontSize: 13,
     },
-  };
-}
-
-export function workRoutingSnapshot(): AppSnapshot {
-  const snapshot = createTestSnapshot();
-  snapshot.teams[0]!.agentIds = ['agent-dina'];
-  snapshot.agents = [{
-    id: 'agent-dina',
-    teamId: 'team-test',
-    name: 'Dina',
-    folder: '/repo',
-    backend: 'codex',
-    status: { type: 'idle' },
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: '2026-08-01T00:00:00.000Z',
-  }];
-  snapshot.activeAgentId = 'agent-dina';
-  return snapshot;
-}
-
-export function workRoutingRequestedEvent(sharedFolderAgentNames: string[] = []) {
-  const request: WorkRoutingRequest = {
-    id: 'work-routing-1',
-    kind: 'work_routing',
-    payload: {
-      request: {
-        agentId: 'agent-dina',
-        task: 'Implement the routed feature.',
-        suggestedBranchName: 'feat/routed-work',
-        sharedFolderAgentNames,
-      },
-    },
-  };
-  return { agentId: 'agent-dina', type: 'workRouting.requested' as const, payload: request };
-}
-
-export function cleanGitStatus(): AgentGitStatus {
-  return {
-    folder: '/repo',
-    branch: 'main',
-    ahead: 0,
-    behind: 0,
-    changedFiles: 0,
-    addedLines: 0,
-    removedLines: 0,
-    hasUntracked: false,
-    state: 'clean',
-    updatedAt: '2026-08-29T00:00:00.000Z',
-  };
-}
-
-export function workRoutingResponseMessage(mode: 'current' | 'branch' | 'delegate', branchName?: string) {
-  const workRouting: NonNullable<import('@codex-claw/core/contracts').ClientRequestResponse['payload']>['workRouting'] = {
-    mode,
-    ...(branchName ? { branchName } : {}),
-  };
-  return {
-    jsonrpc: '2.0' as const,
-    id: `respond-${mode}`,
-    method: backendMethods.clientRequestRespond,
-    params: { response: { id: 'work-routing-1', payload: { workRouting } } },
   };
 }
 

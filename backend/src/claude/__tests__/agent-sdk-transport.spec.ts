@@ -13,7 +13,7 @@ import {
   type ClaudeQueryFactory,
   type ClaudeQueryRuntime,
 } from '../agent-sdk-transport';
-import type { ClaudePermissionRequest } from '../cli-transport';
+import type { ClaudePermissionRequest } from '../transport';
 import type { ClaudeSdkMessage } from '../protocol';
 
 vi.mock('@codex-claw/core/runtime-discovery', () => ({

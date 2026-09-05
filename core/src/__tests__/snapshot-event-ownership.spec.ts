@@ -17,8 +17,6 @@ const runtimeEventTypes = [
   'snapshot.updated',
   'account.rateLimitsUpdated',
   'workBacklog.assignmentUpdated',
-  'workRouting.requested',
-  'workRouting.resolved',
   'agent.updated',
   'agent.statusChanged',
   'thread.started',
@@ -196,8 +194,8 @@ describe('snapshot event ownership', () => {
     } as const;
     const assignedTypes = Object.values(expectedByOwner).flat();
 
-    expect(assignedTypes).toHaveLength(55);
-    expect(new Set(assignedTypes).size).toBe(55);
+    expect(assignedTypes).toHaveLength(53);
+    expect(new Set(assignedTypes).size).toBe(53);
     for (const [owner, types] of Object.entries(expectedByOwner)) {
       expect(
         Object.entries(snapshotEventOwnership)

@@ -210,27 +210,6 @@ function createFixtures(): EventFixtures {
         status: 'inProgress',
       },
     },
-    'workRouting.requested': {
-      ...base,
-      type: 'workRouting.requested',
-      payload: {
-        id: 'routing-1',
-        kind: 'work_routing',
-        payload: {
-          request: {
-            agentId: 'agent-1',
-            task: 'Fix',
-            suggestedBranchName: 'fix/7',
-            sharedFolderAgentNames: [],
-          },
-        },
-      },
-    },
-    'workRouting.resolved': {
-      ...base,
-      type: 'workRouting.resolved',
-      payload: { id: 'routing-1' },
-    },
     'clientRequest.resolved': {
       ...codexThread,
       type: 'clientRequest.resolved',
@@ -471,7 +450,7 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(55);
+    expect(Object.keys(fixtures)).toHaveLength(53);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }

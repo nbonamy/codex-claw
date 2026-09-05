@@ -87,7 +87,6 @@ describe('snapshot guards', () => {
       { name: 'queued prompt', mutate: (snapshot) => { snapshot.queuedPrompts![0]!.attempts = 'once' as never; } },
       { name: 'prompt attachment', mutate: (snapshot) => { snapshot.queuedPrompts![0]!.options!.attachments![0]!.type = 'audio' as never; } },
       { name: 'prompt backend options', mutate: (snapshot) => { snapshot.queuedPrompts![0]!.options!.backendOptions = { kind: 'codex', serviceTier: 42 as never }; } },
-      { name: 'work routing request', mutate: (snapshot) => { snapshot.workRoutingRequests![0]!.payload.request.sharedFolderAgentNames = [42 as never]; } },
       { name: 'agent git status', mutate: (snapshot) => { snapshot.agentGitStatuses.agent!.branch = null as never; } },
       { name: 'turn git diff', mutate: (snapshot) => { snapshot.turnGitDiffs.turn!.addedLines = 'one' as never; } },
       { name: 'account rate limits', mutate: (snapshot) => { snapshot.accountRateLimits!.primary!.usedPercent = 'half' as never; } },
@@ -343,18 +342,6 @@ function completeSnapshot(): AppSnapshot {
     text: 'Continue',
     createdAt: '2026-09-04T00:00:00.000Z',
     options: { backendOptions: { kind: 'claude', thinkingBudgetTokens: 4_096, permissionMode: null } },
-  }];
-  snapshot.workRoutingRequests = [{
-    id: 'routing-1',
-    kind: 'work_routing',
-    payload: {
-      request: {
-        agentId: codexAgent.id,
-        task: 'Deepen guards',
-        suggestedBranchName: 'feature/deep-guards',
-        sharedFolderAgentNames: ['Claude'],
-      },
-    },
   }];
   snapshot.backendApprovals = {
     agent: [{

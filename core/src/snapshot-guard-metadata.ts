@@ -26,7 +26,6 @@ import {
   isAgentGitStatus,
   isQueuedPrompt,
   isTurnGitDiff,
-  isWorkRoutingRequest,
 } from './snapshot-guard-collections';
 
 export function isSnapshotMetadata(value: unknown): value is Record<string, unknown> {
@@ -37,7 +36,6 @@ export function isSnapshotMetadata(value: unknown): value is Record<string, unkn
     isNullableString(value.activeTeamId) &&
     isNullableString(value.activeAgentId) &&
     optional(value, 'queuedPrompts', (candidate) => isArrayOf(candidate, isQueuedPrompt)) &&
-    optional(value, 'workRoutingRequests', (candidate) => isArrayOf(candidate, isWorkRoutingRequest)) &&
     isRecordMapOf(value.backendApprovals, (candidate) => isArrayOf(candidate, isBackendApprovalRequest)) &&
     isRecordMapOf(value.agentGitStatuses, isAgentGitStatus) &&
     isRecordMapOf(value.turnGitDiffs, isTurnGitDiff) &&

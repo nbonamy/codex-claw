@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClaudeBackendDriver } from '../claude-driver';
 import type { ClaudeSdkMessage } from '../protocol';
-import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../cli-transport';
+import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../transport';
 import type { Agent } from '@codex-claw/core/contracts';
 
 const agent: Agent = {
@@ -1161,7 +1161,7 @@ describe('ClaudeBackendDriver', () => {
 
 function createFakeTransport(): ClaudeTurnTransport & {
   emit(message: ClaudeSdkMessage): void;
-  emitPermissionRequest(request: import('../cli-transport').ClaudePermissionRequest): void;
+  emitPermissionRequest(request: import('../transport').ClaudePermissionRequest): void;
   rejectDone(error: Error): void;
   resolveDone(): void;
   lastHandle: ClaudeTurnHandle & { interrupt: ReturnType<typeof vi.fn> };
@@ -1174,7 +1174,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
   readContextUsage: ReturnType<typeof vi.fn>;
 } {
   let onMessage: (message: ClaudeSdkMessage) => void = () => undefined;
-  let onPermissionRequest: (request: import('../cli-transport').ClaudePermissionRequest) => void = () => undefined;
+  let onPermissionRequest: (request: import('../transport').ClaudePermissionRequest) => void = () => undefined;
   let rejectDone: (error: Error) => void = () => undefined;
   let resolveDone: () => void = () => undefined;
   const lastHandle = {
@@ -1189,7 +1189,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
     startTurn: vi.fn((
       _: ClaudeTurnParams,
       listener: (message: ClaudeSdkMessage) => void,
-      permissionListener?: (request: import('../cli-transport').ClaudePermissionRequest) => void,
+      permissionListener?: (request: import('../transport').ClaudePermissionRequest) => void,
     ) => {
       onMessage = listener;
       onPermissionRequest = permissionListener ?? (() => undefined);

@@ -1,8 +1,6 @@
 import type { Agent, AgentBackend, AppSnapshot, MainToRendererEvent } from '@codex-claw/core/contracts';
 
-export type ClientRequestOwner =
-  | { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string }
-  | { kind: 'workRouting'; remoteConnectionId?: string };
+export type ClientRequestOwner = { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string };
 
 export type ClientRequestRegistryOptions = {
   getSnapshot: () => AppSnapshot;
@@ -24,15 +22,6 @@ export class ClientRequestRegistry {
   }
 
   record(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
-    if (event.type === 'workRouting.requested') {
-      const request = event.payload;
-      this.owners.set(request.id, {
-        kind: 'workRouting',
-        ...(remoteConnectionIdOverride ? { remoteConnectionId: remoteConnectionIdOverride } : {}),
-      });
-      return;
-    }
-
     if (
       event.type !== 'approval.requested' &&
       event.type !== 'backendApproval.requested' &&
@@ -62,14 +51,6 @@ export class ClientRequestRegistry {
     });
   }
 
-  recordProjectedWorkRouting(connectionId: string, remoteSnapshot: AppSnapshot, remoteTeamId: string): void {
-    const agentIds = new Set(remoteSnapshot.teams.find((team) => team.id === remoteTeamId)?.agentIds ?? []);
-    for (const request of remoteSnapshot.workRoutingRequests ?? []) {
-      if (agentIds.has(request.payload.request.agentId)) {
-        this.owners.set(request.id, { kind: 'workRouting', remoteConnectionId: connectionId });
-      }
-    }
-  }
 }
 
 function nonBlankRequestId(value: string | undefined): string | null {

@@ -11,7 +11,6 @@ const longRunningRequestMethods = new Set<string>([
   backendMethods.agentHistoryHydrate,
   backendMethods.agentHistoryLoadOlder,
   backendMethods.agentSelect,
-  backendMethods.workProviderItemCreate,
 ]);
 
 export function backendRequestTimeoutMs(method: string, defaultTimeoutMs: number): number {

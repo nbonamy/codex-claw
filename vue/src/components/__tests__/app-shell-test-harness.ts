@@ -119,7 +119,6 @@ export function mountShell(overrides: Partial<{
   loadAssignedWorkItems: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
   loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
-  createWorkItem: (input: import('@codex-claw/core/contracts').CreateWorkItemInput) => Promise<WorkItem>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
@@ -171,7 +170,6 @@ export function mountShell(overrides: Partial<{
       loadAssignedWorkItems: overrides.loadAssignedWorkItems ?? vi.fn().mockResolvedValue(undefined),
       loadGlobalWorkItems: overrides.loadGlobalWorkItems ?? vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 }),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
-      createWorkItem: overrides.createWorkItem ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),
       duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
       assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),

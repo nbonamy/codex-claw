@@ -634,27 +634,8 @@ describe('snapshot runtime reducer', () => {
     }
   });
 
-  it('processes routing and backlog updates without an envelope agent id', () => {
+  it('processes backlog updates without an envelope agent id', () => {
     const snapshot = createInitialSnapshot();
-    const request = {
-      id: 'work-routing-global',
-      kind: 'work_routing' as const,
-      payload: {
-        request: {
-          agentId: 'agent-dina',
-          task: 'Route globally',
-          suggestedBranchName: 'chore/route-globally',
-          sharedFolderAgentNames: [],
-        },
-      },
-    };
-
-    applyMainEventToSnapshot(snapshot, {
-      seq: 1,
-      type: 'workRouting.requested',
-      payload: request,
-      occurredAt: '2026-06-05T00:00:01.000Z',
-    });
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       type: 'workBacklog.assignmentUpdated',
@@ -683,7 +664,6 @@ describe('snapshot runtime reducer', () => {
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
-    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
     expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#global']).toStrictEqual({
       provider: 'github',
       itemId: 'nbonamy/codex-claw#global',
@@ -703,43 +683,6 @@ describe('snapshot runtime reducer', () => {
       status: 'readyForReview',
       note: 'Waiting for review',
     });
-  });
-
-  it('tracks app-owned work-routing requests outside the transcript', () => {
-    const snapshot = createInitialSnapshot();
-    const request = {
-      id: 'work-routing-1',
-      kind: 'work_routing' as const,
-      payload: {
-        request: {
-          agentId: 'agent-dina',
-          task: 'Add queue retries',
-          suggestedBranchName: 'feat/queue-retries',
-          sharedFolderAgentNames: [],
-        },
-      },
-    };
-
-    applyMainEventToSnapshot(snapshot, {
-      seq: 1,
-      agentId: 'agent-dina',
-      type: 'workRouting.requested',
-      payload: request,
-      occurredAt: '2026-06-05T00:00:01.000Z',
-    });
-
-    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
-    expect(snapshot.messages).toHaveLength(0);
-
-    applyMainEventToSnapshot(snapshot, {
-      seq: 2,
-      agentId: 'agent-dina',
-      type: 'workRouting.resolved',
-      payload: { id: 'work-routing-1' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-    });
-
-    expect(snapshot.workRoutingRequests).toStrictEqual([]);
   });
 
   it('preserves missing thread guards and rejects malformed payloads at the decoder boundary', () => {
@@ -787,42 +730,9 @@ describe('snapshot runtime reducer', () => {
     expect(snapshot.agents[0].contextUsage).toBe(contextUsage);
   });
 
-  it('rejects malformed work-routing and backlog payloads at the decoder boundary', () => {
+  it('rejects malformed backlog payloads at the decoder boundary', () => {
     const snapshot = createInitialSnapshot();
-    const routingRequests = snapshot.workRoutingRequests;
     const assignments = snapshot.workBacklog.assignments;
-
-    expect(() => decodeClawBackendEvent({
-      seq: 1,
-      type: 'workRouting.requested',
-      payload: {
-        id: 'malformed-request',
-        kind: 'work_routing',
-        payload: { request: { agentId: 'agent-dina' } },
-      },
-      occurredAt: '2026-06-05T00:00:01.000Z',
-    })).toThrow();
-    expect(snapshot.workRoutingRequests).toBe(routingRequests);
-
-    snapshot.workRoutingRequests = [{
-      id: 'work-routing-1',
-      kind: 'work_routing',
-      payload: {
-        request: {
-          agentId: 'agent-dina',
-          task: 'Keep this request',
-          suggestedBranchName: 'test/keep-request',
-          sharedFolderAgentNames: [],
-        },
-      },
-    }];
-    expect(() => decodeClawBackendEvent({
-      seq: 2,
-      type: 'workRouting.resolved',
-      payload: { id: 42 },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-    })).toThrow();
-    expect(snapshot.workRoutingRequests).toHaveLength(1);
 
     expect(() => decodeClawBackendEvent({
       seq: 3,

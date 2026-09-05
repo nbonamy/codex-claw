@@ -26,7 +26,6 @@ import type {
   SourceWorktree,
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus,
-  WorkRoutingRequest,
 } from '@codex-claw/core/contracts';
 import { createAgentInSnapshot, updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
@@ -34,7 +33,7 @@ import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type PrepareWorkInput, type PrepareWorkResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -67,7 +66,6 @@ export class ClawMcpService {
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
   private readonly promptInputMethodsByAgentId = new Map<string, SendPromptOptions['inputMethod']>();
-  private readonly workRoutingResolvers = new Map<string, (response: PrepareWorkResponse) => void>();
 
   constructor(options: ClawMcpServiceOptions) {
     this.snapshot = options.snapshot;
@@ -98,7 +96,6 @@ export class ClawMcpService {
       onListSourceWorktrees: (repoPath) => this.listSourceWorktrees(repoPath),
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
       onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
-      onPrepareWork: (agent, input) => this.prepareWorkForAgent(agent, input),
     });
     this.server = new ClawMcpHttpServer({
       coordinator: this.coordinator,
@@ -129,21 +126,7 @@ export class ClawMcpService {
   }
 
   stop(): Promise<void> {
-    for (const [requestId] of this.workRoutingResolvers) {
-      this.resolveWorkRoutingRequest(requestId, { mode: 'cancelled' });
-    }
     return this.server.stop();
-  }
-
-  resolveWorkRoutingRequest(requestId: string, response: PrepareWorkResponse): boolean {
-    const resolve = this.workRoutingResolvers.get(requestId);
-    if (!resolve) return false;
-    this.workRoutingResolvers.delete(requestId);
-    this.snapshot.workRoutingRequests = (this.snapshot.workRoutingRequests ?? [])
-      .filter((request) => request.id !== requestId);
-    this.emit({ type: 'workRouting.resolved', payload: { id: requestId } });
-    resolve(response);
-    return true;
   }
 
   sendMessage(fromAgentId: string, toAgentId: string, content: string): void {
@@ -585,33 +568,6 @@ export class ClawMcpService {
     });
   }
 
-  private prepareWorkForAgent(agent: Agent, input: PrepareWorkInput): Promise<PrepareWorkResponse> {
-    const id = createWorkRoutingRequestId();
-    const request: WorkRoutingRequest = {
-      id,
-      kind: 'work_routing',
-      payload: {
-        request: {
-          agentId: agent.id,
-          task: input.task,
-          suggestedBranchName: input.branchName ?? suggestedWorkBranch(input.task),
-          sharedFolderAgentNames: this.snapshot.agents
-            .filter((candidate) => candidate.id !== agent.id && candidate.folder === agent.folder)
-            .map((candidate) => agentDisplayName(candidate)),
-        },
-      },
-    };
-    this.snapshot.workRoutingRequests = [
-      ...(this.snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== id),
-      request,
-    ];
-    this.emit({ agentId: agent.id, type: 'workRouting.requested', payload: request });
-
-    return new Promise((resolve) => {
-      this.workRoutingResolvers.set(id, resolve);
-    });
-  }
-
   private emitWorkAssignmentUpdated(agentId: string, assignment: WorkBacklogAssignment): void {
     this.emit({
       agentId,
@@ -623,19 +579,6 @@ export class ClawMcpService {
   private emit(event: BackendEvent): void {
     this.eventSink?.(event);
   }
-}
-
-function createWorkRoutingRequestId(): string {
-  return `work-routing-${randomUUID()}`;
-}
-
-function suggestedWorkBranch(task: string): string {
-  const slug = task.toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '-')
-    .replace(/^-+|-+$/gu, '')
-    .slice(0, 48)
-    .replace(/-+$/gu, '');
-  return `work/${slug || 'task'}`;
 }
 
 function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {

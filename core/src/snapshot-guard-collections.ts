@@ -123,16 +123,6 @@ function isBackendPromptOptions(value: unknown): boolean {
     optional(value, 'permissionMode', isNullableString);
 }
 
-export function isWorkRoutingRequest(value: unknown): boolean {
-  if (!isRecord(value) || typeof value.id !== 'string' || value.kind !== 'work_routing' || !isRecord(value.payload)) return false;
-  const request = value.payload.request;
-  return isRecord(request) &&
-    typeof request.agentId === 'string' &&
-    typeof request.task === 'string' &&
-    typeof request.suggestedBranchName === 'string' &&
-    isArrayOf(request.sharedFolderAgentNames, isString);
-}
-
 export function isAgentGitStatus(value: unknown): boolean {
   return isRecord(value) &&
     typeof value.folder === 'string' &&

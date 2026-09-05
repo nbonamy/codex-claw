@@ -281,18 +281,6 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return pullRequest;
   }
 
-  async createItem(token: WorkProviderToken, repositoryId: string, input: { title: string; body: string }): Promise<WorkItem> {
-    const repository = parseRepositoryId(repositoryId);
-    if (!repository) throw new Error('The Git remote is not a GitHub repository.');
-    const response = await githubApiRequest(token, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/issues`, {
-      method: 'POST',
-      body: JSON.stringify({ title: input.title, body: input.body }),
-    });
-    const item = githubIssue(response, repositoryId, repository.fullName);
-    if (!item || item.kind !== 'issue') throw new Error('GitHub returned an invalid issue response.');
-    return item;
-  }
-
   private clientId(): string {
     const value = typeof this.clientIdProvider === 'function' ? this.clientIdProvider() : this.clientIdProvider;
     return typeof value === 'string' ? value.trim() : '';
