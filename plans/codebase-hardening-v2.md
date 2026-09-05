@@ -21,7 +21,7 @@ The execution order is:
 
 The authoritative planning state is the checked-out branch
 `chore/codebase-hardening-review` at
-`92551b034a1ee30602c9f3e4b649d38d931501b5` on 2026-09-05. Historical
+`b29854c` on 2026-09-05. Historical
 comparisons still start from the baselines below; future ledger entries start
 from this branch/commit unless a later row explicitly advances it.
 
@@ -37,6 +37,9 @@ from this branch/commit unless a later row explicitly advances it.
 | Last completed Phase 1 contract record | `66e1f28a692ea589b1e60ea1f1e08038f4cc2731` | `chore: record work contract extraction` |
 | Dead-workflow deletion on `main` | `a3673ec160134d3d12591316997adb8fa59b6354` | Canonical 84-file deletion checkpoint: 147 additions and 4,171 deletions |
 | Dead-workflow deletion on review branch | `92551b034a1ee30602c9f3e4b649d38d931501b5` | Cherry-pick adapted to retained contract owners: 86 files, 149 additions, and 4,188 deletions |
+| Skill-event regression fix on `main` | `fdb27e6e6f163807a205ef6e5315ef82007854ff` | Defensive Codex skill-summary normalization shared by list and event paths |
+| Skill-event regression fix on review branch | `b29854c` | Cherry-pick of the Claw fix over retained contract owners |
+| Companion SDK provider-boundary fix | `8fe46e3fdfff4723d965050924b63577ddd3bdf5` | Normalizes nullable app-server skill metadata to the SDK string-or-absent surface contract; validated locally but not pushed |
 
 At authoring time the only pre-existing working-tree modification was
 `plans/codebase-hardening.md`; it must be preserved. Contract checkpoint 5 had
@@ -115,6 +118,29 @@ typecheck; full lint including Stylelint and Knip (apart from Knip's existing
 `lipo knip.json Remove from ignoreBinaries` configuration hint); full
 `npm run test:ai` at 272 files / 2,046 tests (Core 45/282, Backend 60/583, Vue
 121/872, Electron 40/285, Web 6/24); and `git diff --check`.
+
+### Completed skill-event regression checkpoint
+
+A real Codex app-server `skills/list` response returned
+`interface.brandColor: null`. The generated SDK type and SDK surface contract
+promised string-or-absent, but the SDK mapper preserved the runtime `null`.
+Phase 1's strict Claw decoder correctly rejected the malformed
+`skills.changed` event: sequence 9 was dropped, and sequence 10 then triggered
+replica resynchronization rather than silently adopting an invalid payload.
+
+A 374ms red adapter-to-decoder test reproduced the provider payload through the
+real Claw event boundary. Claw commit
+`fdb27e6e6f163807a205ef6e5315ef82007854ff` now defensively normalizes skill
+metadata in one helper used by direct list and both event paths; review-branch
+cherry-pick `b29854c` preserves the same behavior over the retained contract
+owners. SDK commit `8fe46e3fdfff4723d965050924b63577ddd3bdf5`
+normalizes at the preferred provider boundary so its public surface fulfills
+the declared invariant. The SDK commit is locally validated but not pushed.
+
+Claw validation passed: full `npm run test:ai` at 271 files / 2,043 tests,
+lint, all-workspace typecheck, and unsigned Electron build. SDK validation
+passed: Backend 62 files / 1,146 tests, compatibility build, and documentation
+build.
 
 ### Existing measurements
 
@@ -781,6 +807,7 @@ the evidence columns is incomplete.
 | 2026-09-04 | Phase 0: provisional qualification | Complete | Review branch at `20a0b929…` | No ownership change; qualifies the branch provisionally before manual smoke and coverage remediation | `test:ai` 277 files / 2,103 tests passed; lint passed; unsigned build passed; cycles zero; benchmarks 7.1855 Hz Claw and 2.1666 Hz SDK; one 30.25s full-suite timing is not a median | — | Backend/Vue/Electron coverage debt and manual desktop smoke remain pending; this is not final qualification |
 | — | Phase 0: retained snapshot/event manual validation | Pending | — | — | — | — | Must include manual app smoke; provisional automated gates alone are insufficient |
 | 2026-09-05 | Phase 1: obsolete workflow vertical slices | Complete | `main` 84 files, +147/-4,171 -> review branch 86 files, +149/-4,188 after contract-owner adaptation | Removed orphan backlog; composer and complete create-item path; disabled work-routing; obsolete Claude CLI while retaining losslessly moved transport contracts | Focused Core 5/40, Backend 4/59, Vue App 1/5, backlog 3/41; typecheck; lint/Stylelint/Knip; `test:ai` 272 files / 2,046 tests; diff check | `a3673ec160134d3d12591316997adb8fa59b6354` on `main`; `92551b034a1ee30602c9f3e4b649d38d931501b5` here | Unsupported create-item/work-routing compatibility removed; normal parser ignores obsolete additive snapshot fields; live `create_agent`, Claude Agent SDK, and stdio preserved |
+| 2026-09-05 | Phase 1: nullable skill-event regression | Complete | Real app-server `interface.brandColor: null` -> string-or-absent app and SDK surfaces | One Claw normalization helper protects list/event paths; SDK provider boundary removes the upstream representation leak; strict event validation remains unchanged | 374ms red adapter-to-decoder reproduction; Claw `test:ai` 271/2,043, lint, typecheck, unsigned build; SDK Backend 62/1,146, compatibility and docs builds | Claw `fdb27e6e6f163807a205ef6e5315ef82007854ff`; review `b29854c`; SDK `8fe46e3fdfff4723d965050924b63577ddd3bdf5` local/not pushed | Sequence 9 rejection and sequence 10 resync proved strictness worked; generated types alone are not runtime evidence |
 | — | Phase 1: P1 Core dead code | Pending | — | — | — | — | — |
 | — | Phase 1: P1 adapter/UI dead code | Pending | — | — | — | — | — |
 | — | Phase 1: compatibility candidates | Pending | — | — | — | — | One producer/history audit per candidate |
@@ -846,6 +873,7 @@ LOC/file count rises without reducing decisions or coupling. Report at least:
 | Typed lint becomes suppression theater | Baseline by rule/file, classify trust boundaries, no blanket disables, fix typed maps/decoders first, count exceptions |
 | UI test speed improves by stubbing away integration | Keep direct real-owner tests plus named real-composition smokes; preserve assertion intent and manual smoke |
 | Manual validation is skipped because tests are green | Scenario decision and final qualification explicitly require desktop startup and critical workflow smokes |
+| Generated protocol types understate nullable runtime fields | Capture real or realistic provider fixtures at each trust boundary and prove normalized payloads pass the end-to-end app decoder |
 
 ## Lessons carried forward
 
@@ -866,3 +894,6 @@ LOC/file count rises without reducing decisions or coupling. Report at least:
    cannot justify a keep/revert decision.
 8. Plans must record “keep” and product-decision outcomes as carefully as
    deletions and commits, or the audit ceases to be exhaustive.
+9. Generated static types do not prove runtime wire shape. Trust-boundary work
+   needs captured or realistic fixtures for nullable optional fields and an
+   end-to-end assertion that the normalized payload passes the strict decoder.
