@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 14b active — route backend events exhaustively.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.4 slice 14c active — trust decoded backend events downstream.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -118,8 +118,8 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 13c: decode remote backend events.
 - [ ] Phase 1.4 slice 14: close event ownership and remove redundant guards.
 - [x] Phase 1.4 slice 14a: close the backend event union.
-- [ ] Phase 1.4 slice 14b: route backend events exhaustively. **Active.**
-- [ ] Phase 1.4 slice 14c: trust decoded backend events downstream.
+- [x] Phase 1.4 slice 14b: route backend events exhaustively.
+- [ ] Phase 1.4 slice 14c: trust decoded backend events downstream. **Active.**
 - [ ] Phase 1.4 slice 14d: simplify renderer event handling.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
@@ -168,13 +168,15 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 13b: local transport decoder adoption | Complete | local transport agent / root integrator | Electron `backend-rpc-session` and Web `backend-process` typed casts → one decode from `unknown` at each local notification ingress | 34 focused tests passed. Full `npm run test:ai`: 274 files / 2,092 tests in 26.48s (Core 275, Backend 613, Vue 897, Electron 285, Web 22). All-workspace typecheck, Stylelint, Knip, and diff checks passed | `b1058b2da5874955342703f87389f22635cccdb6` | Independent review found no defects. Malformed events are safely logged and dropped without publication; each transport remains usable for subsequent valid events. Existing malformed JSON and JSON-RPC framing behavior is unchanged |
 | 2026-09-04 | Phase 1.4 slice 13c: remote transport decoder adoption | Complete | remote transport agent / root integrator | All four production ingress seams now decode backend events exactly once; no shallow ingress guard or raw `ClawBackendEvent` cast remains except the decoder's validated return and one deliberate malformed fixture | Full `npm run test:ai`: 274 files / 2,095 tests in 24.97s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `0779e2a558713d29b6d10890daec5ded6a66d2ce` | Malformed remote events are safely logged and dropped while connections and pending requests survive; malformed framing behavior is unchanged. Review fixed Web parsing to preserve both outer-envelope and inner-event identity. Protocol and backend-architecture docs now describe all transport boundaries |
 | 2026-09-04 | Phase 1.4 slice 14a: close the backend event union | Complete | event ownership agent / root integrator | `contracts.ts` 2,263 → 2,140 lines; AST inventory proves 59 discriminated members / 55 unique keys with four provider duplicates and an exact disjoint 14 runtime + 24 conversation + four subagent + 13 renderer-only partition; typed union and envelope are byte-identical after removing only the fallback (`4b340028…`) | Full `npm run test:ai`: 275 files / 2,097 tests in 25.677s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed. Core coverage: 91.84% statements / 86.15% branches / 93.28% functions / 93.46% lines; ownership module: 100% | `06583fb3eabb3eed9f96b9bcf4c07d82d18e3e03` | No generic fallback, duplicate event-name union, obsolete typed/untyped alias, hidden cast, or weakened type remains; renderer-only events are explicit state-preserving no-ops and the dormant global approval-resolution no-op remains characterized. Repository-wide coverage remains pre-existing red and is not reported green: Backend 83.76% statements / 73.64% branches; Vue 88.12% statements / 79.87% branches; Electron 68.33% statements / 67.11% branches / 62.69% functions / 70.89% lines |
-| 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Active | root orchestrator | Closed 55-key ownership registry exists, but the top dispatcher and reducers still rely on handled booleans and fallthrough | Make the top dispatcher and each reducer exhaustive without handled booleans; preserve the explicit global `backendApproval.resolved` no-op and remove its misleading all-agent loop only as ownership cleanup; run direct-owner, façade, full-suite, typecheck, lint/Knip, cycle, and diff gates | — | Sole active checkpoint. Preserve behavior; semantic fixes remain separate and every relocation follows `lossless-code-moves` |
+| 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Complete | event routing agent / root integrator | The exact 55-key ownership partition routes 14 runtime, 24 conversation, four subagent, and 13 renderer-only events once; reducer inputs are exact owned subsets, return `void`, and close with compile-time `never`; façade invalidation and dispatch ordering remain unchanged | Focused 11 files / 89 tests; Core 44 / 279. Full `npm run test:ai`: 276 files / 2,099 tests in 26.09s. Core coverage: 91.48% statements / 85.83% branches / 93.28% functions / 93.25% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `6e14cfe3c72b8948dca3f341162c39e9d346fbef` | Independent review found no defects. The removed `thread.modeUpdated` runtime branch was unreachable behind renderer ownership; agent-less `backendApproval.resolved` remains an explicit no-op, while agent-scoped resolution still removes only that agent's approval |
+| 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Active | root orchestrator | Typed wire decoding is established at every ingress; downstream Core and backend handling still contains redundant structural guards and stale casts | Remove only redundant downstream Core/backend structural guards and stale casts after the decoder. Retain business, identity, normalization, and application-policy checks; prove direct-owner and façade behavior, then run full-suite, typecheck, lint/Knip, cycle, and diff gates | — | Sole active checkpoint. Preserve behavior and keep semantic fixes separate |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
 | 2026-09-04 | Phase 3.1: Electron backend replica manifest | Pending / prepared | root orchestrator | `AppController` 1,863 lines; replica responsibility about 205 lines / 29 conditionals; 47 full-snapshot and four metadata callers | Read-only snapshot/event replication and test-ownership audit complete; target owner is `electron-backend-replica.ts` | — | Execute three exact commits: `test: characterize electron backend replication`, `chore: extract electron backend replica`, `test: move electron backend replica specifications`. Preserve raw/transient identity, metadata-only cache, three-attempt sequence barrier, event/client-state/publication ordering, and renderer-only media projection; remote automation remains outside |
 | 2026-09-04 | Phase 3.2: Electron IPC registrar manifest | Pending / prepared | root orchestrator | `AppController` 1,863 lines / 155 methods; `registerIpcHandlers` 393 lines with 120 inline registrations plus nine existing Git registrations, for 129 total; preload 150 lines with 129 invokes and three subscriptions; six specs total 2,860 lines / 72 tests | Read-only registration, preload bridge, helper, and test-ownership audit complete; exact 129 invoke channels plus three subscriptions must remain covered | — | Execute seven exact commits: `test: characterize electron ipc surface`; `chore: extract connection work and source ipc`; `chore: extract agent and automation ipc`; `chore: extract native electron ipc registrars`; `chore: split electron ipc adapters`; `chore: compose typed preload bridge`; `test: move electron ipc ownership specifications`. Exclude private `updateAgentFolder`. Target registration composition at most 35 lines with zero inline handlers, `AppController` after 3.1+3.2 at most 650 lines, each registrar at most 22 channels / four ports / 300 lines, preload index at most 30 lines and modules at most 90, specs at most 400, with lossless handler/helper/test fidelity |
 | 2026-09-04 | Phase 4.1: constructible renderer state manifest | Pending / prepared | root orchestrator | `app-state.ts` 1,842 lines / 27 module-state bindings / 164 façade members; child stores total 1,215 lines; seven specs total 4,932 lines / 116 runtime cases, with 112 singleton imports and 111 global mutations | Read-only dependency, singleton, lifecycle, façade, and test-ownership audit complete; target owner is `createAppState(deps)` with seven ports for API, host, platform, celebration, onboarding, scheduler, and random behavior | — | Execute three exact commits: `chore: inject renderer state dependencies`; `chore: make renderer state constructible`; `test: isolate renderer state specifications`. Preserve fixed dependency identity and all 164 existing façade keys plus `dispose`; `dispose` cleans subscriptions and timers only. Prove AST/body fidelity and all 115 declarations / 116 runtime cases. Exit with a thin singleton wrapper at most 35 lines and zero singleton imports or global mutations in tests; defer domain splitting to Phase 4.2 |
+| 2026-09-04 | Phase 4.2: renderer state ownership manifest | Pending / prepared | root orchestrator | `app-state.ts` 1,842 lines / 164 façade members; function baselines: app 204, composer 76, history 14, unread 30, source 8, work 27; seven specs total 4,932 lines / 115 declarations / 116 runtime cases | Read-only state, command, projection, dependency, and test-ownership audit complete; target is eight acyclic domain namespaces plus `dispose`, with the replica as the sole writable snapshot and synchronization owner | — | Execute six exact commits: `chore: extract renderer replica state`; `chore: extract renderer conversation state`; `chore: extract renderer agent and workspace state`; `chore: extract renderer support state`; `test: move renderer state ownership specifications`; `chore: modularize renderer application state`. Preserve all 164 members with lossless AST/body/test hashes; temporary flat aliases exist only in commits 1–5 and disappear in commit 6. Target composition at 350–600 lines; replica four members / at most 400 lines, agents 24 / 450, conversation 58 / 650, workspace 20 / 350, Git nine / 110, work 18 / 400, automations seven / 180, system 24 / 300. No state module may exceed 700 lines, no spec 700 lines, and the composition spec stays at most 250. Domain modules do not import each other, use narrow ports, keep `isRemoteAutomationLocation` neutral, reuse the post-14d dispatcher, and do not touch AppShell |
 
 For each future row, include:
 
@@ -819,13 +821,16 @@ Execute four small commits:
    explicit renderer-only no-ops. The legacy fallback and obsolete typed and
    untyped aliases are gone; the remaining typed union and envelope are
    byte-identical to their previous definitions.
-2. `chore: route backend events exhaustively` — active. Make the top-level
-   dispatcher and deep reducers exhaustive without handled booleans. Preserve
-   the global `backendApproval.resolved` explicit no-op. Remove its misleading
-   all-agent loop only as ownership cleanup; do not bundle a behavior fix.
-3. `chore: trust decoded backend events` — remove redundant downstream Core and
-   backend structural guards and stale casts after decoding. Retain business,
-   identity, normalization, and application-policy checks.
+2. `chore: route backend events exhaustively` — completed in
+   `6e14cfe3c72b8948dca3f341162c39e9d346fbef`. The façade preserves stale
+   subagent invalidation and routing order while dispatching the exact 55-key
+   ownership partition once. Each reducer takes only its owned event subset,
+   returns `void`, and closes with compile-time `never`. The global
+   `backendApproval.resolved` no-op and agent-scoped resolution behavior remain
+   unchanged after removing the misleading all-agent loop.
+3. `chore: trust decoded backend events` — active. Remove redundant downstream
+   Core and backend structural guards and stale casts after decoding. Retain
+   business, identity, normalization, and application-policy checks.
 4. `chore: simplify renderer event handling` — make renderer dispatch
    exhaustive, remove redundant renderer guards and casts, and list ignored
    renderer events explicitly.
@@ -1093,12 +1098,43 @@ Commit checkpoint: `chore: make renderer state constructible`
 
 ### 4.2 Modularize renderer application state
 
-- Extract a deep renderer replica for backend-owned state.
-- Group commands and projections into fewer than ten domain namespaces.
-- Keep selection, synchronization, conversation, git, automation, and UI-only
-  state with their real owners.
-- Add direct composable tests instead of exercising all behavior through
-  AppShell.
+The prepared baseline remains `app-state.ts` at 1,842 lines and 164 façade
+members. Function inventories are app 204, composer 76, history 14, unread 30,
+source eight, and work 27. The seven related specifications total 4,932 lines,
+115 declarations, and 116 runtime cases.
+
+Replace the flat façade with eight acyclic domain namespaces plus `dispose`:
+
+- replica: four members and at most 400 lines;
+- agents: 24 members and at most 450 lines;
+- conversation: 58 members and at most 650 lines;
+- workspace: 20 members and at most 350 lines;
+- Git: nine members and at most 110 lines;
+- work: 18 members and at most 400 lines;
+- automations: seven members and at most 180 lines;
+- system: 24 members and at most 300 lines.
+
+The replica is the sole writable snapshot and synchronization owner. Domain
+modules do not import each other; compose them through narrow ports. Keep
+`isRemoteAutomationLocation` neutral and reuse the exhaustive renderer event
+dispatcher produced after Slice 14d. Do not touch AppShell in this checkpoint.
+
+Execute six exact checkpoints:
+
+1. `chore: extract renderer replica state`
+2. `chore: extract renderer conversation state`
+3. `chore: extract renderer agent and workspace state`
+4. `chore: extract renderer support state`
+5. `test: move renderer state ownership specifications`
+6. `chore: modularize renderer application state`
+
+Use lossless AST, function-body, and test-body hashes throughout. Preserve all
+164 façade members. Temporary flat compatibility aliases may exist only during
+commits one through five and must be removed in commit six. Exit with
+`app-state.ts` as a 350–600-line composition module, no state module above 700
+lines, no state spec above 700 lines, a composition spec at most 250 lines, and
+no dependency cycles, barrel modules, catch-all dependency bags, or duplicate
+snapshot owner.
 
 Commit checkpoint: `chore: modularize renderer application state`
 
