@@ -1,17 +1,12 @@
 import type {
   AgentSubagentTree,
   AppSnapshot,
+  SubagentActivityChange,
   SubagentIdentityChange,
+  SubagentOperationChange,
   SubagentStatusChange,
 } from './contracts';
 import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
-import {
-  isSubagentActivityKind,
-  isSubagentOperationKind,
-  isSubagentOperationLifecycle,
-  isSubagentOperationStatus,
-  isSubagentStatus,
-} from './subagent-values';
 
 export function applySubagentEventToSnapshot(
   snapshot: AppSnapshot,
@@ -43,22 +38,10 @@ export function applySubagentEventToSnapshot(
   void exhaustiveEvent;
 }
 
-function applySubagentOperationChange(snapshot: AppSnapshot, agentId: string, value: unknown): void {
-  if (!isRecord(value) || typeof value.rootConversationId !== 'string' || !isRecord(value.operation)) return;
+function applySubagentOperationChange(snapshot: AppSnapshot, agentId: string, value: SubagentOperationChange): void {
   const operation = value.operation;
-  if (
-    typeof operation.id !== 'string' ||
-    !isSubagentOperationKind(operation.kind) ||
-    !isSubagentOperationLifecycle(operation.lifecycle) ||
-    !isSubagentOperationStatus(operation.status) ||
-    typeof operation.senderConversationId !== 'string' ||
-    !Array.isArray(operation.receiverConversationIds) ||
-    operation.receiverConversationIds.some((id) => typeof id !== 'string') ||
-    typeof operation.occurredAt !== 'string'
-  ) return;
-
   const tree = ensureSubagentTree(snapshot, agentId, value.rootConversationId);
-  const receiverConversationIds = [...operation.receiverConversationIds] as string[];
+  const receiverConversationIds = [...operation.receiverConversationIds];
   tree.operations[operation.id] = {
     id: operation.id,
     ...(typeof operation.turnId === 'string' ? { turnId: operation.turnId } : {}),
@@ -73,12 +56,12 @@ function applySubagentOperationChange(snapshot: AppSnapshot, agentId: string, va
     occurredAt: operation.occurredAt,
   };
 
-  const agentStates = isRecord(value.agentStates) ? value.agentStates : {};
+  const agentStates = value.agentStates;
   const conversationIds = new Set([...receiverConversationIds, ...Object.keys(agentStates)]);
   for (const conversationId of conversationIds) {
     if (conversationId === value.rootConversationId) continue;
-    const state = isRecord(agentStates[conversationId]) ? agentStates[conversationId] : null;
-    const status = state && isSubagentStatus(state.status) ? state.status : null;
+    const state = agentStates[conversationId];
+    const status = state?.status ?? null;
     const existing = tree.nodes[conversationId];
     tree.nodes[conversationId] = {
       conversationId,
@@ -105,22 +88,8 @@ function applySubagentOperationChange(snapshot: AppSnapshot, agentId: string, va
   }
 }
 
-function applySubagentActivityChange(snapshot: AppSnapshot, agentId: string, value: unknown): void {
-  if (
-    !isRecord(value) ||
-    typeof value.rootConversationId !== 'string' ||
-    typeof value.parentConversationId !== 'string' ||
-    !isRecord(value.activity)
-  ) return;
+function applySubagentActivityChange(snapshot: AppSnapshot, agentId: string, value: SubagentActivityChange): void {
   const activity = value.activity;
-  if (
-    typeof activity.id !== 'string' ||
-    !isSubagentOperationLifecycle(activity.lifecycle) ||
-    !isSubagentActivityKind(activity.kind) ||
-    typeof activity.conversationId !== 'string' ||
-    typeof activity.agentPath !== 'string' ||
-    typeof activity.occurredAt !== 'string'
-  ) return;
   if (activity.conversationId === value.rootConversationId) return;
 
   const tree = ensureSubagentTree(snapshot, agentId, value.rootConversationId);
@@ -150,22 +119,12 @@ function applySubagentActivityChange(snapshot: AppSnapshot, agentId: string, val
   };
 }
 
-function applySubagentIdentityChange(snapshot: AppSnapshot, agentId: string, value: unknown): void {
-  if (
-    !isRecord(value) ||
-    typeof value.rootConversationId !== 'string' ||
-    typeof value.conversationId !== 'string'
-  ) return;
+function applySubagentIdentityChange(snapshot: AppSnapshot, agentId: string, value: SubagentIdentityChange): void {
   const tree = snapshot.subagentTrees[agentId];
   if (!tree || tree.rootConversationId !== value.rootConversationId) return;
   const existing = tree.nodes[value.conversationId];
   if (!existing) return;
-  const change: SubagentIdentityChange = {
-    rootConversationId: value.rootConversationId,
-    conversationId: value.conversationId,
-    ...(typeof value.agentNickname === 'string' ? { agentNickname: value.agentNickname } : {}),
-    ...(typeof value.agentRole === 'string' ? { agentRole: value.agentRole } : {}),
-  };
+  const change = value;
   const updatedNode = { ...existing };
   if (change.agentNickname) updatedNode.agentNickname = change.agentNickname;
   else delete updatedNode.agentNickname;
@@ -177,27 +136,16 @@ function applySubagentIdentityChange(snapshot: AppSnapshot, agentId: string, val
 function applySubagentStatusChange(
   snapshot: AppSnapshot,
   agentId: string,
-  value: unknown,
+  value: SubagentStatusChange,
   occurredAt: string,
 ): void {
-  if (
-    !isRecord(value) ||
-    typeof value.rootConversationId !== 'string' ||
-    typeof value.conversationId !== 'string' ||
-    !isSubagentStatus(value.status)
-  ) return;
   if (value.conversationId === value.rootConversationId) return;
 
   const tree = snapshot.subagentTrees[agentId];
   if (!tree || tree.rootConversationId !== value.rootConversationId) return;
   const existing = tree.nodes[value.conversationId];
   if (!existing) return;
-  const change: SubagentStatusChange = {
-    rootConversationId: value.rootConversationId,
-    conversationId: value.conversationId,
-    status: value.status,
-    ...(typeof value.statusMessage === 'string' ? { statusMessage: value.statusMessage } : {}),
-  };
+  const change = value;
   const updatedNode = {
     ...existing,
     status: change.status,
@@ -219,8 +167,4 @@ function ensureSubagentTree(snapshot: AppSnapshot, agentId: string, rootConversa
   };
   snapshot.subagentTrees[agentId] = created;
   return created;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

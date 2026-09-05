@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   createInitialSnapshot,
@@ -346,7 +347,7 @@ describe('snapshot runtime reducer', () => {
   it('also accepts the legacy flat account rate-limit payload', () => {
     const snapshot = createInitialSnapshot();
 
-    applyMainEventToSnapshot(snapshot, {
+    const event = decodeClawBackendEvent({
       seq: 1,
       type: 'account.rateLimitsUpdated',
       backend: 'codex',
@@ -367,9 +368,12 @@ describe('snapshot runtime reducer', () => {
         individualLimit: null,
         planType: 'pro',
         rateLimitReachedType: null,
+        rateLimits: 42,
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
+    if (event.type !== 'account.rateLimitsUpdated') throw new Error('Expected rate-limit event.');
+    applyMainEventToSnapshot(snapshot, event);
 
     expect(snapshot.accountRateLimits).toStrictEqual({
       limitId: 'codex',
@@ -738,16 +742,17 @@ describe('snapshot runtime reducer', () => {
     expect(snapshot.workRoutingRequests).toStrictEqual([]);
   });
 
-  it('preserves malformed owned events as no-ops', () => {
+  it('preserves missing thread guards and rejects malformed payloads at the decoder boundary', () => {
     const snapshot = createInitialSnapshot();
     const backendRuntimes = snapshot.backendRuntimes;
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 1,
+      backend: 'codex',
       type: 'backend.statusChanged',
       payload: { backend: 'invalid', status: 'running' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as SnapshotEventOwnedBy<'runtime'>);
+    })).toThrow();
     expect(snapshot.backendRuntimes).toBe(backendRuntimes);
 
     applyMainEventToSnapshot(snapshot, {
@@ -761,30 +766,33 @@ describe('snapshot runtime reducer', () => {
 
     const goal = snapshot.agents[0].goal;
     const contextUsage = snapshot.agents[0].contextUsage;
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 4,
       agentId: 'agent-dina',
+      threadId: 'thread-1',
       type: 'thread.goalUpdated',
       payload: { goal: { objective: 'missing fields' } },
       occurredAt: '2026-06-05T00:00:04.000Z',
-    } as unknown as SnapshotEventOwnedBy<'runtime'>);
-    applyMainEventToSnapshot(snapshot, {
+    })).toThrow();
+    expect(() => decodeClawBackendEvent({
       seq: 5,
       agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
       type: 'thread.tokenUsageUpdated',
       payload: { contextUsage: { totalTokens: 10 } },
       occurredAt: '2026-06-05T00:00:05.000Z',
-    } as unknown as SnapshotEventOwnedBy<'runtime'>);
+    })).toThrow();
     expect(snapshot.agents[0].goal).toBe(goal);
     expect(snapshot.agents[0].contextUsage).toBe(contextUsage);
   });
 
-  it('ignores malformed work-routing and backlog payloads at the runtime boundary', () => {
+  it('rejects malformed work-routing and backlog payloads at the decoder boundary', () => {
     const snapshot = createInitialSnapshot();
     const routingRequests = snapshot.workRoutingRequests;
     const assignments = snapshot.workBacklog.assignments;
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 1,
       type: 'workRouting.requested',
       payload: {
@@ -793,7 +801,7 @@ describe('snapshot runtime reducer', () => {
         payload: { request: { agentId: 'agent-dina' } },
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as SnapshotEventOwnedBy<'runtime'>);
+    })).toThrow();
     expect(snapshot.workRoutingRequests).toBe(routingRequests);
 
     snapshot.workRoutingRequests = [{
@@ -808,15 +816,15 @@ describe('snapshot runtime reducer', () => {
         },
       },
     }];
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 2,
       type: 'workRouting.resolved',
       payload: { id: 42 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as SnapshotEventOwnedBy<'runtime'>);
+    })).toThrow();
     expect(snapshot.workRoutingRequests).toHaveLength(1);
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 3,
       type: 'workBacklog.assignmentUpdated',
       payload: {
@@ -826,7 +834,7 @@ describe('snapshot runtime reducer', () => {
         assignedAt: '2026-06-05T00:00:03.000Z',
       },
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as SnapshotEventOwnedBy<'runtime'>);
+    })).toThrow();
     expect(snapshot.workBacklog.assignments).toBe(assignments);
   });
 });

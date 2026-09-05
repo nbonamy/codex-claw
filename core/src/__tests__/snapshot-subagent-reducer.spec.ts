@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import { createInitialSnapshot } from '../snapshot';
 import { applySubagentEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-subagent-reducer';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
@@ -258,7 +259,7 @@ describe('snapshot subagent reducer', () => {
     });
   });
 
-  it('keeps malformed and agentless subagent events as boundary no-ops', () => {
+  it('rejects malformed subagent payloads and keeps missing-agent events as reducer no-ops', () => {
     const snapshot = createInitialSnapshot();
     const subagentTrees = snapshot.subagentTrees;
     const malformedEvents = [
@@ -314,7 +315,8 @@ describe('snapshot subagent reducer', () => {
         payload: { rootConversationId: 'thread-root', conversationId: 'thread-child', status: 'invalid' },
         occurredAt: '2026-06-05T00:00:04.000Z',
       },
-      {
+    ];
+    const agentlessEvent = {
         seq: 5,
         backend: 'codex',
         threadId: 'thread-root',
@@ -329,10 +331,12 @@ describe('snapshot subagent reducer', () => {
           agentStates: {},
         },
         occurredAt: '2026-06-05T00:00:05.000Z',
-      },
-    ] as unknown as SnapshotEventOwnedBy<'subagent'>[];
+      } as unknown as SnapshotEventOwnedBy<'subagent'>;
 
-    for (const event of malformedEvents) applyMainEventToSnapshot(snapshot, event);
+    for (const event of malformedEvents) {
+      expect(() => decodeClawBackendEvent(event)).toThrow();
+    }
+    applyMainEventToSnapshot(snapshot, agentlessEvent);
 
     expect(snapshot.subagentTrees).toBe(subagentTrees);
     expect(snapshot.subagentTrees).toStrictEqual({});

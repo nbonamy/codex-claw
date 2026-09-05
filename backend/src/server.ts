@@ -2188,7 +2188,7 @@ export class ClawBackendServer {
   }
 
   private emitGitDiffPreviewForEvent(event: MainToRendererEvent): void {
-    if (event.type !== 'diff.updated' || !event.agentId || !isRecord(event.payload) || typeof event.payload.diff !== 'string' || !event.payload.diff.trim()) {
+    if (event.type !== 'diff.updated' || !event.agentId || !event.payload.diff?.trim()) {
       return;
     }
 

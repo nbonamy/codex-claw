@@ -4,16 +4,14 @@ import type {
   TurnGitDiff,
 } from './contracts';
 import {
-  askUserRequest,
-  confirmToolRequest,
   finiteNonNegativeInteger,
   isRecord,
   parseJsonPreview,
-  rendererToolPartUpdate,
   stringValue,
   toolStatusDescriptor,
   type ToolPart,
 } from './snapshot-conversation-payloads';
+import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 import {
   assistantMessageId,
   ensureAssistantMessage,
@@ -28,13 +26,10 @@ export function updateAssistantToolPart(
   snapshot: AppSnapshot,
   agentId: string,
   turnId: string,
-  payload: unknown,
+  payload: ConversationEventPayload<'item.updated'>,
   createdAt: string,
 ): void {
-  const update = rendererToolPartUpdate(payload);
-  if (!update) {
-    return;
-  }
+  const update = payload;
 
   let message = findAssistantMessageWithToolPart(snapshot, agentId, turnId, update.itemId) ?? findAssistantMessage(snapshot, agentId, turnId);
   let toolPart = message?.parts.find((part): part is ToolPart => {
@@ -93,13 +88,13 @@ export function updateAssistantToolPart(
     };
   }
 }
-export function updateAssistantTurnDiff(snapshot: AppSnapshot, agentId: string, turnId: string, payload: unknown): void {
-  if (!isRecord(payload)) {
-    return;
-  }
-
-  const addedLines = typeof payload.addedLines === 'number' ? payload.addedLines : 0;
-  const removedLines = typeof payload.removedLines === 'number' ? payload.removedLines : 0;
+export function updateAssistantTurnDiff(
+  snapshot: AppSnapshot,
+  agentId: string,
+  turnId: string,
+  payload: ConversationEventPayload<'diff.updated'>,
+): void {
+  const { addedLines, removedLines } = payload;
   if (!addedLines && !removedLines) {
     return;
   }
@@ -125,18 +120,19 @@ export function updateAssistantTurnDiff(snapshot: AppSnapshot, agentId: string, 
   });
 }
 
-export function updateTurnGitDiff(snapshot: AppSnapshot, turnId: string, payload: unknown, updatedAt: string): void {
-  if (!isRecord(payload)) {
-    return;
-  }
-
+export function updateTurnGitDiff(
+  snapshot: AppSnapshot,
+  turnId: string,
+  payload: ConversationEventPayload<'diff.updated'>,
+  updatedAt: string,
+): void {
   const addedLines = finiteNonNegativeInteger(payload.addedLines);
   const removedLines = finiteNonNegativeInteger(payload.removedLines);
   if (!addedLines && !removedLines) {
     return;
   }
 
-  const diff = typeof payload.diff === 'string' ? payload.diff : undefined;
+  const diff = payload.diff;
   const nextDiff: TurnGitDiff = {
     turnId,
     addedLines,
@@ -202,13 +198,10 @@ export function applyApprovalRequest(
   snapshot: AppSnapshot,
   agentId: string,
   turnId: string,
-  payload: unknown,
+  payload: ConversationEventPayload<'approval.requested'>,
   createdAt: string,
 ): void {
-  const request = confirmToolRequest(payload);
-  if (!request) {
-    return;
-  }
+  const request = payload;
 
   const confirmation = request.payload.confirmation;
   const toolPart = findPendingMcpToolPart(snapshot, agentId, turnId, confirmation.integrationId, confirmation.toolName);
@@ -261,13 +254,10 @@ export function applyToolInputRequest(
   snapshot: AppSnapshot,
   agentId: string,
   turnId: string,
-  payload: unknown,
+  payload: ConversationEventPayload<'toolInput.requested'>,
   createdAt: string,
 ): void {
-  const request = askUserRequest(payload);
-  if (!request) {
-    return;
-  }
+  const request = payload;
 
   const question = request.payload.request.questions[0];
   upsertAssistantToolPart(snapshot, agentId, turnId, {
@@ -315,3 +305,6 @@ export function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, t
 
   return exactMatch ?? (runningMcpTools.length === 1 ? runningMcpTools[0] : undefined);
 }
+
+type ConversationEventPayload<Type extends SnapshotEventOwnedBy<'conversation'>['type']> =
+  Extract<SnapshotEventOwnedBy<'conversation'>, { type: Type }>['payload'];

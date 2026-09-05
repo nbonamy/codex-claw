@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import {
   createInitialSnapshot,
 } from '../snapshot';
@@ -257,10 +258,10 @@ describe('snapshot reducer', () => {
     ]);
   });
 
-  it('handles tool item fallbacks, progress updates, and malformed payloads', () => {
+  it('handles tool item fallbacks and rejects malformed payloads at the decoder boundary', () => {
     const snapshot = createInitialSnapshot();
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 1,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -269,8 +270,8 @@ describe('snapshot reducer', () => {
       type: 'item.started',
       payload: { toolPart: { type: 'ignored' } },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
-    applyMainEventToSnapshot(snapshot, {
+    })).toThrow();
+    expect(() => decodeClawBackendEvent({
       seq: 2,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -279,7 +280,7 @@ describe('snapshot reducer', () => {
       type: 'item.updated',
       payload: { itemId: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    })).toThrow();
 
     expect(snapshot.messages).toHaveLength(0);
 

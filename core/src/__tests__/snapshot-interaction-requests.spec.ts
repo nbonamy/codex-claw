@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import {
   createInitialSnapshot,
 } from '../snapshot';
@@ -461,10 +462,10 @@ describe('snapshot reducer', () => {
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
   });
 
-  it('preserves malformed approval and input status fallbacks', () => {
+  it('rejects malformed approval and input payloads at the decoder boundary', () => {
     const snapshot = createInitialSnapshot();
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 1,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -472,11 +473,11 @@ describe('snapshot reducer', () => {
       type: 'backendApproval.requested',
       payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    })).toThrow();
     expect(snapshot.backendApprovals).toStrictEqual({});
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 2,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -485,11 +486,11 @@ describe('snapshot reducer', () => {
       type: 'approval.requested',
       payload: {},
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    })).toThrow();
     expect(snapshot.messages).toStrictEqual([]);
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'awaitingInput', detail: undefined });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 3,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -498,12 +499,9 @@ describe('snapshot reducer', () => {
       type: 'toolInput.requested',
       payload: {},
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    })).toThrow();
     expect(snapshot.messages).toStrictEqual([]);
-    expect(snapshot.agents[0].status).toStrictEqual({
-      type: 'awaitingInput',
-      detail: 'Waiting for user input',
-    });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
   });
 
   it('retains flat approval parsing and leaves agent-less global resolution dormant', () => {

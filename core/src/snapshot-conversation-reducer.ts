@@ -1,16 +1,11 @@
-import type { AppSnapshot, SendPromptOptions } from './contracts';
+import type { AppSnapshot } from './contracts';
 import {
   findAgentInSnapshot as findAgent,
   setAgentStatusInSnapshot as setAgentStatus,
 } from './agent-manager';
 import {
-  askUserRequest,
   backendApprovalRequest,
-  confirmToolRequest,
-  isRecord,
   promptAttachments,
-  rendererMessages,
-  rendererToolPart,
 } from './snapshot-conversation-payloads';
 import {
   appendCompactionMarker,
@@ -49,15 +44,11 @@ export function applyConversationEventToSnapshot(
   if (!event.agentId) return;
 
   if (event.type === 'thread.historyLoaded') {
-    const payload = event.payload as { messages?: unknown };
-    const messages = rendererMessages(payload.messages, event.agentId);
-    const replace = isRecord(event.payload) && event.payload.replace === true;
-    const preserveKnownTurns = isRecord(event.payload) && event.payload.preserveKnownTurns === true;
-    const preserveKnownMessages = isRecord(event.payload) && event.payload.preserveKnownMessages === true;
+    const messages = event.payload.messages.filter((message) => message.agentId === event.agentId);
     hydrateAgentMessages(snapshot, event.agentId, messages, {
-      preserveKnownMessages,
-      preserveKnownTurns,
-      replace,
+      preserveKnownMessages: event.payload.preserveKnownMessages === true,
+      preserveKnownTurns: event.payload.preserveKnownTurns === true,
+      replace: event.payload.replace === true,
     });
     return;
   }
@@ -109,7 +100,7 @@ export function applyConversationEventToSnapshot(
 
   if (event.type === 'message.delta') {
     if (!event.turnId) return;
-    const payload = event.payload as { delta?: unknown; itemId?: unknown; phase?: unknown };
+    const payload = event.payload;
     const agent = findAgent(snapshot, event.agentId);
     appendAssistantDeltaWithPlanFilter(
       snapshot,
@@ -117,18 +108,17 @@ export function applyConversationEventToSnapshot(
       agent,
       typeof event.threadId === 'string' ? event.threadId : undefined,
       event.turnId,
-      typeof payload.delta === 'string' ? payload.delta : '',
-      typeof payload.itemId === 'string' ? payload.itemId : undefined,
+      payload.delta,
+      payload.itemId,
       event.occurredAt,
-      payload.phase === 'commentary' || payload.phase === 'final_answer' ? payload.phase : undefined,
+      payload.phase,
     );
     return;
   }
 
   if (event.type === 'message.updated') {
-    const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
-    const [message] = rendererMessages([payload['message']], event.agentId);
-    if (!message) return;
+    const message = event.payload.message;
+    if (message.agentId !== event.agentId) return;
     const messageIndex = snapshot.messages.findIndex((candidate) => (
       candidate.agentId === event.agentId && candidate.id === message.id
     ));
@@ -139,9 +129,8 @@ export function applyConversationEventToSnapshot(
   }
 
   if (event.type === 'message.userSubmitted') {
-    const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
-    const [message] = rendererMessages([payload['message']], event.agentId);
-    if (message && !snapshot.messages.some((candidate) => candidate.id === message.id)) {
+    const message = event.payload.message;
+    if (message.agentId === event.agentId && !snapshot.messages.some((candidate) => candidate.id === message.id)) {
       snapshot.messages.push(message);
       pruneSupersededEmptyAssistantPlaceholders(snapshot, event.agentId);
     }
@@ -150,8 +139,8 @@ export function applyConversationEventToSnapshot(
 
   if (event.type === 'message.steer') {
     if (!event.turnId) return;
-    const payload = event.payload as { prompt?: unknown; attachments?: unknown };
-    if (typeof payload.prompt === 'string' && payload.prompt.trim()) {
+    const payload = event.payload;
+    if (payload.prompt.trim()) {
       appendSteerPrompt(
         snapshot,
         event.agentId,
@@ -165,50 +154,43 @@ export function applyConversationEventToSnapshot(
   }
 
   if (event.type === 'agent.promptQueued') {
-    const payload = event.payload as { id?: unknown; text?: unknown; options?: unknown; submitted?: unknown };
-    if (typeof payload.id === 'string' && typeof payload.text === 'string') {
-      const queuedPrompts = snapshot.queuedPrompts ?? [];
-      if (!queuedPrompts.some((prompt) => prompt.agentId === event.agentId && prompt.id === payload.id)) {
-        snapshot.queuedPrompts = [...queuedPrompts, {
-          id: payload.id,
-          agentId: event.agentId,
-          text: payload.text,
-          createdAt: event.occurredAt,
-          ...(payload.options ? { options: payload.options as SendPromptOptions } : {}),
-          ...(payload.submitted === true ? { submitted: true } : {}),
-        }];
-      }
+    const payload = event.payload;
+    const queuedPrompts = snapshot.queuedPrompts ?? [];
+    if (!queuedPrompts.some((prompt) => prompt.agentId === event.agentId && prompt.id === payload.id)) {
+      snapshot.queuedPrompts = [...queuedPrompts, {
+        id: payload.id,
+        agentId: event.agentId,
+        text: payload.text,
+        createdAt: event.occurredAt,
+        ...(payload.options ? { options: payload.options } : {}),
+        ...(payload.submitted === true ? { submitted: true } : {}),
+      }];
     }
     return;
   }
 
   if (event.type === 'agent.promptRetryScheduled') {
-    const payload = event.payload as { id?: unknown; attempts?: unknown; lastError?: unknown; retryAt?: unknown };
+    const payload = event.payload;
     const queuedPrompt = (snapshot.queuedPrompts ?? []).find((prompt) => (
       prompt.agentId === event.agentId && prompt.id === payload.id
     ));
     if (
-      queuedPrompt &&
-      typeof payload.attempts === 'number' &&
-      typeof payload.lastError === 'string'
+      queuedPrompt
     ) {
       queuedPrompt.attempts = payload.attempts;
       queuedPrompt.lastError = payload.lastError;
       queuedPrompt.submitted = true;
-      if (typeof payload.retryAt === 'string') queuedPrompt.retryAt = payload.retryAt;
+      if (payload.retryAt !== undefined) queuedPrompt.retryAt = payload.retryAt;
       else delete queuedPrompt.retryAt;
     }
     return;
   }
 
   if (event.type === 'agent.promptDequeued') {
-    const payload = event.payload as { ids?: unknown };
-    if (Array.isArray(payload.ids)) {
-      const ids = new Set(payload.ids.filter((id): id is string => typeof id === 'string'));
-      snapshot.queuedPrompts = (snapshot.queuedPrompts ?? []).filter((prompt) => (
-        prompt.agentId !== event.agentId || !ids.has(prompt.id)
-      ));
-    }
+    const ids = new Set(event.payload.ids);
+    snapshot.queuedPrompts = (snapshot.queuedPrompts ?? []).filter((prompt) => (
+      prompt.agentId !== event.agentId || !ids.has(prompt.id)
+    ));
     return;
   }
 
@@ -250,10 +232,7 @@ export function applyConversationEventToSnapshot(
 
   if (event.type === 'item.started' || event.type === 'item.completed') {
     if (!event.turnId) return;
-    const toolPart = rendererToolPart(event.payload.toolPart);
-    if (toolPart) {
-      upsertAssistantToolPart(snapshot, event.agentId, event.turnId, toolPart, event.occurredAt);
-    }
+    upsertAssistantToolPart(snapshot, event.agentId, event.turnId, event.payload.toolPart, event.occurredAt);
     return;
   }
 
@@ -273,10 +252,10 @@ export function applyConversationEventToSnapshot(
   if (event.type === 'approval.requested') {
     if (!event.turnId) return;
     applyApprovalRequest(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
-    const confirmation = confirmToolRequest(event.payload);
+    const confirmation = event.payload;
     setAgentStatus(snapshot, event.agentId, {
       type: 'awaitingInput',
-      detail: confirmation?.payload.confirmation.summary,
+      detail: confirmation.payload.confirmation.summary,
     });
     return;
   }
@@ -284,10 +263,10 @@ export function applyConversationEventToSnapshot(
   if (event.type === 'toolInput.requested') {
     if (!event.turnId) return;
     applyToolInputRequest(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
-    const request = askUserRequest(event.payload);
+    const request = event.payload;
     setAgentStatus(snapshot, event.agentId, {
       type: 'awaitingInput',
-      detail: request?.payload.request.questions[0]?.question ?? 'Waiting for user input',
+      detail: request.payload.request.questions[0]?.question ?? 'Waiting for user input',
     });
     return;
   }
@@ -305,7 +284,7 @@ export function applyConversationEventToSnapshot(
   }
 
   if (event.type === 'error') {
-    const message = typeof event.payload.message === 'string' ? event.payload.message : 'Backend error';
+    const message = event.payload.message;
     if (event.payload.willRetry === true) {
       setAgentStatus(snapshot, event.agentId, { type: 'working', detail: message });
       return;

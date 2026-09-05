@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import {
   createInitialSnapshot,
 } from '../snapshot';
@@ -131,7 +132,7 @@ describe('snapshot reducer', () => {
     });
   });
 
-  it('sanitizes partial plan updates before storing them on the agent', () => {
+  it('normalizes plan whitespace and rejects malformed plans at the decoder boundary', () => {
     const snapshot = createInitialSnapshot();
 
     applyMainEventToSnapshot(snapshot, {
@@ -144,13 +145,12 @@ describe('snapshot reducer', () => {
       payload: {
         explanation: ' ',
         plan: [
-          null,
           { step: ' ', status: 'completed' },
-          { step: 'Use fallback status', status: 'unknown' },
+          { step: 'Use fallback status', status: 'pending' },
         ],
       },
       occurredAt: '2026-06-05T00:00:00.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    });
 
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
@@ -165,7 +165,7 @@ describe('snapshot reducer', () => {
       updatedAt: '2026-06-05T00:00:00.000Z',
     });
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 1,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -174,7 +174,7 @@ describe('snapshot reducer', () => {
       type: 'turn.planUpdated',
       payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    })).toThrow();
 
     expect(snapshot.agents[0].plan?.turnId).toBe('turn-plan');
   });

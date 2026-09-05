@@ -4,7 +4,8 @@ import type {
   ThreadPlan,
   ThreadPlanStep,
 } from './contracts';
-import { isRecord, type ToolPart } from './snapshot-conversation-payloads';
+import type { ToolPart } from './snapshot-conversation-payloads';
+import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 import {
   appendAssistantDelta,
   findAssistantMessageWithToolPart,
@@ -20,20 +21,16 @@ export function formatThreadPlanMarkdown(input: Pick<ThreadPlan, 'explanation' |
 
   return [explanation, ...steps].filter(Boolean).join('\n');
 }
-export function threadPlan(payload: unknown, threadId: string, turnId: string, updatedAt: string): ThreadPlan | null {
-  if (!isRecord(payload)) {
-    return null;
-  }
-
-  const explanation = typeof payload.explanation === 'string' && payload.explanation.trim()
+export function threadPlan(
+  payload: ConversationEventPayload<'turn.planUpdated'>,
+  threadId: string,
+  turnId: string,
+  updatedAt: string,
+): ThreadPlan | null {
+  const explanation = payload.explanation?.trim()
     ? payload.explanation.trim()
     : '';
-  const plan = Array.isArray(payload.plan) ? payload.plan : [];
-  const steps = plan.map((entry): ThreadPlanStep | null => {
-    if (!isRecord(entry) || typeof entry.step !== 'string') {
-      return null;
-    }
-
+  const steps = payload.plan.map((entry): ThreadPlanStep | null => {
     const step = entry.step.trim();
     if (!step) {
       return null;
@@ -41,7 +38,7 @@ export function threadPlan(payload: unknown, threadId: string, turnId: string, u
 
     return {
       step,
-      status: isThreadPlanStepStatus(entry.status) ? entry.status : 'pending',
+      status: entry.status,
     };
   }).filter((step): step is ThreadPlanStep => Boolean(step));
 
@@ -68,7 +65,10 @@ export function executionThreadPlanStatus(steps: ThreadPlanStep[]): ThreadPlan['
     : 'inProgress';
 }
 
-export function finalizedThreadPlanStatus(plan: ThreadPlan, payload: unknown): ThreadPlan['status'] {
+export function finalizedThreadPlanStatus(
+  plan: ThreadPlan,
+  payload: ConversationEventPayload<'turn.completed'>,
+): ThreadPlan['status'] {
   const turnStatus = turnCompletionStatus(payload);
   if (turnStatus === 'interrupted') return 'interrupted';
   if (turnStatus === 'failed') return 'failed';
@@ -77,26 +77,23 @@ export function finalizedThreadPlanStatus(plan: ThreadPlan, payload: unknown): T
     : 'incomplete';
 }
 
-export function turnCompletionStatus(payload: unknown): string {
-  if (!isRecord(payload)) return '';
-  if (typeof payload.status === 'string') return payload.status;
-  return isRecord(payload.turn) && typeof payload.turn.status === 'string'
-    ? payload.turn.status
-    : '';
-}
-
-export function isThreadPlanStepStatus(value: unknown): value is ThreadPlanStep['status'] {
-  return value === 'pending' || value === 'inProgress' || value === 'completed';
+export function turnCompletionStatus(
+  payload: ConversationEventPayload<'turn.completed'>,
+): string {
+  if ('status' in payload && typeof payload.status === 'string') {
+    return payload.status;
+  }
+  return 'turn' in payload ? payload.turn.status : '';
 }
 
 export function appendAgentPlanMarkdownDelta(
   agent: Agent | undefined,
   threadId: string,
   turnId: string,
-  payload: unknown,
+  payload: ConversationEventPayload<'turn.proposedPlanDelta'>,
   updatedAt: string,
 ): void {
-  if (!isRecord(payload) || typeof payload.delta !== 'string' || !payload.delta) {
+  if (!payload.delta) {
     return;
   }
 
@@ -112,13 +109,9 @@ export function updateAgentPlanMarkdown(
   agent: Agent | undefined,
   threadId: string,
   turnId: string,
-  payload: unknown,
+  payload: ConversationEventPayload<'turn.proposedPlanCompleted'>,
   updatedAt: string,
 ): void {
-  if (!isRecord(payload) || typeof payload.markdown !== 'string') {
-    return;
-  }
-
   if (!agent) {
     return;
   }
@@ -303,3 +296,6 @@ export function planProgressToolPartId(turnId: string): string {
 export function planLineCount(markdown: string): number {
   return markdown.split(/\r?\n/).filter((line) => line.trim()).length;
 }
+
+type ConversationEventPayload<Type extends SnapshotEventOwnedBy<'conversation'>['type']> =
+  Extract<SnapshotEventOwnedBy<'conversation'>, { type: Type }>['payload'];

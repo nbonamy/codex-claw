@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import { updateAgentFolder } from '../agent-manager';
 import {
   applyMainEventToSnapshot,
@@ -21,24 +22,25 @@ describe('snapshot reducer', () => {
     } as unknown as MainToRendererEvent);
     expect(snapshot.messages).toHaveLength(0);
 
-    applyMainEventToSnapshot(snapshot, {
+    expect(() => decodeClawBackendEvent({
       seq: 2,
       agentId: 'agent-dina',
+      backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-with-empty-delta',
       type: 'message.delta',
       payload: { delta: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    })).toThrow();
     expect(snapshot.messages).toHaveLength(0);
 
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
       type: 'error',
-      payload: {},
+      payload: { message: 'Backend error' },
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as MainToRendererEvent);
+    });
 
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Backend error' });
     expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Backend error' }]);

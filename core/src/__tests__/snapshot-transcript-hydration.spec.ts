@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decodeClawBackendEvent } from '../backend-protocol/events';
 import {
   appendUserPrompt,
   createInitialSnapshot,
@@ -545,25 +546,17 @@ describe('snapshot reducer', () => {
     ]);
   });
 
-  it('ignores malformed resumed history payloads', () => {
+  it('rejects malformed history at decoding and filters messages owned by another agent', () => {
     const snapshot = createInitialSnapshot();
     appendUserPrompt(snapshot, 'agent-dina', 'keep me', '2026-06-05T00:00:03.000Z');
 
-    applyMainEventToSnapshot(snapshot, {
+    const malformedEvent = {
       seq: 1,
       agentId: 'agent-dina',
       threadId: 'thread-1',
       type: 'thread.historyLoaded',
       payload: {
         messages: [
-          {
-            id: 'wrong-agent-message',
-            agentId: 'agent-jesse',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:02.000Z',
-            parts: [{ type: 'text', text: 'wrong agent' }],
-          },
           {
             id: 'bad-role-message',
             agentId: 'agent-dina',
@@ -599,7 +592,25 @@ describe('snapshot reducer', () => {
         ],
       },
       occurredAt: '2026-06-05T00:00:04.000Z',
-    } as unknown as SnapshotEventOwnedBy<'conversation'>);
+    };
+    expect(() => decodeClawBackendEvent(malformedEvent)).toThrow();
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 2,
+      agentId: 'agent-dina',
+      type: 'thread.historyLoaded',
+      payload: {
+        messages: [{
+          id: 'wrong-agent-message',
+          agentId: 'agent-jesse',
+          role: 'assistant',
+          status: 'complete',
+          createdAt: '2026-06-05T00:00:02.000Z',
+          parts: [{ type: 'text', text: 'wrong agent' }],
+        }],
+      },
+      occurredAt: '2026-06-05T00:00:05.000Z',
+    });
 
     expect(snapshot.messages).toStrictEqual([
       {
