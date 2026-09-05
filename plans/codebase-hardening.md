@@ -91,7 +91,7 @@ backend request and event boundaries are stable.
 - [x] Phase 0.1: resolve the update-badge change separately.
 - [x] Phase 0.2: align stale architecture documentation.
 - [x] Phase 0.3: split oversized test suites along ownership boundaries.
-- [ ] Phase 1: harden core state and contracts. **Phase 1.5 checkpoint 1 active — extract shared repository contracts.**
+- [ ] Phase 1: harden core state and contracts. **Phase 1.5 checkpoint 2 active — extract backend contracts.**
 - [x] Phase 1.1: consolidate agent state ownership.
 - [x] Phase 1.2: extract snapshot construction.
 - [x] Phase 1.3: extract deep snapshot reducers.
@@ -121,7 +121,10 @@ backend request and event boundaries are stable.
 - [x] Phase 1.4 slice 14b: route backend events exhaustively.
 - [x] Phase 1.4 slice 14c: trust decoded backend events downstream.
 - [x] Phase 1.4 slice 14d: simplify renderer event handling.
-- [ ] Phase 1.5: split contract domains. **Checkpoint 1 active — extract shared repository contracts.**
+- [ ] Phase 1.5: split contract domains. **Checkpoint 2 active — extract backend contracts.**
+- [x] Phase 1.5 checkpoint 1: extract shared repository contracts.
+- [ ] Phase 1.5 checkpoint 2: extract backend contracts.
+- [ ] Phase 1 decision gate: review Phase 1 outcomes with Nicolas and obtain explicit approval before any Phase 2 implementation.
 - [ ] Phase 2: modularize backend request, event, and persistence ownership.
 - [ ] Phase 3: reduce Electron to focused desktop adapters.
 - [ ] Phase 4: modularize renderer state and slim AppShell.
@@ -171,8 +174,9 @@ row is not complete.
 | 2026-09-04 | Phase 1.4 slice 14a: close the backend event union | Complete | event ownership agent / root integrator | `contracts.ts` 2,263 → 2,140 lines; AST inventory proves 59 discriminated members / 55 unique keys with four provider duplicates and an exact disjoint 14 runtime + 24 conversation + four subagent + 13 renderer-only partition; typed union and envelope are byte-identical after removing only the fallback (`4b340028…`) | Full `npm run test:ai`: 275 files / 2,097 tests in 25.677s. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed. Core coverage: 91.84% statements / 86.15% branches / 93.28% functions / 93.46% lines; ownership module: 100% | `06583fb3eabb3eed9f96b9bcf4c07d82d18e3e03` | No generic fallback, duplicate event-name union, obsolete typed/untyped alias, hidden cast, or weakened type remains; renderer-only events are explicit state-preserving no-ops and the dormant global approval-resolution no-op remains characterized. Repository-wide coverage remains pre-existing red and is not reported green: Backend 83.76% statements / 73.64% branches; Vue 88.12% statements / 79.87% branches; Electron 68.33% statements / 67.11% branches / 62.69% functions / 70.89% lines |
 | 2026-09-04 | Phase 1.4 slice 14b: route backend events exhaustively | Complete | event routing agent / root integrator | The exact 55-key ownership partition routes 14 runtime, 24 conversation, four subagent, and 13 renderer-only events once; reducer inputs are exact owned subsets, return `void`, and close with compile-time `never`; façade invalidation and dispatch ordering remain unchanged | Focused 11 files / 89 tests; Core 44 / 279. Full `npm run test:ai`: 276 files / 2,099 tests in 26.09s. Core coverage: 91.48% statements / 85.83% branches / 93.28% functions / 93.25% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `6e14cfe3c72b8948dca3f341162c39e9d346fbef` | Independent review found no defects. The removed `thread.modeUpdated` runtime branch was unreachable behind renderer ownership; agent-less `backendApproval.resolved` remains an explicit no-op, while agent-scoped resolution still removes only that agent's approval |
 | 2026-09-04 | Phase 1.4 slice 14c: trust decoded backend events downstream | Complete | downstream event agent / root integrator | Production downstream handling: 5,462 → 5,033 lines, net -429; 23 redundant structural helpers removed; 63 / 63 runtime cases retained | Full `npm run test:ai`: 276 files / 2,099 tests in 24.81s. Core coverage: 91.75% statements / 85.18% branches / 93.21% functions / 93.57% lines. Backend's known coverage debt remains explicit at 83.78% / 73.57% / 87.95% / 85.70% across 614 tests. All-workspace typecheck, lint, Knip, Madge, and diff checks passed | `3bc7ca4af524ad69ea891e900b0d5a7591deadee` | All audited policy, security, identity, normalization, malformed-input, and compatibility gates remain. Only post-decoder structural duplication and stale casts were removed; renderer simplification is the sole active checkpoint |
-| 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Complete | renderer event agent / root integrator | Renderer event production 4,330 → 4,291 lines, net -39; ten redundant validators removed; exact 13 / 13 renderer event switch retained; the typed client bypass remains the only non-decoded application boundary | Full `npm run test:ai`: 276 files / 2,099 tests in 26.44s. Vue's known global coverage debt remains explicit at 88.19% statements / 79.83% branches / 89.42% functions / 90.51% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `34d439bb8942922917f51e8bac92e1b299cf66a0` | Renderer dispatch is exhaustive and decoded event payloads are trusted without redundant structural guards. Ordering, state policy, source-less compatibility, typed client bypass behavior, and ignored renderer events remain unchanged; Phase 1.5 checkpoint one is now the sole active checkpoint |
-| 2026-09-04 | Phase 1.5: contract-domain manifest | Active / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Execute the 14 exact commits in the Phase 1.5 section, beginning with `chore: extract shared repository contracts`. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
+| 2026-09-04 | Phase 1.4 slice 14d: simplify renderer event handling | Complete | renderer event agent / root integrator | Renderer event production 4,330 → 4,291 lines, net -39; ten redundant validators removed; exact 13 / 13 renderer event switch retained; the typed client bypass remains the only non-decoded application boundary | Full `npm run test:ai`: 276 files / 2,099 tests in 26.44s. Vue's known global coverage debt remains explicit at 88.19% statements / 79.83% branches / 89.42% functions / 90.51% lines. All-workspace typecheck, lint, Stylelint, Knip, Madge, and diff checks passed | `34d439bb8942922917f51e8bac92e1b299cf66a0` | Renderer dispatch is exhaustive and decoded event payloads are trusted without redundant structural guards. Ordering, state policy, source-less compatibility, typed client bypass behavior, and ignored renderer events remain unchanged; Phase 1.5 contract extraction followed |
+| 2026-09-04 | Phase 1.5: contract-domain manifest | Active / prepared | root orchestrator | `contracts.ts`: 2,140 lines; 214 exports plus 28 private declarations = 242 symbols; `CodexClawApi`: 132 members; 55 event keys; 317 consumers across Core 62 / Backend 73 / Electron 27 / Vue 152 / Web 3 | Read-only declaration, runtime-identity, API-signature, event-ownership, consumer, dependency, and move-order audit complete | — | Checkpoint 1 is complete; checkpoint 2, `chore: extract backend contracts`, is active. Preserve 214 exports, 28 private declarations, seven runtime constant identities, 132 API signatures, and the 55-key event registry. Exit with a barrel below 30 lines, zero internal barrel imports, no cycles, and every target module within its recorded size bound |
+| 2026-09-04 | Phase 1.5 checkpoint 1: extract shared repository contracts | Complete | contract-domain agent / root integrator | Exact ownership: shared five declarations / 12 lines, Git 19 / 112, workspace 12 / 86, connections 10 / 75; compatibility barrel 2,140 → 1,961 lines | All 46 moved declarations retained byte-identical source and normalized AST hashes; all 196 remaining declarations and 28 private aliases stayed exact; the barrel retained the same 214 exports and all 317 audited consumers remained untouched. Focused 3 tests and Core 45 files / 282 tests passed. Full `npm run test:ai`: 277 files / 2,102 tests. All-workspace typecheck, lint, Stylelint, Knip, static import inventory, Madge, and diff checks passed | `469d19aaf44d6fc2ff4cd383e61d3460bc8d3e0d` | Independent review found no defects. All four owners are type-only acyclic leaves with exact assigned export surfaces; no runtime value moved and compatibility imports/re-exports remain honest. Checkpoint 2 is now the sole active checkpoint |
 | 2026-09-04 | Phase 2.1: source workspace request manifest | Pending | root orchestrator | Prepared future move: `driver-rpc.ts` 466 lines / 47 cases, including 11 source/file/worktree cases; `server.ts` 2,759 lines / 102 cases; typed protocol baseline corrected to 12/156 methods | Read-only request, protocol, authority, filesystem-security, and test inventory complete | — | Introduce a deep source-workspace request owner with parsing, authoritative agent-folder resolution, local/remote routing, initialization, persistence, and error policy; retain filesystem confinement, symlink protection, size caps, remote stripping, and shared worktree ownership. Target driver dispatch 47 → 36 cases, server ≤93 cases, and typed protocol 23/154 after removing two obsolete internal file methods. Execute only after Phase 1 |
 | 2026-09-04 | Phase 2.6: backend event coordination manifest | Pending / prepared | root orchestrator | `server.ts` currently owns about 299 event-coordination lines across 20 methods and six helpers; target owner is `backend/src/events/backend-event-coordinator.ts` | Read-only event ingestion, publication, persistence, remote forwarding, transcript, and lifecycle audit complete; implementation waits for the Phase 2 routing and source-workspace seams | — | Execute as four commits: `test: characterize backend event coordination`; `chore: extract backend event publication`; `chore: extract backend event coordination`; `test: move backend event ownership specifications`. Preserve event ordering, persistence-before-publication, remote projection/forwarding, and transcript invariants. Every substantial move uses `lossless-code-moves` with byte/AST fidelity. Exit: remove at least 290 net lines from `server.ts`, coordinator below 450 lines, and server event specs at or below 180 lines |
 | 2026-09-04 | Phase 2.7: persistence codec manifest | Pending / prepared | root orchestrator | `backend/src/state-persistence.ts`: 1,357 lines / 71 functions / 81 `if` statements; main spec: 1,269 lines / 32 tests plus seven state-spec tests | Read-only codec, migration, recovery, topology, and test-ownership audit complete; split owners by app-state, agent, subagent, work, topology, and codec-values while retaining the load/save façade | — | Execute the seven recorded commits in order with declaration and test-body hashes for every lossless move. Preserve shape-based migrations, semantic recovery, and current invalid-JSON propagation. Exit: façade ≤140 lines, app-state ≤200, agent/work ≤450, topology ≤220, subagent ≤150, and every spec ≤600 lines |
@@ -839,7 +843,7 @@ Execute four small commits:
    shrank from 5,462 to 5,033 lines, removing 23 redundant structural helpers
    while retaining all 63 runtime cases and every audited policy, security,
    identity, normalization, malformed-input, and compatibility gate.
-4. `chore: simplify renderer event handling` — active. Make renderer dispatch
+4. `chore: simplify renderer event handling` — complete. Make renderer dispatch
    exhaustive, remove redundant renderer guards and casts, and list ignored
    renderer events explicitly.
 
@@ -931,7 +935,7 @@ exact; prompt, host-API, decoder, and ownership boundaries remain intact; and
 focused contract/runtime tests, full tests, all-workspace typecheck,
 lint/Stylelint/Knip, Madge, and diff checks are green.
 
-Active commit checkpoint: `chore: extract shared repository contracts`
+Active commit checkpoint: `chore: extract backend contracts`
 
 ### Phase 1 exit criteria
 
@@ -941,6 +945,37 @@ Active commit checkpoint: `chore: extract shared repository contracts`
 - Agent mutation policy has one owner.
 - Direct module tests own detailed behavior; façade tests cover composition.
 - `npm run test:ai` passes.
+
+## Mandatory Phase 1 decision gate — stop before Phase 2
+
+Phase 1 completion does not authorize Phase 2 implementation. Stop execution
+after the Phase 1 exit gates and conduct a ruthless, evidence-based review of
+the entire phase with Nicolas before changing any Phase 2 production or test
+code.
+
+The review must:
+
+- verify every Phase 1 exit criterion against recorded evidence rather than
+  checkpoint status alone;
+- compare before/after LOC, module counts, public and private export counts,
+  interface sizes, dependency direction, and cycle results;
+- compare test counts and durations, direct-owner versus façade coverage, and
+  the known repository-wide coverage debt without describing a partially red
+  coverage gate as green;
+- inventory defects found and fixed during review, any regressions, and the
+  behavior or compatibility risks still being carried;
+- assess whether code navigation, ownership, locality, and module depth
+  improved enough to justify the additional files, imports, re-exports, and
+  plumbing; call out file proliferation, duplication, shallow pass-throughs,
+  or compatibility façades candidly;
+- inspect the complete Phase 1 diff and commit history for coherent,
+  independently reviewable changes and identify residual technical debt or
+  transitional architecture;
+- present a candid recommendation to **continue**, **reduce**, or **stop** the
+  hardening program, with the evidence and tradeoffs behind that recommendation.
+
+Wait for Nicolas's explicit decision. Do not begin Phase 2 implementation
+until he approves continuing past this gate.
 
 ## Phase 2 — Backend orchestration
 
