@@ -5,7 +5,8 @@ import {
   selectAgent,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { MainToRendererEvent, RendererMessage } from '../contracts';
+import type { RendererMessage } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   commandToolPart,
   toolPartPayload,
@@ -129,7 +130,7 @@ describe('snapshot reducer', () => {
         }],
       },
       occurredAt: '2026-06-05T00:00:06.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.messages.map((message) => message.id)).toStrictEqual(['older-page', 'genuine-tail']);
   });
@@ -598,7 +599,7 @@ describe('snapshot reducer', () => {
         ],
       },
       occurredAt: '2026-06-05T00:00:04.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.messages).toStrictEqual([
       {

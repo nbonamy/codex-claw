@@ -65,13 +65,16 @@ export type SnapshotEventTypeOwnedBy<Owner extends SnapshotEventOwner> = {
     (typeof snapshotEventOwnership)[Type] extends Owner ? Type : never;
 }[keyof typeof snapshotEventOwnership];
 
-export type RendererOnlySnapshotEvent = Extract<
+export type SnapshotEventOwnedBy<Owner extends SnapshotEventOwner> = Extract<
   MainToRendererEvent,
-  { type: SnapshotEventTypeOwnedBy<'renderer'> }
+  { type: SnapshotEventTypeOwnedBy<Owner> }
 >;
 
-export function isRendererOnlySnapshotEvent(
+export type RendererOnlySnapshotEvent = SnapshotEventOwnedBy<'renderer'>;
+
+export function isSnapshotEventOwnedBy<Owner extends SnapshotEventOwner>(
   event: MainToRendererEvent,
-): event is RendererOnlySnapshotEvent {
-  return snapshotEventOwnership[event.type] === 'renderer';
+  owner: Owner,
+): event is SnapshotEventOwnedBy<Owner> {
+  return snapshotEventOwnership[event.type] === owner;
 }

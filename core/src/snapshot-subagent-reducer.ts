@@ -1,10 +1,10 @@
 import type {
   AgentSubagentTree,
   AppSnapshot,
-  MainToRendererEvent,
   SubagentIdentityChange,
   SubagentStatusChange,
 } from './contracts';
+import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 import {
   isSubagentActivityKind,
   isSubagentOperationKind,
@@ -13,7 +13,10 @@ import {
   isSubagentStatus,
 } from './subagent-values';
 
-export function applySubagentEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
+export function applySubagentEventToSnapshot(
+  snapshot: AppSnapshot,
+  event: SnapshotEventOwnedBy<'subagent'>,
+): void {
   if (!event.agentId) return;
 
   if (event.type === 'subagent.operationChanged') {
@@ -35,6 +38,9 @@ export function applySubagentEventToSnapshot(snapshot: AppSnapshot, event: MainT
     applySubagentStatusChange(snapshot, event.agentId, event.payload, event.occurredAt);
     return;
   }
+
+  const exhaustiveEvent: never = event;
+  void exhaustiveEvent;
 }
 
 function applySubagentOperationChange(snapshot: AppSnapshot, agentId: string, value: unknown): void {

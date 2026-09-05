@@ -1,12 +1,16 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { MainToRendererEvent } from '../contracts';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../snapshot';
+import { applyConversationEventToSnapshot } from '../snapshot-conversation-reducer';
 import {
-  isRendererOnlySnapshotEvent,
+  isSnapshotEventOwnedBy,
   snapshotEventOwnership,
   type RendererOnlySnapshotEvent,
+  type SnapshotEventOwnedBy,
   type SnapshotEventTypeOwnedBy,
 } from '../snapshot-event-ownership';
+import { applyRuntimeEventToSnapshot } from '../snapshot-runtime-reducer';
+import { applySubagentEventToSnapshot } from '../snapshot-subagent-reducer';
 
 const runtimeEventTypes = [
   'backend.statusChanged',
@@ -203,6 +207,15 @@ describe('snapshot event ownership', () => {
     }
   });
 
+  it('gives each reducer only its owned event subset', () => {
+    expectTypeOf<Parameters<typeof applyRuntimeEventToSnapshot>[1]>()
+      .toEqualTypeOf<SnapshotEventOwnedBy<'runtime'>>();
+    expectTypeOf<Parameters<typeof applyConversationEventToSnapshot>[1]>()
+      .toEqualTypeOf<SnapshotEventOwnedBy<'conversation'>>();
+    expectTypeOf<Parameters<typeof applySubagentEventToSnapshot>[1]>()
+      .toEqualTypeOf<SnapshotEventOwnedBy<'subagent'>>();
+  });
+
   it('explicitly ignores renderer-owned events in the snapshot facade', () => {
     expect(rendererOnlyEvents.map((event) => event.type)).toEqual(rendererEventTypes);
 
@@ -210,7 +223,7 @@ describe('snapshot event ownership', () => {
       const snapshot = createInitialSnapshot();
       const before = structuredClone(snapshot);
 
-      expect(isRendererOnlySnapshotEvent(event)).toBe(true);
+      expect(isSnapshotEventOwnedBy(event, 'renderer')).toBe(true);
       applyMainEventToSnapshot(snapshot, event);
 
       expect(snapshot).toStrictEqual(before);

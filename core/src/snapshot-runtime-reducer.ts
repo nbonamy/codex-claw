@@ -5,7 +5,6 @@ import type {
   ApprovalPreset,
   AppSnapshot,
   ClientRequest,
-  MainToRendererEvent,
   ThreadGoal,
   WorkBacklogAssignment,
 } from './contracts';
@@ -17,15 +16,19 @@ import { appText } from './app-text';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { applySnapshotMetadata } from './snapshot-construction';
 import { decodeAppSnapshot } from './snapshot-guards';
+import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 import { workItemAssignmentKey } from './work-assignments';
 
-export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): boolean {
+export function applyRuntimeEventToSnapshot(
+  snapshot: AppSnapshot,
+  event: SnapshotEventOwnedBy<'runtime'>,
+): void {
   if (event.type === 'snapshot.updated') {
     const decodedSnapshot = decodeAppSnapshot(event.payload);
     if (decodedSnapshot) {
       applySnapshotMetadata(snapshot, decodedSnapshot.value);
     }
-    return true;
+    return;
   }
 
   if (event.type === 'workRouting.requested') {
@@ -36,7 +39,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
         request,
       ];
     }
-    return true;
+    return;
   }
 
   if (event.type === 'workRouting.resolved') {
@@ -44,7 +47,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
     if (id) {
       snapshot.workRoutingRequests = (snapshot.workRoutingRequests ?? []).filter((candidate) => candidate.id !== id);
     }
-    return true;
+    return;
   }
 
   if (event.type === 'backend.statusChanged') {
@@ -57,7 +60,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
         capabilities: isRecord(payload.capabilities) ? backendCapabilities(payload.capabilities) : undefined,
       });
     }
-    return true;
+    return;
   }
 
   if (event.type === 'account.rateLimitsUpdated') {
@@ -65,7 +68,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
     if (rateLimits) {
       snapshot.accountRateLimits = rateLimits;
     }
-    return true;
+    return;
   }
 
   if (event.type === 'workBacklog.assignmentUpdated') {
@@ -76,11 +79,11 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
         [workItemAssignmentKey(assignment)]: assignment,
       };
     }
-    return true;
+    return;
   }
 
   if (!event.agentId) {
-    return true;
+    return;
   }
 
   if (event.type === 'agent.updated') {
@@ -92,12 +95,12 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
         delete agent.statusText;
       }
     }
-    return true;
+    return;
   }
 
   if (event.type === 'agent.statusChanged') {
     setAgentStatus(snapshot, event.agentId, event.payload);
-    return true;
+    return;
   }
 
   if (event.type === 'thread.started') {
@@ -127,7 +130,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
       if (model && !reasoningEffort) {
         delete agent.backendDefaults.reasoningEffort;
       }
-      return true;
+      return;
     }
 
     if (agent && event.threadId) {
@@ -135,7 +138,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
       agent.backendSession = { kind: 'codex', threadId: event.threadId };
       agent.status = { type: 'idle' };
     }
-    return true;
+    return;
   }
 
   if (event.type === 'thread.settingsUpdated') {
@@ -168,7 +171,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
         }
       }
     }
-    return true;
+    return;
   }
 
   if (event.type === 'thread.tokenUsageUpdated') {
@@ -177,7 +180,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
     if (agent && contextUsage) {
       agent.contextUsage = contextUsage;
     }
-    return true;
+    return;
   }
 
   if (event.type === 'thread.goalUpdated') {
@@ -186,7 +189,7 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
     if (agent && goal) {
       agent.goal = goal;
     }
-    return true;
+    return;
   }
 
   if (event.type === 'thread.goalCleared') {
@@ -194,19 +197,16 @@ export function applyRuntimeEventToSnapshot(snapshot: AppSnapshot, event: MainTo
     if (agent) {
       delete agent.goal;
     }
-    return true;
+    return;
   }
 
-  if (event.type === 'thread.modeUpdated') {
-    return true;
-  }
-
-  if (event.type === 'git.statusUpdated' && event.agentId) {
+  if (event.type === 'git.statusUpdated') {
     updateAgentGitStatus(snapshot, event.agentId, event.payload);
-    return true;
+    return;
   }
 
-  return false;
+  const exhaustiveEvent: never = event;
+  void exhaustiveEvent;
 }
 
 function updateAgentGitStatus(snapshot: AppSnapshot, agentId: string, payload: unknown): void {

@@ -3,7 +3,7 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { MainToRendererEvent } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 
 describe('snapshot reducer', () => {
 
@@ -150,7 +150,7 @@ describe('snapshot reducer', () => {
         ],
       },
       occurredAt: '2026-06-05T00:00:00.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.agents[0].plan).toStrictEqual({
       threadId: 'thread-1',
@@ -174,7 +174,7 @@ describe('snapshot reducer', () => {
       type: 'turn.planUpdated',
       payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.agents[0].plan?.turnId).toBe('turn-plan');
   });
@@ -193,7 +193,7 @@ describe('snapshot reducer', () => {
         plan: [{ step: 'Ignored', status: 'completed' }],
       },
       occurredAt: '2026-06-05T00:00:00.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.agents[0].plan).toBeUndefined();
     expect(snapshot.messages).toStrictEqual([]);

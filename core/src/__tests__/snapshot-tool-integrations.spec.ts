@@ -3,7 +3,8 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { MainToRendererEvent, RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   commandOutputDeltaToToolPartUpdate,
   commandToolPart,
@@ -268,7 +269,7 @@ describe('snapshot reducer', () => {
       type: 'item.started',
       payload: { toolPart: { type: 'ignored' } },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
@@ -278,7 +279,7 @@ describe('snapshot reducer', () => {
       type: 'item.updated',
       payload: { itemId: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.messages).toHaveLength(0);
 
@@ -451,7 +452,7 @@ describe('snapshot reducer', () => {
         status: 'running',
       })),
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
@@ -460,7 +461,7 @@ describe('snapshot reducer', () => {
       type: 'diff.updated',
       payload: { addedLines: 1, removedLines: 0 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.messages).toHaveLength(0);
     expect(snapshot.turnGitDiffs).toStrictEqual({});

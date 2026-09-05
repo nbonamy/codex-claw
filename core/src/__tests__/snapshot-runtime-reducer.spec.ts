@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { MainToRendererEvent } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   createInitialSnapshot,
   snapshotMetadata,
@@ -18,7 +18,7 @@ describe('snapshot runtime reducer', () => {
       type: 'thread.started',
       payload: { cwd: '/Users/nbonamy/src/codex-claw' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       type: 'backend.statusChanged',
@@ -38,7 +38,7 @@ describe('snapshot runtime reducer', () => {
         },
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
     expect(snapshot.backendRuntimes).toContainEqual({
@@ -610,7 +610,7 @@ describe('snapshot runtime reducer', () => {
           updatedAt: '2026-06-05T00:00:02.000Z',
         },
         occurredAt: '2026-06-05T00:00:02.000Z',
-      } as unknown as MainToRendererEvent);
+      } as unknown as SnapshotEventOwnedBy<'runtime'>);
 
       expect(snapshot.agents[0].updatedAt).toBe('2026-06-05T01:00:00.000Z');
       expect(snapshot.agentGitStatuses['unknown-agent']).toStrictEqual({
@@ -738,67 +738,45 @@ describe('snapshot runtime reducer', () => {
     expect(snapshot.workRoutingRequests).toStrictEqual([]);
   });
 
-  it('reports owned no-ops and the legacy missing-agent gate as handled', () => {
+  it('preserves malformed owned events as no-ops', () => {
     const snapshot = createInitialSnapshot();
     const backendRuntimes = snapshot.backendRuntimes;
 
-    expect(applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, {
       seq: 1,
       type: 'backend.statusChanged',
       payload: { backend: 'invalid', status: 'running' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.backendRuntimes).toBe(backendRuntimes);
 
-    expect(applyMainEventToSnapshot(snapshot, {
-      seq: 2,
-      type: 'message.delta',
-      payload: { delta: 'missing agent' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
-
-    expect(applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
       type: 'thread.settingsUpdated',
       payload: { threadSettings: { model: 'ignored-without-thread' } },
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.agents[0].backendSession).toBeUndefined();
 
     const goal = snapshot.agents[0].goal;
     const contextUsage = snapshot.agents[0].contextUsage;
-    expect(applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, {
       seq: 4,
       agentId: 'agent-dina',
       type: 'thread.goalUpdated',
       payload: { goal: { objective: 'missing fields' } },
       occurredAt: '2026-06-05T00:00:04.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
-    expect(applyMainEventToSnapshot(snapshot, {
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
+    applyMainEventToSnapshot(snapshot, {
       seq: 5,
       agentId: 'agent-dina',
       type: 'thread.tokenUsageUpdated',
       payload: { contextUsage: { totalTokens: 10 } },
       occurredAt: '2026-06-05T00:00:05.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
-    expect(applyMainEventToSnapshot(snapshot, {
-      seq: 6,
-      agentId: 'agent-dina',
-      type: 'thread.modeUpdated',
-      payload: { mode: 'unsupported' },
-      occurredAt: '2026-06-05T00:00:06.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.agents[0].goal).toBe(goal);
     expect(snapshot.agents[0].contextUsage).toBe(contextUsage);
-
-    expect(applyMainEventToSnapshot(snapshot, {
-      seq: 7,
-      agentId: 'agent-dina',
-      type: 'message.delta',
-      payload: { delta: 'conversation-owned' },
-      occurredAt: '2026-06-05T00:00:07.000Z',
-    } as unknown as MainToRendererEvent)).toBe(false);
   });
 
   it('ignores malformed work-routing and backlog payloads at the runtime boundary', () => {
@@ -806,7 +784,7 @@ describe('snapshot runtime reducer', () => {
     const routingRequests = snapshot.workRoutingRequests;
     const assignments = snapshot.workBacklog.assignments;
 
-    expect(applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, {
       seq: 1,
       type: 'workRouting.requested',
       payload: {
@@ -815,7 +793,7 @@ describe('snapshot runtime reducer', () => {
         payload: { request: { agentId: 'agent-dina' } },
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.workRoutingRequests).toBe(routingRequests);
 
     snapshot.workRoutingRequests = [{
@@ -830,15 +808,15 @@ describe('snapshot runtime reducer', () => {
         },
       },
     }];
-    expect(applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, {
       seq: 2,
       type: 'workRouting.resolved',
       payload: { id: 42 },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.workRoutingRequests).toHaveLength(1);
 
-    expect(applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, {
       seq: 3,
       type: 'workBacklog.assignmentUpdated',
       payload: {
@@ -848,7 +826,7 @@ describe('snapshot runtime reducer', () => {
         assignedAt: '2026-06-05T00:00:03.000Z',
       },
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as MainToRendererEvent)).toBe(true);
+    } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.workBacklog.assignments).toBe(assignments);
   });
 });

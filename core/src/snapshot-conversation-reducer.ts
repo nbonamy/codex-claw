@@ -1,8 +1,4 @@
-import type {
-  AppSnapshot,
-  MainToRendererEvent,
-  SendPromptOptions,
-} from './contracts';
+import type { AppSnapshot, SendPromptOptions } from './contracts';
 import {
   findAgentInSnapshot as findAgent,
   setAgentStatusInSnapshot as setAgentStatus,
@@ -44,8 +40,12 @@ import {
   updateAgentPlanMarkdown,
   upsertPlanProgressToolPart,
 } from './snapshot-conversation-plans';
+import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 
-export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
+export function applyConversationEventToSnapshot(
+  snapshot: AppSnapshot,
+  event: SnapshotEventOwnedBy<'conversation'>,
+): void {
   if (!event.agentId) return;
 
   if (event.type === 'thread.historyLoaded') {
@@ -71,7 +71,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'turn.planUpdated' && event.threadId && event.turnId) {
+  if (event.type === 'turn.planUpdated') {
+    if (!event.threadId || !event.turnId) return;
     const agent = findAgent(snapshot, event.agentId);
     const plan = threadPlan(event.payload, event.threadId, event.turnId, event.occurredAt);
     if (agent && plan) {
@@ -82,7 +83,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'turn.proposedPlanDelta' && event.threadId && event.turnId) {
+  if (event.type === 'turn.proposedPlanDelta') {
+    if (!event.threadId || !event.turnId) return;
     const agent = findAgent(snapshot, event.agentId);
     const operation = agent ? planProgressOperation(agent, event.turnId) : 'write';
     appendAgentPlanMarkdownDelta(agent, event.threadId, event.turnId, event.payload, event.occurredAt);
@@ -93,7 +95,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'turn.proposedPlanCompleted' && event.threadId && event.turnId) {
+  if (event.type === 'turn.proposedPlanCompleted') {
+    if (!event.threadId || !event.turnId) return;
     const agent = findAgent(snapshot, event.agentId);
     const operation = agent ? planProgressOperation(agent, event.turnId) : 'write';
     updateAgentPlanMarkdown(agent, event.threadId, event.turnId, event.payload, event.occurredAt);
@@ -104,7 +107,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'message.delta' && event.turnId) {
+  if (event.type === 'message.delta') {
+    if (!event.turnId) return;
     const payload = event.payload as { delta?: unknown; itemId?: unknown; phase?: unknown };
     const agent = findAgent(snapshot, event.agentId);
     appendAssistantDeltaWithPlanFilter(
@@ -144,7 +148,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'message.steer' && event.turnId) {
+  if (event.type === 'message.steer') {
+    if (!event.turnId) return;
     const payload = event.payload as { prompt?: unknown; attachments?: unknown };
     if (typeof payload.prompt === 'string' && payload.prompt.trim()) {
       appendSteerPrompt(
@@ -159,7 +164,7 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'agent.promptQueued' && event.agentId) {
+  if (event.type === 'agent.promptQueued') {
     const payload = event.payload as { id?: unknown; text?: unknown; options?: unknown; submitted?: unknown };
     if (typeof payload.id === 'string' && typeof payload.text === 'string') {
       const queuedPrompts = snapshot.queuedPrompts ?? [];
@@ -177,7 +182,7 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'agent.promptRetryScheduled' && event.agentId) {
+  if (event.type === 'agent.promptRetryScheduled') {
     const payload = event.payload as { id?: unknown; attempts?: unknown; lastError?: unknown; retryAt?: unknown };
     const queuedPrompt = (snapshot.queuedPrompts ?? []).find((prompt) => (
       prompt.agentId === event.agentId && prompt.id === payload.id
@@ -207,7 +212,7 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'backendApproval.requested' && event.agentId) {
+  if (event.type === 'backendApproval.requested') {
     const approval = backendApprovalRequest(event.payload);
     if (approval) {
       const approvals = snapshot.backendApprovals[event.agentId] ?? [];
@@ -223,27 +228,28 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
   if (event.type === 'backendApproval.resolved') {
     const approval = backendApprovalRequest(event.payload);
     if (approval) {
-      const agentIds = event.agentId ? [event.agentId] : Object.keys(snapshot.backendApprovals);
-      for (const agentId of agentIds) {
-        snapshot.backendApprovals[agentId] = (snapshot.backendApprovals[agentId] ?? []).filter((candidate) => candidate.id !== approval.id);
-      }
+      snapshot.backendApprovals[event.agentId] = (snapshot.backendApprovals[event.agentId] ?? [])
+        .filter((candidate) => candidate.id !== approval.id);
     }
     return;
   }
 
-  if (event.type === 'context.compactionStarted' && event.turnId) {
+  if (event.type === 'context.compactionStarted') {
+    if (!event.turnId) return;
     appendCompactionMarker(snapshot, event.agentId, event.turnId, event.occurredAt);
     return;
   }
 
-  if (event.type === 'context.compactionCompleted' && event.turnId) {
+  if (event.type === 'context.compactionCompleted') {
+    if (!event.turnId) return;
     for (const message of findCompactionMessages(snapshot, event.agentId, event.turnId)) {
       message.status = 'complete';
     }
     return;
   }
 
-  if ((event.type === 'item.started' || event.type === 'item.completed') && event.turnId) {
+  if (event.type === 'item.started' || event.type === 'item.completed') {
+    if (!event.turnId) return;
     const toolPart = rendererToolPart(event.payload.toolPart);
     if (toolPart) {
       upsertAssistantToolPart(snapshot, event.agentId, event.turnId, toolPart, event.occurredAt);
@@ -251,18 +257,21 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'item.updated' && event.turnId) {
+  if (event.type === 'item.updated') {
+    if (!event.turnId) return;
     updateAssistantToolPart(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
     return;
   }
 
-  if (event.type === 'diff.updated' && event.turnId) {
+  if (event.type === 'diff.updated') {
+    if (!event.turnId) return;
     updateTurnGitDiff(snapshot, event.turnId, event.payload, event.occurredAt);
     updateAssistantTurnDiff(snapshot, event.agentId, event.turnId, event.payload);
     return;
   }
 
-  if (event.type === 'approval.requested' && event.turnId) {
+  if (event.type === 'approval.requested') {
+    if (!event.turnId) return;
     applyApprovalRequest(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
     const confirmation = confirmToolRequest(event.payload);
     setAgentStatus(snapshot, event.agentId, {
@@ -272,7 +281,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'toolInput.requested' && event.turnId) {
+  if (event.type === 'toolInput.requested') {
+    if (!event.turnId) return;
     applyToolInputRequest(snapshot, event.agentId, event.turnId, event.payload, event.occurredAt);
     const request = askUserRequest(event.payload);
     setAgentStatus(snapshot, event.agentId, {
@@ -282,7 +292,8 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     return;
   }
 
-  if (event.type === 'turn.completed' && event.turnId) {
+  if (event.type === 'turn.completed') {
+    if (!event.turnId) return;
     const agent = findAgent(snapshot, event.agentId);
     if (agent?.plan?.kind === 'execution' && agent.plan.turnId === event.turnId) {
       agent.plan.status = finalizedThreadPlanStatus(agent.plan, event.payload);
@@ -301,5 +312,9 @@ export function applyConversationEventToSnapshot(snapshot: AppSnapshot, event: M
     }
     appendSystemMessage(snapshot, event.agentId, message, event.occurredAt);
     setAgentStatus(snapshot, event.agentId, { type: 'error', message });
+    return;
   }
+
+  const exhaustiveEvent: never = event;
+  void exhaustiveEvent;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot';
 import { applySubagentEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-subagent-reducer';
-import type { MainToRendererEvent } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 
 describe('snapshot subagent reducer', () => {
   it('builds and updates the current subagent tree from app-owned events', () => {
@@ -330,7 +330,7 @@ describe('snapshot subagent reducer', () => {
         },
         occurredAt: '2026-06-05T00:00:05.000Z',
       },
-    ] as unknown as MainToRendererEvent[];
+    ] as unknown as SnapshotEventOwnedBy<'subagent'>[];
 
     for (const event of malformedEvents) applyMainEventToSnapshot(snapshot, event);
 

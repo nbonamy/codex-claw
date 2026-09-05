@@ -3,7 +3,8 @@ import {
   createInitialSnapshot,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { MainToRendererEvent, RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { RendererToolPart, RendererToolPartUpdate } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   commandOutputDeltaToToolPartUpdate,
   commandToolPart,
@@ -549,7 +550,7 @@ describe('snapshot reducer', () => {
         kind: 'unknown',
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.messages).toHaveLength(0);
 

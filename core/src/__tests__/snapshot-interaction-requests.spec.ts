@@ -5,10 +5,10 @@ import {
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
 import type {
   BackendApprovalRequest,
-  MainToRendererEvent,
   RendererToolPart,
   RendererToolPartUpdate,
 } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   commandOutputDeltaToToolPartUpdate,
   commandToolPart,
@@ -472,7 +472,7 @@ describe('snapshot reducer', () => {
       type: 'backendApproval.requested',
       payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
     expect(snapshot.backendApprovals).toStrictEqual({});
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'idle' });
 
@@ -485,7 +485,7 @@ describe('snapshot reducer', () => {
       type: 'approval.requested',
       payload: {},
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
     expect(snapshot.messages).toStrictEqual([]);
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'awaitingInput', detail: undefined });
 
@@ -498,7 +498,7 @@ describe('snapshot reducer', () => {
       type: 'toolInput.requested',
       payload: {},
       occurredAt: '2026-06-05T00:00:03.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
     expect(snapshot.messages).toStrictEqual([]);
     expect(snapshot.agents[0].status).toStrictEqual({
       type: 'awaitingInput',
@@ -524,7 +524,7 @@ describe('snapshot reducer', () => {
       type: 'backendApproval.requested',
       payload: approval,
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
     snapshot.backendApprovals['agent-jesse'] = [approval];
 
     applyMainEventToSnapshot(snapshot, {
@@ -532,7 +532,7 @@ describe('snapshot reducer', () => {
       type: 'backendApproval.resolved',
       payload: { approval, decision: null, scope: null, reason: 'server' },
       occurredAt: '2026-06-05T00:00:02.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([approval]);
     expect(snapshot.backendApprovals['agent-jesse']).toStrictEqual([approval]);

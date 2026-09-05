@@ -5,7 +5,8 @@ import {
   selectAgent,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { MainToRendererEvent, RendererMessage } from '../contracts';
+import type { RendererMessage } from '../contracts';
+import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   commandToolPart,
   toolPartPayload,
@@ -23,7 +24,7 @@ describe('snapshot reducer', () => {
       type: 'context.compactionStarted',
       payload: { itemId: 'compact-1' },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    } as unknown as MainToRendererEvent);
+    } as unknown as SnapshotEventOwnedBy<'conversation'>);
 
     expect(snapshot.messages).toStrictEqual([]);
   });
