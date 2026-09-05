@@ -12,6 +12,7 @@ class FakeTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];
   readonly close = vi.fn(async () => undefined);
   readonly start = vi.fn(async () => undefined);
+  skillBrandColor: unknown;
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
@@ -74,7 +75,8 @@ class FakeTransport implements RpcTransport {
               name: `skill-${this.skillVersion}-${cwd}`,
               description: `Skill ${this.skillVersion} for ${cwd}`,
               path: `${cwd}/skill-${this.skillVersion}/SKILL.md`,
-              scope: 'repo', enabled: true, interface: null,
+              scope: 'repo', enabled: true,
+              interface: this.skillBrandColor === undefined ? null : { brandColor: this.skillBrandColor },
             }],
             errors: [],
           }],
@@ -1006,6 +1008,33 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.listSkills(agentB)).resolves.toMatchObject([{
       name: 'skill-2-/workspace/b', path: '/workspace/b/skill-2/SKILL.md',
     }]);
+  });
+
+  it('normalizes provider skill colors in lists and change events', async () => {
+    const { adapter, transport } = createAdapter();
+    transport.skillBrandColor = null;
+
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.not.objectContaining({ brandColor: expect.anything() }),
+    ]);
+
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+    transport.skillVersion = 2;
+    transport.emit({ method: 'skills/changed', params: {} });
+
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'skills.changed')).toBe(true));
+    const event = events.find((candidate) => candidate.type === 'skills.changed');
+    expect(event?.payload).toEqual(expect.objectContaining({
+      skills: [expect.not.objectContaining({ brandColor: expect.anything() })],
+    }));
+
+    transport.skillBrandColor = '#123abc';
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.objectContaining({ brandColor: '#123abc' }),
+    ]);
   });
 
   it('preserves image and file attachments through send and steer SDK turn input', async () => {

@@ -201,7 +201,7 @@ export class CodexSurfaceAgentAdapter {
 
   async listSkills(agent: Agent, forceReload = false): Promise<BackendSkillSummary[]> {
     const skills = await this.surface.listSkills({ ...agentCwd(agent), forceReload });
-    return skills.map((skill) => ({ id: skill.path, ...skill }));
+    return skills.map(backendSkillSummary);
   }
 
   async listPlugins(): Promise<BackendPluginSummary[]> {
@@ -1525,8 +1525,17 @@ function skillsChangedPayload(
 ): { cwd: string | null; skills: BackendSkillSummary[]; status: 'loaded' } {
   return {
     cwd,
-    skills: skills.map((skill) => ({ id: skill.path, ...skill })),
+    skills: skills.map(backendSkillSummary),
     status,
+  };
+}
+
+function backendSkillSummary(skill: CodexSurfaceSkill): BackendSkillSummary {
+  const { brandColor, ...summary } = skill;
+  return {
+    id: skill.path,
+    ...summary,
+    ...(typeof brandColor === 'string' && brandColor.trim() ? { brandColor } : {}),
   };
 }
 
