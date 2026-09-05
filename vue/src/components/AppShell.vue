@@ -193,6 +193,7 @@
         :handle-start-work-action="handleStartWorkAction"
         :is-agent-empty="isAgentEmpty"
         :is-conversation-loading="isConversationLoading"
+        :history-load-failed="isConversationLoadFailed"
         :is-loading="isLoading"
         :is-modal-dialog-visible="isModalDialogVisible"
         :is-right-workspace-visible="isRightWorkspaceVisible"
@@ -212,6 +213,7 @@
         :right-workspaces="rightWorkspaces"
         :right-workspace-visible="rightWorkspaceVisible"
         :read-conversation-messages="readConversationMessages"
+        :retry-conversation-history="props.retryAgentHistory"
         :select-agent-from-shell="selectAgentFromShell"
         :select-right-workspace-tab="selectRightWorkspaceTab"
         :snapshot="snapshot"
@@ -425,6 +427,7 @@ const props = withDefaults(defineProps<{
   messages: RendererMessage[];
   isLoading: boolean;
   isConversationLoading?: boolean;
+  isConversationLoadFailed?: boolean;
   historyHasOlder?: boolean;
   historyLoadingOlder?: boolean;
   isSending: boolean;
@@ -528,6 +531,7 @@ const props = withDefaults(defineProps<{
   duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
+  retryAgentHistory?: () => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -539,6 +543,7 @@ const props = withDefaults(defineProps<{
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   isConversationLoading: false,
+  isConversationLoadFailed: false,
   historyHasOlder: true,
   historyLoadingOlder: false,
   connectionState: () => ({ status: 'connected' }),
@@ -635,6 +640,7 @@ const props = withDefaults(defineProps<{
   loadAssignedWorkItems: async () => undefined,
   duplicateAgentAction: async () => null,
   assignWorkItemAction: async () => undefined,
+  retryAgentHistory: async () => undefined,
   quit: async () => undefined,
 });
 
@@ -1132,7 +1138,9 @@ const conversationPaneState: CodexConversationPaneState = {
     get conversationKey() { return conversationKey.value; },
     get messages() { return props.messages; },
     get busy() { return props.isSending; },
-    get disabled() { return !currentAgent.value; },
+    get disabled() {
+      return !currentAgent.value || (props.isConversationLoadFailed && props.messages.length === 0);
+    },
   },
   history: {
     get hasOlder() { return props.historyHasOlder; },

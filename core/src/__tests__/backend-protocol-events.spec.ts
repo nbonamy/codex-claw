@@ -266,6 +266,11 @@ function createFixtures(): EventFixtures {
       type: 'thread.historyLoaded',
       payload: { messages: [message] },
     },
+    'thread.historyHydrationFailed': {
+      ...agent,
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    },
     'subagent.operationChanged': {
       ...codexThread,
       type: 'subagent.operationChanged',
@@ -450,7 +455,7 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(53);
+    expect(Object.keys(fixtures)).toHaveLength(54);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }
@@ -512,6 +517,15 @@ describe('Claw backend event decoder', () => {
     expect(() => decodeClawBackendEvent(malformed)).toThrow(
       '$.payload.models[0].id: expected a string',
     );
+  });
+
+  it('keeps history hydration failure payloads strictly empty', () => {
+    const event = createFixtures()['thread.historyHydrationFailed'];
+
+    expect(() => decodeClawBackendEvent({
+      ...event,
+      payload: { detail: 'provider diagnostics stay in backend logs' },
+    })).toThrow('$.payload: expected an empty object');
   });
 
   it('rejects missing required provider context', () => {

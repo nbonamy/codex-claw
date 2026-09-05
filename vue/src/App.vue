@@ -8,6 +8,8 @@
     :messages="visibleMessages"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
+    :is-conversation-load-failed="isActiveAgentHistoryFailed"
+    :retry-agent-history="retryActiveAgentHistory"
     :history-has-older="activeHistoryHasOlder"
     :history-loading-older="isLoadingOlderHistory"
     :load-older-agent-history="loadOlderAgentHistory"
@@ -225,7 +227,9 @@ const {
   activeComposerAttachments,
   unreadAgentIds,
   isLoading,
+  isActiveAgentHistoryFailed,
   isHydratingActiveAgentHistory,
+  retryActiveAgentHistory,
   activeHistoryHasOlder,
   isLoadingOlderHistory,
   isSending,

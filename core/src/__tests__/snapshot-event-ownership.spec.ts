@@ -74,6 +74,7 @@ const rendererEventTypes = [
   'browser.annotationCreated',
   'clientRequest.resolved',
   'thread.modeUpdated',
+  'thread.historyHydrationFailed',
   'file.activity',
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'renderer'>[];
 
@@ -166,6 +167,11 @@ const rendererOnlyEvents = [
   },
   {
     ...agent,
+    type: 'thread.historyHydrationFailed',
+    payload: {},
+  },
+  {
+    ...agent,
     backend: 'codex',
     threadId: 'thread-1',
     turnId: 'turn-1',
@@ -194,8 +200,8 @@ describe('snapshot event ownership', () => {
     } as const;
     const assignedTypes = Object.values(expectedByOwner).flat();
 
-    expect(assignedTypes).toHaveLength(53);
-    expect(new Set(assignedTypes).size).toBe(53);
+    expect(assignedTypes).toHaveLength(54);
+    expect(new Set(assignedTypes).size).toBe(54);
     for (const [owner, types] of Object.entries(expectedByOwner)) {
       expect(
         Object.entries(snapshotEventOwnership)

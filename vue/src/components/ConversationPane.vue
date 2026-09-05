@@ -1,6 +1,12 @@
 <template>
   <div class="conversation-pane">
+    <ConversationLoadError
+      v-if="historyLoadFailed && !hasVisibleMessages"
+      :loading="historyLoading"
+      @retry="emit('retry-history')"
+    />
     <CodexConversationPane
+      v-else
       ref="surface"
       class="conversation-pane__surface"
       :controller="controller"
@@ -81,6 +87,7 @@ import type {
 } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
+import ConversationLoadError from './ConversationLoadError.vue';
 import AgentMention from './AgentMention.vue';
 import {
   presentCollaborationMessage,
@@ -103,10 +110,16 @@ const props = withDefaults(defineProps<{
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
+  historyLoadFailed?: boolean;
+  historyLoading?: boolean;
+  hasVisibleMessages?: boolean;
 }>(), {
   agents: () => [],
   attachmentAnnotationCounts: () => ({}),
   planVisible: true,
+  historyLoadFailed: false,
+  historyLoading: false,
+  hasVisibleMessages: false,
 });
 provideClawToolPresentation(
   (key, params) => t(key, params ?? {}),
@@ -119,6 +132,7 @@ provideClawToolPresentation(
 const emit = defineEmits<{
   'annotate-attachment': [attachment: CodexNativeAttachment];
   'close-plan': [];
+  'retry-history': [];
 }>();
 
 const conversationKey = computed(() => props.agent?.id ?? 'no-agent');

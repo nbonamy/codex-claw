@@ -363,6 +363,34 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.find('.conversation-plan').exists()).toBe(false);
   });
 
+  it('disables only an empty failed conversation and forwards retry', async () => {
+    const retryAgentHistory = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      isConversationLoadFailed: true,
+      retryAgentHistory,
+    });
+
+    expect(conversationControllerState(wrapper).identity.disabled).toBe(true);
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('historyLoadFailed')).toBe(true);
+
+    wrapper.getComponent({ name: 'ConversationPane' }).vm.$emit('retry-history');
+    await flushPromises();
+    expect(retryAgentHistory).toHaveBeenCalledOnce();
+
+    const snapshot = createInitialSnapshot();
+    snapshot.messages.push({
+      id: 'message-existing',
+      agentId: snapshot.agents[0]!.id,
+      role: 'assistant',
+      status: 'complete',
+      parts: [{ type: 'text', text: 'Keep me visible.' }],
+      createdAt: '2026-09-05T00:00:00.000Z',
+    });
+    const withMessages = mountShell({ snapshot, isConversationLoadFailed: true });
+    expect(conversationControllerState(withMessages).identity.disabled).toBe(false);
+    expect(withMessages.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
+  });
+
   it('forwards prompts from the composer', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {

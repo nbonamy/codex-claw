@@ -426,6 +426,7 @@ describe('useAppState', () => {
       'sidePanel.gitDiffRequested',
       'sidePanel.markdownRequested',
       'skills.changed',
+      'thread.historyHydrationFailed',
       'thread.modeUpdated',
     ]);
 

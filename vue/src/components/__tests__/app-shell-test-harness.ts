@@ -14,8 +14,8 @@ import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, B
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
-  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'plan', 'planVisible'],
-  emits: ['annotate-attachment', 'close-plan'],
+  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'historyLoadFailed', 'historyLoading', 'hasVisibleMessages', 'plan', 'planVisible'],
+  emits: ['annotate-attachment', 'close-plan', 'retry-history'],
   setup(_props, { expose }) {
     expose({ focusComposer: vi.fn() });
   },
@@ -128,6 +128,8 @@ export function mountShell(overrides: Partial<{
   workItemsByRepository: Record<string, WorkItem[]>;
   realConversationPane: boolean;
   realAgentSidebar: boolean;
+  isConversationLoadFailed: boolean;
+  retryAgentHistory: () => Promise<void>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   return mount(AppShell, {
@@ -138,6 +140,8 @@ export function mountShell(overrides: Partial<{
       agentFiles: overrides.agentFiles ?? [],
       messages: snapshot.messages,
       isLoading: false,
+      isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
+      retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },

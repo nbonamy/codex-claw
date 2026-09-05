@@ -472,6 +472,11 @@ export const agentPayloadValidators = {
       'hasOlderMessages',
     ].forEach((key) => expectOptional(value, key, path, expectBoolean));
   },
+  'thread.historyHydrationFailed': (value, path) => {
+    expectRecord(value, path);
+    if (Object.keys(value).length > 0)
+      failEventValidation(path, 'expected an empty object');
+  },
   'subagent.operationChanged': expectSubagentOperationChange,
   'subagent.activityChanged': expectSubagentActivityChange,
   'subagent.identityChanged': expectSubagentIdentityChange,

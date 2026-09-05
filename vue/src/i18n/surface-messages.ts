@@ -850,7 +850,10 @@ export const surfaceMessages = {
   },
   "conversationPane": {
     "selectAnAgent": "Select an agent",
-    "chooseAnAgentFromTheLeftToStartANativeBackendSession": "Choose an agent from the left to start a native backend session."
+    "chooseAnAgentFromTheLeftToStartANativeBackendSession": "Choose an agent from the left to start a native backend session.",
+    "historyLoadFailed": "Conversation couldn’t be loaded.",
+    "historyLoadFailedReason": "Make sure this conversation isn’t open in ChatGPT, then try again. If it still won’t load, restart the agent.",
+    "retryHistory": "Retry"
   },
   "team-close-confirmation": {
     "deleteTeam": "Delete Team",

@@ -42,8 +42,12 @@
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
+      :history-load-failed="historyLoadFailed"
+      :history-loading="isConversationLoading"
+      :has-visible-messages="messages.length > 0"
       @annotate-attachment="openAttachmentImageAnnotation"
       @close-plan="closeExecutionPlan"
+      @retry-history="retryConversationHistory"
     />
     <RightWorkspacePanel
       v-for="agent in snapshot.agents"
@@ -189,6 +193,7 @@ const props = defineProps<{
   handleStartWorkAction: (action: 'github' | 'local' | 'url') => void;
   isAgentEmpty: boolean;
   isConversationLoading: boolean;
+  historyLoadFailed: boolean;
   isLoading: boolean;
   isModalDialogVisible: boolean;
   isRightWorkspaceVisible: (agentId: string) => boolean;
@@ -217,6 +222,7 @@ const props = defineProps<{
     agentId: string,
     location?: AutomationLocation,
   ) => Promise<RendererMessage[]>;
+  retryConversationHistory: () => Promise<void>;
   selectAgentFromShell: (agentId: string) => void;
   selectRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   snapshot: AppSnapshot;
@@ -263,6 +269,7 @@ const {
   handleStartWorkAction,
   isAgentEmpty,
   isConversationLoading,
+  historyLoadFailed,
   isLoading,
   isModalDialogVisible,
   isRightWorkspaceVisible,
@@ -271,6 +278,7 @@ const {
   openFilePreviewForAgent,
   openInApplications,
   rightWorkspaceVisible,
+  retryConversationHistory,
   selectAgentFromShell,
   selectRightWorkspaceTab,
   snapshot,

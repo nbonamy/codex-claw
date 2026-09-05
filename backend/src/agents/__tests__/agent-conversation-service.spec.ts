@@ -129,6 +129,27 @@ describe('AgentConversationService', () => {
       { agent, title: 'Dina' },
     );
   });
+
+  it('reports hydration failures without exposing diagnostics and deduplicates concurrent requests', async () => {
+    const { agent, driverRequest, events, service } = createService();
+    let rejectHydration!: (error: Error) => void;
+    driverRequest.mockReturnValue(new Promise((_resolve, reject) => {
+      rejectHydration = reject;
+    }));
+
+    const first = service.hydrate(agent.id);
+    const second = service.hydrate(agent.id);
+    rejectHydration(new Error('active writer: sensitive provider detail'));
+
+    await expect(Promise.all([first, second])).resolves.toStrictEqual([undefined, undefined]);
+    expect(driverRequest).toHaveBeenCalledOnce();
+    expect(events).toContainEqual({
+      agentId: agent.id,
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    });
+    expect(JSON.stringify(events)).not.toContain('active writer');
+  });
 });
 
 function createService() {

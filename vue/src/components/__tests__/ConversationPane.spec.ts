@@ -107,6 +107,33 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).toContain('Looking now.');
   });
 
+  it('replaces only an empty transcript with the history load recovery state', async () => {
+    const wrapper = mountPane({
+      controller: controllerFor([]),
+      agent,
+      historyLoadFailed: true,
+      historyLoading: false,
+    });
+
+    expect(wrapper.text()).toContain('Conversation couldn’t be loaded.');
+    expect(wrapper.text()).not.toContain('Chat with Dina');
+    expect(wrapper.find('[aria-label="Prompt composer"]').exists()).toBe(false);
+    await wrapper.get('button').trigger('click');
+    expect(wrapper.emitted('retry-history')).toStrictEqual([[]]);
+  });
+
+  it('preserves visible messages when a later history hydration fails', () => {
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent,
+      historyLoadFailed: true,
+      hasVisibleMessages: true,
+    });
+
+    expect(wrapper.text()).toContain('Find the failing test.');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
   it('renders Codex phased work while leaving unphased backend output flat', () => {
     const wrapper = mountPane({
       controller: controllerFor([
@@ -389,6 +416,9 @@ function mountPane(props: {
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
+  historyLoadFailed?: boolean;
+  historyLoading?: boolean;
+  hasVisibleMessages?: boolean;
 }) {
   return mount(ConversationPane, {
     props,

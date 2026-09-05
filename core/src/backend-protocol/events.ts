@@ -86,6 +86,7 @@ function expectEventContext(event: EventRecord): void {
     case 'agent.statusChanged':
     case 'thread.goalCleared':
     case 'thread.historyLoaded':
+    case 'thread.historyHydrationFailed':
     case 'message.userSubmitted':
     case 'message.steer':
     case 'agent.promptQueued':

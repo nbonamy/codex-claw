@@ -124,6 +124,8 @@ const {
   activeHistoryHasOlder,
   handleMainEvent: syncHistoryPageStateFromMainEvent,
   hydrateActive: hydrateActiveAgentHistory,
+  retryActive: retryActiveAgentHistory,
+  isActiveAgentHistoryFailed,
   isHydratingActiveAgentHistory,
   isLoadingOlderHistory,
   loadOlder: loadOlderAgentHistory,
@@ -1230,7 +1232,9 @@ export function useAppState() {
     unreadAgentIds,
     isLoading,
     connectionState,
+    isActiveAgentHistoryFailed,
     isHydratingActiveAgentHistory,
+    retryActiveAgentHistory,
     activeHistoryHasOlder,
     isLoadingOlderHistory,
     loadOlderAgentHistory,
@@ -1586,6 +1590,9 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
     case 'skills.changed':
     case 'thread.modeUpdated':
       syncComposerStateFromMainEvent(event);
+      return;
+    case 'thread.historyHydrationFailed':
+      syncHistoryPageStateFromMainEvent(event);
       return;
     case 'sidePanel.markdownRequested':
     case 'sidePanel.gitDiffRequested':

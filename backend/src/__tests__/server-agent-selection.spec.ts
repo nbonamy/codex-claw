@@ -248,6 +248,57 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it('forwards a safe hydration failure event while keeping the request nonblocking', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.activeAgentId = 'agent-dina';
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: snapshot.teams[0]!.id,
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
+      status: { type: 'idle' },
+      createdAt: '2026-09-05T00:00:00.000Z',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    }];
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      respondToRequest: async () => undefined,
+      hydrateAgent: vi.fn().mockRejectedValue(new Error('active writer: provider-only detail')),
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: Array<{ type: string; agentId?: string; payload?: unknown }> = [];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      onEvent: (event) => events.push(event),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'hydrate-failed',
+      method: 'agent/history/hydrate',
+      params: { agentId: snapshot.agents[0]!.id },
+    })).resolves.toMatchObject({ result: { activeAgentId: snapshot.activeAgentId } });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: snapshot.agents[0]!.id,
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    }));
+    expect(JSON.stringify(events)).not.toContain('provider-only detail');
+    await server.close();
+  });
+
   it('revalidates a selected agent while keeping its live in-memory messages', async () => {
     const snapshot = createTestSnapshot();
     snapshot.activeAgentId = null;

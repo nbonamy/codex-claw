@@ -49,6 +49,7 @@ export {
   IconMessage as MessageIcon,
   IconMessageCircle as MessageCircleIcon,
   IconMessageCirclePlus as MessageCirclePlusIcon,
+  IconMessageCircleX as MessageCircleXIcon,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,
   IconLogout as QuitIcon,

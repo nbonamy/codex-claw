@@ -8,6 +8,7 @@ import type {
 } from '@codex-claw/core/contracts';
 import type { BackendEvent, BackendRollbackResult } from '@codex-claw/core/backend-driver';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
+import { warnMain } from '../log';
 
 export type ResolvedMessageAction = {
   agent: Agent;
@@ -27,6 +28,8 @@ export type AgentConversationServiceOptions = {
 
 /** Owns conversation history mutation, retry resolution, hydration, and title synchronization. */
 export class AgentConversationService {
+  private readonly hydrationRequests = new Map<string, Promise<void>>();
+
   constructor(private readonly options: AgentConversationServiceOptions) {}
 
   async rollbackToTurn(agentId: string, turnId: string): Promise<AppSnapshot | null> {
@@ -84,6 +87,18 @@ export class AgentConversationService {
   }
 
   async hydrate(agentId: string): Promise<void> {
+    const existing = this.hydrationRequests.get(agentId);
+    if (existing) return existing;
+    const request = this.performHydration(agentId).finally(() => {
+      if (this.hydrationRequests.get(agentId) === request) {
+        this.hydrationRequests.delete(agentId);
+      }
+    });
+    this.hydrationRequests.set(agentId, request);
+    return request;
+  }
+
+  private async performHydration(agentId: string): Promise<void> {
     const agent = this.agent(agentId);
     if (!agent?.backendSession) return;
     try {
@@ -92,8 +107,17 @@ export class AgentConversationService {
         agent.backendSession = session;
         await this.options.persistSnapshot();
       }
-    } catch {
-      // Hydration is opportunistic; failed history restore should not block selection.
+    } catch (error) {
+      warnMain('agent-conversation', 'history hydration failed', {
+        agentId,
+        backend: agent.backend,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      this.options.applyEvent({
+        agentId,
+        type: 'thread.historyHydrationFailed',
+        payload: {},
+      });
     }
   }
 

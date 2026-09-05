@@ -27,6 +27,7 @@ export const snapshotEventOwnership = {
   'thread.goalCleared': 'runtime',
   'thread.tokenUsageUpdated': 'runtime',
   'thread.historyLoaded': 'conversation',
+  'thread.historyHydrationFailed': 'renderer',
   'subagent.operationChanged': 'subagent',
   'subagent.activityChanged': 'subagent',
   'subagent.identityChanged': 'subagent',

@@ -889,6 +889,11 @@ export type MainToRendererEvent =
       payload: ThreadHistoryLoadedPayload;
     }>
   | MainToRendererEventWith<{
+      type: 'thread.historyHydrationFailed';
+      agentId: string;
+      payload: Record<string, never>;
+    }>
+  | MainToRendererEventWith<{
       type: 'subagent.operationChanged';
       agentId: string;
       backend: AgentBackend;

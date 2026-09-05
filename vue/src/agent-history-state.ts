@@ -13,12 +13,17 @@ export function createAgentHistoryState(options: {
   synchronizeComposerSelection: (agentId: string) => void;
 }) {
   const hydratingAgentIds = ref(new Set<string>());
+  const failedAgentIds = ref(new Set<string>());
   const loadingOlderAgentIds = ref(new Set<string>());
   const hasOlderByAgentId = ref<Record<string, boolean>>({});
 
   const isHydratingActiveAgentHistory = computed(() => {
     const agentId = options.getSnapshot().activeAgentId;
     return Boolean(agentId && hydratingAgentIds.value.has(agentId));
+  });
+  const isActiveAgentHistoryFailed = computed(() => {
+    const agentId = options.getSnapshot().activeAgentId;
+    return Boolean(agentId && failedAgentIds.value.has(agentId));
   });
   const activeHistoryHasOlder = computed(() => {
     const snapshot = options.getSnapshot();
@@ -63,12 +68,29 @@ export function createAgentHistoryState(options: {
 
   function markHydrating(agentId: string, hydrating: boolean): void {
     const next = new Set(hydratingAgentIds.value);
-    if (hydrating) next.add(agentId);
+    if (hydrating) {
+      next.add(agentId);
+      const failed = new Set(failedAgentIds.value);
+      failed.delete(agentId);
+      failedAgentIds.value = failed;
+    }
     else next.delete(agentId);
     hydratingAgentIds.value = next;
   }
 
-  function handleMainEvent(event: Extract<MainToRendererEvent, { type: 'thread.historyLoaded' }>): void {
+  function handleMainEvent(event: Extract<MainToRendererEvent, {
+    type: 'thread.historyLoaded' | 'thread.historyHydrationFailed';
+  }>): void {
+    if (event.type === 'thread.historyHydrationFailed') {
+      const failed = new Set(failedAgentIds.value);
+      failed.add(event.agentId);
+      failedAgentIds.value = failed;
+      markHydrating(event.agentId, false);
+      return;
+    }
+    const failed = new Set(failedAgentIds.value);
+    failed.delete(event.agentId);
+    failedAgentIds.value = failed;
     const hasOlder = event.payload.hasOlderMessages;
     if (hasOlder === undefined) return;
     hasOlderByAgentId.value = { ...hasOlderByAgentId.value, [event.agentId]: hasOlder };
@@ -78,6 +100,8 @@ export function createAgentHistoryState(options: {
     activeHistoryHasOlder,
     handleMainEvent,
     hydrateActive,
+    retryActive: hydrateActive,
+    isActiveAgentHistoryFailed,
     isHydratingActiveAgentHistory,
     isLoadingOlderHistory,
     loadOlder,
