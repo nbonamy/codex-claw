@@ -35,7 +35,6 @@ import { AgentWorkspaceService } from './agents/agent-workspace-service';
 import { AgentConversationService } from './agents/agent-conversation-service';
 import { DelegatedWorkReportService, type DelegatedWorkReportPort } from './agents/delegated-work-report-service';
 import { SubagentIdentityService } from './agents/subagent-identity-service';
-import { WorkRoutingService, type WorkRoutingPort } from './work-routing/work-routing-service';
 import { ClientRequestRegistry } from './client-requests/client-request-registry';
 
 export type ClawBackendServerOptions = {
@@ -58,7 +57,6 @@ export type ClawBackendServerOptions = {
   inspectPluginStatus?: () => Promise<AppPluginStatus>;
   agentGitService?: AgentGitService;
   delegatedWorkReports?: DelegatedWorkReportPort;
-  workRouting?: WorkRoutingPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
 };
 
@@ -115,7 +113,6 @@ export class ClawBackendServer {
   private readonly subagentIdentities: SubagentIdentityService;
   private readonly agentGitService: AgentGitService;
   private readonly agentGitWorkflows: AgentGitWorkflowService;
-  private readonly workRouting: WorkRoutingService;
   private readonly transcriptRetention: AgentTranscriptRetention;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -197,17 +194,6 @@ export class ClawBackendServer {
       getSnapshot: () => this.snapshot,
       onForwardedEvent: (connectionId, event) => this.forwardRemoteBackendEvent(connectionId, event),
       onProjectedSnapshotChanged: () => { void this.emitProjectedSnapshot(); },
-      recordProjectedWorkRouting: (connectionId, snapshot, remoteTeamId) => {
-        this.clientRequests.recordProjectedWorkRouting(connectionId, snapshot, remoteTeamId);
-      },
-    });
-    this.workRouting = new WorkRoutingService({
-      getSnapshot: () => this.snapshot,
-      git: this.agentGitService,
-      port: options.workRouting,
-      persistAndEmitSnapshot: () => this.persistAndEmitSnapshot(),
-      refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
-      sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
     });
     this.transcriptRetention = new AgentTranscriptRetention({
       snapshot: this.snapshot,
@@ -474,28 +460,14 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `No backend owns client request '${response.id}'.`);
         }
 
-        if (owner.kind === 'workRouting') {
-          await this.requestInLocation(
-            this.locationFromRemoteConnectionId(owner.remoteConnectionId),
-            backendMethods.mcpWorkRoutingRespond,
-            { response },
-            () => this.workRouting.respond(response),
-          );
-        } else {
-          await this.requestInLocation(
-            this.locationFromRemoteConnectionId(owner.remoteConnectionId),
-            backendMethods.driverClientRequestRespond,
-            { backend: owner.backend, response },
-            () => this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, { backend: owner.backend, response }),
-          );
-        }
+        await this.requestInLocation(
+          this.locationFromRemoteConnectionId(owner.remoteConnectionId),
+          backendMethods.driverClientRequestRespond,
+          { backend: owner.backend, response },
+          () => this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, { backend: owner.backend, response }),
+        );
         this.clientRequests.delete(response.id);
         return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
-      }
-      case backendMethods.mcpWorkRoutingRespond: {
-        const response = requireClientRequestResponse(message.params);
-        await this.workRouting.respond(response);
-        return createClawRpcResult(message.id, this.snapshot);
       }
       case backendMethods.agentCreate: {
         const input = requireAgentCreateInput(message.params);
@@ -1541,26 +1513,6 @@ export class ClawBackendServer {
           { provider: requireWorkProvider(message.params) },
           () => this.requireWorkIntegrations().listAssignedItems(requireWorkProvider(message.params)),
         );
-      }
-      case backendMethods.workProviderItemCreate: {
-        const params = requireRecord(message.params);
-        const input = requireRecord(params.input);
-        const agentId = requireString(input.agentId, 'agentId');
-        const provider = requireWorkProvider(input);
-        const repositoryId = requireString(input.repositoryId, 'repositoryId').trim();
-        const description = requireString(input.description, 'description').trim();
-        if (!description) throw new Error('Issue description is required.');
-        if (description.length > 20_000) throw new Error('Issue description is too long.');
-        return this.routeAgentResultRequest(message.id, agentId, backendMethods.workProviderItemCreate, { input }, async (agent) => {
-          const generated = await this.handleAgentDriverRequest(agent, backendMethods.driverTextGenerate, {
-            agent,
-            cwd: agent.folder,
-            prompt: `Draft an issue for ${repositoryId} from this description.\n\n${description}`,
-            developerInstructions: 'Return a concise, actionable issue title and a useful Markdown body. Preserve the user\'s intent and facts. Add context and acceptance criteria only when they are supported by the description. Do not invent facts or add commentary.',
-            outputSchema: workItemDraftOutputSchema,
-          });
-          return this.requireWorkIntegrations().createItem(provider, repositoryId, parseGeneratedWorkItemDraft(generated));
-        });
       }
       case backendMethods.snapshotAutomationsGet: {
         const location = this.automationLocationFromParams(message.params);
@@ -2664,31 +2616,6 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     candidate.folder.trim().length > 0 &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
-}
-
-const workItemDraftOutputSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    title: { type: 'string' },
-    body: { type: 'string' },
-  },
-  required: ['title', 'body'],
-};
-
-function parseGeneratedWorkItemDraft(value: unknown): { title: string; body: string } {
-  if (!isRecord(value) || typeof value.text !== 'string') throw new Error('The backend returned an invalid issue draft.');
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value.text);
-  } catch {
-    throw new Error('The backend returned malformed issue content.');
-  }
-  if (!isRecord(parsed)) throw new Error('The backend returned malformed issue content.');
-  const title = typeof parsed.title === 'string' ? parsed.title.trim() : '';
-  const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
-  if (!title) throw new Error('The backend returned an empty issue title.');
-  return { title, body };
 }
 
 function planReviewPreview(markdown: string): { title: AppText; content: string } {

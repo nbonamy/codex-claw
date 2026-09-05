@@ -355,13 +355,6 @@ export type WorkItem = {
   updatedAt: string;
 };
 
-export type CreateWorkItemInput = {
-  agentId: string;
-  provider: WorkProviderKind;
-  repositoryId: string;
-  description: string;
-};
-
 export type AutomationRepositoryTarget = {
   provider: 'github';
   repositoryId: string;
@@ -1279,7 +1272,6 @@ export type AppSnapshot = {
   activeAgentId: string | null;
   messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
-  workRoutingRequests?: WorkRoutingRequest[];
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
   turnGitDiffs: Record<string, TurnGitDiff>;
@@ -1383,8 +1375,6 @@ export type MainToRendererEvent = {
     | 'backendApproval.resolved'
     | 'clientRequest.resolved'
     | 'toolInput.requested'
-    | 'workRouting.requested'
-    | 'workRouting.resolved'
     | 'browser.annotationCreated'
     | 'error';
   payload: unknown;
@@ -1558,29 +1548,7 @@ export type ClientRequest =
     payload: {
       request: AskUserRequest;
     };
-  }
-  | WorkRoutingRequest;
-
-export type WorkRoutingMode = 'current' | 'branch' | 'delegate';
-
-export type WorkRoutingResult =
-  | { mode: 'cancelled' }
-  | { mode: 'current'; folder: string }
-  | { mode: 'branch'; branchName: string; folder: string }
-  | { mode: 'delegated'; agentId: string; agentName: string; branchName: string; folder: string };
-
-export type WorkRoutingRequest = {
-  id: string;
-  kind: 'work_routing';
-  payload: {
-    request: {
-      agentId: string;
-      task: string;
-      suggestedBranchName: string;
-      sharedFolderAgentNames: string[];
-    };
   };
-};
 
 export type ClientRequestResponse = {
   id: string;
@@ -1588,10 +1556,6 @@ export type ClientRequestResponse = {
     answers?: AskUserAnswers;
     cancelled?: boolean;
     decision?: ToolConfirmationDecision | null;
-    workRouting?: {
-      mode: WorkRoutingMode;
-      branchName?: string;
-    };
   };
 };
 
@@ -1633,7 +1597,6 @@ export type CodexClawApi = {
   listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
   listAssignedWorkItems?(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
-  createWorkItem(input: CreateWorkItemInput): Promise<WorkItem>;
   listBackendModels(agentId: string): Promise<BackendModelOption[]>;
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;

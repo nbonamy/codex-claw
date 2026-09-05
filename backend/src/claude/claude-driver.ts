@@ -28,7 +28,7 @@ import {
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
-} from './cli-transport';
+} from './transport';
 import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
 import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';

@@ -310,7 +310,6 @@ const props = defineProps<{
   prefillAction: (item: WorkItem) => void;
   clearAssignmentAction?: (item: WorkItem) => void;
   closeAgentAction?: (agentId: string) => void;
-  createIssueAction: (description: string) => Promise<WorkItem>;
   showAgentAction?: (agentId: string) => void;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   startWorkAction: (input: RepositoryWorkStartInput) => Promise<void>;

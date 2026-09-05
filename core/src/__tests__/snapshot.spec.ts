@@ -3040,43 +3040,6 @@ describe('snapshot reducer', () => {
     });
   });
 
-  it('tracks app-owned work-routing requests outside the transcript', () => {
-    const snapshot = createInitialSnapshot();
-    const request = {
-      id: 'work-routing-1',
-      kind: 'work_routing' as const,
-      payload: {
-        request: {
-          agentId: 'agent-dina',
-          task: 'Add queue retries',
-          suggestedBranchName: 'feat/queue-retries',
-          sharedFolderAgentNames: [],
-        },
-      },
-    };
-
-    applyMainEventToSnapshot(snapshot, {
-      seq: 1,
-      agentId: 'agent-dina',
-      type: 'workRouting.requested',
-      payload: request,
-      occurredAt: '2026-06-05T00:00:01.000Z',
-    });
-
-    expect(snapshot.workRoutingRequests).toStrictEqual([request]);
-    expect(snapshot.messages).toHaveLength(0);
-
-    applyMainEventToSnapshot(snapshot, {
-      seq: 2,
-      agentId: 'agent-dina',
-      type: 'workRouting.resolved',
-      payload: { id: 'work-routing-1' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-    });
-
-    expect(snapshot.workRoutingRequests).toStrictEqual([]);
-  });
-
   it('attaches approval requests to the only running MCP tool when metadata is incomplete', () => {
     const snapshot = createInitialSnapshot();
 

@@ -405,35 +405,6 @@ describe('GitHubWorkProviderDriver', () => {
     expect(fetch).toHaveBeenNthCalledWith(1, 'https://api.github.com/repos/o/r/pulls/8', expect.any(Object));
   });
 
-  it('creates issues and normalizes the returned work item', async () => {
-    const fetch = vi.fn().mockResolvedValue(jsonResponse({
-      number: 24,
-      title: 'Keep reconnect status accurate',
-      body: 'The reconnect banner can stay visible forever.',
-      html_url: 'https://github.com/o/r/issues/24',
-      state: 'open',
-      user: { login: 'nbonamy' },
-      labels: [],
-      created_at: '2026-08-12T12:00:00.000Z',
-      updated_at: '2026-08-12T12:00:00.000Z',
-    }));
-    vi.stubGlobal('fetch', fetch);
-    const driver = new GitHubWorkProviderDriver('client-id');
-    const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
-
-    await expect(driver.createItem(token, 'o/r', {
-      title: 'Keep reconnect status accurate',
-      body: 'The reconnect banner can stay visible forever.',
-    })).resolves.toMatchObject({ id: 'o/r#24', kind: 'issue', number: 24, repositoryId: 'o/r' });
-    expect(fetch).toHaveBeenCalledWith('https://api.github.com/repos/o/r/issues', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({
-        title: 'Keep reconnect status accurate',
-        body: 'The reconnect banner can stay visible forever.',
-      }),
-    }));
-  });
-
   it('reports GitHub API rate-limit resets instead of a generic 403', async () => {
     const fetch = vi.fn().mockResolvedValue(errorResponse(403, {
       message: 'API rate limit exceeded for this user.',

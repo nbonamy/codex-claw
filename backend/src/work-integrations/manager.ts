@@ -100,12 +100,6 @@ export class WorkIntegrationManager {
     return driver.createPullRequest(await this.connectedToken('github'), repositoryId, input);
   }
 
-  async createItem(provider: WorkProviderKind, repositoryId: string, input: { title: string; body: string }): Promise<WorkItem> {
-    const driver = this.driver(provider);
-    if (!driver.createItem) throw new Error(`${providerLabel(provider)} issue creation is unavailable.`);
-    return driver.createItem(await this.connectedToken(provider), repositoryId, input);
-  }
-
   async githubConnected(): Promise<boolean> {
     return Boolean(await this.options.tokenStore.get('github'));
   }

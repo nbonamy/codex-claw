@@ -1,8 +1,6 @@
 import type { Agent, AgentBackend, AppSnapshot, ClientRequest, MainToRendererEvent } from '@codex-claw/core/contracts';
 
-export type ClientRequestOwner =
-  | { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string }
-  | { kind: 'workRouting'; remoteConnectionId?: string };
+export type ClientRequestOwner = { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string };
 
 export type ClientRequestRegistryOptions = {
   getSnapshot: () => AppSnapshot;
@@ -24,16 +22,6 @@ export class ClientRequestRegistry {
   }
 
   record(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
-    if (event.type === 'workRouting.requested') {
-      const request = clientRequest(event.payload);
-      if (request?.kind !== 'work_routing') return;
-      this.owners.set(request.id, {
-        kind: 'workRouting',
-        ...(remoteConnectionIdOverride ? { remoteConnectionId: remoteConnectionIdOverride } : {}),
-      });
-      return;
-    }
-
     if (
       event.type !== 'approval.requested' &&
       event.type !== 'backendApproval.requested' &&
@@ -63,14 +51,6 @@ export class ClientRequestRegistry {
     });
   }
 
-  recordProjectedWorkRouting(connectionId: string, remoteSnapshot: AppSnapshot, remoteTeamId: string): void {
-    const agentIds = new Set(remoteSnapshot.teams.find((team) => team.id === remoteTeamId)?.agentIds ?? []);
-    for (const request of remoteSnapshot.workRoutingRequests ?? []) {
-      if (agentIds.has(request.payload.request.agentId)) {
-        this.owners.set(request.id, { kind: 'workRouting', remoteConnectionId: connectionId });
-      }
-    }
-  }
 }
 
 function clientRequest(value: unknown): ClientRequest | null {
@@ -81,7 +61,7 @@ function clientRequest(value: unknown): ClientRequest | null {
     !('id' in value) ||
     !('kind' in value) ||
     typeof value.id !== 'string' ||
-    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user' && value.kind !== 'work_routing')
+    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user')
   ) {
     return null;
   }

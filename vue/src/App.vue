@@ -109,7 +109,6 @@
     :load-work-items="loadWorkItems"
     :load-global-work-items="loadGlobalWorkItems"
     :load-assigned-work-items="loadAssignedWorkItems"
-    :create-work-item="createWorkItem"
     :duplicate-agent-action="duplicateAgent"
     :assign-work-item-action="assignWorkItemToAgent"
     :quit="quit"
@@ -172,14 +171,6 @@
     @close="cancelPullRequestCleanup"
     @confirm="confirmPullRequestCleanup"
   />
-  <WorkRoutingDialog
-    :visible="pendingWorkRoutingRequest !== null"
-    :request="pendingWorkRoutingRequest"
-    :busy="workRoutingBusy"
-    :error="workRoutingError"
-    @cancel="cancelWorkRouting"
-    @respond="respondToWorkRouting"
-  />
   <AgentCreationProgressDialog
     :progress="agentCreationProgress"
     @close="clearAgentCreationProgress"
@@ -208,12 +199,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, WorkRoutingMode } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
 import AgentCreationProgressDialog from './components/AgentCreationProgressDialog.vue';
-import WorkRoutingDialog from './components/WorkRoutingDialog.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
@@ -345,7 +335,6 @@ const {
   loadWorkItems,
   loadGlobalWorkItems,
   loadAssignedWorkItems,
-  createWorkItem,
   assignWorkItemToAgent,
   removeWorkItemAssignment,
   resolveBackendApproval,
@@ -385,50 +374,6 @@ const agentCloseError = ref<string | null>(null);
 const pendingPullRequestCleanup = ref<Agent | null>(null);
 const pullRequestCleanupBusy = ref(false);
 const pullRequestCleanupError = ref<string | null>(null);
-const pendingWorkRoutingRequest = computed(() => snapshot.value.workRoutingRequests?.[0] ?? null);
-const workRoutingBusy = ref(false);
-const workRoutingError = ref<string | null>(null);
-
-watch(() => pendingWorkRoutingRequest.value?.id, () => {
-  workRoutingBusy.value = false;
-  workRoutingError.value = null;
-});
-
-async function respondToWorkRouting(mode: WorkRoutingMode, branchName?: string): Promise<void> {
-  const request = pendingWorkRoutingRequest.value;
-  if (!request || workRoutingBusy.value) return;
-  workRoutingBusy.value = true;
-  workRoutingError.value = null;
-  try {
-    await respondToClientRequest({
-      id: request.id,
-      payload: {
-        workRouting: {
-          mode,
-          ...(branchName ? { branchName } : {}),
-        },
-      },
-    });
-  } catch (error) {
-    workRoutingError.value = localizedErrorMessage(error, t);
-  } finally {
-    workRoutingBusy.value = false;
-  }
-}
-
-async function cancelWorkRouting(): Promise<void> {
-  const request = pendingWorkRoutingRequest.value;
-  if (!request || workRoutingBusy.value) return;
-  workRoutingBusy.value = true;
-  workRoutingError.value = null;
-  try {
-    await respondToClientRequest({ id: request.id, payload: { cancelled: true } });
-  } catch (error) {
-    workRoutingError.value = localizedErrorMessage(error, t);
-  } finally {
-    workRoutingBusy.value = false;
-  }
-}
 let unsubscribeSystemAppearance: (() => void) | null = null;
 let unsubscribeUpdateStatus: (() => void) | null = null;
 

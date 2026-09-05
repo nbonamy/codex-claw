@@ -478,7 +478,6 @@ function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPane
     items: [workItem()],
     repositoryId: 'nbonamy/codex-claw',
     prefillAction: vi.fn(),
-    createIssueAction: vi.fn().mockResolvedValue(workItem({ number: 24 })),
     status: 'loaded',
     startWorkAction: vi.fn().mockResolvedValue(undefined),
     visible: true,

@@ -16,9 +16,7 @@ Claw currently exposes isolation choices in several different places:
 - backlog assignment can continue in an existing agent or create an isolated
   agent and worktree;
 - duplicating or forking an agent may retain its folder;
-- automations and MCP tools can create agents;
-- the dormant `prepare-work` MCP flow can ask where implementation should
-  continue.
+- automations and MCP tools can create agents.
 
 These are all presentations of one product question: **when should work share
 a checkout, and when should Claw require or recommend isolation?** Designing
@@ -64,18 +62,7 @@ boundary for concurrent coding work.
 
 - Agent creation permits multiple agents to use the same folder without an
   explicit warning.
-- Work routing already detects other agents using the same folder and prevents
-  switching that shared checkout to another branch.
-- Work routing rejects branch switching when the checkout is dirty or its Git
-  status cannot be verified.
-- Creating an isolated work-routing destination creates a worktree, duplicates
-  the current agent into it, and dispatches the task there.
-- The `prepare-work` registration is parked and is not exposed in the
-  model-facing MCP tool catalog while its trigger and preference model are
-  reconsidered. Its coordinator, request lifecycle, backend behavior, and UI
-  remain in the codebase.
-- There is no persisted user policy for shared-checkout warnings or default-
-  branch work routing.
+- There is no persisted user policy for shared-checkout warnings.
 
 ## Agreed Direction: Explicit Shared-Checkout Creation
 
@@ -109,43 +96,6 @@ continuing.
 Suppression must be reversible in Settings. A global setting should control
 whether Claw warns when agents share a checkout, and repository exceptions
 need a discoverable reset mechanism.
-
-## Dormant Direction: `prepare-work`
-
-The original `prepare-work` idea lets the model pause before implementation
-and ask whether to continue in the current checkout, switch the checkout to a
-new branch, or delegate into a new worktree and agent.
-
-The capability may still be valuable, but the original trigger—"substantial
-implementation work"—is subjective, undiscoverable, and too broad. Before the
-tool can be exposed again, its purpose needs to be narrow enough that both the
-model and Claw can apply it predictably.
-
-A possible purpose is protecting work on a repository's default branch. Under
-that interpretation, Claw rather than the model must authoritatively determine
-eligibility. Candidate rules are:
-
-- only a Git workspace whose current branch is the repository's default
-  branch is eligible;
-- planning, explanation, review, diagnosis, and other read-only work do not
-  trigger it;
-- explicit user routing instructions always win;
-- a task is asked at most once;
-- non-default branches, Quick Chats, plain folders, and already isolated
-  task worktrees bypass it;
-- cancellation means implementation must not continue silently;
-- waiting is presented as a user decision, not a tool that appears to execute
-  indefinitely.
-
-Repository-level and global suppression may be appropriate here too, but it
-must not silently inherit the shared-checkout warning preference. These are
-different safety questions:
-
-- "May two agents share this checkout?"
-- "May this agent begin implementation on the default branch?"
-
-They can reuse repository identity and preference UI patterns without becoming
-one setting.
 
 ## Creation Surfaces Requiring A Decision
 
@@ -237,19 +187,13 @@ remote clients, or a race can bypass.
 5. What isolation contract should automations enforce?
 6. What should `create-agent` MCP do when its target checkout is already in
    use?
-7. When `prepare-work` returns to the catalog, how does the model learn that
-   the current branch is the default branch without guessing?
-8. Should default-branch protection remember "continue here," or merely stop
-   asking and default to current-checkout work?
-9. Can multiple pending isolation decisions exist across agents, and how are
-   they restored or cancelled across backend restart?
-10. Should Claw offer navigation to the existing agent as an alternative to
+7. Should Claw offer navigation to the existing agent as an alternative to
     creating another one?
 
 ## Next Step
 
 Resolve the open questions into one isolation policy matrix before implementing
-the shared-checkout dialog or re-exposing `prepare-work`. Once agreed, define
+the shared-checkout dialog. Once agreed, define
 the app-owned backend contract and persistence shape, then implement every
 creation surface against that same policy rather than adding independent UI
 guards.

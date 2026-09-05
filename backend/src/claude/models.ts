@@ -1,5 +1,5 @@
 import type { BackendModelOption } from '@codex-claw/core/contracts';
-import type { ClaudeAvailableModel } from './cli-transport';
+import type { ClaudeAvailableModel } from './transport';
 
 export const claudeModelOptions: BackendModelOption[] = [
   {

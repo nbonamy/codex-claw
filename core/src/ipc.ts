@@ -24,7 +24,6 @@ export const ipcChannels = {
   listGlobalWorkItems: 'work-provider:global-items:list',
   listAssignedWorkItems: 'work-provider:assigned-items:list',
   listWorkItems: 'work-provider:items:list',
-  createWorkItem: 'work-provider:item:create',
   listBackendModels: 'backend:models:list',
   listBackendPlugins: 'backend:plugins:list',
   listBackendSkills: 'backend:skills:list',

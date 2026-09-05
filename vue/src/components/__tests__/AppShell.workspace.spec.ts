@@ -326,11 +326,9 @@ describe('AppShell workspace and plans', () => {
     };
     const item = workItem();
     const loadWorkItems = vi.fn().mockResolvedValue([item]);
-    const createdItem = workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Created issue' });
-    const createWorkItem = vi.fn().mockResolvedValue(createdItem);
     const createAgentGitBranch = vi.fn().mockResolvedValue({});
     const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, loadWorkItems, createWorkItem, createAgentGitBranch, assignWorkItemAction });
+    const wrapper = mountShell({ snapshot, loadWorkItems, createAgentGitBranch, assignWorkItemAction });
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await nextTick();
@@ -345,16 +343,6 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
     const backlog = wrapper.getComponent({ name: 'RepositoryBacklogPanel' });
     expect(backlog.props('items')).toStrictEqual([item]);
-
-    await backlog.props('createIssueAction')('Create a keyboard navigation issue.');
-    await nextTick();
-    expect(createWorkItem).toHaveBeenCalledWith({
-      agentId: 'agent-dina',
-      provider: 'github',
-      repositoryId: 'nbonamy/codex-claw',
-      description: 'Create a keyboard navigation issue.',
-    });
-    expect(backlog.props('items')).toStrictEqual([createdItem, item]);
 
     await backlog.props('startWorkAction')({
       action: 'fix',

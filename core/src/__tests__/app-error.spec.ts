@@ -21,8 +21,8 @@ describe('app error descriptors', () => {
   });
 
   it('survives transports that preserve only an error message', () => {
-    const descriptor = { kind: 'appError', code: 'workRouting.branchRequired' } as const;
-    const transported = new Error(`Error invoking remote method: ${encodeAppErrorDescriptor(descriptor, 'Enter a branch name.')}`);
+    const descriptor = { kind: 'appError', code: 'clone.invalidName' } as const;
+    const transported = new Error(`Error invoking remote method: ${encodeAppErrorDescriptor(descriptor, 'Invalid repository name.')}`);
 
     expect(decodeAppErrorDescriptor(transported)).toStrictEqual(descriptor);
   });

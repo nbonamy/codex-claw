@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem, WorkRoutingRequest } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -16,7 +16,19 @@ import type { AgentGitService } from '../git/agent-git-service';
 
 describe('ClawBackendServer', () => {
   it('backfills missing workspace identity before returning the startup snapshot', async () => {
-    const snapshot = workRoutingSnapshot();
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    }];
+    snapshot.activeAgentId = 'agent-dina';
     const identity = vi.fn().mockResolvedValue({
       kind: 'git',
       folder: '/repo',
@@ -51,196 +63,6 @@ describe('ClawBackendServer', () => {
 
     expect(identity).toHaveBeenCalledWith('/repo');
     expect(saveSnapshot).toHaveBeenCalledTimes(1);
-    await server.close();
-  });
-
-  it('continues a routed task in the current checkout without mutating git', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn();
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      agentGitService: { createBranch } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent());
-
-    await expect(server.handleMessage(workRoutingResponseMessage('current'))).resolves.toMatchObject({ result: snapshot });
-
-    expect(createBranch).not.toHaveBeenCalled();
-    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', { mode: 'current', folder: '/repo' });
-    await server.close();
-  });
-
-  it('cancels a routed task without mutating git or agents', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn();
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      agentGitService: { createBranch } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent());
-
-    await server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'cancel-routing',
-      method: backendMethods.clientRequestRespond,
-      params: { response: { id: 'work-routing-1', payload: { cancelled: true } } },
-    });
-
-    expect(createBranch).not.toHaveBeenCalled();
-    expect(snapshot.agents).toHaveLength(1);
-    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', { mode: 'cancelled' });
-    await server.close();
-  });
-
-  it('switches the current checkout to the selected branch before continuing', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn().mockResolvedValue('/repo');
-    const status = vi.fn().mockResolvedValue(cleanGitStatus());
-    const identity = vi.fn().mockResolvedValue({
-      kind: 'git',
-      folder: '/repo',
-      repositoryName: 'repo',
-      repositoryRoot: '/repo',
-      branch: 'feat/routed-work',
-      isLinkedWorktree: false,
-      primaryWorktreeRoot: '/repo',
-      updatedAt: '2026-08-27T12:00:00.000Z',
-    });
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      agentGitService: { createBranch, identity, status } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent());
-
-    await server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work'));
-
-    expect(createBranch).toHaveBeenCalledWith('/repo', 'feat/routed-work', false);
-    expect(status).toHaveBeenCalledWith('/repo');
-    expect(snapshot.agents[0].workspace).toMatchObject({ branch: 'feat/routed-work' });
-    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', {
-      mode: 'branch', branchName: 'feat/routed-work', folder: '/repo',
-    });
-    await server.close();
-  });
-
-  it('rejects switching a dirty checkout', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn();
-    const status = vi.fn().mockResolvedValue({ ...cleanGitStatus(), changedFiles: 1, state: 'dirty' });
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      agentGitService: { createBranch, status } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent());
-
-    await expect(server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work')))
-      .rejects.toThrow('This checkout has uncommitted changes. Commit, stash, or delegate to a worktree instead.');
-
-    expect(createBranch).not.toHaveBeenCalled();
-    expect(resolveWorkRoutingRequest).not.toHaveBeenCalled();
-    await server.close();
-  });
-
-  it('rejects switching when checkout status cannot be verified', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn();
-    const status = vi.fn().mockResolvedValue({ ...cleanGitStatus(), state: 'unknown' });
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      agentGitService: { createBranch, status } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent());
-
-    await expect(server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work')))
-      .rejects.toThrow('Could not verify whether this checkout has uncommitted changes. Delegate to a worktree instead.');
-
-    expect(createBranch).not.toHaveBeenCalled();
-    expect(resolveWorkRoutingRequest).not.toHaveBeenCalled();
-    await server.close();
-  });
-
-  it('rejects switching a checkout shared with another agent', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn();
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      agentGitService: { createBranch } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent(['Paul']));
-
-    await expect(server.handleMessage(workRoutingResponseMessage('branch', 'feat/routed-work')))
-      .rejects.toThrow('This folder is also used by Paul. Delegate to a worktree instead.');
-
-    expect(createBranch).not.toHaveBeenCalled();
-    expect(resolveWorkRoutingRequest).not.toHaveBeenCalled();
-    await server.close();
-  });
-
-  it('delegates routed work to a background agent in an isolated worktree', async () => {
-    const snapshot = workRoutingSnapshot();
-    const createBranch = vi.fn().mockResolvedValue('/repo-feat-routed-work');
-    const resolveWorkRoutingRequest = vi.fn().mockReturnValue(true);
-    const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-delegated' } });
-    const driver: AgentBackendDriver = {
-      backend: 'codex',
-      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
-      getCapabilities: () => codexBackendCapabilities,
-      sendPrompt,
-      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      getGitStatus: async () => null,
-      onEvent: () => () => undefined,
-      close: async () => undefined,
-    };
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
-      agentGitService: { createBranch } as unknown as AgentGitService,
-      workRouting: { resolveWorkRoutingRequest },
-    });
-    server.emitEvent(workRoutingRequestedEvent());
-
-    await server.handleMessage(workRoutingResponseMessage('delegate', 'feat/routed-work'));
-
-    expect(createBranch).toHaveBeenCalledWith('/repo', 'feat/routed-work', true);
-    expect(snapshot.activeAgentId).toBe('agent-dina');
-    const delegated = snapshot.agents.find((agent) => agent.id !== 'agent-dina');
-    expect(delegated).toMatchObject({
-      folder: '/repo-feat-routed-work',
-      backend: 'codex',
-      delegatedByAgentId: 'agent-dina',
-    });
-    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledWith(
-      expect.objectContaining({ id: delegated!.id, folder: '/repo-feat-routed-work' }),
-      'Implement the routed feature.',
-      undefined,
-    ));
-    expect(resolveWorkRoutingRequest).toHaveBeenCalledWith('work-routing-1', {
-      mode: 'delegated',
-      agentId: delegated!.id,
-      agentName: delegated!.name,
-      branchName: 'feat/routed-work',
-      folder: '/repo-feat-routed-work',
-    });
     await server.close();
   });
 
@@ -4912,82 +4734,6 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('drafts and creates an issue without starting a visible conversation', async () => {
-    const snapshot = createTestSnapshot();
-    snapshot.teams[0]!.agentIds = ['agent-dina'];
-    snapshot.agents = [{
-      id: 'agent-dina',
-      teamId: 'team-test',
-      name: 'Dina',
-      folder: '/repo',
-      backend: 'codex',
-      status: { type: 'idle' },
-      createdAt: '2026-06-13T00:00:00.000Z',
-      updatedAt: '2026-06-13T00:00:00.000Z',
-    }];
-    const generateText = vi.fn().mockResolvedValue({
-      text: '{"title":"Keep reconnect status accurate","body":"The reconnect banner can stay visible forever."}',
-    });
-    const sendPrompt = vi.fn();
-    const driver: AgentBackendDriver = {
-      backend: 'codex',
-      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
-      getCapabilities: () => codexBackendCapabilities,
-      generateText,
-      sendPrompt,
-      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      onEvent: () => () => undefined,
-      close: async () => undefined,
-    };
-    const createItem = vi.fn().mockResolvedValue({
-      provider: 'github',
-      id: 'owner/repo#24',
-      kind: 'issue',
-      repositoryId: 'owner/repo',
-      repositoryFullName: 'owner/repo',
-      number: 24,
-      title: 'Keep reconnect status accurate',
-      url: 'https://github.com/owner/repo/issues/24',
-      state: 'open',
-      labels: [],
-      createdAt: '2026-08-12T12:00:00.000Z',
-      updatedAt: '2026-08-12T12:00:00.000Z',
-    });
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      snapshot,
-      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
-      workIntegrations: { createItem } as unknown as WorkIntegrationManager,
-    });
-
-    await expect(server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'create-issue',
-      method: backendMethods.workProviderItemCreate,
-      params: {
-        input: {
-          agentId: 'agent-dina',
-          provider: 'github',
-          repositoryId: 'owner/repo',
-          description: 'The reconnect banner can stay visible forever.',
-        },
-      },
-    })).resolves.toMatchObject({ result: { id: 'owner/repo#24', number: 24 } });
-
-    expect(generateText).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), expect.objectContaining({
-      cwd: '/repo',
-      prompt: expect.stringContaining('The reconnect banner can stay visible forever.'),
-      outputSchema: expect.objectContaining({ type: 'object' }),
-    }));
-    expect(createItem).toHaveBeenCalledWith('github', 'owner/repo', {
-      title: 'Keep reconnect status accurate',
-      body: 'The reconnect banner can stay visible forever.',
-    });
-    expect(sendPrompt).not.toHaveBeenCalled();
-    await server.close();
-  });
-
   it('checks for an existing pull request and pushes local commits before creation', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -7095,67 +6841,6 @@ function createTestSnapshot(): AppSnapshot {
       chatFontSize: 15,
       codeFontSize: 13,
     },
-  };
-}
-
-function workRoutingSnapshot(): AppSnapshot {
-  const snapshot = createTestSnapshot();
-  snapshot.teams[0]!.agentIds = ['agent-dina'];
-  snapshot.agents = [{
-    id: 'agent-dina',
-    teamId: 'team-test',
-    name: 'Dina',
-    folder: '/repo',
-    backend: 'codex',
-    status: { type: 'idle' },
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: '2026-08-01T00:00:00.000Z',
-  }];
-  snapshot.activeAgentId = 'agent-dina';
-  return snapshot;
-}
-
-function workRoutingRequestedEvent(sharedFolderAgentNames: string[] = []) {
-  const request: WorkRoutingRequest = {
-    id: 'work-routing-1',
-    kind: 'work_routing',
-    payload: {
-      request: {
-        agentId: 'agent-dina',
-        task: 'Implement the routed feature.',
-        suggestedBranchName: 'feat/routed-work',
-        sharedFolderAgentNames,
-      },
-    },
-  };
-  return { agentId: 'agent-dina', type: 'workRouting.requested' as const, payload: request };
-}
-
-function cleanGitStatus(): AgentGitStatus {
-  return {
-    folder: '/repo',
-    branch: 'main',
-    ahead: 0,
-    behind: 0,
-    changedFiles: 0,
-    addedLines: 0,
-    removedLines: 0,
-    hasUntracked: false,
-    state: 'clean',
-    updatedAt: '2026-08-29T00:00:00.000Z',
-  };
-}
-
-function workRoutingResponseMessage(mode: 'current' | 'branch' | 'delegate', branchName?: string) {
-  const workRouting: NonNullable<import('@codex-claw/core/contracts').ClientRequestResponse['payload']>['workRouting'] = {
-    mode,
-    ...(branchName ? { branchName } : {}),
-  };
-  return {
-    jsonrpc: '2.0' as const,
-    id: `respond-${mode}`,
-    method: backendMethods.clientRequestRespond,
-    params: { response: { id: 'work-routing-1', payload: { workRouting } } },
   };
 }
 

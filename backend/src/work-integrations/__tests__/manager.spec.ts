@@ -261,29 +261,6 @@ describe('WorkIntegrationManager', () => {
     });
   });
 
-  it('creates work items through the connected provider driver', async () => {
-    const snapshot = createInitialSnapshot();
-    const tokenStore = new MemoryWorkIntegrationTokenStore();
-    await tokenStore.set({
-      provider: 'github',
-      accessToken: 'gho_secret',
-      tokenType: 'bearer',
-      connectedAt: '2026-06-09T12:00:00.000Z',
-    });
-    const item = workItem();
-    const createItem = vi.fn().mockResolvedValue(item);
-    const manager = createManager({ driver: { ...fakeDriver(), createItem }, snapshot, tokenStore });
-
-    await expect(manager.createItem('github', 'nbonamy/codex-claw', {
-      title: 'Fix backlog assignment',
-      body: 'Details',
-    })).resolves.toBe(item);
-    expect(createItem).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'gho_secret' }), 'nbonamy/codex-claw', {
-      title: 'Fix backlog assignment',
-      body: 'Details',
-    });
-  });
-
   it('persists GitHub backlog provider configuration', async () => {
     const snapshot = createInitialSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);

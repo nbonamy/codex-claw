@@ -2,7 +2,6 @@ import { ref } from 'vue';
 import type {
   AppSnapshot,
   AutomationLocation,
-  CreateWorkItemInput,
   GlobalWorkItemQuery,
   WorkBacklogConfigurationInput,
   WorkItem,
@@ -186,13 +185,6 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     }
   }
 
-  async function createItem(input: CreateWorkItemInput): Promise<WorkItem> {
-    if (!codexClawApi?.createWorkItem) {
-      throw new Error(translate('surface.app-state.issueCreationIsNotAvailable'));
-    }
-    return codexClawApi.createWorkItem(input);
-  }
-
   async function loadConnected(): Promise<void> {
     const providers = options.getSnapshot().workBacklog.connections
       .filter((candidate) => candidate.status === 'connected')
@@ -289,7 +281,6 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     completeConnection,
     configure,
     connect,
-    createItem,
     disconnect,
     loadAssignedItems,
     loadConnected,

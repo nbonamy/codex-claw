@@ -97,8 +97,7 @@ transport configures:
 - Claw's agent-scoped collaboration MCP server and allowed-tool rule;
 - partial streaming events for responsive text and tool cards.
 
-The legacy print-mode `ClaudeCliTransport` remains an isolated transport seam,
-but it is no longer the driver's default. Both transports feed the same
+The live Claude transport uses the Agent SDK and feeds its messages through the
 app-owned message adapter. The driver maps Claude SDK stream messages into
 app-owned backend events:
 
@@ -145,10 +144,9 @@ Claude advertises prompt attachments through the shared composer. The Electron
 attachment registry resolves renderer-safe references before they reach
 `clawd`; the Agent SDK transport sends supported images, PDFs, and text/source
 files as native multimodal content blocks. Other binary files remain available
-to Claude Code by their trusted local path. The legacy print-mode transport
-rejects attachments explicitly rather than silently dropping them. Rollback
-and edit/retry remain disabled until those surfaces are implemented reliably
-for Claude. Model listing is local.
+to Claude Code by their trusted local path. Rollback and edit/retry remain
+disabled until those surfaces are implemented reliably for Claude. Model
+listing is local.
 Claude context usage comes from the Agent SDK's `getContextUsage()` control
 request and is normalized into Claw's provider-neutral context gauge after
 session initialization, turns, and compaction. Selecting a persisted Claude
