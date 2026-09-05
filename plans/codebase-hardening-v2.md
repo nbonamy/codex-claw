@@ -21,9 +21,9 @@ The execution order is:
 
 The authoritative planning state is the checked-out branch
 `chore/codebase-hardening-review` at
-`20a0b9298f872e1a53d16e8707bd8526776c08b8` on 2026-09-04. All comparisons,
-decisions, and future ledger entries start from that branch/commit unless a
-later ledger row explicitly advances it.
+`92551b034a1ee30602c9f3e4b649d38d931501b5` on 2026-09-05. Historical
+comparisons still start from the baselines below; future ledger entries start
+from this branch/commit unless a later row explicitly advances it.
 
 | Reference | Exact commit | Meaning |
 | --- | --- | --- |
@@ -35,6 +35,8 @@ later ledger row explicitly advances it.
 | Contract checkpoint 3 | `f37512ab56c4fd82b43393b63ed4ef42094b34bf` | Conversation contract owner |
 | Contract checkpoint 4 | `42738b90b3cbb3d6d86e4e47d0a57e8043a5f5f7` | Work contract owner |
 | Last completed Phase 1 contract record | `66e1f28a692ea589b1e60ea1f1e08038f4cc2731` | `chore: record work contract extraction` |
+| Dead-workflow deletion on `main` | `a3673ec160134d3d12591316997adb8fa59b6354` | Canonical 84-file deletion checkpoint: 147 additions and 4,171 deletions |
+| Dead-workflow deletion on review branch | `92551b034a1ee30602c9f3e4b649d38d931501b5` | Cherry-pick adapted to retained contract owners: 86 files, 149 additions, and 4,188 deletions |
 
 At authoring time the only pre-existing working-tree modification was
 `plans/codebase-hardening.md`; it must be preserved. Contract checkpoint 5 had
@@ -72,6 +74,47 @@ checkpoint must keep each workspace at or above its recorded per-dimension
 baseline (regression prevention). After remediation and at final qualification,
 every workspace must reach at least 85% statements, branches, functions, and
 lines (debt remediation).
+
+### Completed dead-code checkpoint
+
+The 2026-09-05 checkpoint removed four independently audited dead vertical
+slices. On `main`, commit `a3673ec160134d3d12591316997adb8fa59b6354`
+changed 84 files with 147 additions and 4,171 deletions. Review-branch
+cherry-pick `92551b034a1ee30602c9f3e4b649d38d931501b5` changed 86 files with
+149 additions and 4,188 deletions because the removal was adapted to the
+retained contract-owner modules.
+
+- `WorkBacklogPanel.vue`, its isolated spec, private i18n namespace, and stale
+  documentation reference were removed after runtime-registration searches
+  proved the surface orphaned.
+- `RepositoryIssueComposer.vue` and its spec were removed with the complete
+  dormant create-item path: Vue prop/state glue, Web operation, Electron
+  preload/IPC/controller/timeout plumbing, Core API/protocol declarations,
+  Backend work-integration/server methods, and endpoint-only tests.
+- The obsolete Claude print-mode CLI implementation and its tests were
+  removed. Active `ClaudeTurnTransport` declarations were moved losslessly to
+  `backend/src/claude/transport.ts`; the Agent SDK and unrelated stdio
+  transports remain.
+- The disabled `prepare-work` / work-routing system was removed end to end:
+  commented MCP registration, coordinator/service callbacks, backend routing,
+  client/remote projection, Core protocol/events/snapshot/errors, renderer
+  dialog/state/i18n, tests, fixtures, and stale documentation. Live
+  `create_agent` behavior with `createWorktree: true`, `initialPrompt`, and
+  initialization progress remains.
+
+Compatibility decisions were explicit: the unsupported create-item and
+work-routing protocol methods are no longer retained without live producers;
+ordinary snapshot parsing safely ignores the obsolete additive routing field;
+and no compatibility façade remains solely for dormant UI. This does not
+authorize removal of the separate compatibility candidates still inventoried
+below.
+
+Validation passed: focused Core 5 files / 40 tests, Backend 4 files / 59 tests,
+Vue App 1 file / 5 tests, and active backlog 3 files / 41 tests; all-workspace
+typecheck; full lint including Stylelint and Knip (apart from Knip's existing
+`lipo knip.json Remove from ignoreBinaries` configuration hint); full
+`npm run test:ai` at 272 files / 2,046 tests (Core 45/282, Backend 60/583, Vue
+121/872, Electron 40/285, Web 6/24); and `git diff --check`.
 
 ### Existing measurements
 
@@ -304,26 +347,27 @@ The first P1 checkpoint may combine only symbols that share a workspace and
 validation gate. Do not hide a failing reference by replacing removed code with
 pass-through plumbing.
 
-### P2/P3 — product-dependent orphan Vue surfaces
+### Completed history — product-dependent orphan Vue surfaces
 
-Current static/runtime inventory found no production inbound import, async
-component resolver, global registration, glob registration, or string-based
-registry for these two product-dependent groups. The two P1-safe orphan groups
-are listed above:
+Static/runtime inventory found no production inbound import, async component
+resolver, global registration, glob registration, or string-based registry for
+these groups. Product approval selected deletion, completed in the dead-code
+checkpoint above:
 
-| Surface | Files and measured size | Attached cleanup | Decision |
+| Surface | Files and measured size before deletion | Completed closure | Decision/result |
 | --- | --- | --- | --- |
-| Legacy work backlog | `vue/src/components/WorkBacklogPanel.vue` (668); `vue/src/components/__tests__/WorkBacklogPanel.spec.ts` (407) | Remove surface-specific i18n/style/icon references only after proving they are not shared | **P3.** Explicit product approval required because historical plans treated it as future-facing. Prefer deletion over refactoring if retired |
-| Repository issue composer | `vue/src/components/RepositoryIssueComposer.vue` (326); `vue/src/components/__tests__/RepositoryIssueComposer.spec.ts` (101) | Remove composer-only copy, validation helpers, and styles found by post-delete Knip/RG | **P2.** Delete after confirming no intended issue-create entry point remains |
+| Legacy work backlog | `vue/src/components/WorkBacklogPanel.vue` (668); `vue/src/components/__tests__/WorkBacklogPanel.spec.ts` (407) | Component, isolated spec, private `surface.workBacklogPanel` i18n, and stale `docs/team-cockpit.md` reference removed | **Complete.** Product approval retired the future-facing orphan |
+| Repository issue composer and create-item slice | `vue/src/components/RepositoryIssueComposer.vue` (326); `vue/src/components/__tests__/RepositoryIssueComposer.spec.ts` (101), plus the dormant Vue/Web/Electron/Core/Backend path | Composer/spec and the full `workProvider/item/create` API, IPC, Web, backend, prop/state, tests, and i18n closure removed | **Complete.** No intended visible entry point or live producer remained |
 
-These two groups total 1,502 measured lines in the current tree. Their deletion
-is two independent commits, not a single “Vue cleanup” commit.
+The two component/spec groups alone totaled 1,502 measured lines before
+deletion. They are completed history and contribute zero lines to the remaining
+dead-code inventory.
 
-### P3 — parked `prepare-work` / work-routing system
+### Completed history — parked `prepare-work` / work-routing system
 
-The model-facing registration in `backend/src/mcp/tools.ts` is commented out,
-and `backend/src/mcp/__tests__/service.spec.ts` explicitly proves the tool is
-not exposed. The retained lifecycle still spans:
+The model-facing registration in `backend/src/mcp/tools.ts` was commented out,
+and `backend/src/mcp/__tests__/service.spec.ts` proved the tool was not exposed.
+The completed deletion removed:
 
 - `backend/src/mcp/agent-coordinator.ts`: `PrepareWorkInput`,
   `PrepareWorkResponse`, `onPrepareWork`, constructor field, and `prepareWork`;
@@ -352,30 +396,24 @@ not exposed. The retained lifecycle still spans:
 - `docs/mcp.md`, `docs/agent-isolation.md`, `docs/protocol.md`, and
   `docs/backend-architecture.md` work-routing sections.
 
-Size context for the affected owners, not a claim that every line is dormant:
+Pre-deletion size context for the affected owners, not a claim that every line
+was dormant:
 agent coordinator 567 lines, MCP service 693, MCP tools 213, work-routing
 service 122, client-request registry 77, remote-team service 320, server 2,761,
 runtime 268, `App.vue` 627, Core contracts/work 230, snapshot construction 162,
 metadata guard 531, runtime reducer 348, protocol methods 176, runtime event
 payload decoder 360, and the four docs 1,368 combined. Before deletion, record
-the exact line/symbol slice in each owner; never count an entire shared file as
-removed work-routing code.
+the audit recorded the exact line/symbol slice in each owner; the checkpoint
+does not count an entire shared file as removed work-routing code.
 
-Decision gate:
+The decision was **delete**, completed as one vertical-slice checkpoint without
+snapshot/event/persistence ghosts. Generic client requests, live
+`create_agent` worktree creation and initialization progress, unrelated
+delegated-work flows, and `RepositorySessionSourceDialog` branch-preparation
+copy remain. Reintroducing a different workflow requires a separate product
+design.
 
-- **Keep parked:** document the intended trigger and owner, then exclude the
-  code from monolith metrics; add no new behavior.
-- **Delete:** remove the complete vertical slice in one feature checkpoint,
-  including persistence/wire fields only after proving no supported released
-  state needs them. Preserve unrelated `RepositorySessionSourceDialog` branch
-  preparation copy.
-- **Revive:** requires a separate product design and is outside this hardening
-  plan.
-
-Do not delete isolated pieces while leaving snapshot/event/persistence
-compatibility ghosts.
-
-### P2 — legacy Claude print-mode CLI transport
+### Completed history — legacy Claude print-mode CLI transport
 
 `backend/src/claude/cli-transport.ts` is 299 lines total and mixes two things:
 roughly 203 lines of obsolete `ClaudeCliTransport` implementation/helpers and
@@ -383,23 +421,16 @@ the still-active `ClaudeTurnTransport` protocol/types imported by
 `agent-sdk-transport.ts`, `claude-driver.ts`, `models.ts`, and tests. The active default is
 `backend/src/claude/agent-sdk-transport.ts`.
 
-Deletion sequence:
+The shared turn, permission, context, model, and transport declarations were
+moved losslessly to `backend/src/claude/transport.ts` and active imports were
+updated. Runtime/export searches found no `ClaudeCliTransport` construction or
+fallback, so the class, CLI helpers, spec, and stale documentation were removed.
+Backend `clawd` stdio, SSH stdio, Electron backend stdio, and the Claude Agent
+SDK transport remain active.
 
-1. Mechanically move the shared turn, permission, context, model, and transport
-   types to `backend/src/claude/transport.ts`; update active imports and prove
-   the move with `lossless-code-moves` hashes.
-2. Search runtime construction for `new ClaudeCliTransport`, environment or
-   configuration fallbacks, and exported package APIs.
-3. If none exists, delete the `ClaudeCliTransport` class, CLI argument/env/
-   redaction/process helpers, and
-   `backend/src/claude/__tests__/cli-transport.spec.ts`.
-4. Update `docs/claude.md` to remove the statement that the legacy seam remains.
-5. Preserve backend `clawd` stdio, SSH stdio, Electron backend stdio, and the
-   Claude Agent SDK transport; they are unrelated and active.
-
-Validation: Claude driver, Agent SDK transport, protocol, transcript, model,
-permission, full backend tests, typecheck, Knip, and a manual Claude prompt/
-resume/interrupt smoke.
+Automated validation is included in the completed checkpoint evidence above.
+The manual Claude prompt/resume/interrupt smoke remains part of final
+qualification, not evidence already claimed by this deletion checkpoint.
 
 ### P2 — protocol and persistence compatibility candidates
 
@@ -409,7 +440,6 @@ resume/interrupt smoke.
 | `completionInstructionsDeliveredAt` | `core/src/contracts/work.ts`; snapshot metadata/runtime validators and reducers; backend persistence reader; related Core/backend tests | Inventory every current writer and released persisted-state producer. If no writer exists, delete reader, contract, reducers, fixtures, and migration assertions together. If old releases wrote it and restoring it still changes behavior, retain as an explicit migration field |
 | `agent/folder/update` | `core/src/backend-protocol/methods.ts`; backend server request case/tests; Electron IPC/controller tests and any API member | Prove no current renderer, MCP, Web, remote, or external client calls it. Decide whether it is a supported protocol method before removing the complete request path |
 | `automation/due/run` | `core/src/backend-protocol/methods.ts#automationDueRun`; `backend/src/server.ts` request case; `server-automation-requests.spec.ts`, `server-protocol-lifecycle.spec.ts`; `docs/protocol.md` | Scheduler production search finds no protocol caller; it invokes automation runtime directly. Decide whether external/manual clients may run all due automations. If no, delete method, server case, protocol docs, and endpoint-only tests while preserving scheduler behavior |
-| Work-item creation (`workProvider/item/create`) | `core/src/backend-protocol/methods.ts#workProviderItemCreate`, `core/src/ipc.ts#createWorkItem`, `CodexClawApi.createWorkItem`; Backend server case/tests; Electron timeout, IPC/controller/preload path; Web `operations.ts#createWorkItem`; Vue `work-provider-state.ts`, `app-state.ts`, `App.vue`, `AppShell.vue`, `AgentWorkspace.vue#createRepositoryIssue`, `RightWorkspacePanel.vue#createRepositoryIssue`, and `RepositoryBacklogPanel.vue#createIssueAction`; associated tests | The child `RepositoryBacklogPanel` declares but never reads `createIssueAction`, yet production glue reaches all the way to Backend and Web. Product decision: restore a visible create-issue flow or delete the complete API/IPC/protocol/glue vertical slice. Do not remove only the child prop and leave the dormant upstream feature |
 | Flat backend-approval and agent-less resolution compatibility | Core event payload decoder/ownership; snapshot reducer; backend/provider translation tests | Enumerate active Codex/Claude producers and released wire forms. Delete only forms no supported producer emits; retain explicit agent-less no-op if it is wire compatibility |
 | Legacy full-versus-metadata snapshot fallback forms | mixed snapshot adoption in Core, Backend, Electron, Web, and Vue | Maintain strict no-downgrade decoding. Remove a fallback only after every supported sender is versioned or proven to send the canonical envelope |
 | Named legacy persistence readers | `backend/src/state-persistence.ts`: `legacyThreadPlanStatus`, `legacyWorkBacklogAssignments`, `legacyWorkBacklogAssignment`, and `legacyCodexConversationRef`; their fixtures/assertions in `backend/src/__tests__/state-persistence.spec.ts` | Map each reader to the last released writer and decide the minimum supported upgrade version separately. Delete reader and fixtures only when that state shape is no longer supported; never remove all migrations as one bulk cleanup |
@@ -490,7 +520,7 @@ runtime. A candidate without those targets remains review-only.
 | Remote state is projected/cached in server, `remote-team-service`, connection client, and client request registry | **Extract:** `RemoteBackendReplica` owns per-location snapshot, event adoption, agent projection, pending client requests, reconnect/invalidation. Location router asks the replica; domain owners never know SSH/stdio | Remote identity mapping, metadata/full transcript rules, reconnect recovery, pending request resolution, malformed-event recovery | One replica owner; no remote cache mutation in server; direct recovery/projection tests; local handlers transport-agnostic |
 | `backend/src/state-persistence.ts` is 1,357 lines/71 functions/81 `if`s | **Keep deep public façade; extract private codecs:** app root, agents, subagents, work, topology, primitive values. Persistence may import codecs; codecs may import contracts, never server/services | Released shape migrations, normalization/repair, corrupt subrecord recovery, invalid JSON behavior, defaults, unknown additive fields | `load/save` façade stays narrow; every codec has direct migration tests; no behavior move mixed with relocation; decisions localized, not merely redistributed |
 | `backend/src/codex/codex-driver.ts` is a shallow public wrapper over 1,744-line `codex-surface-adapter.ts`; Claude driver is 1,266 lines | **Consolidate public provider entrypoints, extract private owners:** session lifecycle, event translation, transcript/history, approval/tool semantics. Do not invent a shared Codex/Claude base beyond `AgentBackendDriver` | Provider-specific session resume, tools, approvals, model/effort, compaction, transcript, file events, MCP configuration | One public driver per provider; private modules have provider-local interfaces/direct tests; wrapper-to-adapter pass-through removed; no renderer/provider leakage |
-| `backend/src/mcp/service.ts` owns mailbox storage/delivery and many unrelated model-facing workflows; coordinator duplicates orchestration callbacks | **Extract/consolidate:** `McpMailboxService` owns inbox/envelopes/delivery/read state. Workflow tools call backend domain services through explicit ports. HTTP/tool registration remains MCP adapter. Delete parked `prepare-work` slice if approved | Message ordering, recipient identity, unread state, tool result presentation, caller authorization, create-agent atomicity | Mailbox tests independent of create-agent/Git/browser tools; workflow policy has one backend owner; MCP adapter contains no state mutation policy |
+| `backend/src/mcp/service.ts` owns mailbox storage/delivery and many unrelated model-facing workflows; coordinator duplicates orchestration callbacks | **Extract/consolidate:** `McpMailboxService` owns inbox/envelopes/delivery/read state. Workflow tools call backend domain services through explicit ports. HTTP/tool registration remains MCP adapter. The parked `prepare-work` slice is already deleted | Message ordering, recipient identity, unread state, tool result presentation, caller authorization, create-agent atomicity | Mailbox tests independent of create-agent/Git/browser tools; workflow policy has one backend owner; MCP adapter contains no state mutation policy |
 | Service construction and environment/lifecycle wiring are split between `clawd.ts`, server constructor, and ad hoc factories | **Extract:** `backend/src/runtime.ts` composition root creates persistence, drivers, scheduler, services, router, replica, event coordinator, server. Domain modules never import runtime | Singletons, shutdown order, daemon/stdio/socket modes, injected clocks/IDs, no eager provider side effects | One construction root; server no longer `new`s domain services; runtime smoke tests cover start/stop modes; dependency graph acyclic |
 
 ### Electron and Web adapters
@@ -509,7 +539,7 @@ runtime. A candidate without those targets remains review-only.
 | `vue/src/App.vue` is 627 lines with roughly 153 bindings; `AppShell.vue` is 1,798 lines with 112 props/39 emits; `AgentWorkspace.vue` is 696 lines | **Extract/cascade by responsibility:** App owns route/onboarding/root composition; AppShell owns layout; `AppShellNavigation` owns navigation; `AgentWorkspace` owns active-agent layout; command router owns user intents and calls app-state namespaces. Prefer scoped context objects over prop/event forwarding, but do not create a giant context bag | Keyboard/menu commands, focus, active agent/team, settings/Cockpit/Automations navigation, SDK conversation wiring, dialogs, side panels, Debug actions | App/AppShell primitive prop+emit cardinality drops; no child-to-root event relays without policy; direct command/router tests own most cases; retain eight real-composition smokes |
 | Renderer commands/workflows are split between `use-app-shell-commands`, shell methods, App callbacks, and component emits | **Consolidate:** typed `AppCommandRouter` maps `AppCommand`/UI intents to app-state commands and modal/navigation owners; features emit semantic intents only | Shortcut/menu parity, disabled-state policy, error reporting, modal sequencing | One exhaustive command map; zero duplicated command switch; direct router tests; components no longer know root plumbing |
 | `GitWorkflowControl.vue` is 1,326 lines and models commit/push/merge/PR/report/cleanup/progress with overlapping flags | **Extract:** one discriminated Git operation controller/state machine; pure form/view components consume it. Backend remains mutation owner | Operation exclusivity, squash/push/delete ordering, handoff-before-cleanup, background progress, PR metadata/message delivery, recoverable errors | Impossible flag combinations unrepresentable; controller direct tests own transitions; component tests focus rendering; one progress model |
-| `RepositoryBacklogPanel.vue` (1,310), `CockpitWorkInbox.vue` (1,087), and `CockpitView.vue` (709) duplicate some workflow but have different projections | **Extract selectively:** repository projection/query owner; Cockpit projection/selection owner; shared work-item routing contract only. Delete orphan `WorkBacklogPanel` if approved. Do not share rows whose semantics differ | Fixed height across loading/empty/list, pagination/filter/scope, selection, assignment/routing, stable item identity, error recovery | Active parents lose projection/policy decisions; direct projection/workflow tests; component mounts/time fall; no forced visual abstraction |
+| `RepositoryBacklogPanel.vue` (1,310), `CockpitWorkInbox.vue` (1,087), and `CockpitView.vue` (709) duplicate some workflow but have different projections | **Extract selectively:** repository projection/query owner; Cockpit projection/selection owner; shared work-item routing contract only. The orphan `WorkBacklogPanel` is already deleted. Do not share rows whose semantics differ | Fixed height across loading/empty/list, pagination/filter/scope, selection, assignment/routing, stable item identity, error recovery | Active parents lose projection/policy decisions; direct projection/workflow tests; component mounts/time fall; no forced visual abstraction |
 | `ImageAnnotationDialog.vue` is 1,298 lines (207 template/708 script/383 style), 44 functions/19 refs | **Extract:** pure `image-annotation-session` owns shapes, comments, numbering, history, export model; DOM/canvas adapter owns coordinates, zoom, scroll, pixel sampling, capture, rasterization, popup placement. Move style byte-identically if split | Image-relative coordinates, comment edit, numbering, last-annotation undo, export fidelity, browser hiding | Pure session direct tests; fewer dialog mounts; DOM adapter tests isolate geometry; no general redo/text/selection feature added |
 | `AutomationsView.vue` is 804 lines while `AutomationEditor.vue` is already a coherent 340-line editor | **Keep editor; extract only remote/local state and mutation workflow from view.** Scheduler remains backend-owned. Do not revive the retired graph design | Repository multi-select, two prompts, schedule/off/team/enabled state, voice textarea, save/run/status, remote location | View owns presentation, controller owns load/save/run/races; direct workflow tests; no extra graph/persona abstraction |
 | `AgentDialog.vue` is 731 lines and combines create/edit mode, repository/worktree acquisition, backend choices, validation, and submit sequencing | **Extract:** form model/validation plus workspace acquisition controller; keep dialog presentation. Reuse backend/source selectors; do not revive orphan AvatarPicker implicitly | Create vs edit defaults, new/existing worktree, reuse conflict choice, branch edit, backend/team/folder validation, init progress | Form/controller direct tests; one semantic submit; dialog component test count/mount cost decreases; no duplicate worktree policy |
@@ -605,15 +635,17 @@ Commit boundaries:
 
 ### Phase 1 — dead code
 
+Completed: the WorkBacklog surface, repository issue composer/create-item
+vertical slice, parked work-routing vertical slice, and legacy Claude CLI
+transport closure described in Appendix A. Remaining order:
+
 1. P1 Core symbols/re-exports.
-2. P1 Electron and Vue dead paths.
-3. Four separate orphan decisions/deletions.
-4. `prepare-work` keep/delete decision and, if delete, one complete vertical
-   slice checkpoint.
-5. Claude transport protocol move, then separate legacy implementation deletion.
-6. Protocol/persistence candidates one at a time after producer/history proof.
-7. Install typed ESLint Stage L1 immediately after the approved dead-code
-   checkpoints. Record rather than suppress the remaining unsafe baseline.
+2. P1 Electron and Vue symbols/orphans.
+3. Install typed ESLint Stage L1 immediately after the remaining proven-safe
+   dead-code checkpoints. Record rather than suppress the remaining unsafe
+   baseline.
+4. Protocol/persistence candidates one at a time after producer/history proof;
+   these compatibility decisions do not delay L1.
 
 Commit titles are scope-specific, for example:
 
@@ -741,20 +773,18 @@ the evidence columns is incomplete.
 
 | Date | Scenario/phase/checkpoint | Status | Baseline -> result | Owner/interface/decision change | Verification and timing | Commit | Findings/follow-up |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-04 | Phase 0: review-branch isolation | Complete | `chore/codebase-hardening-review` preserves HEAD `20a0b9298f872e1a53d16e8707bd8526776c08b8` | Establishes the review branch as the hardening state; does not rewrite shared `main` | Branch/ref/status inspection | — | Any shared-history rewrite/revert requires a separate strategy and approval |
+| 2026-09-04 | Phase 0: review-branch isolation | Complete | `chore/codebase-hardening-review` preserved HEAD `20a0b9298f872e1a53d16e8707bd8526776c08b8`; now advanced to `92551b034a1ee30602c9f3e4b649d38d931501b5` | Establishes the review branch as the hardening state; does not rewrite shared `main` | Branch/ref/status inspection | — | Any shared-history rewrite/revert requires a separate strategy and approval |
 | 2026-09-04 | Phase 0: checkpoint 5 disposition | Complete | Four-file working diff -> absent | Discarded the interaction/settings compatibility-only split; checkpoints 1–4 unchanged | Status/path/diff inspection | — | Do not recreate checkpoint 5 merely to shorten the barrel |
 | 2026-09-04 | Plan v2 authoring | Complete | Prior mechanical plan -> exhaustive deletion/ownership/type-safety plan | Preserves all candidates while requiring activation gates and Scenario A/B consequences | Markdown structure/path/table sanity and `git diff --check` | — | Preserve modified `plans/codebase-hardening.md` |
 | 2026-09-04 | Independent plan and baseline review | Complete | Initial v2 draft -> corrected exhaustive inventory and staged gates | Corrected rollback provenance, candidate classifications, activation policy, coverage debt, and branch-history policy | Independent review findings reconciled against source | — | Exhaustive inventories remain appendices; review does not itself authorize a candidate |
 | 2026-09-04 | Phase 0: Scenario A decision | Complete | A/B decision pending -> Scenario A selected | Keeps checkpoints 1–4 as the dependency floor for approved typed-request, prompt, lifecycle, and renderer ownership; Scenario B remains exact fallback | Mechanical fidelity, export/runtime identity, cycle, consumer, and ownership-needs audit | — | Passing tests support compatibility; architectural value is the concrete dependency floor, not greenness alone |
 | 2026-09-04 | Phase 0: provisional qualification | Complete | Review branch at `20a0b929…` | No ownership change; qualifies the branch provisionally before manual smoke and coverage remediation | `test:ai` 277 files / 2,103 tests passed; lint passed; unsigned build passed; cycles zero; benchmarks 7.1855 Hz Claw and 2.1666 Hz SDK; one 30.25s full-suite timing is not a median | — | Backend/Vue/Electron coverage debt and manual desktop smoke remain pending; this is not final qualification |
 | — | Phase 0: retained snapshot/event manual validation | Pending | — | — | — | — | Must include manual app smoke; provisional automated gates alone are insufficient |
+| 2026-09-05 | Phase 1: obsolete workflow vertical slices | Complete | `main` 84 files, +147/-4,171 -> review branch 86 files, +149/-4,188 after contract-owner adaptation | Removed orphan backlog; composer and complete create-item path; disabled work-routing; obsolete Claude CLI while retaining losslessly moved transport contracts | Focused Core 5/40, Backend 4/59, Vue App 1/5, backlog 3/41; typecheck; lint/Stylelint/Knip; `test:ai` 272 files / 2,046 tests; diff check | `a3673ec160134d3d12591316997adb8fa59b6354` on `main`; `92551b034a1ee30602c9f3e4b649d38d931501b5` here | Unsupported create-item/work-routing compatibility removed; normal parser ignores obsolete additive snapshot fields; live `create_agent`, Claude Agent SDK, and stdio preserved |
 | — | Phase 1: P1 Core dead code | Pending | — | — | — | — | — |
 | — | Phase 1: P1 adapter/UI dead code | Pending | — | — | — | — | — |
-| — | Phase 1: orphan decisions | Pending | — | — | — | — | Four independent decisions |
-| — | Phase 1: parked work-routing decision | Pending | — | — | — | — | Keep/delete/revive gate |
-| — | Phase 1: legacy Claude CLI | Pending | — | — | — | — | Protocol move precedes deletion |
 | — | Phase 1: compatibility candidates | Pending | — | — | — | — | One producer/history audit per candidate |
-| — | Phase 1: typed ESLint L1 | Pending | — | — | — | — | Runs immediately after dead-code cleanup |
+| — | Phase 1: typed ESLint L1 | Pending | — | — | — | — | Next after remaining P1 proven-safe symbol cleanup |
 | — | Phase 2: backend/Core ownership review | Pending | — | — | — | — | Add only activated candidates as new rows |
 | — | Phase 3: adapter/renderer ownership review | Pending | — | — | — | — | Add only activated candidates as new rows |
 | — | Phase 4: Backend coverage remediation | Pending | 83.78/73.57/87.95/85.70 -> 85+ each | — | — | — | Pre-existing debt; preserve baseline at every prior checkpoint |
