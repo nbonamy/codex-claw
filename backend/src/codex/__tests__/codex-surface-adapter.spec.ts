@@ -14,6 +14,7 @@ class FakeTransport implements RpcTransport {
   readonly close = vi.fn(async () => undefined);
   readonly start = vi.fn(async () => undefined);
   skillBrandColor: unknown;
+  skillDefaultPrompt: unknown;
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
@@ -77,7 +78,12 @@ class FakeTransport implements RpcTransport {
               description: `Skill ${this.skillVersion} for ${cwd}`,
               path: `${cwd}/skill-${this.skillVersion}/SKILL.md`,
               scope: 'repo', enabled: true,
-              interface: this.skillBrandColor === undefined ? null : { brandColor: this.skillBrandColor },
+              interface: this.skillBrandColor === undefined && this.skillDefaultPrompt === undefined
+                ? null
+                : {
+                    brandColor: this.skillBrandColor,
+                    defaultPrompt: this.skillDefaultPrompt,
+                  },
             }],
             errors: [],
           }],
@@ -1038,6 +1044,48 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
       expect.objectContaining({ brandColor: '#123abc' }),
     ]);
+  });
+
+  it('emits and lists decodable skills when the provider returns a null default prompt', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.skillDefaultPrompt = null;
+    transport.skillVersion = 2;
+    transport.emit({ method: 'skills/changed', params: {} });
+
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'skills.changed')).toBe(true));
+    const event = events.find((candidate): candidate is Extract<BackendEvent, { type: 'skills.changed' }> => (
+      candidate.type === 'skills.changed'
+    ))!;
+    const notification = {
+      ...event,
+      seq: 1,
+      occurredAt: event.occurredAt ?? '2026-09-05T00:00:00.000Z',
+    };
+    expect(decodeClawBackendEvent(notification)).toBe(notification);
+    expect(event.payload.skills[0]).not.toHaveProperty('defaultPrompt');
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.not.objectContaining({ defaultPrompt: expect.anything() }),
+    ]);
+
+    transport.skillDefaultPrompt = 'Review this repository';
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.objectContaining({ defaultPrompt: 'Review this repository' }),
+    ]);
+
+    events.length = 0;
+    transport.skillVersion = 3;
+    transport.emit({ method: 'skills/changed', params: {} });
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      type: 'skills.changed',
+      payload: expect.objectContaining({
+        skills: [expect.objectContaining({ defaultPrompt: 'Review this repository' })],
+      }),
+    })));
   });
 
   it('preserves image and file attachments through send and steer SDK turn input', async () => {

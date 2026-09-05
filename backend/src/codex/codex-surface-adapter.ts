@@ -1547,11 +1547,12 @@ function skillsChangedPayload(
 }
 
 function backendSkillSummary(skill: CodexSurfaceSkill): BackendSkillSummary {
-  const { brandColor, ...summary } = skill;
+  const { brandColor, defaultPrompt, ...summary } = skill;
   return {
     id: skill.path,
     ...summary,
     ...(typeof brandColor === 'string' && brandColor.trim() ? { brandColor } : {}),
+    ...(typeof defaultPrompt === 'string' ? { defaultPrompt } : {}),
   };
 }
 
