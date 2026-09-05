@@ -113,18 +113,12 @@ GitHub, and explicit-URL sources shown inline for an empty team. Agent editing
 changes only the optional custom name; clearing it stores `null` and restores
 the branch fallback. Keep repository grouping dense, borderless, and quiet.
 
-### Work routing
+### Work delegation
 
-The Claw-owned `prepare-work` MCP tool supplies three modes:
-
-- **Continue here**: no structural change.
-- **Continue on a branch**: same session stays selected and moves to the new
-  branch identity.
-- **Delegate in a worktree**: create/reuse a branch worktree, create a
-  background session there, dispatch the task, and leave the caller selected.
-
-Existing branches/worktrees are reused. Shared-folder branch switching stays
-blocked. Failures remain actionable in the routing dialog.
+The historical `prepare-work` routing flow was removed. Repository work is now
+delegated through `create-agent` with `createWorktree: true`, a branch name,
+and a self-contained initial `prompt`; agent creation, worktree setup, and task
+handoff happen as one backend-owned operation.
 
 ### Mentions
 
@@ -165,14 +159,10 @@ Checkpoint: `feat: add repository session sidebar components`
 
 Checkpoint: `feat: switch sidebar to repository sessions`
 
-### Phase 4 — Routing and live updates
+### Phase 4 — Routing and live updates (superseded)
 
-- Land the existing `prepare-work` request flow.
-- Feed branch/worktree results into workspace identity.
-- Verify same-row branch moves and background delegated-row insertion.
-- Verify existing branch/worktree reuse and dirty/shared-checkout errors.
-
-Checkpoint: `feat: route work into branches and worktrees`
+This historical phase shipped with `prepare-work`; that flow was later removed
+in favor of `create-agent` worktree delegation described above.
 
 ### Phase 5 — Mentions, history, and migration polish
 
@@ -190,7 +180,7 @@ Checkpoint: `feat: finish workspace-first navigation`
 - [x] Workspace identity contract, persistence, reconciliation, and cleanup.
 - [x] Pure repository/session projection with Quick chats fallback.
 - [x] Repository-first AppShell sidebar with approved context actions and Add project entry points.
-- [x] Work-routing request flow for current checkout, branch, and worktree.
+- [x] Historical work routing replaced by `create-agent` worktree delegation.
 - [x] Dense visual pass with colored session kinds and persisted repository icons.
 - [x] Contextual mention labels and remaining history/migration polish.
 
@@ -207,7 +197,7 @@ Checkpoint: `feat: finish workspace-first navigation`
 - primary checkout, worktree, detached, existing branch, non-Git, missing folder;
 - refresh triggers without polling;
 - remote projection;
-- all routing modes and existing worktree reuse;
+- `create-agent` worktree delegation and existing worktree reuse;
 - no full Git-status fan-out.
 
 ### Vue
