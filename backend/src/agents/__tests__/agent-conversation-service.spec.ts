@@ -131,24 +131,66 @@ describe('AgentConversationService', () => {
   });
 
   it('reports hydration failures without exposing diagnostics and deduplicates concurrent requests', async () => {
+    vi.useFakeTimers();
+    try {
+      const { agent, driverRequest, events, service } = createService();
+      driverRequest.mockRejectedValue(new Error('thread thread-root already has an active writer: sensitive provider detail'));
+
+      const first = service.hydrate(agent.id);
+      const second = service.hydrate(agent.id);
+      await vi.runAllTimersAsync();
+
+      await expect(Promise.all([first, second])).resolves.toStrictEqual([undefined, undefined]);
+      expect(driverRequest).toHaveBeenCalledTimes(2);
+      expect(events).toContainEqual({
+        agentId: agent.id,
+        type: 'thread.historyHydrationFailed',
+        payload: {},
+      });
+      expect(JSON.stringify(events)).not.toContain('active writer');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    'Codex app-server request timed out: thread/resume',
+    'thread thread-root already has an active writer',
+  ])('retries a transient history hydration failure before reporting it: %s', async (message) => {
+    vi.useFakeTimers();
+    try {
+      const { agent, driverRequest, events, service } = createService();
+      driverRequest
+        .mockRejectedValueOnce(new Error(message))
+        .mockResolvedValueOnce({ kind: 'codex', threadId: 'thread-root' });
+
+      const hydration = service.hydrate(agent.id);
+      await vi.runAllTimersAsync();
+      await hydration;
+
+      expect(driverRequest).toHaveBeenCalledTimes(2);
+      expect(events).not.toContainEqual({
+        agentId: agent.id,
+        type: 'thread.historyHydrationFailed',
+        payload: {},
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retry a permanent history hydration failure', async () => {
     const { agent, driverRequest, events, service } = createService();
-    let rejectHydration!: (error: Error) => void;
-    driverRequest.mockReturnValue(new Promise((_resolve, reject) => {
-      rejectHydration = reject;
-    }));
+    driverRequest.mockRejectedValue(new Error('session thread-root is archived'));
 
-    const first = service.hydrate(agent.id);
-    const second = service.hydrate(agent.id);
-    rejectHydration(new Error('active writer: sensitive provider detail'));
+    await service.hydrate(agent.id);
 
-    await expect(Promise.all([first, second])).resolves.toStrictEqual([undefined, undefined]);
     expect(driverRequest).toHaveBeenCalledOnce();
     expect(events).toContainEqual({
       agentId: agent.id,
       type: 'thread.historyHydrationFailed',
       payload: {},
     });
-    expect(JSON.stringify(events)).not.toContain('active writer');
   });
 });
 

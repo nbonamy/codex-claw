@@ -102,7 +102,7 @@ export class AgentConversationService {
     const agent = this.agent(agentId);
     if (!agent?.backendSession) return;
     try {
-      const session = await this.options.driverRequest(agent, backendMethods.driverHistoryHydrate, { agent });
+      const session = await this.hydrateSessionWithTransientRetry(agentId, agent);
       if (isBackendSession(session)) {
         agent.backendSession = session;
         await this.options.persistSnapshot();
@@ -118,6 +118,18 @@ export class AgentConversationService {
         type: 'thread.historyHydrationFailed',
         payload: {},
       });
+    }
+  }
+
+  private async hydrateSessionWithTransientRetry(agentId: string, agent: Agent): Promise<unknown> {
+    try {
+      return await this.options.driverRequest(agent, backendMethods.driverHistoryHydrate, { agent });
+    } catch (error) {
+      if (!isTransientHistoryHydrationError(error)) throw error;
+      await delay(HISTORY_HYDRATION_RETRY_DELAY_MS);
+      const retryAgent = this.agent(agentId);
+      if (!retryAgent?.backendSession) return undefined;
+      return this.options.driverRequest(retryAgent, backendMethods.driverHistoryHydrate, { agent: retryAgent });
     }
   }
 
@@ -154,6 +166,17 @@ export class AgentConversationService {
   private agent(agentId: string): Agent | undefined {
     return this.options.getSnapshot().agents.find((candidate) => candidate.id === agentId);
   }
+}
+
+const HISTORY_HYDRATION_RETRY_DELAY_MS = 500;
+
+function isTransientHistoryHydrationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /request timed out: thread\/resume/i.test(message) || /already has an active writer/i.test(message);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function resolveMessageTurnId(messages: RendererMessage[], index: number): string | null {
