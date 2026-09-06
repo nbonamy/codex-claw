@@ -42,6 +42,41 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
+  it('forwards an edited terminal Codex prompt with its authoritative turn id', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-edit' };
+    snapshot.messages = [
+      {
+        id: 'user-turn-edit',
+        agentId: agent.id,
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-edit',
+        parts: [{ type: 'text', text: 'Original prompt' }],
+        createdAt: '2026-09-06T00:00:00.000Z',
+      },
+      {
+        id: 'assistant-turn-edit',
+        agentId: agent.id,
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-edit',
+        parts: [{ type: 'text', text: 'Original response' }],
+        createdAt: '2026-09-06T00:00:01.000Z',
+      },
+    ];
+    const wrapper = mountShell({ snapshot, realConversationPane: true });
+
+    await wrapper.get('button[aria-label="Edit"]').trigger('click');
+    await wrapper.get('textarea[aria-label="Edit prompt"]').setValue('Edited prompt');
+    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
+
+    expect(wrapper.emitted('edit-turn')).toStrictEqual([[
+      { content: 'Edited prompt', turnId: 'turn-edit' },
+    ]]);
+  });
+
   it('shows passive connection progress while discovering existing ChatGPT credentials', async () => {
     let resolveAuthentication!: (value: {
       account: { type: 'apiKey' };

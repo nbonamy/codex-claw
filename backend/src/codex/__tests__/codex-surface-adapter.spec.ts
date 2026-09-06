@@ -647,6 +647,45 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
+  it('edits a hydrated terminal turn through the SDK and returns the replacement prompt', async () => {
+    const { adapter, surface, transport } = createAdapter();
+    const driver = new CodexBackendDriver(adapter);
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-original', 'completed', [
+        {
+          type: 'userMessage', id: 'user-original', clientId: null,
+          content: [{ type: 'text', text: 'Original prompt', textElements: [] }],
+        },
+        agentMessage('assistant-original', 'Original response'),
+      ]),
+    ]);
+    await driver.hydrateAgent(agentA);
+
+    const result = await driver.editTurn(agentA, 'turn-original', 'Edited prompt');
+
+    expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
+      params: { threadId: 'thread-a', numTurns: 1 },
+    });
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: {
+        threadId: 'thread-a',
+        input: [{ type: 'text', text: 'Edited prompt' }],
+      },
+    });
+    expect(result).toMatchObject({
+      backendSession: { kind: 'codex', threadId: 'thread-a' },
+      activeTurnId: 'turn-thread-a',
+      messages: expect.arrayContaining([expect.objectContaining({
+        role: 'user',
+        turnId: 'turn-thread-a',
+        parts: [{ type: 'text', text: 'Edited prompt' }],
+      })]),
+    });
+    expect(conversationRows(result.messages)).toStrictEqual(
+      conversationRows(surface.conversation('thread-a').getSnapshot().messages),
+    );
+  });
+
   it('projects completed reasoning summaries without raw reasoning content', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
@@ -2018,6 +2057,23 @@ function turn(
 
 function agentMessage(id: string, text: string): Record<string, unknown> {
   return { type: 'agentMessage', id, text, phase: null, memoryCitation: null };
+}
+
+function conversationRows(messages: readonly {
+  id: string;
+  parts: readonly { text?: string; type: string }[];
+  role: string;
+  turnId?: string;
+}[]) {
+  return messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    turnId: message.turnId ?? null,
+    text: message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => part.text ?? '')
+      .join(''),
+  }));
 }
 
 function resumeResponse(
