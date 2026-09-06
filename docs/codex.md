@@ -220,10 +220,10 @@ agent directly below the source with the new `{ kind: "codex", threadId }`
 session, and leaves raw fork protocol types outside product contracts. Forking
 requires an idle Codex agent with an existing conversation.
 
-The controlled conversation pane opts into SDK message-level Fork actions for
-user and assistant messages. It passes the absolute host message index through
-the app-owned `agent/fork` request; the Codex adapter calls the conversation
-handle's `forkMessage()` operation, and the result enters the same new-agent
+The controlled conversation pane opts into SDK turn-level Fork actions for
+user and assistant messages. It passes the stable turn id through the
+app-owned `agent/fork` request; the Codex adapter calls the conversation
+handle's `forkTurn()` operation, and the result enters the same new-agent
 workflow without changing the source thread.
 
 ## Requests

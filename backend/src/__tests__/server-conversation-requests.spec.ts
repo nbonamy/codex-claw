@@ -68,9 +68,7 @@ describe('ClawBackendServer', () => {
         },
       });
       expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
-      expect(snapshot.messages).toEqual(expect.arrayContaining([
-        expect.objectContaining({ agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello codex' }] }),
-      ]));
+      expect(snapshot.messages).toStrictEqual([]);
       await flushMicrotasks();
 
       expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);
@@ -306,24 +304,7 @@ describe('ClawBackendServer', () => {
       inputMethod: 'dictated',
     });
     expect(snapshot.queuedPrompts).toHaveLength(1);
-    const submittedEvent = events.find((event) => event.type === 'message.userSubmitted');
-    expect(submittedEvent).toEqual(expect.objectContaining({
-      type: 'message.userSubmitted',
-      payload: {
-        message: expect.objectContaining({
-          agentId: 'agent-dina',
-          role: 'user',
-          parts: [
-            { type: 'text', text: 'run next' },
-            {
-              type: 'attachment',
-              attachment: { kind: 'file', path: '/tmp/queue.txt', name: 'queue.txt' },
-            },
-          ],
-        }),
-      },
-    }));
-    expect(submittedEvent).not.toHaveProperty('snapshot');
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
 
     acceptPrompt({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-next' });
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toStrictEqual([]));
@@ -407,7 +388,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('retries failed queue drains without losing the item or duplicating its user message', async () => {
+  it('retries failed queue drains without losing the item', async () => {
     vi.useFakeTimers();
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -452,18 +433,18 @@ describe('ClawBackendServer', () => {
       attempts: 1,
       lastError: 'transport disconnected',
     });
-    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(0);
     expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'error', message: 'transport disconnected' });
     await vi.runOnlyPendingTimersAsync();
     await flushMicrotasks();
     expect(sendPrompt).toHaveBeenCalledTimes(2);
-    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(0);
     expect(snapshot.queuedPrompts).toStrictEqual([]);
     await server.close();
     vi.useRealTimers();
   });
 
-  it('owns message retry and edit rollback orchestration', async () => {
+  it('routes turn retry and edit through the backend driver', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -481,22 +462,25 @@ describe('ClawBackendServer', () => {
       createTextMessage('user-turn-1', 'agent-dina', 'first prompt', 'turn-1'),
       createTextMessage('assistant-turn-1', 'agent-dina', 'first answer', 'turn-1', 'assistant'),
     ];
-    const rollbackToTurn = vi.fn().mockResolvedValue({
-      backendSession: { kind: 'codex' as const, threadId: 'thread-rollback' },
-      messages: [],
-    });
-    const sendPrompt = vi.fn().mockResolvedValue({
+    const retryTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
-      turnId: 'turn-new',
+      messages: [],
+      activeTurnId: 'turn-new',
+    });
+    const editTurn = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      messages: [],
+      activeTurnId: 'turn-edited',
     });
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
       getCapabilities: () => codexBackendCapabilities,
-      sendPrompt,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      rollbackToTurn,
+      editTurn,
+      retryTurn,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -510,12 +494,11 @@ describe('ClawBackendServer', () => {
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'retry',
-      method: 'agent/message/retry',
-      params: { agentId: 'agent-dina', messageId: 'assistant-turn-1' },
+      method: 'agent/turn/retry',
+      params: { agentId: 'agent-dina', turnId: 'turn-1' },
     });
 
-    expect(rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
-    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'first prompt', undefined);
+    expect(retryTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
 
     snapshot.agents[0]!.status = { type: 'idle' };
     snapshot.messages = [
@@ -526,11 +509,11 @@ describe('ClawBackendServer', () => {
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'edit',
-      method: 'agent/message/update',
-      params: { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' },
+      method: 'agent/turn/edit',
+      params: { agentId: 'agent-dina', turnId: 'turn-1', content: ' edited prompt ' },
     });
 
-    expect(sendPrompt).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'edited prompt', undefined);
+    expect(editTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1', 'edited prompt');
     await server.close();
   });
 });

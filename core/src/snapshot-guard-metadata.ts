@@ -301,9 +301,9 @@ function isBackendCapabilities(value: unknown): boolean {
     optional(value, 'interrupt', isBoolean) &&
     optional(value, 'history', isBoolean) &&
     optional(value, 'conversationFork', isBoolean) &&
-    optional(value, 'rollback', isBoolean) &&
-    optional(value, 'editMessage', isBoolean) &&
-    optional(value, 'retryMessage', isBoolean) &&
+    optional(value, 'deleteTurn', isBoolean) &&
+    optional(value, 'editTurn', isBoolean) &&
+    optional(value, 'retryTurn', isBoolean) &&
     optional(value, 'approvals', isBoolean) &&
     optional(value, 'approvalPresets', (candidate) => isArrayOf(candidate, isApprovalPreset)) &&
     optional(value, 'permissionModes', (candidate) => isArrayOf(candidate, isPermissionModeOption));
@@ -442,8 +442,7 @@ function isWorkBacklogAssignment(value: unknown): boolean {
     optional(value, 'note', isString) &&
     optional(value, 'updatedAt', isString) &&
     optional(value, 'automationId', isString) &&
-    optional(value, 'automationExecutionId', isString) &&
-    optional(value, 'completionInstructionsDeliveredAt', isString);
+    optional(value, 'automationExecutionId', isString);
 }
 
 function isRemoteConnections(value: unknown): boolean {

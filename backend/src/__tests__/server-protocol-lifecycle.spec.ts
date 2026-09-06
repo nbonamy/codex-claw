@@ -113,7 +113,7 @@ describe('ClawBackendServer', () => {
     const invalidRequests: Array<[string, unknown, string]> = [
       [backendMethods.agentCreate, { input: { name: '', folder: '' } }, 'name'],
       [backendMethods.agentUpdate, { input: { id: 'agent-1', name: 42 } }, 'agent name'],
-      [backendMethods.agentFork, { agentId: 'agent-1', messageIndex: -1 }, 'fork message index'],
+      [backendMethods.agentFork, { agentId: 'agent-1', turnId: 42 }, 'turnId'],
       [backendMethods.agentOpenInApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
       [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],
       [backendMethods.teamCreate, { input: { name: 'Team', color: 'transparent' } }, 'color'],
@@ -139,9 +139,6 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'work-manager', method: backendMethods.workProviderConnectionsReload,
     })).rejects.toThrow('Work integrations are not configured');
-    await expect(server.handleMessage({
-      jsonrpc: '2.0', id: 'automation-runner', method: backendMethods.automationDueRun,
-    })).rejects.toThrow('Automation runner is not configured');
     await server.close();
   });
 

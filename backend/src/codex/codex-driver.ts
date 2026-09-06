@@ -21,7 +21,7 @@ import type {
 } from '@codex-claw/core/contracts';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendRollbackResult, BackendSendResult, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
@@ -219,11 +219,30 @@ export class CodexBackendDriver implements AgentBackendDriver {
     this.sessionManager.forgetAgentSession(agentId);
   }
 
-  async rollbackToTurn(agent: Agent, turnId: string): Promise<BackendRollbackResult> {
-    const result = await this.sessionManager.rollbackToTurn(agent, turnId);
+  async deleteTurn(agent: Agent, turnId: string): Promise<BackendTurnActionResult> {
+    const result = await this.sessionManager.deleteTurn(agent, turnId);
     return {
       backendSession: codexBackendSession(result.threadId),
       messages: result.messages,
+      activeTurnId: result.activeTurnId,
+    };
+  }
+
+  async editTurn(agent: Agent, turnId: string, content: string): Promise<BackendTurnActionResult> {
+    const result = await this.sessionManager.editTurn(agent, turnId, content);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      messages: result.messages,
+      activeTurnId: result.activeTurnId,
+    };
+  }
+
+  async retryTurn(agent: Agent, turnId: string): Promise<BackendTurnActionResult> {
+    const result = await this.sessionManager.retryTurn(agent, turnId);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      messages: result.messages,
+      activeTurnId: result.activeTurnId,
     };
   }
 
@@ -264,10 +283,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async forkConversation(agent: Agent, targetAgent: Agent, messageIndex?: number): Promise<BackendConversationForkResult> {
-    const result = messageIndex === undefined
+  async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string): Promise<BackendConversationForkResult> {
+    const result = turnId === undefined
       ? await this.sessionManager.forkConversation(agent, targetAgent)
-      : await this.sessionManager.forkConversation(agent, targetAgent, messageIndex);
+      : await this.sessionManager.forkConversation(agent, targetAgent, turnId);
     return {
       backendSession: codexBackendSession(result.threadId),
       messages: result.messages,

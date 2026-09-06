@@ -323,12 +323,33 @@ export class CodexSurfaceAgentAdapter {
     this.surface.forgetConversation(session.handle.id);
   }
 
-  async rollbackToTurn(agent: Agent, turnId: string) {
+  async deleteTurn(agent: Agent, turnId: string) {
     const session = await this.ensureSession(agent);
-    const snapshot = await session.handle.rollbackToTurn(turnId);
+    const snapshot = await session.handle.deleteTurn(turnId);
     return {
       threadId: session.handle.id,
       messages: historicalSurfaceMessages(snapshot.messages, agent.id),
+      activeTurnId: snapshot.activeTurnId,
+    };
+  }
+
+  async editTurn(agent: Agent, turnId: string, content: string) {
+    const session = await this.ensureSession(agent);
+    const snapshot = await session.handle.editTurn(turnId, content);
+    return {
+      threadId: session.handle.id,
+      messages: historicalSurfaceMessages(snapshot.messages, agent.id),
+      activeTurnId: snapshot.activeTurnId,
+    };
+  }
+
+  async retryTurn(agent: Agent, turnId: string) {
+    const session = await this.ensureSession(agent);
+    const snapshot = await session.handle.retryTurn(turnId);
+    return {
+      threadId: session.handle.id,
+      messages: historicalSurfaceMessages(snapshot.messages, agent.id),
+      activeTurnId: snapshot.activeTurnId,
     };
   }
 
@@ -402,13 +423,13 @@ export class CodexSurfaceAgentAdapter {
     };
   }
 
-  async forkConversation(agent: Agent, targetAgent: Agent, messageIndex?: number) {
+  async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string) {
     const source = await this.ensureSession(agent);
-    const result = await (messageIndex === undefined ? source.handle.fork(
+    const result = await (turnId === undefined ? source.handle.fork(
       agentCwd(agent),
       { extensionContext: targetAgent },
-    ) : source.handle.forkMessage(
-      messageIndex,
+    ) : source.handle.forkTurn(
+      turnId,
       agentCwd(agent),
       { extensionContext: targetAgent },
     ));
@@ -851,9 +872,6 @@ export class CodexSurfaceAgentAdapter {
         return;
       case 'message.appended':
         if (event.payload.message.role === 'user') {
-          // Claw inserts local prompts before calling the SDK. Notification-origin
-          // prompts instead come from outside Claw, such as a paired remote client.
-          if (event.origin === 'action' && event.payload.message.metadata?.reviewPrompt !== true) return;
           const [message] = surfaceMessages([event.payload.message], session.agent.id);
           if (!message) return;
           this.emitThread(session, {

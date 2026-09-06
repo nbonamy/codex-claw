@@ -385,7 +385,6 @@ const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
 const sourceFolderLabel = computed(() => sourceFolderState.value.path || translate('dynamic.misc.notConfigured'));
 const daemonEnabled = computed(() => props.daemonStatus?.installed ?? false);
-const daemonRunning = computed(() => props.daemonStatus?.running ?? false);
 const daemonSwitchDisabled = computed(() => settingDaemon.value || props.daemonStatus?.supported !== true);
 const daemonStatusLabel = computed(() => {
   if (daemonOperation.value === 'installing') {

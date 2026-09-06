@@ -223,11 +223,6 @@ export function resolveConversationControllerValue<T>(source: T | { readonly val
   return source as T;
 }
 
-export async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, repositorySelectIndex = 0) {
-  wrapper.findComponent({ name: 'AgentDialog' }).findAllComponents({ name: 'ElSelect' })[repositorySelectIndex]?.vm.$emit('update:modelValue', '__custom_folder__');
-  await flushPromises();
-}
-
 export function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',

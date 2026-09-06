@@ -5,29 +5,13 @@ import { applyRuntimeEventToSnapshot } from './snapshot-runtime-reducer';
 import { applySubagentEventToSnapshot } from './snapshot-subagent-reducer';
 
 export {
-  createAgentFromInput,
-  createAgentInSnapshot,
-  createQuickChatInSnapshot,
-  selectAgent,
-  updateAgentFolder,
-  updateAgentFromInput,
-  updateAgentOpenInApplication,
-  updateAgentWorkspace,
-} from './agent-manager';
-
-export {
-  createDefaultRemoteConnectionsState,
   createEmptySnapshot,
   createInitialSnapshot,
   applySnapshotMetadata,
   snapshotMetadata,
 } from './snapshot-construction';
 
-export {
-  appendSteerPrompt,
-  appendSystemMessage,
-  appendUserPrompt,
-} from './snapshot-conversation-transcript';
+export { appendUserPrompt } from './snapshot-conversation-transcript';
 
 export { formatThreadPlanMarkdown } from './snapshot-conversation-plans';
 
@@ -56,12 +40,4 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
 
   const exhaustiveEvent: never = event;
   void exhaustiveEvent;
-}
-
-function normalizedFolder(folder: string): string {
-  return folder.trim();
-}
-
-function folderBasename(folder: string): string {
-  return normalizedFolder(folder).split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 }

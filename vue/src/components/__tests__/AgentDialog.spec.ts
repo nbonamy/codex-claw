@@ -142,7 +142,6 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Repository');
     expect(wrapper.text()).not.toContain('Work in...');
     expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false);
-    expect(wrapper.findComponent({ name: 'AgentAvatarPicker' }).exists()).toBe(false);
     expect((wrapper.get('#agent-dialog-name').element as HTMLInputElement).value).toBe('Dina');
     expect(wrapper.get('#agent-dialog-name').attributes('placeholder')).toBe('codex-claw');
     await wrapper.get('#agent-dialog-name').setValue('Dina Prime');

@@ -2,7 +2,6 @@ import type {
   AgentBackend,
   AppText,
   ApprovalPreset,
-  ReasoningEffort,
 } from './contracts/shared';
 import type {
   AgentCloseInput,
@@ -80,31 +79,18 @@ import type {
 } from './contracts/conversation';
 import type {
   Automation,
-  AutomationExecutionCreatedAgent,
-  AutomationExecutionLogEntry,
-  AutomationExecutionStatus,
   AutomationLocation,
-  AutomationRepositoryTarget,
-  AutomationSchedule,
   CreateAutomationInput,
-  GitHubWorkBacklogConfiguration,
-  GitHubWorkBacklogConfigurationInput,
   GlobalWorkItemQuery,
   UpdateAutomationInput,
   WorkBacklogAssignment,
   WorkBacklogAssignmentPolicy,
   WorkBacklogAssignmentStatus,
   WorkBacklogConfigurationInput,
-  WorkBacklogProviderConfigurations,
   WorkBacklogState,
-  WorkIntegrationConnection,
-  WorkIntegrationStatus,
   WorkItem,
-  WorkItemKind,
-  WorkItemLabel,
   WorkItemPage,
   WorkItemQuery,
-  WorkItemState,
   WorkProviderAuthorization,
   WorkProviderKind,
   WorkProviderSettings,
@@ -1310,7 +1296,7 @@ export type CodexClawApi = {
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
   removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
   duplicateAgent(agentId: string, options?: DuplicateAgentOptions): Promise<AppSnapshot>;
-  forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>;
+  forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
@@ -1350,9 +1336,9 @@ export type CodexClawApi = {
   steerQueuedPrompt(agentId: string, promptId: string, prompt?: string): Promise<AppSnapshot>;
   updateQueuedPrompt(agentId: string, promptId: string, prompt: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;
-  deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
-  editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
-  retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
+  deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
+  editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>;
+  retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
   browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
   browserOpenVisualization(agentId: string, browserId: string, path: string, title: string): Promise<BrowserState>;
   browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;

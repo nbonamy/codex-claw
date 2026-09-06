@@ -1,58 +1,54 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 import { AgentConversationService } from '../agent-conversation-service';
 
 describe('AgentConversationService', () => {
-  it('replaces rollback history and restores the idle session state', async () => {
+  it.each([
+    ['deleteTurn', backendMethods.driverTurnDelete, ['turn-1'], null],
+    ['editTurn', backendMethods.driverTurnEdit, ['turn-1', 'edited'], 'turn-new'],
+    ['retryTurn', backendMethods.driverTurnRetry, ['turn-1'], 'turn-new'],
+  ] as const)('applies %s snapshots and status', async (method, driverMethod, args, activeTurnId) => {
     const { agent, driverRequest, events, persistSnapshot, service, snapshot } = createService();
-    const messages = [message('assistant-turn-1', 'assistant', 'rolled back', 'turn-1')];
+    const messages = [{
+      id: 'assistant-turn-1',
+      agentId: agent.id,
+      role: 'assistant' as const,
+      status: 'complete' as const,
+      turnId: 'turn-1',
+      parts: [{ type: 'text' as const, text: 'updated' }],
+      createdAt: '2026-09-02T00:00:00.000Z',
+    }];
     driverRequest.mockResolvedValue({
-      backendSession: { kind: 'codex', threadId: 'thread-rollback' },
+      backendSession: { kind: 'codex', threadId: 'thread-updated' },
       messages,
+      activeTurnId,
     });
 
-    await expect(service.rollbackToTurn(agent.id, 'turn-1')).resolves.toBe(snapshot);
+    await expect((service[method] as (...input: string[]) => Promise<unknown>)(agent.id, ...args)).resolves.toBe(snapshot);
 
-    expect(agent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-rollback' });
+    expect(driverRequest).toHaveBeenCalledWith(agent, driverMethod, {
+      agent,
+      turnId: 'turn-1',
+      ...(method === 'editTurn' ? { content: 'edited' } : {}),
+    });
+    expect(agent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-updated' });
     expect(events).toStrictEqual([
       {
         agentId: agent.id,
-        threadId: 'thread-rollback',
+        threadId: 'thread-updated',
         type: 'thread.historyLoaded',
         payload: { messages, replace: true },
       },
       {
         agentId: agent.id,
-        threadId: 'thread-rollback',
+        threadId: 'thread-updated',
         type: 'agent.statusChanged',
-        payload: { type: 'idle' },
+        payload: { type: activeTurnId ? 'working' : 'idle' },
       },
     ]);
     expect(persistSnapshot).toHaveBeenCalledOnce();
-  });
-
-  it('resolves retry prompts from assistant segments and compaction messages', () => {
-    const { agent, service, snapshot } = createService();
-    snapshot.messages = [
-      message('user-local', 'user', 'first prompt'),
-      message('assistant-turn-7-segment-2', 'assistant', 'first answer'),
-      message('user-followup', 'user', 'second prompt', 'turn-8'),
-      message('compaction-turn-8', 'assistant', 'compacted'),
-    ];
-
-    expect(service.resolveMessageAction(agent.id, 'assistant-turn-7-segment-2')).toMatchObject({
-      agent,
-      prompt: 'first prompt',
-      turnId: 'turn-7',
-    });
-    expect(service.resolveMessageAction(agent.id, 'compaction-turn-8')).toMatchObject({
-      agent,
-      prompt: 'second prompt',
-      turnId: 'turn-8',
-    });
-    expect(service.resolveMessageAction(agent.id, 'missing')).toBeNull();
   });
 
   it('accepts only conversations owned by stored automation or subagent state', () => {
@@ -225,21 +221,4 @@ function createService() {
     refreshWorkspaceIdentity,
   });
   return { agent, driverRequest, events, persistSnapshot, refreshGitStatus, refreshWorkspaceIdentity, service, snapshot };
-}
-
-function message(
-  id: string,
-  role: RendererMessage['role'],
-  text: string,
-  turnId?: string,
-): RendererMessage {
-  return {
-    id,
-    agentId: 'agent-dina',
-    role,
-    status: 'complete',
-    parts: [{ type: 'text', text }],
-    createdAt: '2026-09-02T00:00:00.000Z',
-    ...(turnId ? { turnId } : {}),
-  };
 }

@@ -1,7 +1,9 @@
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
+import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
+import { applyMainEventToSnapshot, createEmptySnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, MainToRendererEvent, RendererMessage } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { CodexAppServerClient, type RpcMessage, type RpcTransport } from '@codex-app-sdk/backend/protocol';
 import { CodexSurface } from '@codex-app-sdk/backend';
@@ -597,6 +599,52 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(events).toStrictEqual([
       expect.objectContaining({ type: 'message.delta', agentId: 'agent-b', threadId: 'thread-b' }),
     ]);
+  });
+
+  it('uses the SDK optimistic Codex prompt as the single user row and adopts its turn id', async () => {
+    const { adapter } = createAdapter();
+    const driver = new CodexBackendDriver(adapter);
+    const snapshot = createEmptySnapshot();
+    const agent = structuredClone(agentA);
+    snapshot.agents = [agent];
+    snapshot.teams = [{ id: 'team-1', name: 'Team', color: '#1B4FB2', agentIds: [agent.id] }];
+    snapshot.activeAgentId = agent.id;
+    snapshot.activeTeamId = 'team-1';
+    let seq = 0;
+    const events: MainToRendererEvent[] = [];
+    const apply = (event: BackendEvent) => {
+      const rendererEvent: MainToRendererEvent = {
+        ...event,
+        seq: ++seq,
+        occurredAt: event.occurredAt ?? '2026-09-06T00:00:00.000Z',
+      };
+      events.push(rendererEvent);
+      applyMainEventToSnapshot(snapshot, rendererEvent);
+    };
+    driver.onEvent(apply);
+
+    sendAgentPrompt(snapshot, driver, agent.id, 'Run exactly once', undefined, apply);
+
+    await vi.waitFor(() => {
+      expect(snapshot.messages.filter((message) => message.role === 'user')).toStrictEqual([
+        expect.objectContaining({
+          agentId: agent.id,
+          role: 'user',
+          turnId: 'turn-thread-a',
+          parts: [{ type: 'text', text: 'Run exactly once' }],
+        }),
+      ]);
+    });
+    const submitted = events.find((event) => event.type === 'message.userSubmitted');
+    const updated = events.find((event) => event.type === 'message.updated' && event.payload.message.role === 'user');
+    const submittedMessage = submitted?.type === 'message.userSubmitted' ? submitted.payload.message : null;
+    expect(submittedMessage).toMatchObject({ role: 'user' });
+    expect(submittedMessage).not.toHaveProperty('turnId');
+    expect(updated?.type === 'message.updated' ? updated.payload.message : null).toMatchObject({
+      id: submittedMessage?.id,
+      role: 'user',
+      turnId: 'turn-thread-a',
+    });
   });
 
   it('projects completed reasoning summaries without raw reasoning content', async () => {
@@ -1699,7 +1747,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       params: { threadId: 'thread-a', turn: turn('turn-thread-a', 'completed') },
     });
     events.length = 0;
-    await adapter.rollbackToTurn(agentA, 'turn-thread-a');
+    await adapter.deleteTurn(agentA, 'turn-thread-a');
     expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
   });
 
@@ -1722,7 +1770,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('forwards an absolute host message index to the SDK fork operation', async () => {
+  it('forwards a stable turn id to the SDK fork operation', async () => {
     const { adapter, transport } = createAdapter();
     const targetAgent = createForkTarget();
     transport.fullHistoryTurnsByThreadId.set('thread-a', [
@@ -1733,7 +1781,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
     await adapter.hydrateAgent(agentA);
 
-    await expect(adapter.forkConversation(agentA, targetAgent, 0)).resolves.toMatchObject({
+    await expect(adapter.forkConversation(agentA, targetAgent, 'turn-source')).resolves.toMatchObject({
       threadId: 'thread-forked',
     });
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({

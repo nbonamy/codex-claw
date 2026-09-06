@@ -389,7 +389,7 @@ describe('AppController', () => {
     });
   });
 
-  it('deletes a message by rolling back from its Codex turn and replacing history', async () => {
+  it('deletes a Codex turn and replaces history', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -408,12 +408,12 @@ describe('AppController', () => {
 
     await controller.initialize();
 
-    await expect(deleteMessage(controller, 'agent-dina', 'user-turn-2')).resolves.toBe(rollbackSnapshot);
+    await expect(deleteTurn(controller, 'agent-dina', 'turn-2')).resolves.toBe(rollbackSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/message/delete', { agentId: 'agent-dina', messageId: 'user-turn-2' });
+    expect(request).toHaveBeenCalledWith('agent/turn/delete', { agentId: 'agent-dina', turnId: 'turn-2' });
   });
 
-  it('retries an assistant message by rolling back and resending the matching user prompt', async () => {
+  it('retries a Codex turn', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -429,12 +429,12 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
-    await retryMessage(controller, 'agent-dina', 'assistant-turn-1');
+    await retryTurn(controller, 'agent-dina', 'turn-1');
 
-    expect(request).toHaveBeenCalledWith('agent/message/retry', { agentId: 'agent-dina', messageId: 'assistant-turn-1' });
+    expect(request).toHaveBeenCalledWith('agent/turn/retry', { agentId: 'agent-dina', turnId: 'turn-1' });
   });
 
-  it('edits a user message by rolling back and resending the edited prompt', async () => {
+  it('edits a Codex turn', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -450,9 +450,9 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
-    await editMessage(controller, 'agent-dina', 'user-turn-1', ' edited prompt ');
+    await editTurn(controller, 'agent-dina', 'turn-1', ' edited prompt ');
 
-    expect(request).toHaveBeenCalledWith('agent/message/update', { agentId: 'agent-dina', messageId: 'user-turn-1', prompt: ' edited prompt ' });
+    expect(request).toHaveBeenCalledWith('agent/turn/edit', { agentId: 'agent-dina', turnId: 'turn-1', content: ' edited prompt ' });
   });
 });
 
@@ -548,22 +548,22 @@ async function interruptAgent(controller: AppController, agentId: string): Promi
   }).interruptAgent(agentId);
 }
 
-async function deleteMessage(controller: AppController, agentId: string, messageId: string): Promise<AppSnapshot> {
+async function deleteTurn(controller: AppController, agentId: string, turnId: string): Promise<AppSnapshot> {
   return (controller as unknown as {
-    deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
-  }).deleteMessage(agentId, messageId);
+    deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
+  }).deleteTurn(agentId, turnId);
 }
 
-async function retryMessage(controller: AppController, agentId: string, messageId: string): Promise<AppSnapshot> {
+async function retryTurn(controller: AppController, agentId: string, turnId: string): Promise<AppSnapshot> {
   return (controller as unknown as {
-    retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
-  }).retryMessage(agentId, messageId);
+    retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
+  }).retryTurn(agentId, turnId);
 }
 
-async function editMessage(controller: AppController, agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
+async function editTurn(controller: AppController, agentId: string, turnId: string, content: string): Promise<AppSnapshot> {
   return (controller as unknown as {
-    editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
-  }).editMessage(agentId, messageId, prompt);
+    editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>;
+  }).editTurn(agentId, turnId, content);
 }
 
 async function setAgentGoal(controller: AppController, agentId: string, objective: string): Promise<AppSnapshot> {

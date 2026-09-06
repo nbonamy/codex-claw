@@ -131,7 +131,6 @@
         @change-page="emit('change-work-items-page', $event)"
         @refresh="emit('refresh-work-items', $event)"
         @select-global-scope="emit('select-global-scope', $event)"
-        @remove-assignment="emit('remove-work-item-assignment', $event)"
         @select-assignee="emit('select-work-assignee', $event)"
         @select-assigned-agent="selectAssignedAgent"
         @select-repository="emit('select-work-repository', $event)"
@@ -224,7 +223,6 @@ const emit = defineEmits<{
   'refresh-work-items': [repositoryId: string | null];
   'change-work-items-page': [page: number];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
-  'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'select-work-repository': [repositoryId: string | null];
   'select-work-assignee': [assigneeLogin: string | null];

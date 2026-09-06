@@ -9,7 +9,7 @@ import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-cla
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, selectAgent, updateAgentFolder, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/agent-manager';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, selectAgent, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -590,16 +590,10 @@ export class ClawBackendServer {
       case backendMethods.agentFork: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        const rawMessageIndex = params.messageIndex;
-        if (rawMessageIndex !== undefined && (
-          typeof rawMessageIndex !== 'number' || !Number.isInteger(rawMessageIndex) || rawMessageIndex < 0
-        )) {
-          throw new Error('Invalid fork message index.');
-        }
-        const messageIndex = rawMessageIndex as number | undefined;
+        const turnId = params.turnId === undefined ? undefined : requireString(params.turnId, 'turnId');
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentFork, {
           agentId,
-          ...(messageIndex === undefined ? {} : { messageIndex }),
+          ...(turnId === undefined ? {} : { turnId }),
         }, async (agent) => {
           if (agent.status.type !== 'idle') {
             throw new Error('Agent must be idle before forking.');
@@ -614,7 +608,7 @@ export class ClawBackendServer {
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverConversationFork, {
             agent,
             targetAgent,
-            ...(messageIndex === undefined ? {} : { messageIndex }),
+            ...(turnId === undefined ? {} : { turnId }),
           }) as BackendConversationForkResult;
           const forked = attachForkedAgentInSnapshot(
             this.snapshot,
@@ -746,17 +740,6 @@ export class ClawBackendServer {
             throw new Error(`Agent not found: ${agentId}`);
           }
           this.transcriptRetention.delete(agentId);
-          return this.persistAndEmitSnapshot();
-        });
-      }
-      case backendMethods.agentFolderUpdate: {
-        const params = requireRecord(message.params);
-        const agentId = requireString(params.agentId, 'agentId');
-        const folder = requireString(params.folder, 'folder').trim();
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentFolderUpdate, { agentId, folder }, async (agent) => {
-          await this.validateAgentInput({ name: 'Agent', folder }, this.remoteTeams.connectionIdForAgent(agent));
-          updateAgentFolder(this.snapshot, agentId, folder);
-          await this.agentWorkspaces.refreshIdentity(agentId);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -1091,62 +1074,40 @@ export class ClawBackendServer {
           return this.snapshot;
         });
       }
-      case backendMethods.agentTurnRollback: {
+      case backendMethods.agentTurnDelete: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         const turnId = requireString(params.turnId, 'turnId');
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentTurnRollback, { agentId, turnId }, async () => {
-          const snapshot = await this.agentConversations.rollbackToTurn(agentId, turnId);
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentTurnDelete, { agentId, turnId }, async () => {
+          const snapshot = await this.agentConversations.deleteTurn(agentId, turnId);
           if (!snapshot) {
             throw new Error(`Agent not found: ${agentId}`);
           }
           return snapshot;
         });
       }
-      case backendMethods.agentMessageDelete: {
-        const agentId = requireAgentId(message.params);
-        const messageId = requireMessageId(message.params);
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentMessageDelete, { agentId, messageId }, async () => {
-          const action = this.agentConversations.resolveMessageAction(agentId, messageId);
-          if (!action) {
-            return this.snapshot;
-          }
-          await this.agentConversations.rollbackToTurn(action.agent.id, action.turnId);
-          return this.snapshot;
-        });
-      }
-      case backendMethods.agentMessageUpdate: {
+      case backendMethods.agentTurnEdit: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        const messageId = requireString(params.messageId, 'messageId');
-        const prompt = requireString(params.prompt, 'prompt').trim();
-        if (!prompt) {
+        const turnId = requireString(params.turnId, 'turnId');
+        const content = requireString(params.content, 'content').trim();
+        if (!content) {
           return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
         }
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentMessageUpdate, { agentId, messageId, prompt }, async () => {
-          const action = this.agentConversations.resolveMessageAction(agentId, messageId);
-          if (!action) {
-            return this.snapshot;
-          }
-          await this.agentConversations.rollbackToTurn(action.agent.id, action.turnId);
-          const result = this.agentPrompts.send(agentId, prompt);
-          await this.persistSnapshotOnly();
-          return result;
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentTurnEdit, { agentId, turnId, content }, async () => {
+          const snapshot = await this.agentConversations.editTurn(agentId, turnId, content);
+          if (!snapshot) throw new Error(`Agent not found: ${agentId}`);
+          return snapshot;
         });
       }
-      case backendMethods.agentMessageRetry: {
+      case backendMethods.agentTurnRetry: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        const messageId = requireString(params.messageId, 'messageId');
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentMessageRetry, { agentId, messageId }, async () => {
-          const action = this.agentConversations.resolveMessageAction(agentId, messageId);
-          if (!action?.prompt) {
-            return this.snapshot;
-          }
-          await this.agentConversations.rollbackToTurn(action.agent.id, action.turnId);
-          const result = this.agentPrompts.send(agentId, action.prompt);
-          await this.persistSnapshotOnly();
-          return result;
+        const turnId = requireString(params.turnId, 'turnId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentTurnRetry, { agentId, turnId }, async () => {
+          const snapshot = await this.agentConversations.retryTurn(agentId, turnId);
+          if (!snapshot) throw new Error(`Agent not found: ${agentId}`);
+          return snapshot;
         });
       }
       case backendMethods.teamCreate: {
@@ -1575,10 +1536,6 @@ export class ClawBackendServer {
             return this.snapshot;
           },
         );
-      }
-      case backendMethods.automationDueRun: {
-        await this.requireAutomationRunner().runAll();
-        return createClawRpcResult(message.id, this.snapshot);
       }
       case backendMethods.automationHistoryClear: {
         const automationId = requireAutomationId(message.params);
@@ -2380,11 +2337,6 @@ function requireDuplicateAgentRequest(params: unknown): { agentId: string; optio
       ...(options.name === undefined ? {} : { name: options.name.trim() }),
     },
   };
-}
-
-function requireMessageId(params: unknown): string {
-  const record = requireRecord(params);
-  return requireString(record.messageId, 'messageId');
 }
 
 function requireSettingsUpdateInput(params: unknown): UpdateSettingsInput {

@@ -164,14 +164,12 @@ Current implementation checkpoint:
 - `clawd` now owns active-turn steering and interruption session mutations.
   Electron forwards steer/interrupt requests and adopts the returned snapshot;
   provider-only steer/interrupt calls use `driver/*` RPC methods.
-- `clawd` now owns prompt dispatch, rollback-to-turn history replacement, and
-  delete/edit/retry message orchestration. Electron forwards message actions by
-  agent/message ids and adopts the returned snapshot.
+- `clawd` now owns prompt dispatch and delete/edit/retry turn orchestration.
+  Electron forwards stable agent/turn ids and adopts the returned snapshot.
 - Queued prompt admission, draining, retry scheduling, and timer cleanup live
   in `AgentPromptManager`; `ClawBackendServer` routes the protocol methods and
   backend events into that service rather than owning its lifecycle state.
-- Conversation hydration, rollback history replacement, message retry/edit
-  resolution, and provider title synchronization live in
+- Conversation hydration, turn-action snapshot replacement, and provider title synchronization live in
   `AgentConversationService`. This keeps conversation mutation policy together
   while the server remains the protocol and local/remote routing boundary.
 - Pending provider request ownership lives in `ClientRequestRegistry`, and
@@ -540,7 +538,7 @@ names that describe backend ownership:
 - `team/create`, `team/update`, `team/reorder`, `team/delete`, `team/select`
 - `agent/create`, `agent/update`, `agent/delete`, `agent/select`,
   `agent/restart`, `agent/prompt/send`, `agent/prompt/steer`, `agent/interrupt`,
-  `agent/message/delete`, `agent/message/update`, `agent/message/retry`
+  `agent/turn/delete`, `agent/turn/edit`, `agent/turn/retry`
 - `client/request/respond`
 - `agent/folder/validate`, `agent/models/list`, `agent/skills/list`,
   `agent/conversations/list`, `agent/conversation/resume`,

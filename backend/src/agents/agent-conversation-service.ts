@@ -4,18 +4,10 @@ import type {
   AppSnapshot,
   BackendConversationRef,
   BackendSession,
-  RendererMessage,
 } from '@codex-claw/core/contracts';
-import type { BackendEvent, BackendRollbackResult } from '@codex-claw/core/backend-driver';
+import type { BackendEvent, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { warnMain } from '../log';
-
-export type ResolvedMessageAction = {
-  agent: Agent;
-  message: RendererMessage;
-  prompt: string | null;
-  turnId: string;
-};
 
 export type AgentConversationServiceOptions = {
   applyEvent: (event: BackendEvent) => void;
@@ -26,47 +18,43 @@ export type AgentConversationServiceOptions = {
   refreshWorkspaceIdentity: (agentId: string) => Promise<void>;
 };
 
-/** Owns conversation history mutation, retry resolution, hydration, and title synchronization. */
+/** Owns conversation turn actions, hydration, and title synchronization. */
 export class AgentConversationService {
   private readonly hydrationRequests = new Map<string, Promise<void>>();
 
   constructor(private readonly options: AgentConversationServiceOptions) {}
 
-  async rollbackToTurn(agentId: string, turnId: string): Promise<AppSnapshot | null> {
+  async deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot | null> {
     const agent = this.agent(agentId);
     if (!agent) return null;
     const result = await this.options.driverRequest(
       agent,
-      backendMethods.driverTurnRollback,
+      backendMethods.driverTurnDelete,
       { agent, turnId },
-    ) as BackendRollbackResult;
-    agent.backendSession = result.backendSession;
-    const sessionThread = result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {};
-    this.options.applyEvent({
-      agentId,
-      ...sessionThread,
-      type: 'thread.historyLoaded',
-      payload: { messages: result.messages, replace: true },
-    });
-    this.options.applyEvent({
-      agentId,
-      ...sessionThread,
-      type: 'agent.statusChanged',
-      payload: { type: 'idle' },
-    });
-    return this.options.persistSnapshot();
+    ) as BackendTurnActionResult;
+    return this.applyTurnAction(agentId, result);
   }
 
-  resolveMessageAction(agentId: string, messageId: string): ResolvedMessageAction | null {
+  async editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot | null> {
     const agent = this.agent(agentId);
     if (!agent) return null;
-    const messages = this.options.getSnapshot().messages.filter((message) => message.agentId === agentId);
-    const index = messages.findIndex((message) => message.id === messageId);
-    const message = messages[index];
-    if (index === -1 || !message) return null;
-    const turnId = resolveMessageTurnId(messages, index);
-    if (!turnId) return null;
-    return { agent, message, prompt: promptForMessageRetry(messages, index, turnId), turnId };
+    const result = await this.options.driverRequest(
+      agent,
+      backendMethods.driverTurnEdit,
+      { agent, turnId, content },
+    ) as BackendTurnActionResult;
+    return this.applyTurnAction(agentId, result);
+  }
+
+  async retryTurn(agentId: string, turnId: string): Promise<AppSnapshot | null> {
+    const agent = this.agent(agentId);
+    if (!agent) return null;
+    const result = await this.options.driverRequest(
+      agent,
+      backendMethods.driverTurnRetry,
+      { agent, turnId },
+    ) as BackendTurnActionResult;
+    return this.applyTurnAction(agentId, result);
   }
 
   isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
@@ -166,6 +154,25 @@ export class AgentConversationService {
   private agent(agentId: string): Agent | undefined {
     return this.options.getSnapshot().agents.find((candidate) => candidate.id === agentId);
   }
+
+  private async applyTurnAction(agentId: string, result: BackendTurnActionResult): Promise<AppSnapshot> {
+    const agent = this.agent(agentId);
+    if (agent) agent.backendSession = result.backendSession;
+    const sessionThread = result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {};
+    this.options.applyEvent({
+      agentId,
+      ...sessionThread,
+      type: 'thread.historyLoaded',
+      payload: { messages: result.messages, replace: true },
+    });
+    this.options.applyEvent({
+      agentId,
+      ...sessionThread,
+      type: 'agent.statusChanged',
+      payload: result.activeTurnId ? { type: 'working' } : { type: 'idle' },
+    });
+    return this.options.persistSnapshot();
+  }
 }
 
 const HISTORY_HYDRATION_RETRY_DELAY_MS = 500;
@@ -177,40 +184,6 @@ function isTransientHistoryHydrationError(error: unknown): boolean {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-function resolveMessageTurnId(messages: RendererMessage[], index: number): string | null {
-  const message = messages[index];
-  if (!message) return null;
-  if (message.turnId) return message.turnId;
-  const idTurnId = turnIdFromRendererMessageId(message.id);
-  if (idTurnId) return idTurnId;
-  if (message.role === 'user') {
-    for (let offset = index + 1; offset < messages.length; offset += 1) {
-      const candidate = messages[offset];
-      if (candidate?.role === 'user') break;
-      const candidateTurnId = candidate ? candidate.turnId ?? turnIdFromRendererMessageId(candidate.id) : null;
-      if (candidateTurnId) return candidateTurnId;
-    }
-  }
-  return null;
-}
-
-function promptForMessageRetry(messages: RendererMessage[], index: number, turnId: string): string | null {
-  const message = messages[index];
-  if (!message) return null;
-  if (message.role === 'user') return rendererMessageText(message);
-  for (let offset = index - 1; offset >= 0; offset -= 1) {
-    const candidate = messages[offset];
-    if (!candidate || candidate.role !== 'user') continue;
-    const candidateTurnId = candidate.turnId ?? resolveMessageTurnId(messages, offset);
-    if (candidateTurnId === turnId) return rendererMessageText(candidate);
-  }
-  for (let offset = index - 1; offset >= 0; offset -= 1) {
-    const candidate = messages[offset];
-    if (candidate?.role === 'user') return rendererMessageText(candidate);
-  }
-  return null;
 }
 
 function sameConversationRef(left: BackendConversationRef, right: BackendConversationRef): boolean {
@@ -231,24 +204,4 @@ function isBackendSession(value: unknown): value is BackendSession {
     typeof session.sessionId === 'string' &&
     session.sessionId.trim().length > 0 &&
     typeof session.transport === 'string';
-}
-
-function rendererMessageText(message: RendererMessage): string {
-  return message.parts
-    .map((part) => part.type === 'text' || part.type === 'status' ? part.text : '')
-    .filter(Boolean)
-    .join('\n\n')
-    .trim();
-}
-
-function turnIdFromRendererMessageId(messageId: string): string | null {
-  if (messageId.startsWith('assistant-')) {
-    return messageId.slice('assistant-'.length).split('-segment-')[0] || null;
-  }
-
-  if (messageId.startsWith('compaction-')) {
-    return messageId.slice('compaction-'.length) || null;
-  }
-
-  return null;
 }

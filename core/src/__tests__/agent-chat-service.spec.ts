@@ -3,13 +3,15 @@ import { sendAgentPrompt } from '../agent-chat-service';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../snapshot';
 import type { MainToRendererEvent } from '../contracts';
 import type { AgentBackendDriver, BackendSendResult } from '../backend-driver';
-import { codexBackendCapabilities } from '../backend-capabilities';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '../backend-capabilities';
 
 describe('agent chat service', () => {
-  it('queues a prompt immediately and records the returned thread id later', async () => {
+  it('queues a Claude prompt immediately and records the returned session later', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backend = 'claude';
+    snapshot.agents[0].backendDefaults = { kind: 'claude' };
     const completion = deferred<BackendSendResult>();
-    const backendDriver = createFakeBackendDriver(completion.promise);
+    const backendDriver = createFakeBackendDriver(completion.promise, 'claude');
     const events: MainToRendererEvent[] = [];
 
     const result = sendAgentPrompt(snapshot, backendDriver, 'agent-dina', ' hello ', undefined, (event) => {
@@ -38,38 +40,57 @@ describe('agent chat service', () => {
       { message: { agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello' }] } },
       { type: 'starting' },
       {
-        backend: 'codex',
+        backend: 'claude',
         status: 'starting',
-        detail: 'Starting Codex backend...',
-        capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
+        detail: 'Starting Claude backend...',
+        capabilities: { approvalPresets: [] },
       },
     ]);
 
     completion.resolve({
-      backendSession: { kind: 'codex', threadId: 'thread-1' },
-      turnId: 'turn-1',
+      backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
     });
     await flushMicrotasks();
 
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'session-1', transport: 'stdio' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(events.map((event) => event.payload)).toMatchObject([
       { message: { agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello' }] } },
       { type: 'starting' },
       {
-        backend: 'codex',
+        backend: 'claude',
         status: 'starting',
-        detail: 'Starting Codex backend...',
-        capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
+        detail: 'Starting Claude backend...',
+        capabilities: { approvalPresets: [] },
       },
       { type: 'working' },
       {
-        backend: 'codex',
+        backend: 'claude',
         status: 'running',
-        detail: { key: 'backend.connected', params: { backend: 'Codex' } },
-        capabilities: { approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'] },
+        detail: { key: 'backend.connected', params: { backend: 'Claude' } },
+        capabilities: { approvalPresets: [] },
       },
     ]);
+  });
+
+  it('leaves Codex optimistic message identity to the backend driver', () => {
+    const snapshot = createInitialSnapshot();
+    const backendDriver = createFakeBackendDriver(Promise.resolve({
+      backendSession: { kind: 'codex', threadId: 'thread-1' },
+      turnId: 'turn-1',
+    }));
+    const events: MainToRendererEvent[] = [];
+
+    sendAgentPrompt(snapshot, backendDriver, 'agent-dina', 'hello', undefined, (event) => {
+      events.push({
+        ...event,
+        seq: events.length + 1,
+        occurredAt: event.occurredAt ?? '2026-06-05T00:00:01.000Z',
+      });
+    });
+
+    expect(snapshot.messages).toStrictEqual([]);
+    expect(events.some((event) => event.type === 'message.userSubmitted')).toBe(false);
   });
 
   it('records visible backend errors without throwing through IPC', async () => {
@@ -258,7 +279,11 @@ describe('agent chat service', () => {
 
   it('preserves provider-neutral attachment descriptors for the backend driver', () => {
     const snapshot = createInitialSnapshot();
-    const backendDriver = createFakeBackendDriver(Promise.resolve({ backendSession: { kind: 'codex', threadId: 'thread-1' }, turnId: 'turn-1' }));
+    snapshot.agents[0].backend = 'claude';
+    snapshot.agents[0].backendDefaults = { kind: 'claude' };
+    const backendDriver = createFakeBackendDriver(Promise.resolve({
+      backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
+    }), 'claude');
     const attachments = [
       {
         type: 'image' as const,
@@ -309,10 +334,11 @@ describe('agent chat service', () => {
 
   it('submits attachment-only prompts', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backend = 'claude';
+    snapshot.agents[0].backendDefaults = { kind: 'claude' };
     const backendDriver = createFakeBackendDriver(Promise.resolve({
-      backendSession: { kind: 'codex', threadId: 'thread-1' },
-      turnId: 'turn-1',
-    }));
+      backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
+    }), 'claude');
     const attachments = [{ type: 'file' as const, path: '/tmp/report.txt', name: 'report.txt' }];
 
     sendAgentPrompt(snapshot, backendDriver, 'agent-dina', '   ', { attachments }, vi.fn());
@@ -375,13 +401,18 @@ describe('agent chat service', () => {
   });
 });
 
-function createFakeBackendDriver(sendResult: Promise<BackendSendResult>): AgentBackendDriver {
+function createFakeBackendDriver(
+  sendResult: Promise<BackendSendResult>,
+  backend: 'codex' | 'claude' = 'codex',
+): AgentBackendDriver {
   return {
-    backend: 'codex',
-    getRuntimeStatus: () => ({ backend: 'codex', status: 'notConfigured' }),
-    getCapabilities: () => codexBackendCapabilities,
+    backend,
+    getRuntimeStatus: () => ({ backend, status: 'notConfigured' }),
+    getCapabilities: () => backend === 'codex' ? codexBackendCapabilities : claudeBackendCapabilities,
     sendPrompt: vi.fn().mockReturnValue(sendResult),
-    interrupt: vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-1' } }),
+    interrupt: vi.fn().mockResolvedValue(backend === 'codex'
+      ? { backendSession: { kind: 'codex', threadId: 'thread-1' } }
+      : { backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' } }),
     respondToRequest: vi.fn().mockResolvedValue(undefined),
     onEvent: vi.fn(() => () => undefined),
     close: vi.fn().mockResolvedValue(undefined),

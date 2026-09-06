@@ -460,6 +460,7 @@ describe('AppShell authentication and conversation', () => {
       messages: snapshot.messages,
       busy: false,
       disabled: false,
+      activeTurnId: null,
     });
     expect(state.composer).toMatchObject({
       selectedModelId: 'gpt-5',
@@ -490,23 +491,25 @@ describe('AppShell authentication and conversation', () => {
         };
       }),
     }]);
-    expect(state.policy?.canForkMessage).toBe(true);
+    expect(state.policy?.canForkTurn).toBe(true);
 
     const updatedMessages: RendererMessage[] = [{
       id: 'controller-reactive-message',
       agentId: activeAgent.id,
       role: 'assistant',
       status: 'complete',
+      turnId: 'turn-controller',
       createdAt: '2026-08-04T00:00:00.000Z',
       parts: [{ type: 'text', text: 'Updated through the stable controller.' }],
     }];
-    await wrapper.setProps({ messages: updatedMessages } as Record<string, unknown>);
+    await wrapper.setProps({ messages: updatedMessages, isSending: true } as Record<string, unknown>);
     expect(conversationControllerState(wrapper).identity.messages).toStrictEqual(updatedMessages);
+    expect(conversationControllerState(wrapper).identity.activeTurnId).toBe('turn-controller');
     expect(wrapper.text()).toContain('Updated through the stable controller.');
 
     const actions = conversationControllerActions(wrapper);
-    await actions.forkMessage?.(3);
-    expect(wrapper.emitted('fork-message')).toStrictEqual([[3]]);
+    await actions.forkTurn?.('turn-3');
+    expect(wrapper.emitted('fork-turn')).toStrictEqual([['turn-3']]);
     await actions.updateQueuedPrompt?.('queued-1', 'Edited queued prompt');
     await actions.steerQueuedPrompt?.('queued-1', 'Edited steer');
     expect(wrapper.emitted('update-queued-prompt')).toStrictEqual([['queued-1', 'Edited queued prompt']]);

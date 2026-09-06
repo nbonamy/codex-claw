@@ -425,16 +425,16 @@ describe('useAppState', () => {
       ...remoteSnapshot,
       messages: [remoteSnapshot.messages[1]],
     };
-    const deleteMessage = vi.fn().mockResolvedValue(afterDelete);
-    const editMessage = vi.fn().mockResolvedValue(afterEdit);
-    const retryMessage = vi.fn().mockResolvedValue(afterRetry);
+    const deleteTurn = vi.fn().mockResolvedValue(afterDelete);
+    const editTurn = vi.fn().mockResolvedValue(afterEdit);
+    const retryTurn = vi.fn().mockResolvedValue(afterRetry);
 
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        deleteMessage,
-        editMessage,
-        retryMessage,
+        deleteTurn,
+        editTurn,
+        retryTurn,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -442,16 +442,16 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    await state.deleteMessage(0);
-    expect(deleteMessage).toHaveBeenCalledWith('agent-dina', 'user-turn-1');
+    await state.deleteTurn('turn-1');
+    expect(deleteTurn).toHaveBeenCalledWith('agent-dina', 'turn-1');
 
     state.snapshot.value = remoteSnapshot;
-    await state.editMessage({ content: '  edited prompt  ', index: 0 });
-    expect(editMessage).toHaveBeenCalledWith('agent-dina', 'user-turn-1', 'edited prompt');
+    await state.editTurn({ content: '  edited prompt  ', turnId: 'turn-1' });
+    expect(editTurn).toHaveBeenCalledWith('agent-dina', 'turn-1', 'edited prompt');
 
     state.snapshot.value = remoteSnapshot;
-    await state.retryMessage(1);
-    expect(retryMessage).toHaveBeenCalledWith('agent-dina', 'assistant-turn-1');
+    await state.retryTurn('turn-1');
+    expect(retryTurn).toHaveBeenCalledWith('agent-dina', 'turn-1');
   });
 
   it('blocks message actions when the active backend does not support them', async () => {
@@ -478,16 +478,16 @@ describe('useAppState', () => {
         parts: [{ type: 'text', text: 'original answer' }],
       },
     ];
-    const deleteMessage = vi.fn().mockResolvedValue(remoteSnapshot);
-    const editMessage = vi.fn().mockResolvedValue(remoteSnapshot);
-    const retryMessage = vi.fn().mockResolvedValue(remoteSnapshot);
+    const deleteTurn = vi.fn().mockResolvedValue(remoteSnapshot);
+    const editTurn = vi.fn().mockResolvedValue(remoteSnapshot);
+    const retryTurn = vi.fn().mockResolvedValue(remoteSnapshot);
 
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        deleteMessage,
-        editMessage,
-        retryMessage,
+        deleteTurn,
+        editTurn,
+        retryTurn,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -495,13 +495,13 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    await state.deleteMessage(0);
-    await state.editMessage({ content: 'edited prompt', index: 0 });
-    await state.retryMessage(1);
+    await state.deleteTurn('turn-1');
+    await state.editTurn({ content: 'edited prompt', turnId: 'turn-1' });
+    await state.retryTurn('turn-1');
 
-    expect(deleteMessage).not.toHaveBeenCalled();
-    expect(editMessage).not.toHaveBeenCalled();
-    expect(retryMessage).not.toHaveBeenCalled();
+    expect(deleteTurn).not.toHaveBeenCalled();
+    expect(editTurn).not.toHaveBeenCalled();
+    expect(retryTurn).not.toHaveBeenCalled();
   });
 
   it('renders backend-owned queues and never drains them from the renderer', async () => {

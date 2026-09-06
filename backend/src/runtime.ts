@@ -131,7 +131,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       const driver = requireBackendDriver(backendDrivers, agent);
       mcpService.recordPromptInputMethod(agentId, 'typed');
       sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, (event) => server.emitEvent(event), {
-        onBackendSessionUpdated: (result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
+        onBackendSessionUpdated: (_result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
         onPromptStarted: async (result) => {
           const automation = updateAutomationExecutionAgentConversationInSnapshot(snapshot, context.automationId, context.executionId, agentId, {
             conversationRef: conversationRefFromSendResult(agent, result),

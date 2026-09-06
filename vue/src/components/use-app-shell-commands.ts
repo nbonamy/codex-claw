@@ -2,7 +2,6 @@ import type {
   Agent,
   AppCommand,
   BackendApprovalRequest,
-  RendererSendPromptOptions,
   SidePanelMarkdownRequest,
   Team,
 } from '@codex-claw/core/contracts';

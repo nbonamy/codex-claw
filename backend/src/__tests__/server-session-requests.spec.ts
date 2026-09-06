@@ -151,7 +151,7 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'fork-agent',
       method: 'agent/fork',
-      params: { agentId: 'agent-dina', messageIndex: 2 },
+      params: { agentId: 'agent-dina', turnId: 'turn-2' },
     })).resolves.toMatchObject({
       result: {
         activeAgentId: expect.stringContaining('agent-'),
@@ -171,7 +171,7 @@ describe('ClawBackendServer', () => {
     expect(forkConversation).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'agent-dina' }),
       expect.objectContaining({ name: 'Dina (fork)' }),
-      2,
+      'turn-2',
     );
     expect(setConversationTitle).toHaveBeenCalledWith(
       expect.objectContaining({ id: forkedAgentId, backendSession: { kind: 'codex', threadId: 'thread-forked' } }),
@@ -487,7 +487,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('owns rollback history replacement mutations', async () => {
+  it('owns turn deletion history replacement mutations', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -506,9 +506,10 @@ describe('ClawBackendServer', () => {
       createTextMessage('old-jesse', 'agent-jesse', 'keep'),
     ];
     const rollbackMessages = [createTextMessage('rollback-dina', 'agent-dina', 'rolled back')];
-    const rollbackToTurn = vi.fn().mockResolvedValue({
+    const deleteTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-rollback' },
       messages: rollbackMessages,
+      activeTurnId: null,
     });
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -517,7 +518,7 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      rollbackToTurn,
+      deleteTurn,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -534,8 +535,8 @@ describe('ClawBackendServer', () => {
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'rollback',
-      method: 'agent/turn/rollback',
+      id: 'delete-turn',
+      method: 'agent/turn/delete',
       params: { agentId: 'agent-dina', turnId: 'turn-1' },
     })).resolves.toMatchObject({
       result: {
@@ -543,7 +544,7 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(rollbackToTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+    expect(deleteTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
     expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
       ['old-jesse', 'agent-jesse'],
       ['rollback-dina', 'agent-dina'],

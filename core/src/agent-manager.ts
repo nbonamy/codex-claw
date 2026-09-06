@@ -366,33 +366,6 @@ export function updateWorkItemAssignmentInSnapshot(
   return updatedAssignment;
 }
 
-export function markWorkItemCompletionInstructionsDeliveredInSnapshot(
-  snapshot: AppSnapshot,
-  agentId: string,
-  workItemId: string,
-  deliveredAt = new Date().toISOString(),
-): WorkBacklogAssignment | null {
-  const assignment = snapshot.workBacklog.assignments[workItemId];
-  if (!assignment || assignment.agentId !== agentId) {
-    return null;
-  }
-
-  const updatedAssignment: WorkBacklogAssignment = {
-    ...assignment,
-    completionInstructionsDeliveredAt: deliveredAt,
-  };
-  snapshot.workBacklog.assignments = {
-    ...snapshot.workBacklog.assignments,
-    [workItemId]: updatedAssignment,
-  };
-
-  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (agent) {
-    agent.updatedAt = deliveredAt;
-  }
-  return updatedAssignment;
-}
-
 export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string, teamId: string, updatedAt = new Date().toISOString()): Agent | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   const targetTeam = snapshot.teams.find((candidate) => candidate.id === teamId);

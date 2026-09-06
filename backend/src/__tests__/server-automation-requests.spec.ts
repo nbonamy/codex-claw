@@ -349,7 +349,6 @@ describe('ClawBackendServer', () => {
       method: 'automation/run',
       params: { automationId },
     })).resolves.toMatchObject({ result: { automations: [{ id: automationId }] } });
-    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'run-due', method: 'automation/due/run' })).resolves.toMatchObject({ result: { automations: [{ id: automationId }] } });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -359,7 +358,6 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({ result: { automations: [] } });
 
     expect(automationRunner.runAutomation).toHaveBeenCalledWith(automationId);
-    expect(automationRunner.runAll).toHaveBeenCalledOnce();
     expect(saveSnapshot).toHaveBeenCalled();
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),

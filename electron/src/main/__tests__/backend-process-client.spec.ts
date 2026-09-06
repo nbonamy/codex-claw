@@ -44,6 +44,27 @@ describe('ClawBackendProcessClient', () => {
     });
   });
 
+  it.each([
+    backendMethods.agentTurnDelete,
+    backendMethods.agentTurnEdit,
+    backendMethods.agentTurnRetry,
+  ])('accepts a successful delayed response for %s', async (method) => {
+    vi.useFakeTimers();
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+
+    await client.start();
+    const response = client.request<{ ok: true }>(method, { agentId: 'agent-dina', turnId: 'turn-1' });
+    const request = JSON.parse(child.stdin.writes[0]);
+    await vi.advanceTimersByTimeAsync(6_000);
+    child.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { ok: true } })}\n`);
+
+    await expect(response).resolves.toStrictEqual({ ok: true });
+  });
+
   it('rejects requests when the backend returns a JSON-RPC error', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({

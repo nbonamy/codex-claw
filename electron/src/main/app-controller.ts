@@ -14,7 +14,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendConversationRef, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -400,8 +400,8 @@ export class AppController {
       return this.duplicateAgent(agentId, options);
     });
 
-    ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, messageIndex?: number) => {
-      return this.forkAgent(agentId, messageIndex);
+    ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, turnId?: string) => {
+      return this.forkAgent(agentId, turnId);
     });
 
     ipc.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
@@ -517,16 +517,16 @@ export class AppController {
       return this.interruptAgent(agentId);
     });
 
-    ipc.handle(ipcChannels.deleteMessage, (_event, agentId: string, messageId: string) => {
-      return this.deleteMessage(agentId, messageId);
+    ipc.handle(ipcChannels.deleteTurn, (_event, agentId: string, turnId: string) => {
+      return this.deleteTurn(agentId, turnId);
     });
 
-    ipc.handle(ipcChannels.editMessage, (_event, agentId: string, messageId: string, prompt: string) => {
-      return this.editMessage(agentId, messageId, prompt);
+    ipc.handle(ipcChannels.editTurn, (_event, agentId: string, turnId: string, content: string) => {
+      return this.editTurn(agentId, turnId, content);
     });
 
-    ipc.handle(ipcChannels.retryMessage, (_event, agentId: string, messageId: string) => {
-      return this.retryMessage(agentId, messageId);
+    ipc.handle(ipcChannels.retryTurn, (_event, agentId: string, turnId: string) => {
+      return this.retryTurn(agentId, turnId);
     });
 
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string) => this.browserOpen(agentId, browserId, url));
@@ -807,10 +807,10 @@ export class AppController {
     }));
   }
 
-  private async forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot> {
+  private async forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentFork, {
       agentId,
-      ...(messageIndex === undefined ? {} : { messageIndex }),
+      ...(turnId === undefined ? {} : { turnId }),
     }));
   }
 
@@ -835,10 +835,6 @@ export class AppController {
 
   private async selectAgent(agentId: string): Promise<AppSnapshotMetadata> {
     return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentSelect, { agentId }));
-  }
-
-  private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentFolderUpdate, { agentId, folder }));
   }
 
   private async assignWorkItemToAgent(agentId: string, item: unknown): Promise<AppSnapshot> {
@@ -1277,16 +1273,16 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentInterrupt, { agentId }));
   }
 
-  private async deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageDelete, { agentId, messageId }));
+  private async deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnDelete, { agentId, turnId }));
   }
 
-  private async editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageUpdate, { agentId, messageId, prompt }));
+  private async editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnEdit, { agentId, turnId, content }));
   }
 
-  private async retryMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageRetry, { agentId, messageId }));
+  private async retryTurn(agentId: string, turnId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnRetry, { agentId, turnId }));
   }
 
   private async chooseAgentFolder(): Promise<string | null> {

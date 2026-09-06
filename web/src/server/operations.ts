@@ -70,7 +70,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   assignWorkItemToAgent: [backendMethods.agentWorkItemAssign, named('agentId', 'item')],
   removeWorkItemAssignment: [backendMethods.agentWorkItemAssignmentDelete, named('item')],
   duplicateAgent: [backendMethods.agentDuplicate, namedOptional('agentId', 'options')],
-  forkAgent: [backendMethods.agentFork, namedOptional('agentId', 'messageIndex')],
+  forkAgent: [backendMethods.agentFork, namedOptional('agentId', 'turnId')],
   moveAgentToTeam: [backendMethods.agentTeamMove, named('input')],
   reorderAgents: [backendMethods.agentReorder, named('input')],
   reorderRepositories: [backendMethods.repositoryReorder, named('input')],
@@ -97,9 +97,9 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   steerQueuedPrompt: [backendMethods.agentQueuedPromptSteer, namedOptional('agentId', 'promptId', 'prompt')],
   updateQueuedPrompt: [backendMethods.agentQueuedPromptUpdate, named('agentId', 'promptId', 'prompt')],
   interruptAgent: [backendMethods.agentInterrupt, named('agentId')],
-  deleteMessage: [backendMethods.agentMessageDelete, named('agentId', 'messageId')],
-  editMessage: [backendMethods.agentMessageUpdate, named('agentId', 'messageId', 'prompt')],
-  retryMessage: [backendMethods.agentMessageRetry, named('agentId', 'messageId')],
+  deleteTurn: [backendMethods.agentTurnDelete, named('agentId', 'turnId')],
+  editTurn: [backendMethods.agentTurnEdit, named('agentId', 'turnId', 'content')],
+  retryTurn: [backendMethods.agentTurnRetry, named('agentId', 'turnId')],
   respondToClientRequest: [backendMethods.clientRequestRespond, named('response')],
 };
 

@@ -89,9 +89,9 @@ export type BackendCapabilities = {
   interrupt: boolean;
   history: boolean;
   conversationFork?: boolean;
-  rollback: boolean;
-  editMessage: boolean;
-  retryMessage: boolean;
+  deleteTurn: boolean;
+  editTurn: boolean;
+  retryTurn: boolean;
   approvals: boolean;
   approvalPresets?: ApprovalPreset[];
   permissionModes?: BackendPermissionModeOption[];

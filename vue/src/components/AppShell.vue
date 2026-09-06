@@ -162,7 +162,6 @@
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
-        @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @refresh-work-items="refreshWorkItems"
         @change-work-items-page="changeGlobalWorkItemsPage"
         @select-global-scope="selectGlobalBacklogScope"
@@ -367,7 +366,7 @@ import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilitie
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { projectAgentMentionLabels } from '@codex-claw/core/workspace-sidebar';
-import { clawHostCapabilities, codexClawApi } from '../platform-api';
+import { codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import AgentCreationProgressDialog from './AgentCreationProgressDialog.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
@@ -414,10 +413,6 @@ import { useCockpitBacklog } from './use-cockpit-backlog';
 import { useWorkspacePreviews } from './use-workspace-previews';
 import { useWorkItemRouting } from './use-work-item-routing';
 import { useAppShellCommands } from './use-app-shell-commands';
-
-import {
-  type RightWorkspaceTab,
-} from './right-workspace';
 
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
@@ -651,13 +646,13 @@ const emit = defineEmits<{
   'cleanup-pull-request': [agentId: string];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
-  'delete-message': [index: number];
+  'delete-turn': [turnId: string];
   'delete-queued-prompt': [promptId: string];
   'debug-mark-unread': [];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
-  'fork-message': [index: number];
-  'edit-message': [payload: { content: string; index: number }];
+  'fork-turn': [turnId: string];
+  'edit-turn': [payload: { content: string; turnId: string }];
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'reorder-agents': [input: ReorderAgentsInput];
@@ -667,7 +662,7 @@ const emit = defineEmits<{
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
-  'retry-message': [index: number];
+  'retry-turn': [turnId: string];
   'send-agent-prompt': [payload: { agentId: string; prompt: string }];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
@@ -1099,6 +1094,14 @@ const conversationKey = computed(() => {
   if (session?.kind === 'claude') return `claude:${session.sessionId}`;
   return currentAgent.value ? `agent:${currentAgent.value.id}` : 'no-agent';
 });
+const conversationActiveTurnId = computed(() => {
+  if (!props.isSending) return null;
+  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
+    const turnId = props.messages[index]?.turnId;
+    if (turnId) return turnId;
+  }
+  return null;
+});
 const conversationCapabilities = computed<CodexCapabilities>(() => ({
   models: props.backendCapabilities.models,
   skills: props.backendCapabilities.skills,
@@ -1111,9 +1114,9 @@ const conversationCapabilities = computed<CodexCapabilities>(() => ({
   steerPrompt: props.backendCapabilities.steerPrompt,
   interrupt: props.backendCapabilities.interrupt,
   history: props.backendCapabilities.history,
-  rollback: props.backendCapabilities.rollback,
-  editMessage: props.backendCapabilities.editMessage,
-  retryMessage: props.backendCapabilities.retryMessage,
+  deleteTurn: props.backendCapabilities.deleteTurn,
+  editTurn: props.backendCapabilities.editTurn,
+  retryTurn: props.backendCapabilities.retryTurn,
   approvals: props.backendCapabilities.approvals,
   approvalPresets: props.backendCapabilities.approvalPresets ?? [],
 }));
@@ -1136,6 +1139,7 @@ const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
 const conversationPaneState: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return conversationKey.value; },
+    get activeTurnId() { return conversationActiveTurnId.value; },
     get messages() { return props.messages; },
     get busy() { return props.isSending; },
     get disabled() {
@@ -1186,22 +1190,22 @@ const conversationPaneState: CodexConversationPaneState = {
   get capabilities() { return conversationCapabilities.value; },
   policy: {
     get attachEnabled() { return props.backendCapabilities.attachments; },
-    get canDeleteMessage() { return props.backendCapabilities.rollback; },
-    get canEditMessage() { return props.backendCapabilities.editMessage; },
-    get canForkMessage() {
+    get canDeleteTurn() { return props.backendCapabilities.deleteTurn; },
+    get canEditTurn() { return props.backendCapabilities.editTurn; },
+    get canForkTurn() {
       const agent = currentAgent.value;
       return Boolean(agent && forkableAgentIds.value.includes(agent.id));
     },
-    get canRetryMessage() { return props.backendCapabilities.retryMessage; },
+    get canRetryTurn() { return props.backendCapabilities.retryTurn; },
   },
 };
 const conversationPaneActions: CodexConversationPaneActions = {
   clearGoal: () => emit('clear-goal'),
   clientResponse: (response) => emit('client-response', response),
-  deleteMessage: (index) => emit('delete-message', index),
+  deleteTurn: (turnId) => emit('delete-turn', turnId),
   deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
-  editMessage: (payload) => emit('edit-message', payload),
-  forkMessage: (index) => emit('fork-message', index),
+  editTurn: (payload) => emit('edit-turn', payload),
+  forkTurn: (turnId) => emit('fork-turn', turnId),
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   menuSelect: (item) => {
@@ -1212,7 +1216,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   openImage: (image, context) => agentWorkspace.value?.openConversationImage(image, context) ?? false,
   openVisualization: (visualization) => agentWorkspace.value?.openConversationVisualization(visualization),
   resolveApproval: forwardApprovalResolution,
-  retryMessage: (index) => emit('retry-message', index),
+  retryTurn: (turnId) => emit('retry-turn', turnId),
   steer: forwardCodexSteerPrompt,
   steerQueuedPrompt: (promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
   updateQueuedPrompt: (promptId, prompt) => emit('update-queued-prompt', promptId, prompt),

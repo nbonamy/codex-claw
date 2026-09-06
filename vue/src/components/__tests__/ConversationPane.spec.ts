@@ -34,6 +34,7 @@ const messages: RendererMessage[] = [
     agentId: agent.id,
     role: 'user',
     status: 'complete',
+    turnId: 'turn-1',
     createdAt: '2026-06-05T00:00:00.000Z',
     parts: [{ type: 'text', text: 'Find the failing test.' }],
   },
@@ -42,6 +43,7 @@ const messages: RendererMessage[] = [
     agentId: agent.id,
     role: 'assistant',
     status: 'complete',
+    turnId: 'turn-1',
     createdAt: '2026-06-05T00:00:01.000Z',
     parts: [{ type: 'text', text: 'Looking now.' }],
   },
@@ -274,9 +276,9 @@ describe('ConversationPane', () => {
           conversationKey: 'agent:agent-dina',
           messages,
         },
-        policy: { canForkMessage: true },
+        policy: { canForkTurn: true },
       },
-      actions: { forkMessage: () => undefined },
+      actions: { forkTurn: () => undefined },
     });
 
     const wrapper = mountPane({ controller, agent });

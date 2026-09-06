@@ -360,24 +360,22 @@ describe('AppController', () => {
     await expect(createAgent(controller, createInput)).resolves.toBe(backendSnapshot);
     await expect(updateAgent(controller, updateInput)).resolves.toBe(backendSnapshot);
     await expect(duplicateAgent(controller, 'agent-dina', { name: 'Dina gh-24', select: false })).resolves.toBe(backendSnapshot);
-    await expect(forkAgent(controller, 'agent-dina', 4)).resolves.toBe(backendSnapshot);
+    await expect(forkAgent(controller, 'agent-dina', 'turn-4')).resolves.toBe(backendSnapshot);
     await expect(moveAgentToTeam(controller, moveInput)).resolves.toBe(backendSnapshot);
     await expect(reorderAgents(controller, reorderInput)).resolves.toBe(backendSnapshot);
     await expect(reorderRepositories(controller, reorderRepositoriesInput)).resolves.toBe(backendSnapshot);
-    await expect(updateAgentFolder(controller, 'agent-dina', '/Users/nbonamy/src/id8')).resolves.toBe(backendSnapshot);
     await expect(selectAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
     await expect(closeAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenNthCalledWith(1, 'agent/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'agent/update', { input: updateInput });
     expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina', options: { name: 'Dina gh-24', select: false } });
-    expect(request).toHaveBeenNthCalledWith(4, 'agent/fork', { agentId: 'agent-dina', messageIndex: 4 });
+    expect(request).toHaveBeenNthCalledWith(4, 'agent/fork', { agentId: 'agent-dina', turnId: 'turn-4' });
     expect(request).toHaveBeenNthCalledWith(5, 'agent/team/move', { input: moveInput });
     expect(request).toHaveBeenNthCalledWith(6, 'agent/reorder', { input: reorderInput });
     expect(request).toHaveBeenNthCalledWith(7, 'repository/reorder', { input: reorderRepositoriesInput });
-    expect(request).toHaveBeenNthCalledWith(8, 'agent/folder/update', { agentId: 'agent-dina', folder: '/Users/nbonamy/src/id8' });
-    expect(request).toHaveBeenNthCalledWith(9, 'agent/select', { agentId: 'agent-dina' });
-    expect(request).toHaveBeenNthCalledWith(10, 'agent/delete', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(8, 'agent/select', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(9, 'agent/delete', { agentId: 'agent-dina' });
     expect(request).not.toHaveBeenCalledWith('agent/folder/validate', expect.anything());
   });
 
@@ -699,10 +697,10 @@ async function duplicateAgent(controller: AppController, agentId: string, option
   }).duplicateAgent(agentId, options);
 }
 
-async function forkAgent(controller: AppController, agentId: string, messageIndex?: number): Promise<AppSnapshot> {
+async function forkAgent(controller: AppController, agentId: string, turnId?: string): Promise<AppSnapshot> {
   return (controller as unknown as {
-    forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>;
-  }).forkAgent(agentId, messageIndex);
+    forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>;
+  }).forkAgent(agentId, turnId);
 }
 
 async function moveAgentToTeam(controller: AppController, input: MoveAgentToTeamInput): Promise<AppSnapshot> {
@@ -727,12 +725,6 @@ async function closeAgent(controller: AppController, agentId: string): Promise<A
   return (controller as unknown as {
     closeAgent(agentId: string): Promise<AppSnapshot>;
   }).closeAgent(agentId);
-}
-
-async function updateAgentFolder(controller: AppController, agentId: string, folder: string): Promise<AppSnapshot> {
-  return (controller as unknown as {
-    updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot>;
-  }).updateAgentFolder(agentId, folder);
 }
 
 async function createTeam(controller: AppController, input: CreateTeamInput): Promise<AppSnapshot> {

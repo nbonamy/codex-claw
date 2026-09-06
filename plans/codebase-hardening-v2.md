@@ -350,7 +350,17 @@ Every deletion checkpoint must search static imports, dynamic imports,
 component registration, string registries, package exports, docs, i18n keys,
 styles, assets, tests, and persisted/wire producers immediately before editing.
 
-### P1 — proven-safe symbols and paths
+### P1 — completed proven-safe symbols and paths
+
+The 2026-09-06 re-audit completed this inventory. It removed every candidate
+that remained dead in the current tree, including the orphan files and the
+Cockpit-only event relay. It also corrected stale audit results instead of
+deleting live code: `DashboardIcon`, `SquareCheck`, and
+`AgentWorkspace.isConversationLoading` have current production consumers, and
+the first positional runtime callback argument remains as `_result` because
+the second argument is used. Eighteen, rather than twenty, app-icon aliases
+were therefore removed. Production-only `noUnusedLocals` and
+`noUnusedParameters` probes are clean in all five workspaces.
 
 | Candidate | Exact files/symbols and attached material | Prerequisite and deletion checkpoint | Validation |
 | --- | --- | --- | --- |
@@ -662,16 +672,18 @@ Commit boundaries:
 ### Phase 1 — dead code
 
 Completed: the WorkBacklog surface, repository issue composer/create-item
-vertical slice, parked work-routing vertical slice, and legacy Claude CLI
-transport closure described in Appendix A. Remaining order:
+vertical slice, parked work-routing vertical slice, legacy Claude CLI
+transport closure, all proven-unused Core/Electron/Vue symbols, four dormant
+compatibility groups, two orphan Vue modules, and the orphan visual asset
+described in Appendix A. Knip, compiler checks, static/registry searches, and
+the final P2 audit found no further code that is both unreachable and safe to
+delete.
 
-1. P1 Core symbols/re-exports.
-2. P1 Electron and Vue symbols/orphans.
-3. Install typed ESLint Stage L1 immediately after the remaining proven-safe
-   dead-code checkpoints. Record rather than suppress the remaining unsafe
-   baseline.
-4. Protocol/persistence candidates one at a time after producer/history proof;
-   these compatibility decisions do not delay L1.
+The remaining P2 rows are deliberate keeps: released persistence and wire
+readers have direct migration tests, and the in-memory integration token store
+is live test support rather than runtime dead code. Revisit those rows only
+with the producer/history proof listed in Appendix A. Typed ESLint Stage L1 is
+the next independent checkpoint; it is not part of dead-code removal.
 
 Commit titles are scope-specific, for example:
 
@@ -808,8 +820,9 @@ the evidence columns is incomplete.
 | — | Phase 0: retained snapshot/event manual validation | Pending | — | — | — | — | Must include manual app smoke; provisional automated gates alone are insufficient |
 | 2026-09-05 | Phase 1: obsolete workflow vertical slices | Complete | `main` 84 files, +147/-4,171 -> review branch 86 files, +149/-4,188 after contract-owner adaptation | Removed orphan backlog; composer and complete create-item path; disabled work-routing; obsolete Claude CLI while retaining losslessly moved transport contracts | Focused Core 5/40, Backend 4/59, Vue App 1/5, backlog 3/41; typecheck; lint/Stylelint/Knip; `test:ai` 272 files / 2,046 tests; diff check | `a3673ec160134d3d12591316997adb8fa59b6354` on `main`; `92551b034a1ee30602c9f3e4b649d38d931501b5` here | Unsupported create-item/work-routing compatibility removed; normal parser ignores obsolete additive snapshot fields; live `create_agent`, Claude Agent SDK, and stdio preserved |
 | 2026-09-05 | Phase 1: nullable skill-event regression | Complete | Real app-server `interface.brandColor: null` -> string-or-absent app and SDK surfaces | One Claw normalization helper protects list/event paths; SDK provider boundary removes the upstream representation leak; strict event validation remains unchanged | 374ms red adapter-to-decoder reproduction; Claw `test:ai` 271/2,043, lint, typecheck, unsigned build; SDK Backend 62/1,146, compatibility and docs builds | Claw `fdb27e6e6f163807a205ef6e5315ef82007854ff`; review `b29854c`; SDK `8fe46e3fdfff4723d965050924b63577ddd3bdf5` local/not pushed | Sequence 9 rejection and sequence 10 resync proved strictness worked; generated types alone are not runtime evidence |
-| — | Phase 1: P1 Core dead code | Pending | — | — | — | — | — |
-| — | Phase 1: P1 adapter/UI dead code | Pending | — | — | — | — | — |
+| 2026-09-06 | Phase 1: P1 Core and adapter/UI dead code | Complete / uncommitted | 45 implementation files, +14/-322 before this ledger update; orphan 278,088-byte PNG also removed | Removed dead Core exports/helpers, Electron wrapper/logger/imports, Vue event relay/helper/icon exports, two orphan component modules and owner-only tests | Focused 17 files / 181 tests; full `test:ai` 272 files / 2,066 tests; all-workspace lint/typecheck/Stylelint/Knip; Core/Backend/Vue/Web builds and Electron typecheck; production-only unused-symbol probes clean | — | Re-audit preserved live `DashboardIcon`, `SquareCheck`, and `isConversationLoading`; the later final unsigned root build passes against the refreshed sibling SDK |
+| 2026-09-06 | Phase 1: proven compatibility dead code | Complete / uncommitted | Four dormant compatibility groups -> absent | Removed unused snapshot façade re-exports, write-only `completionInstructionsDeliveredAt`, `agent/folder/update`, and `automation/due/run`; active owner implementations and scheduler execution remain | Included in the focused/full gates above; protocol/source inventory has zero remaining references to the removed request methods or field | — | Remaining compatibility rows stay pending because they protect released persistence/wire forms or useful test adapters and are not proven dead |
+| 2026-09-06 | Phase 1: SDK turn-contract migration | Complete | Message-index/message-id compatibility path -> stable turn ids end to end; Codex prompt optimism also has one SDK-owned message identity | Migrated fork/delete/edit/retry through Core contracts, protocol, backend driver/service, Electron, Web, Vue controller/actions, and docs; removed Claw's message-to-turn and retry-prompt reconstruction helpers because the SDK now owns those semantics; classified turn mutations as 120-second backend operations so successful long-thread actions are not abandoned after five seconds; removed Claw's competing Codex prompt insertion so the SDK append/update lifecycle can attach the authoritative turn id without duplicating the row | Focused Core/Backend/Electron/Vue suites; all-workspace typecheck and lint/Stylelint/Knip; full `test:ai` 272 files / 2,072 tests; unsigned production build before the prompt-identity regression; delayed-success transport regression at six seconds; real-order SDK append/update regression | Current Phase 1 checkpoint | Claw supplies active-turn and turn lifecycle identity; the SDK now exposes normal mutations only on the latest terminal turn, with fork further restricted to completed turns; production logs identified the timeout rather than transcript reduction as the observed stale-row cause; Claude retains Claw-owned optimistic prompt rendering |
 | — | Phase 1: compatibility candidates | Pending | — | — | — | — | One producer/history audit per candidate |
 | — | Phase 1: typed ESLint L1 | Pending | — | — | — | — | Next after remaining P1 proven-safe symbol cleanup |
 | — | Phase 2: backend/Core ownership review | Pending | — | — | — | — | Add only activated candidates as new rows |

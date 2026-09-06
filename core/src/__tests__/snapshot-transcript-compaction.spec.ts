@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  appendUserPrompt,
-  createInitialSnapshot,
-  selectAgent,
-} from '../snapshot';
+import { createInitialSnapshot } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
-import type { RendererMessage } from '../contracts';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
-import {
-  commandToolPart,
-  toolPartPayload,
-} from './snapshot-test-fixtures';
 
 describe('snapshot reducer', () => {
 

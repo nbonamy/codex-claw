@@ -440,7 +440,7 @@ type CodexClawApi = {
   listAgentConversations(agentId: string): Promise<ConversationSummary[]>
   resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>
   duplicateAgent(agentId: string): Promise<AppSnapshot>
-  forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>
+  forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>
   restartAgent(agentId: string): Promise<AppSnapshot>
   closeAgent(agentId: string): Promise<AppSnapshot>
@@ -450,9 +450,9 @@ type CodexClawApi = {
   sendPrompt(agentId: string, prompt: string, options?: SendPromptOptions): Promise<AppSnapshot>
   steerPrompt(agentId: string, prompt: string): Promise<AppSnapshot>
   interruptAgent(agentId: string): Promise<AppSnapshot>
-  deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>
-  editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>
-  retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>
+  deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot>
+  editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>
+  retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>
   respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot>
   onEvent(listener: (event: MainToRendererEvent) => void): () => void
   onAppCommand(listener: (command: AppCommand) => void): () => void

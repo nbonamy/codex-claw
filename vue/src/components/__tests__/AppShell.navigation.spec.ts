@@ -465,14 +465,12 @@ describe('AppShell navigation and teams', () => {
       agentId: 'agent-dina',
       item,
     });
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('remove-work-item-assignment', item);
     await flushPromises();
 
     expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
       agentId: 'agent-dina',
       item,
     }]]);
-    expect(wrapper.emitted('remove-work-item-assignment')).toStrictEqual([[item]]);
   });
 
   it('loads one assigned-to-me page by default without fanning out by repository', async () => {

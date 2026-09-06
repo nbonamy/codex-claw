@@ -279,7 +279,6 @@ const emit = defineEmits<{
   refresh: [repositoryId: string | null];
   'change-page': [page: number];
   'select-global-scope': [scope: 'assignedToMe' | 'all'];
-  'remove-assignment': [item: WorkItem];
   'select-assigned-agent': [agentId: string];
   'select-assignee': [login: string | null];
   'select-repository': [repositoryId: string | null];

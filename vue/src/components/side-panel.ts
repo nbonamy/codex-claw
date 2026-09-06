@@ -33,8 +33,6 @@ export type SidePanelGitDiffState = SidePanelBaseState & {
   sections?: AgentGitDiffSection[];
 };
 
-export type SidePanelState = SidePanelMarkdownState | SidePanelSourceState | SidePanelImageState | SidePanelGitDiffState;
-
 export type PlanReviewComment = {
   id: string;
   quote: string;

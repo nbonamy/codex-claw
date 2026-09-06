@@ -239,12 +239,12 @@ describe('CodexBackendDriver', () => {
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
       messages,
     });
-    await expect(driver.forkConversation(agent, targetAgent, 5)).resolves.toStrictEqual({
+    await expect(driver.forkConversation(agent, targetAgent, 'turn-5')).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
       messages,
     });
     expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
-    expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 5);
+    expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 'turn-5');
   });
 
   it('loads one older history page through the session manager', async () => {

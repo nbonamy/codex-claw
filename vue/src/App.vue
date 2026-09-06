@@ -121,7 +121,7 @@
     @cleanup-pull-request="requestPullRequestCleanup"
     @duplicate-agent="duplicateAgent"
     @fork-agent="forkAgent"
-    @fork-message="forkActiveAgentMessage"
+    @fork-turn="forkActiveAgentTurn"
     @move-agent-to-team="moveAgentToTeam"
     @reorder-agents="reorderAgents"
     @reorder-repositories="reorderRepositories"
@@ -142,10 +142,10 @@
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
     @debug-mark-unread="markDebugAgentsUnread"
-    @delete-message="deleteMessage"
-    @edit-message="editMessage"
+    @delete-turn="deleteTurn"
+    @edit-turn="editTurn"
     @interrupt-agent="interruptActiveAgent"
-    @retry-message="retryMessage"
+    @retry-turn="retryTurn"
     @send-agent-prompt="sendAgentPrompt($event.agentId, $event.prompt)"
     @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
@@ -199,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
@@ -299,7 +299,7 @@ const {
   updateAgent,
   duplicateAgent,
   forkAgent,
-  forkActiveAgentMessage,
+  forkActiveAgentTurn,
   moveAgentToTeam,
   reorderAgents,
   reorderRepositories,
@@ -360,9 +360,9 @@ const {
   sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,
-  deleteMessage,
-  editMessage,
-  retryMessage,
+  deleteTurn,
+  editTurn,
+  retryTurn,
   steerQueuedPrompt,
   updateQueuedPrompt,
   removeQueuedPrompt,

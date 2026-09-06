@@ -36,9 +36,9 @@ function expectBackendCapabilities(value: unknown, path: string): void {
     'interrupt',
     'history',
     'conversationFork',
-    'rollback',
-    'editMessage',
-    'retryMessage',
+    'deleteTurn',
+    'editTurn',
+    'retryTurn',
     'approvals',
   ];
   booleans.forEach((key) => expectOptional(value, key, path, expectBoolean));
@@ -303,7 +303,6 @@ function expectWorkBacklogAssignment(value: unknown, path: string): void {
     'updatedAt',
     'automationId',
     'automationExecutionId',
-    'completionInstructionsDeliveredAt',
   ].forEach((key) => expectOptional(value, key, path, expectString));
 }
 

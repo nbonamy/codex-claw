@@ -574,7 +574,6 @@ describe('AppStatePersistence', () => {
           completedAt: '2026-06-09T13:30:00.000Z',
           automationId: 'automation-bugs',
           automationExecutionId: 'automation-exec-1',
-          completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
     };
@@ -611,7 +610,6 @@ describe('AppStatePersistence', () => {
           completedAt: '2026-06-09T13:30:00.000Z',
           automationId: 'automation-bugs',
           automationExecutionId: 'automation-exec-1',
-          completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
     });

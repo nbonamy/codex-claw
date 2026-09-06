@@ -2,14 +2,12 @@ import type { ApprovalPreset, BackendDefaults, CodexApprovalPreset } from './con
 import {
   approvalBackendDefaultsWithPreset,
   approvalPresetFromDefaults,
-  approvalPresetOptions,
   defaultApprovalPreset,
   isApprovalPreset,
   isApprovalsReviewer,
 } from './approval-presets';
 
 export const defaultCodexApprovalPreset = defaultApprovalPreset;
-export const codexApprovalPresetOptions = approvalPresetOptions;
 export const isCodexApprovalPreset = isApprovalPreset;
 export const isCodexApprovalsReviewer = isApprovalsReviewer;
 export const codexApprovalPresetFromDefaults = approvalPresetFromDefaults;
@@ -45,8 +43,6 @@ export function codexApprovalPresetFromThreadSettings(threadSettings: unknown): 
 
   return null;
 }
-
-export type CodexApprovalPresetOption = typeof approvalPresetOptions[number];
 
 export type { ApprovalPreset, BackendDefaults };
 

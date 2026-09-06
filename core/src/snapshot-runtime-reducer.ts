@@ -245,7 +245,6 @@ function workBacklogAssignment(
     ...(typeof value.updatedAt === 'string' ? { updatedAt: value.updatedAt } : {}),
     ...(typeof value.automationId === 'string' && value.automationId.trim() ? { automationId: value.automationId.trim() } : {}),
     ...(typeof value.automationExecutionId === 'string' && value.automationExecutionId.trim() ? { automationExecutionId: value.automationExecutionId.trim() } : {}),
-    ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
   };
 }
 
@@ -290,9 +289,9 @@ function backendCapabilities(value: Record<string, unknown>): Partial<BackendRun
     ...(typeof value.interrupt === 'boolean' ? { interrupt: value.interrupt } : {}),
     ...(typeof value.history === 'boolean' ? { history: value.history } : {}),
     ...(typeof value.conversationFork === 'boolean' ? { conversationFork: value.conversationFork } : {}),
-    ...(typeof value.rollback === 'boolean' ? { rollback: value.rollback } : {}),
-    ...(typeof value.editMessage === 'boolean' ? { editMessage: value.editMessage } : {}),
-    ...(typeof value.retryMessage === 'boolean' ? { retryMessage: value.retryMessage } : {}),
+    ...(typeof value.deleteTurn === 'boolean' ? { deleteTurn: value.deleteTurn } : {}),
+    ...(typeof value.editTurn === 'boolean' ? { editTurn: value.editTurn } : {}),
+    ...(typeof value.retryTurn === 'boolean' ? { retryTurn: value.retryTurn } : {}),
     ...(typeof value.approvals === 'boolean' ? { approvals: value.approvals } : {}),
     ...(Array.isArray(value.approvalPresets) ? { approvalPresets: value.approvalPresets.filter(isApprovalPreset) } : {}),
     ...(Array.isArray(value.permissionModes) ? { permissionModes: value.permissionModes.flatMap(permissionModeOption) } : {}),

@@ -3,7 +3,6 @@ import { decodeClawBackendEvent } from '../backend-protocol/events';
 import {
   appendUserPrompt,
   createInitialSnapshot,
-  selectAgent,
 } from '../snapshot';
 import { applyConversationEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-conversation-reducer';
 import type { RendererMessage } from '../contracts';

@@ -759,8 +759,8 @@ describe('ClawBackendServer', () => {
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
-      id: 'rollback',
-      method: 'agent/turn/rollback',
+      id: 'delete-turn',
+      method: 'agent/turn/delete',
       params: { agentId: 'agent-remote', turnId: 'turn-1' },
     })).resolves.toMatchObject({
       result: {
@@ -769,21 +769,15 @@ describe('ClawBackendServer', () => {
     });
     await server.handleMessage({
       jsonrpc: '2.0',
-      id: 'delete',
-      method: 'agent/message/delete',
-      params: { agentId: 'agent-remote', messageId: 'user-turn-1' },
-    });
-    await server.handleMessage({
-      jsonrpc: '2.0',
       id: 'edit',
-      method: 'agent/message/update',
-      params: { agentId: 'agent-remote', messageId: 'user-turn-1', prompt: 'edited prompt' },
+      method: 'agent/turn/edit',
+      params: { agentId: 'agent-remote', turnId: 'turn-1', content: 'edited prompt' },
     });
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'retry',
-      method: 'agent/message/retry',
-      params: { agentId: 'agent-remote', messageId: 'assistant-turn-1' },
+      method: 'agent/turn/retry',
+      params: { agentId: 'agent-remote', turnId: 'turn-1' },
     });
 
     expect(remoteClients.request).toHaveBeenNthCalledWith(
@@ -796,29 +790,22 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       2,
       snapshot.remoteConnections.connections[0],
-      'agent/turn/rollback',
+      'agent/turn/delete',
       { agentId: 'agent-remote', turnId: 'turn-1' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       3,
       snapshot.remoteConnections.connections[0],
-      'agent/message/delete',
-      { agentId: 'agent-remote', messageId: 'user-turn-1' },
+      'agent/turn/edit',
+      { agentId: 'agent-remote', turnId: 'turn-1', content: 'edited prompt' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       4,
       snapshot.remoteConnections.connections[0],
-      'agent/message/update',
-      { agentId: 'agent-remote', messageId: 'user-turn-1', prompt: 'edited prompt' },
-      expect.any(Function),
-    );
-    expect(remoteClients.request).toHaveBeenNthCalledWith(
-      5,
-      snapshot.remoteConnections.connections[0],
-      'agent/message/retry',
-      { agentId: 'agent-remote', messageId: 'assistant-turn-1' },
+      'agent/turn/retry',
+      { agentId: 'agent-remote', turnId: 'turn-1' },
       expect.any(Function),
     );
     expect(snapshot.messages).toStrictEqual([]);

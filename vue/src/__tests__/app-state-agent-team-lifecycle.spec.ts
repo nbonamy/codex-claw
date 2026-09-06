@@ -605,7 +605,7 @@ describe('useAppState', () => {
     await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime' });
-    await state.forkActiveAgentMessage(4);
+    await state.forkActiveAgentTurn('turn-4');
     await state.duplicateAgent('agent-jules');
     await state.forkAgent('agent-jules');
     await state.moveAgentToTeam({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
@@ -621,7 +621,7 @@ describe('useAppState', () => {
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
-    expect(forkAgent).toHaveBeenNthCalledWith(1, 'agent-jules', 4);
+    expect(forkAgent).toHaveBeenNthCalledWith(1, 'agent-jules', 'turn-4');
     expect(forkAgent).toHaveBeenNthCalledWith(2, 'agent-jules');
     expect(moveAgentToTeam).toHaveBeenCalledWith({ agentId: 'agent-jules', teamId: 'team-skwad-core' });
     expect(restartAgent).toHaveBeenCalledWith('agent-jules');
@@ -708,7 +708,7 @@ describe('useAppState', () => {
     await state.removeWorkItemAssignment(workItem());
     await state.forkAgent('agent-dina');
     state.snapshot.value.activeAgentId = null;
-    await state.forkActiveAgentMessage(0);
+    await state.forkActiveAgentTurn('turn-1');
     await state.resolveBackendApproval('missing', 'approve', 'once');
     state.selectModel('missing');
     state.selectReasoningEffort('high');

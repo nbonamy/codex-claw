@@ -33,7 +33,6 @@ export type WorkBacklogAssignment = {
   updatedAt?: string;
   automationId?: string;
   automationExecutionId?: string;
-  completionInstructionsDeliveredAt?: string;
 };
 
 export type GitHubWorkBacklogConfiguration = {

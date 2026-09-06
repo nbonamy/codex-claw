@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, AppPluginStatus, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, CodexClawApi, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
@@ -78,7 +78,7 @@ const api: CodexClawApi = {
   assignWorkItemToAgent: (agentId: string, item: WorkItem) => ipc.invoke(ipcChannels.assignWorkItemToAgent, agentId, item),
   removeWorkItemAssignment: (item: WorkItem) => ipc.invoke(ipcChannels.removeWorkItemAssignment, item),
   duplicateAgent: (agentId: string, options?: DuplicateAgentOptions) => ipc.invoke(ipcChannels.duplicateAgent, agentId, options),
-  forkAgent: (agentId: string, messageIndex?: number) => ipc.invoke(ipcChannels.forkAgent, agentId, messageIndex),
+  forkAgent: (agentId: string, turnId?: string) => ipc.invoke(ipcChannels.forkAgent, agentId, turnId),
   moveAgentToTeam: (input: MoveAgentToTeamInput) => ipc.invoke(ipcChannels.moveAgentToTeam, input),
   reorderAgents: (input: ReorderAgentsInput) => ipc.invoke(ipcChannels.reorderAgents, input),
   reorderRepositories: (input: ReorderRepositoriesInput) => ipc.invoke(ipcChannels.reorderRepositories, input),
@@ -118,9 +118,9 @@ const api: CodexClawApi = {
   updateQueuedPrompt: (agentId: string, promptId: string, prompt: string) => ipc.invoke(ipcChannels.updateQueuedPrompt, agentId, promptId, prompt),
   steerQueuedPrompt: (agentId: string, promptId: string, prompt?: string) => ipc.invoke(ipcChannels.steerQueuedPrompt, agentId, promptId, prompt),
   interruptAgent: (agentId: string) => ipc.invoke(ipcChannels.interruptAgent, agentId),
-  deleteMessage: (agentId: string, messageId: string) => ipc.invoke(ipcChannels.deleteMessage, agentId, messageId),
-  editMessage: (agentId: string, messageId: string, prompt: string) => ipc.invoke(ipcChannels.editMessage, agentId, messageId, prompt),
-  retryMessage: (agentId: string, messageId: string) => ipc.invoke(ipcChannels.retryMessage, agentId, messageId),
+  deleteTurn: (agentId: string, turnId: string) => ipc.invoke(ipcChannels.deleteTurn, agentId, turnId),
+  editTurn: (agentId: string, turnId: string, content: string) => ipc.invoke(ipcChannels.editTurn, agentId, turnId, content),
+  retryTurn: (agentId: string, turnId: string) => ipc.invoke(ipcChannels.retryTurn, agentId, turnId),
   browserOpen: (agentId: string, browserId: string, url: string) => ipc.invoke(ipcChannels.browserOpen, agentId, browserId, url),
   browserOpenVisualization: (agentId: string, browserId: string, path: string, title: string) => ipc.invoke(ipcChannels.browserOpenVisualization, agentId, browserId, path, title),
   browserNavigate: (agentId: string, browserId: string, url: string) => ipc.invoke(ipcChannels.browserNavigate, agentId, browserId, url),

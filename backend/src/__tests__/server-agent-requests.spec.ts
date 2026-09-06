@@ -105,13 +105,6 @@ describe('ClawBackendServer', () => {
       expect(snapshot.teams.find((team) => team.id === 'team-test')?.agentIds).toStrictEqual([agentId]);
       await expect(server.handleMessage({
         jsonrpc: '2.0',
-        id: 'update-folder',
-        method: 'agent/folder/update',
-        params: { agentId, folder: tempDir },
-      })).resolves.toMatchObject({ result: { activeAgentId: expect.any(String) } });
-      expect(snapshot.agents.find((agent) => agent.id === agentId)?.folder).toBe(tempDir);
-      await expect(server.handleMessage({
-        jsonrpc: '2.0',
         id: 'close-agent',
         method: 'agent/delete',
         params: { agentId: duplicateId },

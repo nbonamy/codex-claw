@@ -33,7 +33,7 @@ export function sendAgentPrompt(
   }
 
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
-  if (!promptResult && hooks?.appendUserMessage !== false) {
+  if (!promptResult && backendDriver.backend !== 'codex' && hooks?.appendUserMessage !== false) {
     const message = appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
     emit({
       agentId,

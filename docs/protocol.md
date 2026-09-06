@@ -122,11 +122,10 @@ the synchronization barrier bounded even for very long threads.
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
 | `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent configuration directly below the source agent. |
-| `agent/fork` | `{ agentId, messageIndex? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at an absolute host message index, into a new selected agent directly below the source. |
+| `agent/fork` | `{ agentId, turnId? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at a stable turn id, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
 | `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
-| `agent/folder/update` | `{ agentId, folder }` | `AppSnapshot` | Folder picker remains client-side; mutation and validation are backend-owned. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
@@ -157,10 +156,9 @@ the synchronization barrier bounded even for very long threads.
 | `agent/queuedPrompt/steer` | `{ agentId, promptId, prompt? }` | `AppSnapshot` | Atomically steers the stored or edited queued prompt and dequeues it only after acceptance. |
 | `agent/queuedPrompt/delete` | `{ agentId, promptId }` | `AppSnapshot` | Deletes a prompt from the backend-owned queue. |
 | `agent/interrupt` | `{ agentId }` | `AppSnapshot` | Interrupts the active backend turn if supported. |
-| `agent/turn/rollback` | `{ agentId, turnId }` | `AppSnapshot` | Resolves the owning backend location, rolls back provider history, and replaces visible history. |
-| `agent/message/delete` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, maps message to turn, rolls back, and persists. |
-| `agent/message/update` | `{ agentId, messageId, prompt }` | `AppSnapshot` | Resolves the owning backend location, rolls back, then sends edited prompt. |
-| `agent/message/retry` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, rolls back, then resends the matching user prompt. |
+| `agent/turn/delete` | `{ agentId, turnId }` | `AppSnapshot` | Deletes the selected turn and all later turns through the owning backend, then replaces visible history. |
+| `agent/turn/edit` | `{ agentId, turnId, content }` | `AppSnapshot` | Replaces the selected turn's prompt and restarts execution through the owning backend. |
+| `agent/turn/retry` | `{ agentId, turnId }` | `AppSnapshot` | Retries the selected turn through the owning backend. |
 | `agent/goal/update` | `{ agentId, objective }` | `AppSnapshot` | Sets provider goal metadata and updates agent goal state. |
 | `agent/goal/clear` | `{ agentId }` | `AppSnapshot` | Clears provider goal metadata and agent goal state. |
 | `agent/approvalPreset/update` | `{ agentId, preset: ApprovalPreset }` | `AppSnapshot` | Applies app-owned approval preset through the backend driver. |
@@ -262,7 +260,6 @@ without adopting it as the local product snapshot.
 | `automation/create` | `{ input: CreateAutomationInput, location? }` | `AppSnapshot` | Creates scheduler configuration in local `clawd` or the selected remote automation location. |
 | `automation/update` | `{ input: UpdateAutomationInput, location? }` | `AppSnapshot` | Updates scheduler configuration in local `clawd` or the selected remote automation location. |
 | `automation/run` | `{ automationId, location? }` | `AppSnapshot` | Runs one automation immediately in local `clawd` or the selected remote automation location. |
-| `automation/due/run` | none | `AppSnapshot` | Runs due automations. Used by backend scheduler and tests. |
 | `automation/history/clear` | `{ automationId, location? }` | `AppSnapshot` | Clears execution history in local `clawd` or the selected remote automation location. |
 | `automation/execution/delete` | `{ automationId, executionId, location? }` | `AppSnapshot` | Deletes one execution log entry in local `clawd` or the selected remote automation location. |
 | `automation/delete` | `{ automationId, location? }` | `AppSnapshot` | Deletes scheduler configuration in local `clawd` or the selected remote automation location. |
@@ -304,10 +301,12 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/history/load-older` | `{ agent }` | `{ hasOlder }` |
 | `driver/conversations/list` | `{ agent }` | `ConversationSummary[]` |
 | `driver/conversation/resume` | `{ agent, ref }` | `BackendConversationResumeResult` |
-| `driver/conversation/fork` | `{ agent, messageIndex? }` | `BackendConversationResumeResult` |
+| `driver/conversation/fork` | `{ agent, turnId? }` | `BackendConversationResumeResult` |
 | `driver/conversation/messages/get` | `{ ref, agentId }` | `RendererMessage[]` |
 | `driver/prompt/steer` | `{ agent, prompt }` | `BackendSendResult` |
-| `driver/turn/rollback` | `{ agent, turnId }` | `BackendRollbackResult` |
+| `driver/turn/delete` | `{ agent, turnId }` | `BackendTurnActionResult` |
+| `driver/turn/edit` | `{ agent, turnId, content }` | `BackendTurnActionResult` |
+| `driver/turn/retry` | `{ agent, turnId }` | `BackendTurnActionResult` |
 | `driver/models/list` | `{ agent }` | `BackendModelOption[]` |
 | `driver/skills/list` | `{ agent }` | `BackendSkillSummary[]` |
 | `source/folder/detect` | none | `string | null` |

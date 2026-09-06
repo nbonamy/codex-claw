@@ -416,53 +416,53 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.interruptAgent(agentId));
   }
 
-  async function deleteMessage(index: number): Promise<void> {
-    const action = activeMessageAction(index);
-    if (!action || !codexClawApi?.deleteMessage || isAgentSending(action.agentId)) {
+  async function deleteTurn(turnId: string): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
+    if (!agentId || !codexClawApi?.deleteTurn || isAgentSending(agentId)) {
       return;
     }
 
-    if (!messageActionCapabilities(action.agentId).rollback) {
+    if (!messageActionCapabilities(agentId).deleteTurn) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.deleteMessage(action.agentId, action.messageId));
+    adoptBackgroundSnapshot(await codexClawApi.deleteTurn(agentId, turnId));
   }
 
-  async function editMessage(payload: { content: string; index: number }): Promise<void> {
-    const action = activeMessageAction(payload.index);
+  async function editTurn(payload: { content: string; turnId: string }): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
     const trimmed = payload.content.trim();
-    if (!action || !trimmed || !codexClawApi?.editMessage || isAgentSending(action.agentId)) {
+    if (!agentId || !trimmed || !codexClawApi?.editTurn || isAgentSending(agentId)) {
       return;
     }
 
-    if (!messageActionCapabilities(action.agentId).editMessage) {
+    if (!messageActionCapabilities(agentId).editTurn) {
       return;
     }
 
-    markAgentSending(action.agentId, true);
+    markAgentSending(agentId, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.editMessage(action.agentId, action.messageId, trimmed));
+      adoptBackgroundSnapshot(await codexClawApi.editTurn(agentId, payload.turnId, trimmed));
     } finally {
-      markAgentSending(action.agentId, false);
+      markAgentSending(agentId, false);
     }
   }
 
-  async function retryMessage(index: number): Promise<void> {
-    const action = activeMessageAction(index);
-    if (!action || !codexClawApi?.retryMessage || isAgentSending(action.agentId)) {
+  async function retryTurn(turnId: string): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
+    if (!agentId || !codexClawApi?.retryTurn || isAgentSending(agentId)) {
       return;
     }
 
-    if (!messageActionCapabilities(action.agentId).retryMessage) {
+    if (!messageActionCapabilities(agentId).retryTurn) {
       return;
     }
 
-    markAgentSending(action.agentId, true);
+    markAgentSending(agentId, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.retryMessage(action.agentId, action.messageId));
+      adoptBackgroundSnapshot(await codexClawApi.retryTurn(agentId, turnId));
     } finally {
-      markAgentSending(action.agentId, false);
+      markAgentSending(agentId, false);
     }
   }
 
@@ -1069,24 +1069,24 @@ export function useAppState() {
     return duplicate;
   }
 
-  async function forkAgent(agentId: string, messageIndex?: number): Promise<void> {
+  async function forkAgent(agentId: string, turnId?: string): Promise<void> {
     if (!codexClawApi?.forkAgent) {
       return;
     }
 
-    const nextSnapshot = messageIndex === undefined
+    const nextSnapshot = turnId === undefined
       ? await codexClawApi.forkAgent(agentId)
-      : await codexClawApi.forkAgent(agentId, messageIndex);
+      : await codexClawApi.forkAgent(agentId, turnId);
     adoptNavigationSnapshot(nextSnapshot);
     await loadActiveAgentCatalogs();
   }
 
-  async function forkActiveAgentMessage(messageIndex: number): Promise<void> {
+  async function forkActiveAgentTurn(turnId: string): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
     if (!agentId) {
       return;
     }
-    await forkAgent(agentId, messageIndex);
+    await forkAgent(agentId, turnId);
   }
 
   async function moveAgentToTeam(input: MoveAgentToTeamInput): Promise<void> {
@@ -1353,7 +1353,7 @@ export function useAppState() {
     removeWorkItemAssignment,
     duplicateAgent,
     forkAgent,
-    forkActiveAgentMessage,
+    forkActiveAgentTurn,
     moveAgentToTeam,
     reorderAgents,
     reorderRepositories,
@@ -1379,9 +1379,9 @@ export function useAppState() {
     steerPrompt,
     clearAgentCreationProgress,
     interruptActiveAgent,
-    deleteMessage,
-    editMessage,
-    retryMessage,
+    deleteTurn,
+    editTurn,
+    retryTurn,
     steerQueuedPrompt,
     updateQueuedPrompt,
     removeQueuedPrompt,
@@ -1428,23 +1428,6 @@ function cloneWorkItemForIpc(item: WorkItem): WorkItem {
     })),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-  };
-}
-
-function activeMessageAction(index: number): { agentId: string; messageId: string } | null {
-  const agentId = snapshot.value.activeAgentId;
-  if (!agentId) {
-    return null;
-  }
-
-  const message = snapshot.value.messages.filter((candidate) => candidate.agentId === agentId)[index];
-  if (!message) {
-    return null;
-  }
-
-  return {
-    agentId,
-    messageId: message.id,
   };
 }
 

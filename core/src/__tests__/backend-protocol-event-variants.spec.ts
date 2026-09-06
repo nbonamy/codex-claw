@@ -106,9 +106,9 @@ describe('Claw backend event decoder variants', () => {
             interrupt: true,
             history: true,
             conversationFork: true,
-            rollback: true,
-            editMessage: true,
-            retryMessage: true,
+            deleteTurn: true,
+            editTurn: true,
+            retryTurn: true,
             approvals: true,
             approvalPresets: ['ask-for-approval'],
             permissionModes: [
@@ -286,7 +286,6 @@ describe('Claw backend event decoder variants', () => {
           updatedAt: occurredAt,
           automationId: 'automation',
           automationExecutionId: 'execution',
-          completionInstructionsDeliveredAt: occurredAt,
         },
       },
       {
