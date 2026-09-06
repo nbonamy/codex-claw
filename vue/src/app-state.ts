@@ -11,6 +11,7 @@ import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilitie
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
 import { type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { appText } from '@codex-claw/core/app-text';
@@ -42,6 +43,11 @@ const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
 const agentCreationProgress = ref<AgentCreationProgress | null>(null);
+const codexConversationFramesByAgentId = ref<Record<string, {
+  revision: number;
+  snapshot: CodexConversationSnapshot;
+  threadId: string;
+}>>({});
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
@@ -155,6 +161,12 @@ export function useAppState() {
 
   const activeBackendCapabilities = computed(() => backendCapabilitiesForAgent(activeAgent.value));
   const activeBackendCommands = computed<BackendCommandSummary[]>(() => defaultBackendCommands(activeAgent.value?.backend ?? 'codex'));
+  const activeCodexConversationSnapshot = computed(() => {
+    const agent = activeAgent.value;
+    if (!agent || agent.backend !== 'codex' || agent.backendSession?.kind !== 'codex') return null;
+    const frame = codexConversationFramesByAgentId.value[agent.id];
+    return frame?.threadId === agent.backendSession.threadId ? frame.snapshot : null;
+  });
 
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id ?? null;
@@ -1245,6 +1257,7 @@ export function useAppState() {
     answeredClientRequestIds,
     backendModels,
     activeBackendCommands,
+    activeCodexConversationSnapshot,
     activeBackendCapabilities,
     modelCatalogStatus,
     modelCatalogError,
@@ -1577,6 +1590,22 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
     case 'thread.modeUpdated':
       syncComposerStateFromMainEvent(event);
       return;
+    case 'codex.conversationSnapshotChanged': {
+      const current = codexConversationFramesByAgentId.value[event.agentId];
+      if (
+        current?.threadId === event.threadId
+        && current.revision >= event.payload.revision
+      ) return;
+      codexConversationFramesByAgentId.value = {
+        ...codexConversationFramesByAgentId.value,
+        [event.agentId]: {
+          revision: event.payload.revision,
+          snapshot: event.payload.snapshot,
+          threadId: event.threadId,
+        },
+      };
+      return;
+    }
     case 'thread.historyHydrationFailed':
       syncHistoryPageStateFromMainEvent(event);
       return;

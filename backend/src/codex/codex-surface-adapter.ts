@@ -52,6 +52,10 @@ import type {
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
 } from '@codex-app-sdk/core/surface';
+import {
+  invokeCodexConversationBridgeOperation,
+  subscribeCodexConversationBridge,
+} from '@codex-app-sdk/core/surface-bridge';
 
 type AdapterListener = (event: BackendEvent) => void;
 type ThreadBackendEvent<Event extends BackendEvent = BackendEvent> = Event extends BackendEvent
@@ -86,6 +90,7 @@ export class CodexSurfaceAgentAdapter {
   private readonly lastSubagentIdentityByConversationId = new Map<string, string>();
   private readonly subagentIdentityLoads = new Map<string, Promise<void>>();
   private readonly liveSubagentConversationIds = new Set<string>();
+  private readonly conversationRevisionsByAgentId = new Map<string, number>();
   private readonly unsubscribeSurface: () => void;
   private closed = false;
 
@@ -251,7 +256,9 @@ export class CodexSurfaceAgentAdapter {
   async compactThread(agent: Agent) {
     const session = await this.ensureSession(agent);
     const beforeTurnIds = session.handle.getSnapshot().turnIds;
-    const snapshot = await session.handle.compact();
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'compactConversation', [],
+    );
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
@@ -262,14 +269,18 @@ export class CodexSurfaceAgentAdapter {
 
   async setThreadGoal(agent: Agent, objective: string) {
     const session = await this.ensureSession(agent);
-    const snapshot = await session.handle.setGoal(objective);
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'setGoal', [objective],
+    );
     if (!snapshot.goal) throw new Error('Codex did not return the updated goal.');
     return { threadId: session.handle.id, goal: snapshot.goal };
   }
 
   async clearThreadGoal(agent: Agent) {
     const session = await this.ensureSession(agent);
-    await session.handle.clearGoal();
+    await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'clearGoal', [],
+    );
     return { threadId: session.handle.id, cleared: true };
   }
 
@@ -277,14 +288,18 @@ export class CodexSurfaceAgentAdapter {
     const session = await this.ensureSession(agent);
     const effective = effectiveApprovalPreset(preset, session.handle.getSnapshot().approvalPresets);
     if (!effective) throw new Error('No Claw approval preset satisfies the Codex app-server requirements.');
-    await session.handle.updateSettings({ approvalPreset: effective });
+    await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'updateConversationSettings', [{ approvalPreset: effective }],
+    );
     return { threadId: session.handle.id, approvalPreset: effective };
   }
 
   async reviewThread(agent: Agent, target: CodexSurfaceReviewTarget) {
     const session = await this.ensureSession(agent);
     const beforeTurnIds = session.handle.getSnapshot().turnIds;
-    const snapshot = await session.handle.startReview({ target });
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'startReview', [{ target }],
+    );
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
@@ -299,7 +314,9 @@ export class CodexSurfaceAgentAdapter {
     const session = await this.ensureSession(agent);
     const turnId = session.handle.getSnapshot().activeTurnId;
     if (!turnId) throw new Error('No active Codex turn to interrupt.');
-    await session.handle.interrupt();
+    await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'interrupt', [],
+    );
     return { threadId: session.handle.id, turnId };
   }
 
@@ -325,7 +342,9 @@ export class CodexSurfaceAgentAdapter {
 
   async deleteTurn(agent: Agent, turnId: string) {
     const session = await this.ensureSession(agent);
-    const snapshot = await session.handle.deleteTurn(turnId);
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'deleteTurn', [turnId],
+    );
     return {
       threadId: session.handle.id,
       messages: historicalSurfaceMessages(snapshot.messages, agent.id),
@@ -335,7 +354,9 @@ export class CodexSurfaceAgentAdapter {
 
   async editTurn(agent: Agent, turnId: string, content: string) {
     const session = await this.ensureSession(agent);
-    const snapshot = await session.handle.editTurn(turnId, content);
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'editTurn', [turnId, content],
+    );
     return {
       threadId: session.handle.id,
       messages: historicalSurfaceMessages(snapshot.messages, agent.id),
@@ -345,7 +366,9 @@ export class CodexSurfaceAgentAdapter {
 
   async retryTurn(agent: Agent, turnId: string) {
     const session = await this.ensureSession(agent);
-    const snapshot = await session.handle.retryTurn(turnId);
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'retryTurn', [turnId],
+    );
     return {
       threadId: session.handle.id,
       messages: historicalSurfaceMessages(snapshot.messages, agent.id),
@@ -488,12 +511,16 @@ export class CodexSurfaceAgentAdapter {
       const scope = response.payload?.decision === 'allow_conversation' || response.payload?.decision === 'always_allow'
         ? 'session'
         : 'once';
-      await approvalOwner.handle.resolveApproval(response.id, allow ? 'approve' : 'deny', scope);
+      await invokeCodexConversationBridgeOperation(
+        this.surface, approvalOwner.handle.id, 'resolveApproval', [response.id, allow ? 'approve' : 'deny', scope],
+      );
       return;
     }
     const requestOwner = this.clientRequestOwners.get(response.id);
     if (requestOwner) {
-      await requestOwner.handle.respondToClientRequest(response);
+      await invokeCodexConversationBridgeOperation(
+        this.surface, requestOwner.handle.id, 'respondToClientRequest', [response],
+      );
       return;
     }
     await this.surface.respondToClientRequest(response);
@@ -560,7 +587,9 @@ export class CodexSurfaceAgentAdapter {
       (conversation) => conversation.id === session.handle.id,
     );
     if (summary?.title === name) return;
-    await session.handle.rename(name);
+    await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'renameConversation', [name],
+    );
   }
 
   private async bindAndLoad(
@@ -605,10 +634,14 @@ export class CodexSurfaceAgentAdapter {
       const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
       const effectivePreset = effectiveApprovalPreset(requestedPreset, snapshot.approvalPresets);
       if (effectivePreset && snapshot.approvalPreset !== effectivePreset) {
-        await session.handle.updateSettings({ approvalPreset: effectivePreset });
+        await invokeCodexConversationBridgeOperation(
+          this.surface, session.handle.id, 'updateConversationSettings', [{ approvalPreset: effectivePreset }],
+        );
       }
       if (requestedServiceTier !== undefined && snapshot.selectedServiceTier !== requestedServiceTier) {
-        await session.handle.updateSettings({ serviceTier: requestedServiceTier });
+        await invokeCodexConversationBridgeOperation(
+          this.surface, session.handle.id, 'updateConversationSettings', [{ serviceTier: requestedServiceTier }],
+        );
       }
       if (emitHistory) {
         if (interruptedTurnId && !resumedActiveGoal) {
@@ -644,7 +677,13 @@ export class CodexSurfaceAgentAdapter {
       suppressEvents,
       unsubscribe: () => undefined,
     };
-    session.unsubscribe = handle.onEvent((event) => this.handleConversationEvent(session, event));
+    session.unsubscribe = subscribeCodexConversationBridge(this.surface, threadId, (notification) => {
+      if (notification.type === 'snapshot') {
+        this.publishConversationSnapshot(session, notification.snapshot);
+        return;
+      }
+      this.handleConversationEvent(session, notification.event);
+    });
     this.sessionsByAgentId.set(agent.id, session);
     this.agentIdsByThreadId.set(threadId, agent.id);
     if (publishInitial) this.publishInitial(session, handle.getSnapshot(), false);
@@ -679,6 +718,23 @@ export class CodexSurfaceAgentAdapter {
     if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
     this.emitStatus(session, statusFromSnapshot(snapshot));
     this.rememberPending(session, snapshot, true);
+    this.publishConversationSnapshot(session, snapshot);
+  }
+
+  private publishConversationSnapshot(
+    session: AgentConversation,
+    snapshot: CodexConversationSnapshot,
+  ): void {
+    if (this.sessionsByAgentId.get(session.agent.id) !== session) return;
+    const revision = (this.conversationRevisionsByAgentId.get(session.agent.id) ?? 0) + 1;
+    this.conversationRevisionsByAgentId.set(session.agent.id, revision);
+    this.emitThread(session, {
+      type: 'codex.conversationSnapshotChanged',
+      payload: {
+        revision,
+        snapshot: structuredClone(snapshot),
+      },
+    });
   }
 
   private rememberPending(

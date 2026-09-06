@@ -77,6 +77,10 @@ function expectEventContext(event: EventRecord): void {
     case 'skills.changed':
       expectRequiredBackend(event);
       return;
+    case 'codex.conversationSnapshotChanged':
+      expectAgentBackend(event, 'codex');
+      expectRequiredString(event, 'threadId');
+      return;
     case 'sidePanel.markdownRequested':
     case 'sidePanel.gitDiffRequested':
     case 'celebration.requested':

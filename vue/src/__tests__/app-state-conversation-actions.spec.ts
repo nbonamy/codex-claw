@@ -9,6 +9,7 @@ import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
 import { configureClawClient } from '../platform-api';
 import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+import { codexConversationSnapshot, codexTextMessage } from '../test/codex-conversation-fixtures';
 describe('useAppState', () => {
   afterEach(() => {
     clearConfetti();
@@ -974,5 +975,43 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:06.000Z',
     });
     expect(state.selectedServiceTier.value).toBeNull();
+  });
+
+  it('keeps the newest provider-owned Codex conversation frame per agent', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    for (const [seq, revision, text] of [[1, 2, 'Newest'], [2, 1, 'Stale']] as const) {
+      listeners[0]?.({
+        seq,
+        agentId: 'agent-dina',
+        backend: 'codex',
+        threadId: 'thread-1',
+        type: 'codex.conversationSnapshotChanged',
+        payload: {
+          revision,
+          snapshot: codexConversationSnapshot([
+            codexTextMessage(`message-${text}`, 'assistant', text),
+          ]),
+        },
+        occurredAt: `2026-09-06T00:00:0${seq}.000Z`,
+      });
+    }
+
+    expect(state.activeCodexConversationSnapshot.value?.messages).toStrictEqual([
+      expect.objectContaining({ parts: [{ type: 'text', text: 'Newest' }] }),
+    ]);
   });
 });

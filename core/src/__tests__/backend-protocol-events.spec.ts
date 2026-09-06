@@ -155,6 +155,51 @@ function createFixtures(): EventFixtures {
         skills: [{ name: 'test', path: '/skill', enabled: true }],
       },
     },
+    'codex.conversationSnapshotChanged': {
+      ...codexThread,
+      type: 'codex.conversationSnapshotChanged',
+      payload: {
+        revision: 1,
+        snapshot: {
+          status: 'ready',
+          authentication: {
+            status: 'loaded', account: null, requiresOpenaiAuth: false,
+            error: null, login: { status: 'idle', loginId: null, authUrl: null, error: null },
+          },
+          conversations: [],
+          activeConversationId: 'thread-1',
+          activeTurnId: null,
+          turnIds: [],
+          turns: [],
+          messages: [],
+          clientRequests: [],
+          answeredClientRequestIds: [],
+          approvals: [],
+          models: [],
+          modelCatalogStatus: 'loaded',
+          skills: [],
+          skillCatalogStatus: 'loaded',
+          plugins: [],
+          pluginCatalogStatus: 'loaded',
+          permissionProfiles: [],
+          approvalPresets: [],
+          approvalPreset: null,
+          selectedModelId: null,
+          selectedReasoningEffort: null,
+          selectedServiceTier: null,
+          planMode: false,
+          contextUsage: null,
+          goal: null,
+          turnGitDiff: null,
+          threadStatus: null,
+          rateLimits: null,
+          queuedPrompts: [],
+          busy: false,
+          historyLoading: false,
+          error: null,
+        },
+      },
+    },
     'sidePanel.markdownRequested': {
       ...agent,
       type: 'sidePanel.markdownRequested',
@@ -455,7 +500,7 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(54);
+    expect(Object.keys(fixtures)).toHaveLength(55);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }

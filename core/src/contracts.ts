@@ -3,6 +3,7 @@ import type {
   AppText,
   ApprovalPreset,
 } from './contracts/shared';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import type {
   AgentCloseInput,
   AgentGitBranchInput,
@@ -761,6 +762,16 @@ export type MainToRendererEvent =
         cwd: string | null;
         status: 'loaded';
         skills: BackendSkillSummary[];
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'codex.conversationSnapshotChanged';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: {
+        revision: number;
+        snapshot: CodexConversationSnapshot;
       };
     }>
   | MainToRendererEventWith<{

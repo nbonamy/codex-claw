@@ -10,6 +10,7 @@ export const snapshotEventOwnership = {
   'devicePairing.statusChanged': 'renderer',
   'models.changed': 'renderer',
   'skills.changed': 'renderer',
+  'codex.conversationSnapshotChanged': 'renderer',
   'sidePanel.markdownRequested': 'renderer',
   'sidePanel.gitDiffRequested': 'renderer',
   'celebration.requested': 'renderer',

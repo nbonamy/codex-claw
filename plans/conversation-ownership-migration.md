@@ -343,7 +343,8 @@ new path is measurably smaller, and provider behavior has one owner.
 | Date | Phase | Status | Evidence | Commit | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 2026-09-06 | Plan | Complete | Existing Codex/Claude ownership, SDK bridge, renderer controller, reducers, and mutation route inspected | — | Awaiting approval to begin Phase 0 |
-| 2026-09-06 | Phase 0 | Complete | Real SDK Vue edit emits `{turnId, content}`; SDK fake transport rolls back and starts exactly one replacement turn; Claw/SDK projections compared; 2,074 tests pass in 19.6s | pending | Both halves work in isolation. The live defect is only possible because the renderer can expose Claw-owned history that the SDK runtime does not own; eliminating the second transcript is the fix. |
+| 2026-09-06 | Phase 0 | Complete | Real SDK Vue edit emits `{turnId, content}`; SDK fake transport rolls back and starts exactly one replacement turn; Claw/SDK projections compared; 2,074 tests pass in 19.6s | `0ab52f6` | Both halves work in isolation. The live defect is only possible because the renderer can expose Claw-owned history that the SDK runtime does not own; eliminating the second transcript is the fix. |
+| 2026-09-06 | Phase 1 | Complete | SDK targeted bridge `93d2ae3`; one targeted subscription per agent; concurrent A/B snapshots carry independent identity and monotonic per-agent revisions; reconnect regression; Core/backend/Vue focused tests and typechecks pass | pending | Generic Electron/Web backend-event adapters already carry the app-owned snapshot frame, so no provider protocol leaked across those boundaries. SDK operations are invoked through the targeted bridge where renderer attachment resolution is not required. |
 
 ### Phase 0 baseline
 

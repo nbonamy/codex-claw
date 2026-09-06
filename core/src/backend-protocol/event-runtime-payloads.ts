@@ -311,6 +311,25 @@ function expectId(value: unknown, path: string): void {
   expectString(value.id, `${path}.id`);
 }
 
+function expectCodexConversationSnapshot(value: unknown, path: string): void {
+  expectRecord(value, path);
+  expectString(value.activeConversationId, `${path}.activeConversationId`);
+  expectArray(value.turnIds, `${path}.turnIds`, expectString);
+  expectArray(value.turns, `${path}.turns`, (turn, turnPath) => {
+    expectRecord(turn, turnPath);
+    expectString(turn.id, `${turnPath}.id`);
+    expectLiteral(turn.status, ['completed', 'interrupted', 'failed', 'inProgress'], `${turnPath}.status`);
+  });
+  expectArray(value.messages, `${path}.messages`, (message, messagePath) => {
+    expectRecord(message, messagePath);
+    expectString(message.id, `${messagePath}.id`);
+    expectLiteral(message.role, ['user', 'assistant'], `${messagePath}.role`);
+    expectArray(message.parts, `${messagePath}.parts`, expectRecord);
+  });
+  expectNullable(value.activeTurnId, `${path}.activeTurnId`, expectString);
+  expectBoolean(value.busy, `${path}.busy`);
+}
+
 export const runtimePayloadValidators = {
   'backend.statusChanged': expectBackendRuntimeStatus,
   'client.connectionChanged': expectConnectionState,
@@ -326,6 +345,11 @@ export const runtimePayloadValidators = {
     expectNullable(value.cwd, `${path}.cwd`, expectString);
     expectLiteral(value.status, ['loaded'], `${path}.status`);
     expectArray(value.skills, `${path}.skills`, expectSkill);
+  },
+  'codex.conversationSnapshotChanged': (value, path) => {
+    expectRecord(value, path);
+    expectNumber(value.revision, `${path}.revision`);
+    expectCodexConversationSnapshot(value.snapshot, `${path}.snapshot`);
   },
   'sidePanel.markdownRequested': expectSidePanelMarkdown,
   'sidePanel.gitDiffRequested': expectSidePanelGitDiff,
