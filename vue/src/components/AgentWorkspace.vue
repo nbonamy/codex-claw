@@ -44,7 +44,7 @@
       :plan-visible="executionPlanVisible"
       :history-load-failed="historyLoadFailed"
       :history-loading="isConversationLoading"
-      :has-visible-messages="messages.length > 0"
+      :has-visible-messages="hasVisibleMessages ?? messages.length > 0"
       @annotate-attachment="openAttachmentImageAnnotation"
       @close-plan="closeExecutionPlan"
       @retry-history="retryConversationHistory"
@@ -204,6 +204,7 @@ const props = defineProps<{
     query?: WorkItemQuery,
   ) => Promise<WorkItem[] | void>;
   messages: RendererMessage[];
+  hasVisibleMessages?: boolean;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   openAgentGitDiffPreview: (agentId?: string) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;

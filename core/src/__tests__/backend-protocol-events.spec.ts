@@ -200,6 +200,26 @@ function createFixtures(): EventFixtures {
         },
       },
     },
+    'codex.conversationEventReceived': {
+      ...codexThread,
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 7,
+          occurredAt,
+          origin: 'notification',
+          type: 'message.delta',
+          conversationId: 'thread-1',
+          turnId: 'turn-1',
+          payload: {
+            messageId: 'message-1',
+            itemId: 'item-1',
+            delta: 'Hello',
+          },
+        },
+      },
+    },
     'sidePanel.markdownRequested': {
       ...agent,
       type: 'sidePanel.markdownRequested',
@@ -500,7 +520,7 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(55);
+    expect(Object.keys(fixtures)).toHaveLength(56);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }
@@ -519,6 +539,14 @@ describe('Claw backend event decoder', () => {
     };
 
     expect(decodeClawBackendEvent(withSideChannels)).toBe(withSideChannels);
+  });
+
+  it('rejects a Codex event routed under a different conversation', () => {
+    const event = createFixtures()['codex.conversationEventReceived'];
+    expect(() => decodeClawBackendEvent({
+      ...event,
+      threadId: 'thread-other',
+    })).toThrow('$.payload.event.conversationId: expected the outer thread id');
   });
 
   it.each([

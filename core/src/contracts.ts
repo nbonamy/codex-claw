@@ -3,7 +3,10 @@ import type {
   AppText,
   ApprovalPreset,
 } from './contracts/shared';
-import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import type {
+  CodexConversationEvent,
+  CodexConversationSnapshot,
+} from '@codex-app-sdk/core/surface';
 import type {
   AgentCloseInput,
   AgentGitBranchInput,
@@ -772,6 +775,16 @@ export type MainToRendererEvent =
       payload: {
         revision: number;
         snapshot: CodexConversationSnapshot;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'codex.conversationEventReceived';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: {
+        revision: number;
+        event: CodexConversationEvent;
       };
     }>
   | MainToRendererEventWith<{

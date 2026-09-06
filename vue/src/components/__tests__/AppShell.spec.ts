@@ -14,6 +14,7 @@ import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setFirstRunOnboardingStage } from '../../onboarding-session';
+import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 
 import {
   conversationControllerActions,
@@ -42,6 +43,59 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
+  it('uses the provider-owned Codex conversation instead of a divergent Claw transcript', () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-provider' };
+    const staleClawMessage: RendererMessage = {
+      id: 'stale-claw-message',
+      agentId: agent.id,
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'turn-stale',
+      parts: [{ type: 'text', text: 'Stale Claw transcript' }],
+      createdAt: '2026-09-06T00:00:00.000Z',
+    };
+    snapshot.messages = [staleClawMessage];
+    const providerMessages = [
+      codexTextMessage('provider-user', 'user', 'Provider prompt', 'turn-provider'),
+      codexTextMessage('provider-assistant', 'assistant', 'Provider response', 'turn-provider'),
+    ];
+    const providerSnapshot = codexConversationSnapshot(providerMessages, {
+      activeConversationId: 'thread-provider',
+      activeTurnId: 'turn-provider',
+      turnIds: ['turn-provider'],
+      turns: [{
+        id: 'turn-provider', status: 'inProgress', error: null, willRetry: false,
+        startedAt: '2026-09-06T00:00:00.000Z', completedAt: null, durationMs: null,
+      }],
+      busy: true,
+      approvals: [{
+        id: 'approval-provider',
+        kind: 'command',
+        conversationId: 'thread-provider',
+        turnId: 'turn-provider',
+        itemId: 'item-provider',
+        command: 'npm test',
+        cwd: '/tmp/project',
+        title: 'Run tests',
+      }],
+    });
+
+    const wrapper = mountShell({
+      snapshot,
+      codexConversationSnapshot: providerSnapshot,
+    });
+    const state = conversationControllerState(wrapper);
+
+    expect(state.identity.messages).toStrictEqual(providerMessages);
+    expect(state.identity.turns).toStrictEqual(providerSnapshot.turns);
+    expect(state.identity.activeTurnId).toBe('turn-provider');
+    expect(state.identity.busy).toBe(true);
+    expect(state.thread?.approvals).toStrictEqual(providerSnapshot.approvals);
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
+  });
+
   it('forwards an edited terminal Codex prompt with its authoritative turn id', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
@@ -66,7 +120,22 @@ describe('AppShell authentication and conversation', () => {
         createdAt: '2026-09-06T00:00:01.000Z',
       },
     ];
-    const wrapper = mountShell({ snapshot, realConversationPane: true });
+    const providerMessages = [
+      codexTextMessage('user-turn-edit', 'user', 'Original prompt', 'turn-edit'),
+      codexTextMessage('assistant-turn-edit', 'assistant', 'Original response', 'turn-edit'),
+    ];
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      codexConversationSnapshot: codexConversationSnapshot(providerMessages, {
+        activeConversationId: 'thread-edit',
+        turnIds: ['turn-edit'],
+        turns: [{
+          id: 'turn-edit', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-09-06T00:00:00.000Z', completedAt: '2026-09-06T00:00:01.000Z', durationMs: 1_000,
+        }],
+      }),
+    });
 
     await wrapper.get('button[aria-label="Edit"]').trigger('click');
     await wrapper.get('textarea[aria-label="Edit prompt"]').setValue('Edited prompt');
@@ -421,7 +490,13 @@ describe('AppShell authentication and conversation', () => {
       parts: [{ type: 'text', text: 'Keep me visible.' }],
       createdAt: '2026-09-05T00:00:00.000Z',
     });
-    const withMessages = mountShell({ snapshot, isConversationLoadFailed: true });
+    const withMessages = mountShell({
+      snapshot,
+      isConversationLoadFailed: true,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('message-existing', 'assistant', 'Keep me visible.'),
+      ]),
+    });
     expect(conversationControllerState(withMessages).identity.disabled).toBe(false);
     expect(withMessages.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
   });
@@ -468,6 +543,15 @@ describe('AppShell authentication and conversation', () => {
     const activeAgent = snapshot.agents[0];
     if (!activeAgent) throw new Error('Expected seeded agent.');
     activeAgent.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const providerSnapshot = codexConversationSnapshot([], {
+      activeConversationId: 'thread-dina',
+      plugins: [{
+        id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+        name: 'dropbox',
+        displayName: 'Dropbox',
+        enabled: true,
+      }],
+    });
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
@@ -475,6 +559,7 @@ describe('AppShell authentication and conversation', () => {
         messages: snapshot.messages,
         isLoading: false,
         isSending: false,
+        codexConversationSnapshot: providerSnapshot,
         selectedModelId: 'gpt-5',
         selectedReasoningEffort: 'high',
         selectedServiceTier: 'fast',
@@ -528,16 +613,26 @@ describe('AppShell authentication and conversation', () => {
     }]);
     expect(state.policy?.canForkTurn).toBe(true);
 
-    const updatedMessages: RendererMessage[] = [{
-      id: 'controller-reactive-message',
-      agentId: activeAgent.id,
-      role: 'assistant',
-      status: 'complete',
-      turnId: 'turn-controller',
-      createdAt: '2026-08-04T00:00:00.000Z',
-      parts: [{ type: 'text', text: 'Updated through the stable controller.' }],
-    }];
-    await wrapper.setProps({ messages: updatedMessages, isSending: true } as Record<string, unknown>);
+    const updatedMessages = [codexTextMessage(
+      'controller-reactive-message', 'assistant', 'Updated through the stable controller.', 'turn-controller',
+    )];
+    await wrapper.setProps({
+      messages: [{
+        id: 'stale-claw-row', agentId: activeAgent.id, role: 'assistant', status: 'complete',
+        createdAt: '2026-08-04T00:00:00.000Z', parts: [{ type: 'text', text: 'Must not render.' }],
+      }],
+      isSending: true,
+      codexConversationSnapshot: codexConversationSnapshot(updatedMessages, {
+        activeConversationId: 'thread-dina',
+        activeTurnId: 'turn-controller',
+        turnIds: ['turn-controller'],
+        turns: [{
+          id: 'turn-controller', status: 'inProgress', error: null, willRetry: false,
+          startedAt: '2026-08-04T00:00:00.000Z', completedAt: null, durationMs: null,
+        }],
+        busy: true,
+      }),
+    } as Record<string, unknown>);
     expect(conversationControllerState(wrapper).identity.messages).toStrictEqual(updatedMessages);
     expect(conversationControllerState(wrapper).identity.activeTurnId).toBe('turn-controller');
     expect(wrapper.text()).toContain('Updated through the stable controller.');

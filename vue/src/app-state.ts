@@ -11,6 +11,10 @@ import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilitie
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
 import { type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
+import {
+  createCodexConversationReplica,
+  type CodexConversationReplica,
+} from '@codex-app-sdk/core/conversation-replica';
 import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
@@ -44,10 +48,12 @@ const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: tr
 const backendRestartInProgress = ref(false);
 const agentCreationProgress = ref<AgentCreationProgress | null>(null);
 const codexConversationFramesByAgentId = ref<Record<string, {
+  replica: CodexConversationReplica;
   revision: number;
   snapshot: CodexConversationSnapshot;
   threadId: string;
 }>>({});
+const recoveringCodexConversationAgentIds = new Set<string>();
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
@@ -276,6 +282,8 @@ export function useAppState() {
 
     resetCatalogStateIfSourceChanged(codexClawApi);
     resetUnreadAgentIds();
+    codexConversationFramesByAgentId.value = {};
+    recoveringCodexConversationAgentIds.clear();
     agentCreationProgress.value = null;
 
     isLoading.value = true;
@@ -550,10 +558,12 @@ export function useAppState() {
     }
 
     const requestId = ++agentSelectionRequestId;
-    const needsHistory = Boolean(
-      snapshot.value.agents.find((agent) => agent.id === agentId)?.backendSession
-      && !snapshot.value.messages.some((message) => message.agentId === agentId),
-    );
+    const selectedAgent = snapshot.value.agents.find((agent) => agent.id === agentId);
+    const needsHistory = Boolean(selectedAgent?.backendSession && (
+      selectedAgent.backendSession.kind === 'codex'
+        ? codexConversationFramesByAgentId.value[agentId]?.threadId !== selectedAgent.backendSession.threadId
+        : !snapshot.value.messages.some((message) => message.agentId === agentId)
+    ));
     rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
     markAgentRead(agentId);
@@ -1599,9 +1609,38 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       codexConversationFramesByAgentId.value = {
         ...codexConversationFramesByAgentId.value,
         [event.agentId]: {
+          replica: createCodexConversationReplica(event.payload.snapshot),
           revision: event.payload.revision,
           snapshot: event.payload.snapshot,
           threadId: event.threadId,
+        },
+      };
+      return;
+    }
+    case 'codex.conversationEventReceived': {
+      const current = codexConversationFramesByAgentId.value[event.agentId];
+      if (
+        current?.threadId !== event.threadId
+        || event.payload.revision !== current.revision + 1
+      ) {
+        if (!current || event.payload.revision > current.revision) {
+          invalidateAndRecoverCodexConversation(event.agentId);
+        }
+        return;
+      }
+      let nextSnapshot: CodexConversationSnapshot;
+      try {
+        nextSnapshot = current.replica.apply(event.payload.event);
+      } catch {
+        invalidateAndRecoverCodexConversation(event.agentId);
+        return;
+      }
+      codexConversationFramesByAgentId.value = {
+        ...codexConversationFramesByAgentId.value,
+        [event.agentId]: {
+          ...current,
+          revision: event.payload.revision,
+          snapshot: nextSnapshot,
         },
       };
       return;
@@ -1630,6 +1669,18 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       void exhaustive;
     }
   }
+}
+
+function invalidateAndRecoverCodexConversation(agentId: string): void {
+  const frames = { ...codexConversationFramesByAgentId.value };
+  delete frames[agentId];
+  codexConversationFramesByAgentId.value = frames;
+  if (recoveringCodexConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
+  recoveringCodexConversationAgentIds.add(agentId);
+  void codexClawApi.hydrateAgentHistory(agentId)
+    .then(adoptBackgroundSnapshotMetadata)
+    .catch(() => undefined)
+    .finally(() => recoveringCodexConversationAgentIds.delete(agentId));
 }
 
 function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, RendererOnlySnapshotEvent>): void {

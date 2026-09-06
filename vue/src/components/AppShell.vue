@@ -196,6 +196,7 @@
         :is-loading="isLoading"
         :is-modal-dialog-visible="isModalDialogVisible"
         :is-right-workspace-visible="isRightWorkspaceVisible"
+        :has-visible-messages="conversationMessages.length > 0"
         :load-work-items="props.loadWorkItems"
         :messages="messages"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
@@ -403,6 +404,7 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
@@ -437,6 +439,7 @@ const props = withDefaults(defineProps<{
   backendPlugins?: BackendPluginSummary[];
   backendSkills?: BackendSkillSummary[];
   backendCapabilities?: BackendCapabilities;
+  codexConversationSnapshot?: CodexConversationSnapshot | null;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
@@ -1072,8 +1075,11 @@ const {
 } = cockpitBacklogState;
 const effectiveApprovals = computed(() => {
   const fixture = debugApproval.value;
+  const providerApprovals = currentAgent.value?.backend === 'codex'
+    ? providerConversation.value?.approvals ?? []
+    : props.approvals ?? [];
   return [
-    ...(props.approvals ?? []),
+    ...providerApprovals,
     ...(fixture && fixture.agentId === currentAgent.value?.id ? [fixture.request] : []),
   ];
 });
@@ -1094,10 +1100,20 @@ const conversationKey = computed(() => {
   if (session?.kind === 'claude') return `claude:${session.sessionId}`;
   return currentAgent.value ? `agent:${currentAgent.value.id}` : 'no-agent';
 });
+const providerConversation = computed(() => (
+  currentAgent.value?.backend === 'codex' ? props.codexConversationSnapshot ?? null : null
+));
+const conversationMessages = computed(() => (
+  currentAgent.value?.backend === 'codex'
+    ? providerConversation.value?.messages ?? []
+    : props.messages
+));
 const conversationActiveTurnId = computed(() => {
+  if (providerConversation.value) return providerConversation.value.activeTurnId;
+  if (currentAgent.value?.backend === 'codex') return null;
   if (!props.isSending) return null;
-  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    const turnId = props.messages[index]?.turnId;
+  for (let index = conversationMessages.value.length - 1; index >= 0; index -= 1) {
+    const turnId = conversationMessages.value[index]?.turnId;
     if (turnId) return turnId;
   }
   return null;
@@ -1140,27 +1156,38 @@ const conversationPaneState: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return conversationKey.value; },
     get activeTurnId() { return conversationActiveTurnId.value; },
-    get messages() { return props.messages; },
-    get busy() { return props.isSending; },
+    get turns() { return providerConversation.value?.turns; },
+    get messages() { return conversationMessages.value; },
+    get busy() { return providerConversation.value?.busy ?? props.isSending; },
     get disabled() {
-      return !currentAgent.value || (props.isConversationLoadFailed && props.messages.length === 0);
+      return !currentAgent.value || (props.isConversationLoadFailed && conversationMessages.value.length === 0);
     },
   },
   history: {
-    get hasOlder() { return props.historyHasOlder; },
+    get hasOlder() { return providerConversation.value?.historyState?.hasOlder ?? props.historyHasOlder; },
     get loading() {
       return Boolean(currentAgent.value?.backendSession)
-        && props.messages.length === 0
-        && (props.isLoading || props.isConversationLoading);
+        && conversationMessages.value.length === 0
+        && (providerConversation.value?.historyLoading ?? (props.isLoading || props.isConversationLoading));
     },
-    get loadingOlder() { return props.historyLoadingOlder; },
+    get loadingOlder() { return providerConversation.value?.historyState?.loadingOlder ?? props.historyLoadingOlder; },
   },
   thread: {
     get approvals() { return effectiveApprovals.value; },
-    get answeredClientRequestIds() { return props.answeredClientRequestIds; },
-    get goal() { return props.goal ?? null; },
-    get queuedPrompts() { return props.queuedPrompts; },
-    get contextUsage() { return currentAgent.value?.contextUsage ?? null; },
+    get answeredClientRequestIds() {
+      return providerConversation.value
+        ? new Set(providerConversation.value.answeredClientRequestIds)
+        : currentAgent.value?.backend === 'codex' ? new Set<string>() : props.answeredClientRequestIds;
+    },
+    get goal() {
+      return providerConversation.value?.goal
+        ?? (currentAgent.value?.backend === 'codex' ? null : props.goal ?? null);
+    },
+    get queuedPrompts() {
+      return providerConversation.value?.queuedPrompts
+        ?? (currentAgent.value?.backend === 'codex' ? [] : props.queuedPrompts);
+    },
+    get contextUsage() { return providerConversation.value?.contextUsage ?? currentAgent.value?.contextUsage ?? null; },
   },
   composer: {
     get state() { return props.composerState; },

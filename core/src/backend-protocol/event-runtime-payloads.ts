@@ -330,6 +330,17 @@ function expectCodexConversationSnapshot(value: unknown, path: string): void {
   expectBoolean(value.busy, `${path}.busy`);
 }
 
+function expectCodexConversationEvent(value: unknown, path: string): void {
+  expectRecord(value, path);
+  expectNumber(value.seq, `${path}.seq`);
+  expectString(value.occurredAt, `${path}.occurredAt`);
+  expectLiteral(value.origin, ['action', 'notification', 'lifecycle'], `${path}.origin`);
+  expectString(value.type, `${path}.type`);
+  expectString(value.conversationId, `${path}.conversationId`);
+  expectOptional(value, 'turnId', path, expectString);
+  expectRecord(value.payload, `${path}.payload`);
+}
+
 export const runtimePayloadValidators = {
   'backend.statusChanged': expectBackendRuntimeStatus,
   'client.connectionChanged': expectConnectionState,
@@ -350,6 +361,11 @@ export const runtimePayloadValidators = {
     expectRecord(value, path);
     expectNumber(value.revision, `${path}.revision`);
     expectCodexConversationSnapshot(value.snapshot, `${path}.snapshot`);
+  },
+  'codex.conversationEventReceived': (value, path) => {
+    expectRecord(value, path);
+    expectNumber(value.revision, `${path}.revision`);
+    expectCodexConversationEvent(value.event, `${path}.event`);
   },
   'sidePanel.markdownRequested': expectSidePanelMarkdown,
   'sidePanel.gitDiffRequested': expectSidePanelGitDiff,

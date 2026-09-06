@@ -54,7 +54,7 @@ import type {
 } from '@codex-app-sdk/core/surface';
 import {
   invokeCodexConversationBridgeOperation,
-  subscribeCodexConversationBridge,
+  subscribeCodexConversationReplicaBridge,
 } from '@codex-app-sdk/core/surface-bridge';
 
 type AdapterListener = (event: BackendEvent) => void;
@@ -628,7 +628,10 @@ export class CodexSurfaceAgentAdapter {
         (conversation) => conversation.id === threadId,
       ));
       if (emitHistory) this.publishInitial(session, snapshot, true);
-      else this.rememberPending(session, snapshot);
+      else {
+        this.rememberPending(session, snapshot);
+        this.publishConversationSnapshot(session, snapshot);
+      }
       session.suppressEvents = false;
 
       const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
@@ -677,16 +680,21 @@ export class CodexSurfaceAgentAdapter {
       suppressEvents,
       unsubscribe: () => undefined,
     };
-    session.unsubscribe = subscribeCodexConversationBridge(this.surface, threadId, (notification) => {
-      if (notification.type === 'snapshot') {
-        this.publishConversationSnapshot(session, notification.snapshot);
-        return;
-      }
-      this.handleConversationEvent(session, notification.event);
-    });
     this.sessionsByAgentId.set(agent.id, session);
     this.agentIdsByThreadId.set(threadId, agent.id);
-    if (publishInitial) this.publishInitial(session, handle.getSnapshot(), false);
+    try {
+      session.unsubscribe = subscribeCodexConversationReplicaBridge(this.surface, threadId, (notification) => {
+        if (notification.type === 'snapshot') {
+          if (!session.suppressEvents) this.publishConversationSnapshot(session, notification.snapshot);
+          return;
+        }
+        this.handleConversationEvent(session, notification.event);
+      });
+    } catch (error) {
+      this.forgetAgentSession(agent.id);
+      throw error;
+    }
+    if (publishInitial) this.publishInitial(session, handle.getSnapshot(), false, false, false);
     return session;
   }
 
@@ -695,6 +703,7 @@ export class CodexSurfaceAgentAdapter {
     snapshot: CodexConversationSnapshot,
     emitHistory: boolean,
     preserveKnownTurns = false,
+    publishProviderSnapshot = true,
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
     if (emitHistory) {
@@ -718,7 +727,7 @@ export class CodexSurfaceAgentAdapter {
     if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
     this.emitStatus(session, statusFromSnapshot(snapshot));
     this.rememberPending(session, snapshot, true);
-    this.publishConversationSnapshot(session, snapshot);
+    if (publishProviderSnapshot) this.publishConversationSnapshot(session, snapshot);
   }
 
   private publishConversationSnapshot(
@@ -732,7 +741,7 @@ export class CodexSurfaceAgentAdapter {
       type: 'codex.conversationSnapshotChanged',
       payload: {
         revision,
-        snapshot: structuredClone(snapshot),
+        snapshot: conversationSnapshotForTransport(snapshot),
       },
     });
   }
@@ -844,6 +853,7 @@ export class CodexSurfaceAgentAdapter {
 
   private handleConversationEvent(session: AgentConversation, event: CodexConversationEvent): void {
     if (session.suppressEvents) return;
+    if (isRendererConversationEvent(event)) this.publishConversationEvent(session, event);
     this.historyHydratedAtByAgentId.set(session.agent.id, Date.now());
     const metadata = { occurredAt: event.occurredAt };
     switch (event.type) {
@@ -1071,6 +1081,22 @@ export class CodexSurfaceAgentAdapter {
         });
         return;
     }
+  }
+
+  private publishConversationEvent(
+    session: AgentConversation,
+    event: CodexConversationEvent,
+  ): void {
+    if (this.sessionsByAgentId.get(session.agent.id) !== session) return;
+    const revision = (this.conversationRevisionsByAgentId.get(session.agent.id) ?? 0) + 1;
+    this.conversationRevisionsByAgentId.set(session.agent.id, revision);
+    this.emitThread(session, {
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision,
+        event: structuredClone(event),
+      },
+    });
   }
 
   private emitAppendedMessage(
@@ -1829,4 +1855,41 @@ function expandHome(folder: string): string {
 
 function conversationCwd(snapshot: CodexConversationSnapshot): string | undefined {
   return snapshot.conversations.find((conversation) => conversation.id === snapshot.activeConversationId)?.cwd;
+}
+
+function conversationSnapshotForTransport(
+  snapshot: CodexConversationSnapshot,
+): CodexConversationSnapshot {
+  return structuredClone({
+    ...snapshot,
+    conversations: [],
+    models: [],
+    skills: [],
+    plugins: [],
+    permissionProfiles: [],
+    approvalPresets: [],
+  });
+}
+
+function isRendererConversationEvent(event: CodexConversationEvent): boolean {
+  switch (event.type) {
+    case 'conversation.summaryUpserted':
+    case 'conversation.summaryRemoved':
+    case 'conversation.skillsChanged':
+    case 'conversation.permissionsChanged':
+    case 'file.activity':
+    case 'subagent.toolCallChanged':
+    case 'subagent.activity':
+    case 'realtime.started':
+    case 'realtime.itemAdded':
+    case 'realtime.transcriptDelta':
+    case 'realtime.transcriptCompleted':
+    case 'realtime.audioDelta':
+    case 'realtime.sdp':
+    case 'realtime.error':
+    case 'realtime.closed':
+      return false;
+    default:
+      return true;
+  }
 }

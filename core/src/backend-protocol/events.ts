@@ -81,6 +81,19 @@ function expectEventContext(event: EventRecord): void {
       expectAgentBackend(event, 'codex');
       expectRequiredString(event, 'threadId');
       return;
+    case 'codex.conversationEventReceived': {
+      expectAgentBackend(event, 'codex');
+      expectRequiredString(event, 'threadId');
+      const payload = event.payload as Record<string, unknown>;
+      const providerEvent = payload.event as Record<string, unknown>;
+      if (providerEvent.conversationId !== event.threadId) {
+        failEventValidation(
+          '$.payload.event.conversationId',
+          'expected the outer thread id',
+        );
+      }
+      return;
+    }
     case 'sidePanel.markdownRequested':
     case 'sidePanel.gitDiffRequested':
     case 'celebration.requested':

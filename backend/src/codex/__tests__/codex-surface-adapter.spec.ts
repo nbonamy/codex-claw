@@ -11,6 +11,11 @@ import { decodeClawBackendEvent } from '@codex-claw/core/backend-protocol/events
 import { CodexBackendDriver } from '../codex-driver';
 import { CodexSurfaceAgentAdapter } from '../codex-surface-adapter';
 
+function isLegacyClawConversationEvent(event: BackendEvent): boolean {
+  return event.type !== 'codex.conversationSnapshotChanged'
+    && event.type !== 'codex.conversationEventReceived';
+}
+
 class FakeTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];
   readonly close = vi.fn(async () => undefined);
@@ -584,7 +589,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/agentMessage/delta',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: ' suffix' },
     });
-    expect(events.filter((event) => event.type !== 'codex.conversationSnapshotChanged')).toStrictEqual([
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([
       expect.objectContaining({
         type: 'message.delta', agentId: 'agent-a', threadId: 'thread-a',
         payload: expect.objectContaining({ itemId: 'agent-a', delta: ' suffix', phase: 'commentary' }),
@@ -596,7 +601,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/agentMessage/delta',
       params: { threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'agent-b', delta: 'Only B' },
     });
-    expect(events.filter((event) => event.type !== 'codex.conversationSnapshotChanged')).toStrictEqual([
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([
       expect.objectContaining({ type: 'message.delta', agentId: 'agent-b', threadId: 'thread-b' }),
     ]);
   });
@@ -647,11 +652,29 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('publishes independently revisioned SDK snapshots for concurrent agent conversations', async () => {
+  it('publishes one reset snapshot followed by independently revisioned SDK events', async () => {
     const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
     await Promise.all([adapter.hydrateAgent(agentA), adapter.hydrateAgent(agentB)]);
+    const resetFrames = events.filter((event) => event.type === 'codex.conversationSnapshotChanged');
+    for (const agent of [agentA, agentB]) {
+      const frame = resetFrames.find((event) => event.agentId === agent.id);
+      expect(frame).toMatchObject({
+        type: 'codex.conversationSnapshotChanged',
+        agentId: agent.id,
+        payload: {
+          snapshot: {
+            conversations: [],
+            models: [],
+            skills: [],
+            plugins: [],
+            permissionProfiles: [],
+            approvalPresets: [],
+          },
+        },
+      });
+    }
     events.length = 0;
 
     await Promise.all([
@@ -659,36 +682,40 @@ describe('CodexSurfaceAgentAdapter', () => {
       adapter.sendPrompt(agentB, 'Prompt B'),
     ]);
 
-    const frames = events.filter((event) => event.type === 'codex.conversationSnapshotChanged');
+    expect(events.some((event) => event.type === 'codex.conversationSnapshotChanged')).toBe(false);
+    const frames = events.filter((event) => event.type === 'codex.conversationEventReceived');
     for (const [agent, threadId, prompt] of [
       [agentA, 'thread-a', 'Prompt A'],
       [agentB, 'thread-b', 'Prompt B'],
     ] as const) {
       const agentFrames = frames.filter((event) => event.agentId === agent.id);
       expect(agentFrames.length).toBeGreaterThan(0);
-      const revisions = agentFrames.map((event) => event.type === 'codex.conversationSnapshotChanged'
+      const revisions = agentFrames.map((event) => event.type === 'codex.conversationEventReceived'
         ? event.payload.revision
         : 0);
       expect(revisions.every((revision, index) => index === 0 || revision > revisions[index - 1]!)).toBe(true);
-      expect(agentFrames.at(-1)).toMatchObject({
+      expect(agentFrames).toContainEqual(expect.objectContaining({
         agentId: agent.id,
         backend: 'codex',
         threadId,
-        payload: {
-          snapshot: {
-            activeConversationId: threadId,
-            messages: expect.arrayContaining([expect.objectContaining({
-              role: 'user',
-              turnId: `turn-${threadId}`,
-              parts: [{ type: 'text', text: prompt }],
-            })]),
-          },
-        },
-      });
+        payload: expect.objectContaining({
+          event: expect.objectContaining({
+            conversationId: threadId,
+            type: 'message.updated',
+            payload: expect.objectContaining({
+              message: expect.objectContaining({
+                role: 'user',
+                turnId: `turn-${threadId}`,
+                parts: [{ type: 'text', text: prompt }],
+              }),
+            }),
+          }),
+        }),
+      }));
     }
 
     const priorRevision = frames
-      .filter((event) => event.type === 'codex.conversationSnapshotChanged' && event.agentId === agentA.id)
+      .filter((event) => event.type === 'codex.conversationEventReceived' && event.agentId === agentA.id)
       .at(-1)?.payload.revision ?? 0;
     adapter.forgetAgentSession(agentA.id);
     events.length = 0;
@@ -815,7 +842,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
 
-    expect(events.slice(0, 2)).toStrictEqual([
+    expect(events.filter(isLegacyClawConversationEvent).slice(0, 2)).toStrictEqual([
       expect.objectContaining({
         type: 'subagent.operationChanged', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-subagent',
         payload: {
@@ -1016,7 +1043,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/mcpToolCall/progress',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'tool-a', message: 'Halfway' },
     });
-    expect(events.filter((event) => event.type !== 'codex.conversationSnapshotChanged')).toStrictEqual([
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([
       expect.objectContaining({ type: 'item.updated', agentId: 'agent-a', threadId: 'thread-a' }),
     ]);
 
@@ -1026,7 +1053,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/plan/delta',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'plan-a', delta: markdown },
     });
-    expect(events.filter((event) => event.type !== 'codex.conversationSnapshotChanged')).toStrictEqual([
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([
       expect.objectContaining({
         type: 'turn.proposedPlanDelta', agentId: 'agent-a', threadId: 'thread-a',
         payload: expect.objectContaining({ itemId: 'plan-a', delta: markdown }),
@@ -1041,7 +1068,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         item: { type: 'plan', id: 'plan-a', text: markdown },
       },
     });
-    expect(events.filter((event) => event.type !== 'codex.conversationSnapshotChanged')).toStrictEqual([
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([
       expect.objectContaining({
         type: 'turn.proposedPlanCompleted', agentId: 'agent-a', threadId: 'thread-a',
         payload: { itemId: 'plan-a', markdown },

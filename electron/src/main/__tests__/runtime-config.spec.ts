@@ -193,6 +193,7 @@ describe('runtime config', () => {
     expect(devScript).toContain("process.env.CODEX_APP_SDK_SOURCE = '1'");
     expect(aliasConfig).toContain("'@codex-app-sdk/vue': path.join(sdkSourceRoot, 'packages/vue/src/index.ts')");
     expect(aliasConfig).toContain("'@codex-app-sdk/vue/styles.css': path.join(sdkSourceRoot, 'packages/vue/src/styles.css')");
+    expect(aliasConfig).toContain("'@codex-app-sdk/core/conversation-replica': path.join(sdkSourceRoot, 'packages/core/src/conversation-replica.ts')");
     for (const viteConfig of viteConfigs) {
       expect(viteConfig).toContain('useSdkSources');
       expect(viteConfig).toContain('sdkSourceAliases');

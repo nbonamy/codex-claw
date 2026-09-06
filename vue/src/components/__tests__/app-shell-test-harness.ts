@@ -6,6 +6,7 @@ import type {
   CodexConversationPaneState,
   CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
@@ -91,6 +92,7 @@ export function mountShell(overrides: Partial<{
   unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
+  codexConversationSnapshot: CodexConversationSnapshot | null;
   chooseAgentFolder: () => Promise<string | null>;
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -139,6 +141,7 @@ export function mountShell(overrides: Partial<{
       unreadAgentIds: overrides.unreadAgentIds ?? [],
       agentFiles: overrides.agentFiles ?? [],
       messages: snapshot.messages,
+      codexConversationSnapshot: overrides.codexConversationSnapshot ?? null,
       isLoading: false,
       isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
       retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),

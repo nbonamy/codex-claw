@@ -1014,4 +1014,136 @@ describe('useAppState', () => {
       expect.objectContaining({ parts: [{ type: 'text', text: 'Newest' }] }),
     ]);
   });
+
+  it('advances the provider-owned Codex frame with SDK conversation events', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationSnapshotChanged',
+      payload: { revision: 1, snapshot: codexConversationSnapshot() },
+      occurredAt: '2026-09-06T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 10,
+          occurredAt: '2026-09-06T00:00:02.000Z',
+          origin: 'notification',
+          type: 'message.appended',
+          conversationId: 'thread-1',
+          turnId: 'turn-1',
+          payload: {
+            message: {
+              id: 'assistant-1', role: 'assistant', status: 'streaming', turnId: 'turn-1', parts: [],
+              createdAt: '2026-09-06T00:00:02.000Z',
+            },
+          },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 3,
+        event: {
+          seq: 11,
+          occurredAt: '2026-09-06T00:00:03.000Z',
+          origin: 'notification',
+          type: 'message.delta',
+          conversationId: 'thread-1',
+          turnId: 'turn-1',
+          payload: { messageId: 'assistant-1', itemId: 'item-1', delta: 'Hello' },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:03.000Z',
+    });
+
+    expect(state.activeCodexConversationSnapshot.value?.messages).toStrictEqual([
+      expect.objectContaining({
+        id: 'assistant-1',
+        parts: [{ type: 'text', text: 'Hello', itemId: 'item-1' }],
+      }),
+    ]);
+  });
+
+  it('invalidates and rehydrates a Codex frame after a revision gap', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot));
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        hydrateAgentHistory,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalled());
+    hydrateAgentHistory.mockClear();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationSnapshotChanged',
+      payload: { revision: 4, snapshot: codexConversationSnapshot() },
+      occurredAt: '2026-09-06T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 6,
+        event: {
+          seq: 12,
+          occurredAt: '2026-09-06T00:00:02.000Z',
+          origin: 'notification',
+          type: 'conversation.activityChanged',
+          conversationId: 'thread-1',
+          payload: { threadStatus: null, busy: true, error: null },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+
+    expect(state.activeCodexConversationSnapshot.value).toBeNull();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
+  });
 });

@@ -6,6 +6,7 @@
     :active-agent="activeAgent"
     :unread-agent-ids="unreadAgentIds"
     :messages="visibleMessages"
+    :codex-conversation-snapshot="activeCodexConversationSnapshot"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-conversation-load-failed="isActiveAgentHistoryFailed"
@@ -238,6 +239,7 @@ const {
   agentFiles,
   backendModels,
   activeBackendCommands,
+  activeCodexConversationSnapshot,
   backendPlugins,
   activeBackendCapabilities,
   modelCatalogStatus,

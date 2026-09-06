@@ -429,6 +429,8 @@ describe('useAppState', () => {
       'celebration.requested',
       'client.connectionChanged',
       'clientRequest.resolved',
+      'codex.conversationEventReceived',
+      'codex.conversationSnapshotChanged',
       'devicePairing.statusChanged',
       'file.activity',
       'git.operationProgress',

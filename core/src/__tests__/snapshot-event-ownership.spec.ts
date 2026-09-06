@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import type { MainToRendererEvent } from '../contracts';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../snapshot';
 import { applyConversationEventToSnapshot } from '../snapshot-conversation-reducer';
@@ -66,6 +67,8 @@ const rendererEventTypes = [
   'devicePairing.statusChanged',
   'models.changed',
   'skills.changed',
+  'codex.conversationSnapshotChanged',
+  'codex.conversationEventReceived',
   'sidePanel.markdownRequested',
   'sidePanel.gitDiffRequested',
   'celebration.requested',
@@ -77,6 +80,48 @@ const rendererEventTypes = [
   'thread.historyHydrationFailed',
   'file.activity',
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'renderer'>[];
+
+const codexConversationSnapshot = {
+  status: 'ready',
+  authentication: {
+    status: 'loaded',
+    account: null,
+    requiresOpenaiAuth: false,
+    error: null,
+    login: { status: 'idle', loginId: null, authUrl: null, error: null },
+  },
+  conversations: [],
+  activeConversationId: 'thread-1',
+  activeTurnId: null,
+  turnIds: [],
+  turns: [],
+  messages: [],
+  clientRequests: [],
+  answeredClientRequestIds: [],
+  approvals: [],
+  models: [],
+  modelCatalogStatus: 'loaded',
+  skills: [],
+  skillCatalogStatus: 'loaded',
+  plugins: [],
+  pluginCatalogStatus: 'loaded',
+  permissionProfiles: [],
+  approvalPresets: [],
+  approvalPreset: null,
+  selectedModelId: null,
+  selectedReasoningEffort: null,
+  selectedServiceTier: null,
+  planMode: false,
+  contextUsage: null,
+  goal: null,
+  turnGitDiff: null,
+  threadStatus: null,
+  rateLimits: null,
+  queuedPrompts: [],
+  busy: false,
+  historyLoading: false,
+  error: null,
+} satisfies CodexConversationSnapshot;
 
 const occurredAt = '2026-09-04T00:00:00.000Z';
 const base = { seq: 1, occurredAt } as const;
@@ -106,6 +151,31 @@ const rendererOnlyEvents = [
       cwd: null,
       status: 'loaded',
       skills: [{ name: 'test', path: '/skill', enabled: true }],
+    },
+  },
+  {
+    ...agent,
+    backend: 'codex',
+    threadId: 'thread-1',
+    type: 'codex.conversationSnapshotChanged',
+    payload: { revision: 1, snapshot: codexConversationSnapshot },
+  },
+  {
+    ...agent,
+    backend: 'codex',
+    threadId: 'thread-1',
+    type: 'codex.conversationEventReceived',
+    payload: {
+      revision: 2,
+      event: {
+        seq: 2,
+        occurredAt,
+        origin: 'notification',
+        type: 'message.delta',
+        conversationId: 'thread-1',
+        turnId: 'turn-1',
+        payload: { messageId: 'message-1', itemId: 'item-1', delta: 'Hello' },
+      },
     },
   },
   {
@@ -200,8 +270,8 @@ describe('snapshot event ownership', () => {
     } as const;
     const assignedTypes = Object.values(expectedByOwner).flat();
 
-    expect(assignedTypes).toHaveLength(54);
-    expect(new Set(assignedTypes).size).toBe(54);
+    expect(assignedTypes).toHaveLength(56);
+    expect(new Set(assignedTypes).size).toBe(56);
     for (const [owner, types] of Object.entries(expectedByOwner)) {
       expect(
         Object.entries(snapshotEventOwnership)

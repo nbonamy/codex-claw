@@ -11,6 +11,7 @@ import type { AppCommand, CodexClawApi, RendererMessage, SidePanelRequest } from
 import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
+import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 
 import {
@@ -542,6 +543,9 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('message-doc-link', 'assistant', 'Open [architecture](docs/architecture.md).'),
+        ]),
         messages: [
           {
             id: 'message-doc-link',
@@ -596,6 +600,9 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('message-source-link', 'assistant', 'Open [main](src/main.ts).'),
+        ]),
         messages: [
           {
             id: 'message-source-link',
@@ -780,6 +787,9 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('message-line-link', 'assistant', 'Open [readme](README.md:40).'),
+        ]),
         messages: [
           {
             id: 'message-line-link',
@@ -817,6 +827,13 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage(
+            'message-file-url-line-link',
+            'assistant',
+            'Open [readme](file:///Users/nbonamy/src/id8/README.md:40:2).',
+          ),
+        ]),
         messages: [
           {
             id: 'message-file-url-line-link',
@@ -854,6 +871,13 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage(
+            'message-file-url',
+            'assistant',
+            'Open [file](file:///Users/nbonamy/src/id8/src/file%20name.ts).',
+          ),
+        ]),
         messages: [
           {
             id: 'message-file-url',
@@ -890,6 +914,13 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage(
+            'message-outside-file-url',
+            'assistant',
+            'Open [file](file:///Users/nbonamy/src/codex-claw/README.md).',
+          ),
+        ]),
         messages: [
           {
             id: 'message-outside-file-url',
@@ -927,6 +958,9 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('message-doc-link', 'assistant', 'Open [architecture](docs/architecture.md).'),
+        ]),
         messages: [
           {
             id: 'message-doc-link',
@@ -969,6 +1003,9 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('message-doc-link', 'assistant', 'Open [architecture](docs/architecture.md).'),
+        ]),
         messages: [
           {
             id: 'message-doc-link',
@@ -1007,6 +1044,9 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('message-doc-link', 'assistant', 'Open [secret](../secret.md).'),
+        ]),
         messages: [
           {
             id: 'message-doc-link',
