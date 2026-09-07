@@ -16,7 +16,8 @@ to the renderer, and owns only desktop-native callbacks.
 - own JSON-RPC request IDs and response matching;
 - route server notifications to the right agent/session;
 - answer server-initiated approval and user-input requests;
-- adapt Codex events into app-owned events;
+- wrap SDK-owned conversation snapshots/events in Claw's agent/thread/revision
+  routing envelope;
 - persist only app product state, not Codex transcripts.
 
 Codex assistant text keeps the app-server's optional `commentary` or
@@ -28,10 +29,14 @@ the final answer begins.
 
 The local `codex-app-sdk` dependency owns Codex executable discovery, generated
 app-server protocol types, request/response inference, bidirectional request
-routing, and stdio JSONL framing. `clawd` remains the product adapter: it owns
-explicit executable selection, initialization metadata, agent/session policy,
-approval presets, event adaptation, and recovery behavior. Product policy must
-not be added to the SDK to make a Codex Claw call compile.
+routing, stdio JSONL framing, targeted conversation operations, conversation
+snapshots/reducers, optimistic submissions, history reconciliation, queues,
+turn mutations, and generic conversation rendering. `clawd` remains the
+product adapter: it owns explicit executable selection, initialization
+metadata, agent/session policy, approval presets, the Claw routing envelope,
+and recovery behavior. Product policy must not be added to the SDK to make a
+Codex Claw call compile; generic Codex conversation behavior must not be added
+to Claw to avoid fixing the SDK.
 
 Electron main responsibilities:
 
@@ -43,7 +48,9 @@ Electron main responsibilities:
 
 Renderer responsibilities:
 
-- render app-owned message, tool, diff, plan, and approval state;
+- route SDK-owned Codex provider frames to the addressed per-agent SDK replica
+  and render it through `CodexConversationPane`;
+- render Claw-owned coordination and workspace state around that conversation;
 - send user actions through preload IPC;
 - never import generated Codex protocol types;
 - never spawn Codex or access `CODEX_HOME`.

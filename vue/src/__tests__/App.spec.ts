@@ -46,6 +46,27 @@ describe('App', () => {
     expect(wrapper.text()).toContain('Chat with Dina');
   });
 
+  it('gives the conversation pane a promise-returning prompt action', async () => {
+    const snapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue(snapshot);
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      onEvent: vi.fn(),
+      sendPrompt,
+    });
+    const wrapper = mount(App, {
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    const action = wrapper.findComponent(AppShell).props('sendPromptAction') as (
+      prompt: string,
+    ) => Promise<void>;
+    await action('hello');
+
+    expect(sendPrompt).toHaveBeenCalledWith(snapshot.activeAgentId, 'hello');
+  });
+
   it('blocks the whole app while resource sharing restarts the backend', async () => {
     const snapshot = createInitialSnapshot();
     let resolveSharing!: (value: typeof snapshot) => void;

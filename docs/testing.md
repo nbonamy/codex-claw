@@ -96,7 +96,10 @@ Cover:
   hydration, model/skill catalogs, and unsupported capabilities.
 - `CodexAgentSessionManager` behavior: start/resume thread, start turn, steer,
   interrupt, status updates, and event routing by agent/thread.
-- Codex event adaptation into app-owned events and `RendererMessage` state.
+- Codex routing-envelope behavior and SDK replica revision handling, without a
+  second Claw transcript reducer.
+- Host-boundary regressions proving Claw forwards SDK snapshots, events, and
+  promise-returning conversation actions without duplicating SDK behavior.
 - Approval and user-input request coordination.
 - Persistence, migrations, settings, teams, agents, selected
   team/agent, and window state.

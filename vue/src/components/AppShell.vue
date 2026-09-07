@@ -531,6 +531,7 @@ const props = withDefaults(defineProps<{
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   retryAgentHistory?: () => Promise<void>;
+  sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
@@ -1678,7 +1679,8 @@ function forwardApprovalResolution(
   emit('resolve-approval', approvalId, decision, scope);
 }
 
-function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void {
+function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
+  if (props.sendPromptAction) return props.sendPromptAction(prompt, options);
   if (options) {
     emit('sendPrompt', prompt, options);
   } else {

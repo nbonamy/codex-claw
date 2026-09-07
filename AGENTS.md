@@ -38,18 +38,29 @@ Preserve the product and process boundaries:
   Codex app-server or any future backend process, spawn tools, read arbitrary
   local files, or depend on backend protocol types.
 - Preload exposes a small typed IPC bridge. Keep it boring and explicit.
-- Backend events become app-owned events before they become renderer state.
-- Codex-specific protocol data belongs in the Codex driver/adapter, not in
-  reusable renderer components.
-- Backend-dependent features must enter through app-owned contracts and the
-  backend protocol first. Add or extend an optional driver method or capability
-  behind `clawd`, route Electron through `ClawBackendClient`, and keep renderer
-  components free of Codex/Claude protocol branches.
-- `RendererMessage` is our app contract. It can borrow ideas from id8, but it
-  is not bound to id8 or multi-llm-ts message shapes.
-- Future provider support should arrive through backend drivers and translators
-  behind `clawd`, not by making Electron main or renderer components
-  provider-aware.
+- Coordination events become app-owned before reaching renderer state.
+  Provider conversation traffic keeps its provider-native snapshot/event inside
+  an app-owned routing envelope.
+- Provider conversations stay provider-owned end to end. For Codex,
+  `codex-app-sdk` owns the conversation snapshot/reducer, optimistic messages,
+  history, turn mutations, queues, and generic conversation UI. Claw stores the
+  thread reference, transports SDK snapshots/events, invokes SDK operations,
+  and adds Claw-specific coordination metadata. When generic Codex conversation
+  behavior is missing or wrong, fix it in the SDK and consume that fix here.
+- Codex-specific product policy belongs in the Codex driver/adapter; generic
+  Codex conversation behavior belongs in `codex-app-sdk`, not in Claw
+  renderer state or wrappers.
+- Backend-dependent Claw product features must enter through app-owned
+  contracts and the backend protocol first. Add or extend an optional driver
+  method or capability behind `clawd`, route Electron through
+  `ClawBackendClient`, and keep renderer components free of Codex/Claude
+  protocol branches.
+- `RendererMessage` remains an app-owned DTO where Claw explicitly needs one,
+  including the normalized Claude host and cross-provider historical reads. It
+  is not a live Codex transcript model.
+- Future provider support should arrive through provider hosts behind `clawd`,
+  app-owned capability seams, and provider-owned conversation replicas—not a
+  new global Claw transcript reducer.
 - Theme support must use semantic tokens and CSS variables. Do not hard-code
   product colors inside components.
 
@@ -65,9 +76,9 @@ changes; specify feature behavior in tests:
   canonical UI, visual references, and design tokens.
 - `docs/team-cockpit.md`: design note for a possible team-scoped Cockpit entry
   inside the agent sidebar while preserving the global Cockpit.
-- `docs/codex.md`: how Electron main communicates with Codex app-server,
-  including transport, lifecycle, event adaptation, generated types, and test
-  fixtures.
+- `docs/codex.md`: read before changing Codex conversation state, rendering,
+  actions, history, or transport; it defines the SDK/Claw ownership boundary,
+  lifecycle, generated types, and test fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
   strategy, and remaining Claude-driver questions.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration

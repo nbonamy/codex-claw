@@ -137,7 +137,10 @@ Use `CodexConversationPane` from `@codex-app-sdk/vue` as the complete
 conversation and composer surface. Extend it through its controller, slots, and
 typed actions. Keep Claw's wrapper limited to app-state mapping and product
 routing; the SDK retains its leaf UI, CSS, attachment, clipboard, and
-transcription code.
+transcription code. A generic Codex interaction defect is an SDK defect: add the
+behavior and regression there, then keep only the host wiring and a boundary
+regression in Claw. Do not compensate with a second Claw-owned message,
+optimistic-state, paging, queue, or turn-mutation implementation.
 
 Codex panes receive the SDK-owned snapshot and invoke targeted SDK bridge
 operations for the pane's conversation. Claude panes receive the Claude host's

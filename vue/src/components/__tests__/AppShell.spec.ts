@@ -568,6 +568,79 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
+  it('uses the promise-returning prompt action when the host provides one', async () => {
+    const snapshot = createInitialSnapshot();
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        isLoading: false,
+        isSending: false,
+        sendPromptAction,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = 'hello';
+    await editor.trigger('input');
+    await nextTick();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(sendPromptAction).toHaveBeenCalledWith('hello', undefined);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+  });
+
+  it('keeps the first submitted prompt visible while its Codex conversation is created', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    delete agent.backendSession;
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      sendPromptAction,
+    });
+
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = 'Create the first turn';
+    await editor.trigger('input');
+    await nextTick();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+
+    agent.backendSession = { kind: 'codex', threadId: 'thread-created' };
+    await wrapper.setProps({
+      snapshot: { ...snapshot },
+      activeAgent: agent,
+      codexConversationSnapshot: codexConversationSnapshot([], {
+        activeConversationId: 'thread-created',
+      }),
+    });
+
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+
+    await wrapper.setProps({
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('authoritative-user', 'user', 'Create the first turn', 'turn-created'),
+      ], {
+        activeConversationId: 'thread-created',
+        turnIds: ['turn-created'],
+      }),
+    });
+
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.text().match(/Create the first turn/g)).toHaveLength(1);
+  });
+
   it('owns the SDK conversation controller state and actions at the shell boundary', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe = vi.fn();

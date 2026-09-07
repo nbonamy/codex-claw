@@ -133,6 +133,7 @@ export function mountShell(overrides: Partial<{
   realAgentSidebar: boolean;
   isConversationLoadFailed: boolean;
   retryAgentHistory: () => Promise<void>;
+  sendPromptAction: (prompt: string, options?: import('@codex-claw/core/contracts').RendererSendPromptOptions) => Promise<void>;
   deleteTurnAction: (turnId: string) => Promise<void>;
   editTurnAction: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction: (turnId: string) => Promise<void>;
@@ -149,6 +150,7 @@ export function mountShell(overrides: Partial<{
       isLoading: false,
       isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
       retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),
+      sendPromptAction: overrides.sendPromptAction,
       deleteTurnAction: overrides.deleteTurnAction,
       editTurnAction: overrides.editTurnAction,
       retryTurnAction: overrides.retryTurnAction,

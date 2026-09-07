@@ -11,6 +11,7 @@
     :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-conversation-load-failed="isActiveAgentHistoryFailed"
     :retry-agent-history="retryActiveAgentHistory"
+    :send-prompt-action="sendPrompt"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
     :retry-turn-action="retryTurn"

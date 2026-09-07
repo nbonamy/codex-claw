@@ -112,7 +112,7 @@ export function useImageAnnotation(options: {
   async function forward(
     prompt: string,
     sendOptions: CodexRendererSendMessageOptions | undefined,
-    send: (nextPrompt: string, nextOptions?: RendererSendPromptOptions) => void,
+    send: (nextPrompt: string, nextOptions?: RendererSendPromptOptions) => void | Promise<void>,
   ): Promise<void> {
     const agentId = options.currentAgentId();
     const savedByReference = agentId ? draftsByAgentId[agentId] ?? {} : {};
@@ -124,7 +124,7 @@ export function useImageAnnotation(options: {
       return draft?.annotations.length ? [{ attachment, draft: cloneDraft(draft), imageNumber }] : [];
     });
     if (!agentId || annotatedImages.length === 0) {
-      send(prompt, promptOptions(sendOptions));
+      await send(prompt, promptOptions(sendOptions));
       return;
     }
     const nativeApi = getCodexNativeRendererApi();
@@ -160,7 +160,7 @@ export function useImageAnnotation(options: {
           reference: replacements.get(attachment.reference) ?? attachment.reference,
         })),
       };
-      send(formatImageAnnotationPrompt(annotatedImages.map(({ attachment, draft, imageNumber: number }) => ({
+      await send(formatImageAnnotationPrompt(annotatedImages.map(({ attachment, draft, imageNumber: number }) => ({
         annotations: draft.annotations,
         fileName: attachment.name,
         imageNumber: number,

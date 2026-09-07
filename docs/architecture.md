@@ -484,8 +484,8 @@ Renderer layers:
   over that area without forcing every artifact into the chat column. Opening
   the workspace before a tab exists shows a Claw-owned launcher for the
   currently supported surfaces;
-- chat state store that reduces `MainToRendererEvent` into message/tool/diff
-  state;
+- a provider-replica registry that routes revisioned conversation frames to the
+  addressed per-agent SDK/host reducer without interpreting transcript events;
 - the SDK `CodexConversationPane` for product-neutral message, tool, approval,
   composer, markdown, mermaid, media, clipboard, attachment, and transcription
   behavior; the Claw wrapper only adapts provider capabilities and product
@@ -507,11 +507,11 @@ Renderer layers:
 - theme provider that applies semantic CSS custom properties to the document.
 
 Streaming preserves structural identity outside the row that changed. The
-active transcript passed to the SDK stays referentially stable when a
-background agent streams, Claw does not eagerly remap the full transcript into
-SDK messages, and the SDK projects each keyed row locally. Off-screen message
-rows use browser rendering containment so a long transcript does not make
-composer typing compete with layout and paint work for the full history.
+renderer applies provider-native deltas to the matching per-agent provider
+replica; it does not reduce them into a second global transcript. The SDK
+projects each keyed Codex row locally. Off-screen message rows use browser
+rendering containment so a long transcript does not make composer typing
+compete with layout and paint work for the full history.
 
 ## IPC And Backend Protocol
 
@@ -648,88 +648,47 @@ shared transport/type boundary used by the current implementation.
 - its Vue components provide the complete generic conversation pane and its
   extensible composer/message primitives through typed props, events, and
   slots;
+- its Codex conversation replica owns message and turn identity, optimistic
+  submissions, streaming, history reconciliation, queues, mutation results,
+  and other generic conversation lifecycle state;
 - Codex Claw wrappers map approval presets, plan mode, message actions, and
   design tokens onto those primitives.
 
-The SDK boundary is enforced by tests. Codex Claw separately tests its adapter
-policy and wrapper behavior, so generic SDK behavior and host-product behavior
-do not share a catch-all suite.
+The SDK boundary is enforced by tests. Generic Codex behavior and regressions
+are specified in the SDK. Claw tests only its routing envelope, adapter policy,
+controller wiring, and Claw-specific decorations. A missing generic behavior is
+implemented in the SDK first; Claw must not patch over it with a parallel
+message store, optimistic row, history reducer, queue reducer, or turn-mutation
+state machine.
 
-## Event Adaptation
+## Conversation Ownership
 
-Codex Claw owns its renderer message model. The current id8 `Message` type came
-from multi-llm-ts and is not a rigid contract for this app. We can reuse id8 UI
-components, but we should freely reshape data where Codex-native semantics need
-a better model.
+Conversation state remains native to its provider host rather than being
+translated into one Claw transcript model:
 
-The durable pattern is backend-specific translation into an app-owned message
-model:
+- Codex app-server events enter the `codex-app-sdk` conversation replica in
+  `clawd`. Claw adds an outer envelope with agent id, thread id, and revision,
+  but does not translate the contained snapshot or event.
+- Electron forwards that envelope unchanged. The renderer routes it to the
+  addressed per-agent SDK replica, and `CodexConversationPane` renders the SDK
+  state directly.
+- Codex actions call the conversation-targeted SDK bridge. The SDK owns turn
+  ids, delete/edit/retry/fork semantics, paging, queue reconciliation, and
+  optimistic user submissions. For a new agent, the SDK Vue pane carries its
+  optimistic first prompt across the provisional agent key to the authoritative
+  thread id and reconciles it with the matching SDK message.
+- The Claude conversation host similarly owns its normalized Claude snapshot
+  and reducer. Provider parity is expressed through Claw capabilities and
+  product actions, not a lowest-common-denominator transcript.
+- Claw may derive read-only coordination projections—agent status, unread
+  state, plans, diffs, file activity, and sidebar indicators—from provider
+  events. Those projections never construct, replace, reorder, or mutate
+  provider messages or turns.
 
-```ts
-type RendererMessage = {
-  id: string
-  agentId: string
-  kind?: "compaction" | "steer"
-  role: "user" | "assistant" | "system"
-  status: "streaming" | "complete" | "error"
-  turnId?: string
-  parts: RendererMessagePart[]
-  createdAt: string
-}
-
-type RendererMessagePart =
-  | { type: "text"; text: string; itemId?: string }
-  | {
-      type: "tool"
-      id: string
-      kind: "command" | "mcp" | "dynamic" | "fileChange" | "generic"
-      title: string
-      status: "running" | "completed" | "failed"
-      statusText?: string
-      body?: string
-      input?: unknown
-      output?: unknown
-      metadata?: Record<string, unknown>
-    }
-  | { type: "status"; text: string }
-```
-
-For the first backend, the flow is Codex app-server event -> Codex adapter ->
-`RendererMessage`. If we support Claude Code later, the flow should be Claude
-event -> Claude adapter -> `RendererMessage`, with no renderer rewrite.
-
-id8 chat rendering currently expects a compact stream shape:
-
-- content chunks;
-- reasoning chunks;
-- tool chunks with `preparing | running | completed | canceled | error`;
-- usage/error/done.
-
-Codex app-server emits richer thread items. The adapter maps them into Codex
-Claw's provider-neutral renderer-message contract, then the thin renderer
-wrapper adapts that contract to the SDK conversation pane. The SDK component
-contract must not dictate Claw's stored product schema.
-
-Mapping sketch:
-
-- `UserMessage` -> user `Message`
-- `AgentMessageDelta` -> append assistant text to an in-flight assistant
-  `Message`
-- completed `AgentMessage` -> finalize assistant `Message`
-- `CommandExecution` -> tool call named `command_execution`
-- `CommandExecutionOutputDelta` -> append command output to the matching tool
-  call result/output buffer
-- `FileChange` and `FileChangePatchUpdated` -> file change tool item plus diff
-  state
-- `TurnDiffUpdated` -> aggregate diff panel/state for the turn and git diff
-  side-panel preview
-- `McpToolCall` and `DynamicToolCall` -> tool calls
-- approval server requests -> pending UI prompts, not transcript items until
-  answered
-- `TurnCompleted` -> mark assistant streaming false and update usage/status
-
-The adapter should preserve original app-server payloads in debug fields during
-development, but renderer components should use normalized fields by default.
+This boundary is the default design test for conversation changes: if a change
+would make Claw remember provider message identity or reproduce an SDK reducer
+transition, the seam is wrong. Put the behavior in the provider SDK/host and
+make Claw's integration thinner.
 
 ## Theming
 
