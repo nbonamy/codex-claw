@@ -531,6 +531,9 @@ const props = withDefaults(defineProps<{
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   retryAgentHistory?: () => Promise<void>;
+  deleteTurnAction?: (turnId: string) => Promise<void>;
+  editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
+  retryTurnAction?: (turnId: string) => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -1243,9 +1246,9 @@ const conversationPaneState: CodexConversationPaneState = {
 const conversationPaneActions: CodexConversationPaneActions = {
   clearGoal: () => emit('clear-goal'),
   clientResponse: (response) => emit('client-response', response),
-  deleteTurn: (turnId) => emit('delete-turn', turnId),
+  deleteTurn: (turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
   deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
-  editTurn: (payload) => emit('edit-turn', payload),
+  editTurn: (payload) => props.editTurnAction?.(payload) ?? emit('edit-turn', payload),
   forkTurn: (turnId) => emit('fork-turn', turnId),
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
@@ -1257,7 +1260,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   openImage: (image, context) => agentWorkspace.value?.openConversationImage(image, context) ?? false,
   openVisualization: (visualization) => agentWorkspace.value?.openConversationVisualization(visualization),
   resolveApproval: forwardApprovalResolution,
-  retryTurn: (turnId) => emit('retry-turn', turnId),
+  retryTurn: (turnId) => props.retryTurnAction?.(turnId) ?? emit('retry-turn', turnId),
   steer: forwardCodexSteerPrompt,
   steerQueuedPrompt: (promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
   updateQueuedPrompt: (promptId, prompt) => emit('update-queued-prompt', promptId, prompt),

@@ -133,6 +133,9 @@ export function mountShell(overrides: Partial<{
   realAgentSidebar: boolean;
   isConversationLoadFailed: boolean;
   retryAgentHistory: () => Promise<void>;
+  deleteTurnAction: (turnId: string) => Promise<void>;
+  editTurnAction: (payload: { content: string; turnId: string }) => Promise<void>;
+  retryTurnAction: (turnId: string) => Promise<void>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   return mount(AppShell, {
@@ -146,6 +149,9 @@ export function mountShell(overrides: Partial<{
       isLoading: false,
       isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
       retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),
+      deleteTurnAction: overrides.deleteTurnAction,
+      editTurnAction: overrides.editTurnAction,
+      retryTurnAction: overrides.retryTurnAction,
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },

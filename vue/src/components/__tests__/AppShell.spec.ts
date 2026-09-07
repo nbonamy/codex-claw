@@ -147,6 +147,56 @@ describe('AppShell authentication and conversation', () => {
     ]]);
   });
 
+  it('keeps the asynchronous edit action attached so the SDK renders failures', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-edit' };
+    const editTurnAction = vi.fn().mockRejectedValue(new Error('Codex rollback timed out'));
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      editTurnAction,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('user-turn-edit', 'user', 'Original prompt', 'turn-edit'),
+        codexTextMessage('assistant-turn-edit', 'assistant', 'Original response', 'turn-edit'),
+      ], {
+        activeConversationId: 'thread-edit',
+        turnIds: ['turn-edit'],
+        turns: [{
+          id: 'turn-edit', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-09-06T00:00:00.000Z', completedAt: '2026-09-06T00:00:01.000Z', durationMs: 1_000,
+        }],
+      }),
+    });
+
+    await wrapper.get('button[aria-label="Edit"]').trigger('click');
+    await wrapper.get('textarea[aria-label="Edit prompt"]').setValue('Edited prompt');
+    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
+    await flushPromises();
+
+    expect(editTurnAction).toHaveBeenCalledWith({ content: 'Edited prompt', turnId: 'turn-edit' });
+    expect(wrapper.get('[role="alert"]').text()).toBe('Codex rollback timed out');
+  });
+
+  it('preserves promise-returning turn mutation callbacks at the SDK controller boundary', async () => {
+    const deleteTurnAction = vi.fn().mockResolvedValue(undefined);
+    const editTurnAction = vi.fn().mockResolvedValue(undefined);
+    const retryTurnAction = vi.fn().mockResolvedValue(undefined);
+    const actions = conversationControllerActions(mountShell({
+      deleteTurnAction,
+      editTurnAction,
+      retryTurnAction,
+    }));
+
+    await actions.deleteTurn?.('turn-delete');
+    await actions.editTurn?.({ content: 'Edited', turnId: 'turn-edit' });
+    await actions.retryTurn?.('turn-retry');
+
+    expect(deleteTurnAction).toHaveBeenCalledWith('turn-delete');
+    expect(editTurnAction).toHaveBeenCalledWith({ content: 'Edited', turnId: 'turn-edit' });
+    expect(retryTurnAction).toHaveBeenCalledWith('turn-retry');
+  });
+
   it('shows passive connection progress while discovering existing ChatGPT credentials', async () => {
     let resolveAuthentication!: (value: {
       account: { type: 'apiKey' };
