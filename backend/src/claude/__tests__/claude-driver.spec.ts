@@ -796,7 +796,6 @@ describe('ClaudeBackendDriver', () => {
       sessionId: 'claude-session-existing',
     })).resolves.toStrictEqual({
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
-      messages: [],
     });
     expect(events).toContainEqual(expect.objectContaining({
       type: 'claude.conversationSnapshotChanged',

@@ -38,13 +38,11 @@ export type BackendSendResult = {
 
 export type BackendTurnActionResult = {
   backendSession: BackendSession;
-  messages: RendererMessage[];
   activeTurnId: string | null;
 };
 
 export type BackendConversationResumeResult = {
   backendSession: BackendSession;
-  messages: RendererMessage[];
 };
 
 export type BackendConversationForkResult = BackendConversationResumeResult & {

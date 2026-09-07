@@ -3,10 +3,10 @@ import { translate } from './i18n';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { applyMainEventToSnapshot, applySnapshotMetadata } from '@codex-claw/core/snapshot';
+import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
@@ -139,7 +139,7 @@ const {
   unreadAgentIds,
 } = agentUnread;
 const agentHistory = createAgentHistoryState({
-  adoptSnapshotMetadata: adoptBackgroundSnapshotMetadata,
+  adoptSnapshot: adoptBackgroundSnapshot,
   getSnapshot: () => snapshot.value,
   synchronizeComposerSelection: synchronizeComposerSelectionForAgent,
 });
@@ -169,9 +169,6 @@ const {
 } = sourceRepositoryState;
 
 export function useAppState() {
-  let visibleMessageAgentId: string | null = null;
-  let visibleMessageCache: RendererMessage[] = [];
-
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
@@ -190,23 +187,6 @@ export function useAppState() {
     const frame = claudeConversationFramesByAgentId.value[agent.id];
     const sessionId = agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
     return !frame || (sessionId && frame.snapshot.sessionId !== sessionId) ? null : frame.snapshot;
-  });
-
-  const visibleMessages = computed(() => {
-    const agentId = activeAgent.value?.id ?? null;
-    const next = agentId
-      ? snapshot.value.messages.filter((message) => message.agentId === agentId)
-      : [];
-    if (
-      agentId === visibleMessageAgentId &&
-      next.length === visibleMessageCache.length &&
-      next.every((message, index) => message === visibleMessageCache[index])
-    ) {
-      return visibleMessageCache;
-    }
-    visibleMessageAgentId = agentId;
-    visibleMessageCache = next;
-    return visibleMessageCache;
   });
 
   const activeQueuedPrompts = computed(() => {
@@ -443,7 +423,7 @@ export function useAppState() {
     }
 
     const options = resolvedPromptOptions(agentId, trimmed, submissionOptions);
-    adoptBackgroundSnapshotMetadata(options
+    adoptBackgroundSnapshot(options
       ? await codexClawApi.steerPrompt(agentId, trimmed, options)
       : await codexClawApi.steerPrompt(agentId, trimmed));
   }
@@ -555,7 +535,7 @@ export function useAppState() {
     markAgentSending(agentId, true);
 
     try {
-      adoptBackgroundSnapshotMetadata(options
+      adoptBackgroundSnapshot(options
         ? await api.sendPrompt(agentId, prompt, options)
         : await api.sendPrompt(agentId, prompt));
     } finally {
@@ -1271,7 +1251,6 @@ export function useAppState() {
     activeBackendApprovals,
     activeApprovalPreset,
     activePermissionMode,
-    visibleMessages,
     activeQueuedPrompts,
     activeComposerState,
     activeComposerAttachments,
@@ -1738,7 +1717,7 @@ function invalidateAndRecoverCodexConversation(agentId: string): void {
   if (recoveringCodexConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
   recoveringCodexConversationAgentIds.add(agentId);
   void codexClawApi.hydrateAgentHistory(agentId)
-    .then(adoptBackgroundSnapshotMetadata)
+    .then(adoptBackgroundSnapshot)
     .catch(() => undefined)
     .finally(() => recoveringCodexConversationAgentIds.delete(agentId));
 }
@@ -1750,7 +1729,7 @@ function invalidateAndRecoverClaudeConversation(agentId: string): void {
   if (recoveringClaudeConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
   recoveringClaudeConversationAgentIds.add(agentId);
   void codexClawApi.hydrateAgentHistory(agentId)
-    .then(adoptBackgroundSnapshotMetadata)
+    .then(adoptBackgroundSnapshot)
     .catch(() => undefined)
     .finally(() => recoveringClaudeConversationAgentIds.delete(agentId));
 }
@@ -1762,9 +1741,6 @@ function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, R
       return;
     case 'thread.settingsUpdated':
       syncComposerStateFromMainEvent(event);
-      return;
-    case 'thread.historyLoaded':
-      syncHistoryPageStateFromMainEvent(event);
       return;
     default:
       return;
@@ -1830,12 +1806,8 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
   }
   if (event.type === 'snapshot.updated') {
     const decodedSnapshot = decodeAppSnapshot(event.payload);
-    if (decodedSnapshot?.kind === 'full') {
+    if (decodedSnapshot) {
       adoptBackgroundSnapshot(decodedSnapshot.value);
-      return;
-    }
-    if (decodedSnapshot?.kind === 'metadata') {
-      adoptBackgroundSnapshotMetadata(decodedSnapshot.value);
       return;
     }
     return;
@@ -1844,16 +1816,6 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
   if (event.type === 'thread.started' && event.backend === 'claude') {
     synchronizeComposerSelectionForAgent(event.agentId);
   }
-}
-
-function adoptBackgroundSnapshotMetadata(metadata: AppSnapshotMetadata): void {
-  const activeAgentId = snapshot.value.activeAgentId;
-  applySnapshotMetadata(snapshot.value, metadata);
-  if (activeAgentId && snapshot.value.agents.some((agent) => agent.id === activeAgentId)) {
-    selectAgentInSnapshot(snapshot.value, activeAgentId);
-  }
-  pruneUnreadAgentIds();
-  pruneConversationFrames();
 }
 
 function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
@@ -1965,7 +1927,7 @@ async function refreshAgentSelection(agentId: string, requestId: number, needsHi
   try {
     const nextSnapshot = await codexClawApi!.selectAgent(agentId);
     if (requestId === agentSelectionRequestId) {
-      adoptBackgroundSnapshotMetadata(nextSnapshot);
+      adoptBackgroundSnapshot(nextSnapshot);
       synchronizeComposerSelectionForAgent(agentId);
     }
   } catch {

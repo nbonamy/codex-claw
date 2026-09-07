@@ -451,27 +451,6 @@ export const agentPayloadValidators = {
     }
     expectContextUsage(value, path);
   },
-  'thread.historyLoaded': (value, path) => {
-    expectRecord(value, path);
-    expectArray(
-      value.messages,
-      `${path}.messages`,
-      (candidate, candidatePath) => {
-        expectKnownShape(
-          candidate,
-          candidatePath,
-          isRendererMessage,
-          'renderer message',
-        );
-      },
-    );
-    [
-      'replace',
-      'preserveKnownTurns',
-      'preserveKnownMessages',
-      'hasOlderMessages',
-    ].forEach((key) => expectOptional(value, key, path, expectBoolean));
-  },
   'thread.historyHydrationFailed': (value, path) => {
     expectRecord(value, path);
     if (Object.keys(value).length > 0)

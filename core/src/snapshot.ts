@@ -1,5 +1,5 @@
 import type { AppSnapshot, MainToRendererEvent } from './contracts';
-import { applyConversationEventToSnapshot } from './snapshot-conversation-reducer';
+import { applyCoordinationEventToSnapshot } from './snapshot-coordination-reducer';
 import { isSnapshotEventOwnedBy } from './snapshot-event-ownership';
 import { applyRuntimeEventToSnapshot } from './snapshot-runtime-reducer';
 import { applySubagentEventToSnapshot } from './snapshot-subagent-reducer';
@@ -7,13 +7,8 @@ import { applySubagentEventToSnapshot } from './snapshot-subagent-reducer';
 export {
   createEmptySnapshot,
   createInitialSnapshot,
-  applySnapshotMetadata,
-  snapshotMetadata,
+  replaceAppSnapshot,
 } from './snapshot-construction';
-
-export { appendUserPrompt } from './snapshot-conversation-transcript';
-
-export { formatThreadPlanMarkdown } from './snapshot-conversation-plans';
 
 export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
   if (
@@ -33,8 +28,8 @@ export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRen
     applySubagentEventToSnapshot(snapshot, event);
     return;
   }
-  if (isSnapshotEventOwnedBy(event, 'conversation')) {
-    applyConversationEventToSnapshot(snapshot, event);
+  if (isSnapshotEventOwnedBy(event, 'coordination')) {
+    applyCoordinationEventToSnapshot(snapshot, event);
     return;
   }
 

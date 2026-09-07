@@ -1,13 +1,9 @@
 import type {
-  Agent,
-  AppSnapshot,
   ClaudeConversationEvent,
   ClaudeConversationSnapshot,
   ClaudeConversationTurn,
 } from './contracts';
-import { applyConversationEventToSnapshot } from './snapshot-conversation-reducer';
-import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
-import { createEmptySnapshot } from './snapshot-construction';
+import { applyClaudeConversationEvent } from './claude-conversation-reducer';
 
 export type ClaudeConversationReplica = {
   apply(event: ClaudeConversationEvent): ClaudeConversationSnapshot;
@@ -17,59 +13,29 @@ export type ClaudeConversationReplica = {
 export function createClaudeConversationReplica(
   initialSnapshot: ClaudeConversationSnapshot,
 ): ClaudeConversationReplica {
-  const state = replicaState(initialSnapshot);
-  let snapshot = projectSnapshot(state, initialSnapshot);
+  let snapshot = structuredClone(initialSnapshot);
 
   return {
     apply(event) {
       if (event.agentId !== snapshot.agentId) {
         throw new Error(`Claude conversation event belongs to '${event.agentId}', expected '${snapshot.agentId}'.`);
       }
+      const next = structuredClone(snapshot);
       if (event.type === 'clientRequest.resolved') {
-        if (!snapshot.answeredClientRequestIds.includes(event.payload.id)) {
-          snapshot = {
-            ...snapshot,
-            answeredClientRequestIds: [...snapshot.answeredClientRequestIds, event.payload.id],
-          };
+        if (!next.answeredClientRequestIds.includes(event.payload.id)) {
+          next.answeredClientRequestIds.push(event.payload.id);
         }
+        snapshot = next;
         return snapshot;
       }
 
-      const replicaEvent = structuredClone(event);
-      applyConversationEventToSnapshot(
-        state,
-        replicaEvent as SnapshotEventOwnedBy<'conversation'>,
-      );
-      snapshot = projectSnapshot(state, applyTurnLifecycle(snapshot, event));
+      applyClaudeConversationEvent(next, structuredClone(event));
+      snapshot = applyTurnLifecycle(next, event);
       return snapshot;
     },
     getSnapshot() {
       return snapshot;
     },
-  };
-}
-
-function replicaState(initialSnapshot: ClaudeConversationSnapshot): AppSnapshot {
-  const state = createEmptySnapshot();
-  state.agents = [replicaAgent(initialSnapshot)];
-  state.messages = [...initialSnapshot.messages];
-  return state;
-}
-
-function replicaAgent(snapshot: ClaudeConversationSnapshot): Agent {
-  return {
-    id: snapshot.agentId,
-    name: snapshot.agentId,
-    folder: null,
-    backend: 'claude',
-    ...(snapshot.sessionId ? {
-      backendSession: { kind: 'claude', sessionId: snapshot.sessionId, transport: 'stdio' },
-    } : {}),
-    ...(snapshot.contextUsage ? { contextUsage: snapshot.contextUsage } : {}),
-    ...(snapshot.plan ? { plan: snapshot.plan } : {}),
-    status: snapshot.busy ? { type: 'working' } : { type: 'idle' },
-    createdAt: new Date(0).toISOString(),
-    updatedAt: new Date(0).toISOString(),
   };
 }
 
@@ -127,19 +93,6 @@ function completeTurn(
     completedAt,
     durationMs: startedAt ? Math.max(0, Date.parse(completedAt) - Date.parse(startedAt)) : null,
   });
-}
-
-function projectSnapshot(
-  state: AppSnapshot,
-  snapshot: ClaudeConversationSnapshot,
-): ClaudeConversationSnapshot {
-  const agent = state.agents[0];
-  return {
-    ...snapshot,
-    messages: [...state.messages],
-    contextUsage: agent?.contextUsage ?? snapshot.contextUsage,
-    plan: agent?.plan ?? null,
-  };
 }
 
 function upsertTurn(

@@ -29,7 +29,6 @@ describe('agent chat service', () => {
       id: 'agent-dina',
       folder: '~/src/codex-claw',
     }), 'hello');
-    expect(snapshot.messages).toStrictEqual([]);
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
     expect(events.map((event) => event.type)).toStrictEqual([
       'agent.statusChanged',
@@ -86,8 +85,7 @@ describe('agent chat service', () => {
       });
     });
 
-    expect(snapshot.messages).toStrictEqual([]);
-    expect(events.some((event) => event.type === 'message.userSubmitted')).toBe(false);
+    expect(snapshot.agents[0].status.type).toBe('starting');
   });
 
   it('records visible backend errors without throwing through IPC', async () => {
@@ -111,7 +109,6 @@ describe('agent chat service', () => {
 
     expect(snapshot.backendRuntimes).toContainEqual({ backend: 'codex', status: 'error', detail: 'not authenticated' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'not authenticated' });
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'not authenticated' }]);
   });
 
   it('ignores blank prompts, missing agents, and busy agents', () => {
@@ -124,7 +121,6 @@ describe('agent chat service', () => {
     sendAgentPrompt(snapshot, backendDriver, 'agent-dina', 'hello', undefined, vi.fn());
 
     expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.messages).toHaveLength(0);
   });
 
   it('routes backend prompt commands without appending visible user prompts', async () => {
@@ -146,7 +142,6 @@ describe('agent chat service', () => {
 
     expect(backendDriver.tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/compact');
     expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.messages).toHaveLength(0);
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
 
     completion.resolve({
@@ -168,7 +163,6 @@ describe('agent chat service', () => {
 
     expect(backendDriver.tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/review check regressions');
     expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.messages).toHaveLength(0);
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
 
     completion.resolve({
@@ -331,7 +325,6 @@ describe('agent chat service', () => {
       'review these files',
       { attachments },
     );
-    expect(snapshot.messages).toStrictEqual([]);
   });
 
   it('submits attachment-only prompts', () => {
@@ -350,7 +343,6 @@ describe('agent chat service', () => {
       '',
       { attachments },
     );
-    expect(snapshot.messages).toStrictEqual([]);
   });
 
   it('lets the backend driver prepare selected prompt skills', () => {

@@ -1,26 +1,15 @@
-import type { AppSnapshot, AppSnapshotMetadata, ClientState } from './contracts';
-import { isRendererMessage } from './snapshot-guard-collections';
+import type { AppSnapshot, ClientState } from './contracts';
 import { isSnapshotMetadata } from './snapshot-guard-metadata';
-import { hasOwn, isArrayOf, isBoolean, isRecord, optional } from './snapshot-guard-primitives';
+import { isBoolean, isRecord, optional } from './snapshot-guard-primitives';
 
-export type DecodedAppSnapshot =
-  | { kind: 'full'; value: AppSnapshot }
-  | { kind: 'metadata'; value: AppSnapshotMetadata };
+export type DecodedAppSnapshot = { value: AppSnapshot };
 
 export function decodeAppSnapshot(value: unknown): DecodedAppSnapshot | null {
   if (!isSnapshotMetadata(value)) return null;
-  if (hasOwn(value, 'messages')) {
-    if (!isArrayOf(value.messages, isRendererMessage)) return null;
-    return { kind: 'full', value: value as AppSnapshot };
-  }
-  return { kind: 'metadata', value: value as AppSnapshotMetadata };
+  return { value: value as AppSnapshot };
 }
 
 export function isAppSnapshot(value: unknown): value is AppSnapshot {
-  return decodeAppSnapshot(value)?.kind === 'full';
-}
-
-export function isAppSnapshotMetadata(value: unknown): value is AppSnapshotMetadata {
   return decodeAppSnapshot(value) !== null;
 }
 

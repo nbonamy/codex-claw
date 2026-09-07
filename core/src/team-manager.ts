@@ -104,7 +104,6 @@ export function closeTeamInSnapshot(snapshot: AppSnapshot, teamId: string): Team
   const closedAgentIds = new Set(team.agentIds);
   snapshot.teams = snapshot.teams.filter((candidate) => candidate.id !== teamId);
   snapshot.agents = snapshot.agents.filter((agent) => !closedAgentIds.has(agent.id));
-  snapshot.messages = snapshot.messages.filter((message) => !closedAgentIds.has(message.agentId));
 
   if (snapshot.activeTeamId === teamId || !snapshot.teams.some((candidate) => candidate.id === snapshot.activeTeamId)) {
     snapshot.activeTeamId = snapshot.teams[0]?.id ?? null;

@@ -20,7 +20,7 @@ import {
   createClaudeConversationReplica,
   type ClaudeConversationReplica,
 } from '@codex-claw/core/claude-conversation-replica';
-import { createUserMessage } from '@codex-claw/core/snapshot-conversation-transcript';
+import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
 import { type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
@@ -352,7 +352,6 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }
     return {
       backendSession: resolvedBackendSession,
-      messages: [],
     };
   }
 

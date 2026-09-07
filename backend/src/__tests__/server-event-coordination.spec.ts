@@ -2,14 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { snapshotMetadata } from '@codex-claw/core/snapshot';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { CodexBackendDriver } from '../codex/codex-driver';
 import type { CodexSurfaceAgentAdapter } from '../codex/codex-surface-adapter';
 import {
   createTestSnapshot,
-  createTextMessage,
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
@@ -98,14 +96,13 @@ describe('ClawBackendServer', () => {
       type: 'diff.updated',
       payload: { addedLines: 3, removedLines: 1, diff: 'diff --git a/README.md b/README.md\n' },
     });
-    emitEvent({
-      backend: 'codex',
-      agentId: 'agent-jesse',
-      threadId: 'thread-jesse',
-      turnId: 'turn-jesse',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-    });
+    emitEvent(codexConversationEvent(
+      'agent-jesse',
+      'thread-jesse',
+      'turn-jesse',
+      'turn.completed',
+      { status: 'completed' },
+    ));
     await Promise.resolve();
     expect(getGitStatus).not.toHaveBeenCalled();
 
@@ -190,15 +187,13 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    emitEvent({
-      agentId: 'agent-dina',
-      type: 'approval.requested',
+    emitEvent(codexConversationEvent('agent-dina', 'thread-dina', 'turn-1', 'approval.requested', {
+      id: 'approval-1',
+      kind: 'confirm_tool',
       payload: {
-        id: 'approval-1',
-        kind: 'confirm_tool',
-        payload: { confirmation: { id: 'tool-1', title: 'Run tool', command: 'npm test' } },
+        confirmation: { id: 'tool-1', title: 'Run tool', command: 'npm test' },
       },
-    } as unknown as BackendEvent);
+    }));
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -210,7 +205,7 @@ describe('ClawBackendServer', () => {
     });
 
     expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'approval.requested', agentId: 'agent-dina' }),
+      expect.objectContaining({ type: 'codex.conversationEventReceived', agentId: 'agent-dina' }),
     ]));
     expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
     await server.close();
@@ -290,7 +285,6 @@ describe('ClawBackendServer', () => {
 
   it('persists backend-owned snapshot changes for stateful events', async () => {
     const snapshot = createTestSnapshot();
-    snapshot.messages.push(createTextMessage('message-large-transcript', 'agent-dina', 'large transcript'));
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const onEvent = vi.fn();
     const server = new ClawBackendServer({
@@ -321,7 +315,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
       type: 'snapshot.updated',
-      payload: snapshotMetadata(snapshot),
+      payload: snapshot,
     }));
   });
 
@@ -342,24 +336,16 @@ describe('ClawBackendServer', () => {
       type: 'thread.tokenUsageUpdated',
       payload: { contextUsage: { totalTokens: 100 } },
     } as unknown as BackendEvent);
-    server.emitEvent({
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-dina',
-      type: 'turn.planUpdated',
-      payload: { explanation: 'working', plan: [] },
-    });
+    server.emitEvent(codexConversationEvent(
+      'agent-dina', 'thread-dina', 'turn-dina', 'turn.planUpdated',
+      { explanation: 'working', plan: [] },
+    ));
     expect(saveSnapshot).not.toHaveBeenCalled();
 
-    server.emitEvent({
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-dina',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-    });
+    server.emitEvent(codexConversationEvent(
+      'agent-dina', 'thread-dina', 'turn-dina', 'turn.completed',
+      { status: 'completed' },
+    ));
     await Promise.resolve();
     expect(saveSnapshot).toHaveBeenCalledOnce();
   });
@@ -431,7 +417,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(3);
   });
 
-  it('keeps execution plans passive and previews only proposed plans', () => {
+  it('previews proposed plans from provider-owned conversation events', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -452,56 +438,10 @@ describe('ClawBackendServer', () => {
       onEvent: (event) => events.push(event),
     });
 
-    server.emitEvent({
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.planUpdated',
-      payload: {
-        explanation: 'Current plan',
-        plan: [
-          { step: 'Inspect backend event', status: 'completed' },
-          { step: 'Preview markdown', status: 'inProgress' },
-        ],
-      },
-      occurredAt: '2026-06-13T00:00:00.000Z',
-    });
-
-    expect(snapshot.agents[0]?.plan?.markdown).toBe('Current plan\n- [x] Inspect backend event\n- [ ] Preview markdown');
-    expect(events.some((event) => (
-      typeof event === 'object' &&
-      event !== null &&
-      'type' in event &&
-      event.type === 'sidePanel.markdownRequested'
-    ))).toBe(false);
-
-    server.emitEvent({
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-      occurredAt: '2026-06-13T00:00:01.000Z',
-    });
-
-    expect(events.some((event) => (
-      typeof event === 'object' &&
-      event !== null &&
-      'type' in event &&
-      event.type === 'sidePanel.markdownRequested'
-    ))).toBe(false);
-
-    server.emitEvent({
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-proposed-plan',
-      type: 'turn.proposedPlanCompleted',
-      payload: { itemId: 'turn-proposed-plan-plan', markdown: '# Proposed plan\n\n- Build it' },
-      occurredAt: '2026-06-13T00:00:02.000Z',
-    });
+    server.emitEvent(codexConversationEvent(
+      'agent-dina', 'thread-dina', 'turn-proposed-plan', 'turn.proposedPlanCompleted',
+      { itemId: 'turn-proposed-plan-plan', markdown: '# Proposed plan\n\n- Build it' },
+    ));
 
     expect(events.filter((event) => (
       typeof event === 'object' &&
@@ -572,3 +512,30 @@ describe('ClawBackendServer', () => {
     }));
   });
 });
+
+function codexConversationEvent(
+  agentId: string,
+  conversationId: string,
+  turnId: string,
+  type: string,
+  payload: unknown,
+): BackendEvent {
+  return {
+    agentId,
+    backend: 'codex',
+    threadId: conversationId,
+    type: 'codex.conversationEventReceived',
+    payload: {
+      revision: 1,
+      event: {
+        seq: 1,
+        occurredAt: '2026-06-13T00:00:00.000Z',
+        origin: 'notification',
+        conversationId,
+        turnId,
+        type,
+        payload,
+      },
+    },
+  } as BackendEvent;
+}

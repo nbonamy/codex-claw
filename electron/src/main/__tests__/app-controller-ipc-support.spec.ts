@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
-import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -27,8 +27,8 @@ describe('AppController', () => {
     await expect(respondToClientRequest(controller, response)).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledWith('client/request/respond', { response });
-    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'idle' });
   });
 
   it('routes source repository discovery through clawd', async () => {
@@ -573,8 +573,8 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(1, 'snapshot/automations/get', { location });
     expect(request).toHaveBeenNthCalledWith(2, 'automation/create', { input: createInput, location });
     expect(request).toHaveBeenNthCalledWith(3, 'automation/run', { automationId: 'automation-bugs', location });
-    expect(currentSnapshot(controller)).not.toBe(snapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(snapshot);
+    expect(currentSnapshot(controller).activeTeamId).toBe(snapshot.activeTeamId);
   });
 });
 

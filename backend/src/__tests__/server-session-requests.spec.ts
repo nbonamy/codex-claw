@@ -7,7 +7,6 @@ import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import {
   createTestSnapshot,
-  createTextMessage,
   createThreadGoal,
 } from './server-test-fixtures';
 
@@ -27,15 +26,9 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    snapshot.messages = [
-      createTextMessage('old-dina', 'agent-dina', 'old'),
-      createTextMessage('old-jesse', 'agent-jesse', 'keep'),
-    ];
-    const resumedMessages = [createTextMessage('new-dina', 'agent-dina', 'resumed')];
     const forgetAgentSession = vi.fn();
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-new' },
-      messages: resumedMessages,
     });
     const setConversationTitle = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
@@ -88,10 +81,6 @@ describe('ClawBackendServer', () => {
       expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-new' } }),
       'Dina',
     );
-    expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
-      ['old-jesse', 'agent-jesse'],
-      ['new-dina', 'agent-dina'],
-    ]);
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
     await server.close();
   });
@@ -119,10 +108,8 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const forkedMessages = [createTextMessage('forked-message', 'agent-dina', 'forked')];
     const forkConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages: forkedMessages,
       activeTurnId: 'turn-forked',
     });
     const setConversationTitle = vi.fn().mockResolvedValue(undefined);
@@ -178,7 +165,6 @@ describe('ClawBackendServer', () => {
       'Dina (fork)',
     );
     expect(snapshot.teams[0]?.agentIds).toStrictEqual(['agent-dina', forkedAgentId, 'agent-jesse']);
-    expect(snapshot.messages).toContainEqual(expect.objectContaining({ id: 'forked-message', agentId: forkedAgentId }));
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     await server.close();
   });
@@ -380,13 +366,11 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const events: unknown[] = [];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
-      onEvent: (event) => events.push(event),
       saveSnapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
@@ -420,19 +404,6 @@ describe('ClawBackendServer', () => {
       attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
     });
     expect(interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'text' && part.text === 'try smaller'))).toBe(true);
-    expect(snapshot.messages.some((message) => message.parts.some((part) => (
-      part.type === 'attachment' && part.attachment.path === '/tmp/notes.txt'
-    )))).toBe(true);
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'message.steer',
-        payload: {
-          prompt: 'try smaller',
-          attachments: [{ type: 'file', path: '/tmp/notes.txt', name: 'notes.txt' }],
-        },
-      }),
-    ]));
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     await server.close();
@@ -482,7 +453,10 @@ describe('ClawBackendServer', () => {
     });
 
     expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'error', payload: { message: 'Failed to interrupt Codex: no active turn' } }),
+      expect.objectContaining({
+        type: 'agent.statusChanged',
+        payload: { type: 'error', message: 'Failed to interrupt Codex: no active turn' },
+      }),
     ]));
     await server.close();
   });
@@ -501,14 +475,8 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    snapshot.messages = [
-      createTextMessage('old-dina', 'agent-dina', 'old'),
-      createTextMessage('old-jesse', 'agent-jesse', 'keep'),
-    ];
-    const rollbackMessages = [createTextMessage('rollback-dina', 'agent-dina', 'rolled back')];
     const deleteTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-rollback' },
-      messages: rollbackMessages,
       activeTurnId: null,
     });
     const driver: AgentBackendDriver = {
@@ -545,11 +513,6 @@ describe('ClawBackendServer', () => {
     });
 
     expect(deleteTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
-    expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
-      ['old-dina', 'agent-dina'],
-      ['old-jesse', 'agent-jesse'],
-    ]);
-    expect(events).not.toContainEqual(expect.objectContaining({ type: 'thread.historyLoaded' }));
     expect(events).toContainEqual(expect.objectContaining({
       type: 'agent.statusChanged', payload: { type: 'idle' },
     }));

@@ -16,7 +16,6 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "benchmark:conversation": "vitest bench src/__benchmarks__/conversation-streaming.bench.ts",
     "test:watch": "vitest watch"
   },
   "devDependencies": {

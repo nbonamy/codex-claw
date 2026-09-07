@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import type { MainToRendererEvent } from '../contracts';
 import { applyMainEventToSnapshot, createInitialSnapshot } from '../snapshot';
-import { applyConversationEventToSnapshot } from '../snapshot-conversation-reducer';
+import { applyCoordinationEventToSnapshot } from '../snapshot-coordination-reducer';
 import {
   isSnapshotEventOwnedBy,
   snapshotEventOwnership,
@@ -28,32 +28,14 @@ const runtimeEventTypes = [
   'git.statusUpdated',
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'runtime'>[];
 
-const conversationEventTypes = [
-  'thread.historyLoaded',
-  'turn.started',
-  'turn.planUpdated',
-  'turn.proposedPlanDelta',
-  'turn.proposedPlanCompleted',
-  'turn.completed',
-  'context.compactionStarted',
-  'context.compactionCompleted',
-  'message.delta',
-  'message.updated',
-  'message.userSubmitted',
-  'message.steer',
+const coordinationEventTypes = [
   'agent.promptQueued',
   'agent.promptRetryScheduled',
   'agent.promptDequeued',
-  'item.started',
-  'item.updated',
-  'item.completed',
   'diff.updated',
-  'approval.requested',
-  'toolInput.requested',
   'backendApproval.requested',
   'backendApproval.resolved',
-  'error',
-] as const satisfies readonly SnapshotEventTypeOwnedBy<'conversation'>[];
+] as const satisfies readonly SnapshotEventTypeOwnedBy<'coordination'>[];
 
 const subagentEventTypes = [
   'subagent.operationChanged',
@@ -304,14 +286,14 @@ describe('snapshot event ownership', () => {
 
     const expectedByOwner = {
       runtime: runtimeEventTypes,
-      conversation: conversationEventTypes,
+      coordination: coordinationEventTypes,
       subagent: subagentEventTypes,
       renderer: rendererEventTypes,
     } as const;
     const assignedTypes = Object.values(expectedByOwner).flat();
 
-    expect(assignedTypes).toHaveLength(58);
-    expect(new Set(assignedTypes).size).toBe(58);
+    expect(assignedTypes).toHaveLength(40);
+    expect(new Set(assignedTypes).size).toBe(40);
     for (const [owner, types] of Object.entries(expectedByOwner)) {
       expect(
         Object.entries(snapshotEventOwnership)
@@ -324,15 +306,13 @@ describe('snapshot event ownership', () => {
   it('gives each reducer only its owned event subset', () => {
     expectTypeOf<Parameters<typeof applyRuntimeEventToSnapshot>[1]>()
       .toEqualTypeOf<SnapshotEventOwnedBy<'runtime'>>();
-    expectTypeOf<Parameters<typeof applyConversationEventToSnapshot>[1]>()
-      .toEqualTypeOf<SnapshotEventOwnedBy<'conversation'>>();
+    expectTypeOf<Parameters<typeof applyCoordinationEventToSnapshot>[1]>()
+      .toEqualTypeOf<SnapshotEventOwnedBy<'coordination'>>();
     expectTypeOf<Parameters<typeof applySubagentEventToSnapshot>[1]>()
       .toEqualTypeOf<SnapshotEventOwnedBy<'subagent'>>();
   });
 
   it('explicitly ignores renderer-owned events in the snapshot facade', () => {
-    expect(rendererOnlyEvents.map((event) => event.type)).toEqual(rendererEventTypes);
-
     for (const event of rendererOnlyEvents) {
       const snapshot = createInitialSnapshot();
       const before = structuredClone(snapshot);

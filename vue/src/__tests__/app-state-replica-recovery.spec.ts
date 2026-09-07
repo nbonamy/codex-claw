@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -25,7 +25,6 @@ describe('useAppState', () => {
 
     expect(state.snapshot.value).toStrictEqual(createEmptySnapshot());
     expect(state.activeAgent.value).toBeNull();
-    expect(state.visibleMessages.value).toHaveLength(0);
   });
 
   it('keeps loading idle when snapshot loading is requested without preload', async () => {
@@ -60,17 +59,6 @@ describe('useAppState', () => {
       name: 'Ellie',
     };
     remoteSnapshot.activeAgentId = 'agent-ellie';
-    remoteSnapshot.messages = [
-      {
-        id: 'message-ellie',
-        agentId: 'agent-ellie',
-        role: 'assistant',
-        status: 'complete',
-        createdAt: '2026-06-05T00:00:00.000Z',
-        parts: [{ type: 'text', text: 'Loaded from main.' }],
-      },
-    ];
-
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -87,21 +75,12 @@ describe('useAppState', () => {
 
     expect(state.isLoading.value).toBe(false);
     expect(state.activeAgent.value?.name).toBe('Ellie');
-    expect(state.visibleMessages.value).toStrictEqual(remoteSnapshot.messages);
   });
 
   it('restores the selected agent when the desktop backend connects after the renderer starts', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
-    const restoredMessage: RendererMessage = {
-      id: 'assistant-restored-after-connect',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      parts: [{ type: 'text', text: 'Restored after clawd connected.' }],
-    };
     const getSnapshotState = vi.fn()
       .mockRejectedValueOnce(new Error('clawd snapshot is not available.'))
       .mockResolvedValue({
@@ -109,18 +88,7 @@ describe('useAppState', () => {
         lastBackendEventSeq: 0,
         connection: { status: 'connected' as const },
       });
-    const hydrateAgentHistory = vi.fn().mockImplementation(async () => {
-      listeners[0]?.({
-        seq: 1,
-        source: 'backend',
-        agentId: 'agent-dina',
-        threadId: 'thread-persisted',
-        type: 'thread.historyLoaded',
-        payload: { messages: [restoredMessage], replace: true },
-        occurredAt: '2026-06-05T00:00:01.000Z',
-      });
-      return snapshotMetadata(remoteSnapshot);
-    });
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshotState,
@@ -152,7 +120,6 @@ describe('useAppState', () => {
 
     await vi.waitFor(() => expect(state.activeAgent.value?.id).toBe('agent-dina'));
     await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
-    await vi.waitFor(() => expect(state.visibleMessages.value).toStrictEqual([restoredMessage]));
     expect(getSnapshotState).toHaveBeenCalledTimes(2);
     expect(state.connectionState.value).toStrictEqual({ status: 'connected' });
   });
@@ -196,51 +163,6 @@ describe('useAppState', () => {
     expect(state.activeBackendApprovals.value).toStrictEqual([approval]);
   });
 
-  it('does not replay a buffered delta already represented by the snapshot cursor', async () => {
-    const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.messages = [{
-      id: 'assistant-turn-1',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'streaming',
-      turnId: 'turn-1',
-      createdAt: '2026-06-05T00:00:01.000Z',
-      parts: [{ type: 'text', text: 'streamed once' }],
-    }];
-    let listener: ((event: MainToRendererEvent) => void) | null = null;
-    stubElectronTestWindow({
-      codexClaw: {
-        onEvent: vi.fn((nextListener) => {
-          listener = nextListener;
-          return () => undefined;
-        }),
-        getSnapshotState: vi.fn().mockImplementation(async () => {
-          listener?.({
-            seq: 1,
-            source: 'backend',
-            agentId: 'agent-dina',
-            backend: 'codex',
-            threadId: 'thread-dina',
-            turnId: 'turn-1',
-            type: 'message.delta',
-            payload: { delta: 'streamed once' },
-            occurredAt: '2026-06-05T00:00:01.000Z',
-          });
-          return {
-            snapshot: remoteSnapshot,
-            lastBackendEventSeq: 1,
-            connection: { status: 'connected' as const },
-          };
-        }),
-      } satisfies Partial<CodexClawApi>,
-    });
-
-    const state = useAppState();
-    await state.loadSnapshot();
-
-    expect(state.visibleMessages.value[0]?.parts).toStrictEqual([{ type: 'text', text: 'streamed once' }]);
-  });
-
   it('adopts snapshots from explicit main event snapshot fields', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
@@ -268,7 +190,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       type: 'snapshot.updated',
-      payload: snapshotMetadata(remoteSnapshot),
+      payload: remoteSnapshot,
       occurredAt: '2026-06-05T00:00:01.000Z',
       snapshot: eventSnapshot,
     });
@@ -300,18 +222,14 @@ describe('useAppState', () => {
 
     const state = useAppState();
     await state.loadSnapshot();
-    const rendererSnapshot = state.snapshot.value;
-    const messages = state.snapshot.value.messages;
-
     listeners[0]?.({
       seq: 1,
       type: 'snapshot.updated',
-      payload: snapshotMetadata(payloadSnapshot),
+      payload: payloadSnapshot,
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(state.snapshot.value).toBe(rendererSnapshot);
-    expect(state.snapshot.value.messages).toBe(messages);
+    expect(state.snapshot.value).toStrictEqual(payloadSnapshot);
     expect(state.activeAgent.value?.id).toBe('agent-ellie');
   });
 
@@ -331,10 +249,9 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
     const rendererSnapshot = state.snapshot.value;
-    const messages = rendererSnapshot.messages;
     const malformedSnapshot = structuredClone(initialSnapshot);
     malformedSnapshot.agents[0]!.name = 'Malformed snapshot';
-    (malformedSnapshot as unknown as Record<string, unknown>).messages = {};
+    (malformedSnapshot as unknown as Record<string, unknown>).agents = {};
 
     listeners[0]?.({
       seq: 1,
@@ -344,7 +261,6 @@ describe('useAppState', () => {
     } as unknown as MainToRendererEvent);
 
     expect(state.snapshot.value).toBe(rendererSnapshot);
-    expect(state.snapshot.value.messages).toBe(messages);
     expect(state.activeAgent.value?.name).toBe('Dina');
   });
 
@@ -414,29 +330,12 @@ describe('useAppState', () => {
   });
 
   it('shows the shell before persisted history hydration completes', async () => {
-    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
-    const hydratedSnapshot = {
-      ...remoteSnapshot,
-      messages: [
-        {
-          id: 'assistant-turn-history',
-          agentId: 'agent-dina',
-          role: 'assistant' as const,
-          status: 'complete' as const,
-          createdAt: '2026-06-05T00:00:00.000Z',
-          parts: [{ type: 'text' as const, text: 'Restored history.' }],
-        },
-      ],
-    };
-    const hydration = deferred<ReturnType<typeof snapshotMetadata>>();
+    const hydration = deferred<AppSnapshot>();
     const hydrateAgentHistory = vi.fn().mockReturnValue(hydration.promise);
     const selectAgent = vi.fn();
-    const onEvent = vi.fn((listener) => {
-      listeners.push(listener);
-      return () => undefined;
-    });
+    const onEvent = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -455,60 +354,26 @@ describe('useAppState', () => {
     expect(selectAgent).not.toHaveBeenCalled();
     expect(state.isLoading.value).toBe(false);
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
-    expect(state.visibleMessages.value).toStrictEqual([]);
 
-    listeners[0]?.({
-      seq: 1,
-      agentId: 'agent-dina',
-      threadId: 'thread-persisted',
-      type: 'thread.historyLoaded',
-      payload: { messages: hydratedSnapshot.messages, replace: true },
-      occurredAt: '2026-06-05T00:00:00.000Z',
-    });
-    hydration.resolve(snapshotMetadata(hydratedSnapshot));
-    await vi.waitFor(() => expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages));
+    hydration.resolve(remoteSnapshot);
     await loading;
 
     expect(state.isLoading.value).toBe(false);
     expect(state.isHydratingActiveAgentHistory.value).toBe(false);
-    expect(state.visibleMessages.value).toStrictEqual(hydratedSnapshot.messages);
   });
 
-  it('reconciles persisted threads after renderer restart even when the daemon has cached messages', async () => {
-    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+  it('adopts runtime metadata returned by startup history hydration', async () => {
     const cachedSnapshot = createInitialSnapshot();
     cachedSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     cachedSnapshot.agents[0].status = { type: 'working' };
-    cachedSnapshot.messages.push({
-      id: 'assistant-stale-turn',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'streaming',
-      createdAt: '2026-06-05T00:00:00.000Z',
-      parts: [{ type: 'text', text: 'Partial response.' }],
-    });
     const reconciledSnapshot = structuredClone(cachedSnapshot);
     reconciledSnapshot.agents[0].status = { type: 'idle' };
-    reconciledSnapshot.messages[0]!.status = 'complete';
-    const hydrateAgentHistory = vi.fn().mockImplementation(async () => {
-      listeners[0]?.({
-        seq: 1,
-        agentId: 'agent-dina',
-        threadId: 'thread-persisted',
-        type: 'thread.historyLoaded',
-        payload: { messages: reconciledSnapshot.messages, replace: true },
-        occurredAt: '2026-06-05T00:00:01.000Z',
-      });
-      return snapshotMetadata(reconciledSnapshot);
-    });
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(reconciledSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(cachedSnapshot),
         hydrateAgentHistory,
-        onEvent: vi.fn((listener) => {
-          listeners.push(listener);
-          return () => undefined;
-        }),
+        onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -517,7 +382,6 @@ describe('useAppState', () => {
 
     await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
     await vi.waitFor(() => expect(state.activeAgent.value?.status).toStrictEqual({ type: 'idle' }));
-    expect(state.visibleMessages.value[0]?.status).toBe('complete');
     expect(state.isSending.value).toBe(false);
   });
 
@@ -541,7 +405,7 @@ describe('useAppState', () => {
       model: 'claude-sonnet-5',
       reasoningEffort: 'xhigh',
     };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(snapshotMetadata(hydratedSnapshot));
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(hydratedSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -620,6 +484,5 @@ describe('useAppState', () => {
     await state.loadSnapshot();
 
     expect(state.activeAgent.value?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-persisted' });
-    expect(state.visibleMessages.value).toStrictEqual([]);
   });
 });

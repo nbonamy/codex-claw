@@ -3,7 +3,6 @@ import { decodeClawBackendEvent } from '../backend-protocol/events';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   createInitialSnapshot,
-  snapshotMetadata,
 } from '../snapshot';
 import { applyRuntimeEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-runtime-reducer';
 
@@ -395,9 +394,8 @@ describe('snapshot runtime reducer', () => {
     });
   });
 
-  it('updates metadata without replacing cached conversation transcripts', () => {
+  it('applies complete snapshots from snapshot update events', () => {
     const snapshot = createInitialSnapshot();
-    const messages = snapshot.messages;
     const nextSnapshot = createInitialSnapshot();
     nextSnapshot.automations = [{
       id: 'automation-bugs',
@@ -418,12 +416,11 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       type: 'snapshot.updated',
-      payload: snapshotMetadata(nextSnapshot),
+      payload: nextSnapshot,
       occurredAt: '2026-06-09T10:00:00.000Z',
     });
 
     expect(snapshot.automations).toStrictEqual(nextSnapshot.automations);
-    expect(snapshot.messages).toBe(messages);
 
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
@@ -432,14 +429,13 @@ describe('snapshot runtime reducer', () => {
       occurredAt: '2026-06-09T10:00:01.000Z',
     });
 
-    expect(snapshot.messages).toBe(messages);
   });
 
   it('ignores deeply malformed snapshot payloads without downgrading full snapshots', () => {
     const snapshot = createInitialSnapshot();
     const teams = snapshot.teams;
     const agents = snapshot.agents;
-    const malformedMetadata = snapshotMetadata(createInitialSnapshot());
+    const malformedMetadata = createInitialSnapshot();
     (malformedMetadata.general.plugins as unknown as Record<string, unknown>).computerUseEnabled = 'yes';
 
     applyMainEventToSnapshot(snapshot, {
@@ -450,8 +446,7 @@ describe('snapshot runtime reducer', () => {
     });
 
     const malformedFullSnapshot = createInitialSnapshot();
-    malformedFullSnapshot.agents[0]!.name = 'Malformed';
-    (malformedFullSnapshot as unknown as Record<string, unknown>).messages = {};
+    malformedFullSnapshot.agents[0]!.name = 42 as never;
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       type: 'snapshot.updated',
@@ -459,8 +454,8 @@ describe('snapshot runtime reducer', () => {
       occurredAt: '2026-06-09T10:00:01.000Z',
     });
 
-    expect(snapshot.teams).toBe(teams);
-    expect(snapshot.agents).toBe(agents);
+    expect(snapshot.teams).toStrictEqual(teams);
+    expect(snapshot.agents).toStrictEqual(agents);
   });
 
   it('merges agent updates from main-process collaboration tools', () => {

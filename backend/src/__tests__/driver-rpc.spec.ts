@@ -168,26 +168,21 @@ describe('BackendDriverRpc', () => {
     });
     const deleteTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages: [],
       activeTurnId: null,
     });
     const editTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages: [],
       activeTurnId: 'turn-new',
     });
     const retryTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages: [],
       activeTurnId: 'turn-new',
     });
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
-      messages: [],
     });
     const forkConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages: [],
     });
     const forgetAgentSession = vi.fn();
     const respondToRequest = vi.fn().mockResolvedValue(undefined);
@@ -229,30 +224,24 @@ describe('BackendDriverRpc', () => {
     });
     await expect(rpc.handle('driver/turn/delete', { agent, turnId: 'turn-1' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages: [],
       activeTurnId: null,
     });
     await expect(rpc.handle('driver/turn/edit', { agent, turnId: 'turn-1', content: 'edited' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages: [],
       activeTurnId: 'turn-new',
     });
     await expect(rpc.handle('driver/turn/retry', { agent, turnId: 'turn-1' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages: [],
       activeTurnId: 'turn-new',
     });
     await expect(rpc.handle('driver/conversation/resume', { agent, ref })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
-      messages: [],
     });
     await expect(rpc.handle('driver/conversation/fork', { agent, targetAgent })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages: [],
     });
     await expect(rpc.handle('driver/conversation/fork', { agent, targetAgent, turnId: 'turn-5' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages: [],
     });
     await expect(rpc.handle('driver/session/forget', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
     await expect(rpc.handle('driver/clientRequest/respond', {

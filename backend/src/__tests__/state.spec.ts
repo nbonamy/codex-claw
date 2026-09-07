@@ -63,23 +63,11 @@ describe('backend state loading', () => {
 
   it('saves backend snapshots using the shared persisted state shape', async () => {
     const snapshot = await loadBackendSnapshot();
-    snapshot.messages.push({
-      id: 'message-runtime',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-13T00:00:00.000Z',
-      parts: [{ type: 'text', text: 'do not persist runtime transcript' }],
-    });
-
     await saveBackendSnapshot(snapshot);
 
     const persisted = JSON.parse(await readFile(path.join(homeDir, 'state.json'), 'utf8')) as Record<string, unknown>;
     expect(persisted).not.toHaveProperty('messages');
-    await expect(loadBackendSnapshot()).resolves.toMatchObject({
-      messages: [],
-      activeTeamId: 'team-codex-claw',
-    });
+    await expect(loadBackendSnapshot()).resolves.toMatchObject({ activeTeamId: 'team-codex-claw' });
   });
 
   it('falls back to a default snapshot for malformed state shape', async () => {

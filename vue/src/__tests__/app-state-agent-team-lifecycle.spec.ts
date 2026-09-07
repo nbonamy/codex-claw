@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -189,26 +189,8 @@ describe('useAppState', () => {
     expect(state.sourceRepositoryError.value).toBe('plain failure');
   });
 
-  it('switches active agents and displays that agent conversation only', async () => {
+  it('switches the active agent through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.messages = [
-      {
-        id: 'message-dina',
-        agentId: 'agent-dina',
-        role: 'assistant',
-        status: 'complete',
-        createdAt: '2026-06-05T00:00:00.000Z',
-        parts: [{ type: 'text', text: 'Dina transcript' }],
-      },
-      {
-        id: 'message-jesse',
-        agentId: 'agent-jesse',
-        role: 'assistant',
-        status: 'complete',
-        createdAt: '2026-06-05T00:00:01.000Z',
-        parts: [{ type: 'text', text: 'Jesse transcript' }],
-      },
-    ];
     const jesseSnapshot = {
       ...remoteSnapshot,
       activeAgentId: 'agent-jesse',
@@ -227,13 +209,11 @@ describe('useAppState', () => {
     await state.loadSnapshot();
 
     expect(state.activeAgent.value?.id).toBe('agent-dina');
-    expect(state.visibleMessages.value.map((message) => message.id)).toStrictEqual(['message-dina']);
 
     await state.selectAgent('agent-jesse');
 
     expect(selectAgent).toHaveBeenCalledWith('agent-jesse');
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
-    expect(state.visibleMessages.value.map((message) => message.id)).toStrictEqual(['message-jesse']);
   });
 
   it('ignores missing team selections without calling main', async () => {
@@ -335,7 +315,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        selectAgent: vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot)),
+        selectAgent: vi.fn().mockResolvedValue(remoteSnapshot),
         setDockBadgeCount,
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
@@ -411,9 +391,18 @@ describe('useAppState', () => {
       threadId: 'thread-jesse',
       turnId: 'turn-jesse-2',
       type: 'backendApproval.requested',
-      payload: {},
+      payload: {
+        approval: {
+          id: 'approval-jesse',
+          kind: 'command',
+          conversationId: 'thread-jesse',
+          turnId: 'turn-jesse-2',
+          itemId: 'command-jesse',
+          title: 'Run tests',
+        },
+      },
       occurredAt: '2026-08-07T10:01:00.000Z',
-    } as unknown as MainToRendererEvent);
+    });
     expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
 
     const snapshotWithoutJesse = structuredClone(remoteSnapshot);
@@ -424,7 +413,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 4,
       type: 'snapshot.updated',
-      payload: snapshotMetadata(snapshotWithoutJesse),
+      payload: snapshotWithoutJesse,
       occurredAt: '2026-08-07T10:02:00.000Z',
     });
     expect(state.unreadAgentIds.value).toStrictEqual([]);
@@ -740,7 +729,6 @@ describe('useAppState', () => {
     remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
     const restartedSnapshot = structuredClone(remoteSnapshot);
     delete restartedSnapshot.agents[0]!.backendSession;
-    restartedSnapshot.messages = [];
     const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
     stubElectronTestWindow({
       codexClaw: {

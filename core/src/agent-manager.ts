@@ -8,7 +8,6 @@ import type {
   CreateAgentInput,
   CreateQuickChatInput,
   DuplicateAgentOptions,
-  RendererMessage,
   UpdateAgentInput,
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus,
@@ -244,13 +243,12 @@ export function forkAgentInSnapshot(
   snapshot: AppSnapshot,
   agentId: string,
   backendSession: BackendSession,
-  messages: RendererMessage[],
   createdAt = new Date().toISOString(),
   createId: IdGenerator = () => createEntityId('agent'),
 ): Agent | null {
   const forked = createForkedAgentDraft(snapshot, agentId, createdAt, createId);
   return forked
-    ? attachForkedAgentInSnapshot(snapshot, agentId, forked, backendSession, messages)
+    ? attachForkedAgentInSnapshot(snapshot, agentId, forked, backendSession)
     : null;
 }
 
@@ -269,7 +267,6 @@ export function attachForkedAgentInSnapshot(
   sourceAgentId: string,
   forked: Agent,
   backendSession: BackendSession,
-  messages: RendererMessage[],
 ): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === sourceAgentId);
   if (!source) {
@@ -284,7 +281,6 @@ export function attachForkedAgentInSnapshot(
 
   forked.backendSession = { ...backendSession };
   insertAgentAfterSource(snapshot, source, forked);
-  snapshot.messages.push(...messages.map((message) => ({ ...message, agentId: forked.id })));
   snapshot.activeTeamId = forked.teamId ?? snapshot.activeTeamId;
   snapshot.activeAgentId = forked.id;
   return forked;
@@ -487,7 +483,6 @@ export function restartAgentConversation(snapshot: AppSnapshot, agentId: string,
   clearRuntimeState(agent);
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
-  snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
   return agent;
 }
 
@@ -495,7 +490,6 @@ export function resumeAgentConversationInSnapshot(
   snapshot: AppSnapshot,
   agentId: string,
   backendSession: BackendSession,
-  messages: RendererMessage[],
   updatedAt = new Date().toISOString(),
 ): Agent | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -512,13 +506,6 @@ export function resumeAgentConversationInSnapshot(
   agent.backendSession = { ...backendSession };
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
-  snapshot.messages = [
-    ...snapshot.messages.filter((message) => message.agentId !== agentId),
-    ...messages.map((message) => ({
-      ...message,
-      agentId,
-    })),
-  ];
   return agent;
 }
 
@@ -529,7 +516,6 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
   }
 
   snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== agentId);
-  snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
   snapshot.workBacklog.assignments = Object.fromEntries(
     Object.entries(snapshot.workBacklog.assignments)
       .filter(([, assignment]) => assignment.agentId !== agentId),

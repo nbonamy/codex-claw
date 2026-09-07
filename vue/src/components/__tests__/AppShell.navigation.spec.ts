@@ -44,7 +44,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: true,
       },
@@ -64,7 +63,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -84,7 +82,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -108,7 +105,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -139,7 +135,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -171,7 +166,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -196,7 +190,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -214,7 +207,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: null,
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -236,7 +228,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: null,
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -256,7 +247,6 @@ describe('AppShell navigation and teams', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -400,7 +390,7 @@ describe('AppShell navigation and teams', () => {
       createdAt: '2026-06-09T09:59:00.000Z',
       updatedAt: '2026-06-09T10:01:00.000Z',
     }];
-    snapshot.messages = [{
+    const conversationMessages = [{
       id: 'message-jesse-user',
       agentId: 'agent-jesse',
       role: 'user',
@@ -415,7 +405,7 @@ describe('AppShell navigation and teams', () => {
       createdAt: '2026-06-09T10:00:45.000Z',
       parts: [{ type: 'text', text: 'Automation work is ready.' }],
     }];
-    const readConversationMessages = vi.fn().mockResolvedValue(snapshot.messages);
+    const readConversationMessages = vi.fn().mockResolvedValue(conversationMessages);
     const wrapper = mountShell({ snapshot, readConversationMessages });
 
     await wrapper.get('[aria-label="Automations"]').trigger('click');

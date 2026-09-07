@@ -9,7 +9,7 @@ import type { MainToRendererEvent } from '../contracts';
 
 describe('snapshot reducer', () => {
 
-  it('handles reducer fallback and error events without Codex protocol leaking into UI state', () => {
+  it('ignores provider transcript events and applies app-owned agent errors', () => {
     const snapshot = createInitialSnapshot();
 
     expect(updateAgentFolder(snapshot, 'missing-agent', '/tmp/nope')).toBeNull();
@@ -20,8 +20,6 @@ describe('snapshot reducer', () => {
       payload: { delta: 'ignored without agent' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     } as unknown as MainToRendererEvent);
-    expect(snapshot.messages).toHaveLength(0);
-
     expect(() => decodeClawBackendEvent({
       seq: 2,
       agentId: 'agent-dina',
@@ -32,19 +30,15 @@ describe('snapshot reducer', () => {
       payload: { delta: 123 },
       occurredAt: '2026-06-05T00:00:02.000Z',
     })).toThrow();
-    expect(snapshot.messages).toHaveLength(0);
-
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
-      type: 'error',
-      payload: { message: 'Backend error' },
+      type: 'agent.statusChanged',
+      payload: { type: 'error', message: 'Backend error' },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'error', message: 'Backend error' });
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'status', text: 'Backend error' }]);
-
     const approval = {
       id: 'approval-global',
       kind: 'command' as const,
@@ -67,7 +61,6 @@ describe('snapshot reducer', () => {
     } as unknown as MainToRendererEvent);
 
     expect(snapshot.backendApprovals['agent-dina']).toStrictEqual([approval]);
-    expect(snapshot.messages).toHaveLength(1);
   });
 
 

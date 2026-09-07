@@ -77,17 +77,12 @@ export function sendAgentPrompt(
     .catch((error) => {
       const normalizedError = error instanceof Error ? error : new Error(String(error));
       const message = normalizedError.message;
-      updateAgentStatus(agentId, { type: 'idle' }, emit, snapshot);
+      updateAgentStatus(agentId, { type: 'error', message }, emit, snapshot);
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
         status: 'error',
         detail: message,
       }, emit, snapshot);
-      emit({
-        agentId,
-        type: 'error',
-        payload: { message },
-      });
       void Promise.resolve(hooks?.onPromptFailed?.(normalizedError)).catch(() => undefined);
     });
 

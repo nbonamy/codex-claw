@@ -7,13 +7,13 @@ import {
 } from '../snapshot-event-ownership';
 
 const reducerSpies = vi.hoisted(() => ({
-  conversation: vi.fn(),
+  coordination: vi.fn(),
   runtime: vi.fn(),
   subagent: vi.fn(),
 }));
 
-vi.mock('../snapshot-conversation-reducer', () => ({
-  applyConversationEventToSnapshot: reducerSpies.conversation,
+vi.mock('../snapshot-coordination-reducer', () => ({
+  applyCoordinationEventToSnapshot: reducerSpies.coordination,
 }));
 vi.mock('../snapshot-runtime-reducer', () => ({
   applyRuntimeEventToSnapshot: reducerSpies.runtime,
@@ -29,7 +29,7 @@ describe('snapshot event dispatch', () => {
 
   it('routes every owned event to exactly one reducer or the explicit renderer no-op', () => {
     const reducerByOwner = {
-      conversation: reducerSpies.conversation,
+      coordination: reducerSpies.coordination,
       runtime: reducerSpies.runtime,
       subagent: reducerSpies.subagent,
     } satisfies Record<Exclude<SnapshotEventOwner, 'renderer'>, typeof reducerSpies.runtime>;

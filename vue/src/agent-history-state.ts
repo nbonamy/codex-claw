@@ -1,14 +1,13 @@
 import type {
   AgentHistoryLoadResult,
   AppSnapshot,
-  AppSnapshotMetadata,
   MainToRendererEvent,
 } from '@codex-claw/core/contracts';
 import { computed, ref } from 'vue';
 import { codexClawApi } from './platform-api';
 
 export function createAgentHistoryState(options: {
-  adoptSnapshotMetadata: (metadata: AppSnapshotMetadata) => void;
+  adoptSnapshot: (snapshot: AppSnapshot) => void;
   getSnapshot: () => AppSnapshot;
   synchronizeComposerSelection: (agentId: string) => void;
 }) {
@@ -44,7 +43,7 @@ export function createAgentHistoryState(options: {
     }
     markHydrating(activeAgent.id, true);
     try {
-      options.adoptSnapshotMetadata(await codexClawApi.hydrateAgentHistory(activeAgent.id));
+      options.adoptSnapshot(await codexClawApi.hydrateAgentHistory(activeAgent.id));
       options.synchronizeComposerSelection(activeAgent.id);
     } finally {
       markHydrating(activeAgent.id, false);
@@ -96,22 +95,11 @@ export function createAgentHistoryState(options: {
     hasOlderByAgentId.value = hasOlder;
   }
 
-  function handleMainEvent(event: Extract<MainToRendererEvent, {
-    type: 'thread.historyLoaded' | 'thread.historyHydrationFailed';
-  }>): void {
-    if (event.type === 'thread.historyHydrationFailed') {
-      const failed = new Set(failedAgentIds.value);
-      failed.add(event.agentId);
-      failedAgentIds.value = failed;
-      markHydrating(event.agentId, false);
-      return;
-    }
+  function handleMainEvent(event: Extract<MainToRendererEvent, { type: 'thread.historyHydrationFailed' }>): void {
     const failed = new Set(failedAgentIds.value);
-    failed.delete(event.agentId);
+    failed.add(event.agentId);
     failedAgentIds.value = failed;
-    const hasOlder = event.payload.hasOlderMessages;
-    if (hasOlder === undefined) return;
-    hasOlderByAgentId.value = { ...hasOlderByAgentId.value, [event.agentId]: hasOlder };
+    markHydrating(event.agentId, false);
   }
 
   return {

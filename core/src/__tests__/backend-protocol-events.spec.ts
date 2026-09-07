@@ -92,7 +92,7 @@ const askUser = {
 
 function createFixtures(): EventFixtures {
   const snapshot = createInitialSnapshot();
-  const { messages: _messages, ...metadata } = snapshot;
+  const metadata = snapshot;
   const base = { seq: 1, occurredAt };
   const agent = { ...base, agentId: 'agent-1' };
   const codexThread = {
@@ -368,11 +368,6 @@ function createFixtures(): EventFixtures {
       type: 'thread.tokenUsageUpdated',
       payload: usage,
     },
-    'thread.historyLoaded': {
-      ...agent,
-      type: 'thread.historyLoaded',
-      payload: { messages: [message] },
-    },
     'thread.historyHydrationFailed': {
       ...agent,
       type: 'thread.historyHydrationFailed',
@@ -425,64 +420,6 @@ function createFixtures(): EventFixtures {
         status: 'running',
       },
     },
-    'turn.started': {
-      ...turn,
-      type: 'turn.started',
-      payload: { status: 'inProgress', startedAt: occurredAt },
-    },
-    'turn.planUpdated': {
-      ...turn,
-      type: 'turn.planUpdated',
-      payload: {
-        explanation: null,
-        plan: [{ step: 'Test', status: 'pending' }],
-      },
-    },
-    'turn.proposedPlanDelta': {
-      ...turn,
-      type: 'turn.proposedPlanDelta',
-      payload: { itemId: 'item-1', delta: 'Plan', markdown: 'Plan' },
-    },
-    'turn.proposedPlanCompleted': {
-      ...turn,
-      type: 'turn.proposedPlanCompleted',
-      payload: { itemId: 'item-1', markdown: 'Plan' },
-    },
-    'turn.completed': {
-      ...turn,
-      type: 'turn.completed',
-      payload: { status: 'completed' },
-    },
-    'context.compactionStarted': {
-      ...turn,
-      type: 'context.compactionStarted',
-      payload: {},
-    },
-    'context.compactionCompleted': {
-      ...turn,
-      type: 'context.compactionCompleted',
-      payload: { itemId: null },
-    },
-    'message.delta': {
-      ...turn,
-      type: 'message.delta',
-      payload: { delta: 'Hello' },
-    },
-    'message.updated': {
-      ...turn,
-      type: 'message.updated',
-      payload: { message },
-    },
-    'message.userSubmitted': {
-      ...agent,
-      type: 'message.userSubmitted',
-      payload: { message: { ...message, role: 'user' } },
-    },
-    'message.steer': {
-      ...agent,
-      type: 'message.steer',
-      payload: { prompt: 'Continue' },
-    },
     'agent.promptQueued': {
       ...agent,
       type: 'agent.promptQueued',
@@ -497,17 +434,6 @@ function createFixtures(): EventFixtures {
       ...agent,
       type: 'agent.promptDequeued',
       payload: { ids: ['prompt-1'] },
-    },
-    'item.started': { ...turn, type: 'item.started', payload: { toolPart } },
-    'item.updated': {
-      ...turn,
-      type: 'item.updated',
-      payload: { itemId: 'tool-1', status: 'running' },
-    },
-    'item.completed': {
-      ...turn,
-      type: 'item.completed',
-      payload: { toolPart },
     },
     'diff.updated': {
       ...turn,
@@ -530,16 +456,6 @@ function createFixtures(): EventFixtures {
       type: 'git.statusUpdated',
       payload: gitStatus,
     },
-    'approval.requested': {
-      ...codexThread,
-      type: 'approval.requested',
-      payload: confirmTool,
-    },
-    'toolInput.requested': {
-      ...codexThread,
-      type: 'toolInput.requested',
-      payload: askUser,
-    },
     'backendApproval.requested': {
       ...codexThread,
       type: 'backendApproval.requested',
@@ -550,11 +466,6 @@ function createFixtures(): EventFixtures {
       type: 'backendApproval.resolved',
       payload: { approval, decision: 'approve', scope: 'once', reason: 'host' },
     },
-    error: {
-      ...agent,
-      type: 'error',
-      payload: { message: 'Backend error', willRetry: false },
-    },
   };
 }
 
@@ -562,7 +473,7 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(58);
+    expect(Object.keys(fixtures)).toHaveLength(40);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }
@@ -644,7 +555,7 @@ describe('Claw backend event decoder', () => {
   });
 
   it('rejects missing required provider context', () => {
-    const event = createFixtures()['turn.started'];
+    const event = createFixtures()['diff.updated'];
     const malformed = { ...event, turnId: undefined };
 
     expect(() => decodeClawBackendEvent(malformed)).toThrow(
@@ -668,8 +579,8 @@ describe('Claw backend event decoder', () => {
 
   it('never includes payload values in validation errors', () => {
     const secret = 'sk-secret-do-not-log';
-    const event = createFixtures()['message.updated'];
-    const malformed = { ...event, payload: { message: { password: secret } } };
+    const event = createFixtures()['backendApproval.requested'];
+    const malformed = { ...event, payload: { approval: { password: secret } } };
 
     let error: unknown;
     try {

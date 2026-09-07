@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -25,7 +25,6 @@ describe('useAppState', () => {
 
     await state.sendPrompt('ignored');
 
-    expect(state.visibleMessages.value).toStrictEqual([]);
     expect(state.isSending.value).toBe(false);
   });
 
@@ -308,37 +307,15 @@ describe('useAppState', () => {
     expect(setAgentPermissionMode).toHaveBeenCalledOnce();
   });
 
-  it('sends prompts through preload and adopts the submitted-message event', async () => {
-    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+  it('sends prompts through preload without owning the provider transcript', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
-    updatedSnapshot.messages.push({
-      id: 'message-user',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:01.000Z',
-      parts: [{ type: 'text', text: 'hello' }],
-    });
-
-    const sendPrompt = vi.fn().mockImplementation(async () => {
-      listeners[0]?.({
-        seq: 1,
-        agentId: 'agent-dina',
-        type: 'message.userSubmitted',
-        payload: { message: updatedSnapshot.messages[0] },
-        occurredAt: '2026-06-05T00:00:01.000Z',
-      });
-      return snapshotMetadata(updatedSnapshot);
-    });
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
-        onEvent: vi.fn((listener) => {
-          listeners.push(listener);
-          return () => undefined;
-        }),
+        onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -351,40 +328,17 @@ describe('useAppState', () => {
 
     expect(sendPrompt).toHaveBeenCalledWith('agent-dina', 'hello');
     expect(state.isSending.value).toBe(false);
-    expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
   });
 
   it('can send prompts to a specific agent from overview surfaces', async () => {
-    const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
-    updatedSnapshot.messages.push({
-      id: 'message-jesse',
-      agentId: 'agent-jesse',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:01.000Z',
-      parts: [{ type: 'text', text: 'ship this' }],
-    });
-
-    const sendPrompt = vi.fn().mockImplementation(async () => {
-      listeners[0]?.({
-        seq: 1,
-        agentId: 'agent-jesse',
-        type: 'message.userSubmitted',
-        payload: { message: updatedSnapshot.messages[0] },
-        occurredAt: '2026-06-05T00:00:01.000Z',
-      });
-      return snapshotMetadata(updatedSnapshot);
-    });
+    const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
-        onEvent: vi.fn((listener) => {
-          listeners.push(listener);
-          return () => undefined;
-        }),
+        onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
 
@@ -398,38 +352,9 @@ describe('useAppState', () => {
 
   it('deletes, edits, and retries active messages through preload message actions', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.messages = [
-      {
-        id: 'user-turn-1',
-        agentId: 'agent-dina',
-        role: 'user',
-        status: 'complete',
-        turnId: 'turn-1',
-        createdAt: '2026-06-05T00:00:01.000Z',
-        parts: [{ type: 'text', text: 'original prompt' }],
-      },
-      {
-        id: 'assistant-turn-1',
-        agentId: 'agent-dina',
-        role: 'assistant',
-        status: 'complete',
-        turnId: 'turn-1',
-        createdAt: '2026-06-05T00:00:02.000Z',
-        parts: [{ type: 'text', text: 'original answer' }],
-      },
-    ];
-    const afterDelete = { ...remoteSnapshot, messages: [] };
-    const afterEdit = {
-      ...remoteSnapshot,
-      messages: [remoteSnapshot.messages[0]],
-    };
-    const afterRetry = {
-      ...remoteSnapshot,
-      messages: [remoteSnapshot.messages[1]],
-    };
-    const deleteTurn = vi.fn().mockResolvedValue(afterDelete);
-    const editTurn = vi.fn().mockResolvedValue(afterEdit);
-    const retryTurn = vi.fn().mockResolvedValue(afterRetry);
+    const deleteTurn = vi.fn().mockResolvedValue(remoteSnapshot);
+    const editTurn = vi.fn().mockResolvedValue(remoteSnapshot);
+    const retryTurn = vi.fn().mockResolvedValue(remoteSnapshot);
 
     stubElectronTestWindow({
       codexClaw: {
@@ -460,26 +385,6 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backend = 'claude';
     remoteSnapshot.agents[0].backendDefaults = { kind: 'claude' };
-    remoteSnapshot.messages = [
-      {
-        id: 'user-turn-1',
-        agentId: 'agent-dina',
-        role: 'user',
-        status: 'complete',
-        turnId: 'turn-1',
-        createdAt: '2026-06-05T00:00:01.000Z',
-        parts: [{ type: 'text', text: 'original prompt' }],
-      },
-      {
-        id: 'assistant-turn-1',
-        agentId: 'agent-dina',
-        role: 'assistant',
-        status: 'complete',
-        turnId: 'turn-1',
-        createdAt: '2026-06-05T00:00:02.000Z',
-        parts: [{ type: 'text', text: 'original answer' }],
-      },
-    ];
     const deleteTurn = vi.fn().mockResolvedValue(remoteSnapshot);
     const editTurn = vi.fn().mockResolvedValue(remoteSnapshot);
     const retryTurn = vi.fn().mockResolvedValue(remoteSnapshot);
@@ -543,11 +448,8 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-1',
-      turnId: 'turn-1',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
+      type: 'agent.promptDequeued',
+      payload: { ids: ['prompt-1'] },
       occurredAt: '2026-06-05T00:00:02.000Z',
       snapshot: drainedSnapshot,
     });
@@ -1099,7 +1001,7 @@ describe('useAppState', () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot));
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -1159,7 +1061,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory: vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot)),
+        hydrateAgentHistory: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
@@ -1238,7 +1140,6 @@ describe('useAppState', () => {
       occurredAt: '2026-09-06T00:00:04.000Z',
     });
 
-    expect(state.snapshot.value.messages).toStrictEqual([]);
     expect(state.activeClaudeConversationSnapshot.value).toMatchObject({
       activeTurnId: 'turn-1',
       busy: true,
@@ -1256,7 +1157,7 @@ describe('useAppState', () => {
     remoteSnapshot.agents[0]!.backendSession = {
       kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio',
     };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot));
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),

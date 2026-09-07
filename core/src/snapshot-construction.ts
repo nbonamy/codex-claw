@@ -1,18 +1,16 @@
-import type { Agent, AppSnapshot, AppSnapshotMetadata } from './contracts';
+import type { Agent, AppSnapshot } from './contracts';
 import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
 import { seedTeamId } from './seed-ids';
 import { defaultTeamColor } from './team-colors';
 
 const seedCreatedAt = '2026-06-05T00:00:00.000Z';
 
-export function snapshotMetadata(snapshot: AppSnapshot): AppSnapshotMetadata {
-  const { messages: _messages, ...metadata } = snapshot;
-  return metadata;
-}
-
-export function applySnapshotMetadata(snapshot: AppSnapshot, metadata: AppSnapshotMetadata): void {
-  const { messages: _messages, ...safeMetadata } = metadata as AppSnapshotMetadata & { messages?: AppSnapshot['messages'] };
-  Object.assign(snapshot, safeMetadata);
+export function replaceAppSnapshot(snapshot: AppSnapshot, replacement: AppSnapshot): void {
+  const target = snapshot as unknown as Record<string, unknown>;
+  for (const key of Object.keys(target)) {
+    if (!(key in replacement)) delete target[key];
+  }
+  Object.assign(snapshot, replacement);
 }
 
 export function createEmptySnapshot(): AppSnapshot {
@@ -24,7 +22,6 @@ export function createEmptySnapshot(): AppSnapshot {
     automations: [],
     activeTeamId: seedTeamId,
     activeAgentId: null,
-    messages: [],
     queuedPrompts: [],
     backendApprovals: {},
     agentGitStatuses: {},
@@ -70,7 +67,6 @@ export function createInitialSnapshot(): AppSnapshot {
     automations: [],
     activeTeamId: seedTeamId,
     activeAgentId: agents[0]?.id ?? null,
-    messages: [],
     queuedPrompts: [],
     backendApprovals: {},
     agentGitStatuses: {},

@@ -158,19 +158,9 @@ export class AgentConversationService {
   private async applyTurnAction(agentId: string, result: BackendTurnActionResult): Promise<AppSnapshot> {
     const agent = this.agent(agentId);
     if (agent) agent.backendSession = result.backendSession;
-    const sessionThread = result.backendSession.kind === 'codex'
-      ? { threadId: result.backendSession.threadId }
-      : {};
-    if (result.backendSession.kind !== 'codex') {
-      this.options.applyEvent({
-        agentId,
-        type: 'thread.historyLoaded',
-        payload: { messages: result.messages, replace: true },
-      });
-    }
     this.options.applyEvent({
       agentId,
-      ...sessionThread,
+      ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
       type: 'agent.statusChanged',
       payload: result.activeTurnId ? { type: 'working' } : { type: 'idle' },
     });

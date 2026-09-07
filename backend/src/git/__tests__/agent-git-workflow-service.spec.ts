@@ -26,7 +26,6 @@ describe('AgentGitWorkflowService', () => {
     const service = new AgentGitWorkflowService({
       applyEvent: vi.fn(),
       delegatedWorkReports: {} as DelegatedWorkReportPort,
-      deleteTranscript: vi.fn(),
       driverRequest: vi.fn(),
       forgetSession: vi.fn(),
       getSnapshot: () => snapshot,

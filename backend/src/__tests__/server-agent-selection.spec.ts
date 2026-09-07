@@ -97,89 +97,6 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('evicts an inactive transcript and reloads it from the backend on selection', async () => {
-    let now = 0;
-    const snapshot = createTestSnapshot();
-    snapshot.teams[0]!.agentIds = ['agent-active', 'agent-background'];
-    snapshot.activeAgentId = 'agent-active';
-    snapshot.agents = [
-      {
-        id: 'agent-active',
-        teamId: 'team-test',
-        name: 'Active',
-        folder: '/tmp/active',
-        backend: 'codex',
-        backendSession: { kind: 'codex', threadId: 'thread-active' },
-        status: { type: 'idle' },
-        createdAt: '2026-08-02T00:00:00.000Z',
-        updatedAt: '2026-08-02T00:00:00.000Z',
-      },
-      {
-        id: 'agent-background',
-        teamId: 'team-test',
-        name: 'Background',
-        folder: '/tmp/background',
-        backend: 'codex',
-        backendSession: { kind: 'codex', threadId: 'thread-background' },
-        status: { type: 'idle' },
-        createdAt: '2026-08-02T00:00:00.000Z',
-        updatedAt: '2026-08-02T00:00:00.000Z',
-      },
-    ];
-    snapshot.messages = [
-      createTextMessage('active-message', 'agent-active', 'keep'),
-      createTextMessage('background-message', 'agent-background', 'evict'),
-    ];
-    const forgetAgentSession = vi.fn();
-    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-background' });
-    const driver: AgentBackendDriver = {
-      backend: 'codex',
-      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
-      getCapabilities: () => codexBackendCapabilities,
-      getGitStatus: async () => null,
-      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      forgetAgentSession,
-      hydrateAgent,
-      onEvent: () => () => undefined,
-      close: async () => undefined,
-    };
-    const events: Array<{ type: string; agentId?: string; payload?: unknown }> = [];
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      pid: 123,
-      snapshot,
-      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
-      onEvent: (event) => events.push(event),
-      transcriptRetention: { ttlMs: 300, sweepIntervalMs: null, now: () => now },
-    });
-
-    now = 300;
-    const retention = server as unknown as {
-      transcriptRetention: { sweep(): Promise<readonly string[]> };
-    };
-    await expect(retention.transcriptRetention.sweep()).resolves.toStrictEqual(['agent-background']);
-    expect(snapshot.messages).toStrictEqual([
-      expect.objectContaining({ id: 'active-message', agentId: 'agent-active' }),
-    ]);
-    expect(forgetAgentSession).toHaveBeenCalledWith('agent-background');
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'thread.historyLoaded',
-      agentId: 'agent-background',
-      payload: { messages: [], replace: true },
-    }));
-
-    await server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'select-background',
-      method: 'agent/select',
-      params: { agentId: 'agent-background' },
-    });
-    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-background' }));
-    await server.close();
-  });
-
   it('hydrates persisted agent history without changing active selection', async () => {
     const snapshot = createTestSnapshot();
     snapshot.activeAgentId = 'agent-dina';
@@ -299,7 +216,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('revalidates a selected agent while keeping its live in-memory messages', async () => {
+  it('revalidates a selected agent without returning provider conversation data', async () => {
     const snapshot = createTestSnapshot();
     snapshot.activeAgentId = null;
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -313,21 +230,6 @@ describe('ClawBackendServer', () => {
       status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
-    }];
-    snapshot.messages = [{
-      id: 'assistant-live',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'streaming',
-      parts: [{
-        type: 'tool',
-        id: 'tool-live',
-        kind: 'command',
-        title: 'Run npm test',
-        status: 'running',
-        input: { cmd: 'npm test' },
-      }],
-      createdAt: '2026-06-13T00:00:00.000Z',
     }];
     const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-stale' });
     const getGitStatus = vi.fn().mockResolvedValue(null);
@@ -362,10 +264,6 @@ describe('ClawBackendServer', () => {
       },
     });
     expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
-    expect(snapshot.messages).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'assistant-live', parts: [expect.objectContaining({ type: 'tool' })] }),
-    ]));
-
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(getGitStatus).toHaveBeenCalledOnce();
     await server.close();

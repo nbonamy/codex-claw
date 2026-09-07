@@ -1,6 +1,6 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { applyMainEventToSnapshot, applySnapshotMetadata } from '@codex-claw/core/snapshot';
+import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { decodeAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, RemoteConnection, Team } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
@@ -159,8 +159,8 @@ export class RemoteTeamService {
     }
   }
 
-  async clientSnapshot(includeMessages = true): Promise<AppSnapshot> {
-    const snapshot = this.clientSnapshotFromKnownRemotes(includeMessages);
+  async clientSnapshot(): Promise<AppSnapshot> {
+    const snapshot = this.clientSnapshotFromKnownRemotes();
     for (const team of snapshot.teams) {
       const pointer = this.pointerForTeam(team);
       if (!pointer || this.snapshots.has(pointer.connectionId)) continue;
@@ -173,13 +173,12 @@ export class RemoteTeamService {
       }
     }
     applyRemoteActiveAgent(snapshot);
-    if (!includeMessages) snapshot.messages = [];
     return snapshot;
   }
 
-  clientSnapshotFromKnownRemotes(includeMessages = true): AppSnapshot {
+  clientSnapshotFromKnownRemotes(): AppSnapshot {
     const source = this.options.getSnapshot();
-    const snapshot = cloneAppSnapshot(includeMessages ? source : { ...source, messages: [] });
+    const snapshot = cloneAppSnapshot(source);
     for (const team of snapshot.teams) {
       const pointer = this.pointerForTeam(team);
       if (!pointer) continue;
@@ -206,11 +205,8 @@ export class RemoteTeamService {
 
   private applyEvent(connectionId: string, event: ClawBackendEvent): void {
     const decodedSnapshot = decodeSnapshotFromRemoteEvent(event);
-    if (decodedSnapshot?.kind === 'full') {
+    if (decodedSnapshot) {
       this.snapshots.set(connectionId, decodedSnapshot.value);
-    } else if (decodedSnapshot?.kind === 'metadata') {
-      const remoteSnapshot = this.snapshots.get(connectionId);
-      if (remoteSnapshot) applySnapshotMetadata(remoteSnapshot, decodedSnapshot.value);
     } else if (event.type !== 'snapshot.updated') {
       const remoteSnapshot = this.snapshots.get(connectionId);
       if (remoteSnapshot) applyMainEventToSnapshot(remoteSnapshot, event);
@@ -243,7 +239,7 @@ export class RemoteTeamService {
 
 function decodeSnapshotFromRemoteEvent(event: ClawBackendEvent) {
   const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
-  if (sideChannelSnapshot?.kind === 'full') return sideChannelSnapshot;
+  if (sideChannelSnapshot) return sideChannelSnapshot;
   if (event.type !== 'snapshot.updated') return null;
   return decodeAppSnapshot(event.payload);
 }
@@ -272,17 +268,14 @@ function projectRemoteTeam(target: AppSnapshot, localTeam: Team, remoteSnapshot:
     : localTeam.agentIds[0];
 
   const projectedAgentIds = new Set(remoteAgents.map((agent) => agent.id));
-  const projectedMessages = remoteSnapshot.messages.filter((message) => projectedAgentIds.has(message.agentId));
-  const projectedTurnIds = new Set(projectedMessages.map((message) => message.turnId).filter((id): id is string => Boolean(id)));
   target.agents = [...target.agents.filter((agent) => !projectedAgentIds.has(agent.id)), ...remoteAgents];
-  target.messages = [...target.messages.filter((message) => !projectedAgentIds.has(message.agentId)), ...projectedMessages];
   target.agentGitStatuses = {
     ...target.agentGitStatuses,
     ...Object.fromEntries(Object.entries(remoteSnapshot.agentGitStatuses).filter(([agentId]) => projectedAgentIds.has(agentId))),
   };
   target.turnGitDiffs = {
-    ...target.turnGitDiffs,
-    ...Object.fromEntries(Object.entries(remoteSnapshot.turnGitDiffs).filter(([turnId]) => projectedTurnIds.has(turnId))),
+    ...Object.fromEntries(Object.entries(target.turnGitDiffs).filter(([, diff]) => !projectedAgentIds.has(diff.agentId))),
+    ...Object.fromEntries(Object.entries(remoteSnapshot.turnGitDiffs).filter(([, diff]) => projectedAgentIds.has(diff.agentId))),
   };
   target.subagentTrees = {
     ...Object.fromEntries(Object.entries(target.subagentTrees).filter(([agentId]) => !projectedAgentIds.has(agentId))),

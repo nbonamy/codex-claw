@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AppSnapshot } from '../contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot-construction';
-import { isAppSnapshot, isAppSnapshotMetadata } from '../snapshot-guards';
+import { isAppSnapshot } from '../snapshot-guards';
 
 describe('snapshot construction', () => {
   it('creates the exact empty snapshot used by persistence defaults', () => {
@@ -55,7 +55,6 @@ describe('snapshot construction', () => {
     expect(first.teams[0].agentIds).not.toBe(second.teams[0].agentIds);
     expect(first.agents).not.toBe(second.agents);
     expect(first.automations).not.toBe(second.automations);
-    expect(first.messages).not.toBe(second.messages);
     expect(first.queuedPrompts).not.toBe(second.queuedPrompts);
     expect(first.backendApprovals).not.toBe(second.backendApprovals);
     expect(first.agentGitStatuses).not.toBe(second.agentGitStatuses);
@@ -110,17 +109,12 @@ describe('snapshot construction', () => {
     expect(second).toStrictEqual(expectedEmptySnapshot());
   });
 
-  it('produces snapshots and metadata accepted by the app-owned guards', () => {
+  it('produces snapshots accepted by the app-owned guards', () => {
     const empty = createEmptySnapshot();
     const initial = createInitialSnapshot();
-    const { messages: _messages, ...metadata } = initial;
-
     expect(isAppSnapshot(empty)).toBe(true);
     expect(isAppSnapshot(initial)).toBe(true);
-    expect(isAppSnapshotMetadata(empty)).toBe(true);
-    expect(isAppSnapshotMetadata(metadata)).toBe(true);
-    expect(isAppSnapshot(metadata)).toBe(false);
-    expect(isAppSnapshotMetadata({ ...metadata, general: null })).toBe(false);
+    expect(isAppSnapshot({ ...initial, general: null })).toBe(false);
   });
 });
 
@@ -137,7 +131,6 @@ function expectedEmptySnapshot(): AppSnapshot {
     automations: [],
     activeTeamId: 'team-codex-claw',
     activeAgentId: null,
-    messages: [],
     queuedPrompts: [],
     backendApprovals: {},
     agentGitStatuses: {},

@@ -1,7 +1,4 @@
-import {
-  isAgentGitStatus,
-  isRendererMessage,
-} from '../snapshot-guard-collections';
+import { isAgentGitStatus } from '../snapshot-guard-collections';
 import {
   expectArray,
   expectBoolean,
@@ -13,85 +10,8 @@ import {
   expectRecord,
   expectString,
   expectStringArray,
-  failEventValidation,
   type EventValueValidator,
 } from './event-validation';
-
-function expectPlanStep(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectString(value.step, `${path}.step`);
-  expectLiteral(
-    value.status,
-    ['pending', 'inProgress', 'completed'],
-    `${path}.status`,
-  );
-}
-
-function expectTurnStarted(value: unknown, path: string): void {
-  expectRecord(value, path);
-  if (value.turn !== undefined) {
-    expectRecord(value.turn, `${path}.turn`);
-    expectString(value.turn.id, `${path}.turn.id`);
-    expectLiteral(value.turn.backend, ['claude'], `${path}.turn.backend`);
-    return;
-  }
-  expectLiteral(value.status, ['inProgress'], `${path}.status`);
-  expectString(value.startedAt, `${path}.startedAt`);
-}
-
-function expectTurnCompleted(value: unknown, path: string): void {
-  expectRecord(value, path);
-  if (value.turn !== undefined) {
-    expectRecord(value.turn, `${path}.turn`);
-    expectString(value.turn.id, `${path}.turn.id`);
-    expectLiteral(
-      value.turn.status,
-      ['completed', 'interrupted'],
-      `${path}.turn.status`,
-    );
-    return;
-  }
-  expectLiteral(
-    value.status,
-    ['completed', 'interrupted', 'failed', 'inProgress'],
-    `${path}.status`,
-  );
-  expectOptional(value, 'error', path, (candidate, candidatePath) => {
-    expectNullable(candidate, candidatePath, (error, errorPath) => {
-      expectRecord(error, errorPath);
-      expectString(error.message, `${errorPath}.message`);
-      expectNullable(
-        error.additionalDetails,
-        `${errorPath}.additionalDetails`,
-        expectString,
-      );
-      if (!Object.prototype.hasOwnProperty.call(error, 'codexErrorInfo')) {
-        failEventValidation(
-          `${errorPath}.codexErrorInfo`,
-          'expected the field to be present',
-        );
-      }
-    });
-  });
-  expectOptional(value, 'willRetry', path, expectBoolean);
-  ['startedAt', 'completedAt'].forEach((key) => {
-    expectOptional(value, key, path, (candidate, candidatePath) =>
-      expectNullable(candidate, candidatePath, expectString),
-    );
-  });
-  expectOptional(value, 'durationMs', path, (candidate, candidatePath) =>
-    expectNullable(candidate, candidatePath, expectNumber),
-  );
-}
-
-function expectCompaction(value: unknown, path: string): void {
-  expectRecord(value, path);
-  if (Object.prototype.hasOwnProperty.call(value, 'itemId')) {
-    expectNullable(value.itemId, `${path}.itemId`, expectString);
-  } else if (Object.keys(value).length > 0) {
-    failEventValidation(path, 'expected an empty object or item identifier');
-  }
-}
 
 function expectPromptAttachment(value: unknown, path: string): void {
   expectRecord(value, path);
@@ -165,39 +85,6 @@ function expectSendPromptOptions(value: unknown, path: string): void {
   });
 }
 
-function expectToolPart(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectLiteral(value.type, ['tool'], `${path}.type`);
-  ['id', 'kind', 'title'].forEach((key) =>
-    expectString(value[key], `${path}.${key}`),
-  );
-  expectLiteral(
-    value.status,
-    ['running', 'completed', 'failed'],
-    `${path}.status`,
-  );
-  ['statusText', 'body'].forEach((key) =>
-    expectOptional(value, key, path, expectString),
-  );
-  expectOptional(value, 'metadata', path, expectRecord);
-}
-
-function expectToolPartUpdate(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectString(value.itemId, `${path}.itemId`);
-  ['messageId', 'title', 'body', 'bodyDelta', 'bodyAppend'].forEach((key) =>
-    expectOptional(value, key, path, expectString),
-  );
-  expectOptional(value, 'status', path, (candidate, candidatePath) =>
-    expectLiteral(candidate, ['running', 'completed', 'failed'], candidatePath),
-  );
-  expectOptional(value, 'statusText', path, (candidate, candidatePath) =>
-    expectNullable(candidate, candidatePath, expectString),
-  );
-  expectOptional(value, 'metadata', path, expectRecord);
-  expectOptional(value, 'fallbackToolPart', path, expectToolPart);
-}
-
 function expectBackendApproval(value: unknown, path: string): void {
   expectRecord(value, path);
   ['id', 'conversationId', 'itemId', 'title'].forEach((key) =>
@@ -247,69 +134,6 @@ function expectBackendApproval(value: unknown, path: string): void {
   expectOptional(value, 'canDeny', path, expectBoolean);
 }
 
-function expectConfirmToolRequest(value: unknown, path: string): void {
-  expectRecord(value, path);
-  [
-    'argumentsPreview',
-    'integrationId',
-    'integrationName',
-    'summary',
-    'toolName',
-  ].forEach((key) => expectString(value[key], `${path}.${key}`));
-  ['allowConversation', 'allowAlways'].forEach((key) =>
-    expectOptional(value, key, path, expectBoolean),
-  );
-}
-
-function expectAskUserRequest(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectString(value.itemId, `${path}.itemId`);
-  expectArray(
-    value.questions,
-    `${path}.questions`,
-    (question, questionPath) => {
-      expectRecord(question, questionPath);
-      ['id', 'header', 'question'].forEach((key) =>
-        expectString(question[key], `${questionPath}.${key}`),
-      );
-      ['isOther', 'isSecret'].forEach((key) =>
-        expectBoolean(question[key], `${questionPath}.${key}`),
-      );
-      expectOptional(question, 'multiSelect', questionPath, expectBoolean);
-      expectNullable(
-        question.options,
-        `${questionPath}.options`,
-        (options, optionsPath) => {
-          expectArray(options, optionsPath, (option, optionPath) => {
-            expectRecord(option, optionPath);
-            expectString(option.label, `${optionPath}.label`);
-            expectString(option.description, `${optionPath}.description`);
-          });
-        },
-      );
-    },
-  );
-}
-
-function expectClientRequest(
-  value: unknown,
-  path: string,
-  kind: 'confirm_tool' | 'ask_user',
-): void {
-  expectRecord(value, path);
-  expectString(value.id, `${path}.id`);
-  expectLiteral(value.kind, [kind], `${path}.kind`);
-  expectRecord(value.payload, `${path}.payload`);
-  if (kind === 'confirm_tool') {
-    expectConfirmToolRequest(
-      value.payload.confirmation,
-      `${path}.payload.confirmation`,
-    );
-  } else {
-    expectAskUserRequest(value.payload.request, `${path}.payload.request`);
-  }
-}
-
 function expectGitDiff(value: unknown, path: string): void {
   expectRecord(value, path);
   expectNumber(value.addedLines, `${path}.addedLines`);
@@ -331,66 +155,6 @@ function expectFileActivity(value: unknown, path: string): void {
 }
 
 export const conversationPayloadValidators = {
-  'turn.started': expectTurnStarted,
-  'turn.planUpdated': (value, path) => {
-    expectRecord(value, path);
-    expectNullable(value.explanation, `${path}.explanation`, expectString);
-    expectArray(value.plan, `${path}.plan`, expectPlanStep);
-    expectOptional(value, 'markdown', path, expectString);
-    expectOptional(value, 'status', path, (candidate, candidatePath) =>
-      expectLiteral(candidate, ['running', 'completed'], candidatePath),
-    );
-  },
-  'turn.proposedPlanDelta': (value, path) => {
-    expectRecord(value, path);
-    ['itemId', 'delta'].forEach((key) =>
-      expectString(value[key], `${path}.${key}`),
-    );
-    expectOptional(value, 'markdown', path, expectString);
-  },
-  'turn.proposedPlanCompleted': (value, path) => {
-    expectRecord(value, path);
-    expectString(value.itemId, `${path}.itemId`);
-    expectString(value.markdown, `${path}.markdown`);
-  },
-  'turn.completed': expectTurnCompleted,
-  'context.compactionStarted': expectCompaction,
-  'context.compactionCompleted': expectCompaction,
-  'message.delta': (value, path) => {
-    expectRecord(value, path);
-    expectString(value.delta, `${path}.delta`);
-    ['messageId', 'itemId'].forEach((key) =>
-      expectOptional(value, key, path, expectString),
-    );
-    expectOptional(value, 'phase', path, (candidate, candidatePath) =>
-      expectLiteral(candidate, ['commentary', 'final_answer'], candidatePath),
-    );
-  },
-  'message.updated': (value, path) => {
-    expectRecord(value, path);
-    expectKnownShape(
-      value.message,
-      `${path}.message`,
-      isRendererMessage,
-      'renderer message',
-    );
-  },
-  'message.userSubmitted': (value, path) => {
-    expectRecord(value, path);
-    expectKnownShape(
-      value.message,
-      `${path}.message`,
-      isRendererMessage,
-      'renderer message',
-    );
-  },
-  'message.steer': (value, path) => {
-    expectRecord(value, path);
-    expectString(value.prompt, `${path}.prompt`);
-    expectOptional(value, 'attachments', path, (candidate, candidatePath) =>
-      expectArray(candidate, candidatePath, expectPromptAttachment),
-    );
-  },
   'agent.promptQueued': (value, path) => {
     expectRecord(value, path);
     ['id', 'text'].forEach((key) => expectString(value[key], `${path}.${key}`));
@@ -409,25 +173,10 @@ export const conversationPayloadValidators = {
     expectRecord(value, path);
     expectStringArray(value.ids, `${path}.ids`);
   },
-  'item.started': (value, path) => {
-    expectRecord(value, path);
-    expectOptional(value, 'messageId', path, expectString);
-    expectToolPart(value.toolPart, `${path}.toolPart`);
-  },
-  'item.updated': expectToolPartUpdate,
-  'item.completed': (value, path) => {
-    expectRecord(value, path);
-    expectOptional(value, 'messageId', path, expectString);
-    expectToolPart(value.toolPart, `${path}.toolPart`);
-  },
   'diff.updated': expectGitDiff,
   'file.activity': expectFileActivity,
   'git.statusUpdated': (value, path) =>
     expectKnownShape(value, path, isAgentGitStatus, 'agent git status'),
-  'approval.requested': (value, path) =>
-    expectClientRequest(value, path, 'confirm_tool'),
-  'toolInput.requested': (value, path) =>
-    expectClientRequest(value, path, 'ask_user'),
   'backendApproval.requested': (value, path) => {
     expectRecord(value, path);
     expectBackendApproval(value.approval, `${path}.approval`);
@@ -455,10 +204,5 @@ export const conversationPayloadValidators = {
       ],
       `${path}.reason`,
     );
-  },
-  error: (value, path) => {
-    expectRecord(value, path);
-    expectString(value.message, `${path}.message`);
-    expectOptional(value, 'willRetry', path, expectBoolean);
   },
 } satisfies Record<string, EventValueValidator>;

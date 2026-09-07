@@ -12,7 +12,7 @@ import {
 } from './agent-manager';
 import { appText } from './app-text';
 import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
-import { applySnapshotMetadata } from './snapshot-construction';
+import { replaceAppSnapshot } from './snapshot-construction';
 import { decodeAppSnapshot } from './snapshot-guards';
 import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 import { workItemAssignmentKey } from './work-assignments';
@@ -24,7 +24,7 @@ export function applyRuntimeEventToSnapshot(
   if (event.type === 'snapshot.updated') {
     const decodedSnapshot = decodeAppSnapshot(event.payload);
     if (decodedSnapshot) {
-      applySnapshotMetadata(snapshot, decodedSnapshot.value);
+      replaceAppSnapshot(snapshot, decodedSnapshot.value);
     }
     return;
   }

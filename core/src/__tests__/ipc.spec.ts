@@ -11,7 +11,6 @@ import type {
   AgentStatus,
   AppCommand,
   AppSnapshot,
-  AppSnapshotMetadata,
   BackendApprovalDecision,
   BackendApprovalRequest,
   BackendApprovalScope,
@@ -289,13 +288,13 @@ describe('ipc channels', () => {
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
-      .toEqualTypeOf<AppSnapshotMetadata>();
+      .toEqualTypeOf<AppSnapshot>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()
       .toEqualTypeOf<MainToRendererEvent>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
     type SnapshotUpdatedEvent = Extract<MainToRendererEvent, { type: 'snapshot.updated' }>;
-    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshotMetadata>();
+    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshot>();
     expectTypeOf<Pick<
       SnapshotUpdatedEvent,
       keyof OptionalEventContext
@@ -450,92 +449,6 @@ describe('ipc channels', () => {
     expectTypeOf<SubagentStatusChangedEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
     expectTypeOf<Pick<SubagentStatusChangedEvent, keyof BackendThreadEventContext>>()
       .toEqualTypeOf<BackendThreadEventContext>();
-    type TurnStartedEvent = Extract<MainToRendererEvent, { type: 'turn.started' }>;
-    expectTypeOf<TurnStartedEvent['payload']>().toEqualTypeOf<
-      | { status: 'inProgress'; startedAt: string }
-      | { turn: { id: string; backend: 'claude' } }
-    >();
-    expectTypeOf<Pick<TurnStartedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    type TurnPlanUpdatedEvent = Extract<MainToRendererEvent, { type: 'turn.planUpdated' }>;
-    expectTypeOf<TurnPlanUpdatedEvent['payload']>().toEqualTypeOf<{
-      explanation: string | null;
-      plan: ThreadPlanStep[];
-      markdown?: string;
-      status?: 'running' | 'completed';
-    }>();
-    expectTypeOf<Pick<TurnPlanUpdatedEvent, keyof ThreadTurnEventContext>>()
-      .toEqualTypeOf<ThreadTurnEventContext>();
-    type ProposedPlanDeltaEvent = Extract<MainToRendererEvent, { type: 'turn.proposedPlanDelta' }>;
-    expectTypeOf<ProposedPlanDeltaEvent['payload']>().toEqualTypeOf<
-      | { itemId: string; delta: string; markdown: string }
-      | { itemId: string; delta: string }
-    >();
-    expectTypeOf<Pick<ProposedPlanDeltaEvent, keyof ThreadTurnEventContext>>()
-      .toEqualTypeOf<ThreadTurnEventContext>();
-    type ProposedPlanCompletedEvent = Extract<MainToRendererEvent, { type: 'turn.proposedPlanCompleted' }>;
-    expectTypeOf<ProposedPlanCompletedEvent['payload']>()
-      .toEqualTypeOf<{ itemId: string; markdown: string }>();
-    expectTypeOf<Pick<ProposedPlanCompletedEvent, keyof ThreadTurnEventContext>>()
-      .toEqualTypeOf<ThreadTurnEventContext>();
-    type TurnCompletedEvent = Extract<MainToRendererEvent, { type: 'turn.completed' }>;
-    expectTypeOf<TurnCompletedEvent['payload']>().toEqualTypeOf<
-      | {
-          status: 'completed' | 'interrupted' | 'failed' | 'inProgress';
-          error?: { message: string; additionalDetails: string | null; codexErrorInfo: unknown } | null;
-          willRetry?: boolean;
-          startedAt?: string | null;
-          completedAt?: string | null;
-          durationMs?: number | null;
-        }
-      | { turn: { id: string; status: 'completed' | 'interrupted' } }
-    >();
-    expectTypeOf<Pick<TurnCompletedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    type CompactionStartedEvent = Extract<MainToRendererEvent, { type: 'context.compactionStarted' }>;
-    type CompactionCompletedEvent = Extract<MainToRendererEvent, { type: 'context.compactionCompleted' }>;
-    expectTypeOf<CompactionStartedEvent['payload']>()
-      .toEqualTypeOf<{ itemId: string | null } | Record<string, never>>();
-    expectTypeOf<CompactionCompletedEvent['payload']>()
-      .toEqualTypeOf<{ itemId: string | null } | Record<string, never>>();
-    expectTypeOf<Pick<CompactionStartedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    expectTypeOf<Pick<CompactionCompletedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    type ThreadHistoryLoadedEvent = Extract<MainToRendererEvent, { type: 'thread.historyLoaded' }>;
-    expectTypeOf<ThreadHistoryLoadedEvent['payload']>().toEqualTypeOf<{
-      messages: RendererMessage[];
-      replace?: boolean;
-      preserveKnownTurns?: boolean;
-      preserveKnownMessages?: boolean;
-      hasOlderMessages?: boolean;
-    }>();
-    expectTypeOf<Pick<ThreadHistoryLoadedEvent, keyof AgentOnlyEventContext>>()
-      .toEqualTypeOf<AgentOnlyEventContext>();
-    type MessageDeltaEvent = Extract<MainToRendererEvent, { type: 'message.delta' }>;
-    expectTypeOf<MessageDeltaEvent['payload']>().toEqualTypeOf<{
-      delta: string;
-      messageId?: string;
-      itemId?: string;
-      phase?: 'commentary' | 'final_answer';
-    }>();
-    expectTypeOf<Pick<MessageDeltaEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    type MessageUpdatedEvent = Extract<MainToRendererEvent, { type: 'message.updated' }>;
-    expectTypeOf<MessageUpdatedEvent['payload']>().toEqualTypeOf<{ message: RendererMessage }>();
-    expectTypeOf<Pick<MessageUpdatedEvent, keyof ThreadTurnEventContext>>()
-      .toEqualTypeOf<ThreadTurnEventContext>();
-    type MessageUserSubmittedEvent = Extract<MainToRendererEvent, { type: 'message.userSubmitted' }>;
-    expectTypeOf<MessageUserSubmittedEvent['payload']>().toEqualTypeOf<{ message: RendererMessage }>();
-    expectTypeOf<Pick<MessageUserSubmittedEvent, keyof AgentOnlyEventContext>>()
-      .toEqualTypeOf<AgentOnlyEventContext>();
-    type MessageSteerEvent = Extract<MainToRendererEvent, { type: 'message.steer' }>;
-    expectTypeOf<MessageSteerEvent['payload']>().toEqualTypeOf<{
-      prompt: string;
-      attachments?: readonly PromptAttachment[];
-    }>();
-    expectTypeOf<Pick<MessageSteerEvent, keyof AgentOnlyEventContext>>()
-      .toEqualTypeOf<AgentOnlyEventContext>();
     type AgentPromptQueuedEvent = Extract<MainToRendererEvent, { type: 'agent.promptQueued' }>;
     expectTypeOf<AgentPromptQueuedEvent['payload']>().toEqualTypeOf<{
       id: string;
@@ -558,24 +471,9 @@ describe('ipc channels', () => {
     expectTypeOf<AgentPromptDequeuedEvent['payload']>().toEqualTypeOf<{ ids: string[] }>();
     expectTypeOf<Pick<AgentPromptDequeuedEvent, keyof AgentOnlyEventContext>>()
       .toEqualTypeOf<AgentOnlyEventContext>();
-    type ItemStartedEvent = Extract<MainToRendererEvent, { type: 'item.started' }>;
-    type ItemUpdatedEvent = Extract<MainToRendererEvent, { type: 'item.updated' }>;
-    type ItemCompletedEvent = Extract<MainToRendererEvent, { type: 'item.completed' }>;
-    expectTypeOf<ItemStartedEvent['payload']>()
-      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
-    expectTypeOf<ItemUpdatedEvent['payload']>()
-      .toEqualTypeOf<RendererToolPartUpdate & { messageId?: string }>();
-    expectTypeOf<ItemCompletedEvent['payload']>()
-      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
-    expectTypeOf<Pick<ItemStartedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    expectTypeOf<Pick<ItemUpdatedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
-    expectTypeOf<Pick<ItemCompletedEvent, keyof TurnEventContext>>()
-      .toEqualTypeOf<TurnEventContext>();
     type DiffUpdatedEvent = Extract<MainToRendererEvent, { type: 'diff.updated' }>;
     expectTypeOf<DiffUpdatedEvent['payload']>()
-      .toEqualTypeOf<Omit<TurnGitDiff, 'turnId' | 'updatedAt'>>();
+      .toEqualTypeOf<Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>>();
     expectTypeOf<Pick<DiffUpdatedEvent, keyof ThreadTurnEventContext>>()
       .toEqualTypeOf<ThreadTurnEventContext>();
     type FileActivityEvent = Extract<MainToRendererEvent, { type: 'file.activity' }>;
@@ -587,24 +485,6 @@ describe('ipc channels', () => {
     expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
     expectTypeOf<Pick<GitStatusUpdatedEvent, keyof AgentOnlyEventContext>>()
       .toEqualTypeOf<AgentOnlyEventContext>();
-    type ApprovalRequestedEvent = Extract<MainToRendererEvent, { type: 'approval.requested' }>;
-    type CodexApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'codex' }>;
-    type ClaudeApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'claude' }>;
-    expectTypeOf<ApprovalRequestedEvent['payload']>()
-      .toEqualTypeOf<Extract<ClientRequest, { kind: 'confirm_tool' }>>();
-    expectTypeOf<Pick<CodexApprovalRequestedEvent, keyof CodexThreadEventContext>>()
-      .toEqualTypeOf<CodexThreadEventContext>();
-    expectTypeOf<Pick<ClaudeApprovalRequestedEvent, keyof ClaudeModeEventContext>>()
-      .toEqualTypeOf<ClaudeModeEventContext>();
-    type ToolInputRequestedEvent = Extract<MainToRendererEvent, { type: 'toolInput.requested' }>;
-    type CodexToolInputRequestedEvent = Extract<ToolInputRequestedEvent, { backend: 'codex' }>;
-    type ClaudeToolInputRequestedEvent = Extract<ToolInputRequestedEvent, { backend: 'claude' }>;
-    expectTypeOf<ToolInputRequestedEvent['payload']>()
-      .toEqualTypeOf<Extract<ClientRequest, { kind: 'ask_user' }>>();
-    expectTypeOf<Pick<CodexToolInputRequestedEvent, keyof CodexThreadEventContext>>()
-      .toEqualTypeOf<CodexThreadEventContext>();
-    expectTypeOf<Pick<ClaudeToolInputRequestedEvent, keyof ClaudeModeEventContext>>()
-      .toEqualTypeOf<ClaudeModeEventContext>();
     type BackendApprovalRequestedEvent = Extract<MainToRendererEvent, { type: 'backendApproval.requested' }>;
     expectTypeOf<BackendApprovalRequestedEvent['payload']>()
       .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
@@ -619,14 +499,6 @@ describe('ipc channels', () => {
     }>();
     expectTypeOf<Pick<BackendApprovalResolvedEvent, keyof CodexThreadEventContext>>()
       .toEqualTypeOf<CodexThreadEventContext>();
-    type ErrorEvent = Extract<MainToRendererEvent, { type: 'error' }>;
-    expectTypeOf<ErrorEvent['payload']>().toEqualTypeOf<{
-      message: string;
-      willRetry?: boolean;
-      error?: unknown;
-    }>();
-    expectTypeOf<Pick<ErrorEvent, keyof AgentOnlyEventContext>>()
-      .toEqualTypeOf<AgentOnlyEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()

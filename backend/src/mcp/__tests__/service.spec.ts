@@ -133,7 +133,6 @@ describe('ClawMcpService', () => {
       expect.stringContaining('Can you review this branch?'),
       undefined,
     );
-    expect(snapshot.messages).toStrictEqual([]);
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
   });
 
@@ -179,11 +178,6 @@ describe('ClawMcpService', () => {
       expect.objectContaining({ id: 'agent-jesse' }),
       expect.stringContaining('Check the failing test.'),
     );
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-jesse',
-      type: 'message.steer',
-      turnId: 'turn-active',
-    }));
     expect(events.some((event) => event.type === 'agent.promptQueued')).toBe(false);
   });
 
@@ -253,7 +247,6 @@ describe('ClawMcpService', () => {
       type: 'agent.promptQueued',
       payload: expect.objectContaining({ submitted: true }),
     })));
-    expect(snapshot.messages.filter((message) => message.agentId === 'agent-jesse' && message.role === 'user')).toHaveLength(0);
   });
 
   it('routes Computer Use MCP calls through the desktop client port', async () => {

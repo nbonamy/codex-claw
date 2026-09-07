@@ -3,7 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { LocalSocketRpcServer } from '../socket-server';
 
 describe('LocalSocketRpcServer', () => {
@@ -41,7 +41,7 @@ describe('LocalSocketRpcServer', () => {
   });
 
   it('broadcasts backend events to connected clients', async () => {
-    const payload = snapshotMetadata(createInitialSnapshot());
+    const payload = createInitialSnapshot();
     const socketPath = await tempSocketPath();
     server = new LocalSocketRpcServer({
       socketPath,

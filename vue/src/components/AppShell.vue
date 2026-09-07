@@ -132,7 +132,6 @@
         :load-work-repositories="loadWorkRepositories"
         :list-source-repositories="listSourceRepositories"
         :automations="snapshot.automations"
-        :messages="snapshot.messages"
         :read-conversation-messages="readConversationMessages"
         :remote-connections="snapshot.remoteConnections.connections"
         :run-automation="runAutomation"
@@ -423,7 +422,6 @@ const props = withDefaults(defineProps<{
   activeAgent: Agent | null;
   unreadAgentIds?: string[];
   agentFiles?: AgentFileSearchItem[];
-  messages: RendererMessage[];
   isLoading: boolean;
   isConversationLoading?: boolean;
   isConversationLoadFailed?: boolean;
@@ -1110,19 +1108,8 @@ const providerConversation = computed(() => (
       ? props.claudeConversationSnapshot ?? null
       : null
 ));
-const conversationMessages = computed(() => (
-  currentAgent.value?.backend === 'codex' || currentAgent.value?.backend === 'claude'
-    ? providerConversation.value?.messages ?? []
-    : props.messages
-));
-const conversationLatestTurnId = computed(() => {
-  if (providerConversation.value) return providerConversation.value.turnIds.at(-1) ?? null;
-  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    const turnId = props.messages[index]?.turnId;
-    if (turnId) return turnId;
-  }
-  return null;
-});
+const conversationMessages = computed(() => providerConversation.value?.messages ?? []);
+const conversationLatestTurnId = computed(() => providerConversation.value?.turnIds.at(-1) ?? null);
 const conversationHasRunningPlanTool = computed(() => conversationMessages.value.some(
   (message) => message.parts.some(
     (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,

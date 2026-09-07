@@ -223,7 +223,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
     const result = await this.sessionManager.deleteTurn(agent, turnId);
     return {
       backendSession: codexBackendSession(result.threadId),
-      messages: result.messages,
       activeTurnId: result.activeTurnId,
     };
   }
@@ -232,7 +231,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
     const result = await this.sessionManager.editTurn(agent, turnId, content);
     return {
       backendSession: codexBackendSession(result.threadId),
-      messages: result.messages,
       activeTurnId: result.activeTurnId,
     };
   }
@@ -241,7 +239,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
     const result = await this.sessionManager.retryTurn(agent, turnId);
     return {
       backendSession: codexBackendSession(result.threadId),
-      messages: result.messages,
       activeTurnId: result.activeTurnId,
     };
   }
@@ -279,7 +276,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
     const result = await this.sessionManager.resumeConversation(agent, ref.threadId);
     return {
       backendSession: codexBackendSession(result.threadId),
-      messages: result.messages,
     };
   }
 
@@ -289,7 +285,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
       : await this.sessionManager.forkConversation(agent, targetAgent, turnId);
     return {
       backendSession: codexBackendSession(result.threadId),
-      messages: result.messages,
       ...(result.activeTurnId ? { activeTurnId: result.activeTurnId } : {}),
     };
   }

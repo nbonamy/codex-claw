@@ -4,33 +4,25 @@ import { createEmptySnapshot, createInitialSnapshot } from '../snapshot-construc
 import {
   decodeAppSnapshot,
   isAppSnapshot,
-  isAppSnapshotMetadata,
   isClientState,
 } from '../snapshot-guards';
 
 describe('snapshot guards', () => {
-  it('decodes valid empty, seeded, metadata, JSON, and fully populated snapshots', () => {
+  it('decodes valid empty, seeded, JSON, and fully populated snapshots', () => {
     const empty = createEmptySnapshot();
     const seeded = createInitialSnapshot();
     const full = completeSnapshot();
-    const { messages: _messages, ...metadata } = full;
     const json = JSON.parse(JSON.stringify(full)) as unknown;
 
-    expect(decodeAppSnapshot(empty)).toStrictEqual({ kind: 'full', value: empty });
-    expect(decodeAppSnapshot(seeded)).toStrictEqual({ kind: 'full', value: seeded });
-    expect(decodeAppSnapshot(metadata)).toStrictEqual({ kind: 'metadata', value: metadata });
-    expect(decodeAppSnapshot(json)).toStrictEqual({ kind: 'full', value: json });
+    expect(decodeAppSnapshot(empty)).toStrictEqual({ value: empty });
+    expect(decodeAppSnapshot(seeded)).toStrictEqual({ value: seeded });
+    expect(decodeAppSnapshot(json)).toStrictEqual({ value: json });
     expect(isAppSnapshot(full)).toBe(true);
-    expect(isAppSnapshotMetadata(full)).toBe(true);
-    expect(isAppSnapshotMetadata(metadata)).toBe(true);
   });
 
-  it('returns the original full and metadata object identities', () => {
+  it('returns the original snapshot object identity', () => {
     const full = completeSnapshot();
-    const { messages: _messages, ...metadata } = full;
-
     expect(decodeAppSnapshot(full)?.value).toBe(full);
-    expect(decodeAppSnapshot(metadata)?.value).toBe(metadata);
   });
 
   it('rejects malformed nested fields across every snapshot domain', () => {
@@ -82,8 +74,6 @@ describe('snapshot guards', () => {
       { name: 'repository icons', mutate: (snapshot) => { snapshot.general.repositoryIcons.repo = 42 as never; } },
       { name: 'source folder', mutate: (snapshot) => { snapshot.sourceFolder.recentRepoNames = [42 as never]; } },
       { name: 'theme', mutate: (snapshot) => { snapshot.theme.mode = 'auto' as never; } },
-      { name: 'message envelope', mutate: (snapshot) => { snapshot.messages[0]!.role = 'developer' as never; } },
-      { name: 'message part', mutate: (snapshot) => { snapshot.messages[0]!.parts[0] = { type: 'unknown' } as never; } },
       { name: 'queued prompt', mutate: (snapshot) => { snapshot.queuedPrompts![0]!.attempts = 'once' as never; } },
       { name: 'prompt attachment', mutate: (snapshot) => { snapshot.queuedPrompts![0]!.options!.attachments![0]!.type = 'audio' as never; } },
       { name: 'prompt backend options', mutate: (snapshot) => { snapshot.queuedPrompts![0]!.options!.backendOptions = { kind: 'codex', serviceTier: 42 as never }; } },
@@ -98,17 +88,7 @@ describe('snapshot guards', () => {
       mutate(snapshot);
       expect(decodeAppSnapshot(snapshot), name).toBeNull();
       expect(isAppSnapshot(snapshot), name).toBe(false);
-      expect(isAppSnapshotMetadata(snapshot), name).toBe(false);
     }
-  });
-
-  it('never downgrades a present malformed messages field to metadata', () => {
-    const snapshot = completeSnapshot();
-    const malformed = { ...snapshot, messages: { 0: snapshot.messages[0] } };
-
-    expect(decodeAppSnapshot(malformed)).toBeNull();
-    expect(isAppSnapshot(malformed)).toBe(false);
-    expect(isAppSnapshotMetadata(malformed)).toBe(false);
   });
 
   it('allows additive unknown fields at every record seam', () => {
@@ -116,9 +96,8 @@ describe('snapshot guards', () => {
     Object.assign(snapshot, { futureSnapshotField: { enabled: true } });
     Object.assign(snapshot.agents[0]!, { futureAgentField: ['preserved'] });
     Object.assign(snapshot.general, { futureGeneralField: 42 });
-    Object.assign(snapshot.messages[0]!.parts[0]!, { futurePartField: 'preserved' });
 
-    expect(decodeAppSnapshot(snapshot)).toStrictEqual({ kind: 'full', value: snapshot });
+    expect(decodeAppSnapshot(snapshot)).toStrictEqual({ value: snapshot });
   });
 
   it('allows stale references and duplicate ids because validation is structural only', () => {
@@ -297,23 +276,6 @@ function completeSnapshot(): AppSnapshot {
     lastRunAt: '2026-09-04T00:00:00.000Z',
     lastCreatedCount: 2,
   }];
-  snapshot.messages = [{
-    id: 'message-1',
-    agentId: codexAgent.id,
-    kind: 'steer',
-    role: 'assistant',
-    status: 'streaming',
-    turnId: 'turn-1',
-    parts: [
-      { type: 'attachment', attachment: { kind: 'file', name: 'plan.md', path: '/repo/plan.md', mimeType: 'text/markdown' } },
-      { type: 'media', media: { url: 'data:image/png;base64,AA==', alt: 'Preview', mimeType: 'image/png', prompt: 'Inspect', title: 'Image' }, itemId: 'media-1' },
-      { type: 'reasoning', summary: 'Inspecting', itemId: 'reasoning-1', summaryIndex: 0 },
-      { type: 'text', text: 'Working', itemId: 'text-1', phase: 'commentary' },
-      { type: 'tool', id: 'tool-1', kind: 'shell', title: 'Run tests', status: 'running', statusText: 'Running', body: 'npm test', input: {}, output: null, metadata: { command: 'npm test' } },
-      { type: 'status', text: 'Compacting' },
-    ],
-    createdAt: '2026-09-04T00:00:00.000Z',
-  }];
   snapshot.queuedPrompts = [{
     id: 'prompt-1',
     agentId: codexAgent.id,
@@ -381,6 +343,7 @@ function completeSnapshot(): AppSnapshot {
   };
   snapshot.turnGitDiffs = {
     turn: {
+      agentId: codexAgent.id,
       turnId: 'turn-1',
       addedLines: 10,
       removedLines: 1,

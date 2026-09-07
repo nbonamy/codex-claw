@@ -108,7 +108,6 @@ describe('agent-manager lifecycle', () => {
       resumeSnapshot,
       'agent-dina',
       { kind: 'codex', threadId: 'thread-resumed' },
-      [],
     );
     expect(resumeSnapshot.agents[0].conversationTitle).toBeUndefined();
   });

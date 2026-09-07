@@ -562,7 +562,6 @@ describe('ClawBackendServer', () => {
     const childMessages = [...messages, subagentMessage];
     const grandchildMessages = [subagentMessage, nestedSubagentMessage];
     const legacyChildMessages = [...messages, legacySubagentMessage];
-    snapshot.messages = messages;
     const listModels = vi.fn().mockResolvedValue([{ id: 'gpt-test', name: 'GPT Test' }]);
     const listPlugins = vi.fn().mockResolvedValue([{ id: 'dropbox', name: 'dropbox', displayName: 'Dropbox', enabled: true }]);
     const listSkills = vi.fn().mockResolvedValue([{ name: 'frontend-design', path: '/skills/frontend-design/SKILL.md' }]);

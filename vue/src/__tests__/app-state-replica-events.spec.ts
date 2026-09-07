@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -15,76 +15,6 @@ describe('useAppState', () => {
     clearConfetti();
     clearFirstRunOnboardingStage();
     vi.useRealTimers();
-  });
-
-  it('applies streamed main-process events to the visible conversation', async () => {
-    const listeners: Array<(event: MainToRendererEvent) => void> = [];
-    stubElectronTestWindow({
-      codexClaw: {
-        getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
-        onEvent: vi.fn((nextListener) => {
-          listeners.push(nextListener);
-          return () => undefined;
-        }),
-      } satisfies Partial<CodexClawApi>,
-    });
-
-    const state = useAppState();
-    await state.loadSnapshot();
-
-    expect(listeners).toHaveLength(1);
-    const emitMainEvent = listeners[0] as (event: MainToRendererEvent) => void;
-
-    emitMainEvent({
-      seq: 1,
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-1',
-      turnId: 'turn-1',
-      type: 'message.delta',
-      payload: { delta: 'streamed' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-    });
-
-    expect(state.visibleMessages.value.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'streamed' }]);
-  });
-
-  it('keeps the active transcript reference stable when another agent streams', async () => {
-    const listeners: Array<(event: MainToRendererEvent) => void> = [];
-    const remoteSnapshot = createInitialSnapshot();
-    remoteSnapshot.agents.push({
-      id: 'agent-jesse', teamId: remoteSnapshot.teams[0]!.id, name: 'Jesse',
-      folder: '/tmp/jesse', backend: 'codex', status: { type: 'working' },
-      createdAt: '2026-06-05T00:00:00.000Z', updatedAt: '2026-06-05T00:00:00.000Z',
-    });
-    remoteSnapshot.teams[0]!.agentIds.push('agent-jesse');
-    stubElectronTestWindow({
-      codexClaw: {
-        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        onEvent: vi.fn((nextListener) => {
-          listeners.push(nextListener);
-          return () => undefined;
-        }),
-      } satisfies Partial<CodexClawApi>,
-    });
-
-    const state = useAppState();
-    await state.loadSnapshot();
-    const activeTranscript = state.visibleMessages.value;
-
-    listeners[0]!({
-      seq: 1,
-      agentId: 'agent-jesse',
-      backend: 'codex',
-      threadId: 'thread-jesse',
-      turnId: 'turn-jesse',
-      type: 'message.delta',
-      payload: { delta: 'background stream' },
-      occurredAt: '2026-06-05T00:00:02.000Z',
-    });
-
-    expect(state.visibleMessages.value).toBe(activeTranscript);
-    expect(state.snapshot.value.messages.some((message) => message.agentId === 'agent-jesse')).toBe(true);
   });
 
   it('publishes validated file activity for inactive and active agents', async () => {
@@ -261,8 +191,6 @@ describe('useAppState', () => {
     });
     const state = useAppState();
     await state.loadSnapshot();
-    const messageCount = state.visibleMessages.value.length;
-
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-jesse',
@@ -284,7 +212,6 @@ describe('useAppState', () => {
     expect(useConfetti().bursts.value).toEqual([
       expect.objectContaining({ kind: 'stars' }),
     ]);
-    expect(state.visibleMessages.value).toHaveLength(messageCount);
   });
 
   it('shows MCP agent creation progress only for the active caller until dismissed', async () => {

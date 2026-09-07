@@ -27,9 +27,8 @@ type AgentGitWorkIntegrationsPort = {
 };
 
 export type AgentGitWorkflowServiceOptions = {
-  applyEvent: (event: BackendEvent, options?: { trackTranscriptActivity?: boolean }) => void;
+  applyEvent: (event: BackendEvent) => void;
   delegatedWorkReports: DelegatedWorkReportPort;
-  deleteTranscript: (agentId: string) => void;
   driverRequest: (agent: Agent, method: string, params: unknown) => Promise<unknown>;
   forgetSession: (agent: Agent) => Promise<void>;
   getSnapshot: () => AppSnapshot;
@@ -91,7 +90,6 @@ export class AgentGitWorkflowService {
         const result = await this.workflow(agent, { refreshStatus: true });
         if (input.closeAgentAfterPush === true) {
           closeAgentInSnapshot(this.options.getSnapshot(), agentId);
-          this.options.deleteTranscript(agentId);
           await this.options.persistAndEmitSnapshot();
         }
         return result;
@@ -318,7 +316,6 @@ export class AgentGitWorkflowService {
     if (deleteWorktree) {
       if (input.pushAfter !== true) {
         closeAgentInSnapshot(this.options.getSnapshot(), agentId);
-        this.options.deleteTranscript(agentId);
       }
       await this.options.persistAndEmitSnapshot();
     }
@@ -334,7 +331,7 @@ export class AgentGitWorkflowService {
       agentId,
       type: 'git.operationProgress',
       payload: { operation, phase } satisfies AgentGitOperationProgress,
-    }, { trackTranscriptActivity: false });
+    });
   }
 }
 

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import BrowserPanel from '../BrowserPanel.vue';
 import { setElectronTestClient } from '../../test/client';
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
-import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 
 class ResizeObserverStub {
   observe = vi.fn();
@@ -207,7 +207,7 @@ describe('BrowserPanel', () => {
     await wrapper.setProps({ visible: false });
     await wrapper.setProps({ visible: true });
     window.dispatchEvent(new Event('resize'));
-    emitEvent({ seq: 10, type: 'snapshot.updated', payload: snapshotMetadata(createInitialSnapshot()), occurredAt: 'now' });
+    emitEvent({ seq: 10, type: 'snapshot.updated', payload: createInitialSnapshot(), occurredAt: 'now' });
     emitEvent({
       seq: 11,
       type: 'browser.annotationCreated',

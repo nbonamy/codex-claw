@@ -231,17 +231,14 @@ describe('CodexBackendDriver', () => {
     await expect(driver.listConversations(agent)).resolves.toStrictEqual(conversations);
     await expect(driver.resumeConversation(agent, { backend: 'codex', threadId: 'thread-dina' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
-      messages,
     });
     expect(sessionManager.listConversations).toHaveBeenCalledWith(agent);
     expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, 'thread-dina');
     await expect(driver.forkConversation(agent, targetAgent)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages,
     });
     await expect(driver.forkConversation(agent, targetAgent, 'turn-5')).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages,
     });
     expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
     expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 'turn-5');
@@ -265,8 +262,8 @@ function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {})
     getRuntimeStatus: vi.fn().mockReturnValue({ backend: 'codex', status: 'notConfigured' }),
     sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     listConversations: vi.fn().mockResolvedValue([]),
-    forkConversation: vi.fn().mockResolvedValue({ threadId: 'thread-forked', messages: [] }),
-    resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
+    forkConversation: vi.fn().mockResolvedValue({ threadId: 'thread-forked' }),
+    resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina' }),
     readConversationMessages: vi.fn().mockResolvedValue([]),
     loadOlderHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
     setConversationTitle: vi.fn().mockResolvedValue(undefined),

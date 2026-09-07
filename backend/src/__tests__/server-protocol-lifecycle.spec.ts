@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -9,7 +9,6 @@ import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
 import {
   createTestSnapshot,
-  createTextMessage,
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
@@ -233,7 +232,6 @@ describe('ClawBackendServer', () => {
         }],
       },
     });
-    expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'tool' && part.id.startsWith('plan-debug-plan-')))).toBe(true);
 
     const removeResult = await server.handleMessage({
       jsonrpc: '2.0',
@@ -243,11 +241,10 @@ describe('ClawBackendServer', () => {
     });
     expect(removeResult).toMatchObject({ result: { agents: [{ id: 'agent-dina' }] } });
     expect((removeResult as { result: AppSnapshot }).result.agents[0]?.plan).toBeUndefined();
-    expect(snapshot.messages.some((message) => message.parts.some((part) => part.type === 'tool' && part.id.startsWith('plan-debug-plan-')))).toBe(false);
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
   });
 
-  it('replaces a stale execution plan on the first debug-menu request', async () => {
+  it('removes an existing execution plan on the first debug-menu request', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{
       id: 'agent-dina',
@@ -269,15 +266,6 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    snapshot.messages = [{
-      id: 'assistant-new',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'complete',
-      turnId: 'turn-new',
-      parts: [{ type: 'text', text: 'Newer work' }],
-      createdAt: '2026-06-13T00:01:00.000Z',
-    }];
     const server = new ClawBackendServer({ version: 'test-version', snapshot });
 
     const result = await server.handleMessage({
@@ -287,17 +275,8 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina' },
     });
 
-    expect(result).toMatchObject({
-      result: {
-        agents: [{
-          id: 'agent-dina',
-          plan: {
-            explanation: 'Debug execution plan',
-            turnId: expect.stringMatching(/^debug-plan-/u),
-          },
-        }],
-      },
-    });
+    expect(result).toMatchObject({ result: { agents: [{ id: 'agent-dina' }] } });
+    expect((result as { result: AppSnapshot }).result.agents[0]?.plan).toBeUndefined();
   });
 
   it('injects a proposed plan and emits the normal plan-review side-panel request', async () => {
@@ -328,7 +307,7 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina' },
     });
 
-    expect(result).toMatchObject({ result: { agents: [{ id: 'agent-dina', plan: { markdown: expect.stringContaining('# Debug plan review') } }] } });
+    expect(result).toMatchObject({ result: { agents: [{ id: 'agent-dina' }] } });
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'sidePanel.markdownRequested',
@@ -475,32 +454,6 @@ describe('ClawBackendServer', () => {
         },
       },
     });
-  });
-
-  it('keeps synchronization snapshots bounded when cached transcripts are large', async () => {
-    const snapshot = createTestSnapshot();
-    snapshot.messages.push(createTextMessage(
-      'message-large-transcript',
-      'agent-dina',
-      'A'.repeat(1_000_000),
-    ));
-    const server = new ClawBackendServer({
-      version: 'test-version',
-      pid: 123,
-      snapshot,
-    });
-
-    const response = await server.handleMessage({
-      jsonrpc: '2.0',
-      id: 'bounded-snapshot',
-      method: backendMethods.snapshotGet,
-    });
-
-    expect(JSON.stringify(response).length).toBeLessThan(100_000);
-    const responseSnapshot = (response as { result: { snapshot: AppSnapshot } }).result.snapshot;
-    expect(responseSnapshot.messages).toStrictEqual([]);
-    expect(snapshot.messages).toHaveLength(1);
-    await server.close();
   });
 
   it('derives client state from backend-owned snapshot state', async () => {

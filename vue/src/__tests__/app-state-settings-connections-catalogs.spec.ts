@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -312,14 +312,6 @@ describe('useAppState', () => {
   it('loads backend models, selects the default reasoning effort, and sends it with prompts', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();
-    updatedSnapshot.messages.push({
-      id: 'message-user',
-      agentId: 'agent-dina',
-      role: 'user',
-      status: 'complete',
-      createdAt: '2026-06-05T00:00:01.000Z',
-      parts: [{ type: 'text', text: 'use the selected model' }],
-    });
     const listBackendModels = vi.fn().mockResolvedValue([
       {
         id: 'codex-fast',

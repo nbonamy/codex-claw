@@ -141,7 +141,6 @@ export function mountShell(overrides: Partial<{
       activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
       unreadAgentIds: overrides.unreadAgentIds ?? [],
       agentFiles: overrides.agentFiles ?? [],
-      messages: snapshot.messages,
       codexConversationSnapshot: overrides.codexConversationSnapshot ?? null,
       claudeConversationSnapshot: overrides.claudeConversationSnapshot ?? null,
       isLoading: false,

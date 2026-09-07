@@ -87,7 +87,6 @@ import AutomationExecutionStatusActions from './AutomationExecutionStatusActions
 
 const props = defineProps<{
   automation: Automation;
-  messages: RendererMessage[];
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
 }>();
 
@@ -223,7 +222,7 @@ async function openConversation(row: AppDataListRow): Promise<void> {
     agentName: agentNameForRow(row),
     error: null,
     loading: Boolean(conversationRef),
-    messages: conversationRef ? [] : liveMessagesForAgent(agentId),
+    messages: [],
     ticket: ticketForRow(row),
   };
 
@@ -264,10 +263,6 @@ function deleteExecution(row: AppDataListRow): void {
 
 function closeConversation(): void {
   selectedConversation.value = null;
-}
-
-function liveMessagesForAgent(agentId: string): RendererMessage[] {
-  return props.messages.filter((message) => message.agentId === agentId);
 }
 
 function isBackendConversationRef(value: unknown): value is BackendConversationRef {

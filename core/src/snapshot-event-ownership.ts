@@ -1,6 +1,6 @@
 import type { MainToRendererEvent } from './contracts';
 
-export type SnapshotEventOwner = 'runtime' | 'conversation' | 'subagent' | 'renderer';
+export type SnapshotEventOwner = 'runtime' | 'coordination' | 'subagent' | 'renderer';
 
 export const snapshotEventOwnership = {
   'backend.statusChanged': 'runtime',
@@ -30,37 +30,19 @@ export const snapshotEventOwnership = {
   'thread.goalUpdated': 'runtime',
   'thread.goalCleared': 'runtime',
   'thread.tokenUsageUpdated': 'runtime',
-  'thread.historyLoaded': 'conversation',
   'thread.historyHydrationFailed': 'renderer',
   'subagent.operationChanged': 'subagent',
   'subagent.activityChanged': 'subagent',
   'subagent.identityChanged': 'subagent',
   'subagent.statusChanged': 'subagent',
-  'turn.started': 'conversation',
-  'turn.planUpdated': 'conversation',
-  'turn.proposedPlanDelta': 'conversation',
-  'turn.proposedPlanCompleted': 'conversation',
-  'turn.completed': 'conversation',
-  'context.compactionStarted': 'conversation',
-  'context.compactionCompleted': 'conversation',
-  'message.delta': 'conversation',
-  'message.updated': 'conversation',
-  'message.userSubmitted': 'conversation',
-  'message.steer': 'conversation',
-  'agent.promptQueued': 'conversation',
-  'agent.promptRetryScheduled': 'conversation',
-  'agent.promptDequeued': 'conversation',
-  'item.started': 'conversation',
-  'item.updated': 'conversation',
-  'item.completed': 'conversation',
-  'diff.updated': 'conversation',
+  'agent.promptQueued': 'coordination',
+  'agent.promptRetryScheduled': 'coordination',
+  'agent.promptDequeued': 'coordination',
+  'diff.updated': 'coordination',
   'file.activity': 'renderer',
   'git.statusUpdated': 'runtime',
-  'approval.requested': 'conversation',
-  'toolInput.requested': 'conversation',
-  'backendApproval.requested': 'conversation',
-  'backendApproval.resolved': 'conversation',
-  error: 'conversation',
+  'backendApproval.requested': 'coordination',
+  'backendApproval.resolved': 'coordination',
 } as const satisfies Record<MainToRendererEvent['type'], SnapshotEventOwner>;
 
 export type SnapshotEventTypeOwnedBy<Owner extends SnapshotEventOwner> = {

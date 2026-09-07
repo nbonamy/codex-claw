@@ -156,13 +156,6 @@ export class ClawMcpService {
         agent.backendSession = result.backendSession;
         this.coordinator.markMessagesRead(messages.map((message) => message.id));
         this.emitDequeuedMessages(agentId, messages.map((message) => message.id));
-        this.emit({
-          agentId,
-          ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
-          turnId: result.turnId,
-          type: 'message.steer',
-          payload: { prompt },
-        });
         this.emitSnapshotUpdated(agent.id);
         return;
       } catch {

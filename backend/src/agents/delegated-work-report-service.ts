@@ -31,14 +31,13 @@ export type DelegatedWorkAction =
   };
 
 type PendingReport = {
-  messageStartIndex: number;
   resolve(summary: string | null): void;
   timer: ReturnType<typeof setTimeout>;
 };
 
 export type DelegatedWorkReportServiceOptions = {
   getSnapshot: () => AppSnapshot;
-  readConversationMessages?: (agent: Agent) => Promise<RendererMessage[]>;
+  readConversationMessages: (agent: Agent) => Promise<RendererMessage[]>;
   sendPrompt: (agentId: string, prompt: string) => void;
   sendMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   timeoutMs?: number;
@@ -61,7 +60,6 @@ export class DelegatedWorkReportService {
       return null;
     }
 
-    const snapshot = this.options.getSnapshot();
     const summary = new Promise<string | null>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(agent.id);
@@ -69,7 +67,6 @@ export class DelegatedWorkReportService {
       }, this.options.timeoutMs ?? defaultTimeoutMs);
       timer.unref?.();
       this.pending.set(agent.id, {
-        messageStartIndex: snapshot.messages.length,
         resolve,
         timer,
       });
@@ -130,12 +127,12 @@ export class DelegatedWorkReportService {
   ): Promise<void> {
     const snapshot = this.options.getSnapshot();
     const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-    let messages = snapshot.messages.slice(pending.messageStartIndex);
-    if (agent && this.options.readConversationMessages) {
+    let messages: RendererMessage[] = [];
+    if (agent) {
       try {
         messages = await this.options.readConversationMessages(agent);
       } catch {
-        // The retained Claw transcript remains a safe fallback for legacy providers.
+        // A report is optional; Git delivery continues when history is unavailable.
       }
     }
     if (this.pending.get(agentId) !== pending) return;

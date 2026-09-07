@@ -13,7 +13,6 @@ export function createTestSnapshot(): AppSnapshot {
     automations: [],
     activeTeamId: 'team-test',
     activeAgentId: null,
-    messages: [],
     backendApprovals: {},
     agentGitStatuses: {},
     turnGitDiffs: {},

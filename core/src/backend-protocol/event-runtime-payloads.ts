@@ -91,11 +91,11 @@ function expectConnectionState(value: unknown, path: string): void {
   expectOptional(value, 'detail', path, expectAppText);
 }
 
-function expectSnapshotMetadata(value: unknown, path: string): void {
+function expectAppSnapshot(value: unknown, path: string): void {
   const decoded = decodeAppSnapshot(value);
-  if (decoded?.kind !== 'metadata') {
+  if (!decoded) {
     throw new Error(
-      `Invalid Claw backend event at ${path}: expected snapshot metadata.`,
+      `Invalid Claw backend event at ${path}: expected an app snapshot.`,
     );
   }
 }
@@ -401,7 +401,7 @@ function expectClaudeConversationEvent(value: unknown, path: string): void {
 export const runtimePayloadValidators = {
   'backend.statusChanged': expectBackendRuntimeStatus,
   'client.connectionChanged': expectConnectionState,
-  'snapshot.updated': expectSnapshotMetadata,
+  'snapshot.updated': expectAppSnapshot,
   'account.rateLimitsUpdated': expectRateLimits,
   'devicePairing.statusChanged': expectDevicePairingStatus,
   'models.changed': (value, path) => {

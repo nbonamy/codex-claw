@@ -13,8 +13,8 @@ import { getClawdDaemonStatus, refreshClawdDaemon, setClawdDaemonEnabled } from 
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { applyMainEventToSnapshot, replaceAppSnapshot } from '@codex-claw/core/snapshot';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -102,7 +102,7 @@ export class AppController {
       resourcesPath: process.resourcesPath,
     }),
   ) {
-    this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
+    this.snapshot = initialSnapshot;
     this.policyAwareSpokenAnnouncements = new PolicyAwareSpokenAnnouncementQueue(
       this.spokenAnnouncements,
       () => ({
@@ -833,8 +833,8 @@ export class AppController {
     }));
   }
 
-  private async selectAgent(agentId: string): Promise<AppSnapshotMetadata> {
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentSelect, { agentId }));
+  private async selectAgent(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentSelect, { agentId }));
   }
 
   private async assignWorkItemToAgent(agentId: string, item: unknown): Promise<AppSnapshot> {
@@ -1021,7 +1021,7 @@ export class AppController {
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
-    this.snapshot = metadataOnlySnapshot(snapshot);
+    this.snapshot = snapshot;
     this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
     try {
@@ -1032,12 +1032,12 @@ export class AppController {
     }
   }
 
-  private async adoptBackendMetadata(metadata: AppSnapshotMetadata): Promise<AppSnapshotMetadata> {
+  private async adoptBackendMutationSnapshot(nextSnapshot: AppSnapshot): Promise<AppSnapshot> {
     if (!this.snapshot) throw new Error('clawd snapshot is not available.');
-    applySnapshotMetadata(this.snapshot, metadata);
+    replaceAppSnapshot(this.snapshot, nextSnapshot);
     this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
-    return metadata;
+    return nextSnapshot;
   }
 
   private async getSnapshot(): Promise<AppSnapshot> {
@@ -1060,9 +1060,9 @@ export class AppController {
     agentId: string,
     prompt: string,
     options?: RendererSendPromptOptions,
-  ): Promise<AppSnapshotMetadata> {
+  ): Promise<AppSnapshot> {
     const backendOptions = this.resolveRendererPromptOptions(options);
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentPromptSend, {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSend, {
       agentId,
       prompt,
       options: backendOptions,
@@ -1164,8 +1164,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRestart, { agentId }));
   }
 
-  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata> {
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentHistoryHydrate, { agentId }));
+  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHistoryHydrate, { agentId }));
   }
 
   private async loadOlderAgentHistory(agentId: string): Promise<{ hasOlder: boolean }> {
@@ -1230,9 +1230,9 @@ export class AppController {
     });
   }
 
-  private async steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata> {
+  private async steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot> {
     const backendOptions = this.resolveRendererPromptOptions(options);
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(
       backendMethods.agentPromptSteer,
       backendOptions ? { agentId, prompt, options: backendOptions } : { agentId, prompt },
     ));
@@ -1395,7 +1395,7 @@ export class AppController {
       if (!isClawSnapshotGetResult(backendState)) throw new Error('clawd returned an invalid snapshot.');
 
       let synchronizedSnapshot = backendState.snapshot;
-      this.snapshot = metadataOnlySnapshot(synchronizedSnapshot);
+      this.snapshot = synchronizedSnapshot;
       this.policyAwareSpokenAnnouncements.refresh();
       this.clientState = backendState.clientState;
       this.lastBackendEventSeq = backendState.lastEventSeq;
@@ -1410,8 +1410,7 @@ export class AppController {
         }
         const rendererEvent = eventForRenderer(event);
         const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
-        if (decodedSnapshot?.kind === 'full') synchronizedSnapshot = decodedSnapshot.value;
-        else if (decodedSnapshot?.kind === 'metadata') applySnapshotMetadata(synchronizedSnapshot, decodedSnapshot.value);
+        if (decodedSnapshot) synchronizedSnapshot = decodedSnapshot.value;
         else if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(synchronizedSnapshot, rendererEvent);
         this.applyBackendEvent(event, true);
       }
@@ -1559,17 +1558,13 @@ export class AppController {
     const rendererEvent = eventForRenderer(event);
     const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
     for (const snapshot of this.transientSnapshots) {
-      if (decodedSnapshot?.kind === 'full') overwriteAppSnapshot(snapshot, decodedSnapshot.value);
-      else if (decodedSnapshot?.kind === 'metadata') applySnapshotMetadata(snapshot, decodedSnapshot.value);
+      if (decodedSnapshot) overwriteAppSnapshot(snapshot, decodedSnapshot.value);
       else if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(snapshot, rendererEvent);
     }
-    if (decodedSnapshot?.kind === 'full') {
-      this.snapshot = metadataOnlySnapshot(decodedSnapshot.value);
-    } else if (decodedSnapshot?.kind === 'metadata') {
-      if (this.snapshot) applySnapshotMetadata(this.snapshot, decodedSnapshot.value);
+    if (decodedSnapshot) {
+      this.snapshot = decodedSnapshot.value;
     } else if (this.snapshot) {
       if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(this.snapshot, rendererEvent);
-      this.snapshot.messages = [];
     }
     this.policyAwareSpokenAnnouncements.refresh();
     if (isClientState(event.clientState)) {
@@ -1636,13 +1631,13 @@ export class AppController {
     if (snapshot) {
       this.emitClientEvent({
         type: 'snapshot.updated',
-        payload: snapshotMetadata(snapshot),
+        payload: snapshot,
         snapshot,
       });
     } else if (this.snapshot) {
       this.emitClientEvent({
         type: 'snapshot.updated',
-        payload: snapshotMetadata(this.snapshot),
+        payload: this.snapshot,
       });
     }
   }
@@ -1823,10 +1818,6 @@ export function requiresSingleInstanceLock(isPackaged: boolean): boolean {
   return isPackaged;
 }
 
-function metadataOnlySnapshot(snapshot: AppSnapshot): AppSnapshot {
-  return { ...snapshot, messages: [] };
-}
-
 function overwriteAppSnapshot(target: AppSnapshot, source: AppSnapshot): void {
   const mutableTarget = target as unknown as Record<string, unknown>;
   for (const key of Object.keys(mutableTarget)) {
@@ -1845,7 +1836,7 @@ function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
 
 function decodeSnapshotFromBackendEvent(event: ClawBackendEvent): DecodedAppSnapshot | null {
   const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
-  if (sideChannelSnapshot?.kind === 'full') return sideChannelSnapshot;
+  if (sideChannelSnapshot) return sideChannelSnapshot;
   if (event.type !== 'snapshot.updated') return null;
   return decodeAppSnapshot(event.payload);
 }

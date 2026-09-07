@@ -4,7 +4,6 @@ import type {
   AgentFileActivity,
   AgentGitStatus,
   AppSnapshot,
-  AppSnapshotMetadata,
   BackendApprovalDecision,
   BackendApprovalRequest,
   BackendApprovalScope,
@@ -92,7 +91,7 @@ describe('backend protocol guards', () => {
     expectTypeOf<Extract<ClawBackendEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
     type SnapshotUpdatedEvent = Extract<ClawBackendEvent, { type: 'snapshot.updated' }>;
-    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshotMetadata>();
+    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshot>();
     expectTypeOf<Pick<SnapshotUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{
         agentId?: string;
@@ -111,40 +110,9 @@ describe('backend protocol guards', () => {
         threadId: string;
         turnId?: string;
       }>();
-    type MessageDeltaEvent = Extract<ClawBackendEvent, { type: 'message.delta' }>;
-    expectTypeOf<MessageDeltaEvent['payload']>().toEqualTypeOf<{
-      delta: string;
-      messageId?: string;
-      itemId?: string;
-      phase?: 'commentary' | 'final_answer';
-    }>();
-    expectTypeOf<Pick<MessageDeltaEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
-      .toEqualTypeOf<{
-        agentId: string;
-        backend: AgentBackend;
-        threadId?: string;
-        turnId: string;
-      }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'thread.historyLoaded' }>['payload']>()
-      .toEqualTypeOf<{
-        messages: RendererMessage[];
-        replace?: boolean;
-        preserveKnownTurns?: boolean;
-        preserveKnownMessages?: boolean;
-        hasOlderMessages?: boolean;
-      }>();
-    type ItemStartedEvent = Extract<ClawBackendEvent, { type: 'item.started' }>;
-    expectTypeOf<ItemStartedEvent['payload']>()
-      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'item.updated' }>['payload']>()
-      .toEqualTypeOf<RendererToolPartUpdate & { messageId?: string }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'item.completed' }>['payload']>()
-      .toEqualTypeOf<{ messageId?: string; toolPart: RendererToolPart }>();
-    expectTypeOf<Pick<ItemStartedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
-      .toEqualTypeOf<{ agentId: string; backend: AgentBackend; threadId?: string; turnId: string }>();
     type DiffUpdatedEvent = Extract<ClawBackendEvent, { type: 'diff.updated' }>;
     expectTypeOf<DiffUpdatedEvent['payload']>()
-      .toEqualTypeOf<Omit<TurnGitDiff, 'turnId' | 'updatedAt'>>();
+      .toEqualTypeOf<Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>>();
     expectTypeOf<Pick<DiffUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{ agentId: string; backend: AgentBackend; threadId: string; turnId: string }>();
     expectTypeOf<Extract<ClawBackendEvent, { type: 'file.activity' }>['payload']>()
@@ -153,17 +121,6 @@ describe('backend protocol guards', () => {
     expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
     expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{ agentId: string; backend?: AgentBackend; threadId?: string; turnId?: string }>();
-    type ApprovalRequestedEvent = Extract<ClawBackendEvent, { type: 'approval.requested' }>;
-    type CodexApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'codex' }>;
-    type ClaudeApprovalRequestedEvent = Extract<ApprovalRequestedEvent, { backend: 'claude' }>;
-    expectTypeOf<ApprovalRequestedEvent['payload']>()
-      .toEqualTypeOf<Extract<ClientRequest, { kind: 'confirm_tool' }>>();
-    expectTypeOf<Pick<CodexApprovalRequestedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
-      .toEqualTypeOf<{ agentId: string; backend: 'codex'; threadId: string; turnId?: string }>();
-    expectTypeOf<Pick<ClaudeApprovalRequestedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
-      .toEqualTypeOf<{ agentId: string; backend: 'claude'; threadId?: string; turnId: string }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'toolInput.requested' }>['payload']>()
-      .toEqualTypeOf<Extract<ClientRequest, { kind: 'ask_user' }>>();
     expectTypeOf<Extract<ClawBackendEvent, { type: 'backendApproval.requested' }>['payload']>()
       .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
     expectTypeOf<Extract<ClawBackendEvent, { type: 'backendApproval.resolved' }>['payload']>()
@@ -173,11 +130,6 @@ describe('backend protocol guards', () => {
         scope: BackendApprovalScope | null;
         reason: 'host' | 'server' | 'conversation_closed' | 'conversation_removed' | 'surface_disconnected';
       }>();
-    type ErrorEvent = Extract<ClawBackendEvent, { type: 'error' }>;
-    expectTypeOf<ErrorEvent['payload']>()
-      .toEqualTypeOf<{ message: string; willRetry?: boolean; error?: unknown }>();
-    expectTypeOf<Pick<ErrorEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
-      .toEqualTypeOf<{ agentId: string; backend?: AgentBackend; threadId?: string; turnId?: string }>();
     expectTypeOf<AnnotationEvent['seq']>().toEqualTypeOf<number>();
     expectTypeOf<AnnotationEvent['occurredAt']>().toEqualTypeOf<string>();
     expectTypeOf<AnnotationEvent['clientState']>().toEqualTypeOf<ClientState | undefined>();

@@ -3,7 +3,6 @@ import path from 'node:path';
 import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
-import { snapshotMetadata } from '@codex-claw/core/snapshot';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import {
   createTestSnapshot,
@@ -11,7 +10,6 @@ import {
   createRemoteAgent,
   createRemoteTeamSnapshot,
   createWorkItem,
-  createTextMessage,
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
@@ -426,10 +424,8 @@ describe('ClawBackendServer', () => {
     snapshot.activeAgentId = 'agent-remote';
     const remoteAgent = createRemoteAgent();
     const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
-    const remoteSnapshotWithMessage = {
-      ...remoteSnapshot,
-      messages: [createTextMessage('message-user', 'agent-remote', 'hello')],
-    };
+    const remoteSnapshotAfterPrompt = structuredClone(remoteSnapshot);
+    remoteSnapshotAfterPrompt.agents[0]!.status = { type: 'working' };
     const remoteClients = {
       request: vi.fn()
         .mockResolvedValueOnce({
@@ -440,7 +436,7 @@ describe('ClawBackendServer', () => {
             shouldPreventDisplaySleep: false,
           },
         })
-        .mockResolvedValueOnce(remoteSnapshotWithMessage),
+        .mockResolvedValueOnce(remoteSnapshotAfterPrompt),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const server = new ClawBackendServer({
@@ -491,7 +487,7 @@ describe('ClawBackendServer', () => {
     expect(snapshot.agents).toStrictEqual([]);
   });
 
-  it('rejects malformed remote full and metadata snapshots without adopting them', async () => {
+  it('rejects malformed remote snapshots without adopting them', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams = [{
@@ -507,13 +503,13 @@ describe('ClawBackendServer', () => {
     const malformedFullSnapshot = structuredClone(remoteSnapshot);
     malformedFullSnapshot.agents[0]!.name = 'Malformed full snapshot';
     (malformedFullSnapshot.general.appshots as unknown as Record<string, unknown>).hotkey = 42;
-    const malformedMetadata = snapshotMetadata(structuredClone(remoteSnapshot));
-    malformedMetadata.agents[0]!.name = 'Malformed metadata snapshot';
-    (malformedMetadata.general.plugins as unknown as Record<string, unknown>).computerUseEnabled = 'yes';
-    const validMetadata = snapshotMetadata(structuredClone(remoteSnapshot));
-    validMetadata.agents[0]!.name = 'Metadata event update';
+    const malformedResult = structuredClone(remoteSnapshot);
+    malformedResult.agents[0]!.name = 'Malformed result snapshot';
+    (malformedResult.general.plugins as unknown as Record<string, unknown>).computerUseEnabled = 'yes';
+    const validUpdatedSnapshot = structuredClone(remoteSnapshot);
+    validUpdatedSnapshot.agents[0]!.name = 'Remote event update';
     const validFullSnapshot = structuredClone(remoteSnapshot);
-    validFullSnapshot.messages = [createTextMessage('message-remote-event', remoteAgent.id, 'Remote event')];
+    validFullSnapshot.agents[0]!.status = { type: 'working' };
     const remoteClients = {
       request: vi.fn(async (_connection, method: string, _params, onEvent?: (event: unknown) => void) => {
         if (method === 'snapshot/get') {
@@ -537,7 +533,7 @@ describe('ClawBackendServer', () => {
           onEvent?.({
             seq: 2,
             type: 'snapshot.updated',
-            payload: validMetadata,
+            payload: validUpdatedSnapshot,
             occurredAt: '2026-06-13T00:00:01.000Z',
           });
           onEvent?.({
@@ -546,7 +542,7 @@ describe('ClawBackendServer', () => {
             payload: malformedFullSnapshot,
             occurredAt: '2026-06-13T00:00:02.000Z',
           });
-          return malformedMetadata;
+          return malformedResult;
         }
         throw new Error(`Unexpected remote method: ${method}`);
       }),
@@ -578,7 +574,7 @@ describe('ClawBackendServer', () => {
     });
 
     expect(selection).toMatchObject({ result: { agents: [{ name: 'Dina' }] } });
-    expect(prompt).toMatchObject({ result: { agents: [{ name: 'Metadata event update' }] } });
+    expect(prompt).toMatchObject({ result: { agents: [{ name: 'Remote event update' }] } });
     await server.close();
   });
 
@@ -726,13 +722,9 @@ describe('ClawBackendServer', () => {
     snapshot.activeAgentId = 'agent-remote';
     const remoteAgent = createRemoteAgent();
     const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
-    remoteSnapshot.messages = [
-      createTextMessage('user-turn-1', remoteAgent.id, 'first prompt', 'turn-1'),
-      createTextMessage('assistant-turn-1', remoteAgent.id, 'first answer', 'turn-1', 'assistant'),
-    ];
     const remoteSnapshotAfterAction = {
       ...remoteSnapshot,
-      messages: [createTextMessage('message-after-action', remoteAgent.id, 'after action')],
+      agents: [{ ...remoteAgent, status: { type: 'idle' as const } }],
     };
     const remoteClients = {
       request: vi.fn(async (_connection, method: string) => {
@@ -762,11 +754,7 @@ describe('ClawBackendServer', () => {
       id: 'delete-turn',
       method: 'agent/turn/delete',
       params: { agentId: 'agent-remote', turnId: 'turn-1' },
-    })).resolves.toMatchObject({
-      result: {
-        messages: [{ id: 'message-after-action', agentId: 'agent-remote' }],
-      },
-    });
+    })).resolves.toMatchObject({ result: { agents: [{ id: remoteAgent.id }] } });
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'edit',
@@ -808,7 +796,6 @@ describe('ClawBackendServer', () => {
       { agentId: 'agent-remote', turnId: 'turn-1' },
       expect.any(Function),
     );
-    expect(snapshot.messages).toStrictEqual([]);
   });
 
   it('rejects moving a local agent into a remote team pointer', async () => {
@@ -895,10 +882,6 @@ describe('ClawBackendServer', () => {
       activeAgentId: otherRemoteAgent.id,
     });
     remoteSnapshot.agents.push(otherRemoteAgent);
-    remoteSnapshot.messages = [
-      createTextMessage('message-remote', remoteAgent.id, 'hello from selected team', 'turn-selected'),
-      createTextMessage('message-other-remote', otherRemoteAgent.id, 'hello from other team', 'turn-other'),
-    ];
     remoteSnapshot.agentGitStatuses = {
       [remoteAgent.id]: {
         folder: remoteAgent.folder!,
@@ -927,6 +910,7 @@ describe('ClawBackendServer', () => {
     };
     remoteSnapshot.turnGitDiffs = {
       'turn-selected': {
+        agentId: remoteAgent.id,
         turnId: 'turn-selected',
         addedLines: 3,
         removedLines: 0,
@@ -934,6 +918,7 @@ describe('ClawBackendServer', () => {
         updatedAt: '2026-06-13T00:00:00.000Z',
       },
       'turn-other': {
+        agentId: otherRemoteAgent.id,
         turnId: 'turn-other',
         addedLines: 10,
         removedLines: 1,
@@ -967,7 +952,6 @@ describe('ClawBackendServer', () => {
       result: {
         snapshot: {
           agents: [expect.objectContaining({ id: remoteAgent.id, teamId: 'team-pointer' })],
-          messages: [],
           agentGitStatuses: {
             [remoteAgent.id]: expect.objectContaining({ branch: 'main' }),
           },
@@ -985,7 +969,6 @@ describe('ClawBackendServer', () => {
     expect(response).toHaveProperty('result');
     const projectedSnapshot = (response as { result: { snapshot: AppSnapshot } }).result.snapshot;
     expect(projectedSnapshot.agents.some((agent) => agent.id === otherRemoteAgent.id)).toBe(false);
-    expect(projectedSnapshot.messages.some((message) => message.id === 'message-other-remote')).toBe(false);
     expect(projectedSnapshot.agentGitStatuses[otherRemoteAgent.id]).toBeUndefined();
     expect(projectedSnapshot.turnGitDiffs['turn-other']).toBeUndefined();
   });

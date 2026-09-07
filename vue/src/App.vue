@@ -5,7 +5,6 @@
     :snapshot="snapshot"
     :active-agent="activeAgent"
     :unread-agent-ids="unreadAgentIds"
-    :messages="visibleMessages"
     :codex-conversation-snapshot="activeCodexConversationSnapshot"
     :claude-conversation-snapshot="activeClaudeConversationSnapshot"
     :is-loading="isLoading"
@@ -223,7 +222,6 @@ const {
   activeBackendApprovals,
   activeApprovalPreset,
   activePermissionMode,
-  visibleMessages,
   activeQueuedPrompts,
   activeComposerState,
   activeComposerAttachments,

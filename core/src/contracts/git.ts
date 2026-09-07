@@ -99,6 +99,7 @@ export type AgentGitMessageGenerationResult =
   | { kind: 'pullRequest'; title: string; body: string };
 
 export type TurnGitDiff = {
+  agentId: string;
   turnId: string;
   addedLines: number;
   removedLines: number;

@@ -44,20 +44,10 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
-  it('uses the provider-owned Codex conversation instead of a divergent Claw transcript', () => {
+  it('uses the provider-owned Codex conversation', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.backendSession = { kind: 'codex', threadId: 'thread-provider' };
-    const staleClawMessage: RendererMessage = {
-      id: 'stale-claw-message',
-      agentId: agent.id,
-      role: 'assistant',
-      status: 'complete',
-      turnId: 'turn-stale',
-      parts: [{ type: 'text', text: 'Stale Claw transcript' }],
-      createdAt: '2026-09-06T00:00:00.000Z',
-    };
-    snapshot.messages = [staleClawMessage];
     const providerMessages = [
       codexTextMessage('provider-user', 'user', 'Provider prompt', 'turn-provider'),
       codexTextMessage('provider-assistant', 'assistant', 'Provider response', 'turn-provider'),
@@ -97,16 +87,12 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
   });
 
-  it('uses the provider-owned Claude conversation instead of the global transcript', () => {
+  it('uses the provider-owned Claude conversation', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.backend = 'claude';
     agent.backendDefaults = { kind: 'claude' };
     agent.backendSession = { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' };
-    snapshot.messages = [{
-      id: 'stale-global', agentId: agent.id, role: 'assistant', status: 'complete',
-      createdAt: '2026-09-06T00:00:00.000Z', parts: [{ type: 'text', text: 'Stale' }],
-    }];
     const messages: RendererMessage[] = [{
       id: 'claude-owned', agentId: agent.id, role: 'assistant', status: 'complete', turnId: 'turn-1',
       createdAt: '2026-09-06T00:00:01.000Z', parts: [{ type: 'text', text: 'Provider owned' }],
@@ -135,26 +121,6 @@ describe('AppShell authentication and conversation', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.backendSession = { kind: 'codex', threadId: 'thread-edit' };
-    snapshot.messages = [
-      {
-        id: 'user-turn-edit',
-        agentId: agent.id,
-        role: 'user',
-        status: 'complete',
-        turnId: 'turn-edit',
-        parts: [{ type: 'text', text: 'Original prompt' }],
-        createdAt: '2026-09-06T00:00:00.000Z',
-      },
-      {
-        id: 'assistant-turn-edit',
-        agentId: agent.id,
-        role: 'assistant',
-        status: 'complete',
-        turnId: 'turn-edit',
-        parts: [{ type: 'text', text: 'Original response' }],
-        createdAt: '2026-09-06T00:00:01.000Z',
-      },
-    ];
     const providerMessages = [
       codexTextMessage('user-turn-edit', 'user', 'Original prompt', 'turn-edit'),
       codexTextMessage('assistant-turn-edit', 'assistant', 'Original response', 'turn-edit'),
@@ -325,7 +291,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0] ?? null,
-        messages: [],
         isLoading: false,
         isSending: false,
         connectionState: { status: 'reconnecting', detail: 'socket closed' },
@@ -394,7 +359,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: snapshot.messages,
         isLoading: false,
         isSending: false,
       },
@@ -427,20 +391,23 @@ describe('AppShell authentication and conversation', () => {
       updatedAt: '2026-08-01T00:00:00.000Z',
     };
     activeAgent.plan = plan;
-    const messages: RendererMessage[] = [{
-      id: 'assistant-plan',
-      agentId: activeAgent.id,
-      role: 'assistant',
-      status: 'streaming',
-      turnId: 'turn-plan',
-      parts: [],
-      createdAt: '2026-08-01T00:00:00.000Z',
-    }];
+    activeAgent.backendSession = { kind: 'codex', threadId: 'thread-plan' };
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
         activeAgent,
-        messages,
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('assistant-plan', 'assistant', '', 'turn-plan'),
+        ], {
+          activeConversationId: 'thread-plan',
+          activeTurnId: 'turn-plan',
+          turnIds: ['turn-plan'],
+          turns: [{
+            id: 'turn-plan', status: 'inProgress', error: null, willRetry: false,
+            startedAt: '2026-08-01T00:00:00.000Z', completedAt: null, durationMs: null,
+          }],
+          busy: true,
+        }),
         isLoading: false,
         isSending: true,
       },
@@ -474,7 +441,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isConversationLoading: true,
         isSending: false,
@@ -487,15 +453,16 @@ describe('AppShell authentication and conversation', () => {
 
     await wrapper.setProps({
       isConversationLoading: false,
-      messages: [{
-        id: 'assistant-newer-turn',
-        agentId: activeAgent.id,
-        role: 'assistant',
-        status: 'complete',
-        turnId: 'turn-newer',
-        parts: [{ type: 'text', text: 'Newer work completed.' }],
-        createdAt: '2026-08-02T00:00:00.000Z',
-      }],
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('assistant-newer-turn', 'assistant', 'Newer work completed.', 'turn-newer'),
+      ], {
+        activeConversationId: 'thread-persisted',
+        turnIds: ['turn-newer'],
+        turns: [{
+          id: 'turn-newer', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-08-02T00:00:00.000Z', completedAt: '2026-08-02T00:00:01.000Z', durationMs: 1_000,
+        }],
+      }),
     } as Record<string, unknown>);
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
@@ -517,14 +484,6 @@ describe('AppShell authentication and conversation', () => {
     expect(retryAgentHistory).toHaveBeenCalledOnce();
 
     const snapshot = createInitialSnapshot();
-    snapshot.messages.push({
-      id: 'message-existing',
-      agentId: snapshot.agents[0]!.id,
-      role: 'assistant',
-      status: 'complete',
-      parts: [{ type: 'text', text: 'Keep me visible.' }],
-      createdAt: '2026-09-05T00:00:00.000Z',
-    });
     const withMessages = mountShell({
       snapshot,
       isConversationLoadFailed: true,
@@ -542,7 +501,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -591,7 +549,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: snapshot.messages,
         isLoading: false,
         isSending: false,
         codexConversationSnapshot: providerSnapshot,
@@ -612,7 +569,7 @@ describe('AppShell authentication and conversation', () => {
     const state = conversationControllerState(wrapper);
     expect(state.identity).toMatchObject({
       conversationKey: 'codex:thread-dina',
-      messages: snapshot.messages,
+      messages: providerSnapshot.messages,
       busy: false,
       disabled: false,
       activeTurnId: null,
@@ -652,10 +609,6 @@ describe('AppShell authentication and conversation', () => {
       'controller-reactive-message', 'assistant', 'Updated through the stable controller.', 'turn-controller',
     )];
     await wrapper.setProps({
-      messages: [{
-        id: 'stale-claw-row', agentId: activeAgent.id, role: 'assistant', status: 'complete',
-        createdAt: '2026-08-04T00:00:00.000Z', parts: [{ type: 'text', text: 'Must not render.' }],
-      }],
       isSending: true,
       codexConversationSnapshot: codexConversationSnapshot(updatedMessages, {
         activeConversationId: 'thread-dina',
@@ -789,7 +742,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isSending: false,
         backendCapabilities: claudeBackendCapabilities,

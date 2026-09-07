@@ -578,7 +578,6 @@ export type AppSnapshot = {
   automations: Automation[];
   activeTeamId: string | null;
   activeAgentId: string | null;
-  messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
@@ -592,13 +591,6 @@ export type AppSnapshot = {
   sourceFolder: SourceFolderState;
   theme: AppThemeSettings;
 };
-
-/**
- * Application state that can be synchronized without retransmitting cached
- * conversation transcripts. Messages have their own incremental event stream
- * and explicit history-hydration path.
- */
-export type AppSnapshotMetadata = Omit<AppSnapshot, 'messages'>;
 
 export type RendererSnapshotState = {
   snapshot: AppSnapshot;
@@ -642,68 +634,6 @@ type TurnEventContext = {
 type ThreadTurnEventContext = TurnEventContext & {
   threadId: string;
 };
-type CodexTurnStartedPayload = {
-  status: 'inProgress';
-  startedAt: string;
-};
-type ClaudeTurnStartedPayload = {
-  turn: {
-    id: string;
-    backend: 'claude';
-  };
-};
-type TurnPlanUpdatedPayload = {
-  explanation: string | null;
-  plan: ThreadPlanStep[];
-  markdown?: string;
-  status?: 'running' | 'completed';
-};
-type CodexProposedPlanDeltaPayload = {
-  itemId: string;
-  delta: string;
-  markdown: string;
-};
-type ClaudeProposedPlanDeltaPayload = Omit<CodexProposedPlanDeltaPayload, 'markdown'>;
-type ProposedPlanCompletedPayload = {
-  itemId: string;
-  markdown: string;
-};
-type CodexTurnCompletedPayload = {
-  status: 'completed' | 'interrupted' | 'failed' | 'inProgress';
-  error?: {
-    message: string;
-    additionalDetails: string | null;
-    codexErrorInfo: unknown;
-  } | null;
-  willRetry?: boolean;
-  startedAt?: string | null;
-  completedAt?: string | null;
-  durationMs?: number | null;
-};
-type ClaudeTurnCompletedPayload = {
-  turn: {
-    id: string;
-    status: 'completed' | 'interrupted';
-  };
-};
-type CompactionPayload = { itemId: string | null } | Record<string, never>;
-type ThreadHistoryLoadedPayload = {
-  messages: RendererMessage[];
-  replace?: boolean;
-  preserveKnownTurns?: boolean;
-  preserveKnownMessages?: boolean;
-  hasOlderMessages?: boolean;
-};
-type MessageDeltaPayload = {
-  delta: string;
-  messageId?: string;
-  itemId?: string;
-  phase?: Extract<RendererMessagePart, { type: 'text' }>['phase'];
-};
-type MessageSteerPayload = {
-  prompt: string;
-  attachments?: readonly PromptAttachment[];
-};
 type AgentPromptQueuedPayload = {
   id: string;
   text: string;
@@ -716,36 +646,12 @@ type AgentPromptRetryScheduledPayload = {
   lastError: string;
   retryAt?: string;
 };
-type RendererToolPartEventPayload = {
-  messageId?: string;
-  toolPart: RendererToolPart;
-};
-type RendererToolPartUpdateEventPayload = RendererToolPartUpdate & {
-  messageId?: string;
-};
-type CodexClientRequestEventContext = {
-  agentId: string;
-  backend: 'codex';
-  threadId: string;
-  turnId?: string;
-};
-type ClaudeClientRequestEventContext = {
-  agentId: string;
-  backend: 'claude';
-  backendSessionId?: string;
-  turnId: string;
-};
 type BackendApprovalResolutionReason =
   | 'host'
   | 'server'
   | 'conversation_closed'
   | 'conversation_removed'
   | 'surface_disconnected';
-type BackendErrorPayload = {
-  message: string;
-  willRetry?: boolean;
-  error?: unknown;
-};
 export type MainToRendererEvent =
   | MainToRendererEventWith<{
       type: 'backend.statusChanged';
@@ -758,7 +664,7 @@ export type MainToRendererEvent =
     }>
   | MainToRendererEventWith<{
       type: 'snapshot.updated';
-      payload: AppSnapshotMetadata;
+      payload: AppSnapshot;
     }>
   | MainToRendererEventWith<{
       type: 'account.rateLimitsUpdated';
@@ -928,11 +834,6 @@ export type MainToRendererEvent =
       payload: AgentContextUsage | { contextUsage: AgentContextUsage };
     }>
   | MainToRendererEventWith<{
-      type: 'thread.historyLoaded';
-      agentId: string;
-      payload: ThreadHistoryLoadedPayload;
-    }>
-  | MainToRendererEventWith<{
       type: 'thread.historyHydrationFailed';
       agentId: string;
       payload: Record<string, never>;
@@ -965,52 +866,6 @@ export type MainToRendererEvent =
       threadId: string;
       payload: SubagentStatusChange;
     }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'turn.started';
-      payload: CodexTurnStartedPayload | ClaudeTurnStartedPayload;
-    }>
-  | MainToRendererEventWith<ThreadTurnEventContext & {
-      type: 'turn.planUpdated';
-      payload: TurnPlanUpdatedPayload;
-    }>
-  | MainToRendererEventWith<ThreadTurnEventContext & {
-      type: 'turn.proposedPlanDelta';
-      payload: CodexProposedPlanDeltaPayload | ClaudeProposedPlanDeltaPayload;
-    }>
-  | MainToRendererEventWith<ThreadTurnEventContext & {
-      type: 'turn.proposedPlanCompleted';
-      payload: ProposedPlanCompletedPayload;
-    }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'turn.completed';
-      payload: CodexTurnCompletedPayload | ClaudeTurnCompletedPayload;
-    }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'context.compactionStarted';
-      payload: CompactionPayload;
-    }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'context.compactionCompleted';
-      payload: CompactionPayload;
-    }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'message.delta';
-      payload: MessageDeltaPayload;
-    }>
-  | MainToRendererEventWith<ThreadTurnEventContext & {
-      type: 'message.updated';
-      payload: { message: RendererMessage };
-    }>
-  | MainToRendererEventWith<{
-      type: 'message.userSubmitted';
-      agentId: string;
-      payload: { message: RendererMessage };
-    }>
-  | MainToRendererEventWith<{
-      type: 'message.steer';
-      agentId: string;
-      payload: MessageSteerPayload;
-    }>
   | MainToRendererEventWith<{
       type: 'agent.promptQueued';
       agentId: string;
@@ -1026,21 +881,9 @@ export type MainToRendererEvent =
       agentId: string;
       payload: { ids: string[] };
     }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'item.started';
-      payload: RendererToolPartEventPayload;
-    }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'item.completed';
-      payload: RendererToolPartEventPayload;
-    }>
-  | MainToRendererEventWith<TurnEventContext & {
-      type: 'item.updated';
-      payload: RendererToolPartUpdateEventPayload;
-    }>
   | MainToRendererEventWith<ThreadTurnEventContext & {
       type: 'diff.updated';
-      payload: Omit<TurnGitDiff, 'turnId' | 'updatedAt'>;
+      payload: Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>;
     }>
   | MainToRendererEventWith<ThreadTurnEventContext & {
       type: 'file.activity';
@@ -1050,22 +893,6 @@ export type MainToRendererEvent =
       type: 'git.statusUpdated';
       agentId: string;
       payload: AgentGitStatus;
-    }>
-  | MainToRendererEventWith<CodexClientRequestEventContext & {
-      type: 'approval.requested';
-      payload: Extract<ClientRequest, { kind: 'confirm_tool' }>;
-    }>
-  | MainToRendererEventWith<ClaudeClientRequestEventContext & {
-      type: 'approval.requested';
-      payload: Extract<ClientRequest, { kind: 'confirm_tool' }>;
-    }>
-  | MainToRendererEventWith<CodexClientRequestEventContext & {
-      type: 'toolInput.requested';
-      payload: Extract<ClientRequest, { kind: 'ask_user' }>;
-    }>
-  | MainToRendererEventWith<ClaudeClientRequestEventContext & {
-      type: 'toolInput.requested';
-      payload: Extract<ClientRequest, { kind: 'ask_user' }>;
     }>
   | MainToRendererEventWith<{
       type: 'backendApproval.requested';
@@ -1087,11 +914,6 @@ export type MainToRendererEvent =
         scope: BackendApprovalScope | null;
         reason: BackendApprovalResolutionReason;
       };
-    }>
-  | MainToRendererEventWith<{
-      type: 'error';
-      agentId: string;
-      payload: BackendErrorPayload;
     }>;
 
 export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
@@ -1296,10 +1118,10 @@ export type CodexClawApi = {
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
-  hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata>;
+  hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
   loadOlderAgentHistory(agentId: string): Promise<AgentHistoryLoadResult>;
   closeAgent(agentId: string, input?: AgentCloseInput): Promise<AppSnapshot>;
-  selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
+  selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): Promise<SpokenAnnouncementQueueResult>;
   getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;
@@ -1325,8 +1147,8 @@ export type CodexClawApi = {
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
   setAgentPermissionMode(agentId: string, mode: string): Promise<AppSnapshot>;
-  sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
-  steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
+  sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot>;
+  steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   steerQueuedPrompt(agentId: string, promptId: string, prompt?: string): Promise<AppSnapshot>;
   updateQueuedPrompt(agentId: string, promptId: string, prompt: string): Promise<AppSnapshot>;

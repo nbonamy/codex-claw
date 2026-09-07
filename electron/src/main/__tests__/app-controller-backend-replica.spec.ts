@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
-import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -14,14 +14,6 @@ describe('AppController', () => {
     const staleSnapshot = createInitialSnapshot();
     const replacementSnapshot = createInitialSnapshot();
     replacementSnapshot.agents[0]!.status = { type: 'working' };
-    replacementSnapshot.messages = [{
-      id: 'message-replacement',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'complete',
-      parts: [{ type: 'text', text: 'Replacement transcript' }],
-      createdAt: '2026-08-02T14:00:00.000Z',
-    }];
     let resolveClientState!: (state: ClientState) => void;
     const clientState = new Promise<ClientState>((resolve) => {
       resolveClientState = resolve;
@@ -48,9 +40,7 @@ describe('AppController', () => {
 
     await expect(adoption).resolves.toBe(staleSnapshot);
     expect(currentSnapshot(controller)).not.toBe(staleSnapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
-    expect(staleSnapshot.messages).toBe(replacementSnapshot.messages);
   });
 
   it('hydrates its metadata cache from clawd snapshot state', async () => {
@@ -85,28 +75,22 @@ describe('AppController', () => {
     await controller.initialize();
 
     expect(request).toHaveBeenCalledWith('snapshot/get');
-    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller).activeAgentId).toBe('agent-dina');
+    expect(currentSnapshot(controller).sourceFolder).toStrictEqual(backendSnapshot.sourceFolder);
     expect(currentClientState(controller)).toStrictEqual(clientState);
   });
 
-  it('forwards transcript-free synchronization snapshots to the renderer', async () => {
+  it('forwards synchronization snapshots to the renderer', async () => {
     const backendSnapshot = createInitialSnapshot();
-    backendSnapshot.messages.push({
-      id: 'large-history-message',
-      agentId: 'agent-dina',
-      role: 'assistant',
-      status: 'complete',
-      createdAt: '2026-08-04T00:00:00.000Z',
-      parts: [{ type: 'text', text: 'A'.repeat(10_000) }],
-    });
+    backendSnapshot.agents[0]!.status = { type: 'working' };
     const clientState: ClientState = { sourceFolderPath: '', shouldPreventDisplaySleep: false };
     const backendClient = createBackendClient({
       request: vi.fn(),
     });
     backendClient.request = vi.fn(async (method: string) => {
       if (method === backendMethods.snapshotGet) {
-        return { snapshot: { ...backendSnapshot, messages: [] }, lastEventSeq: 0, clientState };
+        return { snapshot: backendSnapshot, lastEventSeq: 0, clientState };
       }
       if (method === backendMethods.clientStateGet) return clientState;
       return {};
@@ -114,12 +98,12 @@ describe('AppController', () => {
     const controller = new AppController(createInitialSnapshot(), backendClient);
 
     await controller.initialize();
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
 
     const rendererState = await callPrivate<RendererSnapshotState>(controller, 'getSnapshotState');
 
-    expect(rendererState.snapshot.messages).toStrictEqual([]);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(rendererState.snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
+    expect(rendererState.lastBackendEventSeq).toBe(0);
+    expect(rendererState.connection).toStrictEqual({ status: 'connected' });
   });
 
   it('reconnects the selected backend transport and refreshes its snapshot after disconnect', async () => {
@@ -165,8 +149,8 @@ describe('AppController', () => {
 
     await vi.advanceTimersByTimeAsync(250);
     expect(backendClient.start).toHaveBeenCalledTimes(2);
-    expect(currentSnapshot(controller)).not.toBe(reconnectedSnapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(reconnectedSnapshot);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       type: 'client.connectionChanged',
       payload: { status: 'connected' },
@@ -208,8 +192,8 @@ describe('AppController', () => {
     });
     await controller.shutdown();
 
-    expect(currentSnapshot(controller)).not.toBe(backendSnapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(backendSnapshot);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 1,
       backend: 'codex',
@@ -245,8 +229,7 @@ describe('AppController', () => {
       occurredAt: '2026-06-13T00:00:00.000Z',
     });
 
-    expect(currentSnapshot(controller)).not.toBe(snapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(payloadSnapshot);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
       seq: 1,
@@ -270,35 +253,48 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-dina',
-      turnId: 'turn-image',
-      type: 'message.updated',
+      type: 'codex.conversationEventReceived',
       payload: {
-        message: {
-          id: 'assistant-turn-image',
-          agentId: 'agent-dina',
-          role: 'assistant',
-          status: 'complete',
+        revision: 1,
+        event: {
+          seq: 1,
+          occurredAt: '2026-08-30T18:33:55.000Z',
+          origin: 'notification',
+          conversationId: 'thread-dina',
           turnId: 'turn-image',
-          createdAt: '2026-08-30T18:33:55.000Z',
-          parts: [{
-            type: 'media',
-            itemId: 'image-live',
-            media: {
-              url: generatedImageUrl,
-              alt: 'Generated image',
-              mimeType: 'image/png',
-              title: 'Generated image',
+          type: 'message.updated',
+          payload: {
+            message: {
+              id: 'assistant-turn-image',
+              agentId: 'agent-dina',
+              role: 'assistant',
+              status: 'complete',
+              turnId: 'turn-image',
+              createdAt: '2026-08-30T18:33:55.000Z',
+              parts: [{
+                type: 'media',
+                itemId: 'image-live',
+                media: {
+                  url: generatedImageUrl,
+                  alt: 'Generated image',
+                  mimeType: 'image/png',
+                  title: 'Generated image',
+                },
+              }],
             },
-          }],
-        },
+          },
+        } as unknown as Extract<ClawBackendEvent, { type: 'codex.conversationEventReceived' }>['payload']['event'],
       },
       occurredAt: '2026-08-30T18:33:55.000Z',
     });
 
     const rendererEvent = send.mock.calls.find(([channel, event]) => (
-      channel === ipcChannels.event && event.type === 'message.updated'
+      channel === ipcChannels.event && event.type === 'codex.conversationEventReceived'
     ))?.[1] as MainToRendererEvent | undefined;
-    const message = (rendererEvent?.payload as { message?: RendererMessage } | undefined)?.message;
+    const message = rendererEvent?.type === 'codex.conversationEventReceived'
+      && rendererEvent.payload.event.type === 'message.updated'
+      ? rendererEvent.payload.event.payload.message
+      : undefined;
     const media = message?.parts.find((part) => part.type === 'media');
 
     expect(media?.type === 'media' ? media.media.url : null).toMatch(/^codex-claw-media:\/\/generated\//);
@@ -320,13 +316,13 @@ describe('AppController', () => {
     }).emitBackendEvent({
       seq: 1,
       type: 'snapshot.updated',
-      payload: snapshotMetadata(snapshot),
+      payload: snapshot,
       occurredAt: '2026-06-13T00:00:00.000Z',
       snapshot: malformedSnapshot as unknown as AppSnapshot,
     });
     const malformedPayload = structuredClone(snapshot);
     malformedPayload.agents[0]!.name = 'Malformed payload';
-    (malformedPayload as unknown as Record<string, unknown>).messages = {};
+    (malformedPayload.sourceFolder as unknown as Record<string, unknown>).initialized = 'yes';
     (controller as unknown as {
       emitBackendEvent(event: ClawBackendEvent): void;
     }).emitBackendEvent({
@@ -336,8 +332,7 @@ describe('AppController', () => {
       occurredAt: '2026-06-13T00:00:01.000Z',
     } as unknown as ClawBackendEvent);
 
-    expect(currentSnapshot(controller)).not.toBe(snapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toBe(snapshot);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'idle' });
     expect(currentSnapshot(controller).agents[0]?.name).toBe('Dina');
     expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
@@ -407,95 +402,6 @@ describe('AppController', () => {
     expect(currentSnapshot(controller).accountRateLimits).toStrictEqual(rateLimits);
   });
 
-  it('caches plan updates emitted by clawd', async () => {
-    const snapshot = createInitialSnapshot();
-    const send = vi.fn();
-    const controller = new AppController(snapshot, createBackendClient());
-
-    await controller.initialize();
-    setMainWindowSend(controller, send);
-    emitBackendEvent(controller, {
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.planUpdated',
-      payload: {
-        explanation: 'Current plan',
-        plan: [
-          { step: 'Inspect app-server event', status: 'completed' },
-          { step: 'Preview markdown', status: 'inProgress' },
-        ],
-      },
-      occurredAt: '2026-06-05T10:11:12.000Z',
-    });
-    await flushMicrotasks();
-
-    expect(snapshot.agents[0].plan).toStrictEqual({
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      kind: 'execution',
-      status: 'inProgress',
-      explanation: 'Current plan',
-      steps: [
-        { step: 'Inspect app-server event', status: 'completed' },
-        { step: 'Preview markdown', status: 'inProgress' },
-      ],
-      markdown: 'Current plan\n- [x] Inspect app-server event\n- [ ] Preview markdown',
-      updatedAt: '2026-06-05T10:11:12.000Z',
-    });
-    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.planUpdated',
-    }));
-    expect(send).not.toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      type: 'sidePanel.markdownRequested',
-    }));
-  });
-
-  it('caches completed plan items emitted by clawd', async () => {
-    const snapshot = createInitialSnapshot();
-    const send = vi.fn();
-    const controller = new AppController(snapshot, createBackendClient());
-
-    await controller.initialize();
-    setMainWindowSend(controller, send);
-    emitBackendEvent(controller, {
-      agentId: 'agent-dina',
-      backend: 'codex',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.proposedPlanCompleted',
-      payload: {
-        itemId: 'turn-plan-plan',
-        markdown: '# Dummy False Plan\n\n- [ ] Do not implement',
-      },
-      occurredAt: '2026-06-05T10:11:12.000Z',
-    });
-
-    expect(snapshot.agents[0].plan).toStrictEqual({
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      kind: 'proposed',
-      status: 'completed',
-      explanation: '',
-      steps: [],
-      markdown: '# Dummy False Plan\n\n- [ ] Do not implement',
-      updatedAt: '2026-06-05T10:11:12.000Z',
-    });
-    await flushMicrotasks();
-    expect(send).toHaveBeenLastCalledWith(ipcChannels.event, expect.objectContaining({
-      agentId: 'agent-dina',
-      threadId: 'thread-dina',
-      turnId: 'turn-plan',
-      type: 'turn.proposedPlanCompleted',
-    }));
-    expect(send).not.toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      type: 'sidePanel.markdownRequested',
-    }));
-  });
 
   it('caches turn diff updates emitted by clawd without deriving side-panel previews', async () => {
     const snapshot = createInitialSnapshot();

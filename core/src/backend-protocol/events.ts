@@ -114,15 +114,11 @@ function expectEventContext(event: EventRecord): void {
     case 'agent.updated':
     case 'agent.statusChanged':
     case 'thread.goalCleared':
-    case 'thread.historyLoaded':
     case 'thread.historyHydrationFailed':
-    case 'message.userSubmitted':
-    case 'message.steer':
     case 'agent.promptQueued':
     case 'agent.promptRetryScheduled':
     case 'agent.promptDequeued':
     case 'git.statusUpdated':
-    case 'error':
       expectAgent(event);
       return;
     case 'clientRequest.resolved':
@@ -183,29 +179,9 @@ function expectEventContext(event: EventRecord): void {
       expectAgentBackend(event);
       expectRequiredString(event, 'threadId');
       return;
-    case 'turn.planUpdated':
-    case 'turn.proposedPlanDelta':
-    case 'turn.proposedPlanCompleted':
-    case 'message.updated':
     case 'diff.updated':
     case 'file.activity':
       expectTurnContext(event, true);
-      return;
-    case 'turn.started':
-    case 'turn.completed':
-    case 'context.compactionStarted':
-    case 'context.compactionCompleted':
-    case 'message.delta':
-    case 'item.started':
-    case 'item.updated':
-    case 'item.completed':
-      expectTurnContext(event, false);
-      return;
-    case 'approval.requested':
-    case 'toolInput.requested':
-      expectAgentBackend(event);
-      if (event.backend === 'codex') expectRequiredString(event, 'threadId');
-      else expectRequiredString(event, 'turnId');
       return;
     case 'backendApproval.requested':
     case 'backendApproval.resolved':

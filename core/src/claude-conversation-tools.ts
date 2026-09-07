@@ -1,17 +1,10 @@
-import type {
-  AppSnapshot,
-  RendererMessagePart,
-  TurnGitDiff,
-} from './contracts';
+import type { ClaudeConversationEvent, ClaudeConversationSnapshot } from './contracts';
 import {
-  finiteNonNegativeInteger,
   isRecord,
   parseJsonPreview,
   stringValue,
-  toolStatusDescriptor,
   type ToolPart,
-} from './snapshot-conversation-payloads';
-import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
+} from './claude-conversation-payloads';
 import {
   assistantMessageId,
   ensureAssistantMessage,
@@ -19,11 +12,11 @@ import {
   findAssistantMessages,
   findAssistantMessageWithToolPart,
   pruneSupersededEmptyAssistantPlaceholders,
-} from './snapshot-conversation-transcript';
+} from './claude-conversation-transcript';
 import { toolOutputText } from './tool-output';
 
 export function updateAssistantToolPart(
-  snapshot: AppSnapshot,
+  snapshot: ClaudeConversationSnapshot,
   agentId: string,
   turnId: string,
   payload: ConversationEventPayload<'item.updated'>,
@@ -88,81 +81,8 @@ export function updateAssistantToolPart(
     };
   }
 }
-export function updateAssistantTurnDiff(
-  snapshot: AppSnapshot,
-  agentId: string,
-  turnId: string,
-  payload: ConversationEventPayload<'diff.updated'>,
-): void {
-  const { addedLines, removedLines } = payload;
-  if (!addedLines && !removedLines) {
-    return;
-  }
-
-  const message = findAssistantMessage(snapshot, agentId, turnId);
-  const toolPart = lastRunningFileChangeToolPart(message?.parts);
-  if (!toolPart) {
-    return;
-  }
-
-  const existingDescriptor = toolStatusDescriptor(toolPart.statusText);
-  const existingParams = isRecord(existingDescriptor?.params) ? existingDescriptor.params : {};
-  toolPart.statusText = JSON.stringify({
-    action: typeof existingDescriptor?.action === 'string' ? existingDescriptor.action : 'edit',
-    phase: toolPart.status,
-    params: {
-      ...existingParams,
-      addedLines,
-      removedLines,
-      target: typeof existingParams.target === 'string' ? existingParams.target : toolPart.title,
-    },
-    source: 'codex',
-  });
-}
-
-export function updateTurnGitDiff(
-  snapshot: AppSnapshot,
-  turnId: string,
-  payload: ConversationEventPayload<'diff.updated'>,
-  updatedAt: string,
-): void {
-  const addedLines = finiteNonNegativeInteger(payload.addedLines);
-  const removedLines = finiteNonNegativeInteger(payload.removedLines);
-  if (!addedLines && !removedLines) {
-    return;
-  }
-
-  const diff = payload.diff;
-  const nextDiff: TurnGitDiff = {
-    turnId,
-    addedLines,
-    removedLines,
-    updatedAt,
-    ...(diff ? { diff } : {}),
-  };
-  snapshot.turnGitDiffs = {
-    ...snapshot.turnGitDiffs,
-    [turnId]: nextDiff,
-  };
-}
-
-export function lastRunningFileChangeToolPart(parts: RendererMessagePart[] | undefined): ToolPart | undefined {
-  if (!parts) {
-    return undefined;
-  }
-
-  for (let index = parts.length - 1; index >= 0; index -= 1) {
-    const part = parts[index];
-    if (part?.type === 'tool' && part.kind === 'fileChange' && part.status === 'running') {
-      return part;
-    }
-  }
-
-  return undefined;
-}
-
 export function upsertAssistantToolPart(
-  snapshot: AppSnapshot,
+  snapshot: ClaudeConversationSnapshot,
   agentId: string,
   turnId: string,
   toolPart: ToolPart,
@@ -195,7 +115,7 @@ export function upsertAssistantToolPart(
 }
 
 export function applyApprovalRequest(
-  snapshot: AppSnapshot,
+  snapshot: ClaudeConversationSnapshot,
   agentId: string,
   turnId: string,
   payload: ConversationEventPayload<'approval.requested'>,
@@ -251,7 +171,7 @@ export function applyApprovalRequest(
 }
 
 export function applyToolInputRequest(
-  snapshot: AppSnapshot,
+  snapshot: ClaudeConversationSnapshot,
   agentId: string,
   turnId: string,
   payload: ConversationEventPayload<'toolInput.requested'>,
@@ -283,28 +203,22 @@ export function applyToolInputRequest(
   }, createdAt);
 }
 
-export function findPendingMcpToolPart(snapshot: AppSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {
+function findPendingMcpToolPart(snapshot: ClaudeConversationSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {
   const runningMcpTools = findAssistantMessages(snapshot, agentId, turnId).flatMap((message) => (
-    message.parts.filter((part): part is ToolPart => {
-      if (part.type !== 'tool' || part.kind !== 'mcp' || part.status !== 'running') {
-        return false;
-      }
-
-      return true;
-    })
+    message.parts.filter((part): part is ToolPart => part.type === 'tool' && part.kind === 'mcp' && part.status === 'running')
   ));
   const exactMatch = runningMcpTools.find((part) => {
     const metadataServer = isRecord(part.metadata) ? stringValue(part.metadata.server) : undefined;
     const metadataTool = isRecord(part.metadata) ? stringValue(part.metadata.tool) : undefined;
     return (
-      (metadataServer === server && metadataTool === tool) ||
-      part.title === `${server}.${tool}` ||
-      part.title.endsWith(`.${tool}`)
+      (metadataServer === server && metadataTool === tool)
+      || part.title === `${server}.${tool}`
+      || part.title.endsWith(`.${tool}`)
     );
   });
 
   return exactMatch ?? (runningMcpTools.length === 1 ? runningMcpTools[0] : undefined);
 }
 
-type ConversationEventPayload<Type extends SnapshotEventOwnedBy<'conversation'>['type']> =
-  Extract<SnapshotEventOwnedBy<'conversation'>, { type: Type }>['payload'];
+type ConversationEventPayload<Type extends ClaudeConversationEvent['type']> =
+  Extract<ClaudeConversationEvent, { type: Type }>['payload'];

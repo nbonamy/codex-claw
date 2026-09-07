@@ -61,7 +61,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: snapshot.messages,
         isLoading: false,
         isSending: false,
       },
@@ -269,7 +268,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         openAgentGitDiff,
@@ -515,7 +513,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         sidePanelRequest: {
@@ -547,16 +544,6 @@ describe('AppShell workspace and plans', () => {
         codexConversationSnapshot: codexConversationSnapshot([
           codexTextMessage('message-doc-link', 'assistant', 'Open [architecture](docs/architecture.md).'),
         ]),
-        messages: [
-          {
-            id: 'message-doc-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [architecture](docs/architecture.md).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -604,16 +591,6 @@ describe('AppShell workspace and plans', () => {
         codexConversationSnapshot: codexConversationSnapshot([
           codexTextMessage('message-source-link', 'assistant', 'Open [main](src/main.ts).'),
         ]),
-        messages: [
-          {
-            id: 'message-source-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [main](src/main.ts).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -652,6 +629,7 @@ describe('AppShell workspace and plans', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].folder = '/workspace/dina';
     snapshot.turnGitDiffs['turn-edit'] = {
+      agentId: snapshot.agents[0]!.id,
       turnId: 'turn-edit',
       addedLines: 1,
       removedLines: 0,
@@ -669,7 +647,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -697,7 +674,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         openAgentGitDiff,
@@ -731,7 +707,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: dina,
-        messages: [],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -791,16 +766,6 @@ describe('AppShell workspace and plans', () => {
         codexConversationSnapshot: codexConversationSnapshot([
           codexTextMessage('message-line-link', 'assistant', 'Open [readme](README.md:40).'),
         ]),
-        messages: [
-          {
-            id: 'message-line-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [readme](README.md:40).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -835,16 +800,6 @@ describe('AppShell workspace and plans', () => {
             'Open [readme](file:///Users/nbonamy/src/id8/README.md:40:2).',
           ),
         ]),
-        messages: [
-          {
-            id: 'message-file-url-line-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [readme](file:///Users/nbonamy/src/id8/README.md:40:2).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -879,16 +834,6 @@ describe('AppShell workspace and plans', () => {
             'Open [file](file:///Users/nbonamy/src/id8/src/file%20name.ts).',
           ),
         ]),
-        messages: [
-          {
-            id: 'message-file-url',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [file](file:///Users/nbonamy/src/id8/src/file%20name.ts).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -922,16 +867,6 @@ describe('AppShell workspace and plans', () => {
             'Open [file](file:///Users/nbonamy/src/codex-claw/README.md).',
           ),
         ]),
-        messages: [
-          {
-            id: 'message-outside-file-url',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [file](file:///Users/nbonamy/src/codex-claw/README.md).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -962,16 +897,6 @@ describe('AppShell workspace and plans', () => {
         codexConversationSnapshot: codexConversationSnapshot([
           codexTextMessage('message-doc-link', 'assistant', 'Open [architecture](docs/architecture.md).'),
         ]),
-        messages: [
-          {
-            id: 'message-doc-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [architecture](docs/architecture.md).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -1007,16 +932,6 @@ describe('AppShell workspace and plans', () => {
         codexConversationSnapshot: codexConversationSnapshot([
           codexTextMessage('message-doc-link', 'assistant', 'Open [architecture](docs/architecture.md).'),
         ]),
-        messages: [
-          {
-            id: 'message-doc-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [architecture](docs/architecture.md).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -1048,16 +963,6 @@ describe('AppShell workspace and plans', () => {
         codexConversationSnapshot: codexConversationSnapshot([
           codexTextMessage('message-doc-link', 'assistant', 'Open [secret](../secret.md).'),
         ]),
-        messages: [
-          {
-            id: 'message-doc-link',
-            agentId: 'agent-dina',
-            role: 'assistant',
-            status: 'complete',
-            createdAt: '2026-06-05T00:00:00.000Z',
-            parts: [{ type: 'text', text: 'Open [secret](../secret.md).' }],
-          },
-        ],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -1085,7 +990,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         previewAgentFile,
@@ -1112,7 +1016,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         sidePanelRequest: {
@@ -1149,7 +1052,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         sidePanelRequest: {
@@ -1173,7 +1075,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         planMode: true,
@@ -1202,7 +1103,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         planMode: true,
@@ -1232,7 +1132,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
         planMode: true,
@@ -1285,7 +1184,6 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         codexConversationSnapshot: codexConversationSnapshot([planProgressMessage], {
           activeTurnId: 'turn-plan',
           turnIds: ['turn-plan'],

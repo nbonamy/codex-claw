@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
-import type { AppSnapshotMetadata, CodexClawApi } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, CodexClawApi } from '@codex-claw/core/contracts';
 import { createAgentHistoryState } from '../agent-history-state';
 import { stubElectronTestWindow } from '../test/client';
 import { deferred } from './app-state-test-harness';
@@ -9,8 +9,8 @@ describe('createAgentHistoryState', () => {
   it('preserves an event-before-RPC failure until a later successful retry', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
-    const first = deferred<AppSnapshotMetadata>();
-    const second = deferred<AppSnapshotMetadata>();
+    const first = deferred<AppSnapshot>();
+    const second = deferred<AppSnapshot>();
     const hydrateAgentHistory = vi.fn()
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
@@ -18,7 +18,7 @@ describe('createAgentHistoryState', () => {
       codexClaw: { hydrateAgentHistory } satisfies Partial<CodexClawApi>,
     });
     const state = createAgentHistoryState({
-      adoptSnapshotMetadata: vi.fn(),
+      adoptSnapshot: vi.fn(),
       getSnapshot: () => snapshot,
       synchronizeComposerSelection: vi.fn(),
     });
@@ -33,7 +33,7 @@ describe('createAgentHistoryState', () => {
       type: 'thread.historyHydrationFailed',
       payload: {},
     });
-    first.resolve(snapshotMetadata(snapshot));
+    first.resolve(snapshot);
     await initialHydration;
 
     expect(state.isActiveAgentHistoryFailed.value).toBe(true);
@@ -57,14 +57,7 @@ describe('createAgentHistoryState', () => {
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
     expect(hydrateAgentHistory).toHaveBeenCalledTimes(2);
 
-    state.handleMainEvent({
-      seq: 3,
-      occurredAt: '2026-09-05T00:00:01.000Z',
-      agentId: 'agent-dina',
-      type: 'thread.historyLoaded',
-      payload: { messages: [], replace: true },
-    });
-    second.resolve(snapshotMetadata(snapshot));
+    second.resolve(snapshot);
     await retry;
 
     expect(state.isActiveAgentHistoryFailed.value).toBe(false);

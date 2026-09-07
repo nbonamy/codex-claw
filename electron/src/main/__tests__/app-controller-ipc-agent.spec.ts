@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
-import { createInitialSnapshot, snapshotMetadata } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -16,7 +16,6 @@ describe('AppController', () => {
     const backendSnapshot = {
       ...snapshot,
       agents: [{ ...snapshot.agents[0]!, backendSession: undefined }],
-      messages: snapshot.messages.filter((message) => message.agentId !== 'agent-dina'),
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -28,32 +27,18 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/restart', { agentId: 'agent-dina' });
   });
 
-  it('routes lazy agent history hydration through clawd', async () => {
+  it('routes lazy provider history hydration through clawd', async () => {
     const snapshot = createInitialSnapshot();
-    const backendSnapshot = {
-      ...snapshot,
-      messages: [
-        {
-          id: 'assistant-history',
-          agentId: 'agent-dina',
-          role: 'assistant' as const,
-          status: 'complete' as const,
-          createdAt: '2026-06-13T00:00:00.000Z',
-          parts: [{ type: 'text' as const, text: 'Restored.' }],
-        },
-      ],
-    };
-    const backendMetadata = snapshotMetadata(backendSnapshot);
-    const request = vi.fn().mockResolvedValue(backendMetadata);
+    const backendSnapshot = structuredClone(snapshot);
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
-    await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendMetadata);
+    await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledOnce();
     expect(request).toHaveBeenCalledWith('agent/history/hydrate', { agentId: 'agent-dina' });
-    expect(currentSnapshot(controller)).not.toBe(snapshot);
-    expect(currentSnapshot(controller).messages).toStrictEqual([]);
+    expect(currentSnapshot(controller)).toStrictEqual(backendSnapshot);
   });
 
   it('routes agent goal mutations through clawd', async () => {
@@ -226,10 +211,6 @@ describe('AppController', () => {
     snapshot.agents[0].backendDefaults = { kind: 'claude' };
     const backendSnapshot = {
       ...snapshot,
-      messages: [
-        ...snapshot.messages,
-        userMessage('user-turn-1', 'turn-1', 'hello claude'),
-      ],
       agents: [{
         ...snapshot.agents[0]!,
         backendSession: { kind: 'claude' as const, sessionId: 'claude-session-1', transport: 'stdio' as const },
@@ -389,20 +370,11 @@ describe('AppController', () => {
     });
   });
 
-  it('deletes a Codex turn and replaces history', async () => {
+  it('routes Codex turn deletion through clawd', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
-    snapshot.messages = [
-      userMessage('user-turn-1', 'turn-1', 'first prompt'),
-      assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
-      userMessage('user-turn-2', 'turn-2', 'second prompt'),
-      assistantMessage('assistant-turn-2', 'turn-2', 'second answer'),
-    ];
-    const rollbackSnapshot = {
-      ...snapshot,
-      messages: snapshot.messages.slice(0, 2),
-    };
+    const rollbackSnapshot = { ...snapshot };
     const request = vi.fn().mockResolvedValue(rollbackSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
@@ -417,14 +389,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
-    snapshot.messages = [
-      userMessage('user-turn-1', 'turn-1', 'first prompt'),
-      assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
-    ];
-    const rollbackSnapshot = {
-      ...snapshot,
-      messages: [],
-    };
+    const rollbackSnapshot = { ...snapshot };
     const request = vi.fn().mockResolvedValue(rollbackSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
@@ -438,14 +403,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
-    snapshot.messages = [
-      userMessage('user-turn-1', 'turn-1', 'first prompt'),
-      assistantMessage('assistant-turn-1', 'turn-1', 'first answer'),
-    ];
-    const rollbackSnapshot = {
-      ...snapshot,
-      messages: [],
-    };
+    const rollbackSnapshot = { ...snapshot };
     const request = vi.fn().mockResolvedValue(rollbackSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
@@ -600,28 +558,4 @@ async function listAgentFiles(controller: AppController, agentId: string): Promi
   return (controller as unknown as {
     listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   }).listAgentFiles(agentId);
-}
-
-function userMessage(id: string, turnId: string, text: string) {
-  return {
-    id,
-    agentId: 'agent-dina',
-    role: 'user' as const,
-    status: 'complete' as const,
-    turnId,
-    createdAt: '2026-06-05T00:00:00.000Z',
-    parts: [{ type: 'text' as const, text }],
-  };
-}
-
-function assistantMessage(id: string, turnId: string, text: string) {
-  return {
-    id,
-    agentId: 'agent-dina',
-    role: 'assistant' as const,
-    status: 'complete' as const,
-    turnId,
-    createdAt: '2026-06-05T00:00:01.000Z',
-    parts: [{ type: 'text' as const, text }],
-  };
 }

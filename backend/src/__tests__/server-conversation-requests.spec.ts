@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import {
   createTestSnapshot,
-  createTextMessage,
   flushMicrotasks,
 } from './server-test-fixtures';
 
@@ -68,7 +67,6 @@ describe('ClawBackendServer', () => {
         },
       });
       expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
-      expect(snapshot.messages).toStrictEqual([]);
       await flushMicrotasks();
 
       expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);
@@ -235,7 +233,6 @@ describe('ClawBackendServer', () => {
 
     expect(tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/compact');
     expect(sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.messages).toHaveLength(0);
     expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-command' });
     await server.close();
   });
@@ -324,7 +321,6 @@ describe('ClawBackendServer', () => {
       inputMethod: 'dictated',
     });
     expect(snapshot.queuedPrompts).toHaveLength(1);
-    expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
 
     acceptPrompt({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-next' });
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toStrictEqual([]));
@@ -398,13 +394,6 @@ describe('ClawBackendServer', () => {
     expect(snapshot.queuedPrompts).toEqual([
       expect.objectContaining({ id: 'queued-1', text: 'first' }),
     ]);
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'message.steer',
-      payload: {
-        prompt: 'edited steer',
-        attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
-      },
-    }));
     await server.close();
   });
 
@@ -440,8 +429,11 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina', prompt: 'retry safely' },
     });
     server.emitEvent({
-      agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina', turnId: 'turn-old',
-      type: 'turn.completed', payload: { status: 'completed' },
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
     });
     await flushMicrotasks();
     await flushMicrotasks();
@@ -453,12 +445,10 @@ describe('ClawBackendServer', () => {
       attempts: 1,
       lastError: 'transport disconnected',
     });
-    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(0);
     expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'error', message: 'transport disconnected' });
     await vi.runOnlyPendingTimersAsync();
     await flushMicrotasks();
     expect(sendPrompt).toHaveBeenCalledTimes(2);
-    expect(snapshot.messages.filter((message) => message.role === 'user')).toHaveLength(0);
     expect(snapshot.queuedPrompts).toStrictEqual([]);
     await server.close();
     vi.useRealTimers();
@@ -478,18 +468,12 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    snapshot.messages = [
-      createTextMessage('user-turn-1', 'agent-dina', 'first prompt', 'turn-1'),
-      createTextMessage('assistant-turn-1', 'agent-dina', 'first answer', 'turn-1', 'assistant'),
-    ];
     const retryTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
-      messages: [],
       activeTurnId: 'turn-new',
     });
     const editTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
-      messages: [],
       activeTurnId: 'turn-edited',
     });
     const driver: AgentBackendDriver = {
@@ -521,11 +505,6 @@ describe('ClawBackendServer', () => {
     expect(retryTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
 
     snapshot.agents[0]!.status = { type: 'idle' };
-    snapshot.messages = [
-      createTextMessage('user-turn-1', 'agent-dina', 'first prompt', 'turn-1'),
-      createTextMessage('assistant-turn-1', 'agent-dina', 'first answer', 'turn-1', 'assistant'),
-    ];
-
     await server.handleMessage({
       jsonrpc: '2.0',
       id: 'edit',

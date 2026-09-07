@@ -11,18 +11,8 @@ describe('AgentConversationService', () => {
     ['retryTurn', backendMethods.driverTurnRetry, ['turn-1'], 'turn-new'],
   ] as const)('keeps the Codex transcript provider-owned while applying %s status', async (method, driverMethod, args, activeTurnId) => {
     const { agent, driverRequest, events, persistSnapshot, service, snapshot } = createService();
-    const messages = [{
-      id: 'assistant-turn-1',
-      agentId: agent.id,
-      role: 'assistant' as const,
-      status: 'complete' as const,
-      turnId: 'turn-1',
-      parts: [{ type: 'text' as const, text: 'updated' }],
-      createdAt: '2026-09-02T00:00:00.000Z',
-    }];
     driverRequest.mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
-      messages,
       activeTurnId,
     });
 
@@ -43,29 +33,6 @@ describe('AgentConversationService', () => {
       },
     ]);
     expect(persistSnapshot).toHaveBeenCalledOnce();
-  });
-
-  it('keeps legacy transcript replacement for Claude turn actions', async () => {
-    const { agent, driverRequest, events, service } = createService();
-    agent.backend = 'claude';
-    const messages = [{
-      id: 'assistant-turn-1', agentId: agent.id, role: 'assistant' as const,
-      status: 'complete' as const, parts: [{ type: 'text' as const, text: 'updated' }],
-      createdAt: '2026-09-02T00:00:00.000Z',
-    }];
-    driverRequest.mockResolvedValue({
-      backendSession: { kind: 'claude', sessionId: 'session-updated', transport: 'stdio' },
-      messages,
-      activeTurnId: null,
-    });
-
-    await service.deleteTurn(agent.id, 'turn-1');
-
-    expect(events).toContainEqual({
-      agentId: agent.id,
-      type: 'thread.historyLoaded',
-      payload: { messages, replace: true },
-    });
   });
 
   it('accepts only conversations owned by stored automation or subagent state', () => {
