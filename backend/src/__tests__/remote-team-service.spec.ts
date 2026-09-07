@@ -65,4 +65,238 @@ describe('RemoteTeamService', () => {
     expect(rememberedSnapshot?.agents[0]?.name).toBe('Remote event update');
     expect(onProjectedSnapshotChanged).toHaveBeenCalledTimes(3);
   });
+
+  it('rejects malformed snapshots returned by provider synchronization', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const service = new RemoteTeamService({
+      clients: { request: vi.fn().mockResolvedValue({ snapshot: { agents: 'invalid' } }) } as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent: vi.fn(),
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+
+    await expect(service.snapshot('connection-devbox')).rejects.toThrow('Remote snapshot is invalid.');
+    expect(service.knownSnapshot('connection-devbox')).toBeUndefined();
+  });
+
+  it('adopts and forwards provider frames without restoring a global transcript', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    const remoteAgent = createRemoteAgent();
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    const providerFrame = {
+      seq: 1,
+      occurredAt: '2026-06-13T00:00:01.000Z',
+      agentId: remoteAgent.id,
+      backend: 'codex',
+      threadId: 'thread-remote',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 1,
+        event: {
+          seq: 1,
+          occurredAt: '2026-06-13T00:00:01.000Z',
+          origin: 'notification',
+          conversationId: 'thread-remote',
+          turnId: 'turn-1',
+          type: 'turn.completed',
+          payload: { status: 'completed' },
+        },
+      },
+      snapshot: remoteSnapshot,
+    } as const;
+    const onForwardedEvent = vi.fn();
+    const clients = {
+      request: vi.fn(async (_connection, _method, _params, onEvent?: (event: unknown) => void) => {
+        onEvent?.(providerFrame);
+        onEvent?.({ ...providerFrame, seq: 2, snapshot: undefined });
+        onEvent?.({ ...providerFrame, seq: 3, agentId: 'agent-outside-team', snapshot: undefined });
+        onEvent?.({
+          seq: 4,
+          occurredAt: '2026-06-13T00:00:04.000Z',
+          backend: 'codex',
+          type: 'backend.statusChanged',
+          payload: { backend: 'codex', status: 'running' },
+        });
+        return null;
+      }),
+    };
+    const service = new RemoteTeamService({
+      clients: clients as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent,
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+
+    await service.request('connection-devbox', 'agent/turn/delete');
+
+    expect(service.knownSnapshot('connection-devbox')).toBe(remoteSnapshot);
+    expect(service.knownSnapshot('connection-devbox')).not.toHaveProperty('messages');
+    expect(onForwardedEvent).toHaveBeenCalledWith('connection-devbox', providerFrame);
+    expect(onForwardedEvent).toHaveBeenCalledTimes(3);
+
+    const coldForward = vi.fn();
+    const coldService = new RemoteTeamService({
+      clients: {
+        request: vi.fn(async (_connection, _method, _params, onEvent?: (event: unknown) => void) => {
+          onEvent?.({ ...providerFrame, snapshot: undefined });
+          return null;
+        }),
+      } as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent: coldForward,
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+    await coldService.request('connection-devbox', 'agent/turn/delete');
+    expect(coldForward).not.toHaveBeenCalled();
+  });
+
+  it('adopts active-agent identity from provider operation snapshots in priority order', () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    const service = new RemoteTeamService({
+      clients: {} as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent: vi.fn(),
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+    const pointer = { connectionId: 'connection-devbox', localTeamId: 'team-pointer', remoteTeamId: 'team-remote' };
+    const remoteAgent = createRemoteAgent();
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    remoteSnapshot.activeAgentId = null;
+
+    service.adoptCreatedAgentSnapshot(pointer, remoteSnapshot);
+    expect(snapshot.activeAgentId).toBe(remoteAgent.id);
+
+    delete remoteSnapshot.teams[0]!.activeAgentId;
+    service.adoptCreatedAgentSnapshot(pointer, remoteSnapshot);
+    expect(snapshot.activeAgentId).toBe(remoteAgent.id);
+
+    remoteSnapshot.teams[0]!.agentIds = [];
+    service.adoptCreatedAgentSnapshot(pointer, remoteSnapshot);
+    expect(snapshot.activeAgentId).toBeNull();
+  });
+
+  it('projects transcript-free provider snapshots while preserving unrelated local metadata', () => {
+    const snapshot = createTestSnapshot();
+    const remoteAgent = createRemoteAgent();
+    const unrelatedAgent = { ...createRemoteAgent(), id: 'agent-local', teamId: 'team-local', name: 'Local' };
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Stale name',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [remoteAgent.id],
+    }];
+    snapshot.activeTeamId = 'team-pointer';
+    snapshot.agents = [remoteAgent, unrelatedAgent];
+    snapshot.agentGitStatuses = {
+      [remoteAgent.id]: gitStatus(remoteAgent.id, 'stale'),
+      [unrelatedAgent.id]: gitStatus(unrelatedAgent.id, 'local'),
+    };
+    snapshot.turnGitDiffs = {
+      'turn-stale': turnDiff(remoteAgent.id, 'turn-stale'),
+      'turn-local': turnDiff(unrelatedAgent.id, 'turn-local'),
+    };
+    snapshot.subagentTrees = {
+      [remoteAgent.id]: subagentTree('thread-stale'),
+      [unrelatedAgent.id]: subagentTree('thread-local'),
+    };
+    snapshot.workBacklog.assignments = {
+      remote: assignment(remoteAgent.id),
+      local: assignment(unrelatedAgent.id),
+    };
+
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    remoteSnapshot.agentGitStatuses = { [remoteAgent.id]: gitStatus(remoteAgent.id, 'remote') };
+    remoteSnapshot.turnGitDiffs = { 'turn-remote': turnDiff(remoteAgent.id, 'turn-remote') };
+    remoteSnapshot.subagentTrees = { [remoteAgent.id]: subagentTree('thread-remote') };
+    remoteSnapshot.workBacklog.assignments = { remote: assignment(remoteAgent.id) };
+    const service = new RemoteTeamService({
+      clients: {} as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent: vi.fn(),
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+    service.rememberSnapshot('connection-devbox', remoteSnapshot);
+
+    const projected = service.clientSnapshotFromKnownRemotes();
+
+    expect(projected).not.toHaveProperty('messages');
+    expect(projected.agents.map((agent) => agent.id)).toStrictEqual([unrelatedAgent.id, remoteAgent.id]);
+    expect(projected.agentGitStatuses).toMatchObject({
+      [unrelatedAgent.id]: { branch: 'local' },
+      [remoteAgent.id]: { branch: 'remote' },
+    });
+    expect(projected.turnGitDiffs).toHaveProperty('turn-local');
+    expect(projected.turnGitDiffs).toHaveProperty('turn-remote');
+    expect(projected.turnGitDiffs).not.toHaveProperty('turn-stale');
+    expect(projected.subagentTrees[remoteAgent.id]?.rootConversationId).toBe('thread-remote');
+    expect(projected.workBacklog.assignments).toHaveProperty('local');
+    expect(projected.workBacklog.assignments).toHaveProperty('remote');
+    expect(projected.activeAgentId).toBe(remoteAgent.id);
+
+    remoteSnapshot.teams = [];
+    service.rememberSnapshot('connection-devbox', remoteSnapshot);
+    const withoutRemoteTeam = service.clientSnapshotFromKnownRemotes();
+    expect(withoutRemoteTeam.teams[0]).toMatchObject({ agentIds: [] });
+    expect(withoutRemoteTeam.teams[0]).not.toHaveProperty('activeAgentId');
+  });
 });
+
+function gitStatus(agentId: string, branch: string) {
+  return {
+    agentId,
+    folder: '/repo',
+    branch,
+    ahead: 0,
+    behind: 0,
+    changedFiles: 0,
+    addedLines: 0,
+    removedLines: 0,
+    hasUntracked: false,
+    state: 'clean' as const,
+    updatedAt: '2026-06-13T00:00:00.000Z',
+  };
+}
+
+function turnDiff(agentId: string, turnId: string) {
+  return {
+    agentId,
+    turnId,
+    addedLines: 1,
+    removedLines: 0,
+    diff: `${turnId} diff`,
+    updatedAt: '2026-06-13T00:00:00.000Z',
+  };
+}
+
+function subagentTree(rootConversationId: string) {
+  return { rootConversationId, nodes: {}, operations: {}, activities: {} };
+}
+
+function assignment(agentId: string) {
+  return {
+    provider: 'github' as const,
+    itemId: `item-${agentId}`,
+    agentId,
+    assignedAt: '2026-06-13T00:00:00.000Z',
+    policy: 'review' as const,
+    status: 'inProgress' as const,
+  };
+}

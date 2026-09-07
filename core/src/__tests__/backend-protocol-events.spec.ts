@@ -479,6 +479,214 @@ describe('Claw backend event decoder', () => {
     }
   });
 
+  it('accepts rich queued-prompt options for both provider backends', () => {
+    const fixture = createFixtures()['agent.promptQueued'];
+    const codexPrompt = {
+      ...fixture,
+      payload: {
+        id: 'prompt-codex',
+        text: 'Inspect the attached files',
+        submitted: true,
+        options: {
+          attachments: [
+            {
+              type: 'image',
+              path: '/tmp/screenshot.png',
+              name: 'screenshot.png',
+              mimeType: 'image/png',
+              detail: 'original',
+              previewUrl: 'data:image/png;base64,AA==',
+            },
+            {
+              type: 'file',
+              path: '/tmp/report.txt',
+              name: 'report.txt',
+              mimeType: 'text/plain',
+            },
+          ],
+          model: null,
+          reasoningEffort: 'high',
+          serviceTier: null,
+          planMode: true,
+          skills: [{ name: 'review', path: '/skills/review/SKILL.md' }],
+          inputMethod: 'dictated',
+          recordUserMessage: false,
+          backendOptions: {
+            kind: 'codex',
+            reasoningEffort: null,
+            serviceTier: 'priority',
+            skills: [{ name: 'review', path: '/skills/review/SKILL.md' }],
+          },
+        },
+      },
+    };
+    const claudePrompt = {
+      ...fixture,
+      payload: {
+        id: 'prompt-claude',
+        text: 'Use extended thinking',
+        options: {
+          inputMethod: 'typed',
+          backendOptions: {
+            kind: 'claude',
+            thinkingBudgetTokens: 8_000,
+            permissionMode: null,
+          },
+        },
+      },
+    };
+
+    expect(decodeClawBackendEvent(codexPrompt)).toBe(codexPrompt);
+    expect(decodeClawBackendEvent(claudePrompt)).toBe(claudePrompt);
+  });
+
+  it('accepts rich coordination metadata for retries and approvals', () => {
+    const fixtures = createFixtures();
+    const retry = {
+      ...fixtures['agent.promptRetryScheduled'],
+      payload: {
+        id: 'prompt-1',
+        attempts: 2,
+        lastError: 'provider temporarily unavailable',
+        retryAt: '2026-09-04T12:01:00.000Z',
+      },
+    };
+    const richApproval = {
+      id: 'approval-permissions',
+      kind: 'permissions',
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'item-1',
+      title: 'Expand sandbox access',
+      description: 'Read the fixture and call the package registry',
+      command: 'npm test',
+      cwd: '/repo',
+      requestedPermissions: [
+        { kind: 'filesystem', access: 'read', path: '/repo/fixtures' },
+        { kind: 'network', enabled: true, host: 'registry.npmjs.org', protocol: 'https' },
+      ],
+      allowedScopes: ['once', 'session'],
+      canDeny: true,
+    };
+    const requested = {
+      ...fixtures['backendApproval.requested'],
+      turnId: 'turn-1',
+      payload: { approval: richApproval },
+    };
+    const resolved = {
+      ...fixtures['backendApproval.resolved'],
+      turnId: 'turn-1',
+      payload: {
+        approval: richApproval,
+        decision: null,
+        scope: null,
+        reason: 'surface_disconnected',
+      },
+    };
+
+    expect(decodeClawBackendEvent(retry)).toBe(retry);
+    expect(decodeClawBackendEvent(requested)).toBe(requested);
+    expect(decodeClawBackendEvent(resolved)).toBe(resolved);
+  });
+
+  it('accepts populated provider conversation snapshot frames', () => {
+    const fixtures = createFixtures();
+    const codexFrame = structuredClone(
+      fixtures['codex.conversationSnapshotChanged'],
+    );
+    codexFrame.payload.snapshot.activeTurnId = 'turn-1';
+    codexFrame.payload.snapshot.turnIds = ['turn-1'];
+    codexFrame.payload.snapshot.turns = [{
+      id: 'turn-1',
+      status: 'inProgress',
+      error: null,
+      willRetry: false,
+      startedAt: occurredAt,
+      completedAt: null,
+      durationMs: null,
+    }];
+    codexFrame.payload.snapshot.messages = [message];
+    codexFrame.payload.snapshot.busy = true;
+    codexFrame.payload.snapshot.historyLoading = true;
+    codexFrame.payload.snapshot.historyState = {
+      loadingStrategy: 'lazy',
+      hasOlder: true,
+      loadingOlder: true,
+      fullyLoaded: false,
+    };
+
+    const claudeFrame = structuredClone(
+      fixtures['claude.conversationSnapshotChanged'],
+    );
+    claudeFrame.payload.snapshot.sessionId = 'claude-session-1';
+    claudeFrame.payload.snapshot.activeTurnId = 'turn-1';
+    claudeFrame.payload.snapshot.turnIds = ['turn-1'];
+    claudeFrame.payload.snapshot.turns = [{
+      id: 'turn-1',
+      status: 'interrupted',
+      error: null,
+      willRetry: false,
+      startedAt: occurredAt,
+      completedAt: occurredAt,
+      durationMs: 10,
+    }];
+    claudeFrame.payload.snapshot.messages = [
+      { ...message, role: 'user' },
+      message,
+      { ...message, id: 'message-system', role: 'system' },
+    ];
+    claudeFrame.payload.snapshot.contextUsage = usage;
+    claudeFrame.payload.snapshot.plan = {
+      threadId: 'claude-session-1',
+      turnId: 'turn-1',
+      kind: 'execution',
+      status: 'inProgress',
+      explanation: 'Verify the change',
+      steps: [{ step: 'Run tests', status: 'inProgress' }],
+      markdown: '- [ ] Run tests',
+      updatedAt: occurredAt,
+    };
+    claudeFrame.payload.snapshot.error = 'Interrupted by user';
+
+    expect(decodeClawBackendEvent(codexFrame)).toBe(codexFrame);
+    expect(decodeClawBackendEvent(claudeFrame)).toBe(claudeFrame);
+  });
+
+  it('accepts provider event frames with all optional routing context', () => {
+    const fixtures = createFixtures();
+    const codexFixture = fixtures['codex.conversationEventReceived'];
+    const codexFrame = {
+      ...codexFixture,
+      payload: {
+        ...codexFixture.payload,
+        event: {
+          ...codexFixture.payload.event,
+          origin: 'action',
+          turnId: 'turn-1',
+        },
+      },
+    };
+
+    const claudeFrame = structuredClone(
+      fixtures['claude.conversationEventReceived'],
+    );
+    claudeFrame.payload.event.backendSessionId = 'claude-session-1';
+    claudeFrame.payload.event.threadId = 'claude-session-1';
+    claudeFrame.payload.event.turnId = 'turn-1';
+
+    expect(decodeClawBackendEvent(codexFrame)).toBe(codexFrame);
+    expect(decodeClawBackendEvent(claudeFrame)).toBe(claudeFrame);
+  });
+
+  it('rejects a Claude event routed under a different agent', () => {
+    const event = createFixtures()['claude.conversationEventReceived'];
+
+    expect(() => decodeClawBackendEvent({
+      ...event,
+      agentId: 'agent-other',
+    })).toThrow('$.payload.event.agentId: expected the outer agent id');
+  });
+
   it('accepts valid full snapshot and client-state side channels', () => {
     const event = createFixtures()['snapshot.updated'];
     const withSideChannels = {

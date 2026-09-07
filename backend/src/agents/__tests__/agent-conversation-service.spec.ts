@@ -35,6 +35,36 @@ describe('AgentConversationService', () => {
     expect(persistSnapshot).toHaveBeenCalledOnce();
   });
 
+  it('adopts Claude turn-operation results without adding Codex thread metadata', async () => {
+    const { agent, driverRequest, events, service } = createService();
+    driverRequest.mockResolvedValue({
+      backendSession: { kind: 'claude', sessionId: 'session-updated', transport: 'stdio' },
+      activeTurnId: null,
+    });
+
+    await service.deleteTurn(agent.id, 'turn-1');
+
+    expect(agent.backendSession).toStrictEqual({
+      kind: 'claude', sessionId: 'session-updated', transport: 'stdio',
+    });
+    expect(events).toStrictEqual([{
+      agentId: agent.id,
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+    }]);
+  });
+
+  it.each([
+    ['deleteTurn', ['turn-1']],
+    ['editTurn', ['turn-1', 'edited']],
+    ['retryTurn', ['turn-1']],
+  ] as const)('does not invoke the provider for missing agents during %s', async (method, args) => {
+    const { driverRequest, service } = createService();
+
+    await expect((service[method] as (...input: string[]) => Promise<unknown>)('missing-agent', ...args)).resolves.toBeNull();
+    expect(driverRequest).not.toHaveBeenCalled();
+  });
+
   it('accepts only conversations owned by stored automation or subagent state', () => {
     const { agent, service, snapshot } = createService();
     snapshot.subagentTrees[agent.id] = {

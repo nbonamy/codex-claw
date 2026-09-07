@@ -6,7 +6,7 @@ import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
 import type { OpenInProvider } from '../open-in';
-import { callPrivate, emitBackendEvent, setMainWindowSend, currentSnapshot, createBackendClient } from './app-controller-test-harness';
+import { callPrivate, emitBackendEvent, setMainWindowSend, currentSnapshot, createBackendClient, getSnapshot } from './app-controller-test-harness';
 
 describe('AppController', () => {
 
@@ -106,13 +106,55 @@ describe('AppController', () => {
     expect(rendererState.connection).toStrictEqual({ status: 'connected' });
   });
 
-  it('reconnects the selected backend transport and refreshes its snapshot after disconnect', async () => {
+  it('replaces the cached full snapshot during an explicit renderer resynchronization', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    const refreshedSnapshot = createInitialSnapshot();
+    refreshedSnapshot.agents[0]!.status = { type: 'awaitingInput' };
+    const clientState: ClientState = { sourceFolderPath: '', shouldPreventDisplaySleep: false };
+    let snapshotReads = 0;
+    const backendClient = createBackendClient();
+    backendClient.request = vi.fn(async (method: string) => {
+      if (method === backendMethods.snapshotGet) {
+        snapshotReads += 1;
+        return {
+          snapshot: snapshotReads === 1 ? initialSnapshot : refreshedSnapshot,
+          lastEventSeq: snapshotReads,
+          clientState,
+        };
+      }
+      if (method === backendMethods.clientStateGet) return clientState;
+      return {};
+    }) as typeof backendClient.request;
+    const controller = new AppController(initialSnapshot, backendClient);
+
+    await controller.initialize();
+
+    await expect(getSnapshot(controller)).resolves.toBe(refreshedSnapshot);
+    expect(snapshotReads).toBe(2);
+    expect(currentSnapshot(controller)).toBe(refreshedSnapshot);
+    expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'awaitingInput' });
+  });
+
+  it('replays buffered provider frames before publishing the reconnected snapshot', async () => {
     vi.useFakeTimers();
     const initialSnapshot = createInitialSnapshot();
     const reconnectedSnapshot = createInitialSnapshot();
     reconnectedSnapshot.agents[0]!.status = { type: 'working' };
     const clientState: ClientState = { sourceFolderPath: '', shouldPreventDisplaySleep: false };
     let connectionListener: (state: 'connected' | 'disconnected', error?: Error) => void = () => undefined;
+    let backendEventListener: (event: ClawBackendEvent) => void = () => undefined;
+    let resolveReconnectSnapshot!: (value: {
+      snapshot: AppSnapshot;
+      lastEventSeq: number;
+      clientState: ClientState;
+    }) => void;
+    const reconnectSnapshot = new Promise<{
+      snapshot: AppSnapshot;
+      lastEventSeq: number;
+      clientState: ClientState;
+    }>((resolve) => {
+      resolveReconnectSnapshot = resolve;
+    });
     let snapshotReads = 0;
     const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
       start: vi.fn().mockResolvedValue(undefined),
@@ -120,15 +162,18 @@ describe('AppController', () => {
       request: vi.fn(async (method: string) => {
         if (method === 'snapshot/get') {
           snapshotReads += 1;
-          return {
-            snapshot: snapshotReads === 1 ? initialSnapshot : reconnectedSnapshot,
+          return snapshotReads === 1 ? {
+            snapshot: initialSnapshot,
             lastEventSeq: 0,
             clientState,
-          };
+          } : reconnectSnapshot;
         }
         return {};
       }) as NonNullable<ConstructorParameters<typeof AppController>[1]>['request'],
-      onEvent: vi.fn(() => () => undefined),
+      onEvent: vi.fn((listener) => {
+        backendEventListener = listener;
+        return () => undefined;
+      }),
       onConnectionState: vi.fn((listener) => {
         connectionListener = listener;
         return () => undefined;
@@ -148,6 +193,33 @@ describe('AppController', () => {
     }));
 
     await vi.advanceTimersByTimeAsync(250);
+    expect(snapshotReads).toBe(2);
+    backendEventListener({
+      seq: 2,
+      occurredAt: '2026-09-06T20:00:00.000Z',
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 2,
+          occurredAt: '2026-09-06T20:00:00.000Z',
+          origin: 'notification',
+          conversationId: 'thread-dina',
+          type: 'message.delta',
+          payload: { messageId: 'message-1', itemId: 'item-1', delta: 'Hello' },
+        } as unknown as Extract<ClawBackendEvent, { type: 'codex.conversationEventReceived' }>['payload']['event'],
+      },
+    });
+    resolveReconnectSnapshot({
+      snapshot: reconnectedSnapshot,
+      lastEventSeq: 1,
+      clientState,
+    });
+    await flushMicrotasks();
+
     expect(backendClient.start).toHaveBeenCalledTimes(2);
     expect(currentSnapshot(controller)).toBe(reconnectedSnapshot);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
@@ -155,10 +227,15 @@ describe('AppController', () => {
       type: 'client.connectionChanged',
       payload: { status: 'connected' },
     }));
-    expect(send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
-      type: 'snapshot.updated',
-      payload: expect.not.objectContaining({ messages: expect.anything() }),
-    }));
+    expect(send.mock.calls
+      .filter(([channel]) => channel === ipcChannels.event)
+      .map(([, event]) => event.type))
+      .toStrictEqual([
+        'client.connectionChanged',
+        'codex.conversationEventReceived',
+        'client.connectionChanged',
+        'snapshot.updated',
+      ]);
     await controller.shutdown();
   });
 
@@ -299,6 +376,7 @@ describe('AppController', () => {
 
     expect(media?.type === 'media' ? media.media.url : null).toMatch(/^codex-claw-media:\/\/generated\//);
     expect(media?.type === 'media' ? media.media.url : null).not.toBe(generatedImageUrl);
+    expect(currentSnapshot(controller)).toBe(snapshot);
   });
 
   it('ignores backend event snapshots with malformed nested state', async () => {

@@ -918,6 +918,80 @@ describe('useAppState', () => {
     ]);
   });
 
+  it('projects only the provider snapshot matching the selected agent session', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-codex' };
+    remoteSnapshot.agents[1]!.backend = 'claude';
+    remoteSnapshot.agents[1]!.backendDefaults = { kind: 'claude' };
+    remoteSnapshot.agents[1]!.backendSession = {
+      kind: 'claude', sessionId: 'session-claude', transport: 'stdio',
+    };
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-codex',
+      type: 'codex.conversationSnapshotChanged',
+      payload: {
+        revision: 1,
+        snapshot: codexConversationSnapshot([
+          codexTextMessage('message-codex', 'assistant', 'Codex snapshot'),
+        ], { activeConversationId: 'thread-codex' }),
+      },
+      occurredAt: '2026-09-06T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-jesse',
+      backend: 'claude',
+      type: 'claude.conversationSnapshotChanged',
+      payload: {
+        revision: 1,
+        snapshot: claudeConversationSnapshot([], {
+          agentId: 'agent-jesse',
+          sessionId: 'session-claude',
+        }),
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+
+    expect(state.activeCodexConversationSnapshot.value?.messages).toStrictEqual([
+      expect.objectContaining({ id: 'message-codex' }),
+    ]);
+    expect(state.activeClaudeConversationSnapshot.value).toBeNull();
+
+    state.snapshot.value.activeAgentId = 'agent-jesse';
+    await nextTick();
+
+    expect(state.activeCodexConversationSnapshot.value).toBeNull();
+    expect(state.activeClaudeConversationSnapshot.value?.sessionId).toBe('session-claude');
+
+    state.snapshot.value.agents[1]!.backendSession = undefined;
+    await nextTick();
+
+    expect(state.activeClaudeConversationSnapshot.value?.sessionId).toBe('session-claude');
+
+    state.snapshot.value.agents[1]!.backendSession = {
+      kind: 'claude', sessionId: 'session-replaced', transport: 'stdio',
+    };
+    await nextTick();
+
+    expect(state.activeClaudeConversationSnapshot.value).toBeNull();
+  });
+
   it('advances the provider-owned Codex frame with SDK conversation events', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
@@ -1033,13 +1107,89 @@ describe('useAppState', () => {
       threadId: 'thread-1',
       type: 'codex.conversationEventReceived',
       payload: {
-        revision: 6,
+        revision: 3,
         event: {
-          seq: 12,
+          seq: 11,
           occurredAt: '2026-09-06T00:00:02.000Z',
           origin: 'notification',
           type: 'conversation.activityChanged',
           conversationId: 'thread-1',
+          payload: { threadStatus: null, busy: false, error: null },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+
+    expect(state.activeCodexConversationSnapshot.value).not.toBeNull();
+    expect(hydrateAgentHistory).not.toHaveBeenCalled();
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 6,
+        event: {
+          seq: 12,
+          occurredAt: '2026-09-06T00:00:03.000Z',
+          origin: 'notification',
+          type: 'conversation.activityChanged',
+          conversationId: 'thread-1',
+          payload: { threadStatus: null, busy: true, error: null },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:03.000Z',
+    });
+
+    expect(state.activeCodexConversationSnapshot.value).toBeNull();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
+  });
+
+  it('invalidates and rehydrates a Codex frame when a delta targets another conversation', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        hydrateAgentHistory,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalled());
+    hydrateAgentHistory.mockClear();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationSnapshotChanged',
+      payload: { revision: 1, snapshot: codexConversationSnapshot() },
+      occurredAt: '2026-09-06T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 2,
+          occurredAt: '2026-09-06T00:00:02.000Z',
+          origin: 'notification',
+          type: 'conversation.activityChanged',
+          conversationId: 'thread-other',
           payload: { threadStatus: null, busy: true, error: null },
         },
       },
@@ -1139,6 +1289,17 @@ describe('useAppState', () => {
       },
       occurredAt: '2026-09-06T00:00:04.000Z',
     });
+    listeners[0]?.({
+      seq: 5,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationSnapshotChanged',
+      payload: {
+        revision: 3,
+        snapshot: claudeConversationSnapshot([], { sessionId: 'stale-session' }),
+      },
+      occurredAt: '2026-09-06T00:00:05.000Z',
+    });
 
     expect(state.activeClaudeConversationSnapshot.value).toMatchObject({
       activeTurnId: 'turn-1',
@@ -1187,17 +1348,39 @@ describe('useAppState', () => {
       backend: 'claude',
       type: 'claude.conversationEventReceived',
       payload: {
+        revision: 3,
+        event: {
+          seq: 5,
+          occurredAt: '2026-09-06T00:00:02.000Z',
+          agentId: 'agent-dina',
+          backend: 'claude',
+          type: 'error',
+          payload: { message: 'stale' },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+
+    expect(state.activeClaudeConversationSnapshot.value).not.toBeNull();
+    expect(hydrateAgentHistory).not.toHaveBeenCalled();
+
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
         revision: 6,
         event: {
           seq: 6,
-          occurredAt: '2026-09-06T00:00:02.000Z',
+          occurredAt: '2026-09-06T00:00:03.000Z',
           agentId: 'agent-dina',
           backend: 'claude',
           type: 'error',
           payload: { message: 'gap' },
         },
       },
-      occurredAt: '2026-09-06T00:00:02.000Z',
+      occurredAt: '2026-09-06T00:00:03.000Z',
     });
 
     expect(state.activeClaudeConversationSnapshot.value).toBeNull();

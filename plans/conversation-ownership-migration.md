@@ -374,6 +374,7 @@ new path is measurably smaller, and provider behavior has one owner.
 | 2026-09-06 | Phase 4 | Complete | Existing Claude coverage maps send, streamed/final text, tools, permissions, questions, plan mode, compaction, context, errors, transcript hydration/resume/read, and interruption; new concurrent-agent regression proves session/event isolation; focused 28-test suite and backend typecheck pass | `test: characterize claude conversation ownership` | The ownership audit fixes the seam: a concrete Claude conversation host owns transcript state and emits revisioned frames; `ClaudeBackendDriver` retains only provider catalog/runtime and Claw integration concerns. |
 | 2026-09-06 | Phase 5 | Complete | Claude host emits one revisioned provider snapshot followed by immutable provider deltas; the renderer applies them through the shared Claude replica and never writes the global transcript; Codex and Claude routes remain isolated; 2,086 workspace tests, all workspace typechecks, Stylelint, and Knip pass | `feat: delegate claude conversations to agent sdk` | The provider catalog is separated from the deep conversation host. Claw coordination consumes provider events through a small read-only view, while delegated reports explicitly read the provider-owned transcript. |
 | 2026-09-06 | Phase 6 | Complete | `AppSnapshot` and persistence contain no messages; Electron forwards provider frames without reducing them; the renderer owns only per-agent provider replicas; transcript TTL, shared transcript reducers, direct conversation events, metadata snapshot aliases, duplicate routing, benchmarks, and duplicated semantic suites are removed; all 2,011 workspace tests, typechecks, Stylelint, Knip, and diff checks pass | `9e9c842` | 7,102 net lines removed in this checkpoint. The surviving 861-line conversation reducer/tool/transcript code is explicitly Claude-owned, while app-owned snapshot reduction is an 84-line coordination module. |
+| 2026-09-06 | Phase 7 | Complete | Unsigned desktop and Web builds pass; 266 files / 2,053 tests pass in 20 seconds; every workspace typecheck, lint, Stylelint, and Knip gate passes; Core coverage is green and Backend/Vue/Electron/Web meet or exceed their pre-Phase-6 ratios; live Codex smoke passed send, retry, delete, switching, and restart hydration without malformed events or sequence gaps | `test: qualify provider-owned conversations` | The repository-wide coverage command still reports the same historical Backend/Vue/Electron threshold debt present before the cutover. The apparent restart duplicate was traced to two distinct persisted user turns with different message and turn IDs, proving hydration was faithful rather than duplicating state. |
 
 ### Phase 0 baseline
 
@@ -404,6 +405,38 @@ new path is measurably smaller, and provider behavior has one owner.
 - Full-suite runtime and provider-focused runtime.
 - Coverage by workspace.
 - Streaming render latency and agent-switch latency on a long conversation.
+
+## Final metrics
+
+- Production conversation-path LOC: 5,962, down from 6,525 (-563, 8.6%).
+  This includes the Codex adapter, Claude host and replica helpers, the 84-line
+  coordination reducer, `ConversationPane`, and `AppShell`.
+- Whole migration diff: 7,410 additions and 10,880 deletions across 143 files,
+  net -3,470 lines. Production/config code is net -537 lines; replacing
+  duplicated semantic suites with focused owner and boundary tests accounts
+  for net -3,386 test lines.
+- Codex has one semantic conversation representation, the SDK snapshot/event
+  contract, carried in one app-owned transport envelope. The three legacy
+  semantic conversion hops are gone and the writer count is one.
+- Claude has one semantic conversation representation, the Claude host
+  snapshot/event contract, carried in the same transport envelope. The backend
+  host is authoritative; the renderer replica is a read-only projection.
+- `AppSnapshot` contains zero provider transcript collections. Runtime memory
+  therefore no longer includes Claw's full per-agent transcript duplicate, and
+  transcript retention/TTL infrastructure is gone.
+- Full suite: 266 files / 2,053 tests in 20 seconds, compared with 272 files /
+  2,074 tests in 19.6 seconds at Phase 0.
+- Final coverage (statements / branches / functions / lines): Core
+  90.03 / 87.05 / 89.02 / 91.84; Backend 82.92 / 72.28 / 87.86 / 84.72;
+  Vue 88.23 / 80.06 / 89.58 / 90.57; Electron
+  68.47 / 67.28 / 62.83 / 71.04; Web 96.32 / 87.27 / 95.38 / 97.68.
+  Core and Web pass their configured gates. Every other workspace equals or
+  exceeds its pre-Phase-6 ratio, while retaining its pre-existing threshold
+  debt.
+- The old 130.18 ms benchmark measured the deleted Claw shadow reducer, so it
+  is intentionally not carried forward as a false comparison. Live switching
+  and streaming were visually immediate in the desktop smoke; future numeric
+  performance gates belong at the SDK replica and Claude host boundaries.
 
 ## Lessons learned
 
@@ -440,3 +473,11 @@ provider internals.
 - Remote snapshot validation belongs in the one canonical agent snapshot route.
   Collapsing the old metadata/full routers initially exposed this invariant;
   the malformed-remote-snapshot regression now protects it directly.
+- Coverage should follow ownership, not preserve deleted implementation tests.
+  Focused provider, transport, reconnect, revision-gap, and projection tests
+  restored every migration-era workspace ratio without reintroducing the
+  generic transcript engine or padding unrelated monoliths.
+- A restart that reveals apparently duplicated text is not sufficient evidence
+  of a hydration defect. Comparing provider message and turn identities against
+  the persisted rollout distinguished two real submissions from one duplicated
+  projection and avoided an unnecessary reconciliation layer.

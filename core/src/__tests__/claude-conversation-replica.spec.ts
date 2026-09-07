@@ -113,7 +113,101 @@ describe('Claude conversation replica', () => {
       agentId: 'agent-2',
     })).toThrow("belongs to 'agent-2'");
   });
+
+  it('keeps published snapshots immutable while applying later events', () => {
+    const initial = emptySnapshot();
+    const replica = createClaudeConversationReplica(initial);
+    const before = replica.getSnapshot();
+    const afterStart = replica.apply(event({
+      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } },
+    }));
+    const afterDelta = replica.apply(event({
+      type: 'message.delta', turnId: 'turn-1', payload: { delta: 'Hello' },
+    }));
+
+    expect(initial).toStrictEqual(emptySnapshot());
+    expect(before).not.toBe(afterStart);
+    expect(afterStart).not.toBe(afterDelta);
+    expect(afterStart.messages[0]?.parts).toStrictEqual([]);
+    expect(afterDelta.messages[0]?.parts).toStrictEqual([{ type: 'text', text: 'Hello' }]);
+  });
+
+  it('deduplicates user messages and resolved requests', () => {
+    const replica = createClaudeConversationReplica(emptySnapshot());
+    const submitted = event({
+      type: 'message.userSubmitted',
+      payload: { message: {
+        id: 'user-1', agentId: 'agent-1', role: 'user', status: 'complete',
+        createdAt, parts: [{ type: 'text', text: 'Fix it' }],
+      } },
+    });
+    replica.apply(submitted);
+    replica.apply(submitted);
+    replica.apply(event({ type: 'clientRequest.resolved', payload: { id: 'request-1' } }));
+    replica.apply(event({ type: 'clientRequest.resolved', payload: { id: 'request-1' } }));
+
+    expect(replica.getSnapshot().messages).toHaveLength(1);
+    expect(replica.getSnapshot().answeredClientRequestIds).toStrictEqual(['request-1']);
+  });
+
+  it('tracks compaction, ask-user requests, and retryable versus terminal errors', () => {
+    const replica = createClaudeConversationReplica(emptySnapshot());
+    replica.apply(event({
+      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } },
+    }));
+    replica.apply(event({ type: 'context.compactionStarted', turnId: 'turn-1', payload: {} }));
+    replica.apply(event({ type: 'context.compactionCompleted', turnId: 'turn-1', payload: { itemId: null } }));
+    replica.apply(event({
+      type: 'toolInput.requested', turnId: 'turn-1', payload: {
+        id: 'request-1', kind: 'ask_user', payload: { request: {
+          itemId: 'ask-1',
+          questions: [{ id: 'q1', header: 'Choice', question: 'Continue?', isOther: false, isSecret: false, options: [] }],
+        } },
+      },
+    }));
+    replica.apply(event({ type: 'error', payload: { message: 'retrying', willRetry: true } }));
+    expect(replica.getSnapshot().error).toBeNull();
+    expect(replica.getSnapshot().messages.some((message) => message.role === 'system')).toBe(false);
+    replica.apply(event({ type: 'error', payload: { message: 'stopped' } }));
+
+    expect(replica.getSnapshot()).toMatchObject({ error: 'stopped' });
+    expect(replica.getSnapshot().messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'compaction', status: 'complete' }),
+      expect.objectContaining({ parts: expect.arrayContaining([expect.objectContaining({ id: 'ask-1' })]) }),
+      expect.objectContaining({ role: 'system', parts: [{ type: 'status', text: 'stopped' }] }),
+    ]));
+  });
+
+  it('updates existing lifecycle rows and completes turns that were not observed starting', () => {
+    const initial = emptySnapshot();
+    initial.activeTurnId = 'turn-other';
+    initial.busy = true;
+    initial.turnIds = ['turn-1'];
+    initial.turns = [{
+      id: 'turn-1', status: 'failed', error: null, willRetry: false,
+      startedAt: '2026-09-06T00:00:00.000Z', completedAt: null, durationMs: null,
+    }];
+    const replica = createClaudeConversationReplica(initial);
+    replica.apply(event({
+      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } },
+    }));
+    replica.apply(event({
+      type: 'turn.completed', turnId: 'turn-2', payload: { turn: { id: 'turn-2', status: 'interrupted' } },
+    }));
+
+    expect(replica.getSnapshot()).toMatchObject({
+      activeTurnId: 'turn-1',
+      turnIds: ['turn-1'],
+      busy: false,
+      turns: [
+        { id: 'turn-1', status: 'inProgress', startedAt: createdAt },
+        { id: 'turn-2', status: 'interrupted', startedAt: null, durationMs: null },
+      ],
+    });
+  });
 });
+
+const createdAt = '2026-09-06T00:00:01.000Z';
 
 function emptySnapshot(): ClaudeConversationSnapshot {
   return {
@@ -139,7 +233,7 @@ function event<T extends Omit<ClaudeConversationEvent, 'seq' | 'occurredAt' | 'a
   return {
     ...value,
     seq: 1,
-    occurredAt: '2026-09-06T00:00:01.000Z',
+    occurredAt: createdAt,
     agentId: 'agent-1',
     backend: 'claude',
   } as unknown as Extract<ClaudeConversationEvent, { type: T['type'] }>;
