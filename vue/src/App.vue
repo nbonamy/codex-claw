@@ -1,13 +1,20 @@
 <template>
   <AppShell
-    :inert="backendRestartInProgress ? '' : undefined"
-    :aria-hidden="backendRestartInProgress ? 'true' : undefined"
+    :inert="backendRestartInProgress || pendingSessionCompression !== null ? '' : undefined"
+    :aria-hidden="backendRestartInProgress || pendingSessionCompression !== null ? 'true' : undefined"
     :snapshot="snapshot"
     :active-agent="activeAgent"
     :unread-agent-ids="unreadAgentIds"
-    :messages="visibleMessages"
+    :codex-conversation-snapshot="activeCodexConversationSnapshot"
+    :claude-conversation-snapshot="activeClaudeConversationSnapshot"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
+    :is-conversation-load-failed="isActiveAgentHistoryFailed"
+    :retry-agent-history="retryActiveAgentHistory"
+    :send-prompt-action="sendPromptWithCompression"
+    :delete-turn-action="deleteTurn"
+    :edit-turn-action="editTurn"
+    :retry-turn-action="retryTurn"
     :history-has-older="activeHistoryHasOlder"
     :history-loading-older="isLoadingOlderHistory"
     :load-older-agent-history="loadOlderAgentHistory"
@@ -116,10 +123,11 @@
     @close-team="closeTeam"
     @disconnect-team="disconnectTeam"
     @close-agent="requestCloseAgent"
+    @compress-session="requestSessionCompression"
     @cleanup-pull-request="requestPullRequestCleanup"
     @duplicate-agent="duplicateAgent"
     @fork-agent="forkAgent"
-    @fork-message="forkActiveAgentMessage"
+    @fork-turn="forkActiveAgentTurn"
     @move-agent-to-team="moveAgentToTeam"
     @reorder-agents="reorderAgents"
     @reorder-repositories="reorderRepositories"
@@ -140,12 +148,9 @@
     @client-response="respondToClientRequest"
     @delete-queued-prompt="removeQueuedPrompt"
     @debug-mark-unread="markDebugAgentsUnread"
-    @delete-message="deleteMessage"
-    @edit-message="editMessage"
     @interrupt-agent="interruptActiveAgent"
-    @retry-message="retryMessage"
     @send-agent-prompt="sendAgentPrompt($event.agentId, $event.prompt)"
-    @send-prompt="sendPrompt"
+    @send-prompt="sendPromptWithCompression"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
     @update-queued-prompt="updateQueuedPrompt"
@@ -162,6 +167,13 @@
     @close="cancelAgentClose"
     @keep-worktree="confirmAgentClose(false)"
     @delete-worktree="confirmAgentClose(true, $event)"
+  />
+  <SessionCompressionDialog
+    :visible="pendingSessionCompression !== null"
+    :busy="sessionCompressionBusy"
+    :error="sessionCompressionError"
+    @close="cancelSessionCompression"
+    @confirm="confirmSessionCompression"
   />
   <PullRequestCleanupDialog
     :visible="pendingPullRequestCleanup !== null"
@@ -197,13 +209,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, RendererSendPromptOptions } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
 import AgentCreationProgressDialog from './components/AgentCreationProgressDialog.vue';
+import SessionCompressionDialog from './components/SessionCompressionDialog.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
@@ -219,13 +232,14 @@ const {
   activeBackendApprovals,
   activeApprovalPreset,
   activePermissionMode,
-  visibleMessages,
   activeQueuedPrompts,
   activeComposerState,
   activeComposerAttachments,
   unreadAgentIds,
   isLoading,
+  isActiveAgentHistoryFailed,
   isHydratingActiveAgentHistory,
+  retryActiveAgentHistory,
   activeHistoryHasOlder,
   isLoadingOlderHistory,
   isSending,
@@ -234,6 +248,8 @@ const {
   agentFiles,
   backendModels,
   activeBackendCommands,
+  activeCodexConversationSnapshot,
+  activeClaudeConversationSnapshot,
   backendPlugins,
   activeBackendCapabilities,
   modelCatalogStatus,
@@ -295,7 +311,7 @@ const {
   updateAgent,
   duplicateAgent,
   forkAgent,
-  forkActiveAgentMessage,
+  forkActiveAgentTurn,
   moveAgentToTeam,
   reorderAgents,
   reorderRepositories,
@@ -329,6 +345,7 @@ const {
   deleteAutomation,
   listAgentConversations,
   resumeAgentConversation,
+  compressAgentSession,
   readConversationMessages,
   configureWorkBacklog,
   loadWorkRepositories,
@@ -356,9 +373,9 @@ const {
   sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,
-  deleteMessage,
-  editMessage,
-  retryMessage,
+  deleteTurn,
+  editTurn,
+  retryTurn,
   steerQueuedPrompt,
   updateQueuedPrompt,
   removeQueuedPrompt,
@@ -374,6 +391,9 @@ const agentCloseError = ref<string | null>(null);
 const pendingPullRequestCleanup = ref<Agent | null>(null);
 const pullRequestCleanupBusy = ref(false);
 const pullRequestCleanupError = ref<string | null>(null);
+const pendingSessionCompression = ref<Agent | null>(null);
+const sessionCompressionBusy = ref(false);
+const sessionCompressionError = ref<string | null>(null);
 let unsubscribeSystemAppearance: (() => void) | null = null;
 let unsubscribeUpdateStatus: (() => void) | null = null;
 
@@ -452,6 +472,57 @@ async function confirmPullRequestCleanup(): Promise<void> {
   } finally {
     pullRequestCleanupBusy.value = false;
   }
+}
+
+function requestSessionCompression(agentId: string): void {
+  if (sessionCompressionBusy.value) return;
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  if (
+    !agent ||
+    agent.backend !== 'codex' ||
+    agent.backendSession?.kind !== 'codex' ||
+    agent.status.type !== 'idle'
+  ) {
+    return;
+  }
+  pendingSessionCompression.value = agent;
+  sessionCompressionError.value = null;
+  if (!snapshot.value.general.sessionCompressionWarningEnabled) {
+    void confirmSessionCompression(false);
+  }
+}
+
+function cancelSessionCompression(): void {
+  if (sessionCompressionBusy.value) return;
+  pendingSessionCompression.value = null;
+  sessionCompressionError.value = null;
+}
+
+async function confirmSessionCompression(dontShowAgain: boolean): Promise<void> {
+  const agent = pendingSessionCompression.value;
+  if (!agent || sessionCompressionBusy.value) return;
+  sessionCompressionBusy.value = true;
+  sessionCompressionError.value = null;
+  try {
+    if (dontShowAgain && snapshot.value.general.sessionCompressionWarningEnabled) {
+      await updateSettings({ general: { sessionCompressionWarningEnabled: false } }).catch(() => undefined);
+    }
+    await compressAgentSession(agent.id);
+    pendingSessionCompression.value = null;
+  } catch (error) {
+    sessionCompressionError.value = localizedErrorMessage(error, t);
+  } finally {
+    sessionCompressionBusy.value = false;
+  }
+}
+
+async function sendPromptWithCompression(prompt: string, options?: RendererSendPromptOptions): Promise<void> {
+  const agent = activeAgent.value;
+  if (prompt.trim() === '/compact' && agent?.backend === 'codex') {
+    requestSessionCompression(agent.id);
+    return;
+  }
+  await sendPrompt(prompt, options);
 }
 
 function syncRendererWindowFocus(): void {

@@ -28,12 +28,12 @@ or:
 ```
 
 Supported error codes are defined in
-`shared/src/backend-protocol/rpc.ts`: parse error, invalid request, method not
+`core/src/backend-protocol/rpc.ts`: parse error, invalid request, method not
 found, invalid params, internal error, backend unavailable, and timeout.
 
 Method names use `resource[/subresource]/verb`. Multiword path segments are
 lower camel case, and the action belongs at the end of the path. Method values
-are centralized in `shared/src/backend-protocol/methods.ts`.
+are centralized in `core/src/backend-protocol/methods.ts`.
 The shared request map is being adopted one product domain at a time; all
 app-level `agent/git/*` methods currently have compile-time parameter and result
 contracts used by the Electron adapter and backend routing seam.
@@ -59,7 +59,8 @@ synced after this change.
 
 ## Common Result Types
 
-- `AppSnapshot`: authoritative product snapshot owned by `clawd`.
+- `AppSnapshot`: authoritative transcript-free product and coordination
+  snapshot owned by `clawd`.
 - `ClientState`: backend-derived client hints:
   `{ sourceFolderPath, shouldPreventDisplaySleep,
   shouldPreventDisplaySleepForRemoteAccess? }`. The first sleep hint represents
@@ -68,33 +69,43 @@ synced after this change.
   and Codex remote control is connected; Electron applies that reason only on
   AC power. Keeping the reasons separate prevents the remote-access power policy
   from changing the existing agent-activity behavior.
-- `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`. Its
-  `snapshot` is a valid `AppSnapshot` with `messages: []`; transcripts are
-  deliberately excluded from synchronization frames.
+- `ClawSnapshotGetResult`: `{ snapshot, lastEventSeq, clientState }`. Provider
+  conversations are deliberately excluded from this synchronization frame.
 - `AutomationLocation`: optional automation/work-provider location selector:
   `{ kind: "local" }` or `{ kind: "remote", remoteConnectionId }`.
 - `ClawBackendEvent`: event sent to clients:
   `{ seq, type, payload, occurredAt, agentId?, backend?, backendSessionId?,
   threadId?, turnId?, clientState?, snapshot? }`.
 
+Every transport treats a received event value as untrusted. Local stdio/socket,
+remote SSH stdio, and browser WebSocket ingress decode the complete typed event
+before publishing it to application state. A malformed event notification is
+logged with structural path/reason diagnostics and dropped; its payload values
+are never logged, the connection remains open, and unrelated pending requests
+continue normally. Malformed JSON or JSON-RPC framing retains the transport's
+existing error and reconnection policy.
+
 State-mutating public methods generally return `AppSnapshot`. The returned
-snapshot is authoritative. Between snapshots, clients replay only sequenced
-clawd-authored app events through the shared deterministic reducer.
+product snapshot is authoritative. Between snapshots, clients replay only
+sequenced `clawd` coordination events through the app reducer. Provider
+conversation resets and deltas are carried in provider-specific frames and
+applied by the matching provider replica.
 
 Electron and the renderer both synchronize with a subscribe-buffer-snapshot
 barrier: subscribe first, buffer notifications while reading `snapshot/get`,
 discard buffered events at or below `lastEventSeq`, then apply only contiguous
 events above it. A gap triggers a fresh snapshot barrier. Duplicate deltas are
 therefore never replayed after reconnect or renderer reload. The selected
-conversation is restored separately through `agent/history/hydrate`, keeping
-the synchronization barrier bounded even for very long threads.
+conversation is restored separately through `agent/history/hydrate`, which
+publishes a bounded provider snapshot followed by revisioned provider events.
+This keeps the synchronization barrier bounded even for very long threads.
 
 ## Client To `clawd`: Core
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `backend/health/get` | none | `ClawBackendHealth` | Liveness and version check. |
-| `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes source folder if needed and returns the authoritative transcript-free synchronization snapshot (`messages: []`). |
+| `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes the source folder if needed and returns the authoritative transcript-free product snapshot. |
 | `client/state/get` | none | `ClientState` | Backend-derived client hints only. |
 | `client/request/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Resolves a provider-owned approval or ask-user request. |
 
@@ -114,11 +125,10 @@ the synchronization barrier bounded even for very long threads.
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
 | `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent configuration directly below the source agent. |
-| `agent/fork` | `{ agentId, messageIndex? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at an absolute host message index, into a new selected agent directly below the source. |
+| `agent/fork` | `{ agentId, turnId? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at a stable turn id, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
 | `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
-| `agent/folder/update` | `{ agentId, folder }` | `AppSnapshot` | Folder picker remains client-side; mutation and validation are backend-owned. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
@@ -137,22 +147,22 @@ the synchronization barrier bounded even for very long threads.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `agent/restart` | `{ agentId }` | `AppSnapshot` | Clears app-visible conversation state and forgets backend session. |
-| `agent/history/hydrate` | `{ agentId }` | `AppSnapshot` | Lazily restores persisted session history without selecting the agent. |
-| `agent/history/load-older` | `{ agentId }` | `{ hasOlder }` | Loads one older provider history page; message batches arrive through `thread.historyLoaded`. |
+| `agent/restart` | `{ agentId }` | `AppSnapshot` | Forgets the provider session reference and releases its live conversation host. |
+| `agent/session/compress` | `{ agentId }` | `AppSnapshot` | For an idle Codex agent, creates a replacement conversation, submits the generated handoff as hidden context in its initial prompt, archives the old conversation only after that prompt is accepted, and updates the persisted provider reference. Provider transcripts remain SDK-owned. |
+| `agent/history/hydrate` | `{ agentId }` | `AppSnapshot` | Lazily restores provider-owned session state without selecting the agent; the conversation arrives in a provider snapshot frame. |
+| `agent/history/load-older` | `{ agentId }` | `{ hasOlder }` | Asks the provider owner to load one older history page; the result arrives through provider-native deltas. |
 | `agent/conversations/list` | `{ agentId }` | `ConversationSummary[]` | Lists provider history through the active agent backend. |
-| `agent/conversation/resume` | `{ agentId, ref: BackendConversationRef }` | `AppSnapshot` | Validates backend match and idle status, then replaces visible history. |
+| `agent/conversation/resume` | `{ agentId, ref: BackendConversationRef }` | `AppSnapshot` | Validates backend match and idle status, updates the provider reference, and publishes a provider conversation reset. |
 | `agent/conversation/messages/get` | `{ agentId, ref }` | `RendererMessage[]` | Reads historical messages through the owning backend. |
 | `agent/prompt/send` | `{ agentId, prompt, options? }` | `AppSnapshot` | Starts a backend turn when idle, or appends to the backend-owned per-agent queue while busy. |
-| `agent/prompt/steer` | `{ agentId, prompt }` | `AppSnapshot` | Sends active-turn steering and emits `message.steer`. |
+| `agent/prompt/steer` | `{ agentId, prompt }` | `AppSnapshot` | Sends active-turn steering through the provider owner; provider events update the conversation replica. |
 | `agent/queuedPrompt/update` | `{ agentId, promptId, prompt }` | `AppSnapshot` | Updates the text of an existing backend-owned queued prompt without changing its ID or queue position. |
 | `agent/queuedPrompt/steer` | `{ agentId, promptId, prompt? }` | `AppSnapshot` | Atomically steers the stored or edited queued prompt and dequeues it only after acceptance. |
 | `agent/queuedPrompt/delete` | `{ agentId, promptId }` | `AppSnapshot` | Deletes a prompt from the backend-owned queue. |
 | `agent/interrupt` | `{ agentId }` | `AppSnapshot` | Interrupts the active backend turn if supported. |
-| `agent/turn/rollback` | `{ agentId, turnId }` | `AppSnapshot` | Resolves the owning backend location, rolls back provider history, and replaces visible history. |
-| `agent/message/delete` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, maps message to turn, rolls back, and persists. |
-| `agent/message/update` | `{ agentId, messageId, prompt }` | `AppSnapshot` | Resolves the owning backend location, rolls back, then sends edited prompt. |
-| `agent/message/retry` | `{ agentId, messageId }` | `AppSnapshot` | Resolves the owning backend location, rolls back, then resends the matching user prompt. |
+| `agent/turn/delete` | `{ agentId, turnId }` | `AppSnapshot` | Delegates provider-defined turn deletion to the owning conversation host. |
+| `agent/turn/edit` | `{ agentId, turnId, content }` | `AppSnapshot` | Replaces the selected turn's prompt and restarts execution through the owning backend. |
+| `agent/turn/retry` | `{ agentId, turnId }` | `AppSnapshot` | Retries the selected turn through the owning backend. |
 | `agent/goal/update` | `{ agentId, objective }` | `AppSnapshot` | Sets provider goal metadata and updates agent goal state. |
 | `agent/goal/clear` | `{ agentId }` | `AppSnapshot` | Clears provider goal metadata and agent goal state. |
 | `agent/approvalPreset/update` | `{ agentId, preset: ApprovalPreset }` | `AppSnapshot` | Applies app-owned approval preset through the backend driver. |
@@ -254,7 +264,6 @@ without adopting it as the local product snapshot.
 | `automation/create` | `{ input: CreateAutomationInput, location? }` | `AppSnapshot` | Creates scheduler configuration in local `clawd` or the selected remote automation location. |
 | `automation/update` | `{ input: UpdateAutomationInput, location? }` | `AppSnapshot` | Updates scheduler configuration in local `clawd` or the selected remote automation location. |
 | `automation/run` | `{ automationId, location? }` | `AppSnapshot` | Runs one automation immediately in local `clawd` or the selected remote automation location. |
-| `automation/due/run` | none | `AppSnapshot` | Runs due automations. Used by backend scheduler and tests. |
 | `automation/history/clear` | `{ automationId, location? }` | `AppSnapshot` | Clears execution history in local `clawd` or the selected remote automation location. |
 | `automation/execution/delete` | `{ automationId, executionId, location? }` | `AppSnapshot` | Deletes one execution log entry in local `clawd` or the selected remote automation location. |
 | `automation/delete` | `{ automationId, location? }` | `AppSnapshot` | Deletes scheduler configuration in local `clawd` or the selected remote automation location. |
@@ -285,6 +294,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/git/diff/get` | `{ agent }` | `AgentGitDiff | null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
+| `driver/session/compress` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |
 | `driver/goal/update` | `{ agent, objective }` | `BackendGoalResult` |
 | `driver/goal/clear` | `{ agent }` | `BackendGoalResult` |
@@ -296,10 +306,12 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/history/load-older` | `{ agent }` | `{ hasOlder }` |
 | `driver/conversations/list` | `{ agent }` | `ConversationSummary[]` |
 | `driver/conversation/resume` | `{ agent, ref }` | `BackendConversationResumeResult` |
-| `driver/conversation/fork` | `{ agent, messageIndex? }` | `BackendConversationResumeResult` |
+| `driver/conversation/fork` | `{ agent, turnId? }` | `BackendConversationResumeResult` |
 | `driver/conversation/messages/get` | `{ ref, agentId }` | `RendererMessage[]` |
 | `driver/prompt/steer` | `{ agent, prompt }` | `BackendSendResult` |
-| `driver/turn/rollback` | `{ agent, turnId }` | `BackendRollbackResult` |
+| `driver/turn/delete` | `{ agent, turnId }` | `BackendTurnActionResult` |
+| `driver/turn/edit` | `{ agent, turnId, content }` | `BackendTurnActionResult` |
+| `driver/turn/retry` | `{ agent, turnId }` | `BackendTurnActionResult` |
 | `driver/models/list` | `{ agent }` | `BackendModelOption[]` |
 | `driver/skills/list` | `{ agent }` | `BackendSkillSummary[]` |
 | `source/folder/detect` | none | `string | null` |
@@ -316,42 +328,46 @@ implementation messages, not the preferred app protocol for clients.
 | --- | --- | --- |
 | `backend/event/notify` | `ClawBackendEvent` | Sequenced app-owned event for renderer/UI state. Includes small backend-derived `clientState`; `snapshot` is an optional compatibility or recovery checkpoint rather than accompanying each incremental event. |
 
-Routine `snapshot.updated` notifications carry `AppSnapshotMetadata`, which
-explicitly excludes conversation messages. Transcripts move through
-`thread.historyLoaded` and the incremental message/item events instead. Agent
-selection, history hydration, prompt submission, and steering likewise return
-metadata-only acknowledgements so those hot paths never echo the full cached
-transcript back through stdio and Electron IPC.
+Routine `snapshot.updated` notifications carry a complete transcript-free
+`AppSnapshot`. There is no metadata/full snapshot alias and no global message
+array. Provider conversations travel as bounded resets followed by revisioned
+deltas:
+
+- `codex.conversationSnapshotChanged` and
+  `codex.conversationEventReceived` carry SDK-owned snapshots/events;
+- `claude.conversationSnapshotChanged` and
+  `claude.conversationEventReceived` carry Claude-host snapshots/events.
+
+Electron forwards these frames without reducing them. The renderer rejects
+stale or gapped revisions and rehydrates that provider conversation rather than
+replaying a Claw-owned transcript.
 
 Event `type` values are the app-owned `MainToRendererEvent['type']` union from
-`shared/src/contracts.ts`. Current emitted examples include:
+`core/src/contracts.ts`. Current emitted examples include:
 
 - backend and agent status: `backend.statusChanged`, `agent.updated`,
   `snapshot.updated`, `agent.statusChanged`;
-- thread and turn lifecycle: `thread.started`, `thread.historyLoaded`,
-  `thread.settingsUpdated`, `thread.modeUpdated`, `thread.goalUpdated`,
-  `thread.goalCleared`, `thread.tokenUsageUpdated`, `turn.started`,
-  `turn.planUpdated`, `turn.proposedPlanDelta`,
-  `turn.proposedPlanCompleted`, `turn.completed`;
-- message and item streaming: `message.userSubmitted`, `message.delta`, `message.steer`,
-  `item.started`, `item.updated`, `item.completed`;
-- approvals and requests: `backendApproval.requested`,
-  `backendApproval.resolved`, `approval.requested`, `toolInput.requested`;
+- provider conversations: `codex.conversationSnapshotChanged`,
+  `codex.conversationEventReceived`, `claude.conversationSnapshotChanged`,
+  `claude.conversationEventReceived`;
+- app-owned conversation-adjacent projections: `thread.modeUpdated`,
+  `thread.goalUpdated`, `thread.goalCleared`, and
+  `thread.tokenUsageUpdated`;
+- approvals and requests outside the provider transcript:
+  `backendApproval.requested`, `backendApproval.resolved`;
 - backend-owned prompt queue: `agent.promptQueued`, `agent.promptDequeued`,
   `agent.promptRetryScheduled`;
 - artifacts and account state: `diff.updated`, `sidePanel.markdownRequested`,
   `sidePanel.gitDiffRequested`, `git.statusUpdated`, `git.operationProgress`,
-  `context.compactionStarted`,
   `account.rateLimitsUpdated`, `skills.changed`;
 - native browser feedback: `browser.annotationCreated` (ephemeral element or area metadata that the renderer queues for a batched agent prompt);
 - work backlog: `workBacklog.assignmentUpdated`;
-- failures: `error`.
+- provider-independent failures are reflected through agent/runtime status;
+  provider conversation failures remain inside provider frames.
 
-Execution task-list lifecycle is app-owned: `turn.planUpdated` derives
-completion only when every structured step is completed, and `turn.completed`
-finalizes remaining execution plans as incomplete, interrupted, or failed.
-Proposed Plan-mode documents use the separate proposed-plan events and are not
-interpreted as execution task-list completion.
+Claw may inspect provider events to update a side-panel plan or another
+read-only product projection, but it never applies those events to a second
+transcript.
 
 Clients must ignore unknown event types and refresh via `snapshot/get` if they
 detect sequence gaps.

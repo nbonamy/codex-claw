@@ -1,4 +1,8 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import {
+  decodeClawBackendEvent,
+  type ClawBackendEvent,
+} from '@codex-claw/core/backend-protocol/events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
   createClawRpcError,
@@ -9,7 +13,6 @@ import {
   isClawRpcRequest,
   isClawRpcResponse,
   parseClawRpcMessage,
-  type ClawBackendEvent,
   type ClawRpcId,
   type ClawRpcRequest,
   type ClawRpcResponse,
@@ -153,7 +156,9 @@ class RemoteClawdClient {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`remote clawd request timed out: ${method}`));
-      }, this.options.requestTimeoutMs ?? 15_000);
+      }, method === backendMethods.agentSessionCompress
+        ? Math.max(this.options.requestTimeoutMs ?? 15_000, 10 * 60_000)
+        : this.options.requestTimeoutMs ?? 15_000);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),
@@ -208,8 +213,18 @@ class RemoteClawdClient {
       return;
     }
     if (isClawRpcNotification(message)) {
-      if (message.method === backendMethods.backendEventNotify && isRemoteBackendEvent(message.params)) {
-        this.eventSink?.(message.params);
+      if (message.method === backendMethods.backendEventNotify) {
+        let event: ClawBackendEvent;
+        try {
+          event = decodeClawBackendEvent(message.params);
+        } catch (error) {
+          warnMain('remote-clawd', 'ignored malformed remote backend event notification', {
+            connectionId: this.connection.id,
+            detail: error instanceof Error ? error.message : 'Invalid backend event notification.',
+          });
+          return;
+        }
+        this.eventSink?.(event);
       }
       return;
     }
@@ -301,17 +316,4 @@ function remoteConnectionTransport(connection: RemoteConnection): RemoteConnecti
     return sshStdioTransport(connection.host);
   }
   return connection.transport;
-}
-
-function isRemoteBackendEvent(value: unknown): value is ClawBackendEvent {
-  return Boolean(
-    value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    'seq' in value &&
-    'type' in value &&
-    'payload' in value &&
-    typeof (value as { seq?: unknown }).seq === 'number' &&
-    typeof (value as { type?: unknown }).type === 'string',
-  );
 }

@@ -314,6 +314,25 @@ describe('agent git service parsers', () => {
     expect(runGit).toHaveBeenCalledWith('/repo', ['diff', '--no-ext-diff', 'origin/main...HEAD', '--']);
   });
 
+  it('explains that a feature branch with only uncommitted work must be committed first', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
+      if (args[0] === 'symbolic-ref' && args[3] === 'HEAD') return { stdout: 'fix/issue-7\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: 'origin\n' };
+      if (args[0] === 'remote') return { stdout: 'git@github.com:owner/repo.git\n' };
+      if (args[0] === 'status') return { stdout: ' M src/app.js\0' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/fix/issue-7\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'origin/main\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.pullRequestMessageContext('/repo')).rejects.toThrow(
+      'This branch has no committed changes to include. Commit your work before creating a pull request.',
+    );
+  });
+
   it('rejects pull request generation from an integration branch', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };

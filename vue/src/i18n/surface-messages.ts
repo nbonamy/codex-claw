@@ -61,7 +61,6 @@ export const surfaceMessages = {
     "connected": "Connected",
     "claude": "Claude",
     "codex": "Codex",
-    "starting": "Starting",
     "readyToGetGoing": "Ready to get going"
   },
   "annotationSendButton": {
@@ -294,6 +293,7 @@ export const surfaceMessages = {
     "title": "Title",
     "describeTheChangeOptional": "Describe the change (optional)",
     "generatePullRequestDraftWithCodex": "Generate pull request draft with Codex",
+    "uncommittedChangesWillNotBeIncludedInThisPullRequest": "Uncommitted changes will not be included in this pull request.",
     "createPR": "Create PR",
     "mergeBranch": "Merge branch",
     "mergeStrategy": "Merge strategy",
@@ -301,6 +301,7 @@ export const surfaceMessages = {
     "preserveEveryCommitInAMergeCommit": "Preserve every commit in a merge commit.",
     "squashAndMerge": "Squash and merge",
     "combineAllChangesIntoASingleCommit": "Combine all changes into a single commit.",
+    "uncommittedChangesWillNotBeIncludedInThisMerge": "Uncommitted changes will not be included in this merge.",
     "squashCommitMessage": "Squash commit message",
     "squashCommitMessage2": "Squash commit message…",
     "deleteWorktreeAfterMerging": "Delete worktree after merging",
@@ -829,7 +830,7 @@ export const surfaceMessages = {
     "pullRequestCreationIsNotAvailable": "Pull request creation is not available.",
     "gitMergeIsNotAvailable": "Git merge is not available.",
     "openInIsNotAvailable": "Open In is not available.",
-    "devicePairingIsNotAvailable": "Device pairing is not available."
+    "devicePairingIsNotAvailable": "Device pairing is not available.",
   },
   "annotationPopup": {
     "annotationComment": "Annotation comment",
@@ -850,7 +851,10 @@ export const surfaceMessages = {
   },
   "conversationPane": {
     "selectAnAgent": "Select an agent",
-    "chooseAnAgentFromTheLeftToStartANativeBackendSession": "Choose an agent from the left to start a native backend session."
+    "chooseAnAgentFromTheLeftToStartANativeBackendSession": "Choose an agent from the left to start a native backend session.",
+    "historyLoadFailed": "Conversation couldn’t be loaded.",
+    "historyLoadFailedReason": "Make sure this conversation isn’t open in ChatGPT, then try again. If it still won’t load, restart the agent.",
+    "retryHistory": "Retry"
   },
   "team-close-confirmation": {
     "deleteTeam": "Delete Team",

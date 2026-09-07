@@ -1,3 +1,4 @@
+import { decodeClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
 
 export const clawWebProtocolVersion = 1 as const;
@@ -39,6 +40,8 @@ type ClawWebResponse = {
 export type ClawWebClientMessage = ClawWebRequest;
 export type ClawWebServerMessage = ClawWebReady | ClawWebEvent | ClawWebResponse;
 
+export class ClawWebEventDecodeError extends TypeError {}
+
 export function encodeClawWebMessage(message: ClawWebClientMessage | ClawWebServerMessage): string {
   return JSON.stringify(message);
 }
@@ -58,7 +61,16 @@ export function parseClawWebServerMessage(value: unknown): ClawWebServerMessage 
     throw new TypeError('Invalid Claw web response.');
   }
   if (value.type === 'ready' && typeof value.userId === 'string') return value as ClawWebReady;
-  if (value.type === 'event' && isRecord(value.event)) return value as ClawWebEvent;
+  if (value.type === 'event') {
+    try {
+      decodeClawBackendEvent(value.event);
+      return value as ClawWebEvent;
+    } catch (error) {
+      throw new ClawWebEventDecodeError(
+        `Malformed Claw web event: ${error instanceof Error ? error.message : 'Invalid backend event.'}`,
+      );
+    }
+  }
   if (value.type === 'response' && typeof value.id === 'string' && typeof value.ok === 'boolean') {
     if (value.ok === true) return value as ClawWebResponse;
     if (value.ok === false && typeof value.error === 'string') return value as ClawWebResponse;

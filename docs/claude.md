@@ -97,9 +97,10 @@ transport configures:
 - Claw's agent-scoped collaboration MCP server and allowed-tool rule;
 - partial streaming events for responsive text and tool cards.
 
-The live Claude transport uses the Agent SDK and feeds its messages through the
-app-owned message adapter. The driver maps Claude SDK stream messages into
-app-owned backend events:
+The live Claude transport uses the Agent SDK and feeds its messages into one
+Claude conversation host. The host is the sole owner of the normalized Claude
+transcript and maps SDK stream messages into immutable
+`ClaudeConversationEvent`s:
 
 - `system/init` or any message with `session_id` records a Claude
   `BackendSession`.
@@ -123,13 +124,19 @@ existing flat message layout. Claw does not guess a final-answer boundary or
 label every Claude message as final; if the provider exposes reliable phase
 semantics later, the driver can populate the same provider-neutral fields.
 
+The host maintains one `ClaudeConversationSnapshot` per agent and publishes a
+bounded reset followed by revisioned provider deltas. The renderer applies
+those deltas with the shared Claude replica; `AppSnapshot` and the generic Claw
+coordination reducer never contain or mutate Claude messages.
+
 This gives Claude agents local prompt send, persistent multi-turn sessions,
-streaming display, session resume, and interrupt through the same
-`AgentBackendDriver` seam as Codex. Agent SDK permission callbacks are
-normalized to Claw's existing approval cards. Claude's `AskUserQuestion` tool
-is normalized to the existing multi-question form, and the response is routed
-back to the blocked SDK tool call. Session-scoped and persistent permission
-suggestions back Claw's Allow for conversation and Always allow choices.
+streaming display, session resume, and interrupt through the
+`AgentBackendDriver` lifecycle seam. Agent SDK permission callbacks are
+normalized into the Claude provider snapshot. Claude's `AskUserQuestion` tool
+is normalized to the provider's multi-question form, and the response is
+routed back to the blocked SDK tool call. Session-scoped and persistent
+permission suggestions back Claw's Allow for conversation and Always allow
+choices.
 Claude's proactive permission posture remains distinct from Codex approval
 presets. The composer renders a capability-driven Permissions submenu with
 Claude's own `default`, `acceptEdits`, `dontAsk`, `auto`, and
@@ -190,7 +197,7 @@ directory is the absolute folder path with path separators replaced by `-`
 (`"/Users/nbonamy/src/id8"` becomes `"-Users-nbonamy-src-id8"`). A
 `sessions-index.json` file can also point to the transcript path.
 
-The Claw transcript adapter lives in `src/main/claude/` and reads only the
+The Claude transcript adapter lives in `backend/src/claude/` and reads only the
 displayable records:
 
 - `type: "user"` entries with non-meta text become user `RendererMessage`s.
@@ -202,9 +209,10 @@ displayable records:
 - Claude queue operations, attachments, `last-prompt`, sidechains, and meta
   local-command records are ignored.
 
-On agent selection or startup active-agent hydration, `ClaudeBackendDriver`
-emits `thread.historyLoaded` through the same app-owned event path used by
-Codex, so the renderer remains backend-neutral.
+On agent selection or startup hydration, the Claude conversation host emits a
+`claude.conversationSnapshotChanged` frame. Later SDK and transcript events are
+transported in `claude.conversationEventReceived` frames. Claw owns the outer
+agent/revision envelope but does not reinterpret the provider event.
 
 The Resume Session dialog opened from an agent's sidebar menu is the Claude
 implementation of the generic driver capability documented in
@@ -580,7 +588,8 @@ For Claw's first Claude milestone, the minimum useful set is:
 Claude support should arrive as a backend driver in Electron main, not as
 renderer remote-session hooks.
 
-Recommended module shape:
+Historical recommended module shape (the implemented equivalents now live
+under `backend/src/claude/`):
 
 ```text
 src/main/claude/
@@ -592,10 +601,11 @@ src/main/claude/
   __tests__/
 ```
 
-The app-owned flow should mirror Codex:
+The implemented ownership flow is:
 
 ```text
-Claude SDK stream/control event -> Claude adapter -> app event -> renderer store -> UI
+Claude Agent SDK -> Claude conversation host -> provider snapshot/event
+                 -> Claw revisioned transport frame -> Claude renderer replica -> UI
 ```
 
 ### Transport Choice
@@ -803,38 +813,12 @@ Claude Driver Work".
 - `docs/mcp.md` says backend enablement should be backend-specific; only Codex
   enablement is implemented today.
 
-## Remaining Claude Driver Work
+## Current Claude Follow-ups
 
-The broad pre-Claude cleanup is implemented. The remaining work is a concrete
-Claude driver and fixtures, not another generic provider refactor.
-
-Recommended next steps:
-
-1. Add captured Claude SDK/control fixtures before adding UI surface area.
-2. Implement a Claude process `stream-json` transport behind
-   `AgentBackendDriver`.
-3. Map Claude assistant/result/tool/permission events to app-owned
-   `BackendEvent`, `ClientRequest`, and `RendererMessage` shapes.
-4. Implement interrupt and clear unsupported behavior for steering, rollback,
-   edit, retry, and goals until Claude support is verified.
-5. Add main-process and renderer tests proving Codex agents keep working while
-   Claude agents use only Claude-supported capabilities.
-
-## First Claude Milestone
-
-The smallest useful Claude milestone:
-
-- one Claude agent in one folder;
-- spawn process stream-json or verified direct-connect websocket;
-- send a prompt;
-- render streaming assistant text;
-- render completed assistant messages;
-- show and answer `can_use_tool` permission requests;
-- interrupt the active turn;
-- show completion/error state from `result`;
-- preserve Codex agents unchanged.
-
-Explicit non-goals for the first milestone:
+The local Agent SDK path, provider-owned conversation host, renderer replica,
+streaming, resume, permissions, user questions, plans, compaction, context, and
+interrupt are implemented. Remaining work should add provider capabilities
+without widening Claw's ownership:
 
 - Codex-style active-turn steering;
 - Codex-style goals;

@@ -1,8 +1,222 @@
-import type { Agent, AppSnapshot, BackendSession, DuplicateAgentOptions, RendererMessage, WorkBacklogAssignment, WorkBacklogAssignmentStatus } from './contracts';
+import type {
+  Agent,
+  AgentBackend,
+  AgentStatus,
+  AppSnapshot,
+  BackendDefaults,
+  BackendSession,
+  CreateAgentInput,
+  CreateQuickChatInput,
+  DuplicateAgentOptions,
+  UpdateAgentInput,
+  WorkBacklogAssignment,
+  WorkBacklogAssignmentStatus,
+} from './contracts';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 import { agentDisplayName } from './agent-display';
+import { seedTeamId } from './seed-ids';
 import { workspaceSidebarGroupIdForAgent, workspaceSidebarRepositoryRootForAgent } from './workspace-sidebar';
+
+export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
+  const name = normalizedOptionalString(input.name) ?? null;
+  const backend = normalizedBackend(input.backend);
+  const delegatedByAgentId = normalizedOptionalString(input.delegatedByAgentId);
+
+  return {
+    id,
+    teamId,
+    ...(delegatedByAgentId ? { delegatedByAgentId } : {}),
+    name,
+    avatar: normalizedOptionalString(input.avatar),
+    folder: normalizedFolder(input.folder),
+    backend,
+    backendDefaults: normalizedBackendDefaults(input.backendDefaults, backend) ?? defaultBackendDefaults(backend),
+    status: { type: 'idle' },
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString(), id = createEntityId('agent'), options: { select?: boolean } = {}): AppSnapshot {
+  const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
+  return insertAgentInSnapshot(snapshot, agent, options.select);
+}
+
+export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQuickChatInput, createdAt = new Date().toISOString(), id = createEntityId('agent')): AppSnapshot {
+  const agent = createAgentFromInput({
+    name: null,
+    folder: '',
+    backend: 'codex',
+    ...(input.teamId ? { teamId: input.teamId } : {}),
+  }, createdAt, targetTeamId(snapshot, input.teamId), id);
+  agent.folder = null;
+  agent.sessionKind = 'quickChat';
+  return insertAgentInSnapshot(snapshot, agent);
+}
+
+export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentInput, updatedAt = new Date().toISOString()): Agent | null {
+  const agent = findAgent(snapshot, input.id);
+  if (!agent) {
+    return null;
+  }
+  agent.name = normalizedOptionalString(input.name) ?? null;
+  agent.updatedAt = updatedAt;
+
+  return agent;
+}
+
+export function updateAgentOpenInApplication(
+  snapshot: AppSnapshot,
+  agentId: string,
+  application: Agent['openInApplication'],
+  updatedAt = new Date().toISOString(),
+): Agent | null {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) {
+    return null;
+  }
+
+  agent.openInApplication = application;
+  agent.updatedAt = updatedAt;
+  return agent;
+}
+
+export function updateAgentFolder(snapshot: AppSnapshot, agentId: string, folder: string, updatedAt = new Date().toISOString()): Agent | null {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) {
+    return null;
+  }
+
+  const nextFolder = normalizedFolder(folder);
+  if (nextFolder !== agent.folder) {
+    delete agent.workspace;
+    delete agent.pullRequest;
+  }
+  agent.folder = nextFolder;
+  clearAgentRuntimeState(agent);
+  agent.updatedAt = updatedAt;
+
+  return agent;
+}
+
+export function updateAgentWorkspace(
+  snapshot: AppSnapshot,
+  agentId: string,
+  workspace: Agent['workspace'],
+  updatedAt = new Date().toISOString(),
+): Agent | null {
+  const agent = findAgent(snapshot, agentId);
+  if (!agent) return null;
+
+  if (workspace) {
+    agent.workspace = { ...workspace };
+  } else {
+    delete agent.workspace;
+  }
+  agent.updatedAt = updatedAt;
+  return agent;
+}
+
+export function selectAgent(snapshot: AppSnapshot, agentId: string): AppSnapshot {
+  const agent = findAgent(snapshot, agentId);
+  if (agent) {
+    snapshot.activeAgentId = agentId;
+    const team = snapshot.teams.find((candidate) => candidate.id === agent.teamId);
+    if (team) {
+      snapshot.activeTeamId = team.id;
+      team.activeAgentId = agentId;
+    }
+  }
+
+  return snapshot;
+}
+
+function insertAgentInSnapshot(snapshot: AppSnapshot, agent: Agent, select = true): AppSnapshot {
+  snapshot.agents.push(agent);
+  attachAgentToTeam(snapshot, agent);
+  if (select) {
+    snapshot.activeTeamId = agent.teamId ?? snapshot.activeTeamId;
+    snapshot.activeAgentId = agent.id;
+  }
+  return snapshot;
+}
+
+function activeTeamId(snapshot: AppSnapshot): string {
+  if (snapshot.activeTeamId && snapshot.teams.some((team) => team.id === snapshot.activeTeamId)) {
+    return snapshot.activeTeamId;
+  }
+
+  const activeAgent = snapshot.activeAgentId ? findAgent(snapshot, snapshot.activeAgentId) : undefined;
+  if (activeAgent?.teamId) {
+    return activeAgent.teamId;
+  }
+
+  const activeTeam = snapshot.teams.find((team) => activeAgent && team.agentIds.includes(activeAgent.id));
+  return activeTeam?.id ?? snapshot.teams[0]?.id ?? seedTeamId;
+}
+
+function targetTeamId(snapshot: AppSnapshot, teamId: string | undefined): string {
+  if (teamId && snapshot.teams.some((team) => team.id === teamId)) {
+    return teamId;
+  }
+
+  return activeTeamId(snapshot);
+}
+
+function clearAgentRuntimeState(agent: Agent): void {
+  delete agent.backendSession;
+  delete agent.contextUsage;
+  delete agent.plan;
+  delete agent.goal;
+  delete agent.isRegistered;
+  delete agent.mcpSessionId;
+  delete agent.statusText;
+}
+
+function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
+  return value === 'claude' ? 'claude' : 'codex';
+}
+
+function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {
+  return backend === 'claude' ? { kind: 'claude' } : { kind: 'codex' };
+}
+
+function normalizedBackendDefaults(defaults: BackendDefaults | undefined, backend: AgentBackend): Agent['backendDefaults'] {
+  if (!defaults || defaults.kind !== backend) {
+    return undefined;
+  }
+
+  return defaults.kind === 'claude' && defaults.thinking
+    ? { ...defaults, thinking: { ...defaults.thinking } }
+    : { ...defaults };
+}
+
+function normalizedFolder(folder: string): string {
+  return folder.trim();
+}
+
+function normalizedOptionalString(value: string | null | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function setAgentStatus(snapshot: AppSnapshot, agentId: string, status: AgentStatus): void {
+  const agent = findAgent(snapshot, agentId);
+  if (agent) {
+    agent.status = status;
+    agent.updatedAt = new Date().toISOString();
+  }
+}
+
+function findAgent(snapshot: AppSnapshot, agentId: string): Agent | undefined {
+  return snapshot.agents.find((agent) => agent.id === agentId);
+}
+
+export {
+  findAgent as findAgentInSnapshot,
+  setAgentStatus as setAgentStatusInSnapshot,
+};
 
 export function duplicateAgentInSnapshot(
   snapshot: AppSnapshot,
@@ -29,13 +243,12 @@ export function forkAgentInSnapshot(
   snapshot: AppSnapshot,
   agentId: string,
   backendSession: BackendSession,
-  messages: RendererMessage[],
   createdAt = new Date().toISOString(),
   createId: IdGenerator = () => createEntityId('agent'),
 ): Agent | null {
   const forked = createForkedAgentDraft(snapshot, agentId, createdAt, createId);
   return forked
-    ? attachForkedAgentInSnapshot(snapshot, agentId, forked, backendSession, messages)
+    ? attachForkedAgentInSnapshot(snapshot, agentId, forked, backendSession)
     : null;
 }
 
@@ -54,7 +267,6 @@ export function attachForkedAgentInSnapshot(
   sourceAgentId: string,
   forked: Agent,
   backendSession: BackendSession,
-  messages: RendererMessage[],
 ): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === sourceAgentId);
   if (!source) {
@@ -69,7 +281,6 @@ export function attachForkedAgentInSnapshot(
 
   forked.backendSession = { ...backendSession };
   insertAgentAfterSource(snapshot, source, forked);
-  snapshot.messages.push(...messages.map((message) => ({ ...message, agentId: forked.id })));
   snapshot.activeTeamId = forked.teamId ?? snapshot.activeTeamId;
   snapshot.activeAgentId = forked.id;
   return forked;
@@ -147,33 +358,6 @@ export function updateWorkItemAssignmentInSnapshot(
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
   if (agent) {
     agent.updatedAt = updatedAt;
-  }
-  return updatedAssignment;
-}
-
-export function markWorkItemCompletionInstructionsDeliveredInSnapshot(
-  snapshot: AppSnapshot,
-  agentId: string,
-  workItemId: string,
-  deliveredAt = new Date().toISOString(),
-): WorkBacklogAssignment | null {
-  const assignment = snapshot.workBacklog.assignments[workItemId];
-  if (!assignment || assignment.agentId !== agentId) {
-    return null;
-  }
-
-  const updatedAssignment: WorkBacklogAssignment = {
-    ...assignment,
-    completionInstructionsDeliveredAt: deliveredAt,
-  };
-  snapshot.workBacklog.assignments = {
-    ...snapshot.workBacklog.assignments,
-    [workItemId]: updatedAssignment,
-  };
-
-  const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-  if (agent) {
-    agent.updatedAt = deliveredAt;
   }
   return updatedAssignment;
 }
@@ -299,7 +483,6 @@ export function restartAgentConversation(snapshot: AppSnapshot, agentId: string,
   clearRuntimeState(agent);
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
-  snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
   return agent;
 }
 
@@ -307,7 +490,6 @@ export function resumeAgentConversationInSnapshot(
   snapshot: AppSnapshot,
   agentId: string,
   backendSession: BackendSession,
-  messages: RendererMessage[],
   updatedAt = new Date().toISOString(),
 ): Agent | null {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -324,13 +506,6 @@ export function resumeAgentConversationInSnapshot(
   agent.backendSession = { ...backendSession };
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
-  snapshot.messages = [
-    ...snapshot.messages.filter((message) => message.agentId !== agentId),
-    ...messages.map((message) => ({
-      ...message,
-      agentId,
-    })),
-  ];
   return agent;
 }
 
@@ -341,7 +516,6 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
   }
 
   snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== agentId);
-  snapshot.messages = snapshot.messages.filter((message) => message.agentId !== agentId);
   snapshot.workBacklog.assignments = Object.fromEntries(
     Object.entries(snapshot.workBacklog.assignments)
       .filter(([, assignment]) => assignment.agentId !== agentId),
@@ -408,7 +582,7 @@ function copiedAgent(
 ): Agent {
   return {
     id: uniqueAgentId(snapshot, createId),
-    teamId: source.teamId ?? activeTeamId(snapshot),
+    teamId: source.teamId ?? activeTeamIdForCopy(snapshot),
     name: name?.trim() || `${agentDisplayName(source)} (${suffix})`,
     avatar: source.avatar,
     folder: source.folder,
@@ -428,7 +602,7 @@ function insertAgentAfterSource(snapshot: AppSnapshot, source: Agent, agent: Age
   attachAgentToTeam(snapshot, agent, source.id);
 }
 
-function activeTeamId(snapshot: AppSnapshot): string | undefined {
+function activeTeamIdForCopy(snapshot: AppSnapshot): string | undefined {
   if (snapshot.activeTeamId) {
     return snapshot.activeTeamId;
   }

@@ -3,7 +3,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { createAgentFromInput } from '@codex-claw/core/snapshot';
+import { createAgentFromInput } from '@codex-claw/core/agent-manager';
 import { updateAutomationExecutionAgentConversationInSnapshot } from '@codex-claw/core/automation-manager';
 import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@codex-claw/core/automation-prompts';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -131,7 +131,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       const driver = requireBackendDriver(backendDrivers, agent);
       mcpService.recordPromptInputMethod(agentId, 'typed');
       sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, (event) => server.emitEvent(event), {
-        onBackendSessionUpdated: (result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
+        onBackendSessionUpdated: (_result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
         onPromptStarted: async (result) => {
           const automation = updateAutomationExecutionAgentConversationInSnapshot(snapshot, context.automationId, context.executionId, agentId, {
             conversationRef: conversationRefFromSendResult(agent, result),

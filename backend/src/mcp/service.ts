@@ -4,6 +4,7 @@ import os from 'node:os';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -27,9 +28,8 @@ import type {
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus,
 } from '@codex-claw/core/contracts';
-import { updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
+import { createAgentInSnapshot, updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
-import { createAgentInSnapshot, updateAgentWorkspace } from '@codex-claw/core/snapshot';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
@@ -115,11 +115,8 @@ export class ClawMcpService {
   }
 
   handleBackendEvent(event: MainToRendererEvent): void {
-    const payload = event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)
-      ? event.payload as Record<string, unknown>
-      : null;
-    if (event.type === 'agent.promptDequeued' && payload && Array.isArray(payload.ids)) {
-      const ids = payload.ids.filter((id): id is string => typeof id === 'string');
+    if (event.type === 'agent.promptDequeued') {
+      const ids = event.payload.ids;
       for (const id of ids) this.queuedMessageIds.delete(id);
       this.coordinator.markMessagesRead(ids);
     }
@@ -159,13 +156,6 @@ export class ClawMcpService {
         agent.backendSession = result.backendSession;
         this.coordinator.markMessagesRead(messages.map((message) => message.id));
         this.emitDequeuedMessages(agentId, messages.map((message) => message.id));
-        this.emit({
-          agentId,
-          ...(result.backendSession.kind === 'codex' ? { threadId: result.backendSession.threadId } : {}),
-          turnId: result.turnId,
-          type: 'message.steer',
-          payload: { prompt },
-        });
         this.emitSnapshotUpdated(agent.id);
         return;
       } catch {
@@ -294,6 +284,14 @@ export class ClawMcpService {
         displayed: false,
         kind,
         message: 'Celebrations are disabled in General settings.',
+      };
+    }
+    if (this.snapshot.activeAgentId !== agent.id) {
+      return {
+        success: true,
+        displayed: false,
+        kind,
+        message: 'Celebrations only play for the selected agent.',
       };
     }
     this.emit({
@@ -583,20 +581,6 @@ export class ClawMcpService {
   private emit(event: BackendEvent): void {
     this.eventSink?.(event);
   }
-}
-
-function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {
-  if (agent.backendSession?.kind === 'codex') {
-    return { backend: 'codex', threadId: agent.backendSession.threadId };
-  }
-  if (agent.backendSession?.kind === 'claude') {
-    return {
-      backend: 'claude',
-      folder: requireAgentFolder(agent),
-      sessionId: agent.backendSession.transcriptSessionId ?? agent.backendSession.sessionId,
-    };
-  }
-  return null;
 }
 
 async function readAgentMarkdownFile(filePath: string): Promise<string> {

@@ -175,17 +175,22 @@
               :aria-label="session.isUnread ? t('sidebar.unread') : statusLabel(session.status.type)"
             />
           </button>
-          <button
+          <el-tooltip
             v-if="isPullRequestFinished(session)"
-            v-show="!isWorkspaceCollapsed(group)"
-            class="agent-sidebar__pull-request-attention"
-            type="button"
-            :aria-label="pullRequestAttentionLabel(session)"
-            :title="pullRequestAttentionLabel(session)"
-            @click.stop="emit('cleanup-pull-request', session.agentId)"
+            :content="pullRequestAttentionLabel(session)"
+            placement="right"
+            :show-after="300"
           >
-            <AlertTriangleIcon aria-hidden="true" />
-          </button>
+            <button
+              v-show="!isWorkspaceCollapsed(group)"
+              class="agent-sidebar__pull-request-attention"
+              type="button"
+              :aria-label="pullRequestAttentionLabel(session)"
+              @click.stop="emit('cleanup-pull-request', session.agentId)"
+            >
+              <AlertTriangleIcon aria-hidden="true" />
+            </button>
+          </el-tooltip>
         </div>
       </section>
     </nav>
@@ -193,6 +198,8 @@
     <AgentContextMenu
       v-if="contextMenuAgentId"
       :fork-disabled="!canForkContextMenuAgent"
+      :compress-visible="contextMenuAgent?.backend === 'codex'"
+      :compress-disabled="!canCompressContextMenuAgent"
       :open-in-catalog="resolvedOpenInCatalog"
       :open-in-disabled="!contextMenuAgentIsLocal"
       :move-targets="contextMenuMoveTargets"
@@ -269,6 +276,7 @@ const { t } = useI18n();
 const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
+  'compress-session': [agentId: string];
   'cleanup-pull-request': [agentId: string];
   'update-collapsed-repositories': [repositoryKeys: string[]];
   'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
@@ -317,6 +325,11 @@ const canForkContextMenuAgent = computed(() => (
   contextMenuAgent.value?.status.type === 'idle' &&
   Boolean(contextMenuAgent.value.backendSession) &&
   (props.forkableAgentIds ?? []).includes(contextMenuAgent.value.id)
+));
+const canCompressContextMenuAgent = computed(() => (
+  contextMenuAgent.value?.backend === 'codex' &&
+  contextMenuAgent.value.status.type === 'idle' &&
+  contextMenuAgent.value.backendSession?.kind === 'codex'
 ));
 const contextMenuAgentIsLocal = computed(() => {
   const agent = contextMenuAgent.value;
@@ -506,6 +519,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'duplicate-agent':
       emit('duplicate-agent', agentId);
+      break;
+    case 'compress-session':
+      emit('compress-session', agentId);
       break;
     case 'fork-agent':
       emit('fork-agent', agentId);
@@ -877,7 +893,11 @@ function onResizePointerEnd(event: PointerEvent): void {
 .agent-sidebar__pull-request-attention {
   position: absolute;
   top: 50%;
-  right: var(--space-6);
+  right: calc(
+    var(--space-6) +
+      (var(--agent-sidebar-status-column-width) - var(--agent-status-dot-size)) / 2 +
+      1px
+  );
   display: grid;
   place-items: center;
   width: var(--agent-sidebar-status-column-width);
@@ -1013,10 +1033,6 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__status[data-status="working"],
-.agent-sidebar__status[data-status="starting"] {
-  background: var(--color-warning);
-}
-
 .agent-sidebar__status[data-status="awaitingInput"] {
   background: var(--color-warning);
 }

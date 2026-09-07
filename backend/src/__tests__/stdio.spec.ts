@@ -234,11 +234,11 @@ describe('stdio JSON-RPC transport', () => {
     });
     peer.start();
 
-    peer.notify('backend/event/notify', { type: 'thread.historyLoaded', value: 'x'.repeat(200) });
+    peer.notify('backend/event/notify', { type: 'codex.conversationSnapshotChanged', value: 'x'.repeat(200) });
 
     expect(onOutputOverflow).toHaveBeenCalledWith({
       bufferedBytes: 0,
-      eventType: 'thread.historyLoaded',
+      eventType: 'codex.conversationSnapshotChanged',
       frameBytes: expect.any(Number),
       kind: 'notification',
       method: 'backend/event/notify',

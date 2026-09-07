@@ -6,16 +6,17 @@ import type {
   CodexConversationPaneState,
   CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
-  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'plan', 'planVisible'],
-  emits: ['annotate-attachment', 'close-plan'],
+  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'historyLoadFailed', 'historyLoading', 'hasVisibleMessages', 'plan', 'planVisible'],
+  emits: ['annotate-attachment', 'close-plan', 'retry-history'],
   setup(_props, { expose }) {
     expose({ focusComposer: vi.fn() });
   },
@@ -91,6 +92,8 @@ export function mountShell(overrides: Partial<{
   unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
+  codexConversationSnapshot: CodexConversationSnapshot | null;
+  claudeConversationSnapshot: ClaudeConversationSnapshot | null;
   chooseAgentFolder: () => Promise<string | null>;
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -128,6 +131,12 @@ export function mountShell(overrides: Partial<{
   workItemsByRepository: Record<string, WorkItem[]>;
   realConversationPane: boolean;
   realAgentSidebar: boolean;
+  isConversationLoadFailed: boolean;
+  retryAgentHistory: () => Promise<void>;
+  sendPromptAction: (prompt: string, options?: import('@codex-claw/core/contracts').RendererSendPromptOptions) => Promise<void>;
+  deleteTurnAction: (turnId: string) => Promise<void>;
+  editTurnAction: (payload: { content: string; turnId: string }) => Promise<void>;
+  retryTurnAction: (turnId: string) => Promise<void>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   return mount(AppShell, {
@@ -136,8 +145,15 @@ export function mountShell(overrides: Partial<{
       activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
       unreadAgentIds: overrides.unreadAgentIds ?? [],
       agentFiles: overrides.agentFiles ?? [],
-      messages: snapshot.messages,
+      codexConversationSnapshot: overrides.codexConversationSnapshot ?? null,
+      claudeConversationSnapshot: overrides.claudeConversationSnapshot ?? null,
       isLoading: false,
+      isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
+      retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),
+      sendPromptAction: overrides.sendPromptAction,
+      deleteTurnAction: overrides.deleteTurnAction,
+      editTurnAction: overrides.editTurnAction,
+      retryTurnAction: overrides.retryTurnAction,
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },
@@ -217,11 +233,6 @@ export function resolveConversationControllerValue<T>(source: T | { readonly val
   if (typeof source === 'function') return (source as () => T)();
   if (source && typeof source === 'object' && 'value' in source) return source.value;
   return source as T;
-}
-
-export async function chooseCustomAgentFolder(wrapper: ReturnType<typeof mountShell>, repositorySelectIndex = 0) {
-  wrapper.findComponent({ name: 'AgentDialog' }).findAllComponents({ name: 'ElSelect' })[repositorySelectIndex]?.vm.$emit('update:modelValue', '__custom_folder__');
-  await flushPromises();
 }
 
 export function workItem(overrides: Partial<WorkItem> = {}): WorkItem {

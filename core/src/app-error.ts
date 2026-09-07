@@ -3,7 +3,8 @@ export type AppErrorCode =
   | 'clone.discoveryFailed'
   | 'clone.invalidName'
   | 'clone.sourceFolderMissing'
-  | 'clone.urlRequired';
+  | 'clone.urlRequired'
+  | 'git.pullRequestChangesRequired';
 
 export const appErrorCodes: readonly AppErrorCode[] = [
   'clone.alreadyExists',
@@ -11,6 +12,7 @@ export const appErrorCodes: readonly AppErrorCode[] = [
   'clone.invalidName',
   'clone.sourceFolderMissing',
   'clone.urlRequired',
+  'git.pullRequestChangesRequired',
 ];
 
 export type AppErrorDescriptor = {

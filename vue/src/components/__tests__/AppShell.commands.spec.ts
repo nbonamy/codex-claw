@@ -202,12 +202,10 @@ describe('AppShell dialogs and commands', () => {
       expect(wrapper.findAll('.agent-sidebar__quick-switch-shortcut').map((shortcut) => shortcut.text()))
         .toStrictEqual(['⌘1', '⌘2']);
 
-      listener({ type: 'open-agent-composer', prompt: '/compact', submit: true });
+      listener({ type: 'compress-active-session' });
       await nextTick();
       expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
-      expect(wrapper.emitted('send-agent-prompt')).toStrictEqual([[
-        { agentId: 'agent-dina', prompt: '/compact' },
-      ]]);
+      expect(wrapper.emitted('compress-session')).toStrictEqual([['agent-dina']]);
 
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true }));
       vi.advanceTimersByTime(350);
@@ -221,7 +219,7 @@ describe('AppShell dialogs and commands', () => {
       window.dispatchEvent(switchEvent);
       await nextTick();
       expect(switchEvent.defaultPrevented).toBe(true);
-      expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina'], ['agent-jesse']]);
+      expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
       expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
 
       window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));

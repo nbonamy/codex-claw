@@ -82,6 +82,14 @@ describe('AgentContextMenu', () => {
     expect(wrapper.emitted('action')).toStrictEqual([['fork-agent']]);
   });
 
+  it('shows session compression only when supported and emits it as a product action', async () => {
+    const wrapper = mountMenu({ compressVisible: true });
+
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Compress Session')?.trigger('click');
+
+    expect(wrapper.emitted('action')).toStrictEqual([['compress-session']]);
+  });
+
   it('disables move targets when no other teams are available', () => {
     const wrapper = mountMenu();
 
@@ -159,7 +167,7 @@ describe('AgentContextMenu', () => {
 });
 
 function mountMenu(
-  props: { forkDisabled?: boolean; moveTargets?: Team[]; x?: number; y?: number } = {},
+  props: { compressDisabled?: boolean; compressVisible?: boolean; forkDisabled?: boolean; moveTargets?: Team[]; x?: number; y?: number } = {},
   stubTeleport = true,
 ) {
   const wrapper = mount(AgentContextMenu, {

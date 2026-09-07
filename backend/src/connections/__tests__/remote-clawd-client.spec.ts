@@ -1,12 +1,17 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
+import * as mainLog from '../../log';
 import { RemoteClawdClientManager } from '../remote-clawd-client';
 import { sshStdioTransport } from '../ssh-connections';
 
 describe('RemoteClawdClientManager', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('normalizes persisted SSH stdio transports to the daemon-first command', async () => {
     const child = createChildProcess();
     const spawnProcess = vi.fn(() => child.process);
@@ -69,6 +74,90 @@ describe('RemoteClawdClientManager', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
     }));
+    await manager.close();
+  });
+
+  it('drops malformed remote events without disturbing pending requests or later events', async () => {
+    const child = createChildProcess();
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+    const onEvent = vi.fn();
+    const warn = vi.spyOn(mainLog, 'warnMain');
+    const secret = 'secret-event-value';
+
+    const result = manager.request(readyConnection(), 'driver/prompt/send', {
+      agent: { id: 'agent-remote', backend: 'codex' },
+      prompt: 'go',
+    }, onEvent);
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const request = JSON.parse(child.stdinLines()[0]!) as { id: number };
+
+    for (const params of [
+      {
+        seq: 1,
+        type: 'agent.statusChanged',
+        agentId: 'agent-remote',
+        payload: { type: secret },
+        occurredAt: '2026-06-14T10:00:00.000Z',
+      },
+      {
+        seq: secret,
+        type: 'client.connectionChanged',
+        payload: { status: 'connected' },
+        occurredAt: '2026-06-14T10:00:01.000Z',
+      },
+      {
+        seq: 2,
+        type: secret,
+        payload: {},
+        occurredAt: '2026-06-14T10:00:02.000Z',
+      },
+    ]) {
+      child.stdout.write(`${JSON.stringify({
+        jsonrpc: '2.0',
+        method: backendMethods.backendEventNotify,
+        params,
+      })}\n`);
+    }
+    const validEvent = {
+      seq: 3,
+      type: 'client.connectionChanged',
+      payload: { status: 'connected' },
+      occurredAt: '2026-06-14T10:00:03.000Z',
+    };
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      method: backendMethods.backendEventNotify,
+      params: validEvent,
+    })}\n`);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: request.id,
+      result: { backendSession: { kind: 'codex', threadId: 'thread-remote' } },
+    })}\n`);
+
+    await expect(result).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'thread-remote' } });
+    expect(onEvent).toHaveBeenCalledOnce();
+    expect(onEvent).toHaveBeenCalledWith(validEvent);
+    expect(child.process.kill).not.toHaveBeenCalled();
+    const malformedWarnings = warn.mock.calls.filter(
+      ([, message]) => message === 'ignored malformed remote backend event notification',
+    );
+    expect(malformedWarnings).toHaveLength(3);
+    expect(malformedWarnings).toEqual(expect.arrayContaining([
+      expect.arrayContaining(['remote-clawd', 'ignored malformed remote backend event notification', {
+        connectionId: 'connection-devbox',
+        detail: expect.stringContaining('$.payload.type'),
+      }]),
+      expect.arrayContaining(['remote-clawd', 'ignored malformed remote backend event notification', {
+        connectionId: 'connection-devbox',
+        detail: expect.stringContaining('$.seq'),
+      }]),
+      expect.arrayContaining(['remote-clawd', 'ignored malformed remote backend event notification', {
+        connectionId: 'connection-devbox',
+        detail: expect.stringContaining('$.type'),
+      }]),
+    ]));
+    expect(JSON.stringify(malformedWarnings)).not.toContain(secret);
     await manager.close();
   });
 

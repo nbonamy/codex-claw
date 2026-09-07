@@ -195,7 +195,6 @@ function syncBoundsAfterWindowResize(): void {
 function handleEvent(event: MainToRendererEvent): void {
   if (
     event.type !== 'browser.annotationCreated' ||
-    !isBrowserAnnotation(event.payload) ||
     event.payload.agentId !== props.agentId ||
     event.payload.browserId !== props.browserId
   ) return;
@@ -235,19 +234,6 @@ function annotationBatchPrompt(annotations: BrowserAnnotation[]): string {
     return `${index + 1}. Target: ${target}\n   Feedback: ${annotation.comment?.trim() || 'No comment provided.'}`;
   }).join('\n\n');
   return `Browser annotations on ${annotations[0]?.url}\n\n${entries}\n\nInspect the rendered page and make the smallest changes that address every annotation.`;
-}
-
-function isBrowserAnnotation(value: unknown): value is BrowserAnnotation {
-  return Boolean(
-    value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    typeof (value as BrowserAnnotation).id === 'string' &&
-    typeof (value as BrowserAnnotation).agentId === 'string' &&
-    typeof (value as BrowserAnnotation).browserId === 'string' &&
-    (value as BrowserAnnotation).kind &&
-    (value as BrowserAnnotation).rect
-  );
 }
 
 function messageFor(reason: unknown): string {

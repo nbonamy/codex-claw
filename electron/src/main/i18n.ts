@@ -6,7 +6,7 @@ const messages = {
     'menu.checkingForUpdates': 'Checking for Updates...',
     'menu.closeAgent': 'Close Agent',
     'menu.closeTeam': 'Close Team',
-    'menu.compactContext': 'Compact Context',
+    'menu.compressSession': 'Compress Session',
     'menu.duplicateAgent': 'Duplicate Agent',
     'menu.editAgent': 'Edit Agent',
     'menu.file': 'File',

@@ -1,6 +1,7 @@
 import { createCodexBrowserWebSocketPort, type CodexWebSocketPort } from '@codex-app-sdk/web/client';
 import type { CodexClawApi, MainToRendererEvent } from '@codex-claw/core/contracts';
 import {
+  ClawWebEventDecodeError,
   clawWebProtocolVersion,
   encodeClawWebMessage,
   parseClawWebServerMessage,
@@ -98,7 +99,8 @@ class ClawBrowserTransport {
           if (message.ok) pending.resolve(message.result);
           else pending.reject(new Error(message.error));
         } catch (error) {
-          if (!ready) reject(error);
+          if (error instanceof ClawWebEventDecodeError) console.warn(error.message);
+          else if (!ready) reject(error);
         }
       });
       socket.onClose(() => {

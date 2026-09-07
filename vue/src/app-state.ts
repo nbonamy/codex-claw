@@ -3,14 +3,26 @@ import { translate } from './i18n';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
-import { applyMainEventToSnapshot, applySnapshotMetadata, createEmptySnapshot, selectAgent as selectAgentInSnapshot } from '@codex-claw/core/snapshot';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
+import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
+import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
 import { type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
+import {
+  createCodexConversationReplica,
+  type CodexConversationReplica,
+} from '@codex-app-sdk/core/conversation-replica';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import {
+  createClaudeConversationReplica,
+  type ClaudeConversationReplica,
+} from '@codex-claw/core/claude-conversation-replica';
+import type { ClaudeConversationSnapshot } from '@codex-claw/core/contracts';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
-import { isAppSnapshot, isAppSnapshotMetadata } from '@codex-claw/core/snapshot-guards';
+import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
 import { clawHostCapabilities, codexClawApi } from './platform-api';
@@ -20,6 +32,7 @@ import { createAgentUnreadState } from './agent-unread-state';
 import { createAgentHistoryState } from './agent-history-state';
 import { createSourceRepositoryState } from './source-repository-state';
 import { workspaceSidebarRepositoryRootForAgent } from '@codex-claw/core/workspace-sidebar';
+import { isSnapshotEventOwnedBy, type RendererOnlySnapshotEvent } from '@codex-claw/core/snapshot-event-ownership';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -39,6 +52,19 @@ const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
 const agentCreationProgress = ref<AgentCreationProgress | null>(null);
+const codexConversationFramesByAgentId = ref<Record<string, {
+  replica: CodexConversationReplica;
+  revision: number;
+  snapshot: CodexConversationSnapshot;
+  threadId: string;
+}>>({});
+const claudeConversationFramesByAgentId = ref<Record<string, {
+  replica: ClaudeConversationReplica;
+  revision: number;
+  snapshot: ClaudeConversationSnapshot;
+}>>({});
+const recoveringCodexConversationAgentIds = new Set<string>();
+const recoveringClaudeConversationAgentIds = new Set<string>();
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
@@ -113,7 +139,7 @@ const {
   unreadAgentIds,
 } = agentUnread;
 const agentHistory = createAgentHistoryState({
-  adoptSnapshotMetadata: adoptBackgroundSnapshotMetadata,
+  adoptSnapshot: adoptBackgroundSnapshot,
   getSnapshot: () => snapshot.value,
   synchronizeComposerSelection: synchronizeComposerSelectionForAgent,
 });
@@ -121,10 +147,13 @@ const {
   activeHistoryHasOlder,
   handleMainEvent: syncHistoryPageStateFromMainEvent,
   hydrateActive: hydrateActiveAgentHistory,
+  retryActive: retryActiveAgentHistory,
+  isActiveAgentHistoryFailed,
   isHydratingActiveAgentHistory,
   isLoadingOlderHistory,
   loadOlder: loadOlderAgentHistory,
   markHydrating: markAgentHistoryHydrating,
+  reset: resetAgentHistory,
 } = agentHistory;
 const sourceRepositoryState = createSourceRepositoryState({ getSnapshot: () => snapshot.value });
 const {
@@ -140,31 +169,24 @@ const {
 } = sourceRepositoryState;
 
 export function useAppState() {
-  let visibleMessageAgentId: string | null = null;
-  let visibleMessageCache: RendererMessage[] = [];
-
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
 
   const activeBackendCapabilities = computed(() => backendCapabilitiesForAgent(activeAgent.value));
   const activeBackendCommands = computed<BackendCommandSummary[]>(() => defaultBackendCommands(activeAgent.value?.backend ?? 'codex'));
-
-  const visibleMessages = computed(() => {
-    const agentId = activeAgent.value?.id ?? null;
-    const next = agentId
-      ? snapshot.value.messages.filter((message) => message.agentId === agentId)
-      : [];
-    if (
-      agentId === visibleMessageAgentId &&
-      next.length === visibleMessageCache.length &&
-      next.every((message, index) => message === visibleMessageCache[index])
-    ) {
-      return visibleMessageCache;
-    }
-    visibleMessageAgentId = agentId;
-    visibleMessageCache = next;
-    return visibleMessageCache;
+  const activeCodexConversationSnapshot = computed(() => {
+    const agent = activeAgent.value;
+    if (!agent || agent.backend !== 'codex' || agent.backendSession?.kind !== 'codex') return null;
+    const frame = codexConversationFramesByAgentId.value[agent.id];
+    return frame?.threadId === agent.backendSession.threadId ? frame.snapshot : null;
+  });
+  const activeClaudeConversationSnapshot = computed(() => {
+    const agent = activeAgent.value;
+    if (!agent || agent.backend !== 'claude') return null;
+    const frame = claudeConversationFramesByAgentId.value[agent.id];
+    const sessionId = agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
+    return !frame || (sessionId && frame.snapshot.sessionId !== sessionId) ? null : frame.snapshot;
   });
 
   const activeQueuedPrompts = computed(() => {
@@ -246,7 +268,6 @@ export function useAppState() {
     }
 
     return sendingAgentIds.value.has(agent.id) ||
-      agent.status.type === 'starting' ||
       agent.status.type === 'working' ||
       agent.status.type === 'awaitingInput';
   });
@@ -258,6 +279,10 @@ export function useAppState() {
 
     resetCatalogStateIfSourceChanged(codexClawApi);
     resetUnreadAgentIds();
+    codexConversationFramesByAgentId.value = {};
+    claudeConversationFramesByAgentId.value = {};
+    recoveringCodexConversationAgentIds.clear();
+    recoveringClaudeConversationAgentIds.clear();
     agentCreationProgress.value = null;
 
     isLoading.value = true;
@@ -310,6 +335,7 @@ export function useAppState() {
       }
       snapshot.value = state.snapshot;
       pruneUnreadAgentIds();
+      pruneConversationFrames();
       connectionState.value = state.connection;
       lastBackendEventSeq = state.lastBackendEventSeq;
       const buffered = bufferedMainEvents;
@@ -396,7 +422,7 @@ export function useAppState() {
     }
 
     const options = resolvedPromptOptions(agentId, trimmed, submissionOptions);
-    adoptBackgroundSnapshotMetadata(options
+    adoptBackgroundSnapshot(options
       ? await codexClawApi.steerPrompt(agentId, trimmed, options)
       : await codexClawApi.steerPrompt(agentId, trimmed));
   }
@@ -410,53 +436,53 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.interruptAgent(agentId));
   }
 
-  async function deleteMessage(index: number): Promise<void> {
-    const action = activeMessageAction(index);
-    if (!action || !codexClawApi?.deleteMessage || isAgentSending(action.agentId)) {
+  async function deleteTurn(turnId: string): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
+    if (!agentId || !codexClawApi?.deleteTurn || isAgentSending(agentId)) {
       return;
     }
 
-    if (!messageActionCapabilities(action.agentId).rollback) {
+    if (!messageActionCapabilities(agentId).deleteTurn) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.deleteMessage(action.agentId, action.messageId));
+    adoptBackgroundSnapshot(await codexClawApi.deleteTurn(agentId, turnId));
   }
 
-  async function editMessage(payload: { content: string; index: number }): Promise<void> {
-    const action = activeMessageAction(payload.index);
+  async function editTurn(payload: { content: string; turnId: string }): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
     const trimmed = payload.content.trim();
-    if (!action || !trimmed || !codexClawApi?.editMessage || isAgentSending(action.agentId)) {
+    if (!agentId || !trimmed || !codexClawApi?.editTurn || isAgentSending(agentId)) {
       return;
     }
 
-    if (!messageActionCapabilities(action.agentId).editMessage) {
+    if (!messageActionCapabilities(agentId).editTurn) {
       return;
     }
 
-    markAgentSending(action.agentId, true);
+    markAgentSending(agentId, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.editMessage(action.agentId, action.messageId, trimmed));
+      adoptBackgroundSnapshot(await codexClawApi.editTurn(agentId, payload.turnId, trimmed));
     } finally {
-      markAgentSending(action.agentId, false);
+      markAgentSending(agentId, false);
     }
   }
 
-  async function retryMessage(index: number): Promise<void> {
-    const action = activeMessageAction(index);
-    if (!action || !codexClawApi?.retryMessage || isAgentSending(action.agentId)) {
+  async function retryTurn(turnId: string): Promise<void> {
+    const agentId = snapshot.value.activeAgentId;
+    if (!agentId || !codexClawApi?.retryTurn || isAgentSending(agentId)) {
       return;
     }
 
-    if (!messageActionCapabilities(action.agentId).retryMessage) {
+    if (!messageActionCapabilities(agentId).retryTurn) {
       return;
     }
 
-    markAgentSending(action.agentId, true);
+    markAgentSending(agentId, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.retryMessage(action.agentId, action.messageId));
+      adoptBackgroundSnapshot(await codexClawApi.retryTurn(agentId, turnId));
     } finally {
-      markAgentSending(action.agentId, false);
+      markAgentSending(agentId, false);
     }
   }
 
@@ -508,7 +534,7 @@ export function useAppState() {
     markAgentSending(agentId, true);
 
     try {
-      adoptBackgroundSnapshotMetadata(options
+      adoptBackgroundSnapshot(options
         ? await api.sendPrompt(agentId, prompt, options)
         : await api.sendPrompt(agentId, prompt));
     } finally {
@@ -532,10 +558,12 @@ export function useAppState() {
     }
 
     const requestId = ++agentSelectionRequestId;
-    const needsHistory = Boolean(
-      snapshot.value.agents.find((agent) => agent.id === agentId)?.backendSession
-      && !snapshot.value.messages.some((message) => message.agentId === agentId),
-    );
+    const selectedAgent = snapshot.value.agents.find((agent) => agent.id === agentId);
+    const needsHistory = Boolean(selectedAgent?.backendSession && (
+      selectedAgent.backendSession.kind === 'codex'
+        ? codexConversationFramesByAgentId.value[agentId]?.threadId !== selectedAgent.backendSession.threadId
+        : claudeConversationFramesByAgentId.value[agentId]?.snapshot.sessionId !== selectedAgent.backendSession.sessionId
+    ));
     rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
     markAgentRead(agentId);
@@ -855,8 +883,19 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.resumeAgentConversation(agentId, plainConversationRef(ref)));
+    resetAgentHistory(agentId);
     synchronizeComposerSelectionForAgent(agentId);
     await loadActiveAgentCatalogs();
+  }
+
+  async function compressAgentSession(agentId: string): Promise<void> {
+    if (!codexClawApi?.compressAgentSession) {
+      throw new Error('Session compression is unavailable.');
+    }
+
+    adoptBackgroundSnapshot(await codexClawApi.compressAgentSession(agentId));
+    resetAgentHistory(agentId);
+    synchronizeComposerSelectionForAgent(agentId);
   }
 
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
@@ -1062,24 +1101,24 @@ export function useAppState() {
     return duplicate;
   }
 
-  async function forkAgent(agentId: string, messageIndex?: number): Promise<void> {
+  async function forkAgent(agentId: string, turnId?: string): Promise<void> {
     if (!codexClawApi?.forkAgent) {
       return;
     }
 
-    const nextSnapshot = messageIndex === undefined
+    const nextSnapshot = turnId === undefined
       ? await codexClawApi.forkAgent(agentId)
-      : await codexClawApi.forkAgent(agentId, messageIndex);
+      : await codexClawApi.forkAgent(agentId, turnId);
     adoptNavigationSnapshot(nextSnapshot);
     await loadActiveAgentCatalogs();
   }
 
-  async function forkActiveAgentMessage(messageIndex: number): Promise<void> {
+  async function forkActiveAgentTurn(turnId: string): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
     if (!agentId) {
       return;
     }
-    await forkAgent(agentId, messageIndex);
+    await forkAgent(agentId, turnId);
   }
 
   async function moveAgentToTeam(input: MoveAgentToTeamInput): Promise<void> {
@@ -1131,6 +1170,7 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.restartAgent(agentId));
+    resetAgentHistory(agentId);
   }
 
   async function closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<void> {
@@ -1220,14 +1260,15 @@ export function useAppState() {
     activeBackendApprovals,
     activeApprovalPreset,
     activePermissionMode,
-    visibleMessages,
     activeQueuedPrompts,
     activeComposerState,
     activeComposerAttachments,
     unreadAgentIds,
     isLoading,
     connectionState,
+    isActiveAgentHistoryFailed,
     isHydratingActiveAgentHistory,
+    retryActiveAgentHistory,
     activeHistoryHasOlder,
     isLoadingOlderHistory,
     loadOlderAgentHistory,
@@ -1235,6 +1276,8 @@ export function useAppState() {
     answeredClientRequestIds,
     backendModels,
     activeBackendCommands,
+    activeCodexConversationSnapshot,
+    activeClaudeConversationSnapshot,
     activeBackendCapabilities,
     modelCatalogStatus,
     modelCatalogError,
@@ -1338,12 +1381,13 @@ export function useAppState() {
     deleteAutomation,
     listAgentConversations,
     resumeAgentConversation,
+    compressAgentSession,
     readConversationMessages,
     assignWorkItemToAgent,
     removeWorkItemAssignment,
     duplicateAgent,
     forkAgent,
-    forkActiveAgentMessage,
+    forkActiveAgentTurn,
     moveAgentToTeam,
     reorderAgents,
     reorderRepositories,
@@ -1369,9 +1413,9 @@ export function useAppState() {
     steerPrompt,
     clearAgentCreationProgress,
     interruptActiveAgent,
-    deleteMessage,
-    editMessage,
-    retryMessage,
+    deleteTurn,
+    editTurn,
+    retryTurn,
     steerQueuedPrompt,
     updateQueuedPrompt,
     removeQueuedPrompt,
@@ -1418,23 +1462,6 @@ function cloneWorkItemForIpc(item: WorkItem): WorkItem {
     })),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-  };
-}
-
-function activeMessageAction(index: number): { agentId: string; messageId: string } | null {
-  const agentId = snapshot.value.activeAgentId;
-  if (!agentId) {
-    return null;
-  }
-
-  const message = snapshot.value.messages.filter((candidate) => candidate.agentId === agentId)[index];
-  if (!message) {
-    return null;
-  }
-
-  return {
-    agentId,
-    messageId: message.id,
   };
 }
 
@@ -1556,7 +1583,7 @@ function subscribeToMainEvents(): void {
 }
 
 function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void {
-  if (event.type === 'client.connectionChanged' && isBackendConnectionState(event.payload)) {
+  if (event.type === 'client.connectionChanged') {
     const wasConnected = connectionState.value.status === 'connected';
     connectionState.value = event.payload;
     if (!wasConnected && event.payload.status === 'connected') {
@@ -1565,25 +1592,178 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
   }
   if (adoptSnapshot) adoptSnapshotFromMainEvent(event);
   syncUnreadStateFromMainEvent(event);
-  syncAnsweredClientRequestsFromMainEvent(event);
-  syncComposerStateFromMainEvent(event);
-  syncSidePanelFromMainEvent(event);
-  syncCelebrationFromMainEvent(event);
-  syncAgentCreationProgressFromMainEvent(event);
-  syncFileActivityFromMainEvent(event);
-  syncHistoryPageStateFromMainEvent(event);
+  if (isSnapshotEventOwnedBy(event, 'renderer')) {
+    handleRendererOwnedMainEvent(event);
+    return;
+  }
+  handleSnapshotOwnedRendererEffect(event);
 }
 
-function syncCelebrationFromMainEvent(event: MainToRendererEvent): void {
+function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
+  switch (event.type) {
+    case 'client.connectionChanged':
+    case 'devicePairing.statusChanged':
+    case 'git.operationProgress':
+    case 'browser.annotationCreated':
+      return;
+    case 'models.changed':
+    case 'skills.changed':
+    case 'thread.modeUpdated':
+      syncComposerStateFromMainEvent(event);
+      return;
+    case 'codex.conversationSnapshotChanged': {
+      const current = codexConversationFramesByAgentId.value[event.agentId];
+      if (
+        current?.threadId === event.threadId
+        && current.revision >= event.payload.revision
+      ) return;
+      codexConversationFramesByAgentId.value = {
+        ...codexConversationFramesByAgentId.value,
+        [event.agentId]: {
+          replica: createCodexConversationReplica(event.payload.snapshot),
+          revision: event.payload.revision,
+          snapshot: event.payload.snapshot,
+          threadId: event.threadId,
+        },
+      };
+      return;
+    }
+    case 'codex.conversationEventReceived': {
+      const current = codexConversationFramesByAgentId.value[event.agentId];
+      if (
+        current?.threadId !== event.threadId
+        || event.payload.revision !== current.revision + 1
+      ) {
+        if (!current || event.payload.revision > current.revision) {
+          invalidateAndRecoverCodexConversation(event.agentId);
+        }
+        return;
+      }
+      let nextSnapshot: CodexConversationSnapshot;
+      try {
+        nextSnapshot = current.replica.apply(event.payload.event);
+      } catch {
+        invalidateAndRecoverCodexConversation(event.agentId);
+        return;
+      }
+      codexConversationFramesByAgentId.value = {
+        ...codexConversationFramesByAgentId.value,
+        [event.agentId]: {
+          ...current,
+          revision: event.payload.revision,
+          snapshot: nextSnapshot,
+        },
+      };
+      return;
+    }
+    case 'claude.conversationSnapshotChanged': {
+      const current = claudeConversationFramesByAgentId.value[event.agentId];
+      if (current && current.revision >= event.payload.revision) return;
+      claudeConversationFramesByAgentId.value = {
+        ...claudeConversationFramesByAgentId.value,
+        [event.agentId]: {
+          replica: createClaudeConversationReplica(event.payload.snapshot),
+          revision: event.payload.revision,
+          snapshot: event.payload.snapshot,
+        },
+      };
+      return;
+    }
+    case 'claude.conversationEventReceived': {
+      const current = claudeConversationFramesByAgentId.value[event.agentId];
+      if (!current || event.payload.revision !== current.revision + 1) {
+        if (!current || event.payload.revision > current.revision) {
+          invalidateAndRecoverClaudeConversation(event.agentId);
+        }
+        return;
+      }
+      let nextSnapshot: ClaudeConversationSnapshot;
+      try {
+        nextSnapshot = current.replica.apply(event.payload.event);
+      } catch {
+        invalidateAndRecoverClaudeConversation(event.agentId);
+        return;
+      }
+      claudeConversationFramesByAgentId.value = {
+        ...claudeConversationFramesByAgentId.value,
+        [event.agentId]: {
+          ...current,
+          revision: event.payload.revision,
+          snapshot: nextSnapshot,
+        },
+      };
+      return;
+    }
+    case 'thread.historyHydrationFailed':
+      syncHistoryPageStateFromMainEvent(event);
+      return;
+    case 'sidePanel.markdownRequested':
+    case 'sidePanel.gitDiffRequested':
+      syncSidePanelFromMainEvent(event);
+      return;
+    case 'celebration.requested':
+      syncCelebrationFromMainEvent(event);
+      return;
+    case 'agentCreation.progress':
+      syncAgentCreationProgressFromMainEvent(event);
+      return;
+    case 'clientRequest.resolved':
+      syncAnsweredClientRequestsFromMainEvent(event);
+      return;
+    case 'file.activity':
+      syncFileActivityFromMainEvent(event);
+      return;
+    default: {
+      const exhaustive: never = event;
+      void exhaustive;
+    }
+  }
+}
+
+function invalidateAndRecoverCodexConversation(agentId: string): void {
+  const frames = { ...codexConversationFramesByAgentId.value };
+  delete frames[agentId];
+  codexConversationFramesByAgentId.value = frames;
+  if (recoveringCodexConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
+  recoveringCodexConversationAgentIds.add(agentId);
+  void codexClawApi.hydrateAgentHistory(agentId)
+    .then(adoptBackgroundSnapshot)
+    .catch(() => undefined)
+    .finally(() => recoveringCodexConversationAgentIds.delete(agentId));
+}
+
+function invalidateAndRecoverClaudeConversation(agentId: string): void {
+  const frames = { ...claudeConversationFramesByAgentId.value };
+  delete frames[agentId];
+  claudeConversationFramesByAgentId.value = frames;
+  if (recoveringClaudeConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
+  recoveringClaudeConversationAgentIds.add(agentId);
+  void codexClawApi.hydrateAgentHistory(agentId)
+    .then(adoptBackgroundSnapshot)
+    .catch(() => undefined)
+    .finally(() => recoveringClaudeConversationAgentIds.delete(agentId));
+}
+
+function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, RendererOnlySnapshotEvent>): void {
+  switch (event.type) {
+    case 'backendApproval.resolved':
+      syncAnsweredClientRequestsFromMainEvent(event);
+      return;
+    case 'thread.settingsUpdated':
+      syncComposerStateFromMainEvent(event);
+      return;
+    default:
+      return;
+  }
+}
+
+function syncCelebrationFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'celebration.requested' }>): void {
   if (snapshot.value.general.celebrationsEnabled === false) return;
-  if (event.type !== 'celebration.requested' || !isRecord(event.payload)) return;
-  const kind = event.payload.kind;
-  if (kind !== 'confetti' && kind !== 'stars' && kind !== 'shapes' && kind !== 'schoolPride') return;
-  useConfetti().celebrate({ kind });
+  if (event.agentId !== snapshot.value.activeAgentId) return;
+  useConfetti().celebrate({ kind: event.payload.kind });
 }
 
-function syncAgentCreationProgressFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'agentCreation.progress' || !isAgentCreationProgress(event.payload)) return;
+function syncAgentCreationProgressFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'agentCreation.progress' }>): void {
   if (event.payload.state === 'running') {
     if (event.agentId === snapshot.value.activeAgentId) agentCreationProgress.value = event.payload;
     return;
@@ -1622,18 +1802,8 @@ function isBackendMainEvent(event: MainToRendererEvent): boolean {
   );
 }
 
-function isBackendConnectionState(value: unknown): value is BackendConnectionState {
-  return isRecord(value) &&
-    (value.status === 'connecting' || value.status === 'connected' || value.status === 'reconnecting' || value.status === 'error') &&
-    (value.detail === undefined || appText(value.detail) !== undefined);
-}
-
-function syncAnsweredClientRequestsFromMainEvent(event: MainToRendererEvent): void {
-  if (
-    (event.type !== 'clientRequest.resolved' && event.type !== 'backendApproval.resolved') ||
-    !isRecord(event.payload)
-  ) return;
-  const id = event.type === 'backendApproval.resolved' && isRecord(event.payload.approval)
+function syncAnsweredClientRequestsFromMainEvent(event: Extract<MainToRendererEvent, { type: 'clientRequest.resolved' | 'backendApproval.resolved' }>): void {
+  const id = event.type === 'backendApproval.resolved'
     ? event.payload.approval.id
     : event.payload.id;
   if (typeof id === 'string' && id) markClientRequestAnswered(id);
@@ -1644,27 +1814,18 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
     adoptBackgroundSnapshot(event.snapshot);
     return;
   }
-  if (event.type === 'snapshot.updated' && isAppSnapshot(event.payload)) {
-    adoptBackgroundSnapshot(event.payload);
-    return;
-  }
-  if (event.type === 'snapshot.updated' && isAppSnapshotMetadata(event.payload)) {
-    adoptBackgroundSnapshotMetadata(event.payload);
+  if (event.type === 'snapshot.updated') {
+    const decodedSnapshot = decodeAppSnapshot(event.payload);
+    if (decodedSnapshot) {
+      adoptBackgroundSnapshot(decodedSnapshot.value);
+      return;
+    }
     return;
   }
   applyMainEventToSnapshot(snapshot.value, event);
   if (event.type === 'thread.started' && event.backend === 'claude') {
     synchronizeComposerSelectionForAgent(event.agentId);
   }
-}
-
-function adoptBackgroundSnapshotMetadata(metadata: AppSnapshotMetadata): void {
-  const activeAgentId = snapshot.value.activeAgentId;
-  applySnapshotMetadata(snapshot.value, metadata);
-  if (activeAgentId && snapshot.value.agents.some((agent) => agent.id === activeAgentId)) {
-    selectAgentInSnapshot(snapshot.value, activeAgentId);
-  }
-  pruneUnreadAgentIds();
 }
 
 function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
@@ -1674,6 +1835,7 @@ function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
   }
   snapshot.value = nextSnapshot;
   pruneUnreadAgentIds();
+  pruneConversationFrames();
 }
 
 function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
@@ -1681,6 +1843,7 @@ function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
   rememberActiveComposerConfiguration();
   snapshot.value = nextSnapshot;
   pruneUnreadAgentIds();
+  pruneConversationFrames();
   if (nextSnapshot.activeAgentId && nextSnapshot.activeAgentId !== previousAgentId) {
     restoreComposerConfiguration(nextSnapshot.activeAgentId);
   } else if (!nextSnapshot.activeAgentId) {
@@ -1688,35 +1851,44 @@ function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
   }
 }
 
-function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
-  if (event.agentId && event.agentId !== snapshot.value.activeAgentId) {
-    return;
-  }
-  if ((event.type !== 'sidePanel.markdownRequested' && event.type !== 'sidePanel.gitDiffRequested') || !isRecord(event.payload)) {
+function pruneConversationFrames(): void {
+  const agentsById = new Map(snapshot.value.agents.map((agent) => [agent.id, agent]));
+  codexConversationFramesByAgentId.value = Object.fromEntries(
+    Object.entries(codexConversationFramesByAgentId.value).filter(([agentId, frame]) => {
+      const agent = agentsById.get(agentId);
+      return agent?.backend === 'codex'
+        && agent.backendSession?.kind === 'codex'
+        && agent.backendSession.threadId === frame.threadId;
+    }),
+  );
+  claudeConversationFramesByAgentId.value = Object.fromEntries(
+    Object.entries(claudeConversationFramesByAgentId.value).filter(([agentId, frame]) => {
+      const agent = agentsById.get(agentId);
+      if (agent?.backend !== 'claude') return false;
+      return agent.backendSession?.kind !== 'claude'
+        || frame.snapshot.sessionId === null
+        || frame.snapshot.sessionId === agent.backendSession.sessionId;
+    }),
+  );
+}
+
+function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'sidePanel.markdownRequested' | 'sidePanel.gitDiffRequested' }>): void {
+  if (event.agentId !== snapshot.value.activeAgentId) {
     return;
   }
 
   if (event.type === 'sidePanel.markdownRequested') {
-    if (event.payload.kind !== 'markdown' || typeof event.payload.content !== 'string') {
-      return;
-    }
-
     sidePanelRequest.value = {
       kind: 'markdown',
       content: event.payload.content,
       ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
       ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
-      ...(typeof event.payload.path === 'string' ? { path: event.payload.path } : {}),
+      ...(event.payload.path !== undefined ? { path: event.payload.path } : {}),
     };
     return;
   }
 
-  if (event.payload.kind !== 'gitDiff' || typeof event.payload.diff !== 'string') {
-    return;
-  }
-
-  const sections = parseGitDiffSections(event.payload.sections);
-  if (event.payload.sections !== undefined && !sections) return;
+  const sections = event.payload.sections?.map((section) => ({ scope: section.scope, diff: section.diff })) ?? null;
 
   sidePanelRequest.value = {
     kind: 'gitDiff',
@@ -1726,32 +1898,17 @@ function syncSidePanelFromMainEvent(event: MainToRendererEvent): void {
     ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
     ...(appText(event.payload.subtitle) ? { subtitle: appText(event.payload.subtitle)! } : {}),
     ...(event.payload.state === 'error' ? { state: 'error' } : {}),
-    ...(typeof event.payload.error === 'string' ? { error: event.payload.error } : {}),
+    ...(event.payload.error !== undefined && event.payload.error !== null ? { error: event.payload.error } : {}),
   };
 }
 
-function parseGitDiffSections(value: unknown): Array<{ scope: 'staged' | 'unstaged' | 'untracked'; diff: string }> | null {
-  if (value === undefined) return null;
-  if (!Array.isArray(value)) return null;
-  const sections: Array<{ scope: 'staged' | 'unstaged' | 'untracked'; diff: string }> = [];
-  for (const item of value) {
-    if (!isRecord(item) || (item.scope !== 'staged' && item.scope !== 'unstaged' && item.scope !== 'untracked') || typeof item.diff !== 'string') {
-      return null;
-    }
-    sections.push({ scope: item.scope, diff: item.diff });
-  }
-  return sections;
-}
-
-function syncFileActivityFromMainEvent(event: MainToRendererEvent): void {
-  if (event.type !== 'file.activity' || !event.agentId || !event.turnId || !isRecord(event.payload)) return;
+function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'file.activity' }>): void {
+  if (!event.agentId || !event.turnId) return;
   const { action, itemId, messageId, path, status } = event.payload;
   if (
-    (action !== 'read' && action !== 'edit' && action !== 'create') ||
-    (status !== 'running' && status !== 'completed' && status !== 'failed') ||
-    typeof itemId !== 'string' || !itemId ||
-    typeof messageId !== 'string' || !messageId ||
-    typeof path !== 'string' || !path.trim()
+    !itemId ||
+    !messageId ||
+    !path.trim()
   ) return;
 
   fileActivity.value = {
@@ -1780,7 +1937,7 @@ async function refreshAgentSelection(agentId: string, requestId: number, needsHi
   try {
     const nextSnapshot = await codexClawApi!.selectAgent(agentId);
     if (requestId === agentSelectionRequestId) {
-      adoptBackgroundSnapshotMetadata(nextSnapshot);
+      adoptBackgroundSnapshot(nextSnapshot);
       synchronizeComposerSelectionForAgent(agentId);
     }
   } catch {
@@ -1803,7 +1960,6 @@ function markAgentSending(agentId: string, sending: boolean): void {
 function isAgentSending(agentId: string): boolean {
   const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
   return sendingAgentIds.value.has(agentId) ||
-    agent?.status.type === 'starting' ||
     agent?.status.type === 'working' ||
     agent?.status.type === 'awaitingInput';
 }
@@ -1812,24 +1968,4 @@ function markClientRequestAnswered(requestId: string): void {
   const next = new Set(answeredClientRequestIds.value);
   next.add(requestId);
   answeredClientRequestIds.value = next;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
-function isAgentCreationProgress(value: unknown): value is AgentCreationProgress {
-  if (!isRecord(value)) return false;
-  return typeof value.id === 'string' &&
-    (value.state === 'running' || value.state === 'success' || value.state === 'error') &&
-    (value.backend === 'codex' || value.backend === 'claude') &&
-    typeof value.repositoryName === 'string' &&
-    typeof value.createWorktree === 'boolean' &&
-    typeof value.hasPrompt === 'boolean' &&
-    (value.phase === undefined || value.phase === 'creatingWorktree' || value.phase === 'initializingWorktree' || value.phase === 'creatingAgent' || value.phase === 'startingPrompt') &&
-    (value.initializationDetail === undefined || typeof value.initializationDetail === 'string') &&
-    (value.branchName === undefined || typeof value.branchName === 'string') &&
-    (value.agentId === undefined || typeof value.agentId === 'string') &&
-    (value.agentName === undefined || typeof value.agentName === 'string') &&
-    (value.error === undefined || typeof value.error === 'string');
 }

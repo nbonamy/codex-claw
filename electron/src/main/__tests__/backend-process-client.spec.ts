@@ -1,11 +1,13 @@
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import * as mainLog from '../log';
 import { ClawBackendProcessClient } from '../backend-process-client';
 
 describe('ClawBackendProcessClient', () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('sends backend health over stdio and resolves the response', async () => {
@@ -40,6 +42,27 @@ describe('ClawBackendProcessClient', () => {
       cwd: undefined,
       stdio: 'pipe',
     });
+  });
+
+  it.each([
+    backendMethods.agentTurnDelete,
+    backendMethods.agentTurnEdit,
+    backendMethods.agentTurnRetry,
+  ])('accepts a successful delayed response for %s', async (method) => {
+    vi.useFakeTimers();
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+
+    await client.start();
+    const response = client.request<{ ok: true }>(method, { agentId: 'agent-dina', turnId: 'turn-1' });
+    const request = JSON.parse(child.stdin.writes[0]);
+    await vi.advanceTimersByTimeAsync(6_000);
+    child.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { ok: true } })}\n`);
+
+    await expect(response).resolves.toStrictEqual({ ok: true });
   });
 
   it('rejects requests when the backend returns a JSON-RPC error', async () => {
@@ -122,6 +145,76 @@ describe('ClawBackendProcessClient', () => {
     });
   });
 
+  it('ignores malformed backend events without interrupting later notifications', async () => {
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+    const listener = vi.fn();
+    const warn = vi.spyOn(mainLog, 'warnMain');
+    const secret = 'secret-event-value';
+
+    await client.start();
+    client.onEvent(listener);
+    for (const params of [
+      {
+        seq: 1,
+        type: 'agent.statusChanged',
+        agentId: 'agent-dina',
+        payload: { type: secret },
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+      {
+        seq: secret,
+        type: 'client.connectionChanged',
+        payload: { status: 'connected' },
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+      {
+        seq: 2,
+        type: secret,
+        payload: {},
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+    ]) {
+      child.stdout.write(`${JSON.stringify({
+        jsonrpc: '2.0',
+        method: backendMethods.backendEventNotify,
+        params,
+      })}\n`);
+    }
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      method: backendMethods.backendEventNotify,
+      params: {
+        seq: 3,
+        type: 'client.connectionChanged',
+        payload: { status: 'connected' },
+        occurredAt: '2026-06-13T00:00:00.000Z',
+      },
+    })}\n`);
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ seq: 3 }));
+    const malformedWarnings = warn.mock.calls.filter(
+      ([, message]) => message === 'ignored malformed backend event notification',
+    );
+    expect(malformedWarnings).toHaveLength(3);
+    expect(malformedWarnings).toEqual(expect.arrayContaining([
+      expect.arrayContaining(['clawd', 'ignored malformed backend event notification', {
+        detail: expect.stringContaining('$.payload.type'),
+      }]),
+      expect.arrayContaining(['clawd', 'ignored malformed backend event notification', {
+        detail: expect.stringContaining('$.seq'),
+      }]),
+      expect.arrayContaining(['clawd', 'ignored malformed backend event notification', {
+        detail: expect.stringContaining('$.type'),
+      }]),
+    ]));
+    expect(JSON.stringify(malformedWarnings)).not.toContain(secret);
+  });
+
   it('ignores legacy backend event notification names', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({
@@ -164,6 +257,7 @@ describe('ClawBackendProcessClient', () => {
       params: {
         seq: 1,
         type: 'backend.statusChanged',
+        backend: 'codex',
         payload: { backend: 'codex', status: 'running' },
         occurredAt: '2026-06-13T00:00:00.000Z',
       },
@@ -181,6 +275,39 @@ describe('ClawBackendProcessClient', () => {
 
     await expect(healthPromise).resolves.toMatchObject({ ok: true });
     expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('preserves malformed JSON and JSON-RPC framing behavior', async () => {
+    const child = createFakeChildProcess();
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+    const warn = vi.spyOn(mainLog, 'warnMain');
+
+    await client.start();
+    child.stdout.write('not json\n');
+    child.stdout.write(`${JSON.stringify({ jsonrpc: '1.0', method: 'invalid' })}\n`);
+    const healthPromise = client.health();
+    const request = JSON.parse(child.stdin.writes[0]);
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: request.id,
+      result: { ok: true, name: 'clawd', version: '0.1.0', pid: 123 },
+    })}\n`);
+
+    await expect(healthPromise).resolves.toMatchObject({ ok: true });
+    const parseWarnings = warn.mock.calls.filter(
+      ([, message]) => message === 'failed to parse backend response',
+    );
+    expect(parseWarnings).toHaveLength(2);
+    expect(parseWarnings).toEqual(expect.arrayContaining([
+      expect.arrayContaining([
+        'clawd',
+        'failed to parse backend response',
+        expect.objectContaining({ bytes: expect.any(Number) }),
+      ]),
+    ]));
   });
 
   it('handles backend-initiated client requests over stdio', async () => {

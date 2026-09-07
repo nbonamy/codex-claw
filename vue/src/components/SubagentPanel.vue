@@ -20,7 +20,7 @@
         :actions-disabled="true"
         :can-delete-message="false"
         :can-edit-message="false"
-        :can-fork-message="false"
+        :can-fork-turn="false"
         :can-retry-message="false"
         :follow-ups-disabled="true"
         :aria-label="t('chat.subagents.conversationLabel')"

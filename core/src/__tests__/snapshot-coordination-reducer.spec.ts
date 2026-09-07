@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest';
+import { applyMainEventToSnapshot, createEmptySnapshot } from '../snapshot';
+import type { MainToRendererEvent } from '../contracts';
+
+describe('snapshot coordination reducer', () => {
+  it('owns queued prompt lifecycle without touching provider transcripts', () => {
+    const snapshot = createEmptySnapshot();
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'agent.promptQueued',
+      agentId: 'agent-1',
+      payload: { id: 'prompt-1', text: 'Fix it', submitted: true },
+    }));
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'agent.promptRetryScheduled',
+      agentId: 'agent-1',
+      payload: { id: 'prompt-1', attempts: 2, lastError: 'busy', retryAt: 'later' },
+    }));
+
+    expect(snapshot.queuedPrompts).toEqual([expect.objectContaining({
+      id: 'prompt-1', attempts: 2, lastError: 'busy', retryAt: 'later', submitted: true,
+    })]);
+
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'agent.promptDequeued',
+      agentId: 'agent-1',
+      payload: { ids: ['prompt-1'] },
+    }));
+    expect(snapshot.queuedPrompts).toEqual([]);
+  });
+
+  it('owns legacy backend approval lifecycle as Claw coordination state', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.agents.push({
+      id: 'agent-1', name: 'Agent', folder: null, backend: 'codex', status: { type: 'idle' },
+      createdAt: '2026-09-06T00:00:00.000Z', updatedAt: '2026-09-06T00:00:00.000Z',
+    });
+    const approval = {
+      id: 'approval-1', kind: 'command' as const, conversationId: 'thread-1', itemId: 'item-1',
+      title: 'Run tests',
+    };
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'backendApproval.requested', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1',
+      payload: { approval },
+    }));
+    expect(snapshot.backendApprovals['agent-1']).toEqual([approval]);
+    expect(snapshot.agents[0]?.status).toMatchObject({ type: 'awaitingInput', detail: 'Run tests' });
+
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'backendApproval.resolved', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1',
+      payload: { approval, decision: 'approve', scope: 'once', reason: 'host' },
+    }));
+    expect(snapshot.backendApprovals['agent-1']).toEqual([]);
+  });
+
+  it('stores turn diff summaries without rewriting provider messages', () => {
+    const snapshot = createEmptySnapshot();
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'diff.updated', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1', turnId: 'turn-1',
+      payload: { addedLines: 3, removedLines: 1, diff: '+three\n-one' },
+    }));
+    expect(snapshot.turnGitDiffs['turn-1']).toEqual({
+      agentId: 'agent-1', turnId: 'turn-1', addedLines: 3, removedLines: 1, diff: '+three\n-one',
+      updatedAt: '2026-09-06T00:00:00.000Z',
+    });
+  });
+});
+
+function event<T extends Omit<MainToRendererEvent, 'seq' | 'occurredAt'>>(value: T): MainToRendererEvent {
+  return { ...value, seq: 1, occurredAt: '2026-09-06T00:00:00.000Z' } as MainToRendererEvent;
+}

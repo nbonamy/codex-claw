@@ -1,6 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type {
+  AgentBackend,
+  AgentFileActivity,
+  AgentGitStatus,
+  AppSnapshot,
+  BackendApprovalDecision,
+  BackendApprovalRequest,
+  BackendApprovalScope,
+  BackendConnectionState,
+  BrowserAnnotation,
+  ClientState,
+  ClientRequest,
+  RendererMessage,
+  RendererToolPart,
+  RendererToolPartUpdate,
+  SubagentStatusChange,
+  TurnGitDiff,
+} from '../contracts';
 import { createInitialSnapshot } from '../snapshot';
-import { isClawSnapshotGetResult } from '../backend-protocol/rpc';
+import { isClawSnapshotGetResult, type ClawBackendEvent } from '../backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
 describe('backend protocol guards', () => {
@@ -34,6 +52,22 @@ describe('backend protocol guards', () => {
     })).toBe(false);
   });
 
+  it('rejects snapshot/get results with malformed nested snapshot state', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.backendRuntimes[0]!.capabilities = {
+      planMode: 'automatic',
+    } as never;
+
+    expect(isClawSnapshotGetResult({
+      snapshot,
+      lastEventSeq: 17,
+      clientState: {
+        sourceFolderPath: '/Users/nbonamy/src',
+        shouldPreventDisplaySleep: false,
+      },
+    })).toBe(false);
+  });
+
   it('requires backend-derived client state in snapshot/get results', () => {
     expect(isClientState({
       sourceFolderPath: '/Users/nbonamy/src',
@@ -49,5 +83,55 @@ describe('backend protocol guards', () => {
       snapshot: createInitialSnapshot(),
       lastEventSeq: 17,
     })).toBe(false);
+  });
+
+  it('preserves typed payloads through the clawd event envelope', () => {
+    type AnnotationEvent = Extract<ClawBackendEvent, { type: 'browser.annotationCreated' }>;
+
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'client.connectionChanged' }>['payload']>()
+      .toEqualTypeOf<BackendConnectionState>();
+    type SnapshotUpdatedEvent = Extract<ClawBackendEvent, { type: 'snapshot.updated' }>;
+    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshot>();
+    expectTypeOf<Pick<SnapshotUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{
+        agentId?: string;
+        backend?: AgentBackend;
+        threadId?: string;
+        turnId?: string;
+      }>();
+    expectTypeOf<SnapshotUpdatedEvent['snapshot']>().toEqualTypeOf<AppSnapshot | undefined>();
+    expectTypeOf<AnnotationEvent['payload']>().toEqualTypeOf<BrowserAnnotation>();
+    type SubagentStatusEvent = Extract<ClawBackendEvent, { type: 'subagent.statusChanged' }>;
+    expectTypeOf<SubagentStatusEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
+    expectTypeOf<Pick<SubagentStatusEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{
+        agentId: string;
+        backend: 'codex' | 'claude';
+        threadId: string;
+        turnId?: string;
+      }>();
+    type DiffUpdatedEvent = Extract<ClawBackendEvent, { type: 'diff.updated' }>;
+    expectTypeOf<DiffUpdatedEvent['payload']>()
+      .toEqualTypeOf<Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>>();
+    expectTypeOf<Pick<DiffUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend: AgentBackend; threadId: string; turnId: string }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'file.activity' }>['payload']>()
+      .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
+    type GitStatusUpdatedEvent = Extract<ClawBackendEvent, { type: 'git.statusUpdated' }>;
+    expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
+    expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
+      .toEqualTypeOf<{ agentId: string; backend?: AgentBackend; threadId?: string; turnId?: string }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'backendApproval.requested' }>['payload']>()
+      .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
+    expectTypeOf<Extract<ClawBackendEvent, { type: 'backendApproval.resolved' }>['payload']>()
+      .toEqualTypeOf<{
+        approval: BackendApprovalRequest;
+        decision: BackendApprovalDecision | null;
+        scope: BackendApprovalScope | null;
+        reason: 'host' | 'server' | 'conversation_closed' | 'conversation_removed' | 'surface_disconnected';
+      }>();
+    expectTypeOf<AnnotationEvent['seq']>().toEqualTypeOf<number>();
+    expectTypeOf<AnnotationEvent['occurredAt']>().toEqualTypeOf<string>();
+    expectTypeOf<AnnotationEvent['clientState']>().toEqualTypeOf<ClientState | undefined>();
   });
 });

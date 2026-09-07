@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import GitWorkflowControl from '../GitWorkflowControl.vue';
 import type { Agent, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { encodeAppErrorDescriptor } from '@codex-claw/core/app-error';
 import { stubElectronTestWindow } from '../../test/client';
 
 const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktree', backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'idle' }, createdAt: '', updatedAt: '' } as Agent;
@@ -443,6 +444,32 @@ describe('GitWorkflowControl', () => {
     expect(writingSurface.get('textarea').attributes('placeholder')).toBe('Describe the change (optional)');
   });
 
+  it('warns when pull request or merge actions would leave uncommitted changes behind', async () => {
+    const pullRequest = mountControl();
+    await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await pullRequest.get('.git-workflow-control__trigger').trigger('click');
+    await pullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    expect(pullRequest.get('.git-workflow-control__uncommitted-warning').text()).toBe(
+      'Uncommitted changes will not be included in this pull request.',
+    );
+
+    const merge = mountControl({ mergeBranch: vi.fn() });
+    await vi.waitFor(() => expect(merge.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await merge.get('.git-workflow-control__trigger').trigger('click');
+    await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    expect(merge.get('.git-workflow-control__uncommitted-warning').text()).toBe(
+      'Uncommitted changes will not be included in this merge.',
+    );
+
+    const cleanPullRequest = mountControl({
+      getWorkflow: async () => ({ ...workflow, files: [], stagedFiles: [], unstagedFiles: [] }),
+    });
+    await vi.waitFor(() => expect(cleanPullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await cleanPullRequest.get('.git-workflow-control__trigger').trigger('click');
+    await cleanPullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    expect(cleanPullRequest.find('.git-workflow-control__uncommitted-warning').exists()).toBe(false);
+  });
+
   it('offers report-back by default for delegated pull requests and merges', async () => {
     const createPullRequest = vi.fn(async () => workflow);
     const pullRequest = mountControl({ createPullRequest, reportBackAgentName: 'main' });
@@ -624,6 +651,49 @@ describe('GitWorkflowControl', () => {
     expect(generateMessage).toHaveBeenCalledWith('agent-1', { kind: 'pullRequest' });
     expect((wrapper.get('.git-workflow-control__pull-request-form input').element as HTMLInputElement).value).toBe('Improve Git drafts');
     expect((wrapper.get('.git-workflow-control__pull-request-form textarea').element as HTMLTextAreaElement).value).toContain('ephemeral generation');
+  });
+
+  it('explains that pull request generation requires committed branch changes', async () => {
+    const descriptor = encodeAppErrorDescriptor({
+      kind: 'appError',
+      code: 'git.pullRequestChangesRequired',
+    }, 'This branch has no committed changes to include.');
+    const generateMessage = vi.fn().mockRejectedValue(new Error(
+      `Error invoking remote method 'agent:git-workflow:message:generate': Error: ${descriptor}`,
+    ));
+    const wrapper = mountControl({ generateMessage });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await wrapper.get('[aria-label="Generate pull request draft with Codex"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('.git-workflow-control__generation-error').text()).toBe(
+      'This branch has no committed changes. Commit your work before creating a pull request.',
+    );
+    expect(wrapper.text()).not.toContain('Error invoking remote method');
+  });
+
+  it('blocks pull request creation with the same commit-first guidance', async () => {
+    const descriptor = encodeAppErrorDescriptor({
+      kind: 'appError',
+      code: 'git.pullRequestChangesRequired',
+    }, 'This branch has no committed changes to include.');
+    const createPullRequest = vi.fn().mockRejectedValue(new Error(
+      `Error invoking remote method 'agent:git-workflow:pull-request:create': Error: ${descriptor}`,
+    ));
+    const wrapper = mountControl({ createPullRequest });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
+    await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Fix issue 7');
+    await submitButton(wrapper, 'Create PR').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(
+      'This branch has no committed changes. Commit your work before creating a pull request.',
+    );
+    expect(wrapper.text()).not.toContain('Error invoking remote method');
   });
 
   it('does not offer Codex draft generation for Claude agents', async () => {

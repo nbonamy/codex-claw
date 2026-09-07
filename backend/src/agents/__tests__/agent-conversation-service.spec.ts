@@ -1,58 +1,68 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 import { AgentConversationService } from '../agent-conversation-service';
 
 describe('AgentConversationService', () => {
-  it('replaces rollback history and restores the idle session state', async () => {
+  it.each([
+    ['deleteTurn', backendMethods.driverTurnDelete, ['turn-1'], null],
+    ['editTurn', backendMethods.driverTurnEdit, ['turn-1', 'edited'], 'turn-new'],
+    ['retryTurn', backendMethods.driverTurnRetry, ['turn-1'], 'turn-new'],
+  ] as const)('keeps the Codex transcript provider-owned while applying %s status', async (method, driverMethod, args, activeTurnId) => {
     const { agent, driverRequest, events, persistSnapshot, service, snapshot } = createService();
-    const messages = [message('assistant-turn-1', 'assistant', 'rolled back', 'turn-1')];
     driverRequest.mockResolvedValue({
-      backendSession: { kind: 'codex', threadId: 'thread-rollback' },
-      messages,
+      backendSession: { kind: 'codex', threadId: 'thread-updated' },
+      activeTurnId,
     });
 
-    await expect(service.rollbackToTurn(agent.id, 'turn-1')).resolves.toBe(snapshot);
+    await expect((service[method] as (...input: string[]) => Promise<unknown>)(agent.id, ...args)).resolves.toBe(snapshot);
 
-    expect(agent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-rollback' });
+    expect(driverRequest).toHaveBeenCalledWith(agent, driverMethod, {
+      agent,
+      turnId: 'turn-1',
+      ...(method === 'editTurn' ? { content: 'edited' } : {}),
+    });
+    expect(agent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-updated' });
     expect(events).toStrictEqual([
       {
         agentId: agent.id,
-        threadId: 'thread-rollback',
-        type: 'thread.historyLoaded',
-        payload: { messages, replace: true },
-      },
-      {
-        agentId: agent.id,
-        threadId: 'thread-rollback',
+        threadId: 'thread-updated',
         type: 'agent.statusChanged',
-        payload: { type: 'idle' },
+        payload: { type: activeTurnId ? 'working' : 'idle' },
       },
     ]);
     expect(persistSnapshot).toHaveBeenCalledOnce();
   });
 
-  it('resolves retry prompts from assistant segments and compaction messages', () => {
-    const { agent, service, snapshot } = createService();
-    snapshot.messages = [
-      message('user-local', 'user', 'first prompt'),
-      message('assistant-turn-7-segment-2', 'assistant', 'first answer'),
-      message('user-followup', 'user', 'second prompt', 'turn-8'),
-      message('compaction-turn-8', 'assistant', 'compacted'),
-    ];
+  it('adopts Claude turn-operation results without adding Codex thread metadata', async () => {
+    const { agent, driverRequest, events, service } = createService();
+    driverRequest.mockResolvedValue({
+      backendSession: { kind: 'claude', sessionId: 'session-updated', transport: 'stdio' },
+      activeTurnId: null,
+    });
 
-    expect(service.resolveMessageAction(agent.id, 'assistant-turn-7-segment-2')).toMatchObject({
-      agent,
-      prompt: 'first prompt',
-      turnId: 'turn-7',
+    await service.deleteTurn(agent.id, 'turn-1');
+
+    expect(agent.backendSession).toStrictEqual({
+      kind: 'claude', sessionId: 'session-updated', transport: 'stdio',
     });
-    expect(service.resolveMessageAction(agent.id, 'compaction-turn-8')).toMatchObject({
-      agent,
-      prompt: 'second prompt',
-      turnId: 'turn-8',
-    });
-    expect(service.resolveMessageAction(agent.id, 'missing')).toBeNull();
+    expect(events).toStrictEqual([{
+      agentId: agent.id,
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+    }]);
+  });
+
+  it.each([
+    ['deleteTurn', ['turn-1']],
+    ['editTurn', ['turn-1', 'edited']],
+    ['retryTurn', ['turn-1']],
+  ] as const)('does not invoke the provider for missing agents during %s', async (method, args) => {
+    const { driverRequest, service } = createService();
+
+    await expect((service[method] as (...input: string[]) => Promise<unknown>)('missing-agent', ...args)).resolves.toBeNull();
+    expect(driverRequest).not.toHaveBeenCalled();
   });
 
   it('accepts only conversations owned by stored automation or subagent state', () => {
@@ -129,6 +139,69 @@ describe('AgentConversationService', () => {
       { agent, title: 'Dina' },
     );
   });
+
+  it('reports hydration failures without exposing diagnostics and deduplicates concurrent requests', async () => {
+    vi.useFakeTimers();
+    try {
+      const { agent, driverRequest, events, service } = createService();
+      driverRequest.mockRejectedValue(new Error('thread thread-root already has an active writer: sensitive provider detail'));
+
+      const first = service.hydrate(agent.id);
+      const second = service.hydrate(agent.id);
+      await vi.runAllTimersAsync();
+
+      await expect(Promise.all([first, second])).resolves.toStrictEqual([undefined, undefined]);
+      expect(driverRequest).toHaveBeenCalledTimes(2);
+      expect(events).toContainEqual({
+        agentId: agent.id,
+        type: 'thread.historyHydrationFailed',
+        payload: {},
+      });
+      expect(JSON.stringify(events)).not.toContain('active writer');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    'Codex app-server request timed out: thread/resume',
+    'thread thread-root already has an active writer',
+  ])('retries a transient history hydration failure before reporting it: %s', async (message) => {
+    vi.useFakeTimers();
+    try {
+      const { agent, driverRequest, events, service } = createService();
+      driverRequest
+        .mockRejectedValueOnce(new Error(message))
+        .mockResolvedValueOnce({ kind: 'codex', threadId: 'thread-root' });
+
+      const hydration = service.hydrate(agent.id);
+      await vi.runAllTimersAsync();
+      await hydration;
+
+      expect(driverRequest).toHaveBeenCalledTimes(2);
+      expect(events).not.toContainEqual({
+        agentId: agent.id,
+        type: 'thread.historyHydrationFailed',
+        payload: {},
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retry a permanent history hydration failure', async () => {
+    const { agent, driverRequest, events, service } = createService();
+    driverRequest.mockRejectedValue(new Error('session thread-root is archived'));
+
+    await service.hydrate(agent.id);
+
+    expect(driverRequest).toHaveBeenCalledOnce();
+    expect(events).toContainEqual({
+      agentId: agent.id,
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    });
+  });
 });
 
 function createService() {
@@ -162,21 +235,4 @@ function createService() {
     refreshWorkspaceIdentity,
   });
   return { agent, driverRequest, events, persistSnapshot, refreshGitStatus, refreshWorkspaceIdentity, service, snapshot };
-}
-
-function message(
-  id: string,
-  role: RendererMessage['role'],
-  text: string,
-  turnId?: string,
-): RendererMessage {
-  return {
-    id,
-    agentId: 'agent-dina',
-    role,
-    status: 'complete',
-    parts: [{ type: 'text', text }],
-    createdAt: '2026-09-02T00:00:00.000Z',
-    ...(turnId ? { turnId } : {}),
-  };
 }

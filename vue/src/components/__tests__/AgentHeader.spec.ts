@@ -105,6 +105,78 @@ describe('AgentHeader', () => {
     expect(wrapper.get('.agent-header__folder').text()).toBe('test @ codex-claw-git-fixture');
   });
 
+  it('does not repeat a branch-derived name in the repository location', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: {
+          ...agent,
+          name: null,
+          folder: '/Users/nbonamy/src/codex-claw-hardening',
+          workspace: {
+            kind: 'git',
+            folder: '/Users/nbonamy/src/codex-claw-hardening',
+            repositoryName: 'codex-claw',
+            repositoryRoot: '/Users/nbonamy/src/codex-claw-hardening',
+            branch: 'chore/codebase-hardening-review',
+            isLinkedWorktree: true,
+            primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+            updatedAt: '2026-09-07T00:00:00.000Z',
+          },
+        },
+        gitStatus: {
+          folder: '/Users/nbonamy/src/codex-claw-hardening',
+          repository: 'codex-claw',
+          branch: 'chore/codebase-hardening-review',
+          ahead: 0,
+          behind: 0,
+          changedFiles: 0,
+          addedLines: 0,
+          removedLines: 0,
+          hasUntracked: false,
+          state: 'clean',
+          updatedAt: '2026-09-07T00:00:00.000Z',
+        },
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-header__agent-line strong').text()).toBe('chore/codebase-hardening-review');
+    expect(wrapper.get('.agent-header__folder').text()).toBe('@ codex-claw');
+  });
+
+  it('uses persisted workspace identity before the first Git status refresh', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: {
+          ...agent,
+          name: null,
+          folder: '/Users/nbonamy/src/codex',
+          workspace: {
+            kind: 'git',
+            folder: '/Users/nbonamy/src/codex',
+            repositoryName: 'codex',
+            repositoryRoot: '/Users/nbonamy/src/codex',
+            branch: 'main',
+            isLinkedWorktree: false,
+            primaryWorktreeRoot: '/Users/nbonamy/src/codex',
+            updatedAt: '2026-09-07T00:00:00.000Z',
+          },
+        },
+        gitStatus: null,
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.get('.agent-header__agent-line strong').text()).toBe('main');
+    expect(wrapper.get('.agent-header__folder').text()).toBe('@ codex');
+  });
+
   it('emits a git diff preview request when repo diff stats are clicked', async () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
       folder: '/Users/nbonamy/src/id8',
@@ -287,7 +359,6 @@ describe('AgentHeader', () => {
   it.each([
     [{ type: 'working' as const, detail: 'Getting stats...' }, 'Getting stats...'],
     [{ type: 'working' as const }, 'Working'],
-    [{ type: 'starting' as const }, 'Starting'],
     [{ type: 'awaitingInput' as const, detail: 'Approval needed' }, 'Approval needed'],
     [{ type: 'awaitingInput' as const }, 'Awaiting input'],
     [{ type: 'error' as const, message: 'Tool failed' }, 'Tool failed'],

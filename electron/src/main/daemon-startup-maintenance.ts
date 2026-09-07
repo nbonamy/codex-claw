@@ -89,7 +89,6 @@ async function daemonHasActiveWork(
 
 function snapshotHasActiveWork(snapshot: AppSnapshot): boolean {
   return snapshot.agents.some((agent) => (
-    agent.status.type === 'starting' ||
     agent.status.type === 'working' ||
     agent.status.type === 'awaitingInput'
   )) || snapshot.automations.some((automation) => (

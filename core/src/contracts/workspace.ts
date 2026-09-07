@@ -1,0 +1,86 @@
+export type AgentWorkspaceIdentity =
+  | {
+      kind: 'git';
+      folder: string;
+      repositoryName: string;
+      repositoryRoot: string;
+      branch: string | null;
+      isLinkedWorktree: boolean;
+      primaryWorktreeRoot: string;
+      originUrl?: string;
+      updatedAt: string;
+    }
+  | {
+      kind: 'folder';
+      folder: string;
+      label: string;
+      updatedAt: string;
+    };
+
+export type AgentFileSearchItem = {
+  name: string;
+  path: string;
+};
+
+export type AgentFilePreviewResult = {
+  path: string;
+  size: number;
+  kind: 'text' | 'image' | 'binary' | 'tooLarge';
+  content?: string;
+  dataUrl?: string;
+  mimeType?: string;
+};
+
+export type SourceWorktree = {
+  name: string;
+  path: string;
+};
+
+export type SourceBranch = {
+  name: string;
+  isDefault: boolean;
+  worktreePath?: string;
+};
+
+export type SourceRepository = {
+  name: string;
+  path: string;
+  remoteIdentity?: string;
+  worktrees: SourceWorktree[];
+};
+
+export type CloneSourceRepositoryInput = {
+  url: string;
+  remoteConnectionId?: string;
+};
+
+export type SourceFolderEntry = {
+  name: string;
+  path: string;
+};
+
+export type SourceFolderListing = {
+  path: string;
+  parentPath: string | null;
+  entries: SourceFolderEntry[];
+};
+
+export type SourceFolderListInput = {
+  path?: string;
+  remoteConnectionId?: string;
+};
+
+export type SourceFolderState = {
+  path: string;
+  initialized: boolean;
+  recentRepoNames: string[];
+};
+
+export type CreateSourceWorktreeInput = {
+  repoPath: string;
+  branchName: string;
+  baseBranch?: string;
+  destinationPath?: string;
+  reuseExisting?: boolean;
+  remoteConnectionId?: string;
+};

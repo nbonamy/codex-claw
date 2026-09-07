@@ -11,12 +11,19 @@ describe('DelegatedWorkReportService', () => {
     snapshot.agents = [parent, worker];
     const sendPrompt = vi.fn();
     const sendMessage = vi.fn();
-    const service = new DelegatedWorkReportService({ getSnapshot: () => snapshot, sendPrompt, sendMessage });
+    const readConversationMessages = vi.fn().mockResolvedValue([
+      assistantMessage(worker.id, 'turn-report', 'Implemented the full fix.\n\nTests pass.'),
+    ]);
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages,
+      sendPrompt,
+      sendMessage,
+    });
 
     const report = service.prepare(worker, { kind: 'pullRequest', branch: 'fix/resume' });
     expect(sendPrompt).toHaveBeenCalledWith(worker.id, expect.stringMatching(/will create a pull request from `fix\/resume`.*Do not run tools.*Do not claim that no pull request was created/s));
 
-    snapshot.messages.push(assistantMessage(worker.id, 'turn-report', 'Implemented the full fix.\n\nTests pass.'));
     service.handleEvent(event(worker.id, 'turn-report', 'turn.completed'));
     await expect(report).resolves.toBe('Implemented the full fix.\n\nTests pass.');
 
@@ -33,7 +40,12 @@ describe('DelegatedWorkReportService', () => {
     snapshot.agents = [parent, worker];
     const sendPrompt = vi.fn();
     const sendMessage = vi.fn();
-    const service = new DelegatedWorkReportService({ getSnapshot: () => snapshot, sendPrompt, sendMessage });
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages: vi.fn().mockResolvedValue([]),
+      sendPrompt,
+      sendMessage,
+    });
 
     const outcome = { kind: 'merge' as const, branch: 'feature', repository: 'main' };
     await expect(service.prepare(worker, outcome)).resolves.toBeNull();
@@ -49,7 +61,12 @@ describe('DelegatedWorkReportService', () => {
     const worker = { ...agent('agent-worker', 'fix/resume'), delegatedByAgentId: parent.id };
     snapshot.agents = [parent, worker];
     const sendMessage = vi.fn();
-    const service = new DelegatedWorkReportService({ getSnapshot: () => snapshot, sendPrompt: vi.fn(), sendMessage });
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages: vi.fn().mockResolvedValue([]),
+      sendPrompt: vi.fn(),
+      sendMessage,
+    });
 
     expect(service.notifyWorker(worker, {
       kind: 'pullRequest', branch: 'fix/resume', number: 42, title: 'Fix resume instructions', url: 'https://github.com/openai/codex/pull/42', draft: false,
@@ -63,14 +80,63 @@ describe('DelegatedWorkReportService', () => {
     const worker = { ...agent('agent-worker', 'feature'), delegatedByAgentId: parent.id };
     snapshot.agents = [parent, worker];
     const sendPrompt = vi.fn();
-    const service = new DelegatedWorkReportService({ getSnapshot: () => snapshot, sendPrompt });
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages: vi.fn().mockResolvedValue([
+        assistantMessage(worker.id, 'turn-report', 'Implemented and verified the change.'),
+      ]),
+      sendPrompt,
+    });
 
     const report = service.prepare(worker, { kind: 'merge', branch: 'feature', repository: 'owner/repo' });
     expect(sendPrompt).toHaveBeenCalledWith(worker.id, expect.stringMatching(/will merge `feature` directly into owner\/repo without a pull request.*Do not run tools/s));
 
-    snapshot.messages.push(assistantMessage(worker.id, 'turn-report', 'Implemented and verified the change.'));
     service.handleEvent(event(worker.id, 'turn-report', 'turn.completed'));
     await expect(report).resolves.toBe('Implemented and verified the change.');
+  });
+
+  it('reads a provider-owned transcript when the completion arrives in a provider frame', async () => {
+    const snapshot = createEmptySnapshot();
+    const parent = agent('agent-main', 'main');
+    const worker = {
+      ...agent('agent-worker', 'fix/provider'),
+      backend: 'claude' as const,
+      backendSession: { kind: 'claude' as const, sessionId: 'session-worker', transport: 'stdio' as const },
+      delegatedByAgentId: parent.id,
+    };
+    snapshot.agents = [parent, worker];
+    const readConversationMessages = vi.fn().mockResolvedValue([
+      assistantMessage(worker.id, 'turn-report', 'Provider-owned handoff.'),
+    ]);
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages,
+      sendPrompt: vi.fn(),
+    });
+
+    const report = service.prepare(worker, { kind: 'merge', branch: 'fix/provider', repository: 'main' });
+    service.handleEvent({
+      seq: 1,
+      occurredAt: '2026-09-03T00:01:00.000Z',
+      agentId: worker.id,
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 4,
+        event: {
+          seq: 4,
+          occurredAt: '2026-09-03T00:01:00.000Z',
+          agentId: worker.id,
+          backend: 'claude',
+          turnId: 'turn-report',
+          type: 'turn.completed',
+          payload: { turn: { id: 'turn-report', status: 'completed' } },
+        },
+      },
+    });
+
+    await expect(report).resolves.toBe('Provider-owned handoff.');
+    expect(readConversationMessages).toHaveBeenCalledWith(worker);
   });
 
   it('falls back when the summary prompt cannot start', async () => {
@@ -80,6 +146,7 @@ describe('DelegatedWorkReportService', () => {
     snapshot.agents = [parent, worker];
     const service = new DelegatedWorkReportService({
       getSnapshot: () => snapshot,
+      readConversationMessages: vi.fn().mockResolvedValue([]),
       sendPrompt: () => { throw new Error('backend unavailable'); },
     });
 
@@ -101,6 +168,32 @@ function assistantMessage(agentId: string, turnId: string, text: string): Render
   };
 }
 
-function event(agentId: string, turnId: string, type: MainToRendererEvent['type']): Pick<MainToRendererEvent, 'agentId' | 'turnId' | 'type'> {
-  return { agentId, turnId, type };
+function event(agentId: string, turnId: string, type: 'turn.completed'): MainToRendererEvent {
+  return {
+    seq: 1,
+    occurredAt: '2026-09-03T00:01:00.000Z',
+    agentId,
+    backend: 'codex',
+    threadId: 'thread-report',
+    type: 'codex.conversationEventReceived',
+    payload: {
+      revision: 1,
+      event: {
+        seq: 1,
+        occurredAt: '2026-09-03T00:01:00.000Z',
+        origin: 'notification',
+        conversationId: 'thread-report',
+        turnId,
+        type,
+        payload: {
+          status: 'completed',
+          error: null,
+          willRetry: false,
+          startedAt: null,
+          completedAt: '2026-09-03T00:01:00.000Z',
+          durationMs: null,
+        },
+      },
+    },
+  };
 }

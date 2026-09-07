@@ -1,4 +1,5 @@
 import type { Agent, AppSnapshot, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { computed, ref } from 'vue';
 import { clawHostCapabilities, codexClawApi } from './platform-api';
 
@@ -20,7 +21,8 @@ export function createAgentUnreadState(options: { getSnapshot: () => AppSnapshot
   }
 
   function handleMainEvent(event: MainToRendererEvent): void {
-    if (!event.agentId || !isUnreadWorthyEvent(event.type)) return;
+    const conversationEvent = providerConversationEventView(event);
+    if (!event.agentId || !isUnreadWorthyEvent(conversationEvent.type)) return;
     const snapshot = options.getSnapshot();
     if (!snapshot.agents.some((agent) => agent.id === event.agentId)) return;
     if (rendererWindowFocused.value && snapshot.activeAgentId === event.agentId) {
@@ -96,7 +98,7 @@ export function createAgentUnreadState(options: { getSnapshot: () => AppSnapshot
   };
 }
 
-function isUnreadWorthyEvent(type: MainToRendererEvent['type']): boolean {
+function isUnreadWorthyEvent(type: string): boolean {
   return type === 'turn.completed' ||
     type === 'approval.requested' ||
     type === 'backendApproval.requested' ||

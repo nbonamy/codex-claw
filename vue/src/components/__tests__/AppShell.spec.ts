@@ -14,6 +14,8 @@ import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setFirstRunOnboardingStage } from '../../onboarding-session';
+import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
+import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';
 
 import {
   conversationControllerActions,
@@ -42,6 +44,159 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
+  it('uses the provider-owned Codex conversation', () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-provider' };
+    const providerMessages = [
+      codexTextMessage('provider-user', 'user', 'Provider prompt', 'turn-provider'),
+      codexTextMessage('provider-assistant', 'assistant', 'Provider response', 'turn-provider'),
+    ];
+    const providerSnapshot = codexConversationSnapshot(providerMessages, {
+      activeConversationId: 'thread-provider',
+      activeTurnId: 'turn-provider',
+      turnIds: ['turn-provider'],
+      turns: [{
+        id: 'turn-provider', status: 'inProgress', error: null, willRetry: false,
+        startedAt: '2026-09-06T00:00:00.000Z', completedAt: null, durationMs: null,
+      }],
+      busy: true,
+      approvals: [{
+        id: 'approval-provider',
+        kind: 'command',
+        conversationId: 'thread-provider',
+        turnId: 'turn-provider',
+        itemId: 'item-provider',
+        command: 'npm test',
+        cwd: '/tmp/project',
+        title: 'Run tests',
+      }],
+    });
+
+    const wrapper = mountShell({
+      snapshot,
+      codexConversationSnapshot: providerSnapshot,
+    });
+    const state = conversationControllerState(wrapper);
+
+    expect(state.identity.messages).toStrictEqual(providerMessages);
+    expect(state.identity.turns).toStrictEqual(providerSnapshot.turns);
+    expect(state.identity.activeTurnId).toBe('turn-provider');
+    expect(state.identity.busy).toBe(true);
+    expect(state.thread?.approvals).toStrictEqual(providerSnapshot.approvals);
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
+  });
+
+  it('uses the provider-owned Claude conversation', () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'claude';
+    agent.backendDefaults = { kind: 'claude' };
+    agent.backendSession = { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' };
+    const messages: RendererMessage[] = [{
+      id: 'claude-owned', agentId: agent.id, role: 'assistant', status: 'complete', turnId: 'turn-1',
+      createdAt: '2026-09-06T00:00:01.000Z', parts: [{ type: 'text', text: 'Provider owned' }],
+    }];
+    const providerSnapshot = claudeConversationSnapshot(messages, {
+      activeTurnId: 'turn-1',
+      turnIds: ['turn-1'],
+      turns: [{
+        id: 'turn-1', status: 'inProgress', error: null, willRetry: false,
+        startedAt: '2026-09-06T00:00:01.000Z', completedAt: null, durationMs: null,
+      }],
+      busy: true,
+    });
+
+    const state = conversationControllerState(mountShell({
+      snapshot,
+      claudeConversationSnapshot: providerSnapshot,
+    }));
+
+    expect(state.identity.messages).toStrictEqual(messages);
+    expect(state.identity.turns).toStrictEqual(providerSnapshot.turns);
+    expect(state.identity.busy).toBe(true);
+  });
+
+  it('forwards an edited terminal Codex prompt with its authoritative turn id', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-edit' };
+    const providerMessages = [
+      codexTextMessage('user-turn-edit', 'user', 'Original prompt', 'turn-edit'),
+      codexTextMessage('assistant-turn-edit', 'assistant', 'Original response', 'turn-edit'),
+    ];
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      codexConversationSnapshot: codexConversationSnapshot(providerMessages, {
+        activeConversationId: 'thread-edit',
+        turnIds: ['turn-edit'],
+        turns: [{
+          id: 'turn-edit', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-09-06T00:00:00.000Z', completedAt: '2026-09-06T00:00:01.000Z', durationMs: 1_000,
+        }],
+      }),
+    });
+
+    await wrapper.get('button[aria-label="Edit"]').trigger('click');
+    await wrapper.get('textarea[aria-label="Edit prompt"]').setValue('Edited prompt');
+    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
+
+    expect(wrapper.emitted('edit-turn')).toStrictEqual([[
+      { content: 'Edited prompt', turnId: 'turn-edit' },
+    ]]);
+  });
+
+  it('keeps the asynchronous edit action attached so the SDK renders failures', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-edit' };
+    const editTurnAction = vi.fn().mockRejectedValue(new Error('Codex rollback timed out'));
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      editTurnAction,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('user-turn-edit', 'user', 'Original prompt', 'turn-edit'),
+        codexTextMessage('assistant-turn-edit', 'assistant', 'Original response', 'turn-edit'),
+      ], {
+        activeConversationId: 'thread-edit',
+        turnIds: ['turn-edit'],
+        turns: [{
+          id: 'turn-edit', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-09-06T00:00:00.000Z', completedAt: '2026-09-06T00:00:01.000Z', durationMs: 1_000,
+        }],
+      }),
+    });
+
+    await wrapper.get('button[aria-label="Edit"]').trigger('click');
+    await wrapper.get('textarea[aria-label="Edit prompt"]').setValue('Edited prompt');
+    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
+    await flushPromises();
+
+    expect(editTurnAction).toHaveBeenCalledWith({ content: 'Edited prompt', turnId: 'turn-edit' });
+    expect(wrapper.get('[role="alert"]').text()).toBe('Codex rollback timed out');
+  });
+
+  it('preserves promise-returning turn mutation callbacks at the SDK controller boundary', async () => {
+    const deleteTurnAction = vi.fn().mockResolvedValue(undefined);
+    const editTurnAction = vi.fn().mockResolvedValue(undefined);
+    const retryTurnAction = vi.fn().mockResolvedValue(undefined);
+    const actions = conversationControllerActions(mountShell({
+      deleteTurnAction,
+      editTurnAction,
+      retryTurnAction,
+    }));
+
+    await actions.deleteTurn?.('turn-delete');
+    await actions.editTurn?.({ content: 'Edited', turnId: 'turn-edit' });
+    await actions.retryTurn?.('turn-retry');
+
+    expect(deleteTurnAction).toHaveBeenCalledWith('turn-delete');
+    expect(editTurnAction).toHaveBeenCalledWith({ content: 'Edited', turnId: 'turn-edit' });
+    expect(retryTurnAction).toHaveBeenCalledWith('turn-retry');
+  });
+
   it('shows passive connection progress while discovering existing ChatGPT credentials', async () => {
     let resolveAuthentication!: (value: {
       account: { type: 'apiKey' };
@@ -186,7 +341,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0] ?? null,
-        messages: [],
         isLoading: false,
         isSending: false,
         connectionState: { status: 'reconnecting', detail: 'socket closed' },
@@ -255,7 +409,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: snapshot.messages,
         isLoading: false,
         isSending: false,
       },
@@ -288,20 +441,23 @@ describe('AppShell authentication and conversation', () => {
       updatedAt: '2026-08-01T00:00:00.000Z',
     };
     activeAgent.plan = plan;
-    const messages: RendererMessage[] = [{
-      id: 'assistant-plan',
-      agentId: activeAgent.id,
-      role: 'assistant',
-      status: 'streaming',
-      turnId: 'turn-plan',
-      parts: [],
-      createdAt: '2026-08-01T00:00:00.000Z',
-    }];
+    activeAgent.backendSession = { kind: 'codex', threadId: 'thread-plan' };
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
         activeAgent,
-        messages,
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('assistant-plan', 'assistant', '', 'turn-plan'),
+        ], {
+          activeConversationId: 'thread-plan',
+          activeTurnId: 'turn-plan',
+          turnIds: ['turn-plan'],
+          turns: [{
+            id: 'turn-plan', status: 'inProgress', error: null, willRetry: false,
+            startedAt: '2026-08-01T00:00:00.000Z', completedAt: null, durationMs: null,
+          }],
+          busy: true,
+        }),
         isLoading: false,
         isSending: true,
       },
@@ -335,7 +491,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isConversationLoading: true,
         isSending: false,
@@ -348,19 +503,46 @@ describe('AppShell authentication and conversation', () => {
 
     await wrapper.setProps({
       isConversationLoading: false,
-      messages: [{
-        id: 'assistant-newer-turn',
-        agentId: activeAgent.id,
-        role: 'assistant',
-        status: 'complete',
-        turnId: 'turn-newer',
-        parts: [{ type: 'text', text: 'Newer work completed.' }],
-        createdAt: '2026-08-02T00:00:00.000Z',
-      }],
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('assistant-newer-turn', 'assistant', 'Newer work completed.', 'turn-newer'),
+      ], {
+        activeConversationId: 'thread-persisted',
+        turnIds: ['turn-newer'],
+        turns: [{
+          id: 'turn-newer', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-08-02T00:00:00.000Z', completedAt: '2026-08-02T00:00:01.000Z', durationMs: 1_000,
+        }],
+      }),
     } as Record<string, unknown>);
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
     expect(wrapper.find('.conversation-plan').exists()).toBe(false);
+  });
+
+  it('disables only an empty failed conversation and forwards retry', async () => {
+    const retryAgentHistory = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      isConversationLoadFailed: true,
+      retryAgentHistory,
+    });
+
+    expect(conversationControllerState(wrapper).identity.disabled).toBe(true);
+    expect(wrapper.getComponent({ name: 'ConversationPane' }).props('historyLoadFailed')).toBe(true);
+
+    wrapper.getComponent({ name: 'ConversationPane' }).vm.$emit('retry-history');
+    await flushPromises();
+    expect(retryAgentHistory).toHaveBeenCalledOnce();
+
+    const snapshot = createInitialSnapshot();
+    const withMessages = mountShell({
+      snapshot,
+      isConversationLoadFailed: true,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('message-existing', 'assistant', 'Keep me visible.'),
+      ]),
+    });
+    expect(conversationControllerState(withMessages).identity.disabled).toBe(false);
+    expect(withMessages.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
   });
 
   it('forwards prompts from the composer', async () => {
@@ -369,7 +551,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [],
         isLoading: false,
         isSending: false,
       },
@@ -385,6 +566,79 @@ describe('AppShell authentication and conversation', () => {
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
+  });
+
+  it('uses the promise-returning prompt action when the host provides one', async () => {
+    const snapshot = createInitialSnapshot();
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        isLoading: false,
+        isSending: false,
+        sendPromptAction,
+      },
+      global: {
+        plugins: [ElementPlus, i18n],
+      },
+    });
+
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = 'hello';
+    await editor.trigger('input');
+    await nextTick();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(sendPromptAction).toHaveBeenCalledWith('hello', undefined);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+  });
+
+  it('keeps the first submitted prompt visible while its Codex conversation is created', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    delete agent.backendSession;
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      sendPromptAction,
+    });
+
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = 'Create the first turn';
+    await editor.trigger('input');
+    await nextTick();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+
+    agent.backendSession = { kind: 'codex', threadId: 'thread-created' };
+    await wrapper.setProps({
+      snapshot: { ...snapshot },
+      activeAgent: agent,
+      codexConversationSnapshot: codexConversationSnapshot([], {
+        activeConversationId: 'thread-created',
+      }),
+    });
+
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+
+    await wrapper.setProps({
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('authoritative-user', 'user', 'Create the first turn', 'turn-created'),
+      ], {
+        activeConversationId: 'thread-created',
+        turnIds: ['turn-created'],
+      }),
+    });
+
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.text().match(/Create the first turn/g)).toHaveLength(1);
   });
 
   it('owns the SDK conversation controller state and actions at the shell boundary', async () => {
@@ -405,13 +659,22 @@ describe('AppShell authentication and conversation', () => {
     const activeAgent = snapshot.agents[0];
     if (!activeAgent) throw new Error('Expected seeded agent.');
     activeAgent.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const providerSnapshot = codexConversationSnapshot([], {
+      activeConversationId: 'thread-dina',
+      plugins: [{
+        id: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+        name: 'dropbox',
+        displayName: 'Dropbox',
+        enabled: true,
+      }],
+    });
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
         activeAgent,
-        messages: snapshot.messages,
         isLoading: false,
         isSending: false,
+        codexConversationSnapshot: providerSnapshot,
         selectedModelId: 'gpt-5',
         selectedReasoningEffort: 'high',
         selectedServiceTier: 'fast',
@@ -429,9 +692,10 @@ describe('AppShell authentication and conversation', () => {
     const state = conversationControllerState(wrapper);
     expect(state.identity).toMatchObject({
       conversationKey: 'codex:thread-dina',
-      messages: snapshot.messages,
+      messages: providerSnapshot.messages,
       busy: false,
       disabled: false,
+      activeTurnId: null,
     });
     expect(state.composer).toMatchObject({
       selectedModelId: 'gpt-5',
@@ -462,23 +726,31 @@ describe('AppShell authentication and conversation', () => {
         };
       }),
     }]);
-    expect(state.policy?.canForkMessage).toBe(true);
+    expect(state.policy?.canForkTurn).toBe(true);
 
-    const updatedMessages: RendererMessage[] = [{
-      id: 'controller-reactive-message',
-      agentId: activeAgent.id,
-      role: 'assistant',
-      status: 'complete',
-      createdAt: '2026-08-04T00:00:00.000Z',
-      parts: [{ type: 'text', text: 'Updated through the stable controller.' }],
-    }];
-    await wrapper.setProps({ messages: updatedMessages } as Record<string, unknown>);
+    const updatedMessages = [codexTextMessage(
+      'controller-reactive-message', 'assistant', 'Updated through the stable controller.', 'turn-controller',
+    )];
+    await wrapper.setProps({
+      isSending: true,
+      codexConversationSnapshot: codexConversationSnapshot(updatedMessages, {
+        activeConversationId: 'thread-dina',
+        activeTurnId: 'turn-controller',
+        turnIds: ['turn-controller'],
+        turns: [{
+          id: 'turn-controller', status: 'inProgress', error: null, willRetry: false,
+          startedAt: '2026-08-04T00:00:00.000Z', completedAt: null, durationMs: null,
+        }],
+        busy: true,
+      }),
+    } as Record<string, unknown>);
     expect(conversationControllerState(wrapper).identity.messages).toStrictEqual(updatedMessages);
+    expect(conversationControllerState(wrapper).identity.activeTurnId).toBe('turn-controller');
     expect(wrapper.text()).toContain('Updated through the stable controller.');
 
     const actions = conversationControllerActions(wrapper);
-    await actions.forkMessage?.(3);
-    expect(wrapper.emitted('fork-message')).toStrictEqual([[3]]);
+    await actions.forkTurn?.('turn-3');
+    expect(wrapper.emitted('fork-turn')).toStrictEqual([['turn-3']]);
     await actions.updateQueuedPrompt?.('queued-1', 'Edited queued prompt');
     await actions.steerQueuedPrompt?.('queued-1', 'Edited steer');
     expect(wrapper.emitted('update-queued-prompt')).toStrictEqual([['queued-1', 'Edited queued prompt']]);
@@ -593,7 +865,6 @@ describe('AppShell authentication and conversation', () => {
       props: {
         snapshot,
         activeAgent,
-        messages: [],
         isLoading: false,
         isSending: false,
         backendCapabilities: claudeBackendCapabilities,

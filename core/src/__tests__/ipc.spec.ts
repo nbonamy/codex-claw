@@ -1,5 +1,52 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { AppCommand, AppSnapshot, AppSnapshotMetadata, DesktopUpdateStatus, LaunchChatGptAppInput, LaunchChatGptAppResult, MainToRendererEvent, OpenInApplication, RendererSendPromptOptions } from '../contracts';
+import type {
+  AccountRateLimits,
+  Agent,
+  AgentBackend,
+  AgentContextUsage,
+  AgentCreationProgress,
+  AgentFileActivity,
+  AgentGitStatus,
+  AgentGitOperationProgress,
+  AgentStatus,
+  AppCommand,
+  AppSnapshot,
+  BackendApprovalDecision,
+  BackendApprovalRequest,
+  BackendApprovalScope,
+  BackendConnectionState,
+  BackendModelOption,
+  BackendRuntimeStatus,
+  BackendSkillSummary,
+  BrowserAnnotation,
+  CelebrationKind,
+  ClientRequest,
+  CodexThreadSettings,
+  DesktopUpdateStatus,
+  DevicePairingStatus,
+  LaunchChatGptAppInput,
+  LaunchChatGptAppResult,
+  MainToRendererEvent,
+  OpenInApplication,
+  PromptAttachment,
+  RendererMessage,
+  RendererToolPart,
+  RendererToolPartUpdate,
+  RendererSendPromptOptions,
+  SendPromptOptions,
+  SidePanelGitDiffRequest,
+  SidePanelMarkdownRequest,
+  SubagentActivityChange,
+  SubagentIdentityChange,
+  SubagentOperationChange,
+  SubagentStatusChange,
+  ThreadGoal,
+  ThreadPlanStep,
+  TurnGitDiff,
+  WorkBacklogAssignment,
+  WorkBacklogAssignmentPolicy,
+  WorkBacklogAssignmentStatus,
+} from '../contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
@@ -72,6 +119,7 @@ describe('ipc channels', () => {
       deleteAutomation: 'automation:delete',
       listAgentConversations: 'conversation:list',
       resumeAgentConversation: 'conversation:resume',
+      compressAgentSession: 'conversation:compress',
       readConversationMessages: 'conversation:messages:read',
       createAgent: 'agent:create',
       createQuickChat: 'agent:quick-chat:create',
@@ -116,10 +164,10 @@ describe('ipc channels', () => {
       steerQueuedPrompt: 'agent:steer-queued-prompt',
       updateQueuedPrompt: 'agent:update-queued-prompt',
       interruptAgent: 'agent:interrupt',
-      deleteMessage: 'message:delete',
+      deleteTurn: 'turn:delete',
       deleteQueuedPrompt: 'agent:delete-queued-prompt',
-      editMessage: 'message:edit',
-      retryMessage: 'message:retry',
+      editTurn: 'turn:edit',
+      retryTurn: 'turn:retry',
       browserOpen: 'browser:open',
       browserOpenVisualization: 'browser:visualization:open',
       browserNavigate: 'browser:navigate',
@@ -140,12 +188,322 @@ describe('ipc channels', () => {
   });
 
   it('derives request and event payloads from the preload API contract', () => {
+    type AgentScopedEventContext = {
+      agentId: string;
+      backend?: AgentBackend;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type OptionalEventContext = {
+      agentId?: string;
+      backend?: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type ClientRequestResolvedEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type AgentOnlyEventContext = {
+      agentId: string;
+      backend?: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type CodexThreadEventContext = {
+      agentId: string;
+      backend: 'codex';
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type AgentThreadEventContext = {
+      agentId: string;
+      backend?: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type BackendThreadEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type ClaudeSessionEventContext = {
+      agentId: string;
+      backend: 'claude';
+      backendSessionId: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId?: string;
+      source?: 'backend' | 'client';
+    };
+    type ClaudeModeEventContext = {
+      agentId: string;
+      backend: 'claude';
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId: string;
+      source?: 'backend' | 'client';
+    };
+    type TurnEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId?: string;
+      turnId: string;
+      source?: 'backend' | 'client';
+    };
+    type ThreadTurnEventContext = {
+      agentId: string;
+      backend: AgentBackend;
+      backendSessionId?: string;
+      snapshot?: AppSnapshot;
+      threadId: string;
+      turnId: string;
+      source?: 'backend' | 'client';
+    };
+
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
-      .toEqualTypeOf<AppSnapshotMetadata>();
+      .toEqualTypeOf<AppSnapshot>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.compressAgentSession]['args']>()
+      .toEqualTypeOf<[agentId: string]>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.compressAgentSession]['result']>()
+      .toEqualTypeOf<AppSnapshot>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()
       .toEqualTypeOf<MainToRendererEvent>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'client.connectionChanged' }>['payload']>()
+      .toEqualTypeOf<BackendConnectionState>();
+    type SnapshotUpdatedEvent = Extract<MainToRendererEvent, { type: 'snapshot.updated' }>;
+    expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshot>();
+    expectTypeOf<Pick<
+      SnapshotUpdatedEvent,
+      keyof OptionalEventContext
+    >>().toEqualTypeOf<OptionalEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'backend.statusChanged' }>['payload']>()
+      .toEqualTypeOf<BackendRuntimeStatus>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'backend.statusChanged' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'account.rateLimitsUpdated' }>['payload']>()
+      .toEqualTypeOf<AccountRateLimits | { rateLimits: AccountRateLimits }>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'account.rateLimitsUpdated' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'models.changed' }>['payload']>()
+      .toEqualTypeOf<{ models: BackendModelOption[] }>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'models.changed' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'skills.changed' }>['payload']>()
+      .toEqualTypeOf<{
+        cwd: string | null;
+        status: 'loaded';
+        skills: BackendSkillSummary[];
+      }>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'skills.changed' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'devicePairing.statusChanged' }>['payload']>()
+      .toEqualTypeOf<DevicePairingStatus>();
+    expectTypeOf<Pick<Extract<MainToRendererEvent, { type: 'devicePairing.statusChanged' }>, 'backend'>>()
+      .toEqualTypeOf<{ backend?: AgentBackend }>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'sidePanel.markdownRequested' }>['payload']>()
+      .toEqualTypeOf<SidePanelMarkdownRequest>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'sidePanel.markdownRequested' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'sidePanel.gitDiffRequested' }>['payload']>()
+      .toEqualTypeOf<SidePanelGitDiffRequest>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'sidePanel.gitDiffRequested' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'celebration.requested' }>['payload']>()
+      .toEqualTypeOf<{ kind: CelebrationKind }>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'celebration.requested' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'agentCreation.progress' }>['payload']>()
+      .toEqualTypeOf<AgentCreationProgress>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'agentCreation.progress' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'git.operationProgress' }>['payload']>()
+      .toEqualTypeOf<AgentGitOperationProgress>();
+    expectTypeOf<Pick<
+      Extract<MainToRendererEvent, { type: 'git.operationProgress' }>,
+      keyof AgentScopedEventContext
+    >>().toEqualTypeOf<AgentScopedEventContext>();
+    expectTypeOf<Extract<MainToRendererEvent, { type: 'browser.annotationCreated' }>['payload']>()
+      .toEqualTypeOf<BrowserAnnotation>();
+    type WorkBacklogAssignmentUpdatedEvent = Extract<
+      MainToRendererEvent,
+      { type: 'workBacklog.assignmentUpdated' }
+    >;
+    expectTypeOf<WorkBacklogAssignmentUpdatedEvent['payload']>()
+      .toEqualTypeOf<
+        Omit<WorkBacklogAssignment, 'policy' | 'status'> & {
+          policy?: WorkBacklogAssignmentPolicy;
+          status: WorkBacklogAssignmentStatus | 'working';
+        }
+      >();
+    expectTypeOf<Pick<WorkBacklogAssignmentUpdatedEvent, keyof OptionalEventContext>>()
+      .toEqualTypeOf<OptionalEventContext>();
+    type ClientRequestResolvedEvent = Extract<MainToRendererEvent, { type: 'clientRequest.resolved' }>;
+    expectTypeOf<ClientRequestResolvedEvent['payload']>().toEqualTypeOf<Pick<ClientRequest, 'id'>>();
+    expectTypeOf<Pick<ClientRequestResolvedEvent, keyof ClientRequestResolvedEventContext>>()
+      .toEqualTypeOf<ClientRequestResolvedEventContext>();
+    type AgentUpdatedEvent = Extract<MainToRendererEvent, { type: 'agent.updated' }>;
+    expectTypeOf<AgentUpdatedEvent['payload']>()
+      .toEqualTypeOf<
+        Omit<Partial<Agent>, 'id' | 'statusText'> & {
+          id: string;
+          statusText?: string | null;
+        }
+      >();
+    expectTypeOf<Pick<AgentUpdatedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentStatusChangedEvent = Extract<MainToRendererEvent, { type: 'agent.statusChanged' }>;
+    expectTypeOf<AgentStatusChangedEvent['payload']>().toEqualTypeOf<AgentStatus>();
+    expectTypeOf<Pick<AgentStatusChangedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type ThreadStartedEvent = Extract<MainToRendererEvent, { type: 'thread.started' }>;
+    type ClaudeThreadStartedEvent = Extract<ThreadStartedEvent, { backend: 'claude' }>;
+    type CodexThreadStartedEvent = Exclude<ThreadStartedEvent, ClaudeThreadStartedEvent>;
+    expectTypeOf<CodexThreadStartedEvent['payload']>().toEqualTypeOf<{ cwd?: string }>();
+    expectTypeOf<Pick<CodexThreadStartedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    expectTypeOf<ClaudeThreadStartedEvent['payload']>().toEqualTypeOf<{
+      sessionId: string;
+      transport: 'stdio';
+      model?: string;
+      reasoningEffort?: string;
+    }>();
+    expectTypeOf<Pick<ClaudeThreadStartedEvent, keyof ClaudeSessionEventContext>>()
+      .toEqualTypeOf<ClaudeSessionEventContext>();
+    type ThreadSettingsUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.settingsUpdated' }>;
+    expectTypeOf<ThreadSettingsUpdatedEvent['payload']>()
+      .toEqualTypeOf<{ threadSettings: CodexThreadSettings }>();
+    expectTypeOf<Pick<ThreadSettingsUpdatedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    type ThreadModeUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.modeUpdated' }>;
+    type ClaudeThreadModeUpdatedEvent = Extract<ThreadModeUpdatedEvent, { backend: 'claude' }>;
+    type CodexThreadModeUpdatedEvent = Exclude<ThreadModeUpdatedEvent, ClaudeThreadModeUpdatedEvent>;
+    expectTypeOf<CodexThreadModeUpdatedEvent['payload']>()
+      .toEqualTypeOf<{ mode: 'default' | 'plan' }>();
+    expectTypeOf<Pick<CodexThreadModeUpdatedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    expectTypeOf<ClaudeThreadModeUpdatedEvent['payload']>().toEqualTypeOf<{
+      mode: 'default' | 'plan';
+      provider: 'claude';
+      permissionMode: string;
+    }>();
+    expectTypeOf<Pick<ClaudeThreadModeUpdatedEvent, keyof ClaudeModeEventContext>>()
+      .toEqualTypeOf<ClaudeModeEventContext>();
+    type ThreadGoalUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.goalUpdated' }>;
+    expectTypeOf<ThreadGoalUpdatedEvent['payload']>()
+      .toEqualTypeOf<ThreadGoal | { goal: ThreadGoal }>();
+    expectTypeOf<Pick<ThreadGoalUpdatedEvent, keyof AgentThreadEventContext>>()
+      .toEqualTypeOf<AgentThreadEventContext>();
+    type ThreadGoalClearedEvent = Extract<MainToRendererEvent, { type: 'thread.goalCleared' }>;
+    expectTypeOf<ThreadGoalClearedEvent['payload']>().toEqualTypeOf<Record<string, never>>();
+    expectTypeOf<Pick<ThreadGoalClearedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type ThreadTokenUsageUpdatedEvent = Extract<MainToRendererEvent, { type: 'thread.tokenUsageUpdated' }>;
+    expectTypeOf<ThreadTokenUsageUpdatedEvent['payload']>()
+      .toEqualTypeOf<AgentContextUsage | { contextUsage: AgentContextUsage }>();
+    expectTypeOf<Pick<ThreadTokenUsageUpdatedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentOperationChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.operationChanged' }>;
+    expectTypeOf<SubagentOperationChangedEvent['payload']>().toEqualTypeOf<SubagentOperationChange>();
+    expectTypeOf<Pick<SubagentOperationChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentActivityChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.activityChanged' }>;
+    expectTypeOf<SubagentActivityChangedEvent['payload']>().toEqualTypeOf<SubagentActivityChange>();
+    expectTypeOf<Pick<SubagentActivityChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentIdentityChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.identityChanged' }>;
+    expectTypeOf<SubagentIdentityChangedEvent['payload']>().toEqualTypeOf<SubagentIdentityChange>();
+    expectTypeOf<Pick<SubagentIdentityChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type SubagentStatusChangedEvent = Extract<MainToRendererEvent, { type: 'subagent.statusChanged' }>;
+    expectTypeOf<SubagentStatusChangedEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
+    expectTypeOf<Pick<SubagentStatusChangedEvent, keyof BackendThreadEventContext>>()
+      .toEqualTypeOf<BackendThreadEventContext>();
+    type AgentPromptQueuedEvent = Extract<MainToRendererEvent, { type: 'agent.promptQueued' }>;
+    expectTypeOf<AgentPromptQueuedEvent['payload']>().toEqualTypeOf<{
+      id: string;
+      text: string;
+      options?: SendPromptOptions;
+      submitted?: boolean;
+    }>();
+    expectTypeOf<Pick<AgentPromptQueuedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentPromptRetryScheduledEvent = Extract<MainToRendererEvent, { type: 'agent.promptRetryScheduled' }>;
+    expectTypeOf<AgentPromptRetryScheduledEvent['payload']>().toEqualTypeOf<{
+      id: string;
+      attempts: number;
+      lastError: string;
+      retryAt?: string;
+    }>();
+    expectTypeOf<Pick<AgentPromptRetryScheduledEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type AgentPromptDequeuedEvent = Extract<MainToRendererEvent, { type: 'agent.promptDequeued' }>;
+    expectTypeOf<AgentPromptDequeuedEvent['payload']>().toEqualTypeOf<{ ids: string[] }>();
+    expectTypeOf<Pick<AgentPromptDequeuedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type DiffUpdatedEvent = Extract<MainToRendererEvent, { type: 'diff.updated' }>;
+    expectTypeOf<DiffUpdatedEvent['payload']>()
+      .toEqualTypeOf<Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>>();
+    expectTypeOf<Pick<DiffUpdatedEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type FileActivityEvent = Extract<MainToRendererEvent, { type: 'file.activity' }>;
+    expectTypeOf<FileActivityEvent['payload']>()
+      .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
+    expectTypeOf<Pick<FileActivityEvent, keyof ThreadTurnEventContext>>()
+      .toEqualTypeOf<ThreadTurnEventContext>();
+    type GitStatusUpdatedEvent = Extract<MainToRendererEvent, { type: 'git.statusUpdated' }>;
+    expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
+    expectTypeOf<Pick<GitStatusUpdatedEvent, keyof AgentOnlyEventContext>>()
+      .toEqualTypeOf<AgentOnlyEventContext>();
+    type BackendApprovalRequestedEvent = Extract<MainToRendererEvent, { type: 'backendApproval.requested' }>;
+    expectTypeOf<BackendApprovalRequestedEvent['payload']>()
+      .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
+    expectTypeOf<Pick<BackendApprovalRequestedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
+    type BackendApprovalResolvedEvent = Extract<MainToRendererEvent, { type: 'backendApproval.resolved' }>;
+    expectTypeOf<BackendApprovalResolvedEvent['payload']>().toEqualTypeOf<{
+      approval: BackendApprovalRequest;
+      decision: BackendApprovalDecision | null;
+      scope: BackendApprovalScope | null;
+      reason: 'host' | 'server' | 'conversation_closed' | 'conversation_removed' | 'surface_disconnected';
+    }>();
+    expectTypeOf<Pick<BackendApprovalResolvedEvent, keyof CodexThreadEventContext>>()
+      .toEqualTypeOf<CodexThreadEventContext>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()

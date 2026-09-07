@@ -461,7 +461,6 @@ describe('AppShell work routing', () => {
       props: {
         snapshot,
         activeAgent: null,
-        messages: [],
         isLoading: false,
         isSending: false,
         connectWorkProvider,

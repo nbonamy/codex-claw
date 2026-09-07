@@ -11,9 +11,10 @@ import type {
   AgentGitWorkflow,
   AppSnapshot,
   ClientState,
-  MainToRendererEvent,
 } from '../contracts';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
+
+export type { ClawBackendEvent } from './events';
 
 export type ClawRpcId = string | number;
 
@@ -63,20 +64,6 @@ export type ClawSnapshotGetResult = {
   snapshot: AppSnapshot;
   lastEventSeq: number;
   clientState: ClientState;
-};
-
-export type ClawBackendEvent = {
-  seq: number;
-  type: MainToRendererEvent['type'];
-  agentId?: string;
-  backend?: MainToRendererEvent extends { backend?: infer Backend } ? Backend : never;
-  backendSessionId?: string;
-  threadId?: string;
-  turnId?: string;
-  payload: unknown;
-  occurredAt: string;
-  clientState?: ClientState;
-  snapshot?: AppSnapshot;
 };
 
 export type ClawBackendRequestMap = {

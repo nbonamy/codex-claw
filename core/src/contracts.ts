@@ -1,13 +1,292 @@
-export type AppTextDescriptor = {
-  key: string;
-  params?: Record<string, string | number>;
-};
+import type {
+  AgentBackend,
+  AppText,
+  ApprovalPreset,
+} from './contracts/shared';
+import type {
+  CodexConversationEvent,
+  CodexConversationSnapshot,
+} from '@codex-app-sdk/core/surface';
+import type {
+  ClaudeConversationEvent,
+  ClaudeConversationSnapshot,
+} from './contracts/claude-conversation';
+import type {
+  AgentCloseInput,
+  AgentGitBranchInput,
+  AgentGitCommitInput,
+  AgentGitDiffSection,
+  AgentGitMergeInput,
+  AgentGitMessageGenerationInput,
+  AgentGitMessageGenerationResult,
+  AgentGitOperationProgress,
+  AgentGitPullRequestInput,
+  AgentGitPushInput,
+  AgentGitStageInput,
+  AgentGitStatus,
+  AgentGitWorkflow,
+  AgentPullRequestTracking,
+  TurnGitDiff,
+} from './contracts/git';
+import type {
+  AgentFilePreviewResult,
+  AgentFileSearchItem,
+  AgentWorkspaceIdentity,
+  CloneSourceRepositoryInput,
+  CreateSourceWorktreeInput,
+  SourceBranch,
+  SourceFolderListInput,
+  SourceFolderListing,
+  SourceFolderState,
+  SourceRepository,
+  SourceWorktree,
+} from './contracts/workspace';
+import type {
+  AddSshConnectionInput,
+  DevicePairingSession,
+  DevicePairingStatus,
+  PairedDevice,
+  RemoteConnectionsState,
+  SshHostCandidate,
+  UpdateRemoteConnectionInput,
+} from './contracts/connections';
+import type {
+  AccountRateLimits,
+  BackendConnectionState,
+  BackendDefaults,
+  BackendModelOption,
+  BackendPluginSummary,
+  BackendRuntimeStatus,
+  BackendSession,
+  BackendSkillSummary,
+  CodexAuthentication,
+  CodexChatGptLogin,
+  CodexThreadSettings,
+} from './contracts/backend';
+import type {
+  AgentFileActivity,
+  AgentHistoryLoadResult,
+  AgentContextUsage,
+  AgentQueuedPrompt,
+  AgentSubagentTree,
+  AskUserAnswers,
+  AskUserQuestion,
+  AskUserQuestionOption,
+  AskUserRequest,
+  BackendConversationRef,
+  ClientRequest,
+  ClientRequestResponse,
+  ConfirmToolRequest,
+  ConversationSummary,
+  PromptAttachment,
+  RendererMessage,
+  RendererMessagePart,
+  RendererSendPromptOptions,
+  RendererToolPart,
+  RendererToolPartUpdate,
+  SendPromptOptions,
+  SubagentActivityChange,
+  SubagentIdentityChange,
+  SubagentOperationChange,
+  SubagentStatusChange,
+  ThreadGoal,
+  ThreadPlan,
+  ThreadPlanStep,
+  ToolConfirmationDecision,
+} from './contracts/conversation';
+import type {
+  Automation,
+  AutomationLocation,
+  CreateAutomationInput,
+  GlobalWorkItemQuery,
+  UpdateAutomationInput,
+  WorkBacklogAssignment,
+  WorkBacklogAssignmentPolicy,
+  WorkBacklogAssignmentStatus,
+  WorkBacklogConfigurationInput,
+  WorkBacklogState,
+  WorkItem,
+  WorkItemPage,
+  WorkItemQuery,
+  WorkProviderAuthorization,
+  WorkProviderKind,
+  WorkProviderSettings,
+  WorkRepository,
+} from './contracts/work';
 
-export type AppText = string | AppTextDescriptor;
+export type {
+  AgentBackend,
+  AppText,
+  AppTextDescriptor,
+  ApprovalPreset,
+  ReasoningEffort,
+} from './contracts/shared';
+export type {
+  AgentCloseInput,
+  AgentGitBranchInput,
+  AgentGitCommitInput,
+  AgentGitDiff,
+  AgentGitDiffScope,
+  AgentGitDiffSection,
+  AgentGitFile,
+  AgentGitMergeInput,
+  AgentGitMessageGenerationInput,
+  AgentGitMessageGenerationResult,
+  AgentGitOperationProgress,
+  AgentGitPullRequest,
+  AgentGitPullRequestInput,
+  AgentGitPushInput,
+  AgentGitStageInput,
+  AgentGitStatus,
+  AgentGitWorkflow,
+  AgentPullRequestTracking,
+  TurnGitDiff,
+} from './contracts/git';
+export type {
+  AgentFilePreviewResult,
+  AgentFileSearchItem,
+  AgentWorkspaceIdentity,
+  CloneSourceRepositoryInput,
+  CreateSourceWorktreeInput,
+  SourceBranch,
+  SourceFolderEntry,
+  SourceFolderListInput,
+  SourceFolderListing,
+  SourceFolderState,
+  SourceRepository,
+  SourceWorktree,
+} from './contracts/workspace';
+export type {
+  AddSshConnectionInput,
+  DevicePairingSession,
+  DevicePairingStatus,
+  PairedDevice,
+  RemoteConnection,
+  RemoteConnectionStatus,
+  RemoteConnectionTransport,
+  RemoteConnectionsState,
+  SshHostCandidate,
+  UpdateRemoteConnectionInput,
+} from './contracts/connections';
+export type {
+  AccountRateLimitWindow,
+  AccountRateLimits,
+  BackendCapabilities,
+  BackendCommandSummary,
+  BackendConnectionState,
+  BackendDefaults,
+  BackendModelOption,
+  BackendPermissionModeOption,
+  BackendPlanModeSupport,
+  BackendPluginSummary,
+  BackendReasoningEffortOption,
+  BackendRuntimeStatus,
+  BackendServiceTier,
+  BackendSession,
+  BackendSkillSummary,
+  CodexAccount,
+  CodexApprovalPreset,
+  CodexApprovalsReviewer,
+  CodexAuthentication,
+  CodexChatGptLogin,
+  CodexThreadSettings,
+} from './contracts/backend';
+export {
+  subagentActivityKinds,
+  subagentOperationKinds,
+  subagentOperationLifecycles,
+  subagentOperationStatuses,
+  subagentStatuses,
+} from './contracts/conversation';
+export type {
+  ClaudeConversationEvent,
+  ClaudeConversationSnapshot,
+  ClaudeConversationTurn,
+} from './contracts/claude-conversation';
+export type {
+  AgentFileActivity,
+  AgentHistoryLoadResult,
+  AgentContextUsage,
+  AgentQueuedPrompt,
+  AgentSubagentTree,
+  AskUserAnswers,
+  AskUserQuestion,
+  AskUserQuestionOption,
+  AskUserRequest,
+  BackendConversationRef,
+  BackendPromptOptions,
+  ClientRequest,
+  ClientRequestResponse,
+  ConfirmToolRequest,
+  ConversationFileLink,
+  ConversationSummary,
+  PromptAttachment,
+  PromptSkillInput,
+  RendererMessage,
+  RendererMessageAttachment,
+  RendererMessageMedia,
+  RendererMessagePart,
+  RendererPromptAttachment,
+  RendererSendPromptOptions,
+  RendererToolPart,
+  RendererToolPartUpdate,
+  SendPromptOptions,
+  SubagentActivity,
+  SubagentActivityChange,
+  SubagentActivityKind,
+  SubagentIdentityChange,
+  SubagentNode,
+  SubagentOperation,
+  SubagentOperationChange,
+  SubagentOperationKind,
+  SubagentOperationLifecycle,
+  SubagentOperationStatus,
+  SubagentStatus,
+  SubagentStatusChange,
+  ThreadGoal,
+  ThreadGoalStatus,
+  ThreadPlan,
+  ThreadPlanKind,
+  ThreadPlanStatus,
+  ThreadPlanStep,
+  ThreadPlanStepStatus,
+  ToolConfirmationDecision,
+} from './contracts/conversation';
+export type {
+  Automation,
+  AutomationExecutionCreatedAgent,
+  AutomationExecutionLogEntry,
+  AutomationExecutionStatus,
+  AutomationLocation,
+  AutomationRepositoryTarget,
+  AutomationSchedule,
+  CreateAutomationInput,
+  GitHubWorkBacklogConfiguration,
+  GitHubWorkBacklogConfigurationInput,
+  GlobalWorkItemQuery,
+  UpdateAutomationInput,
+  WorkBacklogAssignment,
+  WorkBacklogAssignmentPolicy,
+  WorkBacklogAssignmentStatus,
+  WorkBacklogConfigurationInput,
+  WorkBacklogProviderConfigurations,
+  WorkBacklogState,
+  WorkIntegrationConnection,
+  WorkIntegrationStatus,
+  WorkItem,
+  WorkItemKind,
+  WorkItemLabel,
+  WorkItemPage,
+  WorkItemQuery,
+  WorkItemState,
+  WorkProviderAuthorization,
+  WorkProviderKind,
+  WorkProviderSettings,
+  WorkRepository,
+} from './contracts/work';
 
 export type AgentStatus =
   | { type: 'idle' }
-  | { type: 'starting' }
   | { type: 'working'; detail?: AppText }
   | { type: 'awaitingInput'; detail?: AppText }
   | { type: 'error'; message: AppText };
@@ -23,9 +302,6 @@ export type Team = {
   activeAgentId?: string;
 };
 
-export type AgentBackend = 'codex' | 'claude';
-
-export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 export type BackendApprovalDecision = 'approve' | 'deny';
 export type BackendApprovalScope = 'once' | 'session';
 export type BackendRequestedPermission =
@@ -55,80 +331,6 @@ export type BackendApprovalRequest = {
   canDeny?: boolean;
 };
 
-export type CodexApprovalPreset = ApprovalPreset;
-
-export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
-
-export type BackendSession =
-  | {
-    kind: 'codex';
-    threadId: string;
-  }
-  | {
-    kind: 'claude';
-    sessionId: string;
-    transport: 'stdio' | 'websocket';
-    transcriptSessionId?: string;
-    serverUrl?: string;
-    model?: string;
-    reasoningEffort?: ReasoningEffort;
-  };
-
-export type BackendDefaults =
-  | {
-    kind: 'codex';
-    model?: string;
-    approvalPreset?: CodexApprovalPreset;
-    approvalPolicy?: string;
-    approvalsReviewer?: CodexApprovalsReviewer;
-    sandboxMode?: string;
-    reasoningEffort?: string;
-    serviceTier?: string | null;
-  }
-  | {
-    kind: 'claude';
-    model?: string;
-    reasoningEffort?: ReasoningEffort;
-    permissionMode?: string;
-    thinking?: {
-      type: 'enabled' | 'disabled';
-      budgetTokens?: number;
-    };
-  };
-
-export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
-
-export type ThreadGoal = {
-  threadId: string;
-  objective: string;
-  status: ThreadGoalStatus;
-  tokenBudget: number | null;
-  tokensUsed: number;
-  timeUsedSeconds: number;
-  createdAt: number;
-  updatedAt: number;
-};
-
-export type ThreadPlanStepStatus = 'pending' | 'inProgress' | 'completed';
-export type ThreadPlanKind = 'execution' | 'proposed';
-export type ThreadPlanStatus = 'inProgress' | 'completed' | 'incomplete' | 'interrupted' | 'failed';
-
-export type ThreadPlanStep = {
-  step: string;
-  status: ThreadPlanStepStatus;
-};
-
-export type ThreadPlan = {
-  threadId: string;
-  turnId: string;
-  kind: ThreadPlanKind;
-  status: ThreadPlanStatus;
-  explanation: string;
-  steps: ThreadPlanStep[];
-  markdown: string;
-  updatedAt: string;
-};
-
 export type OpenInApplication =
   | 'vscode'
   | 'finder'
@@ -149,25 +351,6 @@ export type OpenInApplicationCatalog = {
   defaultApplication: OpenInApplication;
   applications: OpenInApplicationOption[];
 };
-
-export type AgentWorkspaceIdentity =
-  | {
-      kind: 'git';
-      folder: string;
-      repositoryName: string;
-      repositoryRoot: string;
-      branch: string | null;
-      isLinkedWorktree: boolean;
-      primaryWorktreeRoot: string;
-      originUrl?: string;
-      updatedAt: string;
-    }
-  | {
-      kind: 'folder';
-      folder: string;
-      label: string;
-      updatedAt: string;
-    };
 
 export type Agent = {
   id: string;
@@ -195,399 +378,9 @@ export type Agent = {
   updatedAt: string;
 };
 
-export type AgentContextUsage = {
-  totalTokens: number;
-  inputTokens: number;
-  cachedInputTokens: number;
-  outputTokens: number;
-  reasoningOutputTokens: number;
-  lastTotalTokens: number;
-  modelContextWindow: number | null;
-  usedPercent: number | null;
-};
-
-export type AccountRateLimitWindow = {
-  usedPercent: number;
-  windowDurationMins: number | null;
-  resetsAt: number | null;
-};
-
-export type AccountRateLimits = {
-  limitId: string | null;
-  limitName: string | null;
-  primary: AccountRateLimitWindow | null;
-  secondary: AccountRateLimitWindow | null;
-  credits: unknown;
-  individualLimit: unknown;
-  planType: string | null;
-  rateLimitReachedType: string | null;
-};
-
-export type WorkProviderKind = 'github';
-
-export type WorkIntegrationStatus = 'notConfigured' | 'disconnected' | 'connecting' | 'connected' | 'error';
-
-export type WorkIntegrationConnection = {
-  provider: WorkProviderKind;
-  status: WorkIntegrationStatus;
-  accountLabel?: string;
-  detail?: AppText;
-  connectedAt?: string;
-};
-
-export type WorkProviderSettings = {
-  oauthClientId?: string;
-};
-
-export type WorkBacklogAssignmentPolicy = 'complete' | 'review';
-
-export type WorkBacklogAssignmentStatus = 'blocked' | 'completed' | 'inProgress' | 'readyForReview';
-
-export type WorkBacklogAssignment = {
-  provider: WorkProviderKind;
-  itemId: string;
-  agentId: string;
-  assignedAt: string;
-  policy: WorkBacklogAssignmentPolicy;
-  status: WorkBacklogAssignmentStatus;
-  completedAt?: string;
-  note?: string;
-  updatedAt?: string;
-  automationId?: string;
-  automationExecutionId?: string;
-  completionInstructionsDeliveredAt?: string;
-};
-
-export type GitHubWorkBacklogConfiguration = {
-  repositoryId?: string;
-  assigneeLogin?: string;
-  tagName?: string;
-};
-
-export type GitHubWorkBacklogConfigurationInput = {
-  repositoryId?: string | null;
-  assigneeLogin?: string | null;
-  tagName?: string | null;
-};
-
-export type WorkBacklogProviderConfigurations = {
-  github?: GitHubWorkBacklogConfiguration;
-};
-
-export type WorkBacklogConfigurationInput = {
-  provider: 'github';
-  configuration: GitHubWorkBacklogConfigurationInput;
-};
-
-export type WorkBacklogState = {
-  connections: WorkIntegrationConnection[];
-  providerConfigurations: WorkBacklogProviderConfigurations;
-  providerSettings: Partial<Record<WorkProviderKind, WorkProviderSettings>>;
-  assignments: Record<string, WorkBacklogAssignment>;
-};
-
-export type WorkProviderAuthorization = {
-  provider: WorkProviderKind;
-  userCode: string;
-  verificationUri: string;
-  expiresAt: string;
-};
-
 export type WorkProviderConnectResult = {
   snapshot: AppSnapshot;
   authorization?: WorkProviderAuthorization;
-};
-
-export type WorkRepository = {
-  provider: WorkProviderKind;
-  id: string;
-  owner: string;
-  name: string;
-  fullName: string;
-  url: string;
-  isPrivate: boolean;
-  updatedAt?: string;
-  workItemsUpdatedAt?: string;
-};
-
-export type WorkItemLabel = {
-  name: string;
-  color?: string;
-};
-
-export type WorkItemState = 'open' | 'closed';
-export type WorkItemKind = 'issue' | 'pullRequest';
-
-export type WorkItemQuery = {
-  kind?: WorkItemKind | 'all';
-  state?: WorkItemState | 'all';
-};
-
-export type GlobalWorkItemQuery = WorkItemQuery & {
-  assignment?: 'all' | 'viewer';
-  page?: number;
-  pageSize?: number;
-};
-
-export type WorkItemPage = {
-  items: WorkItem[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
-};
-
-export type WorkItem = {
-  provider: WorkProviderKind;
-  id: string;
-  kind?: WorkItemKind;
-  branchName?: string;
-  repositoryId: string;
-  repositoryFullName: string;
-  number: number;
-  title: string;
-  url: string;
-  state: WorkItemState;
-  authorName?: string;
-  assignees?: string[];
-  body?: string;
-  labels: WorkItemLabel[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type AutomationRepositoryTarget = {
-  provider: 'github';
-  repositoryId: string;
-  sourceRepositoryPath: string;
-};
-
-export type AutomationSchedule = {
-  intervalMinutes: number;
-};
-
-export type AutomationExecutionStatus = 'working' | 'completed' | 'failed';
-
-export type BackendConversationRef =
-  | {
-    backend: 'codex';
-    threadId: string;
-  }
-  | {
-    backend: 'claude';
-    folder: string;
-    sessionId: string;
-  };
-
-export type ConversationSummary = {
-  id: string;
-  sessionId?: string;
-  parentConversationId?: string;
-  agentNickname?: string;
-  agentRole?: string;
-  title: string;
-  preview?: string;
-  status?: 'idle' | 'active' | 'error';
-  createdAt?: string;
-  updatedAt: string;
-  messageCount: number;
-  ref: BackendConversationRef;
-};
-
-export const subagentStatuses = [
-  'pendingInit',
-  'running',
-  'interrupted',
-  'completed',
-  'errored',
-  'shutdown',
-  'notFound',
-] as const;
-export type SubagentStatus = typeof subagentStatuses[number];
-
-export const subagentOperationKinds = [
-  'spawnAgent',
-  'sendInput',
-  'resumeAgent',
-  'wait',
-  'closeAgent',
-  'sendMessage',
-  'followupTask',
-  'interruptAgent',
-  'listAgents',
-] as const;
-export type SubagentOperationKind = typeof subagentOperationKinds[number];
-
-export const subagentOperationLifecycles = ['started', 'completed'] as const;
-export type SubagentOperationLifecycle = typeof subagentOperationLifecycles[number];
-
-export const subagentOperationStatuses = ['inProgress', 'completed', 'failed', 'interrupted'] as const;
-export type SubagentOperationStatus = typeof subagentOperationStatuses[number];
-
-export const subagentActivityKinds = ['started', 'interacted', 'interrupted', 'completed'] as const;
-export type SubagentActivityKind = typeof subagentActivityKinds[number];
-
-export type SubagentNode = {
-  conversationId: string;
-  parentConversationId: string;
-  createdAt: string;
-  status: SubagentStatus;
-  statusMessage?: string;
-  agentPath?: string;
-  agentNickname?: string;
-  agentRole?: string;
-  prompt?: string;
-  model?: string;
-  reasoningEffort?: string;
-  updatedAt: string;
-};
-
-export type SubagentOperation = {
-  id: string;
-  turnId?: string;
-  lifecycle: SubagentOperationLifecycle;
-  kind: SubagentOperationKind;
-  status: SubagentOperationStatus;
-  senderConversationId: string;
-  receiverConversationIds: string[];
-  prompt?: string;
-  model?: string;
-  reasoningEffort?: string;
-  occurredAt: string;
-};
-
-export type SubagentOperationChange = {
-  rootConversationId: string;
-  operation: SubagentOperation;
-  agentStates: Record<string, { status: SubagentStatus; message?: string }>;
-};
-
-export type SubagentActivity = {
-  id: string;
-  turnId?: string;
-  lifecycle: SubagentOperationLifecycle;
-  kind: SubagentActivityKind;
-  conversationId: string;
-  agentPath: string;
-  occurredAt: string;
-};
-
-export type SubagentActivityChange = {
-  rootConversationId: string;
-  parentConversationId: string;
-  activity: SubagentActivity;
-};
-
-export type SubagentStatusChange = {
-  rootConversationId: string;
-  conversationId: string;
-  status: SubagentStatus;
-  statusMessage?: string;
-};
-
-export type SubagentIdentityChange = {
-  rootConversationId: string;
-  conversationId: string;
-  agentNickname?: string;
-  agentRole?: string;
-};
-
-export type AgentSubagentTree = {
-  rootConversationId: string;
-  nodes: Record<string, SubagentNode>;
-  operations: Record<string, SubagentOperation>;
-  activities: Record<string, SubagentActivity>;
-};
-
-export type AutomationExecutionCreatedAgent = {
-  agentId: string;
-  agentName: string;
-  workItemId: string;
-  workItemTitle: string;
-  workItemUrl: string;
-  conversationRef?: BackendConversationRef;
-};
-
-export type AutomationExecutionLogEntry = {
-  id: string;
-  automationId: string;
-  startedAt: string;
-  completedAt?: string;
-  status: AutomationExecutionStatus;
-  createdCount: number;
-  createdAgents: AutomationExecutionCreatedAgent[];
-  error?: string;
-};
-
-export type Automation = {
-  id: string;
-  name: string;
-  enabled: boolean;
-  repositories: AutomationRepositoryTarget[];
-  teamId: string;
-  selectionPrompt?: string;
-  assignmentPrompt?: string;
-  schedule: AutomationSchedule;
-  executionLog: AutomationExecutionLogEntry[];
-  createdAt: string;
-  updatedAt: string;
-  lastRunAt?: string;
-  lastError?: string;
-  lastCreatedCount?: number;
-};
-
-export type AutomationLocation =
-  | {
-    kind: 'local';
-  }
-  | {
-    kind: 'remote';
-    remoteConnectionId: string;
-  };
-
-export type CreateAutomationInput = {
-  name?: string;
-  enabled?: boolean;
-  repositories: AutomationRepositoryTarget[];
-  teamId: string;
-  selectionPrompt?: string;
-  assignmentPrompt?: string;
-  schedule: AutomationSchedule;
-};
-
-export type UpdateAutomationInput = CreateAutomationInput & {
-  id: string;
-};
-
-export type ReasoningEffort = string;
-
-export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
-
-export type BackendCapabilities = {
-  attachments: boolean;
-  models: boolean;
-  skills: boolean;
-  reasoningEffort: boolean;
-  serviceTier?: boolean;
-  thinkingBudget: boolean;
-  planMode: BackendPlanModeSupport;
-  goals: boolean;
-  steerPrompt: boolean;
-  interrupt: boolean;
-  history: boolean;
-  conversationFork?: boolean;
-  rollback: boolean;
-  editMessage: boolean;
-  retryMessage: boolean;
-  approvals: boolean;
-  approvalPresets?: ApprovalPreset[];
-  permissionModes?: BackendPermissionModeOption[];
-};
-
-export type BackendPermissionModeOption = {
-  id: string;
-  label: AppText;
-  description: AppText;
-  dangerous?: boolean;
 };
 
 export type AppearanceMode = 'dark' | 'light' | 'system';
@@ -664,6 +457,7 @@ export type AppGeneralSettings = {
   collapsedRepositoryKeys: string[];
   shareCodexSkillsAndPlugins: boolean;
   worktreeInitializationMode: WorktreeInitializationMode;
+  sessionCompressionWarningEnabled: boolean;
   repositoryIcons: Record<string, string>;
   appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
@@ -674,186 +468,12 @@ export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugi
   plugins?: Partial<AppPluginSettings>;
 };
 
-export type CodexAccount =
-  | { type: 'apiKey' }
-  | { type: 'chatgpt'; email: string | null; planType: string }
-  | { type: 'amazonBedrock'; credentialSource: 'codexManaged' | 'awsManaged' };
-
-export type CodexAuthentication = {
-  account: CodexAccount | null;
-  requiresOpenaiAuth: boolean;
-  login: {
-    status: 'idle' | 'starting' | 'pending' | 'completed' | 'cancelled' | 'error';
-    error: string | null;
-  };
-};
-
-export type CodexChatGptLogin = {
-  loginId: string;
-  authUrl: string;
-};
-
 export type ClientState = {
   sourceFolderPath: string;
   /** Agent activity requires sleep prevention regardless of power source. */
   shouldPreventDisplaySleep: boolean;
   /** Remote access requires sleep prevention only while connected to AC power. */
   shouldPreventDisplaySleepForRemoteAccess?: boolean;
-};
-
-export type SshHostCandidate = {
-  host: string;
-  hostName?: string;
-  user?: string;
-  port?: number;
-  identityFile?: string;
-  configPath?: string;
-  line?: number;
-};
-
-export type RemoteConnectionStatus = 'saved' | 'checking' | 'ready' | 'error';
-
-export type RemoteConnectionTransport = {
-  type: 'ssh-stdio';
-  command: 'ssh';
-  args: string[];
-};
-
-export type RemoteConnection = {
-  id: string;
-  kind: 'ssh';
-  name: string;
-  host: string;
-  hostName?: string;
-  user?: string;
-  port?: number;
-  identityFile?: string;
-  status: RemoteConnectionStatus;
-  detail?: string;
-  sourceFolderPath?: string;
-  transport?: RemoteConnectionTransport;
-  installedAt?: string;
-  lastCheckedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type RemoteConnectionsState = {
-  connections: RemoteConnection[];
-};
-
-export type DevicePairingStatus = {
-  status: 'disabled' | 'connecting' | 'connected' | 'errored';
-  serverName?: string;
-  installationId?: string;
-  environmentId?: string | null;
-  allowRemoteControl?: boolean | null;
-  detail?: string;
-};
-
-export type DevicePairingSession = {
-  pairingCode: string;
-  manualPairingCode?: string | null;
-  environmentId: string;
-  expiresAt: string;
-};
-
-export type PairedDevice = {
-  clientId: string;
-  displayName?: string | null;
-  deviceType?: string | null;
-  platform?: string | null;
-  osVersion?: string | null;
-  deviceModel?: string | null;
-  appVersion?: string | null;
-  lastSeenAt?: string | null;
-};
-
-export type AddSshConnectionInput = SshHostCandidate & {
-  name?: string;
-};
-
-export type UpdateRemoteConnectionInput = {
-  sourceFolderPath?: string;
-};
-
-export type BackendReasoningEffortOption = {
-  reasoningEffort: ReasoningEffort;
-  description: string;
-};
-
-export type BackendServiceTier = {
-  id: string;
-  name: string;
-  description: string;
-};
-
-export type BackendModelOption = {
-  id: string;
-  model: string;
-  displayName: string;
-  description?: string;
-  hidden?: boolean;
-  supportedReasoningEfforts?: BackendReasoningEffortOption[];
-  defaultReasoningEffort?: ReasoningEffort | null;
-  serviceTiers?: BackendServiceTier[];
-  defaultServiceTier?: string | null;
-  isDefault?: boolean;
-  capabilities?: Partial<BackendCapabilities>;
-  providerMetadata?: Record<string, unknown>;
-};
-
-export type BackendSkillSummary = {
-  id?: string;
-  name: string;
-  description?: string;
-  shortDescription?: string;
-  displayName?: string;
-  iconSmall?: string;
-  iconLarge?: string;
-  brandColor?: string;
-  defaultPrompt?: string;
-  path: string;
-  scope?: string;
-  enabled: boolean;
-  providerMetadata?: Record<string, unknown>;
-};
-
-export type BackendPluginSummary = {
-  id: string;
-  name: string;
-  displayName: string;
-  shortDescription?: string;
-  longDescription?: string;
-  brandColor?: string;
-  iconUrl?: string;
-  iconUrlDark?: string;
-  enabled: boolean;
-};
-
-export type BackendCommandSummary = {
-  id: string;
-  backend: AgentBackend;
-  name: string;
-  displayName?: string;
-  description?: string;
-  slashName?: string;
-  submitOnSelect?: boolean;
-  providerMetadata?: Record<string, unknown>;
-};
-
-export type AgentFileSearchItem = {
-  name: string;
-  path: string;
-};
-
-export type AgentFilePreviewResult = {
-  path: string;
-  size: number;
-  kind: 'text' | 'image' | 'binary' | 'tooLarge';
-  content?: string;
-  dataUrl?: string;
-  mimeType?: string;
 };
 
 export type SidePanelMarkdownRequest = {
@@ -868,7 +488,7 @@ export type SidePanelGitDiffRequest = {
   kind: 'gitDiff';
   scope?: 'workingTree' | 'turn';
   title?: AppText;
-  subtitle?: AppText;
+  subtitle?: AppText | null;
   diff: string;
   sections?: AgentGitDiffSection[];
   state?: 'idle' | 'error';
@@ -905,66 +525,6 @@ export type BrowserState = {
   canGoForward: boolean;
 };
 
-export type PromptSkillInput = {
-  name: string;
-  path: string;
-};
-
-export type PromptAttachment =
-  | {
-    type: 'image';
-    path: string;
-    detail?: 'auto' | 'low' | 'high' | 'original';
-    name?: string;
-    mimeType?: string;
-    previewUrl?: string;
-  }
-  | {
-    type: 'file';
-    path: string;
-    name?: string;
-    mimeType?: string;
-  };
-
-export type RendererPromptAttachment =
-  | {
-    type: 'image';
-    reference: string;
-    detail?: 'auto' | 'low' | 'high' | 'original';
-  }
-  | {
-    type: 'file';
-    reference: string;
-  };
-
-export type SendPromptOptions = {
-  attachments?: readonly PromptAttachment[];
-  model?: string | null;
-  planMode?: boolean;
-  reasoningEffort?: ReasoningEffort | null;
-  serviceTier?: string | null;
-  skills?: PromptSkillInput[];
-  inputMethod?: 'typed' | 'dictated';
-  backendOptions?: BackendPromptOptions;
-};
-
-export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments'> & {
-  attachments?: readonly RendererPromptAttachment[];
-};
-
-export type BackendPromptOptions =
-  | {
-    kind: 'codex';
-    reasoningEffort?: ReasoningEffort | null;
-    serviceTier?: string | null;
-    skills?: PromptSkillInput[];
-  }
-  | {
-    kind: 'claude';
-    thinkingBudgetTokens?: number | null;
-    permissionMode?: string | null;
-  };
-
 export type SystemPermissionsStatus = {
   platform: string;
   accessibility: {
@@ -996,60 +556,6 @@ export type ClawdDaemonStatus = {
   detail?: string;
 };
 
-export type SourceWorktree = {
-  name: string;
-  path: string;
-};
-
-export type SourceBranch = {
-  name: string;
-  isDefault: boolean;
-  worktreePath?: string;
-};
-
-export type SourceRepository = {
-  name: string;
-  path: string;
-  remoteIdentity?: string;
-  worktrees: SourceWorktree[];
-};
-
-export type CloneSourceRepositoryInput = {
-  url: string;
-  remoteConnectionId?: string;
-};
-
-export type SourceFolderEntry = {
-  name: string;
-  path: string;
-};
-
-export type SourceFolderListing = {
-  path: string;
-  parentPath: string | null;
-  entries: SourceFolderEntry[];
-};
-
-export type SourceFolderListInput = {
-  path?: string;
-  remoteConnectionId?: string;
-};
-
-export type SourceFolderState = {
-  path: string;
-  initialized: boolean;
-  recentRepoNames: string[];
-};
-
-export type CreateSourceWorktreeInput = {
-  repoPath: string;
-  branchName: string;
-  baseBranch?: string;
-  destinationPath?: string;
-  reuseExisting?: boolean;
-  remoteConnectionId?: string;
-};
-
 export type UpdateSettingsInput = {
   general?: UpdateGeneralSettingsInput;
   sourceFolder?: Partial<Pick<SourceFolderState, 'path' | 'recentRepoNames'>>;
@@ -1066,211 +572,12 @@ export type CodexResourceSharingStatus = {
   migrationRequired: boolean;
 };
 
-export type RendererMessageAttachment = {
-  kind: 'file' | 'image';
-  name: string;
-  path?: string;
-  url?: string;
-  mimeType?: string;
-};
-
-export type RendererMessageMedia = {
-  url: string;
-  alt?: string;
-  mimeType?: string;
-  prompt?: string;
-  title?: string;
-};
-
-export type RendererMessagePart =
-  | { type: 'attachment'; attachment: RendererMessageAttachment }
-  | { type: 'media'; media: RendererMessageMedia; itemId?: string }
-  | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
-  | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'final_answer' }
-  | {
-    type: 'tool';
-    id: string;
-    kind: string;
-    title: string;
-    status: 'running' | 'completed' | 'failed';
-    statusText?: string;
-    body?: string;
-    input?: unknown;
-    output?: unknown;
-    metadata?: Record<string, unknown>;
-  }
-  | { type: 'status'; text: string };
-
-export type RendererToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
-
-export type RendererToolPartUpdate = {
-  itemId: string;
-  title?: string;
-  status?: RendererToolPart['status'];
-  statusText?: string | null;
-  body?: string;
-  bodyDelta?: string;
-  bodyAppend?: string;
-  input?: unknown;
-  output?: unknown;
-  metadata?: Record<string, unknown>;
-  fallbackToolPart?: RendererToolPart;
-};
-
-export type RendererMessage = {
-  id: string;
-  agentId: string;
-  kind?: 'compaction' | 'steer';
-  role: 'user' | 'assistant' | 'system';
-  status: 'complete' | 'streaming' | 'error';
-  turnId?: string;
-  parts: RendererMessagePart[];
-  createdAt: string;
-};
-
-export type AgentFileActivity = {
-  agentId: string;
-  turnId: string;
-  messageId: string;
-  itemId: string;
-  path: string;
-  action: 'read' | 'edit' | 'create';
-  status: 'running' | 'completed' | 'failed';
-  occurredAt: string;
-};
-
-export type ConversationFileLink = {
-  kind: 'file';
-  href: string;
-  path: string;
-  filepath?: string;
-  action?: 'read' | 'edit' | 'create';
-  line?: number;
-  column?: number;
-  turnId?: string;
-  messageId?: string;
-  itemId?: string;
-};
-
-export type AgentQueuedPrompt = {
-  id: string;
-  agentId: string;
-  text: string;
-  createdAt: string;
-  options?: SendPromptOptions;
-  attempts?: number;
-  lastError?: string;
-  retryAt?: string;
-  submitted?: boolean;
-};
-
-export type AgentGitStatus = {
-  folder: string;
-  repository?: string;
-  githubRepository?: string;
-  branch?: string;
-  upstream?: string;
-  ahead: number;
-  behind: number;
-  changedFiles: number;
-  addedLines: number;
-  removedLines: number;
-  hasUntracked: boolean;
-  state: 'clean' | 'dirty' | 'unknown';
-  updatedAt: string;
-  error?: string;
-};
-
-export type AgentGitDiffScope = 'staged' | 'unstaged' | 'untracked';
-
-export type AgentGitDiffSection = {
-  scope: AgentGitDiffScope;
-  diff: string;
-};
-
-export type AgentGitDiff = {
-  diff: string;
-  sections: AgentGitDiffSection[];
-};
-
-export type AgentGitFile = {
-  path: string;
-  indexStatus: string;
-  worktreeStatus: string;
-};
-
-export type AgentGitPullRequest = {
-  number: number;
-  title: string;
-  url: string;
-  draft: boolean;
-  headSha: string;
-  state: 'open' | 'merged' | 'closed';
-  mergedAt?: string;
-};
-
-export type AgentPullRequestTracking = AgentGitPullRequest & {
-  provider: 'github';
-  repository: string;
-  branch: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type AgentGitWorkflow = {
-  repository: string;
-  folder: string;
-  isLinkedWorktree: boolean;
-  branch?: string;
-  detached: boolean;
-  remote?: string;
-  remoteUrl?: string;
-  upstream?: string;
-  ahead: number;
-  behind: number;
-  stagedAddedLines?: number;
-  stagedRemovedLines?: number;
-  unstagedAddedLines?: number;
-  unstagedRemovedLines?: number;
-  untrackedAddedLines?: number;
-  untrackedRemovedLines?: number;
-  files: AgentGitFile[];
-  stagedFiles: string[];
-  unstagedFiles: string[];
-  existingPullRequest?: AgentGitPullRequest;
-  githubConnected: boolean;
-  githubError?: string;
-};
-
-export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
-export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
-export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget'; closeAgentAfterPush?: boolean };
-export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
-export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
-export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
-export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
-export type AgentGitMessageGenerationInput =
-  | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }
-  | { kind: 'pullRequest' };
-export type AgentGitMessageGenerationResult =
-  | { kind: 'commit'; message: string }
-  | { kind: 'pullRequest'; title: string; body: string };
-
-export type TurnGitDiff = {
-  turnId: string;
-  addedLines: number;
-  removedLines: number;
-  diff?: string;
-  updatedAt: string;
-};
-
 export type AppSnapshot = {
   teams: Team[];
   agents: Agent[];
   automations: Automation[];
   activeTeamId: string | null;
   activeAgentId: string | null;
-  messages: RendererMessage[];
   queuedPrompts?: AgentQueuedPrompt[];
   backendApprovals: Record<string, BackendApprovalRequest[]>;
   agentGitStatuses: Record<string, AgentGitStatus>;
@@ -1285,36 +592,13 @@ export type AppSnapshot = {
   theme: AppThemeSettings;
 };
 
-/**
- * Application state that can be synchronized without retransmitting cached
- * conversation transcripts. Messages have their own incremental event stream
- * and explicit history-hydration path.
- */
-export type AppSnapshotMetadata = Omit<AppSnapshot, 'messages'>;
-
-export type AgentHistoryLoadResult = {
-  hasOlder: boolean;
-};
-
-export type BackendRuntimeStatus = {
-  backend: AgentBackend;
-  status: 'notConfigured' | 'starting' | 'running' | 'error';
-  detail?: AppText;
-  capabilities?: Partial<BackendCapabilities>;
-};
-
-export type BackendConnectionState = {
-  status: 'connecting' | 'connected' | 'reconnecting' | 'error';
-  detail?: AppText;
-};
-
 export type RendererSnapshotState = {
   snapshot: AppSnapshot;
   lastBackendEventSeq: number;
   connection: BackendConnectionState;
 };
 
-export type MainToRendererEvent = {
+type MainToRendererEventEnvelope = {
   seq: number;
   source?: 'backend' | 'client';
   agentId?: string;
@@ -1323,63 +607,314 @@ export type MainToRendererEvent = {
   snapshot?: AppSnapshot;
   threadId?: string;
   turnId?: string;
-  type:
-    | 'backend.statusChanged'
-    | 'client.connectionChanged'
-    | 'agent.updated'
-    | 'snapshot.updated'
-    | 'agent.statusChanged'
-    | 'thread.started'
-    | 'thread.historyLoaded'
-    | 'thread.settingsUpdated'
-    | 'thread.modeUpdated'
-    | 'thread.goalUpdated'
-    | 'thread.goalCleared'
-    | 'thread.tokenUsageUpdated'
-    | 'subagent.operationChanged'
-    | 'subagent.activityChanged'
-    | 'subagent.identityChanged'
-    | 'subagent.statusChanged'
-    | 'turn.started'
-    | 'turn.planUpdated'
-    | 'turn.proposedPlanDelta'
-    | 'turn.proposedPlanCompleted'
-    | 'turn.completed'
-    | 'message.userSubmitted'
-    | 'message.steer'
-    | 'agent.promptQueued'
-    | 'agent.promptRetryScheduled'
-    | 'agent.promptDequeued'
-    | 'context.compactionStarted'
-    | 'context.compactionCompleted'
-    | 'account.rateLimitsUpdated'
-    | 'devicePairing.statusChanged'
-    | 'workBacklog.assignmentUpdated'
-    | 'models.changed'
-    | 'skills.changed'
-    | 'sidePanel.markdownRequested'
-    | 'sidePanel.gitDiffRequested'
-    | 'celebration.requested'
-    | 'agentCreation.progress'
-    | 'message.delta'
-    | 'message.updated'
-    | 'item.started'
-    | 'item.updated'
-    | 'item.completed'
-    | 'file.activity'
-    | 'diff.updated'
-    | 'git.statusUpdated'
-    | 'git.operationProgress'
-    | 'approval.requested'
-    | 'backendApproval.requested'
-    | 'backendApproval.resolved'
-    | 'clientRequest.resolved'
-    | 'toolInput.requested'
-    | 'browser.annotationCreated'
-    | 'error';
-  payload: unknown;
   occurredAt: string;
 };
+
+type MainToRendererEventWith<Variant> = MainToRendererEventEnvelope & Variant;
+type WorkBacklogAssignmentUpdatedPayload = Omit<WorkBacklogAssignment, 'policy' | 'status'> & {
+  policy?: WorkBacklogAssignmentPolicy;
+  status: WorkBacklogAssignmentStatus | 'working';
+};
+type AgentUpdatedPayload = Omit<Partial<Agent>, 'id' | 'statusText'> & {
+  id: string;
+  statusText?: string | null;
+};
+type ClaudeThreadStartedPayload = {
+  sessionId: string;
+  transport: 'stdio';
+  model?: string;
+  reasoningEffort?: string;
+};
+type ThreadMode = 'default' | 'plan';
+type TurnEventContext = {
+  agentId: string;
+  backend: AgentBackend;
+  turnId: string;
+};
+type ThreadTurnEventContext = TurnEventContext & {
+  threadId: string;
+};
+type AgentPromptQueuedPayload = {
+  id: string;
+  text: string;
+  options?: SendPromptOptions;
+  submitted?: boolean;
+};
+type AgentPromptRetryScheduledPayload = {
+  id: string;
+  attempts: number;
+  lastError: string;
+  retryAt?: string;
+};
+type BackendApprovalResolutionReason =
+  | 'host'
+  | 'server'
+  | 'conversation_closed'
+  | 'conversation_removed'
+  | 'surface_disconnected';
+export type MainToRendererEvent =
+  | MainToRendererEventWith<{
+      type: 'backend.statusChanged';
+      backend: AgentBackend;
+      payload: BackendRuntimeStatus;
+    }>
+  | MainToRendererEventWith<{
+      type: 'client.connectionChanged';
+      payload: BackendConnectionState;
+    }>
+  | MainToRendererEventWith<{
+      type: 'snapshot.updated';
+      payload: AppSnapshot;
+    }>
+  | MainToRendererEventWith<{
+      type: 'account.rateLimitsUpdated';
+      backend: AgentBackend;
+      payload: AccountRateLimits | { rateLimits: AccountRateLimits };
+    }>
+  | MainToRendererEventWith<{
+      type: 'devicePairing.statusChanged';
+      payload: DevicePairingStatus;
+    }>
+  | MainToRendererEventWith<{
+      type: 'models.changed';
+      backend: AgentBackend;
+      payload: { models: BackendModelOption[] };
+    }>
+  | MainToRendererEventWith<{
+      type: 'skills.changed';
+      backend: AgentBackend;
+      payload: {
+        cwd: string | null;
+        status: 'loaded';
+        skills: BackendSkillSummary[];
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'codex.conversationSnapshotChanged';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: {
+        revision: number;
+        snapshot: CodexConversationSnapshot;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'codex.conversationEventReceived';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: {
+        revision: number;
+        event: CodexConversationEvent;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'claude.conversationSnapshotChanged';
+      agentId: string;
+      backend: 'claude';
+      payload: {
+        revision: number;
+        snapshot: ClaudeConversationSnapshot;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'claude.conversationEventReceived';
+      agentId: string;
+      backend: 'claude';
+      payload: {
+        revision: number;
+        event: ClaudeConversationEvent;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'sidePanel.markdownRequested';
+      agentId: string;
+      payload: SidePanelMarkdownRequest;
+    }>
+  | MainToRendererEventWith<{
+      type: 'sidePanel.gitDiffRequested';
+      agentId: string;
+      payload: SidePanelGitDiffRequest;
+    }>
+  | MainToRendererEventWith<{
+      type: 'celebration.requested';
+      agentId: string;
+      payload: { kind: CelebrationKind };
+    }>
+  | MainToRendererEventWith<{
+      type: 'agentCreation.progress';
+      agentId: string;
+      payload: AgentCreationProgress;
+    }>
+  | MainToRendererEventWith<{
+      type: 'git.operationProgress';
+      agentId: string;
+      payload: AgentGitOperationProgress;
+    }>
+  | MainToRendererEventWith<{
+      type: 'browser.annotationCreated';
+      payload: BrowserAnnotation;
+    }>
+  | MainToRendererEventWith<{
+      type: 'workBacklog.assignmentUpdated';
+      payload: WorkBacklogAssignmentUpdatedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'clientRequest.resolved';
+      agentId: string;
+      backend: AgentBackend;
+      payload: Pick<ClientRequest, 'id'>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.updated';
+      agentId: string;
+      payload: AgentUpdatedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.statusChanged';
+      agentId: string;
+      payload: AgentStatus;
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.started';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: { cwd?: string };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.started';
+      agentId: string;
+      backend: 'claude';
+      backendSessionId: string;
+      payload: ClaudeThreadStartedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.settingsUpdated';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: { threadSettings: CodexThreadSettings };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.modeUpdated';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      payload: { mode: ThreadMode };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.modeUpdated';
+      agentId: string;
+      backend: 'claude';
+      turnId: string;
+      payload: {
+        mode: ThreadMode;
+        provider: 'claude';
+        permissionMode: string;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.goalUpdated';
+      agentId: string;
+      threadId: string;
+      payload: ThreadGoal | { goal: ThreadGoal };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.goalCleared';
+      agentId: string;
+      payload: Record<string, never>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.tokenUsageUpdated';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: AgentContextUsage | { contextUsage: AgentContextUsage };
+    }>
+  | MainToRendererEventWith<{
+      type: 'thread.historyHydrationFailed';
+      agentId: string;
+      payload: Record<string, never>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.operationChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentOperationChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.activityChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentActivityChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.identityChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentIdentityChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'subagent.statusChanged';
+      agentId: string;
+      backend: AgentBackend;
+      threadId: string;
+      payload: SubagentStatusChange;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.promptQueued';
+      agentId: string;
+      payload: AgentPromptQueuedPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.promptRetryScheduled';
+      agentId: string;
+      payload: AgentPromptRetryScheduledPayload;
+    }>
+  | MainToRendererEventWith<{
+      type: 'agent.promptDequeued';
+      agentId: string;
+      payload: { ids: string[] };
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'diff.updated';
+      payload: Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>;
+    }>
+  | MainToRendererEventWith<ThreadTurnEventContext & {
+      type: 'file.activity';
+      payload: Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>;
+    }>
+  | MainToRendererEventWith<{
+      type: 'git.statusUpdated';
+      agentId: string;
+      payload: AgentGitStatus;
+    }>
+  | MainToRendererEventWith<{
+      type: 'backendApproval.requested';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      turnId?: string;
+      payload: { approval: BackendApprovalRequest };
+    }>
+  | MainToRendererEventWith<{
+      type: 'backendApproval.resolved';
+      agentId: string;
+      backend: 'codex';
+      threadId: string;
+      turnId?: string;
+      payload: {
+        approval: BackendApprovalRequest;
+        decision: BackendApprovalDecision | null;
+        scope: BackendApprovalScope | null;
+        reason: BackendApprovalResolutionReason;
+      };
+    }>;
 
 export type CelebrationKind = 'confetti' | 'stars' | 'shapes' | 'schoolPride';
 
@@ -1398,11 +933,6 @@ export type AgentCreationProgress = {
   error?: string;
 };
 
-export type AgentGitOperationProgress = {
-  operation: 'pullRequest' | 'merge';
-  phase: 'handoff' | 'delivery';
-};
-
 export type AppCommand =
   | {
     type: 'attach-appshot';
@@ -1414,6 +944,7 @@ export type AppCommand =
   | { type: 'appshot-failed'; message: string }
   | { type: 'close-active-agent' }
   | { type: 'close-active-team' }
+  | { type: 'compress-active-session' }
   | { type: 'cycle-agents'; direction: -1 | 1 }
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
@@ -1494,69 +1025,6 @@ export type ReorderRepositoriesInput = {
   teamId: string;
   repositoryRoot: string;
   beforeRepositoryRoot: string | null;
-};
-
-export type ToolConfirmationDecision =
-  | 'allow'
-  | 'allow_conversation'
-  | 'always_allow'
-  | 'deny';
-
-export type ConfirmToolRequest = {
-  argumentsPreview: string;
-  integrationId: string;
-  integrationName: string;
-  summary: string;
-  toolName: string;
-  allowConversation?: boolean;
-  allowAlways?: boolean;
-};
-
-export type AskUserQuestionOption = {
-  label: string;
-  description: string;
-};
-
-export type AskUserQuestion = {
-  id: string;
-  header: string;
-  question: string;
-  isOther: boolean;
-  isSecret: boolean;
-  multiSelect?: boolean;
-  options: AskUserQuestionOption[] | null;
-};
-
-export type AskUserRequest = {
-  itemId: string;
-  questions: AskUserQuestion[];
-};
-
-export type AskUserAnswers = Record<string, { answers: string[] }>;
-
-export type ClientRequest =
-  | {
-    id: string;
-    kind: 'confirm_tool';
-    payload: {
-      confirmation: ConfirmToolRequest;
-    };
-  }
-  | {
-    id: string;
-    kind: 'ask_user';
-    payload: {
-      request: AskUserRequest;
-    };
-  };
-
-export type ClientRequestResponse = {
-  id: string;
-  payload?: {
-    answers?: AskUserAnswers;
-    cancelled?: boolean;
-    decision?: ToolConfirmationDecision | null;
-  };
 };
 
 export type DesktopUpdateState =
@@ -1646,15 +1114,16 @@ export type CodexClawApi = {
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
   removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
   duplicateAgent(agentId: string, options?: DuplicateAgentOptions): Promise<AppSnapshot>;
-  forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot>;
+  forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
-  hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata>;
+  compressAgentSession(agentId: string): Promise<AppSnapshot>;
+  hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
   loadOlderAgentHistory(agentId: string): Promise<AgentHistoryLoadResult>;
   closeAgent(agentId: string, input?: AgentCloseInput): Promise<AppSnapshot>;
-  selectAgent(agentId: string): Promise<AppSnapshotMetadata>;
+  selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
   previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): Promise<SpokenAnnouncementQueueResult>;
   getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;
@@ -1680,15 +1149,15 @@ export type CodexClawApi = {
   clearAgentGoal(agentId: string): Promise<AppSnapshot>;
   setAgentApprovalPreset(agentId: string, preset: ApprovalPreset): Promise<AppSnapshot>;
   setAgentPermissionMode(agentId: string, mode: string): Promise<AppSnapshot>;
-  sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
-  steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata>;
+  sendPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot>;
+  steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot>;
   deleteQueuedPrompt(agentId: string, promptId: string): Promise<AppSnapshot>;
   steerQueuedPrompt(agentId: string, promptId: string, prompt?: string): Promise<AppSnapshot>;
   updateQueuedPrompt(agentId: string, promptId: string, prompt: string): Promise<AppSnapshot>;
   interruptAgent(agentId: string): Promise<AppSnapshot>;
-  deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
-  editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot>;
-  retryMessage(agentId: string, messageId: string): Promise<AppSnapshot>;
+  deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
+  editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>;
+  retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
   browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
   browserOpenVisualization(agentId: string, browserId: string, path: string, title: string): Promise<BrowserState>;
   browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;

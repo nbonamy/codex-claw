@@ -70,7 +70,7 @@ describe('SubagentPanel', () => {
         plugins: [i18n],
         stubs: {
           CodexMessageList: {
-            props: ['messages', 'actionsDisabled', 'canDeleteMessage', 'canEditMessage', 'canRetryMessage'],
+            props: ['messages', 'actionsDisabled', 'canDeleteTurn', 'canEditTurn', 'canRetryTurn'],
             template: '<div class="message-list-stub" :data-message-id="messages[0] && messages[0].id">{{ messages.length }} messages</div>',
           },
         },

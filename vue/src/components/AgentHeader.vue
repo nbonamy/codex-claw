@@ -221,17 +221,21 @@ const backendLabel = computed(() => (props.backendRuntime.backend === 'claude' ?
 const agentLocationLabel = computed(() => {
   const agent = props.agent;
   const gitStatus = props.gitStatus;
-  if (!agent || !gitStatus || gitStatus.state === 'unknown' || !gitStatus.branch) {
-    return agent?.folder ?? '';
-  }
+  if (!agent) return '';
 
-  const repository = gitStatus.repository ?? gitStatus.folder
+  const workspace = agent.workspace?.kind === 'git' ? agent.workspace : null;
+  const availableGitStatus = gitStatus?.state !== 'unknown' ? gitStatus : null;
+  const branch = availableGitStatus?.branch ?? workspace?.branch;
+  if (!branch) return agent.folder ?? '';
+
+  const repository = availableGitStatus?.repository ?? workspace?.repositoryName ?? availableGitStatus?.folder
     .replace(/[\\/]+$/u, '')
     .split(/[\\/]/u)
     .filter(Boolean)
     .at(-1);
 
-  return repository ? `${gitStatus.branch} @ ${repository}` : agent.folder;
+  if (!repository) return agent.name?.trim() ? branch : '';
+  return agent.name?.trim() ? `${branch} @ ${repository}` : `@ ${repository}`;
 });
 const agentStatusDetail = computed(() => {
   if (!props.agent) {
@@ -245,8 +249,6 @@ const agentStatusDetail = computed(() => {
   switch (props.agent.status.type) {
     case 'working':
       return localizedText(props.agent.status.detail, translate) ?? translate('status.working');
-    case 'starting':
-      return translate('surface.agentHeader.starting');
     case 'awaitingInput':
       return localizedText(props.agent.status.detail, translate) ?? translate('dynamic.misc.awaitingInput');
     case 'error':

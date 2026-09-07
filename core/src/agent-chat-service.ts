@@ -1,12 +1,9 @@
-import {
-  appendUserPrompt,
-} from './snapshot';
-import type { AgentStatus, AppSnapshot, MainToRendererEvent, SendPromptOptions } from './contracts';
-import type { AgentBackendDriver, BackendSendResult } from './backend-driver';
+import type { AgentStatus, AppSnapshot, SendPromptOptions } from './contracts';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from './backend-driver';
 import { backendDisplayName } from './backend-driver';
 
 export type AgentChatEventEmitter = (
-  event: Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>,
+  event: BackendEvent,
 ) => void;
 
 export type SendAgentPromptHooks = {
@@ -33,18 +30,9 @@ export function sendAgentPrompt(
   }
 
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
-  if (!promptResult && hooks?.appendUserMessage !== false) {
-    const message = appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
-    emit({
-      agentId,
-      type: 'message.userSubmitted',
-      payload: { message },
-      occurredAt: message.createdAt,
-    });
-  }
   const hadBackendSession = Boolean(agent.backendSession);
 
-  updateAgentStatus(agentId, { type: 'starting' }, emit, snapshot);
+  updateAgentStatus(agentId, { type: 'working' }, emit, snapshot);
   updateBackendRuntimeStatus({
     backend: backendDriver.backend,
     status: 'starting',
@@ -58,7 +46,10 @@ export function sendAgentPrompt(
       : { kind: 'codex' as const };
     agent.backendDefaults = { ...defaults, serviceTier: options.serviceTier };
   }
-  const preparedOptions = backendDriver.preparePromptOptions?.(agent, options) ?? options;
+  const routedOptions = hooks?.appendUserMessage === false
+    ? { ...options, recordUserMessage: false }
+    : options;
+  const preparedOptions = backendDriver.preparePromptOptions?.(agent, routedOptions) ?? routedOptions;
   const sendResult = promptResult
     ?? (hasPromptOptions(preparedOptions)
       ? backendDriver.sendPrompt(agent, trimmedPrompt, preparedOptions)
@@ -69,9 +60,6 @@ export function sendAgentPrompt(
       agent.backend = backendDriver.backend;
       agent.backendSession = result.backendSession;
       void Promise.resolve(hooks?.onBackendSessionUpdated?.(result, !hadBackendSession)).catch(() => undefined);
-      if (agent.status.type === 'starting') {
-        updateAgentStatus(agentId, { type: 'working' }, emit, snapshot);
-      }
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
         status: 'running',
@@ -86,17 +74,12 @@ export function sendAgentPrompt(
     .catch((error) => {
       const normalizedError = error instanceof Error ? error : new Error(String(error));
       const message = normalizedError.message;
-      updateAgentStatus(agentId, { type: 'idle' }, emit, snapshot);
+      updateAgentStatus(agentId, { type: 'error', message }, emit, snapshot);
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
         status: 'error',
         detail: message,
       }, emit, snapshot);
-      emit({
-        agentId,
-        type: 'error',
-        payload: { message },
-      });
       void Promise.resolve(hooks?.onPromptFailed?.(normalizedError)).catch(() => undefined);
     });
 
@@ -111,12 +94,13 @@ function hasPromptOptions(options: SendPromptOptions | undefined): options is Se
     options?.reasoningEffort ||
     (options?.skills?.length ?? 0) > 0 ||
     options?.inputMethod ||
+    options?.recordUserMessage === false ||
     options?.backendOptions,
   );
 }
 
 function isBusy(status: AgentStatus): boolean {
-  return status.type === 'starting' || status.type === 'working' || status.type === 'awaitingInput';
+  return status.type === 'working' || status.type === 'awaitingInput';
 }
 
 function updateAgentStatus(

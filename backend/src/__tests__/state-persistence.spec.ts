@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
-import { appendUserPrompt, createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/core/settings';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
 
@@ -83,6 +84,7 @@ describe('AppStatePersistence', () => {
       name: null,
       folder: null,
     });
+    expect(isAppSnapshot(restored)).toBe(true);
   });
 
   it('round-trips the agent that delegated a worker', () => {
@@ -300,8 +302,6 @@ describe('AppStatePersistence', () => {
         completedAt: '2026-06-09T13:30:00.000Z',
       },
     };
-    appendUserPrompt(snapshot, 'agent-dina', 'do not persist this', '2026-06-05T10:11:12.000Z');
-
     await persistence.save(snapshot);
 
     const written = JSON.parse(await readFile(filePath, 'utf8')) as Record<string, unknown>;
@@ -525,7 +525,6 @@ describe('AppStatePersistence', () => {
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:00.000Z',
     });
-    expect(restored.messages).toStrictEqual([]);
     expect(restored.backendRuntimes).toStrictEqual(createEmptySnapshot().backendRuntimes);
     expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
     expect(restored.workBacklog.assignments).toStrictEqual({
@@ -572,7 +571,6 @@ describe('AppStatePersistence', () => {
           completedAt: '2026-06-09T13:30:00.000Z',
           automationId: 'automation-bugs',
           automationExecutionId: 'automation-exec-1',
-          completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
     };
@@ -609,7 +607,6 @@ describe('AppStatePersistence', () => {
           completedAt: '2026-06-09T13:30:00.000Z',
           automationId: 'automation-bugs',
           automationExecutionId: 'automation-exec-1',
-          completionInstructionsDeliveredAt: '2026-06-09T13:20:00.000Z',
         },
       },
     });
@@ -992,6 +989,7 @@ describe('AppStatePersistence', () => {
       agentListCompact: true,
       collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
       shareCodexSkillsAndPlugins: false,
+      sessionCompressionWarningEnabled: false,
       worktreeInitializationMode: 'repository',
       repositoryIcons: { '/src/codex-claw': '🦞' },
       appshots: {

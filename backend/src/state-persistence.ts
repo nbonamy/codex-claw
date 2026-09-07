@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, SubagentStatus, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { appText } from '@codex-claw/core/app-text';
@@ -207,7 +207,6 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     general: normalizeGeneralSettings(value.general),
     sourceFolder: normalizeSourceFolderState(value.sourceFolder),
     theme: normalizeThemeSettings(value.theme),
-    messages: [],
     queuedPrompts: [],
     backendRuntimes: seed.backendRuntimes.map((runtime) => ({ ...runtime })),
   };
@@ -834,7 +833,6 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
     ...(typeof value.updatedAt === 'string' ? { updatedAt: value.updatedAt } : {}),
     ...(automationId ? { automationId } : {}),
     ...(automationExecutionId ? { automationExecutionId } : {}),
-    ...(typeof value.completionInstructionsDeliveredAt === 'string' ? { completionInstructionsDeliveredAt: value.completionInstructionsDeliveredAt } : {}),
   };
 }
 

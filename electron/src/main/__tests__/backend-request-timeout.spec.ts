@@ -13,6 +13,10 @@ describe('backendRequestTimeoutMs', () => {
     expect(backendRequestTimeoutMs(backendMethods.agentGitMessageGenerate, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitMerge, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitPullRequestCreate, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentTurnDelete, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentTurnEdit, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentTurnRetry, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentSessionCompress, 5_000)).toBe(600_000);
     expect(backendRequestTimeoutMs(backendMethods.snapshotGet, 5_000)).toBe(5_000);
   });
 });

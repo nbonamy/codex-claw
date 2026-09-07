@@ -534,7 +534,6 @@ function mountView(
     listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
     loadWorkRepositories: (provider: 'github', location?: AutomationLocation) => Promise<WorkRepository[] | void>;
     automations: Automation[];
-    messages: RendererMessage[];
     readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
     remoteConnections: RemoteConnection[];
     runAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
@@ -566,7 +565,6 @@ function mountView(
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),
       automations: overrides.automations ?? [],
-      messages: overrides.messages ?? snapshot.messages,
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
       remoteConnections: overrides.remoteConnections ?? [],
       runAutomation: overrides.runAutomation ?? vi.fn().mockResolvedValue(undefined),

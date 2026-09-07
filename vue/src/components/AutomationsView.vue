@@ -46,7 +46,6 @@
           <AutomationExecutionLog
             v-else-if="logAutomation"
             :automation="logAutomation"
-            :messages="messages"
             :read-conversation-messages="readLocationConversationMessages"
             @clear-history="confirmClearAutomationHistory"
             @close="closeLog"
@@ -161,7 +160,7 @@ import type {
   WorkProviderKind,
   WorkRepository,
 } from '@codex-claw/core/contracts';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -182,7 +181,6 @@ const props = withDefaults(
     listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
     loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
     automations: Automation[];
-    messages?: RendererMessage[];
     remoteConnections?: RemoteConnection[];
     runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
@@ -202,7 +200,6 @@ const props = withDefaults(
     getAutomationSnapshot: async () => createEmptySnapshot(),
     listSourceRepositories: async () => [],
     loadWorkRepositories: async () => undefined,
-    messages: () => [],
     readConversationMessages: async () => [],
     remoteConnections: () => [],
     runAutomation: async () => undefined,

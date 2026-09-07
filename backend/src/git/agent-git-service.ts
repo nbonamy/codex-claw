@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
+import { AppError } from '@codex-claw/core/app-error';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
 import type { GitWorktreeCreateInput } from '../git-worktrees';
@@ -168,6 +169,28 @@ export class AgentGitService {
   }
 
   async pullRequestMessageContext(folder: string): Promise<AgentGitGenerationContext> {
+    const { baseRef, commits, stat, diff } = await this.pullRequestChanges(folder);
+    return {
+      baseRef,
+      context: boundedGenerationContext([
+        `## Base\n${baseRef}`,
+        `## Commits\n${commits || '(none)'}`,
+        `## Diff stat\n${stat || '(none)'}`,
+        `## Diff\n${diff}`,
+      ].join('\n\n')),
+    };
+  }
+
+  async assertPullRequestChanges(folder: string): Promise<void> {
+    await this.pullRequestChanges(folder);
+  }
+
+  private async pullRequestChanges(folder: string): Promise<{
+    baseRef: string;
+    commits: string;
+    stat: string;
+    diff: string;
+  }> {
     const workflow = await this.workflow(folder);
     if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before generating a pull request.');
     if (isIntegrationBranch(workflow.branch)) throw new Error('Create a feature branch before generating a pull request.');
@@ -177,15 +200,17 @@ export class AgentGitService {
       this.runGit(folder, ['diff', '--stat', `${baseRef}...HEAD`, '--']),
       this.runGit(folder, ['diff', '--no-ext-diff', `${baseRef}...HEAD`, '--']),
     ]);
-    if (!commits.stdout.trim() && !diff.stdout.trim()) throw new Error('There are no branch changes to describe.');
+    if (!diff.stdout.trim()) {
+      throw new AppError(
+        'git.pullRequestChangesRequired',
+        'This branch has no committed changes to include. Commit your work before creating a pull request.',
+      );
+    }
     return {
       baseRef,
-      context: boundedGenerationContext([
-        `## Base\n${baseRef}`,
-        `## Commits\n${commits.stdout.trim() || '(none)'}`,
-        `## Diff stat\n${stat.stdout.trim() || '(none)'}`,
-        `## Diff\n${diff.stdout.trim() || '(none)'}`,
-      ].join('\n\n')),
+      commits: commits.stdout.trim(),
+      stat: stat.stdout.trim(),
+      diff: diff.stdout.trim(),
     };
   }
 

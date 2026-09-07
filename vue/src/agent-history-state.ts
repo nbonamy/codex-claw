@@ -1,24 +1,28 @@
 import type {
   AgentHistoryLoadResult,
   AppSnapshot,
-  AppSnapshotMetadata,
   MainToRendererEvent,
 } from '@codex-claw/core/contracts';
 import { computed, ref } from 'vue';
 import { codexClawApi } from './platform-api';
 
 export function createAgentHistoryState(options: {
-  adoptSnapshotMetadata: (metadata: AppSnapshotMetadata) => void;
+  adoptSnapshot: (snapshot: AppSnapshot) => void;
   getSnapshot: () => AppSnapshot;
   synchronizeComposerSelection: (agentId: string) => void;
 }) {
   const hydratingAgentIds = ref(new Set<string>());
+  const failedAgentIds = ref(new Set<string>());
   const loadingOlderAgentIds = ref(new Set<string>());
   const hasOlderByAgentId = ref<Record<string, boolean>>({});
 
   const isHydratingActiveAgentHistory = computed(() => {
     const agentId = options.getSnapshot().activeAgentId;
     return Boolean(agentId && hydratingAgentIds.value.has(agentId));
+  });
+  const isActiveAgentHistoryFailed = computed(() => {
+    const agentId = options.getSnapshot().activeAgentId;
+    return Boolean(agentId && failedAgentIds.value.has(agentId));
   });
   const activeHistoryHasOlder = computed(() => {
     const snapshot = options.getSnapshot();
@@ -39,7 +43,7 @@ export function createAgentHistoryState(options: {
     }
     markHydrating(activeAgent.id, true);
     try {
-      options.adoptSnapshotMetadata(await codexClawApi.hydrateAgentHistory(activeAgent.id));
+      options.adoptSnapshot(await codexClawApi.hydrateAgentHistory(activeAgent.id));
       options.synchronizeComposerSelection(activeAgent.id);
     } finally {
       markHydrating(activeAgent.id, false);
@@ -63,29 +67,51 @@ export function createAgentHistoryState(options: {
 
   function markHydrating(agentId: string, hydrating: boolean): void {
     const next = new Set(hydratingAgentIds.value);
-    if (hydrating) next.add(agentId);
+    if (hydrating) {
+      next.add(agentId);
+      const failed = new Set(failedAgentIds.value);
+      failed.delete(agentId);
+      failedAgentIds.value = failed;
+    }
     else next.delete(agentId);
     hydratingAgentIds.value = next;
   }
 
-  function handleMainEvent(event: MainToRendererEvent): void {
-    if (event.type !== 'thread.historyLoaded' || !event.agentId || !isRecord(event.payload)) return;
-    const hasOlder = event.payload.hasOlderMessages;
-    if (typeof hasOlder !== 'boolean') return;
-    hasOlderByAgentId.value = { ...hasOlderByAgentId.value, [event.agentId]: hasOlder };
+  function reset(agentId: string): void {
+    const hydrating = new Set(hydratingAgentIds.value);
+    hydrating.delete(agentId);
+    hydratingAgentIds.value = hydrating;
+
+    const failed = new Set(failedAgentIds.value);
+    failed.delete(agentId);
+    failedAgentIds.value = failed;
+
+    const loadingOlder = new Set(loadingOlderAgentIds.value);
+    loadingOlder.delete(agentId);
+    loadingOlderAgentIds.value = loadingOlder;
+
+    const hasOlder = { ...hasOlderByAgentId.value };
+    delete hasOlder[agentId];
+    hasOlderByAgentId.value = hasOlder;
+  }
+
+  function handleMainEvent(event: Extract<MainToRendererEvent, { type: 'thread.historyHydrationFailed' }>): void {
+    const failed = new Set(failedAgentIds.value);
+    failed.add(event.agentId);
+    failedAgentIds.value = failed;
+    markHydrating(event.agentId, false);
   }
 
   return {
     activeHistoryHasOlder,
     handleMainEvent,
     hydrateActive,
+    retryActive: hydrateActive,
+    isActiveAgentHistoryFailed,
     isHydratingActiveAgentHistory,
     isLoadingOlderHistory,
     loadOlder,
     markHydrating,
+    reset,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

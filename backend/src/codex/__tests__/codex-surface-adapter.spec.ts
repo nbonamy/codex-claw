@@ -5,17 +5,45 @@ import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { CodexAppServerClient, type RpcMessage, type RpcTransport } from '@codex-app-sdk/backend/protocol';
 import { CodexSurface } from '@codex-app-sdk/backend';
+import { decodeClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
 import { CodexBackendDriver } from '../codex-driver';
 import { CodexSurfaceAgentAdapter } from '../codex-surface-adapter';
+
+function isLegacyClawConversationEvent(event: BackendEvent): boolean {
+  return new Set<string>([
+    'thread.historyLoaded',
+    'turn.started',
+    'turn.planUpdated',
+    'turn.proposedPlanDelta',
+    'turn.proposedPlanCompleted',
+    'turn.completed',
+    'context.compactionStarted',
+    'context.compactionCompleted',
+    'message.delta',
+    'message.updated',
+    'message.userSubmitted',
+    'message.steer',
+    'item.started',
+    'item.updated',
+    'item.completed',
+    'approval.requested',
+    'toolInput.requested',
+    'error',
+  ]).has(event.type);
+}
 
 class FakeTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];
   readonly close = vi.fn(async () => undefined);
   readonly start = vi.fn(async () => undefined);
   skillBrandColor: unknown;
+  skillDefaultPrompt: unknown;
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
+  completedTurnAgentMessage: string | null = null;
+  emitTurnSettingsUpdated = false;
+  includeLunaModel = false;
   resumedServiceTier: string | null = 'fast';
   turnsListDelayMs = 0;
   readonly fullHistoryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
@@ -33,6 +61,49 @@ class FakeTransport implements RpcTransport {
     queueMicrotask(() => {
       void Promise.resolve(this.response(message.method, params)).then((result) => {
         this.emit({ id: message.id, result });
+        if (message.method === 'turn/start' && this.emitTurnSettingsUpdated) {
+          const input = params as { effort?: string; model?: string; threadId: string };
+          this.emit({
+            method: 'thread/settings/updated',
+            params: {
+              threadId: input.threadId,
+              threadSettings: threadSettings({
+                ...(input.model ? { model: input.model } : {}),
+                ...(input.effort ? {
+                  effort: input.effort,
+                  collaborationMode: {
+                    mode: 'default',
+                    settings: {
+                      model: input.model ?? 'gpt-1',
+                      reasoning_effort: input.effort,
+                      developer_instructions: null,
+                    },
+                  },
+                } : {}),
+              }),
+            },
+          });
+        }
+        if (message.method === 'turn/start' && this.completeTurnsImmediately && this.completedTurnAgentMessage) {
+          const threadId = String((params as { threadId: string }).threadId);
+          const turnId = `turn-${threadId}`;
+          this.emit({
+            method: 'item/completed',
+            params: {
+              threadId,
+              turnId,
+              completedAtMs: 1_700_000_001,
+              item: agentMessage(`handoff-${threadId}`, this.completedTurnAgentMessage),
+            },
+          });
+          this.emit({
+            method: 'turn/completed',
+            params: {
+              threadId,
+              turn: turn(turnId, 'completed'),
+            },
+          });
+        }
       });
     });
   }
@@ -63,7 +134,14 @@ class FakeTransport implements RpcTransport {
           defaultReasoningEffort: 'medium', isDefault: true, inputModalities: ['text'], supportsPersonality: true,
           additionalSpeedTiers: [], serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Faster responses' }], defaultServiceTier: 'fast', upgrade: null,
           upgradeInfo: null, availabilityNux: null,
-        }],
+        }, ...(this.includeLunaModel ? [{
+          id: 'gpt-5.6-luna', model: 'gpt-5.6-luna',
+          displayName: 'GPT-5.6 Luna', description: 'Fast test model', hidden: false,
+          supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }],
+          defaultReasoningEffort: 'low', isDefault: false, inputModalities: ['text'], supportsPersonality: true,
+          additionalSpeedTiers: [], serviceTiers: [], defaultServiceTier: null, upgrade: null,
+          upgradeInfo: null, availabilityNux: null,
+        }] : [])],
         nextCursor: null,
       };
       case 'skills/list': {
@@ -76,7 +154,12 @@ class FakeTransport implements RpcTransport {
               description: `Skill ${this.skillVersion} for ${cwd}`,
               path: `${cwd}/skill-${this.skillVersion}/SKILL.md`,
               scope: 'repo', enabled: true,
-              interface: this.skillBrandColor === undefined ? null : { brandColor: this.skillBrandColor },
+              interface: this.skillBrandColor === undefined && this.skillDefaultPrompt === undefined
+                ? null
+                : {
+                    brandColor: this.skillBrandColor,
+                    defaultPrompt: this.skillDefaultPrompt,
+                  },
             }],
             errors: [],
           }],
@@ -202,7 +285,10 @@ class FakeTransport implements RpcTransport {
       case 'thread/goal/clear': return {};
       case 'turn/start': {
         const threadId = String((params as { threadId: string }).threadId);
-        return { turn: turn(`turn-${threadId}`, this.completeTurnsImmediately ? 'completed' : 'inProgress') };
+        const status = this.completeTurnsImmediately && !this.completedTurnAgentMessage
+          ? 'completed'
+          : 'inProgress';
+        return { turn: turn(`turn-${threadId}`, status) };
       }
       case 'turn/steer': return { turnId: String((params as { expectedTurnId: string }).expectedTurnId) };
       case 'review/start': {
@@ -411,10 +497,17 @@ describe('CodexSurfaceAgentAdapter', () => {
 
   it('creates new agent conversations as user threads in their assigned folder', async () => {
     const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
     const agent = createAgent('agent-new', 'thread-new', '/workspace/new');
     delete agent.backendSession;
+    agent.status = { type: 'working' };
 
     await adapter.sendPrompt(agent, 'Start work');
+
+    expect(events.filter((event) => event.type === 'agent.statusChanged')).not.toContainEqual(
+      expect.objectContaining({ payload: { type: 'idle' } }),
+    );
 
     expect(lastRequest(transport, 'thread/start')).toMatchObject({
       params: {
@@ -440,6 +533,123 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/name/set'
     ))).toHaveLength(1);
+  });
+
+  it('compresses a session by handing off into a replacement thread before archiving the old one', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    const compressionAgent: Agent = {
+      ...agentA,
+      backendDefaults: {
+        kind: 'codex',
+        approvalPreset: 'ask-for-approval',
+        model: 'gpt-1',
+        reasoningEffort: 'medium',
+        serviceTier: 'fast',
+      },
+    };
+    adapter.onEvent((event) => {
+      events.push(event);
+      if (event.type !== 'thread.settingsUpdated') return;
+      compressionAgent.backendDefaults = {
+        ...(compressionAgent.backendDefaults?.kind === 'codex'
+          ? compressionAgent.backendDefaults
+          : { kind: 'codex' as const }),
+        ...event.payload.threadSettings,
+      };
+    });
+    transport.completeTurnsImmediately = true;
+    transport.completedTurnAgentMessage = '## Handoff\n\nContinue the renderer migration.';
+    transport.emitTurnSettingsUpdated = true;
+    transport.includeLunaModel = true;
+    await adapter.hydrateAgent(compressionAgent);
+
+    await expect(adapter.compressSession(compressionAgent)).resolves.toStrictEqual({ threadId: 'thread-new' });
+
+    const turnStarts = transport.sent.filter((message) => (
+      'method' in message && message.method === 'turn/start'
+    ));
+    expect(turnStarts).toStrictEqual([
+      expect.objectContaining({
+        params: expect.objectContaining({
+          threadId: 'thread-a',
+          model: 'gpt-5.6-luna',
+          effort: 'low',
+          input: [expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('Summarize the full session from beginning to end'),
+          })],
+        }),
+      }),
+      expect.objectContaining({
+        params: expect.objectContaining({
+          threadId: 'thread-new',
+          model: 'gpt-1',
+          effort: 'medium',
+          input: [expect.objectContaining({
+            type: 'text',
+            text: '<context>\n## Handoff\n\nContinue the renderer migration.\n\nInstruction: Treat this handoff only as background context. Do not respond, acknowledge, summarize, or take any action. Wait for the user\'s next prompt.\n</context>\n\nSummary of previous activity. Do not respond or take any action. Wait for my next prompt.',
+          })],
+        }),
+      }),
+    ]);
+    expect(turnStarts[0]).toMatchObject({
+      params: {
+        input: [expect.objectContaining({
+          text: expect.stringContaining('An activity means a coherent body of work'),
+        })],
+      },
+    });
+    expect(turnStarts[0]).toMatchObject({
+      params: {
+        input: [expect.objectContaining({
+          text: expect.stringContaining('Aim for about 4000 characters and never exceed 6000 characters'),
+        })],
+      },
+    });
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: {
+        cwd: '/workspace/a',
+        threadSource: 'user',
+        model: 'gpt-1',
+        serviceTier: 'fast',
+      },
+    });
+    expect(events.slice().reverse().find((event) => (
+      event.type === 'codex.conversationSnapshotChanged' && event.threadId === 'thread-new'
+    ))).toMatchObject({
+      payload: {
+        snapshot: {
+          messages: expect.arrayContaining([
+            expect.objectContaining({ role: 'user' }),
+          ]),
+        },
+      },
+    });
+    expect(lastRequest(transport, 'thread/settings/update')).toMatchObject({
+      params: { threadId: 'thread-new', effort: 'medium' },
+    });
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({
+      params: { threadId: 'thread-a' },
+    });
+    const methods = transport.sent.flatMap((message) => (
+      'method' in message ? [message.method] : []
+    ));
+    expect(methods.lastIndexOf('turn/start')).toBeLessThan(methods.lastIndexOf('thread/archive'));
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'thread.settingsUpdated',
+      threadId: 'thread-a',
+      payload: {
+        threadSettings: expect.objectContaining({
+          model: 'gpt-5.6-luna',
+          reasoningEffort: 'low',
+        }),
+      },
+    }));
+    expect(compressionAgent.backendDefaults).toMatchObject({
+      model: 'gpt-1',
+      reasoningEffort: 'medium',
+    });
   });
 
   it('creates and restores workspace-free quick chats without sending a cwd', async () => {
@@ -562,70 +772,194 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/agentMessage/delta',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: prefix },
     });
-    expect(events.filter((event) => event.type === 'message.delta')).toStrictEqual([
+    expect(events.filter((event) => (
+      event.type === 'codex.conversationEventReceived'
+      && event.payload.event.type === 'message.delta'
+    ))).toStrictEqual([
       expect.objectContaining({
-        agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
-        payload: expect.objectContaining({ itemId: 'agent-a', delta: prefix, phase: 'commentary' }),
+        agentId: 'agent-a', threadId: 'thread-a',
+        payload: expect.objectContaining({
+          event: expect.objectContaining({
+            turnId: 'turn-thread-a',
+            payload: expect.objectContaining({ itemId: 'agent-a', delta: prefix, phase: 'commentary' }),
+          }),
+        }),
       }),
     ]);
-    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
 
     events.length = 0;
     transport.emit({
       method: 'item/agentMessage/delta',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: ' suffix' },
     });
-    expect(events).toStrictEqual([
+    expect(events.filter((event) => event.type === 'codex.conversationEventReceived')).toStrictEqual([
       expect.objectContaining({
-        type: 'message.delta', agentId: 'agent-a', threadId: 'thread-a',
-        payload: expect.objectContaining({ itemId: 'agent-a', delta: ' suffix', phase: 'commentary' }),
+        agentId: 'agent-a', threadId: 'thread-a',
+        payload: expect.objectContaining({
+          event: expect.objectContaining({
+            type: 'message.delta',
+            payload: expect.objectContaining({ itemId: 'agent-a', delta: ' suffix', phase: 'commentary' }),
+          }),
+        }),
       }),
     ]);
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
 
     events.length = 0;
     transport.emit({
       method: 'item/agentMessage/delta',
       params: { threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'agent-b', delta: 'Only B' },
     });
-    expect(events).toStrictEqual([
-      expect.objectContaining({ type: 'message.delta', agentId: 'agent-b', threadId: 'thread-b' }),
+    expect(events.filter((event) => event.type === 'codex.conversationEventReceived')).toStrictEqual([
+      expect.objectContaining({
+        agentId: 'agent-b', threadId: 'thread-b',
+        payload: expect.objectContaining({ event: expect.objectContaining({ type: 'message.delta' }) }),
+      }),
     ]);
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
   });
 
-  it('projects completed reasoning summaries without raw reasoning content', async () => {
-    const { adapter, transport } = createAdapter();
+  it('uses the SDK optimistic Codex prompt as the single user row and adopts its turn id', async () => {
+    const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
     await adapter.hydrateAgent(agentA);
     events.length = 0;
 
-    transport.emit({
-      method: 'item/completed',
-      params: {
-        threadId: 'thread-a', turnId: 'turn-reasoning', completedAtMs: 2,
-        item: {
-          type: 'reasoning',
-          id: 'reasoning-1',
-          summary: ['Inspecting the renderer flow'],
-          content: ['raw reasoning must stay private'],
+    await adapter.sendPrompt(agentA, 'Run exactly once');
+
+    const providerEvents = events.flatMap((event) => (
+      event.type === 'codex.conversationEventReceived' ? [event.payload.event] : []
+    ));
+    const submitted = providerEvents.find((event) => (
+      event.type === 'message.appended' && event.payload.message.role === 'user'
+    ));
+    const updated = providerEvents.find((event) => (
+      event.type === 'message.updated' && event.payload.message.role === 'user'
+    ));
+    const submittedMessage = submitted?.type === 'message.appended' ? submitted.payload.message : null;
+    expect(submittedMessage).toMatchObject({ role: 'user' });
+    expect(submittedMessage).not.toHaveProperty('turnId');
+    expect(updated?.type === 'message.updated' ? updated.payload.message : null).toMatchObject({
+      id: submittedMessage?.id,
+      role: 'user',
+      turnId: 'turn-thread-a',
+    });
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
+  });
+
+  it('publishes one reset snapshot followed by independently revisioned SDK events', async () => {
+    const { adapter } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await Promise.all([adapter.hydrateAgent(agentA), adapter.hydrateAgent(agentB)]);
+    const resetFrames = events.filter((event) => event.type === 'codex.conversationSnapshotChanged');
+    for (const agent of [agentA, agentB]) {
+      const frame = resetFrames.find((event) => event.agentId === agent.id);
+      expect(frame).toMatchObject({
+        type: 'codex.conversationSnapshotChanged',
+        agentId: agent.id,
+        payload: {
+          snapshot: {
+            conversations: [],
+            models: [],
+            skills: [],
+            plugins: [],
+            permissionProfiles: [],
+            approvalPresets: [],
+          },
         },
+      });
+    }
+    events.length = 0;
+
+    await Promise.all([
+      adapter.sendPrompt(agentA, 'Prompt A'),
+      adapter.sendPrompt(agentB, 'Prompt B'),
+    ]);
+
+    expect(events.some((event) => event.type === 'codex.conversationSnapshotChanged')).toBe(false);
+    const frames = events.filter((event) => event.type === 'codex.conversationEventReceived');
+    for (const [agent, threadId, prompt] of [
+      [agentA, 'thread-a', 'Prompt A'],
+      [agentB, 'thread-b', 'Prompt B'],
+    ] as const) {
+      const agentFrames = frames.filter((event) => event.agentId === agent.id);
+      expect(agentFrames.length).toBeGreaterThan(0);
+      const revisions = agentFrames.map((event) => event.type === 'codex.conversationEventReceived'
+        ? event.payload.revision
+        : 0);
+      expect(revisions.every((revision, index) => index === 0 || revision > revisions[index - 1]!)).toBe(true);
+      expect(agentFrames).toContainEqual(expect.objectContaining({
+        agentId: agent.id,
+        backend: 'codex',
+        threadId,
+        payload: expect.objectContaining({
+          event: expect.objectContaining({
+            conversationId: threadId,
+            type: 'message.updated',
+            payload: expect.objectContaining({
+              message: expect.objectContaining({
+                role: 'user',
+                turnId: `turn-${threadId}`,
+                parts: [{ type: 'text', text: prompt }],
+              }),
+            }),
+          }),
+        }),
+      }));
+    }
+
+    const priorRevision = frames
+      .filter((event) => event.type === 'codex.conversationEventReceived' && event.agentId === agentA.id)
+      .at(-1)?.payload.revision ?? 0;
+    adapter.forgetAgentSession(agentA.id);
+    events.length = 0;
+    await adapter.hydrateAgent(agentA);
+    const reboundFrame = events
+      .filter((event) => event.type === 'codex.conversationSnapshotChanged')
+      .at(-1);
+    expect(reboundFrame).toMatchObject({
+      type: 'codex.conversationSnapshotChanged',
+      agentId: agentA.id,
+    });
+    expect(reboundFrame?.type === 'codex.conversationSnapshotChanged'
+      ? reboundFrame.payload.revision
+      : 0).toBeGreaterThan(priorRevision);
+  });
+
+  it('edits a hydrated terminal turn through the SDK and returns the replacement prompt', async () => {
+    const { adapter, surface, transport } = createAdapter();
+    const driver = new CodexBackendDriver(adapter);
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-original', 'completed', [
+        {
+          type: 'userMessage', id: 'user-original', clientId: null,
+          content: [{ type: 'text', text: 'Original prompt', textElements: [] }],
+        },
+        agentMessage('assistant-original', 'Original response'),
+      ]),
+    ]);
+    await driver.hydrateAgent(agentA);
+
+    const result = await driver.editTurn(agentA, 'turn-original', 'Edited prompt');
+
+    expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
+      params: { threadId: 'thread-a', numTurns: 1 },
+    });
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: {
+        threadId: 'thread-a',
+        input: [{ type: 'text', text: 'Edited prompt' }],
       },
     });
-
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'message.updated',
-      payload: {
-        message: expect.objectContaining({
-          parts: [{
-            type: 'reasoning',
-            summary: 'Inspecting the renderer flow',
-            itemId: 'reasoning-1',
-            summaryIndex: 0,
-          }],
-        }),
-      },
+    expect(result).toMatchObject({
+      backendSession: { kind: 'codex', threadId: 'thread-a' },
+      activeTurnId: 'turn-thread-a',
+    });
+    expect(surface.conversation('thread-a').getSnapshot().messages).toContainEqual(expect.objectContaining({
+      role: 'user', turnId: 'turn-thread-a', parts: [{ type: 'text', text: 'Edited prompt' }],
     }));
-    expect(JSON.stringify(events)).not.toContain('raw reasoning must stay private');
   });
 
   it('adapts SDK subagent events into app-owned tree events', async () => {
@@ -663,7 +997,9 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
 
-    expect(events.slice(0, 2)).toStrictEqual([
+    expect(events.filter((event) => (
+      event.type === 'subagent.operationChanged' || event.type === 'subagent.activityChanged'
+    ))).toStrictEqual([
       expect.objectContaining({
         type: 'subagent.operationChanged', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-subagent',
         payload: {
@@ -841,7 +1177,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
   });
 
-  it('maps tool and plan mutations once while retaining Claw plan events', async () => {
+  it('forwards tool and plan mutations only through the SDK conversation stream', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
@@ -864,9 +1200,11 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/mcpToolCall/progress',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'tool-a', message: 'Halfway' },
     });
-    expect(events).toStrictEqual([
-      expect.objectContaining({ type: 'item.updated', agentId: 'agent-a', threadId: 'thread-a' }),
-    ]);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'codex.conversationEventReceived', agentId: 'agent-a', threadId: 'thread-a',
+      payload: expect.objectContaining({ event: expect.objectContaining({ type: 'tool.updated' }) }),
+    }));
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
 
     events.length = 0;
     const markdown = '# Plan\n- [ ] Implement';
@@ -874,12 +1212,13 @@ describe('CodexSurfaceAgentAdapter', () => {
       method: 'item/plan/delta',
       params: { threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'plan-a', delta: markdown },
     });
-    expect(events).toStrictEqual([
-      expect.objectContaining({
-        type: 'turn.proposedPlanDelta', agentId: 'agent-a', threadId: 'thread-a',
-        payload: expect.objectContaining({ itemId: 'plan-a', delta: markdown }),
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'codex.conversationEventReceived', agentId: 'agent-a', threadId: 'thread-a',
+      payload: expect.objectContaining({
+        event: expect.objectContaining({ type: 'plan.delta', payload: expect.objectContaining({ delta: markdown }) }),
       }),
-    ]);
+    }));
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
 
     events.length = 0;
     transport.emit({
@@ -889,12 +1228,13 @@ describe('CodexSurfaceAgentAdapter', () => {
         item: { type: 'plan', id: 'plan-a', text: markdown },
       },
     });
-    expect(events).toStrictEqual([
-      expect.objectContaining({
-        type: 'turn.proposedPlanCompleted', agentId: 'agent-a', threadId: 'thread-a',
-        payload: { itemId: 'plan-a', markdown },
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'codex.conversationEventReceived', agentId: 'agent-a', threadId: 'thread-a',
+      payload: expect.objectContaining({
+        event: expect.objectContaining({ type: 'plan.completed', payload: { itemId: 'plan-a', markdown } }),
       }),
-    ]);
+    }));
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
   });
 
   it('maps SDK file activity into the app-owned event stream', async () => {
@@ -965,22 +1305,34 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
     await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
-      type: 'backendApproval.requested', agentId: 'agent-b', threadId: 'thread-b',
+      type: 'codex.conversationEventReceived', agentId: 'agent-b', threadId: 'thread-b',
+      payload: expect.objectContaining({ event: expect.objectContaining({ type: 'approval.requested' }) }),
     })));
     expect(events).toContainEqual(expect.objectContaining({
-      type: 'backendApproval.requested',
-      payload: { approval: expect.objectContaining({
-        id: 'approval-b', kind: 'command', conversationId: 'thread-b', turnId: 'turn-b',
-        itemId: 'command-b', command: 'npm test', cwd: '/workspace/b',
-        allowedScopes: ['once', 'session'], canDeny: true,
-      }) },
+      type: 'codex.conversationEventReceived',
+      payload: expect.objectContaining({ event: expect.objectContaining({
+        type: 'approval.requested',
+        payload: { approval: expect.objectContaining({
+          id: 'approval-b', kind: 'command', conversationId: 'thread-b', turnId: 'turn-b',
+          itemId: 'command-b', command: 'npm test', cwd: '/workspace/b',
+          allowedScopes: ['once', 'session'], canDeny: true,
+        }) },
+      }) }),
     }));
-    expect(events.some((event) => event.agentId === 'agent-a' && event.type === 'backendApproval.requested')).toBe(false);
+    expect(events.some((event) => (
+      event.agentId === 'agent-a' && event.type === 'codex.conversationEventReceived'
+      && event.payload.event.type === 'approval.requested'
+    ))).toBe(false);
     await adapter.respondToClientRequest({ id: 'approval-b', payload: { decision: 'allow_conversation' } });
     expect(lastResponse(transport, 'approval-b')).toMatchObject({ result: { decision: 'acceptForSession' } });
     expect(events).toContainEqual(expect.objectContaining({
-      type: 'backendApproval.resolved', agentId: 'agent-b', threadId: 'thread-b',
-      payload: expect.objectContaining({ decision: 'approve', scope: 'session', reason: 'host' }),
+      type: 'codex.conversationEventReceived', agentId: 'agent-b', threadId: 'thread-b',
+      payload: expect.objectContaining({
+        event: expect.objectContaining({
+          type: 'approval.resolved',
+          payload: expect.objectContaining({ decision: 'approve', scope: 'session', reason: 'host' }),
+        }),
+      }),
     }));
 
     events.length = 0;
@@ -1010,31 +1362,75 @@ describe('CodexSurfaceAgentAdapter', () => {
     }]);
   });
 
-  it('normalizes provider skill colors in lists and change events', async () => {
+  it('emits a decodable skill update when the provider returns a null brand color', async () => {
     const { adapter, transport } = createAdapter();
-    transport.skillBrandColor = null;
-
-    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
-      expect.not.objectContaining({ brandColor: expect.anything() }),
-    ]);
-
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
     await adapter.hydrateAgent(agentA);
     events.length = 0;
+
+    transport.skillBrandColor = null;
     transport.skillVersion = 2;
     transport.emit({ method: 'skills/changed', params: {} });
 
     await vi.waitFor(() => expect(events.some((event) => event.type === 'skills.changed')).toBe(true));
-    const event = events.find((candidate) => candidate.type === 'skills.changed');
-    expect(event?.payload).toEqual(expect.objectContaining({
-      skills: [expect.not.objectContaining({ brandColor: expect.anything() })],
-    }));
+    const event = events.find((candidate): candidate is Extract<BackendEvent, { type: 'skills.changed' }> => (
+      candidate.type === 'skills.changed'
+    ))!;
+    const notification = {
+      ...event,
+      seq: 1,
+      occurredAt: event.occurredAt ?? '2026-09-05T00:00:00.000Z',
+    };
+    expect(decodeClawBackendEvent(notification)).toBe(notification);
+    expect(event.payload.skills[0]).not.toHaveProperty('brandColor');
 
     transport.skillBrandColor = '#123abc';
     await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
       expect.objectContaining({ brandColor: '#123abc' }),
     ]);
+  });
+
+  it('emits and lists decodable skills when the provider returns a null default prompt', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    events.length = 0;
+
+    transport.skillDefaultPrompt = null;
+    transport.skillVersion = 2;
+    transport.emit({ method: 'skills/changed', params: {} });
+
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'skills.changed')).toBe(true));
+    const event = events.find((candidate): candidate is Extract<BackendEvent, { type: 'skills.changed' }> => (
+      candidate.type === 'skills.changed'
+    ))!;
+    const notification = {
+      ...event,
+      seq: 1,
+      occurredAt: event.occurredAt ?? '2026-09-05T00:00:00.000Z',
+    };
+    expect(decodeClawBackendEvent(notification)).toBe(notification);
+    expect(event.payload.skills[0]).not.toHaveProperty('defaultPrompt');
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.not.objectContaining({ defaultPrompt: expect.anything() }),
+    ]);
+
+    transport.skillDefaultPrompt = 'Review this repository';
+    await expect(adapter.listSkills(agentA, true)).resolves.toEqual([
+      expect.objectContaining({ defaultPrompt: 'Review this repository' }),
+    ]);
+
+    events.length = 0;
+    transport.skillVersion = 3;
+    transport.emit({ method: 'skills/changed', params: {} });
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      type: 'skills.changed',
+      payload: expect.objectContaining({
+        skills: [expect.objectContaining({ defaultPrompt: 'Review this repository' })],
+      }),
+    })));
   });
 
   it('preserves image and file attachments through send and steer SDK turn input', async () => {
@@ -1113,64 +1509,6 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('projects completed generated images into renderer media parts', async () => {
-    const { adapter, transport } = createAdapter();
-    const events: BackendEvent[] = [];
-    adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
-    events.length = 0;
-
-    transport.emit({
-      method: 'item/started',
-      params: {
-        threadId: 'thread-a', turnId: 'turn-image', startedAtMs: 1,
-        item: {
-          type: 'imageGeneration', id: 'image-live', status: 'inProgress',
-          revisedPrompt: null, result: '',
-        },
-      },
-    });
-    transport.emit({
-      method: 'item/completed',
-      params: {
-        threadId: 'thread-a', turnId: 'turn-image', completedAtMs: 2,
-        item: {
-          type: 'imageGeneration', id: 'image-live', status: 'completed',
-          revisedPrompt: 'Draw the route map', result: generatedPngBase64,
-          savedPath: '/tmp/generated route.png',
-        },
-      },
-    });
-
-    await vi.waitFor(() => {
-      const update = [...events].reverse().find((event) => event.type === 'message.updated');
-      expect(update).toMatchObject({
-        agentId: 'agent-a',
-        threadId: 'thread-a',
-        payload: {
-          message: expect.objectContaining({
-            parts: [
-              expect.objectContaining({
-                type: 'tool', id: 'image-live', status: 'completed',
-              }),
-              {
-                type: 'media',
-                itemId: 'image-live',
-                media: {
-                  url: 'file:///tmp/generated%20route.png',
-                  alt: 'Generated image',
-                  mimeType: 'image/png',
-                  prompt: 'Draw the route map',
-                  title: 'Generated image',
-                },
-              },
-            ],
-          }),
-        },
-      });
-    });
-  });
-
   it('refreshes models and uses handle-scoped approval capabilities', async () => {
     const { adapter, transport } = createAdapter();
     const driver = new CodexBackendDriver(adapter);
@@ -1214,14 +1552,8 @@ describe('CodexSurfaceAgentAdapter', () => {
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     }));
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-a',
-      type: 'turn.completed',
-      turnId: 'turn-thread-a',
-      payload: { status: 'interrupted' },
-    }));
-    expect(events.find((event) => event.type === 'thread.historyLoaded')).toMatchObject({
-      payload: { messages: expect.not.arrayContaining([expect.objectContaining({ status: 'streaming' })]) },
+    expect(events.slice().reverse().find((event) => event.type === 'codex.conversationSnapshotChanged')).toMatchObject({
+      payload: { snapshot: { activeTurnId: null, busy: false } },
     });
   });
 
@@ -1294,7 +1626,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
   });
 
-  it('keeps cached active history authoritative and reconciles through live completion events', async () => {
+  it('keeps cached active provider state authoritative and reconciles live completion', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
@@ -1306,7 +1638,6 @@ describe('CodexSurfaceAgentAdapter', () => {
       type: 'agent.statusChanged',
       payload: { type: 'working' },
     }));
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
 
     events.length = 0;
     await adapter.hydrateAgent(agentA);
@@ -1315,7 +1646,9 @@ describe('CodexSurfaceAgentAdapter', () => {
       'method' in message && message.method === 'thread/resume'
     ))).toHaveLength(1);
     expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
-    expect(events).toHaveLength(0);
+    expect(events).toStrictEqual([
+      expect.objectContaining({ type: 'codex.conversationSnapshotChanged', agentId: 'agent-a' }),
+    ]);
 
     transport.emit({
       method: 'turn/completed',
@@ -1329,14 +1662,14 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
-      type: 'turn.completed',
-      turnId: 'turn-thread-a',
-      payload: expect.objectContaining({ status: 'interrupted' }),
+      type: 'codex.conversationEventReceived',
+      payload: expect.objectContaining({
+        event: expect.objectContaining({ type: 'turn.completed', turnId: 'turn-thread-a' }),
+      }),
     }));
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
   });
 
-  it('publishes full persisted turn items from the initial history page', async () => {
+  it('publishes full persisted turn items in the provider-owned snapshot', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     const turnId = 'turn-thread-a';
@@ -1355,74 +1688,21 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.hydrateAgent(agentA);
 
-    const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
-    expect(historyEvents).toHaveLength(1);
-    const history = historyEvents[0];
-    expect(history).toMatchObject({
+    const providerSnapshot = events.slice().reverse().find((event) => event.type === 'codex.conversationSnapshotChanged');
+    expect(providerSnapshot).toMatchObject({
       payload: {
-        replace: true,
-        messages: [
-          {
+        snapshot: {
+          messages: [{
             role: 'assistant',
             parts: [
-              { type: 'text', text: 'I’ll switch macOS to Dark appearance now.' },
-              { type: 'tool', id: 'command-settings', kind: 'command' },
-              { type: 'text', text: 'Done — your Mac is now in Dark Mode.' },
+              expect.objectContaining({ type: 'text', text: 'I’ll switch macOS to Dark appearance now.' }),
+              expect.objectContaining({ type: 'tool', id: 'command-settings', kind: 'command' }),
+              expect.objectContaining({ type: 'text', text: 'Done — your Mac is now in Dark Mode.' }),
             ],
-          },
-        ],
-      },
-    });
-  });
-
-  it('preserves SDK tool kinds without a closed allowlist', async () => {
-    const { adapter, surface, transport } = createAdapter();
-    const events: BackendEvent[] = [];
-    transport.fullHistoryTurnsByThreadId.set('thread-a', [
-      turn('turn-search', 'completed', [{
-        type: 'webSearch', id: 'search-history', query: 'codex app server', action: null, results: null,
-      }]),
-    ]);
-    adapter.onEvent((event) => events.push(event));
-
-    await adapter.hydrateAgent(agentA);
-
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'thread.historyLoaded',
-      payload: expect.objectContaining({
-        messages: [expect.objectContaining({
-          parts: [expect.objectContaining({ id: 'search-history', kind: 'webSearch', type: 'tool' })],
-        })],
-      }),
-    }));
-
-    events.length = 0;
-    const emitSurfaceEvent = (surface as unknown as {
-      emitEvent(origin: 'notification', event: unknown): void;
-    }).emitEvent.bind(surface);
-    emitSurfaceEvent('notification', {
-      type: 'tool.completed',
-      conversationId: 'thread-a',
-      turnId: 'turn-future',
-      payload: {
-        messageId: 'message-future',
-        toolPart: {
-          type: 'tool', id: 'future-tool', kind: 'futureSdkTool', title: 'Future tool', status: 'completed',
-          input: { path: '/tmp/input.txt' }, output: { result: 'done', agentName: 'feature/contracts', private: 'omit' }, metadata: { cwd: '/workspace' },
+          }],
         },
       },
     });
-
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'item.completed',
-      payload: expect.objectContaining({
-        messageId: 'message-future',
-        toolPart: expect.objectContaining({
-          id: 'future-tool', kind: 'futureSdkTool',
-          input: { path: '/tmp/input.txt' }, output: { result: 'done', agentName: 'feature/contracts' }, metadata: { cwd: '/workspace' },
-        }),
-      }),
-    }));
   });
 
   it('preserves retry metadata when adapting SDK turn errors', async () => {
@@ -1448,17 +1728,17 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
-      type: 'error',
-      turnId: 'turn-thread-a',
-      payload: {
-        error: { message: 'Reconnecting… 3/5' },
-        message: 'Reconnecting… 3/5',
-        willRetry: true,
-      },
+      type: 'codex.conversationEventReceived',
+      payload: expect.objectContaining({ event: expect.objectContaining({
+        type: 'turn.error',
+        turnId: 'turn-thread-a',
+        payload: { error: { message: 'Reconnecting… 3/5' }, willRetry: true },
+      }) }),
     }));
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
   });
 
-  it('publishes the initial five full turns before prepending requested history incrementally', async () => {
+  it('publishes initial and prepended history through the provider-owned stream', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     transport.turnsListDelayMs = 25;
@@ -1471,150 +1751,46 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.hydrateAgent(agentA);
 
-    const initialHistory = events.filter((event) => event.type === 'thread.historyLoaded');
-    expect(initialHistory).toHaveLength(1);
-    expect(initialHistory[0]).toMatchObject({
+    const initialHistory = events.slice().reverse().find((event) => event.type === 'codex.conversationSnapshotChanged');
+    expect(initialHistory).toMatchObject({
       payload: {
-        replace: true,
-        messages: expect.arrayContaining([
-          expect.objectContaining({ parts: [{ type: 'text', text: 'Message 6', itemId: 'message-6' }] }),
-        ]),
+        snapshot: { messages: expect.arrayContaining([
+          expect.objectContaining({ parts: [expect.objectContaining({ type: 'text', text: 'Message 6' })] }),
+        ]) },
       },
     });
-    expect((initialHistory[0]?.payload as { messages: unknown[] }).messages).toHaveLength(5);
+    expect(initialHistory?.type === 'codex.conversationSnapshotChanged'
+      ? initialHistory.payload.snapshot.messages
+      : []).toHaveLength(5);
 
     await expect(adapter.loadOlderHistory(agentA)).resolves.toStrictEqual({ hasOlder: false });
 
-    const historyEvents = events.filter((event) => event.type === 'thread.historyLoaded');
-    expect(historyEvents).toHaveLength(2);
-    expect(historyEvents[1]).toMatchObject({
-      payload: {
-        preserveKnownMessages: true,
-        replace: false,
-        messages: [
-          expect.objectContaining({ parts: [{ type: 'text', text: 'Message 1', itemId: 'message-1' }] }),
-        ],
-      },
-    });
-    expect((historyEvents[1]?.payload as { messages: unknown[] }).messages).toHaveLength(1);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'codex.conversationEventReceived',
+      payload: expect.objectContaining({ event: expect.objectContaining({
+        type: 'conversation.historyPrepended',
+        payload: expect.objectContaining({
+          messages: [expect.objectContaining({
+            parts: [expect.objectContaining({ type: 'text', text: 'Message 1' })],
+          })],
+        }),
+      }) }),
+    }));
   });
 
-  it('omits unused tool payloads from history', async () => {
-    const { adapter, transport } = createAdapter();
-    const events: BackendEvent[] = [];
-    const oversizedOutput = 'x'.repeat(128 * 1024);
-    transport.fullHistoryTurnsByThreadId.set('thread-a', [
-      turn('turn-large-tool', 'completed', [{
-        type: 'mcpToolCall',
-        id: 'tool-large',
-        server: 'tools',
-        tool: 'inspect',
-        status: 'completed',
-        arguments: { kind: 'schoolPride', path: '/tmp/data', to: 'agent-target', prompt: oversizedOutput },
-        appContext: null,
-        pluginId: null,
-        result: {
-          structuredContent: { kind: 'schoolPride', recipientName: 'Target agent', content: oversizedOutput },
-          content: [{ type: 'text', text: oversizedOutput }],
-        },
-        error: null,
-        durationMs: 10,
-      }, {
-        type: 'imageGeneration', id: 'history-image', status: 'completed',
-        revisedPrompt: 'Draw a historical route map', result: generatedPngBase64,
-        savedPath: '/tmp/historical route.png',
-      }]),
-    ]);
-    adapter.onEvent((event) => events.push(event));
-
-    await adapter.hydrateAgent(agentA);
-
-    const history = events.find((event) => event.type === 'thread.historyLoaded');
-    const toolPart = ((history?.payload as { messages: RendererMessage[] }).messages[0]?.parts[0]);
-    expect(toolPart).toMatchObject({
-      type: 'tool',
-      id: 'tool-large',
-      kind: 'mcp',
-    });
-    expect(toolPart).not.toHaveProperty('body');
-    expect(toolPart).not.toHaveProperty('input');
-    expect(toolPart).not.toHaveProperty('output');
-    expect(toolPart).not.toHaveProperty('metadata');
-    expect((history?.payload as { messages: RendererMessage[] }).messages[0]?.parts).toContainEqual({
-      type: 'media',
-      itemId: 'history-image',
-      media: {
-        url: 'file:///tmp/historical%20route.png',
-        alt: 'Generated image',
-        mimeType: 'image/png',
-        prompt: 'Draw a historical route map',
-        title: 'Generated image',
-      },
-    });
-    expect(Buffer.byteLength(JSON.stringify(history))).toBeLessThan(64 * 1024);
-  });
-
-  it('projects announcement lifecycle without retaining spoken text or messages', async () => {
-    const { adapter, surface } = createAdapter();
-    const events: BackendEvent[] = [];
-    adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
-    events.length = 0;
-    const emitSurfaceEvent = (surface as unknown as {
-      emitEvent(origin: 'notification', event: unknown): void;
-    }).emitEvent.bind(surface);
-    emitSurfaceEvent('notification', {
-      type: 'tool.completed',
-      conversationId: 'thread-a',
-      turnId: 'turn-announcement',
-      payload: {
-        messageId: 'message-announcement',
-        toolPart: {
-          type: 'tool',
-          id: 'tool-announcement',
-          kind: 'mcp',
-          title: 'announce',
-          status: 'completed',
-          input: { phase: 'finish', text: 'A phrase that must not reach renderer state.' },
-          output: {
-          structuredContent: {
-            success: true,
-            phase: 'finish',
-            outcome: 'skipped',
-          },
-          content: [{ type: 'text', text: 'private tool transcript' }],
-          },
-          metadata: { server: 'codex_claw', tool: 'announce' },
-        },
-      },
-    });
-
-    const completed = events.find((event) => event.type === 'item.completed');
-    const part = (completed?.payload as { toolPart: RendererMessage['parts'][number] }).toolPart;
-    expect(part).toMatchObject({
-      type: 'tool',
-      input: { phase: 'finish' },
-      output: { structuredContent: { success: true, phase: 'finish', outcome: 'skipped' } },
-    });
-    expect(JSON.stringify(part)).not.toContain('phrase that must not');
-    expect(JSON.stringify(part)).not.toContain('private tool transcript');
-    expect(JSON.stringify(part)).not.toContain('Announcement queued');
-  });
-
-  it('suppresses server-owned action echoes while keeping hydrate and explicit resume ownership exact', async () => {
+  it('keeps Codex conversation state provider-owned across resume, hydration, and actions', async () => {
     const { adapter, surface, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
 
     await adapter.resumeConversation(agentA, 'thread-a');
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
     const cachedHandle = surface.conversation('thread-a');
     adapter.forgetAgentSession(agentA.id);
     expect(surface.conversation('thread-a')).not.toBe(cachedHandle);
     events.length = 0;
 
     await adapter.hydrateAgent(agentA);
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toHaveLength(1);
     expect(events).toContainEqual(expect.objectContaining({
       type: 'thread.settingsUpdated',
       payload: expect.objectContaining({
@@ -1624,7 +1800,9 @@ describe('CodexSurfaceAgentAdapter', () => {
     events.length = 0;
 
     await adapter.hydrateAgent(agentA);
-    expect(events.filter((event) => event.type === 'thread.historyLoaded')).toHaveLength(0);
+    expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toHaveLength(1);
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
+    events.length = 0;
 
     await adapter.setThreadGoal(agentA, 'Ship it');
     await adapter.clearThreadGoal(agentA);
@@ -1632,38 +1810,42 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.sendPrompt(agentA, 'Run once');
     await adapter.steerPrompt(agentA, 'Try smaller');
-    expect(events.some((event) => event.type === 'message.steer')).toBe(false);
-    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
 
     transport.emit({
       method: 'turn/completed',
       params: { threadId: 'thread-a', turn: turn('turn-thread-a', 'completed') },
     });
     events.length = 0;
-    await adapter.rollbackToTurn(agentA, 'turn-thread-a');
-    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
+    await adapter.deleteTurn(agentA, 'turn-thread-a');
   });
 
-  it('forks through the SDK handle and maps the returned history', async () => {
+  it('forks through the SDK handle and publishes the target provider snapshot', async () => {
     const { adapter, transport } = createAdapter();
     const targetAgent = createForkTarget();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
     transport.fullHistoryTurnsByThreadId.set('thread-forked', [
       turn('turn-forked', 'completed', [agentMessage('message-forked', 'Forked answer')]),
     ]);
 
     await expect(adapter.forkConversation(agentA, targetAgent)).resolves.toMatchObject({
       threadId: 'thread-forked',
-      messages: [expect.objectContaining({
-        agentId: 'agent-forked',
-        parts: [expect.objectContaining({ type: 'text', text: 'Forked answer' })],
-      })],
     });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'codex.conversationSnapshotChanged',
+      agentId: 'agent-forked',
+      payload: expect.objectContaining({ snapshot: expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({ parts: [expect.objectContaining({ type: 'text', text: 'Forked answer' })] }),
+        ]),
+      }) }),
+    }));
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
       params: { threadId: 'thread-a', cwd: '/workspace/a' },
     });
   });
 
-  it('forwards an absolute host message index to the SDK fork operation', async () => {
+  it('forwards a stable turn id to the SDK fork operation', async () => {
     const { adapter, transport } = createAdapter();
     const targetAgent = createForkTarget();
     transport.fullHistoryTurnsByThreadId.set('thread-a', [
@@ -1674,7 +1856,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
     await adapter.hydrateAgent(agentA);
 
-    await expect(adapter.forkConversation(agentA, targetAgent, 0)).resolves.toMatchObject({
+    await expect(adapter.forkConversation(agentA, targetAgent, 'turn-source')).resolves.toMatchObject({
       threadId: 'thread-forked',
     });
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
@@ -1682,7 +1864,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('materializes an SDK-marked slash review prompt without replacing history', async () => {
+  it('materializes an SDK-marked slash review prompt through the provider stream', async () => {
     const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
@@ -1691,10 +1873,11 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.sendPrompt(agentA, '/review');
 
-    expect(events.filter((event) => event.type === 'message.userSubmitted')).toStrictEqual([
+    const providerMessages = events.flatMap((event) => (
+      event.type === 'codex.conversationEventReceived' ? [event.payload.event] : []
+    ));
+    expect(providerMessages.filter((event) => event.type === 'message.appended')).toStrictEqual([
       expect.objectContaining({
-        agentId: agentA.id,
-        threadId: 'thread-a',
         payload: {
           message: expect.objectContaining({
             role: 'user',
@@ -1706,10 +1889,10 @@ describe('CodexSurfaceAgentAdapter', () => {
         },
       }),
     ]);
-    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
   });
 
-  it('forwards user messages submitted through remote control', async () => {
+  it('forwards remote-control user messages through the provider stream', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
@@ -1731,11 +1914,11 @@ describe('CodexSurfaceAgentAdapter', () => {
       },
     });
 
-    expect(events.filter((event) => event.type === 'message.userSubmitted')).toStrictEqual([
+    const providerMessages = events.flatMap((event) => (
+      event.type === 'codex.conversationEventReceived' ? [event.payload.event] : []
+    ));
+    expect(providerMessages.filter((event) => event.type === 'message.appended')).toStrictEqual([
       expect.objectContaining({
-        agentId: agentA.id,
-        threadId: 'thread-a',
-        turnId: 'turn-remote',
         payload: {
           message: expect.objectContaining({
             role: 'user',
@@ -1744,7 +1927,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         },
       }),
     ]);
-    expect(events.some((event) => event.type === 'thread.historyLoaded')).toBe(false);
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
   });
 
   it('revalidates an idle cached transcript after its 15-minute freshness ttl', async () => {
@@ -1772,64 +1955,49 @@ describe('CodexSurfaceAgentAdapter', () => {
       expect(transport.sent.filter((message) => (
         'method' in message && message.method === 'thread/resume'
       ))).toHaveLength(2);
-      expect(events.filter((event) => event.type === 'thread.historyLoaded')).toStrictEqual([
-        expect.objectContaining({ payload: expect.objectContaining({ preserveKnownTurns: true, replace: false }) }),
-      ]);
+      expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toHaveLength(2);
+      expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('maps notification-only compaction completion once and ignores speculative action starts', async () => {
+  it('replays the cached provider snapshot when a fresh renderer hydrates the same agent', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
+    transport.fullHistoryTurnsByThreadId.set('thread-a', [
+      turn('turn-cached', 'completed', [agentMessage('message-cached', 'Cached answer')]),
+    ]);
     adapter.onEvent((event) => events.push(event));
+
     await adapter.hydrateAgent(agentA);
     events.length = 0;
 
-    transport.emit({
-      method: 'item/completed',
-      params: {
-        threadId: 'thread-a', turnId: 'turn-notification-only', completedAtMs: 2,
-        item: { type: 'contextCompaction', id: 'compact-notification-only' },
-      },
-    });
-    expect(events.filter((event) => event.type === 'context.compactionStarted')).toStrictEqual([
+    await adapter.hydrateAgent(agentA);
+
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/resume'
+    ))).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toStrictEqual([
       expect.objectContaining({
-        agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-notification-only',
-        payload: { itemId: 'compact-notification-only' },
+        agentId: agentA.id,
+        payload: expect.objectContaining({
+          snapshot: expect.objectContaining({
+            messages: expect.arrayContaining([
+              expect.objectContaining({
+                parts: [expect.objectContaining({ type: 'text', text: 'Cached answer' })],
+              }),
+            ]),
+          }),
+        }),
       }),
     ]);
-    expect(events.filter((event) => event.type === 'context.compactionCompleted')).toHaveLength(1);
-
-    await adapter.sendPrompt(agentA, 'Create a turn');
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-a', turn: turn('turn-thread-a', 'completed') },
-    });
-    events.length = 0;
-    await adapter.compactThread(agentA);
-    expect(events.filter((event) => event.type === 'context.compactionStarted')).toHaveLength(0);
-
-    transport.emit({
-      method: 'item/completed',
-      params: {
-        threadId: 'thread-a', turnId: 'turn-compaction', completedAtMs: 3,
-        item: { type: 'contextCompaction', id: 'compact-action' },
-      },
-    });
-    expect(events.filter((event) => (
-      event.type === 'context.compactionStarted' || event.type === 'context.compactionCompleted'
-    )).map((event) => ({ type: event.type, turnId: event.turnId }))).toStrictEqual([
-      { type: 'context.compactionStarted', turnId: 'turn-compaction' },
-      { type: 'context.compactionCompleted', turnId: 'turn-compaction' },
-    ]);
+    expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
   });
 });
 
 const agentA = createAgent('agent-a', 'thread-a', '/workspace/a');
 const agentB = createAgent('agent-b', 'thread-b', '/workspace/b');
-const generatedPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 function createAdapter(): { adapter: CodexSurfaceAgentAdapter; surface: CodexSurface; transport: FakeTransport } {
   const transport = new FakeTransport();
@@ -1878,6 +2046,48 @@ function turn(
 
 function agentMessage(id: string, text: string): Record<string, unknown> {
   return { type: 'agentMessage', id, text, phase: null, memoryCitation: null };
+}
+
+function threadSettings(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    cwd: '/workspace/a',
+    approvalPolicy: 'on-request',
+    approvalsReviewer: 'user',
+    sandboxPolicy: {
+      type: 'workspaceWrite', writableRoots: ['/workspace/a'], networkAccess: false,
+      excludeTmpdirEnvVar: false, excludeSlashTmp: false,
+    },
+    activePermissionProfile: { id: ':workspace', extends: null },
+    model: 'gpt-1',
+    modelProvider: 'openai',
+    serviceTier: 'fast',
+    effort: 'medium',
+    summary: null,
+    collaborationMode: {
+      mode: 'default',
+      settings: { model: 'gpt-1', reasoning_effort: 'medium', developer_instructions: null },
+    },
+    multiAgentMode: 'explicitRequestOnly',
+    personality: null,
+    ...overrides,
+  };
+}
+
+function conversationRows(messages: readonly {
+  id: string;
+  parts: readonly { text?: string; type: string }[];
+  role: string;
+  turnId?: string;
+}[]) {
+  return messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    turnId: message.turnId ?? null,
+    text: message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => part.text ?? '')
+      .join(''),
+  }));
 }
 
 function resumeResponse(

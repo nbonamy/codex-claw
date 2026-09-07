@@ -13,6 +13,12 @@ import {
   teams,
 } from './agent-sidebar-test-harness';
 
+const ElTooltipStub = {
+  name: 'ElTooltip',
+  props: ['content'],
+  template: '<span class="tooltip-stub" :data-content="content"><slot /></span>',
+};
+
 describe('AgentSidebar actions', () => {
   const id8Agents = [
     agents[0]!,
@@ -68,11 +74,12 @@ describe('AgentSidebar actions', () => {
         activeAgentId: closedAgent.id,
         teamName: 'Codex Claw',
       },
-      global: { components: { ElPopover } },
+      global: { components: { ElPopover, ElTooltip: ElTooltipStub } },
     });
 
     const attention = wrapper.get('.agent-sidebar__pull-request-attention');
     expect(attention.attributes('aria-label')).toContain('#7 was closed');
+    expect(wrapper.get('.tooltip-stub').attributes('data-content')).toContain('#7 was closed');
     expect(wrapper.find('.agent-sidebar__status').exists()).toBe(false);
     await attention.trigger('click');
 
@@ -241,11 +248,11 @@ describe('AgentSidebar actions', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
-          { ...agents[0], id: 'starting', status: { type: 'starting' } },
+          { ...agents[0], id: 'working', status: { type: 'working' } },
           { ...agents[0], id: 'awaiting', status: { type: 'awaitingInput' } },
           { ...agents[0], id: 'error', status: { type: 'error', message: 'failed' } },
         ],
-        activeAgentId: 'starting',
+        activeAgentId: 'working',
         teamName: 'Codex Claw',
       },
       global: {
@@ -253,7 +260,7 @@ describe('AgentSidebar actions', () => {
       },
     });
 
-    expect(wrapper.find('[aria-label="Starting"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
     expect(wrapper.find('[aria-label="Awaiting input"]').exists()).toBe(true);
     expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });
@@ -359,6 +366,7 @@ describe('AgentSidebar actions', () => {
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
+      'Compress Session',
       'Resume Session',
       'Restart Agent',
       'Close Agent',
@@ -410,5 +418,29 @@ describe('AgentSidebar actions', () => {
     expect(wrapper.emitted('open-in')).toStrictEqual([[
       { agentId: 'agent-dina', application: 'finder' },
     ]]);
+  });
+
+  it('offers session compression for an idle Codex agent with a conversation', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{
+          ...agents[0]!,
+          backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        }],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        components: { ElPopover },
+      },
+    });
+
+    await wrapper.get('.agent-sidebar__agent').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await clickPortaledMenuItem('Compress Session');
+
+    expect(wrapper.emitted('compress-session')).toStrictEqual([['agent-dina']]);
   });
 });

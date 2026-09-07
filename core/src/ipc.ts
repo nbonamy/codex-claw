@@ -66,6 +66,7 @@ export const ipcChannels = {
   deleteAutomation: 'automation:delete',
   listAgentConversations: 'conversation:list',
   resumeAgentConversation: 'conversation:resume',
+  compressAgentSession: 'conversation:compress',
   readConversationMessages: 'conversation:messages:read',
   createAgent: 'agent:create',
   createQuickChat: 'agent:quick-chat:create',
@@ -113,9 +114,9 @@ export const ipcChannels = {
   steerQueuedPrompt: 'agent:steer-queued-prompt',
   updateQueuedPrompt: 'agent:update-queued-prompt',
   interruptAgent: 'agent:interrupt',
-  deleteMessage: 'message:delete',
-  editMessage: 'message:edit',
-  retryMessage: 'message:retry',
+  deleteTurn: 'turn:delete',
+  editTurn: 'turn:edit',
+  retryTurn: 'turn:retry',
   browserOpen: 'browser:open',
   browserOpenVisualization: 'browser:visualization:open',
   browserNavigate: 'browser:navigate',
@@ -133,8 +134,6 @@ export const ipcChannels = {
   appCommand: 'app:command',
   updateStatusChanged: 'app:update-status-changed',
 } as const;
-
-export type IpcChannel = typeof ipcChannels[keyof typeof ipcChannels];
 
 type CodexClawIpcRequestApi = Omit<CodexClawApi, 'onAppCommand' | 'onEvent' | 'onUpdateStatusChanged'>;
 

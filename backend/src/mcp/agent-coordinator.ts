@@ -524,8 +524,6 @@ function agentStatusLabel(status: AgentStatus): string {
   switch (status.type) {
     case 'working':
       return literalAppText(status.detail) ?? 'Working';
-    case 'starting':
-      return 'Starting';
     case 'awaitingInput':
       return literalAppText(status.detail) ?? 'Awaiting input';
     case 'error':

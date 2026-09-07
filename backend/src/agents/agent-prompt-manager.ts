@@ -148,5 +148,5 @@ export class AgentPromptManager {
 }
 
 function canStartPrompt(agent: Agent): boolean {
-  return agent.status.type !== 'starting' && agent.status.type !== 'working' && agent.status.type !== 'awaitingInput';
+  return agent.status.type !== 'working' && agent.status.type !== 'awaitingInput';
 }

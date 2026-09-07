@@ -410,7 +410,7 @@ describe('clawd runtime', () => {
     let titlePromise: Promise<void> | undefined;
     let startedPromise: Promise<void> | undefined;
     mocks.sendAgentPrompt.mockImplementation((_snapshot, _driver, _agentId, _prompt, _options, emit, hooks) => {
-      emit({ type: 'message.updated' });
+      emit({ agentId: 'agent-dina', type: 'agent.statusChanged', payload: { type: 'working' } });
       titlePromise = hooks.onBackendSessionUpdated({
         backendSession: { kind: 'codex', threadId: 'thread-42' },
       }, true);

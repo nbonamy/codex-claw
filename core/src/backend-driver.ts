@@ -25,21 +25,28 @@ import type {
   ThreadGoal,
 } from './contracts';
 
-export type BackendEvent = Omit<MainToRendererEvent, 'seq' | 'occurredAt'> & Partial<Pick<MainToRendererEvent, 'seq' | 'occurredAt'>>;
+type BackendEventFrom<Event extends MainToRendererEvent> = Event extends MainToRendererEvent
+  ? Omit<Event, 'seq' | 'occurredAt'> & Partial<Pick<Event, 'seq' | 'occurredAt'>>
+  : never;
+
+export type BackendEvent = BackendEventFrom<MainToRendererEvent>;
 
 export type BackendSendResult = {
   backendSession: BackendSession;
   turnId?: string;
 };
 
-export type BackendRollbackResult = {
+export type BackendTurnActionResult = {
   backendSession: BackendSession;
-  messages: RendererMessage[];
+  activeTurnId: string | null;
 };
 
 export type BackendConversationResumeResult = {
   backendSession: BackendSession;
-  messages: RendererMessage[];
+};
+
+export type BackendSessionCompressionResult = {
+  backendSession: BackendSession;
 };
 
 export type BackendConversationForkResult = BackendConversationResumeResult & {
@@ -100,11 +107,14 @@ export type AgentBackendDriver = {
   loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;
   listConversations?(agent: Agent): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
-  forkConversation?(agent: Agent, targetAgent: Agent, messageIndex?: number): Promise<BackendConversationForkResult>;
+  compressSession?(agent: Agent): Promise<BackendSessionCompressionResult>;
+  forkConversation?(agent: Agent, targetAgent: Agent, turnId?: string): Promise<BackendConversationForkResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   readConversationSummary?(agent: Agent, ref: BackendConversationRef): Promise<ConversationSummary | null>;
   steerPrompt?(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;
-  rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>;
+  deleteTurn?(agent: Agent, turnId: string): Promise<BackendTurnActionResult>;
+  editTurn?(agent: Agent, turnId: string, content: string): Promise<BackendTurnActionResult>;
+  retryTurn?(agent: Agent, turnId: string): Promise<BackendTurnActionResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
   listPlugins?(agent: Agent): Promise<BackendPluginSummary[]>;
   listSkills?(agent: Agent): Promise<BackendSkillSummary[]>;

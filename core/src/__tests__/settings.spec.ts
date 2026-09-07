@@ -34,6 +34,7 @@ describe('settings contracts', () => {
       agentListCompact: true,
       shareCodexSkillsAndPlugins: true,
       worktreeInitializationMode: 'automatic',
+      sessionCompressionWarningEnabled: true,
       repositoryIcons: {},
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
@@ -48,6 +49,8 @@ describe('settings contracts', () => {
       .toBe(false);
     expect(normalizeGeneralSettings({ spokenAnnouncementVoice: 'not-a-voice' }).spokenAnnouncementVoice)
       .toBe('af_heart');
+    expect(normalizeGeneralSettings({ sessionCompressionWarningEnabled: false }).sessionCompressionWarningEnabled)
+      .toBe(false);
     expect(normalizeGeneralSettings(null)).toStrictEqual(defaultGeneralSettings);
     expect(normalizeAppshotSettings(null)).toStrictEqual(defaultAppshotSettings);
     expect(normalizePluginSettings([])).toStrictEqual(defaultPluginSettings);
@@ -119,6 +122,7 @@ describe('settings contracts', () => {
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
       shareCodexSkillsAndPlugins: true,
+      sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',
       repositoryIcons: {},
       appshots: defaultAppshotSettings,

@@ -1,5 +1,6 @@
 import type { Agent, AppSnapshot, MainToRendererEvent, RendererMessage } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 
 const defaultTimeoutMs = 90_000;
 
@@ -30,13 +31,13 @@ export type DelegatedWorkAction =
   };
 
 type PendingReport = {
-  messageStartIndex: number;
   resolve(summary: string | null): void;
   timer: ReturnType<typeof setTimeout>;
 };
 
 export type DelegatedWorkReportServiceOptions = {
   getSnapshot: () => AppSnapshot;
+  readConversationMessages: (agent: Agent) => Promise<RendererMessage[]>;
   sendPrompt: (agentId: string, prompt: string) => void;
   sendMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   timeoutMs?: number;
@@ -59,7 +60,6 @@ export class DelegatedWorkReportService {
       return null;
     }
 
-    const snapshot = this.options.getSnapshot();
     const summary = new Promise<string | null>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(agent.id);
@@ -67,7 +67,6 @@ export class DelegatedWorkReportService {
       }, this.options.timeoutMs ?? defaultTimeoutMs);
       timer.unref?.();
       this.pending.set(agent.id, {
-        messageStartIndex: snapshot.messages.length,
         resolve,
         timer,
       });
@@ -103,27 +102,41 @@ export class DelegatedWorkReportService {
     }
   }
 
-  handleEvent(event: Pick<MainToRendererEvent, 'agentId' | 'turnId' | 'type'>): void {
+  handleEvent(event: MainToRendererEvent): void {
     if (!event.agentId) return;
     const pending = this.pending.get(event.agentId);
     if (!pending) return;
 
-    if (event.type === 'error') {
+    const conversationEvent = providerConversationEventView(event);
+    if (conversationEvent.type === 'error') {
       this.complete(event.agentId, null);
       return;
     }
-    if (event.type !== 'turn.completed') return;
-
-    const message = latestAssistantMessage(
-      this.options.getSnapshot().messages.slice(pending.messageStartIndex),
-      event.agentId,
-      event.turnId,
-    );
-    this.complete(event.agentId, messageText(message));
+    if (conversationEvent.type !== 'turn.completed') return;
+    void this.completeFromConversation(event.agentId, conversationEvent.turnId, pending);
   }
 
   close(): void {
     for (const [agentId] of this.pending) this.complete(agentId, null);
+  }
+
+  private async completeFromConversation(
+    agentId: string,
+    turnId: string | undefined,
+    pending: PendingReport,
+  ): Promise<void> {
+    const snapshot = this.options.getSnapshot();
+    const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+    let messages: RendererMessage[] = [];
+    if (agent) {
+      try {
+        messages = await this.options.readConversationMessages(agent);
+      } catch {
+        // A report is optional; Git delivery continues when history is unavailable.
+      }
+    }
+    if (this.pending.get(agentId) !== pending) return;
+    this.complete(agentId, messageText(latestAssistantMessage(messages, agentId, turnId)));
   }
 
   private complete(agentId: string, summary: string | null): void {

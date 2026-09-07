@@ -16,10 +16,10 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "benchmark:conversation": "vitest bench src/__benchmarks__/conversation-streaming.bench.ts",
     "test:watch": "vitest watch"
   },
   "devDependencies": {
+    "@codex-app-sdk/core": "file:../../codex-app-sdk/packages/core",
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "4.1.8",
     "typescript": "^6.0.3",

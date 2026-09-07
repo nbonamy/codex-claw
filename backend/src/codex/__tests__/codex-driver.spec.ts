@@ -32,18 +32,11 @@ describe('CodexBackendDriver', () => {
     expect(sessionManager.sendPrompt).not.toHaveBeenCalled();
   });
 
-  it('routes bare compact prompts to manual compaction', async () => {
+  it('leaves session compression to the app-owned command flow', () => {
     const sessionManager = createSessionManager();
     const driver = new CodexBackendDriver(sessionManager);
 
-    const result = driver.tryHandlePromptCommand(agent, '/compact');
-
-    await expect(result).resolves.toStrictEqual({
-      backendSession: { kind: 'codex', threadId: 'thread-compact' },
-      turnId: undefined,
-    });
-    expect(sessionManager.compactThread).toHaveBeenCalledWith(agent);
-    expect(sessionManager.sendPrompt).not.toHaveBeenCalled();
+    expect(driver.tryHandlePromptCommand(agent, '/compact')).toBeNull();
   });
 
   it('keeps compact prompts with extra text as normal prompts', () => {
@@ -51,7 +44,16 @@ describe('CodexBackendDriver', () => {
     const driver = new CodexBackendDriver(sessionManager);
 
     expect(driver.tryHandlePromptCommand(agent, '/compact remember this')).toBeNull();
-    expect(sessionManager.compactThread).not.toHaveBeenCalled();
+  });
+
+  it('delegates session compression and returns the replacement Codex session', async () => {
+    const sessionManager = createSessionManager();
+    const driver = new CodexBackendDriver(sessionManager);
+
+    await expect(driver.compressSession(agent)).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-compressed' },
+    });
+    expect(sessionManager.compressSession).toHaveBeenCalledWith(agent);
   });
 
   it('routes review prompts through SDK slash handling', async () => {
@@ -231,20 +233,17 @@ describe('CodexBackendDriver', () => {
     await expect(driver.listConversations(agent)).resolves.toStrictEqual(conversations);
     await expect(driver.resumeConversation(agent, { backend: 'codex', threadId: 'thread-dina' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
-      messages,
     });
     expect(sessionManager.listConversations).toHaveBeenCalledWith(agent);
     expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, 'thread-dina');
     await expect(driver.forkConversation(agent, targetAgent)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages,
     });
-    await expect(driver.forkConversation(agent, targetAgent, 5)).resolves.toStrictEqual({
+    await expect(driver.forkConversation(agent, targetAgent, 'turn-5')).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
-      messages,
     });
     expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
-    expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 5);
+    expect(sessionManager.forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 'turn-5');
   });
 
   it('loads one older history page through the session manager', async () => {
@@ -259,14 +258,14 @@ describe('CodexBackendDriver', () => {
 
 function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {}): CodexSurfaceAgentAdapter {
   return {
-    compactThread: vi.fn().mockResolvedValue({ threadId: 'thread-compact' }),
+    compressSession: vi.fn().mockResolvedValue({ threadId: 'thread-compressed' }),
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     getRuntimeStatus: vi.fn().mockReturnValue({ backend: 'codex', status: 'notConfigured' }),
     sendPrompt: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     listConversations: vi.fn().mockResolvedValue([]),
-    forkConversation: vi.fn().mockResolvedValue({ threadId: 'thread-forked', messages: [] }),
-    resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina', messages: [] }),
+    forkConversation: vi.fn().mockResolvedValue({ threadId: 'thread-forked' }),
+    resumeConversation: vi.fn().mockResolvedValue({ threadId: 'thread-dina' }),
     readConversationMessages: vi.fn().mockResolvedValue([]),
     loadOlderHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
     setConversationTitle: vi.fn().mockResolvedValue(undefined),

@@ -1,4 +1,5 @@
-import type { Agent, AgentBackend, AppSnapshot, ClientRequest, MainToRendererEvent } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AppSnapshot, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 
 export type ClientRequestOwner = { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string };
 
@@ -22,17 +23,18 @@ export class ClientRequestRegistry {
   }
 
   record(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
+    const conversationEvent = providerConversationEventView(event);
     if (
-      event.type !== 'approval.requested' &&
+      conversationEvent.type !== 'approval.requested' &&
       event.type !== 'backendApproval.requested' &&
-      event.type !== 'toolInput.requested'
+      conversationEvent.type !== 'toolInput.requested'
     ) {
       return;
     }
 
     const requestId = event.type === 'backendApproval.requested'
-      ? backendApprovalRequestId(event.payload)
-      : clientRequest(event.payload)?.id ?? null;
+      ? nonBlankRequestId(event.payload.approval?.id)
+      : requestIdFromPayload(conversationEvent.payload);
     if (!requestId) return;
 
     const snapshot = this.options.getSnapshot();
@@ -53,25 +55,11 @@ export class ClientRequestRegistry {
 
 }
 
-function clientRequest(value: unknown): ClientRequest | null {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    Array.isArray(value) ||
-    !('id' in value) ||
-    !('kind' in value) ||
-    typeof value.id !== 'string' ||
-    (value.kind !== 'confirm_tool' && value.kind !== 'ask_user')
-  ) {
-    return null;
-  }
-  return value as ClientRequest;
+function requestIdFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  return nonBlankRequestId('id' in payload && typeof payload.id === 'string' ? payload.id : undefined);
 }
 
-function backendApprovalRequestId(value: unknown): string | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const approval = (value as Record<string, unknown>).approval;
-  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) return null;
-  const id = (approval as Record<string, unknown>).id;
-  return typeof id === 'string' && id.trim().length > 0 ? id : null;
+function nonBlankRequestId(value: string | undefined): string | null {
+  return value?.trim() ? value : null;
 }

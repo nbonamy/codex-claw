@@ -12,9 +12,9 @@ import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './ba
 import { getClawdDaemonStatus, refreshClawdDaemon, setClawdDaemonEnabled } from './daemon-launch-agent';
 import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { isAppSnapshot, isClientState } from '@codex-claw/core/snapshot-guards';
-import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
-import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type AppSnapshotMetadata, type BackendConnectionState, type BackendConversationRef, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@codex-claw/core/snapshot-guards';
+import { applyMainEventToSnapshot, replaceAppSnapshot } from '@codex-claw/core/snapshot';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type ClawdDaemonStatus, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks } from './app-menu';
@@ -34,6 +34,9 @@ type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
 type StartupMaintenance = () => Promise<void>;
 type SpokenAnnouncementQueuePort = Pick<SpokenAnnouncementQueue, 'dispose' | 'queue' | 'queueWithCompletion'>;
+type ClientEventInput<Event extends MainToRendererEvent = MainToRendererEvent> = Event extends MainToRendererEvent
+  ? Omit<Event, 'seq' | 'source' | 'occurredAt'>
+  : never;
 type PendingBrowserOpen = {
   agentId: string;
   browserId: string;
@@ -99,7 +102,7 @@ export class AppController {
       resourcesPath: process.resourcesPath,
     }),
   ) {
-    this.snapshot = initialSnapshot ? metadataOnlySnapshot(initialSnapshot) : null;
+    this.snapshot = initialSnapshot;
     this.policyAwareSpokenAnnouncements = new PolicyAwareSpokenAnnouncementQueue(
       this.spokenAnnouncements,
       () => ({
@@ -397,8 +400,8 @@ export class AppController {
       return this.duplicateAgent(agentId, options);
     });
 
-    ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, messageIndex?: number) => {
-      return this.forkAgent(agentId, messageIndex);
+    ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, turnId?: string) => {
+      return this.forkAgent(agentId, turnId);
     });
 
     ipc.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
@@ -416,6 +419,10 @@ export class AppController {
 
     ipc.handle(ipcChannels.restartAgent, async (_event, agentId: string) => {
       return this.restartAgent(agentId);
+    });
+
+    ipc.handle(ipcChannels.compressAgentSession, async (_event, agentId: string) => {
+      return this.compressAgentSession(agentId);
     });
 
     ipc.handle(ipcChannels.hydrateAgentHistory, async (_event, agentId: string) => {
@@ -514,16 +521,16 @@ export class AppController {
       return this.interruptAgent(agentId);
     });
 
-    ipc.handle(ipcChannels.deleteMessage, (_event, agentId: string, messageId: string) => {
-      return this.deleteMessage(agentId, messageId);
+    ipc.handle(ipcChannels.deleteTurn, (_event, agentId: string, turnId: string) => {
+      return this.deleteTurn(agentId, turnId);
     });
 
-    ipc.handle(ipcChannels.editMessage, (_event, agentId: string, messageId: string, prompt: string) => {
-      return this.editMessage(agentId, messageId, prompt);
+    ipc.handle(ipcChannels.editTurn, (_event, agentId: string, turnId: string, content: string) => {
+      return this.editTurn(agentId, turnId, content);
     });
 
-    ipc.handle(ipcChannels.retryMessage, (_event, agentId: string, messageId: string) => {
-      return this.retryMessage(agentId, messageId);
+    ipc.handle(ipcChannels.retryTurn, (_event, agentId: string, turnId: string) => {
+      return this.retryTurn(agentId, turnId);
     });
 
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string) => this.browserOpen(agentId, browserId, url));
@@ -804,10 +811,10 @@ export class AppController {
     }));
   }
 
-  private async forkAgent(agentId: string, messageIndex?: number): Promise<AppSnapshot> {
+  private async forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentFork, {
       agentId,
-      ...(messageIndex === undefined ? {} : { messageIndex }),
+      ...(turnId === undefined ? {} : { turnId }),
     }));
   }
 
@@ -830,12 +837,8 @@ export class AppController {
     }));
   }
 
-  private async selectAgent(agentId: string): Promise<AppSnapshotMetadata> {
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentSelect, { agentId }));
-  }
-
-  private async updateAgentFolder(agentId: string, folder: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentFolderUpdate, { agentId, folder }));
+  private async selectAgent(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentSelect, { agentId }));
   }
 
   private async assignWorkItemToAgent(agentId: string, item: unknown): Promise<AppSnapshot> {
@@ -1022,7 +1025,7 @@ export class AppController {
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
-    this.snapshot = metadataOnlySnapshot(snapshot);
+    this.snapshot = snapshot;
     this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
     try {
@@ -1033,12 +1036,12 @@ export class AppController {
     }
   }
 
-  private async adoptBackendMetadata(metadata: AppSnapshotMetadata): Promise<AppSnapshotMetadata> {
+  private async adoptBackendMutationSnapshot(nextSnapshot: AppSnapshot): Promise<AppSnapshot> {
     if (!this.snapshot) throw new Error('clawd snapshot is not available.');
-    applySnapshotMetadata(this.snapshot, metadata);
+    replaceAppSnapshot(this.snapshot, nextSnapshot);
     this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
-    return metadata;
+    return nextSnapshot;
   }
 
   private async getSnapshot(): Promise<AppSnapshot> {
@@ -1061,9 +1064,9 @@ export class AppController {
     agentId: string,
     prompt: string,
     options?: RendererSendPromptOptions,
-  ): Promise<AppSnapshotMetadata> {
+  ): Promise<AppSnapshot> {
     const backendOptions = this.resolveRendererPromptOptions(options);
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentPromptSend, {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPromptSend, {
       agentId,
       prompt,
       options: backendOptions,
@@ -1155,15 +1158,25 @@ export class AppController {
   }
 
   private emitBrowserAnnotation(annotation: BrowserAnnotation): void {
-    this.emitClientEvent('browser.annotationCreated', annotation);
+    this.emitClientEvent({
+      type: 'browser.annotationCreated',
+      payload: annotation,
+    });
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRestart, { agentId }));
   }
 
-  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshotMetadata> {
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(backendMethods.agentHistoryHydrate, { agentId }));
+  private async compressAgentSession(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(
+      backendMethods.agentSessionCompress,
+      { agentId },
+    ));
+  }
+
+  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHistoryHydrate, { agentId }));
   }
 
   private async loadOlderAgentHistory(agentId: string): Promise<{ hasOlder: boolean }> {
@@ -1228,9 +1241,9 @@ export class AppController {
     });
   }
 
-  private async steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshotMetadata> {
+  private async steerPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): Promise<AppSnapshot> {
     const backendOptions = this.resolveRendererPromptOptions(options);
-    return this.adoptBackendMetadata(await this.requireBackendClient().request<AppSnapshotMetadata>(
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(
       backendMethods.agentPromptSteer,
       backendOptions ? { agentId, prompt, options: backendOptions } : { agentId, prompt },
     ));
@@ -1271,16 +1284,16 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentInterrupt, { agentId }));
   }
 
-  private async deleteMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageDelete, { agentId, messageId }));
+  private async deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnDelete, { agentId, turnId }));
   }
 
-  private async editMessage(agentId: string, messageId: string, prompt: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageUpdate, { agentId, messageId, prompt }));
+  private async editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnEdit, { agentId, turnId, content }));
   }
 
-  private async retryMessage(agentId: string, messageId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentMessageRetry, { agentId, messageId }));
+  private async retryTurn(agentId: string, turnId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnRetry, { agentId, turnId }));
   }
 
   private async chooseAgentFolder(): Promise<string | null> {
@@ -1393,7 +1406,7 @@ export class AppController {
       if (!isClawSnapshotGetResult(backendState)) throw new Error('clawd returned an invalid snapshot.');
 
       let synchronizedSnapshot = backendState.snapshot;
-      this.snapshot = metadataOnlySnapshot(synchronizedSnapshot);
+      this.snapshot = synchronizedSnapshot;
       this.policyAwareSpokenAnnouncements.refresh();
       this.clientState = backendState.clientState;
       this.lastBackendEventSeq = backendState.lastEventSeq;
@@ -1407,8 +1420,9 @@ export class AppController {
           break;
         }
         const rendererEvent = eventForRenderer(event);
-        if (isAppSnapshot(event.snapshot)) synchronizedSnapshot = event.snapshot;
-        else applyMainEventToSnapshot(synchronizedSnapshot, rendererEvent);
+        const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
+        if (decodedSnapshot) synchronizedSnapshot = decodedSnapshot.value;
+        else if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(synchronizedSnapshot, rendererEvent);
         this.applyBackendEvent(event, true);
       }
       if (!gap) {
@@ -1553,15 +1567,15 @@ export class AppController {
 
   private applyBackendEvent(event: ClawBackendEvent, notifyRenderer: boolean): void {
     const rendererEvent = eventForRenderer(event);
+    const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
     for (const snapshot of this.transientSnapshots) {
-      if (isAppSnapshot(event.snapshot)) overwriteAppSnapshot(snapshot, event.snapshot);
-      else applyMainEventToSnapshot(snapshot, rendererEvent);
+      if (decodedSnapshot) overwriteAppSnapshot(snapshot, decodedSnapshot.value);
+      else if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(snapshot, rendererEvent);
     }
-    if (isAppSnapshot(event.snapshot)) {
-      this.snapshot = metadataOnlySnapshot(event.snapshot);
+    if (decodedSnapshot) {
+      this.snapshot = decodedSnapshot.value;
     } else if (this.snapshot) {
-      applyMainEventToSnapshot(this.snapshot, rendererEvent);
-      this.snapshot.messages = [];
+      if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(this.snapshot, rendererEvent);
     }
     this.policyAwareSpokenAnnouncements.refresh();
     if (isClientState(event.clientState)) {
@@ -1618,28 +1632,37 @@ export class AppController {
 
   private setConnectionState(state: BackendConnectionState): void {
     this.connectionState = state;
-    this.emitClientEvent('client.connectionChanged', state);
+    this.emitClientEvent({
+      type: 'client.connectionChanged',
+      payload: state,
+    });
   }
 
   private emitSnapshotToRenderer(snapshot?: AppSnapshot): void {
     if (snapshot) {
-      this.emitClientEvent('snapshot.updated', snapshotMetadata(snapshot), snapshot);
+      this.emitClientEvent({
+        type: 'snapshot.updated',
+        payload: snapshot,
+        snapshot,
+      });
     } else if (this.snapshot) {
-      this.emitClientEvent('snapshot.updated', snapshotMetadata(this.snapshot));
+      this.emitClientEvent({
+        type: 'snapshot.updated',
+        payload: this.snapshot,
+      });
     }
   }
 
-  private emitClientEvent(type: MainToRendererEvent['type'], payload: unknown, snapshot?: AppSnapshot): void {
+  private emitClientEvent(event: ClientEventInput): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
     this.clientEventSeq += 1;
-    sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls({
+    const rendererEvent: MainToRendererEvent = {
+      ...event,
       seq: this.clientEventSeq,
       source: 'client',
-      type,
-      payload,
       occurredAt: new Date().toISOString(),
-      ...(snapshot ? { snapshot } : {}),
-    }, this.localMediaRegistry));
+    };
+    sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls(rendererEvent, this.localMediaRegistry));
   }
 
   private syncPowerSaveBlocker(): void {
@@ -1806,10 +1829,6 @@ export function requiresSingleInstanceLock(isPackaged: boolean): boolean {
   return isPackaged;
 }
 
-function metadataOnlySnapshot(snapshot: AppSnapshot): AppSnapshot {
-  return { ...snapshot, messages: [] };
-}
-
 function overwriteAppSnapshot(target: AppSnapshot, source: AppSnapshot): void {
   const mutableTarget = target as unknown as Record<string, unknown>;
   for (const key of Object.keys(mutableTarget)) {
@@ -1824,4 +1843,11 @@ function isRemoteAutomationLocation(location: AutomationLocation | undefined): l
 
 function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
   return { ...event, source: 'backend' };
+}
+
+function decodeSnapshotFromBackendEvent(event: ClawBackendEvent): DecodedAppSnapshot | null {
+  const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
+  if (sideChannelSnapshot) return sideChannelSnapshot;
+  if (event.type !== 'snapshot.updated') return null;
+  return decodeAppSnapshot(event.payload);
 }

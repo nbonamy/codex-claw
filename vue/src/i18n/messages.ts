@@ -94,6 +94,7 @@ export const messages = {
     agents: {
       actions: 'Agent actions',
       close: 'Close Agent',
+      compressSession: 'Compress Session',
       duplicate: 'Duplicate Agent',
       edit: 'Edit Agent',
       fork: 'Fork Agent',
@@ -113,6 +114,14 @@ export const messages = {
         empty: 'Use initials',
         noun: 'avatar',
       },
+    },
+    sessionCompression: {
+      title: 'Compress session?',
+      detail: 'The agent will keep a condensed summary of the session, but it will lose access to the detailed history. Some details may be omitted. The full conversation will remain available in Archived sessions.',
+      dontShowAgain: 'Don’t show this warning again',
+      action: 'Compress session',
+      progressTitle: 'Summarizing session…',
+      progressDetail: 'Extracting key decisions, completed work, and next steps for the new session.',
     },
     sidebar: {
       agents: 'Agents',
@@ -155,7 +164,6 @@ export const messages = {
       awaitingInput: 'Awaiting input',
       error: 'Error',
       idle: 'Idle',
-      starting: 'Starting',
       working: 'Working',
     },
     backend: {
@@ -320,6 +328,9 @@ export const messages = {
         invalidName: 'Repository URL does not contain a valid repository name.',
         sourceFolderMissing: 'Source folder is not configured.',
         urlRequired: 'Repository URL is required.',
+      },
+      git: {
+        pullRequestChangesRequired: 'This branch has no committed changes. Commit your work before creating a pull request.',
       },
     },
     agentCreationProgress: {

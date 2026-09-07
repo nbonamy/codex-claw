@@ -42,8 +42,12 @@
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
+      :history-load-failed="historyLoadFailed"
+      :history-loading="isConversationLoading"
+      :has-visible-messages="hasVisibleMessages"
       @annotate-attachment="openAttachmentImageAnnotation"
       @close-plan="closeExecutionPlan"
+      @retry-history="retryConversationHistory"
     />
     <RightWorkspacePanel
       v-for="agent in snapshot.agents"
@@ -177,6 +181,7 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   conversationPaneController: CodexConversationPaneController;
+  conversationPlan: ThreadPlan | null;
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
@@ -189,6 +194,7 @@ const props = defineProps<{
   handleStartWorkAction: (action: 'github' | 'local' | 'url') => void;
   isAgentEmpty: boolean;
   isConversationLoading: boolean;
+  historyLoadFailed: boolean;
   isLoading: boolean;
   isModalDialogVisible: boolean;
   isRightWorkspaceVisible: (agentId: string) => boolean;
@@ -198,7 +204,9 @@ const props = defineProps<{
     location?: AutomationLocation,
     query?: WorkItemQuery,
   ) => Promise<WorkItem[] | void>;
-  messages: RendererMessage[];
+  hasVisibleMessages: boolean;
+  hasRunningPlanTool: boolean;
+  latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   openAgentGitDiffPreview: (agentId?: string) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
@@ -217,6 +225,7 @@ const props = defineProps<{
     agentId: string,
     location?: AutomationLocation,
   ) => Promise<RendererMessage[]>;
+  retryConversationHistory: () => Promise<void>;
   selectAgentFromShell: (agentId: string) => void;
   selectRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   snapshot: AppSnapshot;
@@ -263,6 +272,7 @@ const {
   handleStartWorkAction,
   isAgentEmpty,
   isConversationLoading,
+  historyLoadFailed,
   isLoading,
   isModalDialogVisible,
   isRightWorkspaceVisible,
@@ -271,6 +281,7 @@ const {
   openFilePreviewForAgent,
   openInApplications,
   rightWorkspaceVisible,
+  retryConversationHistory,
   selectAgentFromShell,
   selectRightWorkspaceTab,
   snapshot,
@@ -287,22 +298,14 @@ const rightWorkspaces = props.rightWorkspaces;
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
 
 const currentTurnPlan = computed<ThreadPlan | null>(() => {
-  const plan = currentAgent.value?.plan;
+  const plan = props.conversationPlan;
   if (!plan?.steps.length) {
     return null;
   }
-  if (props.isConversationLoading && props.messages.length === 0) {
+  if (props.isConversationLoading && !props.hasVisibleMessages) {
     return null;
   }
-
-  let latestTurnId: string | undefined;
-  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    if (props.messages[index]?.turnId) {
-      latestTurnId = props.messages[index].turnId;
-      break;
-    }
-  }
-
+  const latestTurnId = props.latestConversationTurnId;
   return !latestTurnId || latestTurnId === plan.turnId ? plan : null;
 });
 const executionPlanVisible = computed(() => {
@@ -485,13 +488,7 @@ function prefillWorkItemForAgent(agentId: string, item: WorkItem): void {
 function isPlanPreviewUpdatingFor(agentId: string): boolean {
   const panel = rightWorkspaceFor(agentId).planPanel;
   if (!panel || panel.purpose !== 'plan') return false;
-  return props.messages.some(
-    (message) =>
-      message.agentId === agentId &&
-      message.parts.some(
-        (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,
-      ),
-  );
+  return agentId === currentAgent.value?.id && props.hasRunningPlanTool;
 }
 
 function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {

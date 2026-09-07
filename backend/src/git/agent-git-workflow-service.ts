@@ -1,8 +1,7 @@
-import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import { backendDisplayName, unsupportedBackendFeature, type BackendEvent } from '@codex-claw/core/backend-driver';
+import { closeAgentInSnapshot, updateAgentFolder } from '@codex-claw/core/agent-manager';
+import { unsupportedBackendFeature, type BackendEvent } from '@codex-claw/core/backend-driver';
 import { agentGitBackendMethods, backendMethods, type AgentGitBackendMethod } from '@codex-claw/core/backend-protocol/methods';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { updateAgentFolder } from '@codex-claw/core/snapshot';
 import type {
   Agent,
   AgentGitDiff,
@@ -28,9 +27,8 @@ type AgentGitWorkIntegrationsPort = {
 };
 
 export type AgentGitWorkflowServiceOptions = {
-  applyEvent: (event: BackendEvent, options?: { trackTranscriptActivity?: boolean }) => void;
+  applyEvent: (event: BackendEvent) => void;
   delegatedWorkReports: DelegatedWorkReportPort;
-  deleteTranscript: (agentId: string) => void;
   driverRequest: (agent: Agent, method: string, params: unknown) => Promise<unknown>;
   forgetSession: (agent: Agent) => Promise<void>;
   getSnapshot: () => AppSnapshot;
@@ -92,7 +90,6 @@ export class AgentGitWorkflowService {
         const result = await this.workflow(agent, { refreshStatus: true });
         if (input.closeAgentAfterPush === true) {
           closeAgentInSnapshot(this.options.getSnapshot(), agentId);
-          this.options.deleteTranscript(agentId);
           await this.options.persistAndEmitSnapshot();
         }
         return result;
@@ -240,6 +237,7 @@ export class AgentGitWorkflowService {
     if (!workflow.remote || !workflow.remoteUrl) throw new Error('Add a GitHub remote before creating a pull request.');
     if (workflow.githubError) throw new Error(`Could not verify existing pull requests: ${workflow.githubError}`);
     if (workflow.existingPullRequest) throw new Error(`Pull request #${workflow.existingPullRequest.number} already exists for this branch.`);
+    await this.options.git.assertPullRequestChanges(folder);
     if (input.reportBack === true) this.emitOperationProgress(agentId, 'pullRequest', 'handoff');
     const handoff = input.reportBack === true
       ? await this.options.delegatedWorkReports.prepare(agent, {
@@ -318,7 +316,6 @@ export class AgentGitWorkflowService {
     if (deleteWorktree) {
       if (input.pushAfter !== true) {
         closeAgentInSnapshot(this.options.getSnapshot(), agentId);
-        this.options.deleteTranscript(agentId);
       }
       await this.options.persistAndEmitSnapshot();
     }
@@ -334,7 +331,7 @@ export class AgentGitWorkflowService {
       agentId,
       type: 'git.operationProgress',
       payload: { operation, phase } satisfies AgentGitOperationProgress,
-    }, { trackTranscriptActivity: false });
+    });
   }
 }
 

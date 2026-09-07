@@ -83,7 +83,7 @@ describe('ClawMcpService', () => {
     service = null;
   });
 
-  it('serves Claw collaboration tools from clawd and injects teammate messages through backend drivers', async () => {
+  it('serves Claw collaboration tools from clawd and delivers teammate messages through backend drivers', async () => {
     const snapshot = createInitialSnapshot();
     const events: unknown[] = [];
     const sendPrompt = vi.fn().mockResolvedValue({
@@ -133,28 +133,7 @@ describe('ClawMcpService', () => {
       expect.stringContaining('Can you review this branch?'),
       undefined,
     );
-    expect(snapshot.messages.at(-1)).toMatchObject({
-      agentId: 'agent-jesse',
-      role: 'user',
-      parts: [{
-        type: 'text',
-        text: expect.stringContaining('Can you review this branch?'),
-      }],
-    });
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-jesse',
-      type: 'snapshot.updated',
-      payload: expect.objectContaining({
-        messages: [expect.objectContaining({
-          agentId: 'agent-jesse',
-          role: 'user',
-          parts: [expect.objectContaining({
-            type: 'text',
-            text: expect.stringContaining('Can you review this branch?'),
-          })],
-        })],
-      }),
-    }));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
   });
 
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {
@@ -199,18 +178,13 @@ describe('ClawMcpService', () => {
       expect.objectContaining({ id: 'agent-jesse' }),
       expect.stringContaining('Check the failing test.'),
     );
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-jesse',
-      type: 'message.steer',
-      turnId: 'turn-active',
-    }));
     expect(events.some((event) => event.type === 'agent.promptQueued')).toBe(false);
   });
 
   it('shows busy teammate messages in the backend-owned queue until it reports dequeue', async () => {
     const snapshot = createInitialSnapshot();
     const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
-    recipient.status = { type: 'starting' };
+    recipient.status = { type: 'working' };
     const events: any[] = [];
     const sendPrompt = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-next' },
@@ -273,7 +247,6 @@ describe('ClawMcpService', () => {
       type: 'agent.promptQueued',
       payload: expect.objectContaining({ submitted: true }),
     })));
-    expect(snapshot.messages.filter((message) => message.agentId === 'agent-jesse' && message.role === 'user')).toHaveLength(1);
   });
 
   it('routes Computer Use MCP calls through the desktop client port', async () => {
@@ -533,6 +506,24 @@ describe('ClawMcpService', () => {
       displayed: false,
       kind: 'schoolPride',
       message: 'Celebrations are disabled in General settings.',
+    });
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+  });
+
+  it('does not emit celebration events for an agent that is not selected', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.activeAgentId = 'agent-dina';
+    const events: Array<{ type?: string }> = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const response = await callTool(url, 'agent-jesse', 'celebrate', { kind: 'stars' });
+
+    expect(response.result.structuredContent).toStrictEqual({
+      success: true,
+      displayed: false,
+      kind: 'stars',
+      message: 'Celebrations only play for the selected agent.',
     });
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
   });

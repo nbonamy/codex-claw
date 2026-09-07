@@ -19,7 +19,6 @@
     "web"
   ],
   "scripts": {
-    "benchmark:conversation": "npm run benchmark:conversation -w @codex-claw/core && npm --prefix ../codex-app-sdk run benchmark:conversation",
     "build": "npm run build:electron",
     "build:backend": "npm run build:sdk && npm run build -w @codex-claw/core && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs",
     "build:codex": "node scripts/prepare-codex-app-server.mjs",

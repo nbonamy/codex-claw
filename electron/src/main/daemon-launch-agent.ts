@@ -1,6 +1,6 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
-import net, { type Socket } from 'node:net';
+import net from 'node:net';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { execFile as execFileCallback } from 'node:child_process';

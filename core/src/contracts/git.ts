@@ -1,0 +1,113 @@
+export type AgentGitStatus = {
+  folder: string;
+  repository?: string;
+  githubRepository?: string;
+  branch?: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  changedFiles: number;
+  addedLines: number;
+  removedLines: number;
+  hasUntracked: boolean;
+  state: 'clean' | 'dirty' | 'unknown';
+  updatedAt: string;
+  error?: string;
+};
+
+export type AgentGitDiffScope = 'staged' | 'unstaged' | 'untracked';
+
+export type AgentGitDiffSection = {
+  scope: AgentGitDiffScope;
+  diff: string;
+};
+
+export type AgentGitDiff = {
+  diff: string;
+  sections: AgentGitDiffSection[];
+};
+
+export type AgentGitFile = {
+  path: string;
+  indexStatus: string;
+  worktreeStatus: string;
+};
+
+export type AgentGitPullRequest = {
+  number: number;
+  title: string;
+  url: string;
+  draft: boolean;
+  headSha: string;
+  state: 'open' | 'merged' | 'closed';
+  mergedAt?: string;
+};
+
+export type AgentPullRequestTracking = AgentGitPullRequest & {
+  provider: 'github';
+  repository: string;
+  branch: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentGitWorkflow = {
+  repository: string;
+  folder: string;
+  isLinkedWorktree: boolean;
+  branch?: string;
+  detached: boolean;
+  remote?: string;
+  remoteUrl?: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  stagedAddedLines?: number;
+  stagedRemovedLines?: number;
+  unstagedAddedLines?: number;
+  unstagedRemovedLines?: number;
+  untrackedAddedLines?: number;
+  untrackedRemovedLines?: number;
+  files: AgentGitFile[];
+  stagedFiles: string[];
+  unstagedFiles: string[];
+  existingPullRequest?: AgentGitPullRequest;
+  githubConnected: boolean;
+  githubError?: string;
+};
+
+export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
+
+export type AgentGitCommitInput = { message: string; confirmed: boolean; includeUnstaged?: boolean; includeUntracked?: boolean };
+
+export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'mergeTarget'; closeAgentAfterPush?: boolean };
+
+export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
+
+export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
+
+export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
+
+export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
+
+export type AgentGitMessageGenerationInput =
+  | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }
+  | { kind: 'pullRequest' };
+
+export type AgentGitMessageGenerationResult =
+  | { kind: 'commit'; message: string }
+  | { kind: 'pullRequest'; title: string; body: string };
+
+export type TurnGitDiff = {
+  agentId: string;
+  turnId: string;
+  addedLines: number;
+  removedLines: number;
+  diff?: string;
+  updatedAt: string;
+};
+
+export type AgentGitOperationProgress = {
+  operation: 'pullRequest' | 'merge';
+  phase: 'handoff' | 'delivery';
+};

@@ -45,6 +45,7 @@
       :unread-team-ids="unreadTeamIds"
       @close-team="$emit('close-team', $event)"
       @close-agent="$emit('close-agent', $event)"
+      @compress-session="$emit('compress-session', $event)"
       @cleanup-pull-request="$emit('cleanup-pull-request', $event)"
       @collapse-sidebar="agentSidebarCollapsed = true"
       @create-agent-from-repository="openRepositorySessionSource"
@@ -132,7 +133,6 @@
         :load-work-repositories="loadWorkRepositories"
         :list-source-repositories="listSourceRepositories"
         :automations="snapshot.automations"
-        :messages="snapshot.messages"
         :read-conversation-messages="readConversationMessages"
         :remote-connections="snapshot.remoteConnections.connections"
         :run-automation="runAutomation"
@@ -162,7 +162,6 @@
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
-        @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @refresh-work-items="refreshWorkItems"
         @change-work-items-page="changeGlobalWorkItemsPage"
         @select-global-scope="selectGlobalBacklogScope"
@@ -183,6 +182,7 @@
         :commit-agent-git-changes="props.commitAgentGitChanges"
         :confirm-plan="confirmPlan"
         :conversation-pane-controller="conversationPaneController"
+        :conversation-plan="conversationPlan"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
         :current-agent-git-status="currentAgentGitStatus"
@@ -193,11 +193,14 @@
         :handle-start-work-action="handleStartWorkAction"
         :is-agent-empty="isAgentEmpty"
         :is-conversation-loading="isConversationLoading"
+        :history-load-failed="isConversationLoadFailed"
         :is-loading="isLoading"
         :is-modal-dialog-visible="isModalDialogVisible"
         :is-right-workspace-visible="isRightWorkspaceVisible"
+        :has-visible-messages="conversationMessages.length > 0"
+        :has-running-plan-tool="conversationHasRunningPlanTool"
+        :latest-conversation-turn-id="conversationLatestTurnId"
         :load-work-items="props.loadWorkItems"
-        :messages="messages"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
@@ -212,6 +215,7 @@
         :right-workspaces="rightWorkspaces"
         :right-workspace-visible="rightWorkspaceVisible"
         :read-conversation-messages="readConversationMessages"
+        :retry-conversation-history="props.retryAgentHistory"
         :select-agent-from-shell="selectAgentFromShell"
         :select-right-workspace-tab="selectRightWorkspaceTab"
         :snapshot="snapshot"
@@ -360,12 +364,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { projectAgentMentionLabels } from '@codex-claw/core/workspace-sidebar';
-import { clawHostCapabilities, codexClawApi } from '../platform-api';
+import { codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import AgentCreationProgressDialog from './AgentCreationProgressDialog.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
@@ -402,6 +406,7 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
+import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { ShieldCheckIcon } from '../shared/icons/app-icons';
 import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
@@ -413,18 +418,14 @@ import { useWorkspacePreviews } from './use-workspace-previews';
 import { useWorkItemRouting } from './use-work-item-routing';
 import { useAppShellCommands } from './use-app-shell-commands';
 
-import {
-  type RightWorkspaceTab,
-} from './right-workspace';
-
 const props = withDefaults(defineProps<{
   snapshot: AppSnapshot;
   activeAgent: Agent | null;
   unreadAgentIds?: string[];
   agentFiles?: AgentFileSearchItem[];
-  messages: RendererMessage[];
   isLoading: boolean;
   isConversationLoading?: boolean;
+  isConversationLoadFailed?: boolean;
   historyHasOlder?: boolean;
   historyLoadingOlder?: boolean;
   isSending: boolean;
@@ -439,6 +440,8 @@ const props = withDefaults(defineProps<{
   backendPlugins?: BackendPluginSummary[];
   backendSkills?: BackendSkillSummary[];
   backendCapabilities?: BackendCapabilities;
+  codexConversationSnapshot?: CodexConversationSnapshot | null;
+  claudeConversationSnapshot?: ClaudeConversationSnapshot | null;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
@@ -528,6 +531,11 @@ const props = withDefaults(defineProps<{
   duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
+  retryAgentHistory?: () => Promise<void>;
+  sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
+  deleteTurnAction?: (turnId: string) => Promise<void>;
+  editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
+  retryTurnAction?: (turnId: string) => Promise<void>;
   quit?: () => Promise<void>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -539,6 +547,7 @@ const props = withDefaults(defineProps<{
   backendSkills: () => [],
   backendCapabilities: () => defaultBackendCapabilities('codex'),
   isConversationLoading: false,
+  isConversationLoadFailed: false,
   historyHasOlder: true,
   historyLoadingOlder: false,
   connectionState: () => ({ status: 'connected' }),
@@ -635,6 +644,7 @@ const props = withDefaults(defineProps<{
   loadAssignedWorkItems: async () => undefined,
   duplicateAgentAction: async () => null,
   assignWorkItemAction: async () => undefined,
+  retryAgentHistory: async () => undefined,
   quit: async () => undefined,
 });
 
@@ -642,16 +652,17 @@ const emit = defineEmits<{
   'close-team': [teamId: string];
   'disconnect-team': [teamId: string];
   'close-agent': [agentId: string];
+  'compress-session': [agentId: string];
   'cleanup-pull-request': [agentId: string];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
-  'delete-message': [index: number];
+  'delete-turn': [turnId: string];
   'delete-queued-prompt': [promptId: string];
   'debug-mark-unread': [];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
-  'fork-message': [index: number];
-  'edit-message': [payload: { content: string; index: number }];
+  'fork-turn': [turnId: string];
+  'edit-turn': [payload: { content: string; turnId: string }];
   'interrupt-agent': [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'reorder-agents': [input: ReorderAgentsInput];
@@ -661,7 +672,7 @@ const emit = defineEmits<{
   'remove-work-item-assignment': [item: WorkItem];
   'restart-agent': [agentId: string];
   'resolve-approval': [approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope];
-  'retry-message': [index: number];
+  'retry-turn': [turnId: string];
   'send-agent-prompt': [payload: { agentId: string; prompt: string }];
   'select-agent': [agentId: string];
   'select-model': [modelId: string];
@@ -687,7 +698,6 @@ const agentSidebarCollapsed = ref(false);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
 const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((agent) => (
-  agent.status.type === 'starting' ||
   agent.status.type === 'working' ||
   agent.status.type === 'awaitingInput'
 )));
@@ -1071,8 +1081,11 @@ const {
 } = cockpitBacklogState;
 const effectiveApprovals = computed(() => {
   const fixture = debugApproval.value;
+  const providerApprovals = currentAgent.value?.backend === 'codex'
+    ? props.codexConversationSnapshot?.approvals ?? []
+    : props.approvals ?? [];
   return [
-    ...(props.approvals ?? []),
+    ...providerApprovals,
     ...(fixture && fixture.agentId === currentAgent.value?.id ? [fixture.request] : []),
   ];
 });
@@ -1093,6 +1106,35 @@ const conversationKey = computed(() => {
   if (session?.kind === 'claude') return `claude:${session.sessionId}`;
   return currentAgent.value ? `agent:${currentAgent.value.id}` : 'no-agent';
 });
+const providerConversation = computed(() => (
+  currentAgent.value?.backend === 'codex'
+    ? props.codexConversationSnapshot ?? null
+    : currentAgent.value?.backend === 'claude'
+      ? props.claudeConversationSnapshot ?? null
+      : null
+));
+const conversationMessages = computed(() => providerConversation.value?.messages ?? []);
+const conversationLatestTurnId = computed(() => providerConversation.value?.turnIds.at(-1) ?? null);
+const conversationHasRunningPlanTool = computed(() => conversationMessages.value.some(
+  (message) => message.parts.some(
+    (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,
+  ),
+));
+const conversationPlan = computed(() => (
+  currentAgent.value?.backend === 'claude'
+    ? props.claudeConversationSnapshot?.plan ?? null
+    : currentAgent.value?.plan ?? null
+));
+const conversationActiveTurnId = computed(() => {
+  if (providerConversation.value) return providerConversation.value.activeTurnId;
+  if (currentAgent.value?.backend === 'codex') return null;
+  if (!props.isSending) return null;
+  for (let index = conversationMessages.value.length - 1; index >= 0; index -= 1) {
+    const turnId = conversationMessages.value[index]?.turnId;
+    if (turnId) return turnId;
+  }
+  return null;
+});
 const conversationCapabilities = computed<CodexCapabilities>(() => ({
   models: props.backendCapabilities.models,
   skills: props.backendCapabilities.skills,
@@ -1105,9 +1147,9 @@ const conversationCapabilities = computed<CodexCapabilities>(() => ({
   steerPrompt: props.backendCapabilities.steerPrompt,
   interrupt: props.backendCapabilities.interrupt,
   history: props.backendCapabilities.history,
-  rollback: props.backendCapabilities.rollback,
-  editMessage: props.backendCapabilities.editMessage,
-  retryMessage: props.backendCapabilities.retryMessage,
+  deleteTurn: props.backendCapabilities.deleteTurn,
+  editTurn: props.backendCapabilities.editTurn,
+  retryTurn: props.backendCapabilities.retryTurn,
   approvals: props.backendCapabilities.approvals,
   approvalPresets: props.backendCapabilities.approvalPresets ?? [],
 }));
@@ -1130,25 +1172,41 @@ const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
 const conversationPaneState: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return conversationKey.value; },
-    get messages() { return props.messages; },
-    get busy() { return props.isSending; },
-    get disabled() { return !currentAgent.value; },
+    get activeTurnId() { return conversationActiveTurnId.value; },
+    get turns() { return providerConversation.value?.turns; },
+    get messages() { return conversationMessages.value; },
+    get busy() { return providerConversation.value?.busy ?? props.isSending; },
+    get disabled() {
+      return !currentAgent.value || (props.isConversationLoadFailed && conversationMessages.value.length === 0);
+    },
   },
   history: {
-    get hasOlder() { return props.historyHasOlder; },
+    get hasOlder() { return providerConversation.value?.historyState?.hasOlder ?? props.historyHasOlder; },
     get loading() {
       return Boolean(currentAgent.value?.backendSession)
-        && props.messages.length === 0
-        && (props.isLoading || props.isConversationLoading);
+        && conversationMessages.value.length === 0
+        && (providerConversation.value?.historyLoading ?? (props.isLoading || props.isConversationLoading));
     },
-    get loadingOlder() { return props.historyLoadingOlder; },
+    get loadingOlder() { return providerConversation.value?.historyState?.loadingOlder ?? props.historyLoadingOlder; },
   },
   thread: {
     get approvals() { return effectiveApprovals.value; },
-    get answeredClientRequestIds() { return props.answeredClientRequestIds; },
-    get goal() { return props.goal ?? null; },
-    get queuedPrompts() { return props.queuedPrompts; },
-    get contextUsage() { return currentAgent.value?.contextUsage ?? null; },
+    get answeredClientRequestIds() {
+      return providerConversation.value
+        ? new Set(providerConversation.value.answeredClientRequestIds)
+        : currentAgent.value?.backend === 'codex' ? new Set<string>() : props.answeredClientRequestIds;
+    },
+    get goal() {
+      return currentAgent.value?.backend === 'codex'
+        ? props.codexConversationSnapshot?.goal ?? null
+        : props.goal ?? null;
+    },
+    get queuedPrompts() {
+      return currentAgent.value?.backend === 'codex'
+        ? props.codexConversationSnapshot?.queuedPrompts ?? []
+        : props.queuedPrompts;
+    },
+    get contextUsage() { return providerConversation.value?.contextUsage ?? currentAgent.value?.contextUsage ?? null; },
   },
   composer: {
     get state() { return props.composerState; },
@@ -1178,22 +1236,22 @@ const conversationPaneState: CodexConversationPaneState = {
   get capabilities() { return conversationCapabilities.value; },
   policy: {
     get attachEnabled() { return props.backendCapabilities.attachments; },
-    get canDeleteMessage() { return props.backendCapabilities.rollback; },
-    get canEditMessage() { return props.backendCapabilities.editMessage; },
-    get canForkMessage() {
+    get canDeleteTurn() { return props.backendCapabilities.deleteTurn; },
+    get canEditTurn() { return props.backendCapabilities.editTurn; },
+    get canForkTurn() {
       const agent = currentAgent.value;
       return Boolean(agent && forkableAgentIds.value.includes(agent.id));
     },
-    get canRetryMessage() { return props.backendCapabilities.retryMessage; },
+    get canRetryTurn() { return props.backendCapabilities.retryTurn; },
   },
 };
 const conversationPaneActions: CodexConversationPaneActions = {
   clearGoal: () => emit('clear-goal'),
   clientResponse: (response) => emit('client-response', response),
-  deleteMessage: (index) => emit('delete-message', index),
+  deleteTurn: (turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
   deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
-  editMessage: (payload) => emit('edit-message', payload),
-  forkMessage: (index) => emit('fork-message', index),
+  editTurn: (payload) => props.editTurnAction?.(payload) ?? emit('edit-turn', payload),
+  forkTurn: (turnId) => emit('fork-turn', turnId),
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   menuSelect: (item) => {
@@ -1204,7 +1262,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   openImage: (image, context) => agentWorkspace.value?.openConversationImage(image, context) ?? false,
   openVisualization: (visualization) => agentWorkspace.value?.openConversationVisualization(visualization),
   resolveApproval: forwardApprovalResolution,
-  retryMessage: (index) => emit('retry-message', index),
+  retryTurn: (turnId) => props.retryTurnAction?.(turnId) ?? emit('retry-turn', turnId),
   steer: forwardCodexSteerPrompt,
   steerQueuedPrompt: (promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
   updateQueuedPrompt: (promptId, prompt) => emit('update-queued-prompt', promptId, prompt),
@@ -1280,6 +1338,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
   },
   actions: {
     closeAgent: (agentId) => emit('close-agent', agentId),
+    compressSession: (agentId) => emit('compress-session', agentId),
     closeTeam: (teamId) => emit('close-team', teamId),
     debugMarkUnread: () => emit('debug-mark-unread'),
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
@@ -1622,7 +1681,8 @@ function forwardApprovalResolution(
   emit('resolve-approval', approvalId, decision, scope);
 }
 
-function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void {
+function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
+  if (props.sendPromptAction) return props.sendPromptAction(prompt, options);
   if (options) {
     emit('sendPrompt', prompt, options);
   } else {

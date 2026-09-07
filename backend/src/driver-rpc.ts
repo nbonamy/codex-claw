@@ -179,6 +179,14 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
+      case backendMethods.driverSessionCompress: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.compressSession) {
+          throw unsupportedBackendFeature(agent, 'session compression');
+        }
+        return driver.compressSession(agent);
+      }
       case backendMethods.driverConversationTitleUpdate: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
@@ -275,19 +283,14 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const targetAgent = requireAgent(record.targetAgent, 'targetAgent');
-        const rawMessageIndex = record.messageIndex;
-        if (rawMessageIndex !== undefined && (
-          typeof rawMessageIndex !== 'number' || !Number.isInteger(rawMessageIndex) || rawMessageIndex < 0
-        )) {
-          throw new Error('Invalid fork message index.');
-        }
+        const turnId = record.turnId === undefined ? undefined : requireString(record.turnId, 'turnId');
         const driver = this.requireDriver(agent.backend);
         if (!driver.forkConversation) {
           throw unsupportedBackendFeature(agent, 'conversation fork');
         }
-        return rawMessageIndex === undefined
+        return turnId === undefined
           ? driver.forkConversation(agent, targetAgent)
-          : driver.forkConversation(agent, targetAgent, rawMessageIndex as number);
+          : driver.forkConversation(agent, targetAgent, turnId);
       }
       case backendMethods.driverConversationMessagesGet: {
         const record = requireRecord(params);
@@ -319,14 +322,36 @@ export class BackendDriverRpc {
           ? driver.steerPrompt(agent, prompt, options)
           : driver.steerPrompt(agent, prompt);
       }
-      case backendMethods.driverTurnRollback: {
+      case backendMethods.driverTurnDelete: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
-        if (!driver.rollbackToTurn) {
-          throw unsupportedBackendFeature(agent, 'rollback');
+        if (!driver.deleteTurn) {
+          throw unsupportedBackendFeature(agent, 'turn deletion');
         }
-        return driver.rollbackToTurn(agent, requireString(record.turnId, 'turnId'));
+        return driver.deleteTurn(agent, requireString(record.turnId, 'turnId'));
+      }
+      case backendMethods.driverTurnEdit: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.editTurn) {
+          throw unsupportedBackendFeature(agent, 'turn editing');
+        }
+        return driver.editTurn(
+          agent,
+          requireString(record.turnId, 'turnId'),
+          requireString(record.content, 'content'),
+        );
+      }
+      case backendMethods.driverTurnRetry: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.retryTurn) {
+          throw unsupportedBackendFeature(agent, 'turn retry');
+        }
+        return driver.retryTurn(agent, requireString(record.turnId, 'turnId'));
       }
       case backendMethods.driverModelsList: {
         const { agent } = requireAgentParams(params);

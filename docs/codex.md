@@ -16,7 +16,8 @@ to the renderer, and owns only desktop-native callbacks.
 - own JSON-RPC request IDs and response matching;
 - route server notifications to the right agent/session;
 - answer server-initiated approval and user-input requests;
-- adapt Codex events into app-owned events;
+- wrap SDK-owned conversation snapshots/events in Claw's agent/thread/revision
+  routing envelope;
 - persist only app product state, not Codex transcripts.
 
 Codex assistant text keeps the app-server's optional `commentary` or
@@ -28,10 +29,14 @@ the final answer begins.
 
 The local `codex-app-sdk` dependency owns Codex executable discovery, generated
 app-server protocol types, request/response inference, bidirectional request
-routing, and stdio JSONL framing. `clawd` remains the product adapter: it owns
-explicit executable selection, initialization metadata, agent/session policy,
-approval presets, event adaptation, and recovery behavior. Product policy must
-not be added to the SDK to make a Codex Claw call compile.
+routing, stdio JSONL framing, targeted conversation operations, conversation
+snapshots/reducers, optimistic submissions, history reconciliation, queues,
+turn mutations, and generic conversation rendering. `clawd` remains the
+product adapter: it owns explicit executable selection, initialization
+metadata, agent/session policy, approval presets, the Claw routing envelope,
+and recovery behavior. Product policy must not be added to the SDK to make a
+Codex Claw call compile; generic Codex conversation behavior must not be added
+to Claw to avoid fixing the SDK.
 
 Electron main responsibilities:
 
@@ -43,7 +48,9 @@ Electron main responsibilities:
 
 Renderer responsibilities:
 
-- render app-owned message, tool, diff, plan, and approval state;
+- route SDK-owned Codex provider frames to the addressed per-agent SDK replica
+  and render it through `CodexConversationPane`;
+- render Claw-owned coordination and workspace state around that conversation;
 - send user actions through preload IPC;
 - never import generated Codex protocol types;
 - never spawn Codex or access `CODEX_HOME`.
@@ -185,46 +192,66 @@ configuration instead of sending a known-invalid `danger-full-access` request.
 The adapter returns the generated app-server `SandboxPolicy` shape directly;
 the shared SDK does not define or normalize a second sandbox-policy model.
 
-`thread/resume` returns a full-item page of the 50 newest turns in app-server
-protocol v2. `clawd` translates that page into app-owned `RendererMessage`s and
-emits it immediately. Codex Claw currently selects lazy loading, so the SDK
-retains the opaque cursor and prefetches one older page of 25 turns when the
-user scrolls within one viewport of the top. Each page is emitted as an
-incremental `thread.historyLoaded` batch. Eager loading can instead hydrate
-every page progressively. Since
-app-server history may omit tool calls already observed live, Claw only adds
-unknown turns from lifecycle hydration and never rewrites a turn already present
-in memory. Lifecycle hydration is reconciled chronologically because its refreshed
-window can contain unknown turns on either side of the live transcript. An explicit
-older-history page owns message placement: Claw preserves the page order, moves any
-overlapping known messages into that position, and retains their richer in-memory
-content.
-Existing active sessions remain memory-authoritative and are not re-resumed on
-selection. The renderer asks through the typed bridge to re-select the active
-persisted agent after subscribing to events, so relaunch restores visible
-history without the renderer importing Codex protocol types.
+`thread/resume` and older-history paging are owned by the Codex SDK. Claw's
+Codex adapter subscribes to the SDK's conversation-targeted replica bridge. It
+publishes one bounded `CodexConversationSnapshot`, then forwards only
+`CodexConversationEvent` deltas with a monotonic per-agent revision. The SDK
+owns history reconciliation, cursors, turn identity, optimistic messages, tool
+lifecycle, and mutation results; Claw does not translate those into a second
+`RendererMessage` store.
+
+Existing active sessions remain SDK-memory-authoritative and are not re-resumed
+on selection. On relaunch, `agent/history/hydrate` binds the persisted thread
+reference to the targeted SDK surface and emits a fresh provider snapshot. The
+renderer creates one SDK replica for that agent and applies only contiguous
+provider revisions; a gap triggers rehydration.
 
 The Resume Session dialog opened from an agent's sidebar menu uses `thread/list`
 with that agent's folder as an exact `cwd` filter, `archived: false`, and
 newest-first `updated_at` sorting. `clawd` sends app-owned
 `ConversationSummary` objects through backend RPC, which Electron forwards over
-typed IPC. Clicking a session row calls `thread/resume`, stores the
-returned `{ kind: "codex", threadId }` session on the agent, replaces that
-agent's visible messages with the resumed turns, and routes the next prompt to
-the selected thread. Resume is allowed only while the agent is idle.
+typed IPC. Clicking a session row calls `thread/resume`, stores the returned
+`{ kind: "codex", threadId }` session on the agent, publishes the SDK snapshot
+for that thread, and routes the next prompt to it. Resume is allowed only while
+the agent is idle.
 
 Fork Agent calls the SDK conversation handle's high-level `fork()` operation,
 which owns `thread/fork` and returns a new conversation id plus its snapshot.
-`clawd` translates that history into app-owned messages, creates a selected
-agent directly below the source with the new `{ kind: "codex", threadId }`
-session, and leaves raw fork protocol types outside product contracts. Forking
-requires an idle Codex agent with an existing conversation.
+`clawd` creates a selected agent directly below the source with the new
+`{ kind: "codex", threadId }` session and publishes the returned SDK snapshot;
+raw fork protocol types remain outside product contracts. Forking requires an
+idle Codex agent with an existing conversation.
 
-The controlled conversation pane opts into SDK message-level Fork actions for
-user and assistant messages. It passes the absolute host message index through
-the app-owned `agent/fork` request; the Codex adapter calls the conversation
-handle's `forkMessage()` operation, and the result enters the same new-agent
+The controlled conversation pane opts into SDK turn-level Fork actions for
+user and assistant messages. It passes the stable turn id through the
+app-owned `agent/fork` request; the Codex adapter calls the conversation
+handle's `forkTurn()` operation, and the result enters the same new-agent
 workflow without changing the source thread.
+
+Compress Session is an app-owned session rollover, not Codex context
+compaction. It is available only for an idle agent with an existing Codex
+thread. The renderer keeps a blocking progress dialog visible across the
+transition. `clawd` asks the current SDK-owned conversation for a bounded
+handoff with a temporary fast model/effort override, waits for the exact
+handoff turn to complete, creates a replacement SDK conversation in the same
+folder with the agent's original Codex settings, sends the handoff inside a
+real initial user prompt, and only then archives the old thread. The temporary
+handoff turn's settings and transcript events are internal to the rollover and
+must not update the agent's persisted defaults. The SDK strips the prompt's
+`<context>` block from the visible message, leaving only the repeated
+background-only instruction in the transcript. Submitting a turn also
+guarantees that the replacement has a persisted rollout that can be resumed
+after restart.
+After the replacement exists, `clawd` updates the agent's persisted thread
+reference and publishes the replacement SDK snapshot. Claw never copies or
+reduces either transcript. If replacement creation or old-thread archival
+fails, the persisted agent continues to reference the old thread.
+
+The warning preference and rollover orchestration are Claw product metadata.
+The old and new conversation contents, optimistic messages, turns, history,
+and rendering remain SDK-owned throughout. This boundary is deliberate: do
+not implement a parallel handoff transcript, synthetic user message, or
+session reducer in Claw.
 
 ## Requests
 
@@ -308,15 +335,17 @@ initial Codex command catalog includes `compact`, `review`, `plan`, and `goal` w
 a visible slash prefix in the menu. Selecting one submits the corresponding
 slash form through the normal composer path.
 
-`compact` and `review` are backend prompt commands. The Codex driver intercepts
-recognized slash commands before appending a visible user message or calling
-`turn/start`:
+`compact` is an app command. Bare `/compact`, the agent-menu action, and
+Command-K all open the Compress Session flow described above. The renderer
+intercepts the bare slash form before normal prompt submission so the warning
+and blocking transition are always applied. `/compact <text>` remains a normal
+prompt.
 
-- bare `/compact` calls `thread/compact/start` with the active `threadId`;
+`review` is a backend prompt command. The Codex driver intercepts recognized
+review forms before appending a visible user message or calling `turn/start`:
+
 - bare `/review` calls `review/start` with `target.type = "uncommittedChanges"`;
-- `/review <instructions>` calls `review/start` with a custom review target;
-- `/compact <text>` remains a normal prompt because Codex's compact RPC does
-  not accept inline instructions.
+- `/review <instructions>` calls `review/start` with a custom review target.
 
 `plan` is handled earlier in the renderer/app prompt path because Codex CLI
 semantics change the composer mode, then optionally submit stripped text:
@@ -488,11 +517,12 @@ not wait forever. This is separate from tool approvals because the request is
 asking Nicolas for information, not for permission.
 
 Context compaction is primarily represented by the `contextCompaction`
-`ThreadItem`. `clawd` converts the item into a `context.compactionStarted`
-app-owned event so the reducer can split the active assistant message and insert
-the visible compaction marker exactly where the item arrived in the stream. The
-deprecated `thread/compacted` notification maps to the same app-owned event for
-compatibility.
+`ThreadItem`. The Codex SDK converts its lifecycle into provider-owned
+conversation events so its reducer can split the active assistant message and
+insert one visible compaction marker exactly where the item arrived in the
+stream. The deprecated `thread/compacted` notification remains an SDK-owned
+completion fallback. Claw only transports those provider events and must not
+synthesize another compaction lifecycle.
 
 Unhandled notifications should also log `not implemented`, but they do not need
 a response because notifications cannot block the app-server.
@@ -650,22 +680,23 @@ protocol churn contained in the Codex adapter.
 The durable flow is:
 
 ```text
-Codex app-server event -> Codex adapter -> app event -> renderer store -> UI
+Codex app-server -> Codex SDK surface -> targeted SDK snapshot/event
+                 -> Claw revisioned transport frame -> SDK renderer replica -> UI
 ```
 
-Renderer components consume app-owned state such as `RendererMessage`,
-`RendererToolCall`, plan state, approval state, and diff state.
+Renderer components consume the SDK-owned conversation snapshot. Claw consumes
+only explicit read-only projections needed by product chrome, such as plan
+preview, diff, unread state, and sidebar activity.
 
 Do not encode Codex tool calls as id8-style `<tool>` text tags. Those tags are
 an id8/multi-LLM parsing artifact. Codex app-server already emits structured
-`ThreadItem` payloads and item-specific progress notifications, so Codex Claw
-should preserve that structure in backend adapters and expose app-owned
-tool parts to the renderer. The chat renderer preserves placement with ordered
+`ThreadItem` payloads and item-specific progress notifications, so the Codex
+SDK preserves that structure in its surface snapshot and exposes typed tool
+parts to its renderer. The chat renderer preserves placement with ordered
 message parts (`text`, `tool`, `text`) so tool calls appear where they happened
-in the stream while the legacy id8 `<tool>` parser remains available for copied
-id8-shaped messages.
+in the stream.
 
-Mapping sketch:
+SDK mapping sketch:
 
 - `UserMessage` becomes a user message.
 - `AgentMessageDelta` appends assistant text to an in-flight assistant message.

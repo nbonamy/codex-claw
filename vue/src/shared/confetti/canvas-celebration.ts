@@ -83,7 +83,6 @@ function launchShapes(): void {
 }
 
 function launchSchoolPride(durationMs: number): void {
-  const startedAt = Date.now();
   const colors = ['#2457c5', '#ffffff'];
   const shoot = (): void => {
     canvasConfetti({
