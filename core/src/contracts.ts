@@ -8,6 +8,10 @@ import type {
   CodexConversationSnapshot,
 } from '@codex-app-sdk/core/surface';
 import type {
+  ClaudeConversationEvent,
+  ClaudeConversationSnapshot,
+} from './contracts/claude-conversation';
+import type {
   AgentCloseInput,
   AgentGitBranchInput,
   AgentGitCommitInput,
@@ -62,9 +66,17 @@ import type {
 import type {
   AgentFileActivity,
   AgentHistoryLoadResult,
+  AgentContextUsage,
   AgentQueuedPrompt,
   AgentSubagentTree,
+  AskUserAnswers,
+  AskUserQuestion,
+  AskUserQuestionOption,
+  AskUserRequest,
   BackendConversationRef,
+  ClientRequest,
+  ClientRequestResponse,
+  ConfirmToolRequest,
   ConversationSummary,
   PromptAttachment,
   RendererMessage,
@@ -80,6 +92,7 @@ import type {
   ThreadGoal,
   ThreadPlan,
   ThreadPlanStep,
+  ToolConfirmationDecision,
 } from './contracts/conversation';
 import type {
   Automation,
@@ -186,12 +199,25 @@ export {
   subagentStatuses,
 } from './contracts/conversation';
 export type {
+  ClaudeConversationEvent,
+  ClaudeConversationSnapshot,
+  ClaudeConversationTurn,
+} from './contracts/claude-conversation';
+export type {
   AgentFileActivity,
   AgentHistoryLoadResult,
+  AgentContextUsage,
   AgentQueuedPrompt,
   AgentSubagentTree,
+  AskUserAnswers,
+  AskUserQuestion,
+  AskUserQuestionOption,
+  AskUserRequest,
   BackendConversationRef,
   BackendPromptOptions,
+  ClientRequest,
+  ClientRequestResponse,
+  ConfirmToolRequest,
   ConversationFileLink,
   ConversationSummary,
   PromptAttachment,
@@ -224,6 +250,7 @@ export type {
   ThreadPlanStatus,
   ThreadPlanStep,
   ThreadPlanStepStatus,
+  ToolConfirmationDecision,
 } from './contracts/conversation';
 export type {
   Automation,
@@ -350,17 +377,6 @@ export type Agent = {
   status: AgentStatus;
   createdAt: string;
   updatedAt: string;
-};
-
-export type AgentContextUsage = {
-  totalTokens: number;
-  inputTokens: number;
-  cachedInputTokens: number;
-  outputTokens: number;
-  reasoningOutputTokens: number;
-  lastTotalTokens: number;
-  modelContextWindow: number | null;
-  usedPercent: number | null;
 };
 
 export type WorkProviderConnectResult = {
@@ -788,6 +804,24 @@ export type MainToRendererEvent =
       };
     }>
   | MainToRendererEventWith<{
+      type: 'claude.conversationSnapshotChanged';
+      agentId: string;
+      backend: 'claude';
+      payload: {
+        revision: number;
+        snapshot: ClaudeConversationSnapshot;
+      };
+    }>
+  | MainToRendererEventWith<{
+      type: 'claude.conversationEventReceived';
+      agentId: string;
+      backend: 'claude';
+      payload: {
+        revision: number;
+        event: ClaudeConversationEvent;
+      };
+    }>
+  | MainToRendererEventWith<{
       type: 'sidePanel.markdownRequested';
       agentId: string;
       payload: SidePanelMarkdownRequest;
@@ -1168,69 +1202,6 @@ export type ReorderRepositoriesInput = {
   teamId: string;
   repositoryRoot: string;
   beforeRepositoryRoot: string | null;
-};
-
-export type ToolConfirmationDecision =
-  | 'allow'
-  | 'allow_conversation'
-  | 'always_allow'
-  | 'deny';
-
-export type ConfirmToolRequest = {
-  argumentsPreview: string;
-  integrationId: string;
-  integrationName: string;
-  summary: string;
-  toolName: string;
-  allowConversation?: boolean;
-  allowAlways?: boolean;
-};
-
-export type AskUserQuestionOption = {
-  label: string;
-  description: string;
-};
-
-export type AskUserQuestion = {
-  id: string;
-  header: string;
-  question: string;
-  isOther: boolean;
-  isSecret: boolean;
-  multiSelect?: boolean;
-  options: AskUserQuestionOption[] | null;
-};
-
-export type AskUserRequest = {
-  itemId: string;
-  questions: AskUserQuestion[];
-};
-
-export type AskUserAnswers = Record<string, { answers: string[] }>;
-
-export type ClientRequest =
-  | {
-    id: string;
-    kind: 'confirm_tool';
-    payload: {
-      confirmation: ConfirmToolRequest;
-    };
-  }
-  | {
-    id: string;
-    kind: 'ask_user';
-    payload: {
-      request: AskUserRequest;
-    };
-  };
-
-export type ClientRequestResponse = {
-  id: string;
-  payload?: {
-    answers?: AskUserAnswers;
-    cancelled?: boolean;
-    decision?: ToolConfirmationDecision | null;
-  };
 };
 
 export type DesktopUpdateState =

@@ -372,6 +372,7 @@ new path is measurably smaller, and provider behavior has one owner.
 | 2026-09-06 | Phase 2 | Complete | SDK replica `33f24a3`; Claw consumes one bounded reset plus revisioned SDK events; divergent legacy rows cannot win; real dev send streamed one user row and one assistant row; no new buffer overflow; Core 285, Backend 597, Vue 884, and Electron runtime 19 tests pass; all four lint/typecheck gates pass | `3535ddd` | The live 1.97 MB snapshot flood forced the correct reset-plus-delta design. The old Claw Codex reducer still runs only as a temporary metadata/overlay bridge and is removed in Phase 3. |
 | 2026-09-06 | Phase 3 | Complete | Codex adapter no longer emits Claw transcript, turn, tool, request, approval, queue, compaction, or history projections; turn actions return no reconstructed transcript; renderer workspace state derives from the provider snapshot; Knip is clean; all 2,075 workspace tests pass | `chore: remove codex conversation shadow state` | 594 net lines removed in this checkpoint. Claw state persistence already excluded all transcripts, so no persistence migration was required. Generic conversation reducers remain only for Claude until its owner is cut over in Phases 4–6. |
 | 2026-09-06 | Phase 4 | Complete | Existing Claude coverage maps send, streamed/final text, tools, permissions, questions, plan mode, compaction, context, errors, transcript hydration/resume/read, and interruption; new concurrent-agent regression proves session/event isolation; focused 28-test suite and backend typecheck pass | `test: characterize claude conversation ownership` | The ownership audit fixes the seam: a concrete Claude conversation host owns transcript state and emits revisioned frames; `ClaudeBackendDriver` retains only provider catalog/runtime and Claw integration concerns. |
+| 2026-09-06 | Phase 5 | Complete | Claude host emits one revisioned provider snapshot followed by immutable provider deltas; the renderer applies them through the shared Claude replica and never writes the global transcript; Codex and Claude routes remain isolated; 2,086 workspace tests, all workspace typechecks, Stylelint, and Knip pass | `feat: delegate claude conversations to agent sdk` | The provider catalog is separated from the deep conversation host. Claw coordination consumes provider events through a small read-only view, while delegated reports explicitly read the provider-owned transcript. |
 
 ### Phase 0 baseline
 
@@ -420,3 +421,10 @@ provider internals.
 - Tests that asserted exact Codex tool, compaction, or message conversion in
   Claw were duplication, not protection. SDK tests own those semantics; Claw
   tests now protect routing, provider-frame delivery, and overlay correlation.
+- Provider events must be immutable at the host boundary. The legacy reducer
+  mutates tool parts in place, so the Claude replica clones incoming events
+  before reducing them; otherwise a previously emitted `item.started` event can
+  silently change when a later tool update arrives.
+- A provider-owned transcript does not prevent Claw features from reading it.
+  Handoff reports now request the provider transcript explicitly instead of
+  relying on an accidentally synchronized global copy.

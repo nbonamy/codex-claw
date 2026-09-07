@@ -73,6 +73,50 @@ describe('DelegatedWorkReportService', () => {
     await expect(report).resolves.toBe('Implemented and verified the change.');
   });
 
+  it('reads a provider-owned transcript when the completion arrives in a provider frame', async () => {
+    const snapshot = createEmptySnapshot();
+    const parent = agent('agent-main', 'main');
+    const worker = {
+      ...agent('agent-worker', 'fix/provider'),
+      backend: 'claude' as const,
+      backendSession: { kind: 'claude' as const, sessionId: 'session-worker', transport: 'stdio' as const },
+      delegatedByAgentId: parent.id,
+    };
+    snapshot.agents = [parent, worker];
+    const readConversationMessages = vi.fn().mockResolvedValue([
+      assistantMessage(worker.id, 'turn-report', 'Provider-owned handoff.'),
+    ]);
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages,
+      sendPrompt: vi.fn(),
+    });
+
+    const report = service.prepare(worker, { kind: 'merge', branch: 'fix/provider', repository: 'main' });
+    service.handleEvent({
+      seq: 1,
+      occurredAt: '2026-09-03T00:01:00.000Z',
+      agentId: worker.id,
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 4,
+        event: {
+          seq: 4,
+          occurredAt: '2026-09-03T00:01:00.000Z',
+          agentId: worker.id,
+          backend: 'claude',
+          turnId: 'turn-report',
+          type: 'turn.completed',
+          payload: { turn: { id: 'turn-report', status: 'completed' } },
+        },
+      },
+    });
+
+    await expect(report).resolves.toBe('Provider-owned handoff.');
+    expect(readConversationMessages).toHaveBeenCalledWith(worker);
+  });
+
   it('falls back when the summary prompt cannot start', async () => {
     const snapshot = createEmptySnapshot();
     const parent = agent('agent-main', 'main');
@@ -101,6 +145,15 @@ function assistantMessage(agentId: string, turnId: string, text: string): Render
   };
 }
 
-function event(agentId: string, turnId: string, type: MainToRendererEvent['type']): Pick<MainToRendererEvent, 'agentId' | 'turnId' | 'type'> {
-  return { agentId, turnId, type };
+function event(agentId: string, turnId: string, type: 'turn.completed'): MainToRendererEvent {
+  return {
+    seq: 1,
+    occurredAt: '2026-09-03T00:01:00.000Z',
+    agentId,
+    backend: 'codex',
+    threadId: 'thread-report',
+    turnId,
+    type,
+    payload: { turn: { id: turnId, status: 'completed' } },
+  };
 }

@@ -29,15 +29,13 @@ describe('agent chat service', () => {
       id: 'agent-dina',
       folder: '~/src/codex-claw',
     }), 'hello');
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'hello' }]);
+    expect(snapshot.messages).toStrictEqual([]);
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
     expect(events.map((event) => event.type)).toStrictEqual([
-      'message.userSubmitted',
       'agent.statusChanged',
       'backend.statusChanged',
     ]);
     expect(events.map((event) => event.payload)).toMatchObject([
-      { message: { agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello' }] } },
       { type: 'starting' },
       {
         backend: 'claude',
@@ -55,7 +53,6 @@ describe('agent chat service', () => {
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'session-1', transport: 'stdio' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(events.map((event) => event.payload)).toMatchObject([
-      { message: { agentId: 'agent-dina', role: 'user', parts: [{ type: 'text', text: 'hello' }] } },
       { type: 'starting' },
       {
         backend: 'claude',
@@ -277,6 +274,30 @@ describe('agent chat service', () => {
     );
   });
 
+  it('tells a provider not to duplicate a previously submitted queued prompt', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backend = 'claude';
+    const backendDriver = createFakeBackendDriver(Promise.resolve({
+      backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
+    }), 'claude');
+
+    sendAgentPrompt(
+      snapshot,
+      backendDriver,
+      'agent-dina',
+      'retry me',
+      undefined,
+      vi.fn(),
+      { appendUserMessage: false },
+    );
+
+    expect(backendDriver.sendPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-dina' }),
+      'retry me',
+      { recordUserMessage: false },
+    );
+  });
+
   it('preserves provider-neutral attachment descriptors for the backend driver', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backend = 'claude';
@@ -310,26 +331,7 @@ describe('agent chat service', () => {
       'review these files',
       { attachments },
     );
-    expect(snapshot.messages).toHaveLength(1);
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
-      { type: 'text', text: 'review these files' },
-      {
-        type: 'attachment',
-        attachment: {
-          kind: 'image',
-          name: 'screenshot.png',
-          path: '/tmp/screenshot.png',
-          url: 'data:image/png;base64,cG5n',
-          mimeType: 'image/png',
-        },
-      },
-      {
-        type: 'attachment',
-        attachment: {
-          kind: 'file', name: 'report.txt', path: '/tmp/report.txt', mimeType: 'text/plain',
-        },
-      },
-    ]);
+    expect(snapshot.messages).toStrictEqual([]);
   });
 
   it('submits attachment-only prompts', () => {
@@ -348,13 +350,7 @@ describe('agent chat service', () => {
       '',
       { attachments },
     );
-    expect(snapshot.messages.at(-1)?.parts).toStrictEqual([
-      { type: 'text', text: '' },
-      {
-        type: 'attachment',
-        attachment: { kind: 'file', name: 'report.txt', path: '/tmp/report.txt' },
-      },
-    ]);
+    expect(snapshot.messages).toStrictEqual([]);
   });
 
   it('lets the backend driver prepare selected prompt skills', () => {

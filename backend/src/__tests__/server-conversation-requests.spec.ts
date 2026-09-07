@@ -292,8 +292,28 @@ describe('ClawBackendServer', () => {
     expect(onPromptStarting).not.toHaveBeenCalled();
 
     server.emitEvent({
-      agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina', turnId: 'turn-old',
-      type: 'turn.completed', payload: { status: 'completed' },
+      agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 2,
+          occurredAt: '2026-06-13T00:00:01.000Z',
+          origin: 'notification',
+          conversationId: 'thread-dina',
+          turnId: 'turn-old',
+          type: 'turn.completed',
+          payload: {
+            status: 'completed', error: null, willRetry: false,
+            startedAt: null, completedAt: '2026-06-13T00:00:01.000Z', durationMs: null,
+          },
+        },
+      },
+    });
+    server.emitEvent({
+      agentId: 'agent-dina',
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
     });
     expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
       attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],

@@ -135,6 +135,7 @@ function expectSendPromptOptions(value: unknown, path: string): void {
   expectOptional(value, 'inputMethod', path, (candidate, candidatePath) =>
     expectLiteral(candidate, ['typed', 'dictated'], candidatePath),
   );
+  expectOptional(value, 'recordUserMessage', path, expectBoolean);
   expectOptional(value, 'backendOptions', path, (candidate, candidatePath) => {
     expectRecord(candidate, candidatePath);
     expectLiteral(candidate.kind, ['codex', 'claude'], `${candidatePath}.kind`);

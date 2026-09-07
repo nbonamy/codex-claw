@@ -16,6 +16,11 @@ import {
   type CodexConversationReplica,
 } from '@codex-app-sdk/core/conversation-replica';
 import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import {
+  createClaudeConversationReplica,
+  type ClaudeConversationReplica,
+} from '@codex-claw/core/claude-conversation-replica';
+import type { ClaudeConversationSnapshot } from '@codex-claw/core/contracts';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { appText } from '@codex-claw/core/app-text';
@@ -53,7 +58,13 @@ const codexConversationFramesByAgentId = ref<Record<string, {
   snapshot: CodexConversationSnapshot;
   threadId: string;
 }>>({});
+const claudeConversationFramesByAgentId = ref<Record<string, {
+  replica: ClaudeConversationReplica;
+  revision: number;
+  snapshot: ClaudeConversationSnapshot;
+}>>({});
 const recoveringCodexConversationAgentIds = new Set<string>();
+const recoveringClaudeConversationAgentIds = new Set<string>();
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
@@ -173,6 +184,13 @@ export function useAppState() {
     const frame = codexConversationFramesByAgentId.value[agent.id];
     return frame?.threadId === agent.backendSession.threadId ? frame.snapshot : null;
   });
+  const activeClaudeConversationSnapshot = computed(() => {
+    const agent = activeAgent.value;
+    if (!agent || agent.backend !== 'claude') return null;
+    const frame = claudeConversationFramesByAgentId.value[agent.id];
+    const sessionId = agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
+    return !frame || (sessionId && frame.snapshot.sessionId !== sessionId) ? null : frame.snapshot;
+  });
 
   const visibleMessages = computed(() => {
     const agentId = activeAgent.value?.id ?? null;
@@ -283,7 +301,9 @@ export function useAppState() {
     resetCatalogStateIfSourceChanged(codexClawApi);
     resetUnreadAgentIds();
     codexConversationFramesByAgentId.value = {};
+    claudeConversationFramesByAgentId.value = {};
     recoveringCodexConversationAgentIds.clear();
+    recoveringClaudeConversationAgentIds.clear();
     agentCreationProgress.value = null;
 
     isLoading.value = true;
@@ -336,6 +356,7 @@ export function useAppState() {
       }
       snapshot.value = state.snapshot;
       pruneUnreadAgentIds();
+      pruneConversationFrames();
       connectionState.value = state.connection;
       lastBackendEventSeq = state.lastBackendEventSeq;
       const buffered = bufferedMainEvents;
@@ -562,7 +583,7 @@ export function useAppState() {
     const needsHistory = Boolean(selectedAgent?.backendSession && (
       selectedAgent.backendSession.kind === 'codex'
         ? codexConversationFramesByAgentId.value[agentId]?.threadId !== selectedAgent.backendSession.threadId
-        : !snapshot.value.messages.some((message) => message.agentId === agentId)
+        : claudeConversationFramesByAgentId.value[agentId]?.snapshot.sessionId !== selectedAgent.backendSession.sessionId
     ));
     rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
@@ -1268,6 +1289,7 @@ export function useAppState() {
     backendModels,
     activeBackendCommands,
     activeCodexConversationSnapshot,
+    activeClaudeConversationSnapshot,
     activeBackendCapabilities,
     modelCatalogStatus,
     modelCatalogError,
@@ -1645,6 +1667,44 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       };
       return;
     }
+    case 'claude.conversationSnapshotChanged': {
+      const current = claudeConversationFramesByAgentId.value[event.agentId];
+      if (current && current.revision >= event.payload.revision) return;
+      claudeConversationFramesByAgentId.value = {
+        ...claudeConversationFramesByAgentId.value,
+        [event.agentId]: {
+          replica: createClaudeConversationReplica(event.payload.snapshot),
+          revision: event.payload.revision,
+          snapshot: event.payload.snapshot,
+        },
+      };
+      return;
+    }
+    case 'claude.conversationEventReceived': {
+      const current = claudeConversationFramesByAgentId.value[event.agentId];
+      if (!current || event.payload.revision !== current.revision + 1) {
+        if (!current || event.payload.revision > current.revision) {
+          invalidateAndRecoverClaudeConversation(event.agentId);
+        }
+        return;
+      }
+      let nextSnapshot: ClaudeConversationSnapshot;
+      try {
+        nextSnapshot = current.replica.apply(event.payload.event);
+      } catch {
+        invalidateAndRecoverClaudeConversation(event.agentId);
+        return;
+      }
+      claudeConversationFramesByAgentId.value = {
+        ...claudeConversationFramesByAgentId.value,
+        [event.agentId]: {
+          ...current,
+          revision: event.payload.revision,
+          snapshot: nextSnapshot,
+        },
+      };
+      return;
+    }
     case 'thread.historyHydrationFailed':
       syncHistoryPageStateFromMainEvent(event);
       return;
@@ -1681,6 +1741,18 @@ function invalidateAndRecoverCodexConversation(agentId: string): void {
     .then(adoptBackgroundSnapshotMetadata)
     .catch(() => undefined)
     .finally(() => recoveringCodexConversationAgentIds.delete(agentId));
+}
+
+function invalidateAndRecoverClaudeConversation(agentId: string): void {
+  const frames = { ...claudeConversationFramesByAgentId.value };
+  delete frames[agentId];
+  claudeConversationFramesByAgentId.value = frames;
+  if (recoveringClaudeConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
+  recoveringClaudeConversationAgentIds.add(agentId);
+  void codexClawApi.hydrateAgentHistory(agentId)
+    .then(adoptBackgroundSnapshotMetadata)
+    .catch(() => undefined)
+    .finally(() => recoveringClaudeConversationAgentIds.delete(agentId));
 }
 
 function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, RendererOnlySnapshotEvent>): void {
@@ -1781,6 +1853,7 @@ function adoptBackgroundSnapshotMetadata(metadata: AppSnapshotMetadata): void {
     selectAgentInSnapshot(snapshot.value, activeAgentId);
   }
   pruneUnreadAgentIds();
+  pruneConversationFrames();
 }
 
 function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
@@ -1790,6 +1863,7 @@ function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
   }
   snapshot.value = nextSnapshot;
   pruneUnreadAgentIds();
+  pruneConversationFrames();
 }
 
 function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
@@ -1797,11 +1871,33 @@ function adoptNavigationSnapshot(nextSnapshot: AppSnapshot): void {
   rememberActiveComposerConfiguration();
   snapshot.value = nextSnapshot;
   pruneUnreadAgentIds();
+  pruneConversationFrames();
   if (nextSnapshot.activeAgentId && nextSnapshot.activeAgentId !== previousAgentId) {
     restoreComposerConfiguration(nextSnapshot.activeAgentId);
   } else if (!nextSnapshot.activeAgentId) {
     clearActiveComposerConfiguration();
   }
+}
+
+function pruneConversationFrames(): void {
+  const agentsById = new Map(snapshot.value.agents.map((agent) => [agent.id, agent]));
+  codexConversationFramesByAgentId.value = Object.fromEntries(
+    Object.entries(codexConversationFramesByAgentId.value).filter(([agentId, frame]) => {
+      const agent = agentsById.get(agentId);
+      return agent?.backend === 'codex'
+        && agent.backendSession?.kind === 'codex'
+        && agent.backendSession.threadId === frame.threadId;
+    }),
+  );
+  claudeConversationFramesByAgentId.value = Object.fromEntries(
+    Object.entries(claudeConversationFramesByAgentId.value).filter(([agentId, frame]) => {
+      const agent = agentsById.get(agentId);
+      if (agent?.backend !== 'claude') return false;
+      return agent.backendSession?.kind !== 'claude'
+        || frame.snapshot.sessionId === null
+        || frame.snapshot.sessionId === agent.backendSession.sessionId;
+    }),
+  );
 }
 
 function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'sidePanel.markdownRequested' | 'sidePanel.gitDiffRequested' }>): void {

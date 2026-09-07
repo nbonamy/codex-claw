@@ -1,6 +1,3 @@
-import {
-  appendUserPrompt,
-} from './snapshot';
 import type { AgentStatus, AppSnapshot, SendPromptOptions } from './contracts';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from './backend-driver';
 import { backendDisplayName } from './backend-driver';
@@ -33,15 +30,6 @@ export function sendAgentPrompt(
   }
 
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
-  if (!promptResult && backendDriver.backend !== 'codex' && hooks?.appendUserMessage !== false) {
-    const message = appendUserPrompt(snapshot, agentId, trimmedPrompt, undefined, options?.attachments);
-    emit({
-      agentId,
-      type: 'message.userSubmitted',
-      payload: { message },
-      occurredAt: message.createdAt,
-    });
-  }
   const hadBackendSession = Boolean(agent.backendSession);
 
   updateAgentStatus(agentId, { type: 'starting' }, emit, snapshot);
@@ -58,7 +46,10 @@ export function sendAgentPrompt(
       : { kind: 'codex' as const };
     agent.backendDefaults = { ...defaults, serviceTier: options.serviceTier };
   }
-  const preparedOptions = backendDriver.preparePromptOptions?.(agent, options) ?? options;
+  const routedOptions = hooks?.appendUserMessage === false
+    ? { ...options, recordUserMessage: false }
+    : options;
+  const preparedOptions = backendDriver.preparePromptOptions?.(agent, routedOptions) ?? routedOptions;
   const sendResult = promptResult
     ?? (hasPromptOptions(preparedOptions)
       ? backendDriver.sendPrompt(agent, trimmedPrompt, preparedOptions)
@@ -111,6 +102,7 @@ function hasPromptOptions(options: SendPromptOptions | undefined): options is Se
     options?.reasoningEffort ||
     (options?.skills?.length ?? 0) > 0 ||
     options?.inputMethod ||
+    options?.recordUserMessage === false ||
     options?.backendOptions,
   );
 }

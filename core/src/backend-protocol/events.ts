@@ -81,6 +81,9 @@ function expectEventContext(event: EventRecord): void {
       expectAgentBackend(event, 'codex');
       expectRequiredString(event, 'threadId');
       return;
+    case 'claude.conversationSnapshotChanged':
+      expectAgentBackend(event, 'claude');
+      return;
     case 'codex.conversationEventReceived': {
       expectAgentBackend(event, 'codex');
       expectRequiredString(event, 'threadId');
@@ -91,6 +94,15 @@ function expectEventContext(event: EventRecord): void {
           '$.payload.event.conversationId',
           'expected the outer thread id',
         );
+      }
+      return;
+    }
+    case 'claude.conversationEventReceived': {
+      expectAgentBackend(event, 'claude');
+      const payload = event.payload as Record<string, unknown>;
+      const providerEvent = payload.event as Record<string, unknown>;
+      if (providerEvent.agentId !== event.agentId) {
+        failEventValidation('$.payload.event.agentId', 'expected the outer agent id');
       }
       return;
     }

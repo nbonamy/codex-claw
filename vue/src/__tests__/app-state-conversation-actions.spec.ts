@@ -10,6 +10,7 @@ import { stubElectronTestWindow } from '../test/client';
 import { configureClawClient } from '../platform-api';
 import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 import { codexConversationSnapshot, codexTextMessage } from '../test/codex-conversation-fixtures';
+import { claudeConversationSnapshot } from '../test/claude-conversation-fixtures';
 describe('useAppState', () => {
   afterEach(() => {
     clearConfetti();
@@ -1144,6 +1145,161 @@ describe('useAppState', () => {
     });
 
     expect(state.activeCodexConversationSnapshot.value).toBeNull();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
+  });
+
+  it('advances the provider-owned Claude frame without writing the global transcript', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backend = 'claude';
+    remoteSnapshot.agents[0]!.backendDefaults = { kind: 'claude' };
+    remoteSnapshot.agents[0]!.backendSession = {
+      kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio',
+    };
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        hydrateAgentHistory: vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot)),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationSnapshotChanged',
+      payload: { revision: 1, snapshot: claudeConversationSnapshot() },
+      occurredAt: '2026-09-06T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 2,
+          occurredAt: '2026-09-06T00:00:02.000Z',
+          agentId: 'agent-dina',
+          backend: 'claude',
+          type: 'turn.started',
+          turnId: 'turn-1',
+          payload: { turn: { id: 'turn-1', backend: 'claude' } },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+    listeners[0]?.({
+      seq: 3,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 3,
+        event: {
+          seq: 3,
+          occurredAt: '2026-09-06T00:00:03.000Z',
+          agentId: 'agent-dina',
+          backend: 'claude',
+          type: 'message.userSubmitted',
+          turnId: 'turn-1',
+          payload: { message: {
+            id: 'user-1', agentId: 'agent-dina', role: 'user', status: 'complete', turnId: 'turn-1',
+            createdAt: '2026-09-06T00:00:03.000Z', parts: [{ type: 'text', text: 'Hello Claude' }],
+          } },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:03.000Z',
+    });
+    listeners[0]?.({
+      seq: 4,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 4,
+        event: {
+          seq: 4,
+          occurredAt: '2026-09-06T00:00:04.000Z',
+          agentId: 'agent-dina',
+          backend: 'claude',
+          type: 'message.delta',
+          turnId: 'turn-1',
+          payload: { messageId: 'assistant-1', delta: 'Hi' },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:04.000Z',
+    });
+
+    expect(state.snapshot.value.messages).toStrictEqual([]);
+    expect(state.activeClaudeConversationSnapshot.value).toMatchObject({
+      activeTurnId: 'turn-1',
+      busy: true,
+      messages: [
+        { id: 'user-1', parts: [{ type: 'text', text: 'Hello Claude' }] },
+        { id: 'assistant-turn-1', parts: [{ type: 'text', text: 'Hi' }] },
+      ],
+    });
+  });
+
+  it('invalidates and rehydrates a Claude frame after a revision gap', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backend = 'claude';
+    remoteSnapshot.agents[0]!.backendSession = {
+      kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio',
+    };
+    const hydrateAgentHistory = vi.fn().mockResolvedValue(snapshotMetadata(remoteSnapshot));
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        hydrateAgentHistory,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalled());
+    hydrateAgentHistory.mockClear();
+
+    listeners[0]?.({
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationSnapshotChanged',
+      payload: { revision: 4, snapshot: claudeConversationSnapshot() },
+      occurredAt: '2026-09-06T00:00:01.000Z',
+    });
+    listeners[0]?.({
+      seq: 2,
+      agentId: 'agent-dina',
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 6,
+        event: {
+          seq: 6,
+          occurredAt: '2026-09-06T00:00:02.000Z',
+          agentId: 'agent-dina',
+          backend: 'claude',
+          type: 'error',
+          payload: { message: 'gap' },
+        },
+      },
+      occurredAt: '2026-09-06T00:00:02.000Z',
+    });
+
+    expect(state.activeClaudeConversationSnapshot.value).toBeNull();
     await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
   });
 });

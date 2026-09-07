@@ -35,6 +35,17 @@ export type ThreadPlan = {
   updatedAt: string;
 };
 
+export type AgentContextUsage = {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  lastTotalTokens: number;
+  modelContextWindow: number | null;
+  usedPercent: number | null;
+};
+
 export type BackendConversationRef =
   | {
     backend: 'codex';
@@ -211,10 +222,12 @@ export type SendPromptOptions = {
   serviceTier?: string | null;
   skills?: PromptSkillInput[];
   inputMethod?: 'typed' | 'dictated';
+  /** Internal delivery hint: the provider must not create another visible user row. */
+  recordUserMessage?: boolean;
   backendOptions?: BackendPromptOptions;
 };
 
-export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments'> & {
+export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments' | 'recordUserMessage'> & {
   attachments?: readonly RendererPromptAttachment[];
 };
 
@@ -331,4 +344,67 @@ export type AgentQueuedPrompt = {
 
 export type AgentHistoryLoadResult = {
   hasOlder: boolean;
+};
+
+export type ToolConfirmationDecision =
+  | 'allow'
+  | 'allow_conversation'
+  | 'always_allow'
+  | 'deny';
+
+export type ConfirmToolRequest = {
+  argumentsPreview: string;
+  integrationId: string;
+  integrationName: string;
+  summary: string;
+  toolName: string;
+  allowConversation?: boolean;
+  allowAlways?: boolean;
+};
+
+export type AskUserQuestionOption = {
+  label: string;
+  description: string;
+};
+
+export type AskUserQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  isOther: boolean;
+  isSecret: boolean;
+  multiSelect?: boolean;
+  options: AskUserQuestionOption[] | null;
+};
+
+export type AskUserRequest = {
+  itemId: string;
+  questions: AskUserQuestion[];
+};
+
+export type AskUserAnswers = Record<string, { answers: string[] }>;
+
+export type ClientRequest =
+  | {
+    id: string;
+    kind: 'confirm_tool';
+    payload: {
+      confirmation: ConfirmToolRequest;
+    };
+  }
+  | {
+    id: string;
+    kind: 'ask_user';
+    payload: {
+      request: AskUserRequest;
+    };
+  };
+
+export type ClientRequestResponse = {
+  id: string;
+  payload?: {
+    answers?: AskUserAnswers;
+    cancelled?: boolean;
+    decision?: ToolConfirmationDecision | null;
+  };
 };

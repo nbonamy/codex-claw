@@ -4,7 +4,7 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot, applySnapshotMetadata, snapshotMetadata } from '@codex-claw/core/snapshot';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppSnapshotMetadata, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -37,6 +37,8 @@ import { AgentConversationService } from './agents/agent-conversation-service';
 import { DelegatedWorkReportService, type DelegatedWorkReportPort } from './agents/delegated-work-report-service';
 import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { ClientRequestRegistry } from './client-requests/client-request-registry';
+import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
+import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -167,6 +169,15 @@ export class ClawBackendServer {
     });
     this.delegatedWorkReports = options.delegatedWorkReports ?? new DelegatedWorkReportService({
       getSnapshot: () => this.snapshot,
+      readConversationMessages: async (agent) => {
+        const ref = conversationRefFromAgent(agent);
+        if (!ref) return [];
+        return await this.handleAgentDriverRequest(
+          agent,
+          backendMethods.driverConversationMessagesGet,
+          { ref, agentId: agent.id },
+        ) as RendererMessage[];
+      },
       sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
       sendMessage: this.sendAgentMessage,
     });
@@ -1956,13 +1967,18 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent);
     this.emitDerivedSidePanelEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
-    if (event.type === 'turn.completed' && event.agentId) {
+    if (
+      event.agentId && (
+        providerConversationEventView(fullEvent).type === 'turn.completed' ||
+        (event.type === 'agent.statusChanged' && event.payload.type === 'idle')
+      )
+    ) {
       this.agentPrompts.drain(event.agentId);
     }
     if (event.type === 'agent.promptQueued' && event.agentId) {
       this.agentPrompts.drain(event.agentId);
     }
-    if (options.persist !== false && shouldPersistSnapshotForEvent(event)) {
+    if (options.persist !== false && shouldPersistSnapshotForEvent(fullEvent)) {
       const persistence = this.saveSnapshot?.(this.snapshot);
       if (persistence) {
         void persistence.catch((error) => {
@@ -1973,7 +1989,7 @@ export class ClawBackendServer {
         });
       }
     }
-    if (event.agentId === this.snapshot.activeAgentId && shouldRefreshGitStatusForEvent(event)) {
+    if (event.agentId === this.snapshot.activeAgentId && shouldRefreshGitStatusForEvent(fullEvent)) {
       void this.agentWorkspaces.refreshGitStatus(event.agentId);
     }
   }
@@ -2585,7 +2601,8 @@ function planReviewPreview(markdown: string): { title: AppText; content: string 
   return { title, content };
 }
 
-function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
+function shouldPersistSnapshotForEvent(event: MainToRendererEvent): boolean {
+  const conversationEventType = providerConversationEventView(event).type;
   return event.type === 'agent.updated' ||
     event.type === 'snapshot.updated' ||
     event.type === 'workBacklog.assignmentUpdated' ||
@@ -2597,12 +2614,12 @@ function shouldPersistSnapshotForEvent(event: BackendEvent): boolean {
     event.type === 'subagent.statusChanged' ||
     // Token usage and plan updates are high-frequency during a turn. The
     // completed event persists their latest state in one durable write.
-    event.type === 'turn.completed' ||
-    event.type === 'turn.proposedPlanCompleted';
+    conversationEventType === 'turn.completed' ||
+    conversationEventType === 'turn.proposedPlanCompleted';
 }
 
-function shouldRefreshGitStatusForEvent(event: BackendEvent): boolean {
-  return event.type === 'turn.completed';
+function shouldRefreshGitStatusForEvent(event: MainToRendererEvent): boolean {
+  return providerConversationEventView(event).type === 'turn.completed';
 }
 
 function clientStateFromSnapshot(snapshot: AppSnapshot, remoteControlStatus: DevicePairingStatus): ClientState {

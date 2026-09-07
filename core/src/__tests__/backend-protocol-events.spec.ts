@@ -172,6 +172,8 @@ function createFixtures(): EventFixtures {
           turnIds: [],
           turns: [],
           messages: [],
+          historyLoading: false,
+          historyState: { loadingStrategy: 'eager', hasOlder: false, loadingOlder: false, fullyLoaded: true },
           clientRequests: [],
           answeredClientRequestIds: [],
           approvals: [],
@@ -195,7 +197,6 @@ function createFixtures(): EventFixtures {
           rateLimits: null,
           queuedPrompts: [],
           busy: false,
-          historyLoading: false,
           error: null,
         },
       },
@@ -217,6 +218,47 @@ function createFixtures(): EventFixtures {
             itemId: 'item-1',
             delta: 'Hello',
           },
+        },
+      },
+    },
+    'claude.conversationSnapshotChanged': {
+      ...agent,
+      backend: 'claude',
+      type: 'claude.conversationSnapshotChanged',
+      payload: {
+        revision: 1,
+        snapshot: {
+          agentId: 'agent-1',
+          sessionId: 'claude-session-1',
+          activeTurnId: null,
+          turnIds: [],
+          turns: [],
+          messages: [],
+          answeredClientRequestIds: [],
+          busy: false,
+          historyLoading: false,
+          historyState: { hasOlder: false, loadingOlder: false },
+          contextUsage: null,
+          plan: null,
+          error: null,
+        },
+      },
+    },
+    'claude.conversationEventReceived': {
+      ...agent,
+      backend: 'claude',
+      type: 'claude.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 2,
+          occurredAt,
+          agentId: 'agent-1',
+          backend: 'claude',
+          backendSessionId: 'claude-session-1',
+          turnId: 'turn-1',
+          type: 'message.delta',
+          payload: { delta: 'Hello' },
         },
       },
     },
@@ -520,7 +562,7 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(56);
+    expect(Object.keys(fixtures)).toHaveLength(58);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }

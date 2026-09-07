@@ -182,6 +182,7 @@
         :commit-agent-git-changes="props.commitAgentGitChanges"
         :confirm-plan="confirmPlan"
         :conversation-pane-controller="conversationPaneController"
+        :conversation-plan="conversationPlan"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
         :current-agent-git-status="currentAgentGitStatus"
@@ -363,7 +364,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -441,6 +442,7 @@ const props = withDefaults(defineProps<{
   backendSkills?: BackendSkillSummary[];
   backendCapabilities?: BackendCapabilities;
   codexConversationSnapshot?: CodexConversationSnapshot | null;
+  claudeConversationSnapshot?: ClaudeConversationSnapshot | null;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
@@ -1077,7 +1079,7 @@ const {
 const effectiveApprovals = computed(() => {
   const fixture = debugApproval.value;
   const providerApprovals = currentAgent.value?.backend === 'codex'
-    ? providerConversation.value?.approvals ?? []
+    ? props.codexConversationSnapshot?.approvals ?? []
     : props.approvals ?? [];
   return [
     ...providerApprovals,
@@ -1102,10 +1104,14 @@ const conversationKey = computed(() => {
   return currentAgent.value ? `agent:${currentAgent.value.id}` : 'no-agent';
 });
 const providerConversation = computed(() => (
-  currentAgent.value?.backend === 'codex' ? props.codexConversationSnapshot ?? null : null
+  currentAgent.value?.backend === 'codex'
+    ? props.codexConversationSnapshot ?? null
+    : currentAgent.value?.backend === 'claude'
+      ? props.claudeConversationSnapshot ?? null
+      : null
 ));
 const conversationMessages = computed(() => (
-  currentAgent.value?.backend === 'codex'
+  currentAgent.value?.backend === 'codex' || currentAgent.value?.backend === 'claude'
     ? providerConversation.value?.messages ?? []
     : props.messages
 ));
@@ -1121,6 +1127,11 @@ const conversationHasRunningPlanTool = computed(() => conversationMessages.value
   (message) => message.parts.some(
     (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,
   ),
+));
+const conversationPlan = computed(() => (
+  currentAgent.value?.backend === 'claude'
+    ? props.claudeConversationSnapshot?.plan ?? null
+    : currentAgent.value?.plan ?? null
 ));
 const conversationActiveTurnId = computed(() => {
   if (providerConversation.value) return providerConversation.value.activeTurnId;
@@ -1194,12 +1205,14 @@ const conversationPaneState: CodexConversationPaneState = {
         : currentAgent.value?.backend === 'codex' ? new Set<string>() : props.answeredClientRequestIds;
     },
     get goal() {
-      return providerConversation.value?.goal
-        ?? (currentAgent.value?.backend === 'codex' ? null : props.goal ?? null);
+      return currentAgent.value?.backend === 'codex'
+        ? props.codexConversationSnapshot?.goal ?? null
+        : props.goal ?? null;
     },
     get queuedPrompts() {
-      return providerConversation.value?.queuedPrompts
-        ?? (currentAgent.value?.backend === 'codex' ? [] : props.queuedPrompts);
+      return currentAgent.value?.backend === 'codex'
+        ? props.codexConversationSnapshot?.queuedPrompts ?? []
+        : props.queuedPrompts;
     },
     get contextUsage() { return providerConversation.value?.contextUsage ?? currentAgent.value?.contextUsage ?? null; },
   },

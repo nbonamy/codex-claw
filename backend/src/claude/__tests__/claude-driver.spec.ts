@@ -3,6 +3,7 @@ import { ClaudeBackendDriver } from '../claude-driver';
 import type { ClaudeSdkMessage } from '../protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../transport';
 import type { Agent } from '@codex-claw/core/contracts';
+import type { BackendEvent } from '@codex-claw/core/backend-driver';
 
 const agent: Agent = {
   id: 'agent-claude',
@@ -14,6 +15,12 @@ const agent: Agent = {
   createdAt: '2026-06-05T00:00:00.000Z',
   updatedAt: '2026-06-05T00:00:00.000Z',
 };
+
+function unwrapClaudeConversationEvent(event: BackendEvent) {
+  return event.type === 'claude.conversationEventReceived'
+    ? event.payload.event
+    : event;
+}
 
 describe('ClaudeBackendDriver', () => {
   it('exposes and persists Claude permission modes without creating a session', async () => {
@@ -46,7 +53,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: unknown[] = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'hello claude', {
       model: 'claude-sonnet-4-5',
@@ -151,7 +158,7 @@ describe('ClaudeBackendDriver', () => {
       folder: '/Users/nbonamy/src/second',
     };
     const events: Array<{ agentId?: string; backendSessionId?: string; type: string; payload: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const firstSend = driver.sendPrompt(agent, 'first prompt');
     const secondSend = driver.sendPrompt(secondAgent, 'second prompt');
@@ -185,6 +192,19 @@ describe('ClaudeBackendDriver', () => {
     ]);
   });
 
+  it('does not create another user row when delivery marks the prompt as already submitted', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const events: unknown[] = [];
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
+
+    const send = driver.sendPrompt(agent, 'retry me', { recordUserMessage: false });
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-retry' });
+    await send;
+
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
+  });
+
   it('routes Claude compact commands and publishes context usage and compaction lifecycle', async () => {
     const transport = createFakeTransport();
     transport.getContextUsage.mockResolvedValue({
@@ -194,7 +214,7 @@ describe('ClaudeBackendDriver', () => {
     });
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const compactResult = driver.tryHandlePromptCommand(agent, '/compact keep the decisions');
     expect(compactResult).not.toBeNull();
@@ -250,7 +270,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: unknown[] = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
     const persistedAgent: Agent = {
       ...agent,
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
@@ -379,7 +399,7 @@ describe('ClaudeBackendDriver', () => {
     }]);
     const driver = new ClaudeBackendDriver(transport);
     const events: unknown[] = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const started = driver.sendPrompt(agent, 'hello', { reasoningEffort: 'high' });
     expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({ effort: 'high' }), expect.any(Function), expect.any(Function));
@@ -515,7 +535,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'edit the file');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-approval' });
@@ -571,7 +591,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'clarify first');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-question' });
@@ -643,7 +663,7 @@ describe('ClaudeBackendDriver', () => {
       ],
     }));
     const events: unknown[] = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
     const persistedAgent: Agent = {
       ...agent,
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
@@ -662,20 +682,21 @@ describe('ClaudeBackendDriver', () => {
       sessionId: 'claude-session-existing',
     }));
     expect(transport.readContextUsage.mock.calls[0]?.[0]).not.toHaveProperty('prompt');
-    await vi.waitFor(() => expect(events).toHaveLength(2));
+    await vi.waitFor(() => expect(events).toHaveLength(3));
     expect(events).toStrictEqual([
       expect.objectContaining({
         agentId: 'agent-claude',
         backend: 'claude',
-        backendSessionId: 'claude-session-existing',
-        type: 'thread.historyLoaded',
+        type: 'claude.conversationSnapshotChanged',
         payload: {
-          messages: [
-            expect.objectContaining({
+          revision: 1,
+          snapshot: expect.objectContaining({
+            sessionId: 'claude-session-existing',
+            messages: [expect.objectContaining({
               id: 'user-claude-session-existing-user-1',
               parts: [{ type: 'text', text: 'hello' }],
-            }),
-          ],
+            })],
+          }),
         },
       }),
       expect.objectContaining({
@@ -696,6 +717,17 @@ describe('ClaudeBackendDriver', () => {
             usedPercent: 16.56,
           },
         },
+      }),
+      expect.objectContaining({
+        agentId: 'agent-claude',
+        backend: 'claude',
+        type: 'claude.conversationSnapshotChanged',
+        payload: expect.objectContaining({
+          snapshot: expect.objectContaining({
+            sessionId: 'claude-session-existing',
+            contextUsage: expect.objectContaining({ totalTokens: 33_120 }),
+          }),
+        }),
       }),
     ]);
   });
@@ -756,7 +788,7 @@ describe('ClaudeBackendDriver', () => {
     });
     const driver = new ClaudeBackendDriver(transport, historyLoader);
     const events: unknown[] = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     await expect(driver.resumeConversation(agent, {
       backend: 'claude',
@@ -764,8 +796,14 @@ describe('ClaudeBackendDriver', () => {
       sessionId: 'claude-session-existing',
     })).resolves.toStrictEqual({
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
-      messages,
+      messages: [],
     });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'claude.conversationSnapshotChanged',
+      payload: expect.objectContaining({
+        snapshot: expect.objectContaining({ messages }),
+      }),
+    }));
     expect(historyLoader).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-claude',
       folder: '/Users/nbonamy/src/codex-claw',
@@ -836,7 +874,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; turnId?: string; threadId?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'draft the plan', { planMode: true });
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-plan' });
@@ -948,7 +986,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'stream please');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-stream' });
@@ -994,7 +1032,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'run tests');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-tools' });
@@ -1070,7 +1108,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'edit the readme');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-files' });
@@ -1163,7 +1201,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const events: Array<{ type?: string; payload?: unknown }> = [];
-    driver.onEvent((event) => events.push(event));
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const sendResult = driver.sendPrompt(agent, 'hello claude');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-1' });

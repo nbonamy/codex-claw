@@ -1,4 +1,5 @@
 import type { Agent, AgentBackend, AppSnapshot, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 
 export type ClientRequestOwner = { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string };
 
@@ -22,17 +23,18 @@ export class ClientRequestRegistry {
   }
 
   record(event: MainToRendererEvent, remoteConnectionIdOverride?: string): void {
+    const conversationEvent = providerConversationEventView(event);
     if (
-      event.type !== 'approval.requested' &&
+      conversationEvent.type !== 'approval.requested' &&
       event.type !== 'backendApproval.requested' &&
-      event.type !== 'toolInput.requested'
+      conversationEvent.type !== 'toolInput.requested'
     ) {
       return;
     }
 
     const requestId = event.type === 'backendApproval.requested'
       ? nonBlankRequestId(event.payload.approval?.id)
-      : event.payload.id;
+      : requestIdFromPayload(conversationEvent.payload);
     if (!requestId) return;
 
     const snapshot = this.options.getSnapshot();
@@ -51,6 +53,11 @@ export class ClientRequestRegistry {
     });
   }
 
+}
+
+function requestIdFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  return nonBlankRequestId('id' in payload && typeof payload.id === 'string' ? payload.id : undefined);
 }
 
 function nonBlankRequestId(value: string | undefined): string | null {

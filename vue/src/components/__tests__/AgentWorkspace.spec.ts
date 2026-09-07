@@ -51,6 +51,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       commitAgentGitChanges: vi.fn(),
       confirmPlan: vi.fn(),
       conversationPaneController: {} as CodexConversationPaneController,
+      conversationPlan: currentAgent.plan ?? null,
       createAgentGitPullRequest: vi.fn(),
       currentAgent,
       currentAgentGitStatus: null,

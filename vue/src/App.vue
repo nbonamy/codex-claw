@@ -7,6 +7,7 @@
     :unread-agent-ids="unreadAgentIds"
     :messages="visibleMessages"
     :codex-conversation-snapshot="activeCodexConversationSnapshot"
+    :claude-conversation-snapshot="activeClaudeConversationSnapshot"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-conversation-load-failed="isActiveAgentHistoryFailed"
@@ -240,6 +241,7 @@ const {
   backendModels,
   activeBackendCommands,
   activeCodexConversationSnapshot,
+  activeClaudeConversationSnapshot,
   backendPlugins,
   activeBackendCapabilities,
   modelCatalogStatus,

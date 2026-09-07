@@ -427,6 +427,8 @@ describe('useAppState', () => {
       'agentCreation.progress',
       'browser.annotationCreated',
       'celebration.requested',
+      'claude.conversationEventReceived',
+      'claude.conversationSnapshotChanged',
       'client.connectionChanged',
       'clientRequest.resolved',
       'codex.conversationEventReceived',

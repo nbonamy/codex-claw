@@ -181,6 +181,7 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   conversationPaneController: CodexConversationPaneController;
+  conversationPlan: ThreadPlan | null;
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
@@ -297,7 +298,7 @@ const rightWorkspaces = props.rightWorkspaces;
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
 
 const currentTurnPlan = computed<ThreadPlan | null>(() => {
-  const plan = currentAgent.value?.plan;
+  const plan = props.conversationPlan;
   if (!plan?.steps.length) {
     return null;
   }

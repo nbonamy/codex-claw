@@ -92,6 +92,7 @@ function isSendPromptOptions(value: unknown): boolean {
     optional(value, 'serviceTier', isNullableString) &&
     optional(value, 'skills', (candidate) => isArrayOf(candidate, isPromptSkill)) &&
     optional(value, 'inputMethod', (candidate) => includes(['typed', 'dictated'], candidate)) &&
+    optional(value, 'recordUserMessage', isBoolean) &&
     optional(value, 'backendOptions', isBackendPromptOptions);
 }
 

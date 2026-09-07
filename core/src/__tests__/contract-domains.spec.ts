@@ -115,12 +115,20 @@ const contractModules = {
     path: fileURLToPath(new URL('../contracts/conversation.ts', import.meta.url)),
     dependencies: ['./shared'],
     exports: [
+      'AgentContextUsage',
       'AgentFileActivity',
       'AgentHistoryLoadResult',
       'AgentQueuedPrompt',
       'AgentSubagentTree',
+      'AskUserAnswers',
+      'AskUserQuestion',
+      'AskUserQuestionOption',
+      'AskUserRequest',
       'BackendConversationRef',
       'BackendPromptOptions',
+      'ClientRequest',
+      'ClientRequestResponse',
+      'ConfirmToolRequest',
       'ConversationFileLink',
       'ConversationSummary',
       'PromptAttachment',
@@ -153,6 +161,7 @@ const contractModules = {
       'ThreadPlanStatus',
       'ThreadPlanStep',
       'ThreadPlanStepStatus',
+      'ToolConfirmationDecision',
       'subagentActivityKinds',
       'subagentOperationKinds',
       'subagentOperationLifecycles',
@@ -240,7 +249,7 @@ describe('contract domain ownership', () => {
       .flatMap((module) => [...module.exports])
       .sort();
 
-    expect(exportsByPath.get(barrelPath)).toHaveLength(210);
+    expect(exportsByPath.get(barrelPath)).toHaveLength(213);
     expect(exportsByPath.get(barrelPath)).toEqual(expect.arrayContaining(expectedMovedExports));
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());

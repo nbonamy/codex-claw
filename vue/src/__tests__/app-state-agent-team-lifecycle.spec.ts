@@ -356,9 +356,22 @@ describe('useAppState', () => {
       agentId: 'agent-jesse',
       backend: 'codex',
       threadId: 'thread-jesse',
-      turnId: 'turn-jesse',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 1,
+        event: {
+          seq: 1,
+          occurredAt: '2026-08-07T10:00:00.000Z',
+          origin: 'notification',
+          conversationId: 'thread-jesse',
+          turnId: 'turn-jesse',
+          type: 'turn.completed',
+          payload: {
+            status: 'completed', error: null, willRetry: false,
+            startedAt: null, completedAt: '2026-08-07T10:00:00.000Z', durationMs: null,
+          },
+        },
+      },
       occurredAt: '2026-08-07T10:00:00.000Z',
     });
 

@@ -15,6 +15,7 @@ import { setElectronTestClient } from '../../test/client';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setFirstRunOnboardingStage } from '../../onboarding-session';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
+import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';
 
 import {
   conversationControllerActions,
@@ -94,6 +95,40 @@ describe('AppShell authentication and conversation', () => {
     expect(state.identity.busy).toBe(true);
     expect(state.thread?.approvals).toStrictEqual(providerSnapshot.approvals);
     expect(wrapper.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
+  });
+
+  it('uses the provider-owned Claude conversation instead of the global transcript', () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'claude';
+    agent.backendDefaults = { kind: 'claude' };
+    agent.backendSession = { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' };
+    snapshot.messages = [{
+      id: 'stale-global', agentId: agent.id, role: 'assistant', status: 'complete',
+      createdAt: '2026-09-06T00:00:00.000Z', parts: [{ type: 'text', text: 'Stale' }],
+    }];
+    const messages: RendererMessage[] = [{
+      id: 'claude-owned', agentId: agent.id, role: 'assistant', status: 'complete', turnId: 'turn-1',
+      createdAt: '2026-09-06T00:00:01.000Z', parts: [{ type: 'text', text: 'Provider owned' }],
+    }];
+    const providerSnapshot = claudeConversationSnapshot(messages, {
+      activeTurnId: 'turn-1',
+      turnIds: ['turn-1'],
+      turns: [{
+        id: 'turn-1', status: 'inProgress', error: null, willRetry: false,
+        startedAt: '2026-09-06T00:00:01.000Z', completedAt: null, durationMs: null,
+      }],
+      busy: true,
+    });
+
+    const state = conversationControllerState(mountShell({
+      snapshot,
+      claudeConversationSnapshot: providerSnapshot,
+    }));
+
+    expect(state.identity.messages).toStrictEqual(messages);
+    expect(state.identity.turns).toStrictEqual(providerSnapshot.turns);
+    expect(state.identity.busy).toBe(true);
   });
 
   it('forwards an edited terminal Codex prompt with its authoritative turn id', async () => {

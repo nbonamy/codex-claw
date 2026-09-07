@@ -12,6 +12,8 @@ export const snapshotEventOwnership = {
   'skills.changed': 'renderer',
   'codex.conversationSnapshotChanged': 'renderer',
   'codex.conversationEventReceived': 'renderer',
+  'claude.conversationSnapshotChanged': 'renderer',
+  'claude.conversationEventReceived': 'renderer',
   'sidePanel.markdownRequested': 'renderer',
   'sidePanel.gitDiffRequested': 'renderer',
   'celebration.requested': 'renderer',

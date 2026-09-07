@@ -11,7 +11,7 @@ import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
@@ -93,6 +93,7 @@ export function mountShell(overrides: Partial<{
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
   codexConversationSnapshot: CodexConversationSnapshot | null;
+  claudeConversationSnapshot: ClaudeConversationSnapshot | null;
   chooseAgentFolder: () => Promise<string | null>;
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -142,6 +143,7 @@ export function mountShell(overrides: Partial<{
       agentFiles: overrides.agentFiles ?? [],
       messages: snapshot.messages,
       codexConversationSnapshot: overrides.codexConversationSnapshot ?? null,
+      claudeConversationSnapshot: overrides.claudeConversationSnapshot ?? null,
       isLoading: false,
       isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
       retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),

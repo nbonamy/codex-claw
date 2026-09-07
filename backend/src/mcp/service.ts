@@ -4,6 +4,7 @@ import os from 'node:os';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -587,20 +588,6 @@ export class ClawMcpService {
   private emit(event: BackendEvent): void {
     this.eventSink?.(event);
   }
-}
-
-function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {
-  if (agent.backendSession?.kind === 'codex') {
-    return { backend: 'codex', threadId: agent.backendSession.threadId };
-  }
-  if (agent.backendSession?.kind === 'claude') {
-    return {
-      backend: 'claude',
-      folder: requireAgentFolder(agent),
-      sessionId: agent.backendSession.transcriptSessionId ?? agent.backendSession.sessionId,
-    };
-  }
-  return null;
 }
 
 async function readAgentMarkdownFile(filePath: string): Promise<string> {

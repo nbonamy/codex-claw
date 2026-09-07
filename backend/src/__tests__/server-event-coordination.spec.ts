@@ -113,9 +113,22 @@ describe('ClawBackendServer', () => {
       backend: 'codex',
       agentId: 'agent-dina',
       threadId: 'thread-dina',
-      turnId: 'turn-test',
-      type: 'turn.completed',
-      payload: { status: 'completed' },
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 4,
+        event: {
+          seq: 4,
+          occurredAt: '2026-06-13T00:00:02.000Z',
+          origin: 'notification',
+          conversationId: 'thread-dina',
+          turnId: 'turn-test',
+          type: 'turn.completed',
+          payload: {
+            status: 'completed', error: null, willRetry: false,
+            startedAt: null, completedAt: '2026-06-13T00:00:02.000Z', durationMs: null,
+          },
+        },
+      },
     });
 
     await vi.waitFor(() => {

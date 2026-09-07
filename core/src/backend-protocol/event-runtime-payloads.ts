@@ -327,7 +327,12 @@ function expectCodexConversationSnapshot(value: unknown, path: string): void {
     expectArray(message.parts, `${messagePath}.parts`, expectRecord);
   });
   expectNullable(value.activeTurnId, `${path}.activeTurnId`, expectString);
+  expectArray(value.turnIds, `${path}.turnIds`, expectString);
   expectBoolean(value.busy, `${path}.busy`);
+  expectBoolean(value.historyLoading, `${path}.historyLoading`);
+  expectRecord(value.historyState, `${path}.historyState`);
+  expectBoolean(value.historyState.hasOlder, `${path}.historyState.hasOlder`);
+  expectBoolean(value.historyState.loadingOlder, `${path}.historyState.loadingOlder`);
 }
 
 function expectCodexConversationEvent(value: unknown, path: string): void {
@@ -337,6 +342,58 @@ function expectCodexConversationEvent(value: unknown, path: string): void {
   expectLiteral(value.origin, ['action', 'notification', 'lifecycle'], `${path}.origin`);
   expectString(value.type, `${path}.type`);
   expectString(value.conversationId, `${path}.conversationId`);
+  expectOptional(value, 'turnId', path, expectString);
+  expectRecord(value.payload, `${path}.payload`);
+}
+
+function expectClaudeConversationSnapshot(value: unknown, path: string): void {
+  expectRecord(value, path);
+  expectString(value.agentId, `${path}.agentId`);
+  expectNullable(value.sessionId, `${path}.sessionId`, expectString);
+  expectNullable(value.activeTurnId, `${path}.activeTurnId`, expectString);
+  expectArray(value.turns, `${path}.turns`, (turn, turnPath) => {
+    expectRecord(turn, turnPath);
+    expectString(turn.id, `${turnPath}.id`);
+    expectLiteral(turn.status, ['inProgress', 'completed', 'interrupted'], `${turnPath}.status`);
+  });
+  expectArray(value.messages, `${path}.messages`, (message, messagePath) => {
+    expectRecord(message, messagePath);
+    expectString(message.id, `${messagePath}.id`);
+    expectString(message.agentId, `${messagePath}.agentId`);
+    expectLiteral(message.role, ['user', 'assistant', 'system'], `${messagePath}.role`);
+    expectArray(message.parts, `${messagePath}.parts`, expectRecord);
+  });
+  expectArray(value.answeredClientRequestIds, `${path}.answeredClientRequestIds`, expectString);
+  expectBoolean(value.busy, `${path}.busy`);
+  expectNullable(value.contextUsage, `${path}.contextUsage`, expectRecord);
+  expectNullable(value.plan, `${path}.plan`, expectRecord);
+  expectNullable(value.error, `${path}.error`, expectString);
+}
+
+function expectClaudeConversationEvent(value: unknown, path: string): void {
+  expectRecord(value, path);
+  expectNumber(value.seq, `${path}.seq`);
+  expectString(value.occurredAt, `${path}.occurredAt`);
+  expectString(value.agentId, `${path}.agentId`);
+  expectLiteral(value.backend, ['claude'], `${path}.backend`);
+  expectLiteral(value.type, [
+    'turn.started',
+    'turn.proposedPlanDelta',
+    'turn.proposedPlanCompleted',
+    'turn.completed',
+    'context.compactionStarted',
+    'context.compactionCompleted',
+    'message.delta',
+    'message.userSubmitted',
+    'item.started',
+    'item.updated',
+    'approval.requested',
+    'toolInput.requested',
+    'clientRequest.resolved',
+    'error',
+  ], `${path}.type`);
+  expectOptional(value, 'backendSessionId', path, expectString);
+  expectOptional(value, 'threadId', path, expectString);
   expectOptional(value, 'turnId', path, expectString);
   expectRecord(value.payload, `${path}.payload`);
 }
@@ -366,6 +423,16 @@ export const runtimePayloadValidators = {
     expectRecord(value, path);
     expectNumber(value.revision, `${path}.revision`);
     expectCodexConversationEvent(value.event, `${path}.event`);
+  },
+  'claude.conversationSnapshotChanged': (value, path) => {
+    expectRecord(value, path);
+    expectNumber(value.revision, `${path}.revision`);
+    expectClaudeConversationSnapshot(value.snapshot, `${path}.snapshot`);
+  },
+  'claude.conversationEventReceived': (value, path) => {
+    expectRecord(value, path);
+    expectNumber(value.revision, `${path}.revision`);
+    expectClaudeConversationEvent(value.event, `${path}.event`);
   },
   'sidePanel.markdownRequested': expectSidePanelMarkdown,
   'sidePanel.gitDiffRequested': expectSidePanelGitDiff,

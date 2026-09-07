@@ -69,6 +69,8 @@ const rendererEventTypes = [
   'skills.changed',
   'codex.conversationSnapshotChanged',
   'codex.conversationEventReceived',
+  'claude.conversationSnapshotChanged',
+  'claude.conversationEventReceived',
   'sidePanel.markdownRequested',
   'sidePanel.gitDiffRequested',
   'celebration.requested',
@@ -180,6 +182,44 @@ const rendererOnlyEvents = [
   },
   {
     ...agent,
+    backend: 'claude',
+    type: 'claude.conversationSnapshotChanged',
+    payload: {
+      revision: 1,
+      snapshot: {
+        agentId: 'agent-1',
+        sessionId: 'claude-session-1',
+        activeTurnId: null,
+        turnIds: [],
+        turns: [],
+        messages: [],
+        answeredClientRequestIds: [],
+        busy: false,
+        historyLoading: false,
+        historyState: { hasOlder: false, loadingOlder: false },
+        contextUsage: null,
+        plan: null,
+        error: null,
+      },
+    },
+  },
+  {
+    ...agent,
+    backend: 'claude',
+    type: 'claude.conversationEventReceived',
+    payload: {
+      revision: 2,
+      event: {
+        ...agent,
+        backend: 'claude',
+        turnId: 'turn-1',
+        type: 'message.delta',
+        payload: { delta: 'Hello' },
+      },
+    },
+  },
+  {
+    ...agent,
     type: 'sidePanel.markdownRequested',
     payload: { kind: 'markdown', content: '# Plan' },
   },
@@ -270,8 +310,8 @@ describe('snapshot event ownership', () => {
     } as const;
     const assignedTypes = Object.values(expectedByOwner).flat();
 
-    expect(assignedTypes).toHaveLength(56);
-    expect(new Set(assignedTypes).size).toBe(56);
+    expect(assignedTypes).toHaveLength(58);
+    expect(new Set(assignedTypes).size).toBe(58);
     for (const [owner, types] of Object.entries(expectedByOwner)) {
       expect(
         Object.entries(snapshotEventOwnership)
