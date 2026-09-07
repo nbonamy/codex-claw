@@ -490,11 +490,12 @@ not wait forever. This is separate from tool approvals because the request is
 asking Nicolas for information, not for permission.
 
 Context compaction is primarily represented by the `contextCompaction`
-`ThreadItem`. `clawd` converts the item into a `context.compactionStarted`
-app-owned event so the reducer can split the active assistant message and insert
-the visible compaction marker exactly where the item arrived in the stream. The
-deprecated `thread/compacted` notification maps to the same app-owned event for
-compatibility.
+`ThreadItem`. The Codex SDK converts its lifecycle into provider-owned
+conversation events so its reducer can split the active assistant message and
+insert one visible compaction marker exactly where the item arrived in the
+stream. The deprecated `thread/compacted` notification remains an SDK-owned
+completion fallback. Claw only transports those provider events and must not
+synthesize another compaction lifecycle.
 
 Unhandled notifications should also log `not implemented`, but they do not need
 a response because notifications cannot block the app-server.
