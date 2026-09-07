@@ -1022,10 +1022,6 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__status[data-status="working"],
-.agent-sidebar__status[data-status="starting"] {
-  background: var(--color-warning);
-}
-
 .agent-sidebar__status[data-status="awaitingInput"] {
   background: var(--color-warning);
 }

@@ -268,7 +268,6 @@ export function useAppState() {
     }
 
     return sendingAgentIds.value.has(agent.id) ||
-      agent.status.type === 'starting' ||
       agent.status.type === 'working' ||
       agent.status.type === 'awaitingInput';
   });
@@ -1950,7 +1949,6 @@ function markAgentSending(agentId: string, sending: boolean): void {
 function isAgentSending(agentId: string): boolean {
   const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
   return sendingAgentIds.value.has(agentId) ||
-    agent?.status.type === 'starting' ||
     agent?.status.type === 'working' ||
     agent?.status.type === 'awaitingInput';
 }

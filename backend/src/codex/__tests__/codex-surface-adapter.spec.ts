@@ -1657,7 +1657,6 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await expect(adapter.forkConversation(agentA, targetAgent)).resolves.toMatchObject({
       threadId: 'thread-forked',
-      messages: [],
     });
     expect(events).toContainEqual(expect.objectContaining({
       type: 'codex.conversationSnapshotChanged',

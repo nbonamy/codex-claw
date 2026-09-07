@@ -92,7 +92,6 @@ function isAgentStatus(value: unknown): boolean {
   if (!isRecord(value)) return false;
   switch (value.type) {
     case 'idle':
-    case 'starting':
       return true;
     case 'working':
     case 'awaitingInput':

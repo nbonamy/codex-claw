@@ -274,7 +274,6 @@ function dropWorkItem(event: DragEvent): void {
 }
 
 .cockpit-view__agent-state[data-status="working"],
-.cockpit-view__agent-state[data-status="starting"],
 .cockpit-view__agent-state[data-status="awaitingInput"] {
   color: var(--color-warning);
 }

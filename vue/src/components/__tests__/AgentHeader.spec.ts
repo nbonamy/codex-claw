@@ -359,7 +359,6 @@ describe('AgentHeader', () => {
   it.each([
     [{ type: 'working' as const, detail: 'Getting stats...' }, 'Getting stats...'],
     [{ type: 'working' as const }, 'Working'],
-    [{ type: 'starting' as const }, 'Starting'],
     [{ type: 'awaitingInput' as const, detail: 'Approval needed' }, 'Approval needed'],
     [{ type: 'awaitingInput' as const }, 'Awaiting input'],
     [{ type: 'error' as const, message: 'Tool failed' }, 'Tool failed'],

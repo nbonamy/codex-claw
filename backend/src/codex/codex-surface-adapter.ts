@@ -339,7 +339,6 @@ export class CodexSurfaceAgentAdapter {
     );
     return {
       threadId: session.handle.id,
-      messages: [],
       activeTurnId: snapshot.activeTurnId,
     };
   }
@@ -351,7 +350,6 @@ export class CodexSurfaceAgentAdapter {
     );
     return {
       threadId: session.handle.id,
-      messages: [],
       activeTurnId: snapshot.activeTurnId,
     };
   }
@@ -363,7 +361,6 @@ export class CodexSurfaceAgentAdapter {
     );
     return {
       threadId: session.handle.id,
-      messages: [],
       activeTurnId: snapshot.activeTurnId,
     };
   }
@@ -434,7 +431,6 @@ export class CodexSurfaceAgentAdapter {
     await this.bindAndLoad(agent, threadId);
     return {
       threadId,
-      messages: [],
     };
   }
 
@@ -451,7 +447,6 @@ export class CodexSurfaceAgentAdapter {
     this.bindRuntime(targetAgent, result.conversationId, false);
     return {
       threadId: result.conversationId,
-      messages: [],
       activeTurnId: result.snapshot.activeTurnId,
     };
   }

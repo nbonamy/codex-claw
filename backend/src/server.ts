@@ -688,7 +688,7 @@ export class ClawBackendServer {
             if (!finishedPullRequest || (finishedPullRequest.state !== 'merged' && finishedPullRequest.state !== 'closed')) {
               throw new Error('This agent does not have a finished pull request ready for cleanup.');
             }
-            if (existingAgent.status.type === 'starting' || existingAgent.status.type === 'working' || existingAgent.status.type === 'awaitingInput') {
+            if (existingAgent.status.type === 'working' || existingAgent.status.type === 'awaitingInput') {
               throw new Error('Wait for the agent to finish before cleaning up its pull request.');
             }
             if (finishedPullRequest.state === 'closed' && input.deleteRemoteBranch === true) {
@@ -2256,7 +2256,6 @@ function requireCodexResourceSharingInput(params: unknown): SetCodexResourceShar
 
 function hasActiveChats(snapshot: AppSnapshot): boolean {
   return snapshot.agents.some((agent) => (
-    agent.status.type === 'starting' ||
     agent.status.type === 'working' ||
     agent.status.type === 'awaitingInput'
   ));
@@ -2517,7 +2516,7 @@ function clientStateFromSnapshot(snapshot: AppSnapshot, remoteControlStatus: Dev
 }
 
 function isActiveAgentStatus(status: AgentStatus): boolean {
-  return status.type === 'starting' || status.type === 'working' || status.type === 'awaitingInput';
+  return status.type === 'working' || status.type === 'awaitingInput';
 }
 
 function devicePairingStatusFromUnknown(value: unknown): DevicePairingStatus | null {

@@ -19,7 +19,6 @@ export function agentStatusText(agent: Agent, translate: Translate): string {
       return localizedText(agent.status.detail, translate) ?? agentStatusLabel(agent.status.type, translate);
     case 'error':
       return localizedText(agent.status.message, translate) ?? agentStatusLabel(agent.status.type, translate);
-    case 'starting':
     case 'idle':
       return agentStatusLabel(agent.status.type, translate);
   }
@@ -30,5 +29,5 @@ export function folderBasename(folder: string): string {
 }
 
 export function agentCanReceivePrompt(agent: Agent): boolean {
-  return agent.status.type !== 'working' && agent.status.type !== 'starting';
+  return agent.status.type !== 'working';
 }

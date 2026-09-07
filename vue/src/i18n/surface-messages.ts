@@ -61,7 +61,6 @@ export const surfaceMessages = {
     "connected": "Connected",
     "claude": "Claude",
     "codex": "Codex",
-    "starting": "Starting",
     "readyToGetGoing": "Ready to get going"
   },
   "annotationSendButton": {

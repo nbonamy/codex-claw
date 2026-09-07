@@ -248,11 +248,11 @@ describe('AgentSidebar actions', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
-          { ...agents[0], id: 'starting', status: { type: 'starting' } },
+          { ...agents[0], id: 'working', status: { type: 'working' } },
           { ...agents[0], id: 'awaiting', status: { type: 'awaitingInput' } },
           { ...agents[0], id: 'error', status: { type: 'error', message: 'failed' } },
         ],
-        activeAgentId: 'starting',
+        activeAgentId: 'working',
         teamName: 'Codex Claw',
       },
       global: {
@@ -260,7 +260,7 @@ describe('AgentSidebar actions', () => {
       },
     });
 
-    expect(wrapper.find('[aria-label="Starting"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Working"]').exists()).toBe(true);
     expect(wrapper.find('[aria-label="Awaiting input"]').exists()).toBe(true);
     expect(wrapper.find('[aria-label="Error"]').exists()).toBe(true);
   });

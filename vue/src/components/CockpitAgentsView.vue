@@ -232,7 +232,7 @@ function closeAgentMenu(): void {
 }
 
 function statusCounts(agents: Agent[]): StatusSummaryItem[] {
-  const order: AgentStatus['type'][] = ['awaitingInput', 'working', 'starting', 'idle', 'error'];
+  const order: AgentStatus['type'][] = ['awaitingInput', 'working', 'idle', 'error'];
   const counts = new Map<AgentStatus['type'], number>();
   for (const agent of agents) counts.set(agent.status.type, (counts.get(agent.status.type) ?? 0) + 1);
   return order.flatMap((status) => {
@@ -321,7 +321,6 @@ function summaryLabel(status: AgentStatus['type'], count: number): string {
 }
 
 .cockpit-agents__team-summary i[data-status="working"],
-.cockpit-agents__team-summary i[data-status="starting"],
 .cockpit-agents__team-summary i[data-status="awaitingInput"] {
   background: var(--color-warning);
 }

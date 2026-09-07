@@ -249,8 +249,6 @@ const agentStatusDetail = computed(() => {
   switch (props.agent.status.type) {
     case 'working':
       return localizedText(props.agent.status.detail, translate) ?? translate('status.working');
-    case 'starting':
-      return translate('surface.agentHeader.starting');
     case 'awaitingInput':
       return localizedText(props.agent.status.detail, translate) ?? translate('dynamic.misc.awaitingInput');
     case 'error':

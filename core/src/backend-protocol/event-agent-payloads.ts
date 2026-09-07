@@ -34,7 +34,7 @@ function expectAgentStatus(value: unknown, path: string): void {
   expectRecord(value, path);
   expectLiteral(
     value.type,
-    ['idle', 'starting', 'working', 'awaitingInput', 'error'],
+    ['idle', 'working', 'awaitingInput', 'error'],
     `${path}.type`,
   );
   if (value.type === 'working' || value.type === 'awaitingInput')

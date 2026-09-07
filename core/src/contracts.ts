@@ -287,7 +287,6 @@ export type {
 
 export type AgentStatus =
   | { type: 'idle' }
-  | { type: 'starting' }
   | { type: 'working'; detail?: AppText }
   | { type: 'awaitingInput'; detail?: AppText }
   | { type: 'error'; message: AppText };

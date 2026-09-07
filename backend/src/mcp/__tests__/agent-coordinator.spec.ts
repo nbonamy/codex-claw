@@ -37,7 +37,7 @@ describe('ClawMcpAgentCoordinator', () => {
   it('labels every backend status variant', () => {
     const { agents, coordinator } = fixture();
     for (const [status, label] of [
-      [{ type: 'starting' }, 'Starting'],
+      [{ type: 'working' }, 'Working'],
       [{ type: 'awaitingInput' }, 'Awaiting input'],
       [{ type: 'awaitingInput', detail: 'Choose a file' }, 'Choose a file'],
       [{ type: 'error', message: '' }, 'Error'],

@@ -184,7 +184,7 @@ describe('ClawMcpService', () => {
   it('shows busy teammate messages in the backend-owned queue until it reports dequeue', async () => {
     const snapshot = createInitialSnapshot();
     const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
-    recipient.status = { type: 'starting' };
+    recipient.status = { type: 'working' };
     const events: any[] = [];
     const sendPrompt = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-next' },

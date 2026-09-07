@@ -155,7 +155,6 @@ export const messages = {
       awaitingInput: 'Awaiting input',
       error: 'Error',
       idle: 'Idle',
-      starting: 'Starting',
       working: 'Working',
     },
     backend: {

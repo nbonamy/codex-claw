@@ -100,7 +100,7 @@ function hasPromptOptions(options: SendPromptOptions | undefined): options is Se
 }
 
 function isBusy(status: AgentStatus): boolean {
-  return status.type === 'starting' || status.type === 'working' || status.type === 'awaitingInput';
+  return status.type === 'working' || status.type === 'awaitingInput';
 }
 
 function updateAgentStatus(

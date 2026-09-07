@@ -696,7 +696,6 @@ const agentSidebarCollapsed = ref(false);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
 const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((agent) => (
-  agent.status.type === 'starting' ||
   agent.status.type === 'working' ||
   agent.status.type === 'awaitingInput'
 )));
