@@ -29,13 +29,13 @@ describe('agent chat service', () => {
       id: 'agent-dina',
       folder: '~/src/codex-claw',
     }), 'hello');
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(events.map((event) => event.type)).toStrictEqual([
       'agent.statusChanged',
       'backend.statusChanged',
     ]);
     expect(events.map((event) => event.payload)).toMatchObject([
-      { type: 'starting' },
+      { type: 'working' },
       {
         backend: 'claude',
         status: 'starting',
@@ -52,14 +52,13 @@ describe('agent chat service', () => {
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'claude', sessionId: 'session-1', transport: 'stdio' });
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(events.map((event) => event.payload)).toMatchObject([
-      { type: 'starting' },
+      { type: 'working' },
       {
         backend: 'claude',
         status: 'starting',
         detail: 'Starting Claude backend...',
         capabilities: { approvalPresets: [] },
       },
-      { type: 'working' },
       {
         backend: 'claude',
         status: 'running',
@@ -85,7 +84,7 @@ describe('agent chat service', () => {
       });
     });
 
-    expect(snapshot.agents[0].status.type).toBe('starting');
+    expect(snapshot.agents[0].status.type).toBe('working');
   });
 
   it('records visible backend errors without throwing through IPC', async () => {
@@ -142,7 +141,7 @@ describe('agent chat service', () => {
 
     expect(backendDriver.tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/compact');
     expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
 
     completion.resolve({
       backendSession: { kind: 'codex', threadId: 'thread-compact' },
@@ -163,7 +162,7 @@ describe('agent chat service', () => {
 
     expect(backendDriver.tryHandlePromptCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), '/review check regressions');
     expect(backendDriver.sendPrompt).not.toHaveBeenCalled();
-    expect(snapshot.agents[0].status).toStrictEqual({ type: 'starting' });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
 
     completion.resolve({
       backendSession: { kind: 'codex', threadId: 'thread-review' },

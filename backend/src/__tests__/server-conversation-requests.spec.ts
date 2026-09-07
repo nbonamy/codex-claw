@@ -63,7 +63,7 @@ describe('ClawBackendServer', () => {
       });
       expect(response).toMatchObject({
         result: {
-          agents: [{ id: 'agent-dina', status: { type: 'starting' } }],
+          agents: [{ id: 'agent-dina', status: { type: 'working' } }],
         },
       });
       expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
@@ -78,9 +78,8 @@ describe('ClawBackendServer', () => {
         'Dina',
       );
       expect(events).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'starting' } }),
-        expect.objectContaining({ type: 'backend.statusChanged', payload: expect.objectContaining({ backend: 'codex', status: 'starting' }) }),
         expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'working' } }),
+        expect.objectContaining({ type: 'backend.statusChanged', payload: expect.objectContaining({ backend: 'codex', status: 'starting' }) }),
       ]));
       await server.close();
     } finally {

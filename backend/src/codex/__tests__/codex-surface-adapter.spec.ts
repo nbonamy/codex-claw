@@ -441,10 +441,17 @@ describe('CodexSurfaceAgentAdapter', () => {
 
   it('creates new agent conversations as user threads in their assigned folder', async () => {
     const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
     const agent = createAgent('agent-new', 'thread-new', '/workspace/new');
     delete agent.backendSession;
+    agent.status = { type: 'working' };
 
     await adapter.sendPrompt(agent, 'Start work');
+
+    expect(events.filter((event) => event.type === 'agent.statusChanged')).not.toContainEqual(
+      expect.objectContaining({ payload: { type: 'idle' } }),
+    );
 
     expect(lastRequest(transport, 'thread/start')).toMatchObject({
       params: {

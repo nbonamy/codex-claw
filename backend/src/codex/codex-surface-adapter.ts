@@ -669,14 +669,19 @@ export class CodexSurfaceAgentAdapter {
       this.forgetAgentSession(agent.id);
       throw error;
     }
-    if (publishInitial) this.publishInitial(session, handle.getSnapshot(), false);
+    if (publishInitial) {
+      this.publishInitial(session, handle.getSnapshot(), {
+        publishProviderSnapshot: false,
+        publishStatus: false,
+      });
+    }
     return session;
   }
 
   private publishInitial(
     session: AgentConversation,
     snapshot: CodexConversationSnapshot,
-    publishProviderSnapshot = true,
+    options: { publishProviderSnapshot?: boolean; publishStatus?: boolean } = {},
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
     this.emitSettings(
@@ -692,9 +697,9 @@ export class CodexSurfaceAgentAdapter {
       this.emitThread(session, { type: 'thread.tokenUsageUpdated', payload: { contextUsage: snapshot.contextUsage } });
     }
     if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
-    this.emitStatus(session, statusFromSnapshot(snapshot));
+    if (options.publishStatus !== false) this.emitStatus(session, statusFromSnapshot(snapshot));
     this.rememberPending(session, snapshot);
-    if (publishProviderSnapshot) this.publishConversationSnapshot(session, snapshot);
+    if (options.publishProviderSnapshot !== false) this.publishConversationSnapshot(session, snapshot);
   }
 
   private publishConversationSnapshot(

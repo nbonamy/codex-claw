@@ -108,7 +108,6 @@ export function applyRuntimeEventToSnapshot(
     if (agent && event.threadId) {
       agent.backend = 'codex';
       agent.backendSession = { kind: 'codex', threadId: event.threadId };
-      agent.status = { type: 'idle' };
     }
     return;
   }

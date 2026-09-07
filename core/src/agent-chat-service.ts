@@ -32,7 +32,7 @@ export function sendAgentPrompt(
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
   const hadBackendSession = Boolean(agent.backendSession);
 
-  updateAgentStatus(agentId, { type: 'starting' }, emit, snapshot);
+  updateAgentStatus(agentId, { type: 'working' }, emit, snapshot);
   updateBackendRuntimeStatus({
     backend: backendDriver.backend,
     status: 'starting',
@@ -60,9 +60,6 @@ export function sendAgentPrompt(
       agent.backend = backendDriver.backend;
       agent.backendSession = result.backendSession;
       void Promise.resolve(hooks?.onBackendSessionUpdated?.(result, !hadBackendSession)).catch(() => undefined);
-      if (agent.status.type === 'starting') {
-        updateAgentStatus(agentId, { type: 'working' }, emit, snapshot);
-      }
       updateBackendRuntimeStatus({
         backend: backendDriver.backend,
         status: 'running',

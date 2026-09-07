@@ -10,6 +10,7 @@ describe('snapshot runtime reducer', () => {
 
   it('records legacy backend-less Codex thread starts and payload-owned backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
 
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
@@ -41,6 +42,7 @@ describe('snapshot runtime reducer', () => {
     } as unknown as SnapshotEventOwnedBy<'runtime'>);
 
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
+    expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(snapshot.backendRuntimes).toContainEqual({
       backend: 'codex',
       status: 'running',
