@@ -181,6 +181,9 @@ describe('BackendDriverRpc', () => {
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
     });
+    const compressSession = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-compressed' },
+    });
     const forkConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });
@@ -188,6 +191,7 @@ describe('BackendDriverRpc', () => {
     const respondToRequest = vi.fn().mockResolvedValue(undefined);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
       clearGoal,
+      compressSession,
       forgetAgentSession,
       forkConversation,
       interrupt,
@@ -237,6 +241,9 @@ describe('BackendDriverRpc', () => {
     await expect(rpc.handle('driver/conversation/resume', { agent, ref })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
     });
+    await expect(rpc.handle('driver/session/compress', { agent })).resolves.toStrictEqual({
+      backendSession: { kind: 'codex', threadId: 'thread-compressed' },
+    });
     await expect(rpc.handle('driver/conversation/fork', { agent, targetAgent })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });
@@ -258,6 +265,7 @@ describe('BackendDriverRpc', () => {
     expect(editTurn).toHaveBeenCalledWith(agent, 'turn-1', 'edited');
     expect(retryTurn).toHaveBeenCalledWith(agent, 'turn-1');
     expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
+    expect(compressSession).toHaveBeenCalledWith(agent);
     expect(forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
     expect(forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 'turn-5');
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');

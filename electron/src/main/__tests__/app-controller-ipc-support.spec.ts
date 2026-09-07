@@ -391,6 +391,19 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/quickChat/create', { input });
   });
 
+  it('routes session compression through clawd and adopts the replacement snapshot', async () => {
+    const snapshot = createInitialSnapshot();
+    const backendSnapshot = structuredClone(snapshot);
+    backendSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-compressed' };
+    const request = vi.fn().mockResolvedValue(backendSnapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+
+    await controller.initialize();
+    await expect(compressAgentSession(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+
+    expect(request).toHaveBeenCalledWith('agent/session/compress', { agentId: 'agent-dina' });
+  });
+
 
   it('routes settings updates through clawd', async () => {
     const snapshot = createInitialSnapshot();
@@ -701,6 +714,12 @@ async function forkAgent(controller: AppController, agentId: string, turnId?: st
   return (controller as unknown as {
     forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>;
   }).forkAgent(agentId, turnId);
+}
+
+async function compressAgentSession(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    compressAgentSession(agentId: string): Promise<AppSnapshot>;
+  }).compressAgentSession(agentId);
 }
 
 async function moveAgentToTeam(controller: AppController, input: MoveAgentToTeamInput): Promise<AppSnapshot> {

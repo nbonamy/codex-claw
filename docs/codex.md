@@ -228,6 +228,31 @@ app-owned `agent/fork` request; the Codex adapter calls the conversation
 handle's `forkTurn()` operation, and the result enters the same new-agent
 workflow without changing the source thread.
 
+Compress Session is an app-owned session rollover, not Codex context
+compaction. It is available only for an idle agent with an existing Codex
+thread. The renderer keeps a blocking progress dialog visible across the
+transition. `clawd` asks the current SDK-owned conversation for a bounded
+handoff with a temporary fast model/effort override, waits for the exact
+handoff turn to complete, creates a replacement SDK conversation in the same
+folder with the agent's original Codex settings, sends the handoff inside a
+real initial user prompt, and only then archives the old thread. The temporary
+handoff turn's settings and transcript events are internal to the rollover and
+must not update the agent's persisted defaults. The SDK strips the prompt's
+`<context>` block from the visible message, leaving only the repeated
+background-only instruction in the transcript. Submitting a turn also
+guarantees that the replacement has a persisted rollout that can be resumed
+after restart.
+After the replacement exists, `clawd` updates the agent's persisted thread
+reference and publishes the replacement SDK snapshot. Claw never copies or
+reduces either transcript. If replacement creation or old-thread archival
+fails, the persisted agent continues to reference the old thread.
+
+The warning preference and rollover orchestration are Claw product metadata.
+The old and new conversation contents, optimistic messages, turns, history,
+and rendering remain SDK-owned throughout. This boundary is deliberate: do
+not implement a parallel handoff transcript, synthetic user message, or
+session reducer in Claw.
+
 ## Requests
 
 Important requests for the first product:
@@ -310,15 +335,17 @@ initial Codex command catalog includes `compact`, `review`, `plan`, and `goal` w
 a visible slash prefix in the menu. Selecting one submits the corresponding
 slash form through the normal composer path.
 
-`compact` and `review` are backend prompt commands. The Codex driver intercepts
-recognized slash commands before appending a visible user message or calling
-`turn/start`:
+`compact` is an app command. Bare `/compact`, the agent-menu action, and
+Command-K all open the Compress Session flow described above. The renderer
+intercepts the bare slash form before normal prompt submission so the warning
+and blocking transition are always applied. `/compact <text>` remains a normal
+prompt.
 
-- bare `/compact` calls `thread/compact/start` with the active `threadId`;
+`review` is a backend prompt command. The Codex driver intercepts recognized
+review forms before appending a visible user message or calling `turn/start`:
+
 - bare `/review` calls `review/start` with `target.type = "uncommittedChanges"`;
-- `/review <instructions>` calls `review/start` with a custom review target;
-- `/compact <text>` remains a normal prompt because Codex's compact RPC does
-  not accept inline instructions.
+- `/review <instructions>` calls `review/start` with a custom review target.
 
 `plan` is handled earlier in the renderer/app prompt path because Codex CLI
 semantics change the composer mode, then optionally submit stripped text:

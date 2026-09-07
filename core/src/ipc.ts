@@ -66,6 +66,7 @@ export const ipcChannels = {
   deleteAutomation: 'automation:delete',
   listAgentConversations: 'conversation:list',
   resumeAgentConversation: 'conversation:resume',
+  compressAgentSession: 'conversation:compress',
   readConversationMessages: 'conversation:messages:read',
   createAgent: 'agent:create',
   createQuickChat: 'agent:quick-chat:create',

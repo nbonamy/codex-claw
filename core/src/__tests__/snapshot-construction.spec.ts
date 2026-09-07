@@ -172,6 +172,7 @@ function expectedEmptySnapshot(): AppSnapshot {
       agentListCompact: false,
       collapsedRepositoryKeys: [],
       shareCodexSkillsAndPlugins: true,
+      sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',
       repositoryIcons: {},
       appshots: {

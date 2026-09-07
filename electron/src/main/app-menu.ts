@@ -311,13 +311,9 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
     label: mainT('menu.view'),
     submenu: [
       {
-        label: mainT('menu.compactContext'),
+        label: mainT('menu.compressSession'),
         accelerator: 'CommandOrControl+K',
-        click: () => callbacks.sendAppCommand({
-          type: 'open-agent-composer',
-          prompt: '/compact',
-          submit: true,
-        }),
+        click: () => callbacks.sendAppCommand({ type: 'compress-active-session' }),
       },
       {
         label: mainT('menu.review'),

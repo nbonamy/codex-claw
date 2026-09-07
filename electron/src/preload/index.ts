@@ -71,6 +71,7 @@ const api: CodexClawApi = {
   deleteAutomation: (automationId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.deleteAutomation, automationId, location),
   listAgentConversations: (agentId: string) => ipc.invoke(ipcChannels.listAgentConversations, agentId),
   resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => ipc.invoke(ipcChannels.resumeAgentConversation, agentId, ref),
+  compressAgentSession: (agentId: string) => ipc.invoke(ipcChannels.compressAgentSession, agentId),
   readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => ipc.invoke(ipcChannels.readConversationMessages, ref, agentId, location),
   createAgent: (input: CreateAgentInput) => ipc.invoke(ipcChannels.createAgent, input),
   createQuickChat: (input: CreateQuickChatInput) => ipc.invoke(ipcChannels.createQuickChat, input),

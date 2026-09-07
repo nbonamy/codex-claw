@@ -366,6 +366,7 @@ describe('AgentSidebar actions', () => {
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
+      'Compress Session',
       'Resume Session',
       'Restart Agent',
       'Close Agent',
@@ -417,5 +418,29 @@ describe('AgentSidebar actions', () => {
     expect(wrapper.emitted('open-in')).toStrictEqual([[
       { agentId: 'agent-dina', application: 'finder' },
     ]]);
+  });
+
+  it('offers session compression for an idle Codex agent with a conversation', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [{
+          ...agents[0]!,
+          backendSession: { kind: 'codex', threadId: 'thread-dina' },
+        }],
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+      },
+      global: {
+        components: { ElPopover },
+      },
+    });
+
+    await wrapper.get('.agent-sidebar__agent').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80,
+    });
+    await clickPortaledMenuItem('Compress Session');
+
+    expect(wrapper.emitted('compress-session')).toStrictEqual([['agent-dina']]);
   });
 });

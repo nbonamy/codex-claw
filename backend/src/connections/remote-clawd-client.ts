@@ -156,7 +156,9 @@ class RemoteClawdClient {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`remote clawd request timed out: ${method}`));
-      }, this.options.requestTimeoutMs ?? 15_000);
+      }, method === backendMethods.agentSessionCompress
+        ? Math.max(this.options.requestTimeoutMs ?? 15_000, 10 * 60_000)
+        : this.options.requestTimeoutMs ?? 15_000);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),

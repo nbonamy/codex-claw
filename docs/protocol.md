@@ -148,6 +148,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `agent/restart` | `{ agentId }` | `AppSnapshot` | Forgets the provider session reference and releases its live conversation host. |
+| `agent/session/compress` | `{ agentId }` | `AppSnapshot` | For an idle Codex agent, creates a replacement conversation, submits the generated handoff as hidden context in its initial prompt, archives the old conversation only after that prompt is accepted, and updates the persisted provider reference. Provider transcripts remain SDK-owned. |
 | `agent/history/hydrate` | `{ agentId }` | `AppSnapshot` | Lazily restores provider-owned session state without selecting the agent; the conversation arrives in a provider snapshot frame. |
 | `agent/history/load-older` | `{ agentId }` | `{ hasOlder }` | Asks the provider owner to load one older history page; the result arrives through provider-native deltas. |
 | `agent/conversations/list` | `{ agentId }` | `ConversationSummary[]` | Lists provider history through the active agent backend. |
@@ -293,6 +294,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/git/diff/get` | `{ agent }` | `AgentGitDiff | null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
+| `driver/session/compress` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |
 | `driver/goal/update` | `{ agent, objective }` | `BackendGoalResult` |
 | `driver/goal/clear` | `{ agent }` | `BackendGoalResult` |

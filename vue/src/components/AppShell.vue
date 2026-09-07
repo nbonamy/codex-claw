@@ -45,6 +45,7 @@
       :unread-team-ids="unreadTeamIds"
       @close-team="$emit('close-team', $event)"
       @close-agent="$emit('close-agent', $event)"
+      @compress-session="$emit('compress-session', $event)"
       @cleanup-pull-request="$emit('cleanup-pull-request', $event)"
       @collapse-sidebar="agentSidebarCollapsed = true"
       @create-agent-from-repository="openRepositorySessionSource"
@@ -651,6 +652,7 @@ const emit = defineEmits<{
   'close-team': [teamId: string];
   'disconnect-team': [teamId: string];
   'close-agent': [agentId: string];
+  'compress-session': [agentId: string];
   'cleanup-pull-request': [agentId: string];
   'clear-goal': [];
   'client-response': [response: ClientRequestResponse];
@@ -1336,6 +1338,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
   },
   actions: {
     closeAgent: (agentId) => emit('close-agent', agentId),
+    compressSession: (agentId) => emit('compress-session', agentId),
     closeTeam: (teamId) => emit('close-team', teamId),
     debugMarkUnread: () => emit('debug-mark-unread'),
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),

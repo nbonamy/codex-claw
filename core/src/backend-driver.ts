@@ -45,6 +45,10 @@ export type BackendConversationResumeResult = {
   backendSession: BackendSession;
 };
 
+export type BackendSessionCompressionResult = {
+  backendSession: BackendSession;
+};
+
 export type BackendConversationForkResult = BackendConversationResumeResult & {
   activeTurnId?: string;
 };
@@ -103,6 +107,7 @@ export type AgentBackendDriver = {
   loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;
   listConversations?(agent: Agent): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
+  compressSession?(agent: Agent): Promise<BackendSessionCompressionResult>;
   forkConversation?(agent: Agent, targetAgent: Agent, turnId?: string): Promise<BackendConversationForkResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   readConversationSummary?(agent: Agent, ref: BackendConversationRef): Promise<ConversationSummary | null>;

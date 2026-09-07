@@ -119,6 +119,7 @@ describe('ipc channels', () => {
       deleteAutomation: 'automation:delete',
       listAgentConversations: 'conversation:list',
       resumeAgentConversation: 'conversation:resume',
+      compressAgentSession: 'conversation:compress',
       readConversationMessages: 'conversation:messages:read',
       createAgent: 'agent:create',
       createQuickChat: 'agent:quick-chat:create',
@@ -288,6 +289,10 @@ describe('ipc channels', () => {
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
     expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
+      .toEqualTypeOf<AppSnapshot>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.compressAgentSession]['args']>()
+      .toEqualTypeOf<[agentId: string]>();
+    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.compressAgentSession]['result']>()
       .toEqualTypeOf<AppSnapshot>();
     expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()
       .toEqualTypeOf<MainToRendererEvent>();

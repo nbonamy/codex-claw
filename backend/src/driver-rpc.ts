@@ -179,6 +179,14 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
+      case backendMethods.driverSessionCompress: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.compressSession) {
+          throw unsupportedBackendFeature(agent, 'session compression');
+        }
+        return driver.compressSession(agent);
+      }
       case backendMethods.driverConversationTitleUpdate: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);

@@ -35,6 +35,7 @@ type AppShellCommandOptions = {
   };
   actions: {
     closeAgent: (agentId: string) => void;
+    compressSession: (agentId: string) => void;
     closeTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
     duplicateAgent: (agentId: string) => void;
@@ -388,6 +389,16 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
         return;
       }
       closeActiveAgent();
+      return;
+    }
+
+    if (command.type === 'compress-active-session') {
+      if (!isAgentWorkspaceVisible.value || !currentAgent.value) return;
+      if (currentAgent.value.backend === 'codex') {
+        options.actions.compressSession(currentAgent.value.id);
+      } else {
+        options.actions.sendAgentPrompt(currentAgent.value.id, '/compact');
+      }
       return;
     }
 

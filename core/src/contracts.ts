@@ -457,6 +457,7 @@ export type AppGeneralSettings = {
   collapsedRepositoryKeys: string[];
   shareCodexSkillsAndPlugins: boolean;
   worktreeInitializationMode: WorktreeInitializationMode;
+  sessionCompressionWarningEnabled: boolean;
   repositoryIcons: Record<string, string>;
   appshots: AppshotSettings;
   /** Optional for backwards compatibility with pre-plugin state files. */
@@ -943,6 +944,7 @@ export type AppCommand =
   | { type: 'appshot-failed'; message: string }
   | { type: 'close-active-agent' }
   | { type: 'close-active-team' }
+  | { type: 'compress-active-session' }
   | { type: 'cycle-agents'; direction: -1 | 1 }
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
@@ -1117,6 +1119,7 @@ export type CodexClawApi = {
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
   reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot>;
   restartAgent(agentId: string): Promise<AppSnapshot>;
+  compressAgentSession(agentId: string): Promise<AppSnapshot>;
   hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
   loadOlderAgentHistory(agentId: string): Promise<AgentHistoryLoadResult>;
   closeAgent(agentId: string, input?: AgentCloseInput): Promise<AppSnapshot>;

@@ -22,6 +22,7 @@ import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import {
+  ArrowsMinimizeIcon,
   CopyIcon,
   ExternalLinkIcon,
   GitForkIcon,
@@ -35,6 +36,7 @@ import { openInApplicationFromMenuItem, openInMenuItems } from '../shared/open-i
 
 export type AgentContextMenuAction =
   | 'close-agent'
+  | 'compress-session'
   | 'duplicate-agent'
   | 'edit-agent'
   | 'fork-agent'
@@ -42,6 +44,8 @@ export type AgentContextMenuAction =
   | 'restart-agent';
 
 const props = defineProps<{
+  compressDisabled?: boolean;
+  compressVisible?: boolean;
   moveTargets?: Team[];
   forkDisabled?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
@@ -110,6 +114,13 @@ const menuItems = computed<AppMenuItem[]>(() => [
     })),
   },
   { id: 'group-danger', type: 'separator' },
+  ...(props.compressVisible === true ? [{
+    id: 'compress-session',
+    type: 'action',
+    label: t('agents.compressSession'),
+    icon: ArrowsMinimizeIcon,
+    disabled: props.compressDisabled === true,
+  } satisfies AppMenuItem] : []),
   {
     id: 'resume-session',
     type: 'action',
@@ -206,6 +217,7 @@ function teamIdFromMoveItemId(itemId: string): string | null {
 
 function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAction {
   return itemId === 'close-agent' ||
+    itemId === 'compress-session' ||
     itemId === 'duplicate-agent' ||
     itemId === 'edit-agent' ||
     itemId === 'fork-agent' ||

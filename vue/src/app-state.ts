@@ -888,6 +888,16 @@ export function useAppState() {
     await loadActiveAgentCatalogs();
   }
 
+  async function compressAgentSession(agentId: string): Promise<void> {
+    if (!codexClawApi?.compressAgentSession) {
+      throw new Error('Session compression is unavailable.');
+    }
+
+    adoptBackgroundSnapshot(await codexClawApi.compressAgentSession(agentId));
+    resetAgentHistory(agentId);
+    synchronizeComposerSelectionForAgent(agentId);
+  }
+
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
     if (!codexClawApi?.updateAgent) {
       return;
@@ -1371,6 +1381,7 @@ export function useAppState() {
     deleteAutomation,
     listAgentConversations,
     resumeAgentConversation,
+    compressAgentSession,
     readConversationMessages,
     assignWorkItemToAgent,
     removeWorkItemAssignment,

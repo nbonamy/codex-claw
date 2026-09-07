@@ -40,6 +40,7 @@ import type {
   CodexSurfaceReviewTarget,
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
+  CodexSurfaceTurnStatus,
   CodexSurfaceThreadStatus,
   SendCodexMessageOptions,
   SurfaceMessage,
@@ -57,6 +58,18 @@ type ThreadBackendEvent<Event extends BackendEvent = BackendEvent> = Event exten
   : never;
 
 const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
+const SESSION_HANDOFF_TARGET_CHARACTERS = 4_000;
+const SESSION_HANDOFF_MAX_CHARACTERS = 6_000;
+const SESSION_HANDOFF_TIMEOUT_MS = 8 * 60 * 1_000;
+const SESSION_HANDOFF_MODEL = 'gpt-5.6-luna';
+const SESSION_HANDOFF_REASONING_EFFORT = 'low';
+const SESSION_HANDOFF_PROMPT = `Prepare a handoff for a fresh continuation of this coding session.
+
+Return only a concise Markdown handoff. Do not call tools, modify files, spawn agents, ask questions, or continue the implementation.
+
+Summarize the full session from beginning to end, not only its recent messages. Cover every meaningful activity in chronological order, including completed work, discarded approaches, discoveries, decisions, implementation, fixes, validation, user feedback, and changes in direction. Give earlier activities concise but sufficient coverage, then give substantially more detail to the most recent activity so work can continue without rediscovery. An activity means a coherent body of work, not an individual message or turn.
+
+End with the current objective and status, constraints, unresolved problems, precise next steps, and important user preferences. Preserve exact identifiers, paths, commands, errors, and commit hashes when they matter. Aim for about ${SESSION_HANDOFF_TARGET_CHARACTERS} characters and never exceed ${SESSION_HANDOFF_MAX_CHARACTERS} characters.`;
 
 type AgentConversation = {
   agent: Agent;
@@ -245,13 +258,43 @@ export class CodexSurfaceAgentAdapter {
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
-  async compactThread(agent: Agent) {
-    const session = await this.ensureSession(agent);
-    const beforeTurnIds = session.handle.getSnapshot().turnIds;
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'compactConversation', [],
-    );
-    return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
+  async compressSession(agent: Agent) {
+    const currentSession = await this.ensureSession(agent);
+    const currentSnapshot = currentSession.handle.getSnapshot();
+    if (currentSnapshot.activeTurnId || currentSnapshot.busy) {
+      throw new Error('Agent must be idle before compressing its session.');
+    }
+
+    const defaults = agent.backendDefaults?.kind === 'codex'
+      ? { ...agent.backendDefaults }
+      : undefined;
+    const requestedPreset = codexApprovalPresetFromDefaults(defaults);
+    const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
+    const handoff = await this.captureSessionHandoff(currentSession);
+    const previousThreadId = currentSession.handle.id;
+    const replacementSnapshot = await this.surface.createConversation({
+      ...agentCwd(agent),
+      threadSource: 'user',
+      ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
+      ...(defaults?.model ? { model: defaults.model } : {}),
+      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
+      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
+    }, { extensionContext: agent });
+    const replacementThreadId = replacementSnapshot.activeConversationId;
+    if (!replacementThreadId || replacementThreadId === previousThreadId) {
+      throw new Error('Codex did not create a replacement conversation.');
+    }
+
+    try {
+      await this.surface.conversation(replacementThreadId).sendMessage(sessionHandoffPrompt(handoff));
+      await this.surface.archiveConversation(previousThreadId);
+    } catch (error) {
+      await this.surface.archiveConversation(replacementThreadId).catch(() => undefined);
+      throw error;
+    }
+
+    this.bindRuntime(agent, replacementThreadId, true, false);
+    return { threadId: replacementThreadId };
   }
 
   async setConversationTitle(agent: Agent, title: string): Promise<void> {
@@ -566,6 +609,49 @@ export class CodexSurfaceAgentAdapter {
       // retries through its normal post-session title synchronization.
     }
     return session;
+  }
+
+  private async captureSessionHandoff(session: AgentConversation): Promise<string> {
+    const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
+    let targetTurnId: string | null = null;
+    let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
+    const completion = new Promise<CodexSurfaceTurnStatus>((resolve) => {
+      resolveCompletion = resolve;
+    });
+    const unsubscribe = session.handle.onEvent((event) => {
+      if (event.type !== 'turn.completed') return;
+      if (event.turnId === targetTurnId) {
+        resolveCompletion?.(event.payload.status);
+      } else {
+        completedBeforeTarget.set(event.turnId, event.payload.status);
+      }
+    });
+    const wasSuppressingEvents = session.suppressEvents;
+    session.suppressEvents = true;
+
+    try {
+      const beforeTurnIds = session.handle.getSnapshot().turnIds;
+      const started = await session.handle.sendMessage(SESSION_HANDOFF_PROMPT, {
+        model: SESSION_HANDOFF_MODEL,
+        reasoningEffort: SESSION_HANDOFF_REASONING_EFFORT,
+      });
+      targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
+      if (!targetTurnId) throw new Error('Codex did not start the session handoff turn.');
+
+      const alreadyCompleted = completedBeforeTarget.get(targetTurnId)
+        ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
+      const status = alreadyCompleted ?? await sessionHandoffCompletion(completion);
+      if (status !== 'completed') {
+        throw new Error(`Session handoff was ${status}.`);
+      }
+
+      const handoff = sessionHandoffText(session.handle.getSnapshot().messages, targetTurnId);
+      if (!handoff) throw new Error('The agent returned an empty session handoff.');
+      return handoff.slice(0, SESSION_HANDOFF_MAX_CHARACTERS);
+    } finally {
+      session.suppressEvents = wasSuppressingEvents;
+      unsubscribe();
+    }
   }
 
   private async renameSessionIfNeeded(session: AgentConversation, title: string): Promise<void> {
@@ -1185,6 +1271,43 @@ function conversationSummary(conversation: CodexConversationSummary): Conversati
     messageCount: conversation.turnCount,
     ref: { backend: 'codex', threadId: conversation.id },
   };
+}
+
+function sessionHandoffText(messages: readonly SurfaceMessage[], turnId: string): string {
+  const assistantMessages = messages.filter((message) => (
+    message.role === 'assistant' && message.turnId === turnId
+  ));
+  const finalText = assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
+    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
+  ))).join('\n').trim();
+  if (finalText) return finalText;
+  return assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
+    part.type === 'text' ? [part.text] : []
+  ))).join('\n').trim();
+}
+
+function sessionHandoffPrompt(handoff: string): string {
+  return `<context>\n${handoff}\n\nInstruction: Treat this handoff only as background context. Do not respond, acknowledge, summarize, or take any action. Wait for the user's next prompt.\n</context>\n\nSummary of previous activity. Do not respond or take any action. Wait for my next prompt.`;
+}
+
+function sessionHandoffCompletion(
+  completion: Promise<CodexSurfaceTurnStatus>,
+): Promise<CodexSurfaceTurnStatus> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Timed out waiting for the agent to prepare the session handoff.'));
+    }, SESSION_HANDOFF_TIMEOUT_MS);
+    void completion.then(
+      (status) => {
+        clearTimeout(timeout);
+        resolve(status);
+      },
+      (error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 function subagentStatusFromTurn(

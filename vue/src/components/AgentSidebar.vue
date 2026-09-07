@@ -198,6 +198,8 @@
     <AgentContextMenu
       v-if="contextMenuAgentId"
       :fork-disabled="!canForkContextMenuAgent"
+      :compress-visible="contextMenuAgent?.backend === 'codex'"
+      :compress-disabled="!canCompressContextMenuAgent"
       :open-in-catalog="resolvedOpenInCatalog"
       :open-in-disabled="!contextMenuAgentIsLocal"
       :move-targets="contextMenuMoveTargets"
@@ -274,6 +276,7 @@ const { t } = useI18n();
 const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
+  'compress-session': [agentId: string];
   'cleanup-pull-request': [agentId: string];
   'update-collapsed-repositories': [repositoryKeys: string[]];
   'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
@@ -322,6 +325,11 @@ const canForkContextMenuAgent = computed(() => (
   contextMenuAgent.value?.status.type === 'idle' &&
   Boolean(contextMenuAgent.value.backendSession) &&
   (props.forkableAgentIds ?? []).includes(contextMenuAgent.value.id)
+));
+const canCompressContextMenuAgent = computed(() => (
+  contextMenuAgent.value?.backend === 'codex' &&
+  contextMenuAgent.value.status.type === 'idle' &&
+  contextMenuAgent.value.backendSession?.kind === 'codex'
 ));
 const contextMenuAgentIsLocal = computed(() => {
   const agent = contextMenuAgent.value;
@@ -511,6 +519,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'duplicate-agent':
       emit('duplicate-agent', agentId);
+      break;
+    case 'compress-session':
+      emit('compress-session', agentId);
       break;
     case 'fork-agent':
       emit('fork-agent', agentId);

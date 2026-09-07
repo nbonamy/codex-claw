@@ -30,6 +30,9 @@ describe('ClawBackendServer', () => {
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-new' },
     });
+    const compressSession = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex', threadId: 'thread-compressed' },
+    });
     const setConversationTitle = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -39,6 +42,7 @@ describe('ClawBackendServer', () => {
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
       forgetAgentSession,
+      compressSession,
       resumeConversation,
       setConversationTitle,
       onEvent: () => () => undefined,
@@ -74,14 +78,33 @@ describe('ClawBackendServer', () => {
         agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-new' } }],
       },
     });
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'compress-agent-session',
+      method: 'agent/session/compress',
+      params: { agentId: 'agent-dina' },
+    })).resolves.toMatchObject({
+      result: {
+        agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-compressed' } }],
+      },
+    });
 
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
     expect(resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), { backend: 'codex', threadId: 'thread-new' });
-    expect(setConversationTitle).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-new' } }),
+    expect(compressSession).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'agent-dina',
+    }));
+    expect(setConversationTitle).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ id: 'agent-dina' }),
       'Dina',
     );
-    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+    expect(setConversationTitle).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: 'agent-dina' }),
+      'Dina',
+    );
+    expect(saveSnapshot).toHaveBeenCalledTimes(3);
     await server.close();
   });
 

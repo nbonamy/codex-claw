@@ -5,6 +5,7 @@ import App from '../App.vue';
 import AppShell from '../components/AppShell.vue';
 import AgentCloseDialog from '../components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from '../components/PullRequestCleanupDialog.vue';
+import SessionCompressionDialog from '../components/SessionCompressionDialog.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { setElectronTestClient } from '../test/client';
@@ -65,6 +66,46 @@ describe('App', () => {
     await action('hello');
 
     expect(sendPrompt).toHaveBeenCalledWith(snapshot.activeAgentId, 'hello');
+  });
+
+  it('routes bare compact through the warned session-compression flow', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
+    const compressedSnapshot = structuredClone(snapshot);
+    compressedSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-compressed' };
+    let resolveCompression!: (value: typeof compressedSnapshot) => void;
+    const compressAgentSession = vi.fn().mockReturnValue(new Promise<typeof compressedSnapshot>((resolve) => {
+      resolveCompression = resolve;
+    }));
+    const sendPrompt = vi.fn().mockResolvedValue(snapshot);
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      onEvent: vi.fn(),
+      compressAgentSession,
+      sendPrompt,
+    });
+    const wrapper = mount(App, {
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    const action = wrapper.findComponent(AppShell).props('sendPromptAction') as (
+      prompt: string,
+    ) => Promise<void>;
+    await action('/compact');
+
+    expect(sendPrompt).not.toHaveBeenCalled();
+    const dialog = wrapper.findComponent(SessionCompressionDialog);
+    expect(dialog.props('visible')).toBe(true);
+    expect(wrapper.get('.app-shell').attributes('inert')).toBe('');
+    dialog.vm.$emit('confirm', false);
+    await wrapper.vm.$nextTick();
+    expect(dialog.props('busy')).toBe(true);
+    expect(compressAgentSession).toHaveBeenCalledWith('agent-dina');
+
+    resolveCompression(compressedSnapshot);
+    await flushPromises();
+    expect(dialog.props('visible')).toBe(false);
   });
 
   it('blocks the whole app while resource sharing restarts the backend', async () => {

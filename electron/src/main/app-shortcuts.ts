@@ -64,11 +64,7 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
       }
 
       if (key === 'k') {
-        return {
-          type: 'open-agent-composer',
-          prompt: '/compact',
-          submit: true,
-        };
+        return { type: 'compress-active-session' };
       }
 
       if (key === 'g') {

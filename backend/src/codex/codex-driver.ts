@@ -21,13 +21,11 @@ import type {
 } from '@codex-claw/core/contracts';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendSessionCompressionResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
 import { AgentGitService } from '../git/agent-git-service';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
-type CodexPromptCommand =
-  | { type: 'compact' }
-  | { type: 'review'; prompt: string };
+type CodexPromptCommand = { type: 'review'; prompt: string };
 
 export class CodexBackendDriver implements AgentBackendDriver {
   readonly backend = 'codex' as const;
@@ -71,6 +69,11 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult> {
     return this.sessionManager.generateText(agent, input);
+  }
+
+  async compressSession(agent: Agent): Promise<BackendSessionCompressionResult> {
+    const result = await this.sessionManager.compressSession(agent);
+    return { backendSession: codexBackendSession(result.threadId) };
   }
 
   async listModels(_agent: Agent): Promise<BackendModelOption[]> {
@@ -184,14 +187,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
   }
 
   private async runPromptCommand(agent: Agent, command: CodexPromptCommand): Promise<BackendSendResult> {
-    if (command.type === 'compact') {
-      const result = await this.sessionManager.compactThread(agent);
-      return {
-        backendSession: codexBackendSession(result.threadId),
-        turnId: result.turnId,
-      };
-    }
-
     const result = await this.sessionManager.sendPrompt(agent, command.prompt);
     return {
       backendSession: codexBackendSession(result.threadId),
@@ -319,10 +314,6 @@ function codexPromptCommand(prompt: string): CodexPromptCommand | null {
   const parsed = parseSlashName(prompt);
   if (!parsed) {
     return null;
-  }
-
-  if (parsed.name === 'compact') {
-    return parsed.rest ? null : { type: 'compact' };
   }
 
   if (parsed.name === 'review') {

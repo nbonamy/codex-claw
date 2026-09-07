@@ -46,6 +46,7 @@
       :repository-icons="snapshot.general.repositoryIcons"
       @collapse-sidebar="$emit('collapse-sidebar')"
       @close-agent="$emit('close-agent', $event)"
+      @compress-session="$emit('compress-session', $event)"
       @cleanup-pull-request="$emit('cleanup-pull-request', $event)"
       @create-agent-from-repository="openRepositorySessionSource"
       @create-agent-on-branch="createRepositorySessionOnBranch"
@@ -117,6 +118,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'close-agent': [agentId: string];
+  'compress-session': [agentId: string];
   'cleanup-pull-request': [agentId: string];
   'close-team': [teamId: string];
   'collapse-sidebar': [];

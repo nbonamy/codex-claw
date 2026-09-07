@@ -41,6 +41,9 @@ class FakeTransport implements RpcTransport {
   skillVersion = 1;
   modelVersion = 1;
   completeTurnsImmediately = false;
+  completedTurnAgentMessage: string | null = null;
+  emitTurnSettingsUpdated = false;
+  includeLunaModel = false;
   resumedServiceTier: string | null = 'fast';
   turnsListDelayMs = 0;
   readonly fullHistoryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
@@ -58,6 +61,49 @@ class FakeTransport implements RpcTransport {
     queueMicrotask(() => {
       void Promise.resolve(this.response(message.method, params)).then((result) => {
         this.emit({ id: message.id, result });
+        if (message.method === 'turn/start' && this.emitTurnSettingsUpdated) {
+          const input = params as { effort?: string; model?: string; threadId: string };
+          this.emit({
+            method: 'thread/settings/updated',
+            params: {
+              threadId: input.threadId,
+              threadSettings: threadSettings({
+                ...(input.model ? { model: input.model } : {}),
+                ...(input.effort ? {
+                  effort: input.effort,
+                  collaborationMode: {
+                    mode: 'default',
+                    settings: {
+                      model: input.model ?? 'gpt-1',
+                      reasoning_effort: input.effort,
+                      developer_instructions: null,
+                    },
+                  },
+                } : {}),
+              }),
+            },
+          });
+        }
+        if (message.method === 'turn/start' && this.completeTurnsImmediately && this.completedTurnAgentMessage) {
+          const threadId = String((params as { threadId: string }).threadId);
+          const turnId = `turn-${threadId}`;
+          this.emit({
+            method: 'item/completed',
+            params: {
+              threadId,
+              turnId,
+              completedAtMs: 1_700_000_001,
+              item: agentMessage(`handoff-${threadId}`, this.completedTurnAgentMessage),
+            },
+          });
+          this.emit({
+            method: 'turn/completed',
+            params: {
+              threadId,
+              turn: turn(turnId, 'completed'),
+            },
+          });
+        }
       });
     });
   }
@@ -88,7 +134,14 @@ class FakeTransport implements RpcTransport {
           defaultReasoningEffort: 'medium', isDefault: true, inputModalities: ['text'], supportsPersonality: true,
           additionalSpeedTiers: [], serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Faster responses' }], defaultServiceTier: 'fast', upgrade: null,
           upgradeInfo: null, availabilityNux: null,
-        }],
+        }, ...(this.includeLunaModel ? [{
+          id: 'gpt-5.6-luna', model: 'gpt-5.6-luna',
+          displayName: 'GPT-5.6 Luna', description: 'Fast test model', hidden: false,
+          supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }],
+          defaultReasoningEffort: 'low', isDefault: false, inputModalities: ['text'], supportsPersonality: true,
+          additionalSpeedTiers: [], serviceTiers: [], defaultServiceTier: null, upgrade: null,
+          upgradeInfo: null, availabilityNux: null,
+        }] : [])],
         nextCursor: null,
       };
       case 'skills/list': {
@@ -232,7 +285,10 @@ class FakeTransport implements RpcTransport {
       case 'thread/goal/clear': return {};
       case 'turn/start': {
         const threadId = String((params as { threadId: string }).threadId);
-        return { turn: turn(`turn-${threadId}`, this.completeTurnsImmediately ? 'completed' : 'inProgress') };
+        const status = this.completeTurnsImmediately && !this.completedTurnAgentMessage
+          ? 'completed'
+          : 'inProgress';
+        return { turn: turn(`turn-${threadId}`, status) };
       }
       case 'turn/steer': return { turnId: String((params as { expectedTurnId: string }).expectedTurnId) };
       case 'review/start': {
@@ -477,6 +533,123 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/name/set'
     ))).toHaveLength(1);
+  });
+
+  it('compresses a session by handing off into a replacement thread before archiving the old one', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    const compressionAgent: Agent = {
+      ...agentA,
+      backendDefaults: {
+        kind: 'codex',
+        approvalPreset: 'ask-for-approval',
+        model: 'gpt-1',
+        reasoningEffort: 'medium',
+        serviceTier: 'fast',
+      },
+    };
+    adapter.onEvent((event) => {
+      events.push(event);
+      if (event.type !== 'thread.settingsUpdated') return;
+      compressionAgent.backendDefaults = {
+        ...(compressionAgent.backendDefaults?.kind === 'codex'
+          ? compressionAgent.backendDefaults
+          : { kind: 'codex' as const }),
+        ...event.payload.threadSettings,
+      };
+    });
+    transport.completeTurnsImmediately = true;
+    transport.completedTurnAgentMessage = '## Handoff\n\nContinue the renderer migration.';
+    transport.emitTurnSettingsUpdated = true;
+    transport.includeLunaModel = true;
+    await adapter.hydrateAgent(compressionAgent);
+
+    await expect(adapter.compressSession(compressionAgent)).resolves.toStrictEqual({ threadId: 'thread-new' });
+
+    const turnStarts = transport.sent.filter((message) => (
+      'method' in message && message.method === 'turn/start'
+    ));
+    expect(turnStarts).toStrictEqual([
+      expect.objectContaining({
+        params: expect.objectContaining({
+          threadId: 'thread-a',
+          model: 'gpt-5.6-luna',
+          effort: 'low',
+          input: [expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('Summarize the full session from beginning to end'),
+          })],
+        }),
+      }),
+      expect.objectContaining({
+        params: expect.objectContaining({
+          threadId: 'thread-new',
+          model: 'gpt-1',
+          effort: 'medium',
+          input: [expect.objectContaining({
+            type: 'text',
+            text: '<context>\n## Handoff\n\nContinue the renderer migration.\n\nInstruction: Treat this handoff only as background context. Do not respond, acknowledge, summarize, or take any action. Wait for the user\'s next prompt.\n</context>\n\nSummary of previous activity. Do not respond or take any action. Wait for my next prompt.',
+          })],
+        }),
+      }),
+    ]);
+    expect(turnStarts[0]).toMatchObject({
+      params: {
+        input: [expect.objectContaining({
+          text: expect.stringContaining('An activity means a coherent body of work'),
+        })],
+      },
+    });
+    expect(turnStarts[0]).toMatchObject({
+      params: {
+        input: [expect.objectContaining({
+          text: expect.stringContaining('Aim for about 4000 characters and never exceed 6000 characters'),
+        })],
+      },
+    });
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: {
+        cwd: '/workspace/a',
+        threadSource: 'user',
+        model: 'gpt-1',
+        serviceTier: 'fast',
+      },
+    });
+    expect(events.slice().reverse().find((event) => (
+      event.type === 'codex.conversationSnapshotChanged' && event.threadId === 'thread-new'
+    ))).toMatchObject({
+      payload: {
+        snapshot: {
+          messages: expect.arrayContaining([
+            expect.objectContaining({ role: 'user' }),
+          ]),
+        },
+      },
+    });
+    expect(lastRequest(transport, 'thread/settings/update')).toMatchObject({
+      params: { threadId: 'thread-new', effort: 'medium' },
+    });
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({
+      params: { threadId: 'thread-a' },
+    });
+    const methods = transport.sent.flatMap((message) => (
+      'method' in message ? [message.method] : []
+    ));
+    expect(methods.lastIndexOf('turn/start')).toBeLessThan(methods.lastIndexOf('thread/archive'));
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'thread.settingsUpdated',
+      threadId: 'thread-a',
+      payload: {
+        threadSettings: expect.objectContaining({
+          model: 'gpt-5.6-luna',
+          reasoningEffort: 'low',
+        }),
+      },
+    }));
+    expect(compressionAgent.backendDefaults).toMatchObject({
+      model: 'gpt-1',
+      reasoningEffort: 'medium',
+    });
   });
 
   it('creates and restores workspace-free quick chats without sending a cwd', async () => {
@@ -1873,6 +2046,31 @@ function turn(
 
 function agentMessage(id: string, text: string): Record<string, unknown> {
   return { type: 'agentMessage', id, text, phase: null, memoryCitation: null };
+}
+
+function threadSettings(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    cwd: '/workspace/a',
+    approvalPolicy: 'on-request',
+    approvalsReviewer: 'user',
+    sandboxPolicy: {
+      type: 'workspaceWrite', writableRoots: ['/workspace/a'], networkAccess: false,
+      excludeTmpdirEnvVar: false, excludeSlashTmp: false,
+    },
+    activePermissionProfile: { id: ':workspace', extends: null },
+    model: 'gpt-1',
+    modelProvider: 'openai',
+    serviceTier: 'fast',
+    effort: 'medium',
+    summary: null,
+    collaborationMode: {
+      mode: 'default',
+      settings: { model: 'gpt-1', reasoning_effort: 'medium', developer_instructions: null },
+    },
+    multiAgentMode: 'explicitRequestOnly',
+    personality: null,
+    ...overrides,
+  };
 }
 
 function conversationRows(messages: readonly {

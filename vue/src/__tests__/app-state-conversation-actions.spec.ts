@@ -617,6 +617,45 @@ describe('useAppState', () => {
     expect(state.selectedReasoningEffort.value).toBe('xhigh');
   });
 
+  it('adopts the replacement session and clears stale history errors after compression', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
+    const compressedSnapshot = structuredClone(remoteSnapshot);
+    compressedSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-compressed' };
+    const compressAgentSession = vi.fn().mockResolvedValue(compressedSnapshot);
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+        compressAgentSession,
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    listeners[0]?.({
+      seq: 1,
+      occurredAt: '2026-09-07T00:00:00.000Z',
+      agentId: 'agent-dina',
+      type: 'thread.historyHydrationFailed',
+      payload: {},
+    });
+    expect(state.isActiveAgentHistoryFailed.value).toBe(true);
+
+    await state.compressAgentSession('agent-dina');
+
+    expect(compressAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(state.snapshot.value.agents[0].backendSession).toStrictEqual({
+      kind: 'codex',
+      threadId: 'thread-compressed',
+    });
+    expect(state.isActiveAgentHistoryFailed.value).toBe(false);
+  });
+
   it('sets a Codex goal from slash goal without sending a prompt', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();

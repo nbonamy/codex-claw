@@ -7,7 +7,7 @@ import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guar
 import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendSessionCompressionResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, selectAgent, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
@@ -863,6 +863,26 @@ export class ClawBackendServer {
             throw new Error(`Agent not found: ${agentId}`);
           }
           this.agentConversations.setTitle(resumedAgent.id);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentSessionCompress: {
+        const agentId = requireAgentId(message.params);
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentSessionCompress, { agentId }, async (agent) => {
+          if (agent.backend !== 'codex' || agent.backendSession?.kind !== 'codex') {
+            throw new Error('Only an existing Codex session can be compressed.');
+          }
+          if (agent.status.type !== 'idle') {
+            throw new Error('Agent must be idle before compressing its session.');
+          }
+          const result = await this.handleAgentDriverRequest(
+            agent,
+            backendMethods.driverSessionCompress,
+            { agent },
+          ) as BackendSessionCompressionResult;
+          const compressedAgent = resumeAgentConversationInSnapshot(this.snapshot, agentId, result.backendSession);
+          if (!compressedAgent) throw new Error(`Agent not found: ${agentId}`);
+          this.agentConversations.setTitle(compressedAgent.id);
           return this.persistAndEmitSnapshot();
         });
       }

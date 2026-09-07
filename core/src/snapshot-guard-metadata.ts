@@ -491,6 +491,7 @@ function isGeneralSettings(value: unknown): boolean {
     typeof value.agentListCompact === 'boolean' &&
     isArrayOf(value.collapsedRepositoryKeys, isString) &&
     typeof value.shareCodexSkillsAndPlugins === 'boolean' &&
+    typeof value.sessionCompressionWarningEnabled === 'boolean' &&
     includes(['automatic', 'repository', 'off'], value.worktreeInitializationMode) &&
     isRecordMapOf(value.repositoryIcons, isString) &&
     isAppshotSettings(value.appshots) &&
