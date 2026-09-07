@@ -3,11 +3,12 @@ import ElementPlus from 'element-plus';
 import type {
   CodexNativeRendererApi,
 } from '@codex-app-sdk/vue';
+import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppCommand, CodexClawApi, RendererMessage, SidePanelRequest } from '@codex-claw/core/contracts';
+import type { AppCommand, CodexClawApi, SidePanelRequest } from '@codex-claw/core/contracts';
 import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
@@ -1263,9 +1264,8 @@ describe('AppShell workspace and plans', () => {
 
   it('shows the plan preview updating overlay while a plan progress tool is running', () => {
     const snapshot = createInitialSnapshot();
-    const planProgressMessage: RendererMessage = {
+    const planProgressMessage: SurfaceMessage = {
       id: 'assistant-turn-plan',
-      agentId: snapshot.agents[0].id,
       role: 'assistant',
       status: 'streaming',
       turnId: 'turn-plan',
@@ -1285,7 +1285,12 @@ describe('AppShell workspace and plans', () => {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
-        messages: [planProgressMessage],
+        messages: [],
+        codexConversationSnapshot: codexConversationSnapshot([planProgressMessage], {
+          activeTurnId: 'turn-plan',
+          turnIds: ['turn-plan'],
+          busy: true,
+        }),
         isLoading: false,
         isSending: true,
         planMode: true,

@@ -487,7 +487,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('owns turn deletion history replacement mutations', async () => {
+  it('keeps Codex turn deletion history provider-owned', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -546,13 +546,13 @@ describe('ClawBackendServer', () => {
 
     expect(deleteTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
     expect(snapshot.messages.map((message) => [message.id, message.agentId])).toStrictEqual([
+      ['old-dina', 'agent-dina'],
       ['old-jesse', 'agent-jesse'],
-      ['rollback-dina', 'agent-dina'],
     ]);
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'thread.historyLoaded', payload: { messages: rollbackMessages, replace: true } }),
-      expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'idle' } }),
-    ]));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'thread.historyLoaded' }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'agent.statusChanged', payload: { type: 'idle' },
+    }));
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     await server.close();
   });

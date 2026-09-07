@@ -44,7 +44,7 @@
       :plan-visible="executionPlanVisible"
       :history-load-failed="historyLoadFailed"
       :history-loading="isConversationLoading"
-      :has-visible-messages="hasVisibleMessages ?? messages.length > 0"
+      :has-visible-messages="hasVisibleMessages"
       @annotate-attachment="openAttachmentImageAnnotation"
       @close-plan="closeExecutionPlan"
       @retry-history="retryConversationHistory"
@@ -203,8 +203,9 @@ const props = defineProps<{
     location?: AutomationLocation,
     query?: WorkItemQuery,
   ) => Promise<WorkItem[] | void>;
-  messages: RendererMessage[];
-  hasVisibleMessages?: boolean;
+  hasVisibleMessages: boolean;
+  hasRunningPlanTool: boolean;
+  latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   openAgentGitDiffPreview: (agentId?: string) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
@@ -300,18 +301,10 @@ const currentTurnPlan = computed<ThreadPlan | null>(() => {
   if (!plan?.steps.length) {
     return null;
   }
-  if (props.isConversationLoading && props.messages.length === 0) {
+  if (props.isConversationLoading && !props.hasVisibleMessages) {
     return null;
   }
-
-  let latestTurnId: string | undefined;
-  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    if (props.messages[index]?.turnId) {
-      latestTurnId = props.messages[index].turnId;
-      break;
-    }
-  }
-
+  const latestTurnId = props.latestConversationTurnId;
   return !latestTurnId || latestTurnId === plan.turnId ? plan : null;
 });
 const executionPlanVisible = computed(() => {
@@ -494,13 +487,7 @@ function prefillWorkItemForAgent(agentId: string, item: WorkItem): void {
 function isPlanPreviewUpdatingFor(agentId: string): boolean {
   const panel = rightWorkspaceFor(agentId).planPanel;
   if (!panel || panel.purpose !== 'plan') return false;
-  return props.messages.some(
-    (message) =>
-      message.agentId === agentId &&
-      message.parts.some(
-        (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,
-      ),
-  );
+  return agentId === currentAgent.value?.id && props.hasRunningPlanTool;
 }
 
 function effectiveGitReviewPanelFor(agent: Agent): SidePanelGitDiffState {

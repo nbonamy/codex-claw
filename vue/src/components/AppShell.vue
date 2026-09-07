@@ -197,8 +197,9 @@
         :is-modal-dialog-visible="isModalDialogVisible"
         :is-right-workspace-visible="isRightWorkspaceVisible"
         :has-visible-messages="conversationMessages.length > 0"
+        :has-running-plan-tool="conversationHasRunningPlanTool"
+        :latest-conversation-turn-id="conversationLatestTurnId"
         :load-work-items="props.loadWorkItems"
-        :messages="messages"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
@@ -1107,6 +1108,19 @@ const conversationMessages = computed(() => (
   currentAgent.value?.backend === 'codex'
     ? providerConversation.value?.messages ?? []
     : props.messages
+));
+const conversationLatestTurnId = computed(() => {
+  if (providerConversation.value) return providerConversation.value.turnIds.at(-1) ?? null;
+  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
+    const turnId = props.messages[index]?.turnId;
+    if (turnId) return turnId;
+  }
+  return null;
+});
+const conversationHasRunningPlanTool = computed(() => conversationMessages.value.some(
+  (message) => message.parts.some(
+    (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,
+  ),
 ));
 const conversationActiveTurnId = computed(() => {
   if (providerConversation.value) return providerConversation.value.activeTurnId;

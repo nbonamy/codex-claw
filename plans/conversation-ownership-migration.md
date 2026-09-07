@@ -345,7 +345,8 @@ new path is measurably smaller, and provider behavior has one owner.
 | 2026-09-06 | Plan | Complete | Existing Codex/Claude ownership, SDK bridge, renderer controller, reducers, and mutation route inspected | — | Awaiting approval to begin Phase 0 |
 | 2026-09-06 | Phase 0 | Complete | Real SDK Vue edit emits `{turnId, content}`; SDK fake transport rolls back and starts exactly one replacement turn; Claw/SDK projections compared; 2,074 tests pass in 19.6s | `0ab52f6` | Both halves work in isolation. The live defect is only possible because the renderer can expose Claw-owned history that the SDK runtime does not own; eliminating the second transcript is the fix. |
 | 2026-09-06 | Phase 1 | Complete | SDK targeted bridge `93d2ae3`; one targeted subscription per agent; concurrent A/B snapshots carry independent identity and monotonic per-agent revisions; reconnect regression; Core/backend/Vue focused tests and typechecks pass | `4940076` | Generic Electron/Web backend-event adapters already carry the app-owned snapshot frame, so no provider protocol leaked across those boundaries. SDK operations are invoked through the targeted bridge where renderer attachment resolution is not required. |
-| 2026-09-06 | Phase 2 | Complete | SDK replica `33f24a3`; Claw consumes one bounded reset plus revisioned SDK events; divergent legacy rows cannot win; real dev send streamed one user row and one assistant row; no new buffer overflow; Core 285, Backend 597, Vue 884, and Electron runtime 19 tests pass; all four lint/typecheck gates pass | pending | The live 1.97 MB snapshot flood forced the correct reset-plus-delta design. The old Claw Codex reducer still runs only as a temporary metadata/overlay bridge and is removed in Phase 3. |
+| 2026-09-06 | Phase 2 | Complete | SDK replica `33f24a3`; Claw consumes one bounded reset plus revisioned SDK events; divergent legacy rows cannot win; real dev send streamed one user row and one assistant row; no new buffer overflow; Core 285, Backend 597, Vue 884, and Electron runtime 19 tests pass; all four lint/typecheck gates pass | `3535ddd` | The live 1.97 MB snapshot flood forced the correct reset-plus-delta design. The old Claw Codex reducer still runs only as a temporary metadata/overlay bridge and is removed in Phase 3. |
+| 2026-09-06 | Phase 3 | Complete | Codex adapter no longer emits Claw transcript, turn, tool, request, approval, queue, compaction, or history projections; turn actions return no reconstructed transcript; renderer workspace state derives from the provider snapshot; Knip is clean; all 2,075 workspace tests pass | `chore: remove codex conversation shadow state` | 594 net lines removed in this checkpoint. Claw state persistence already excluded all transcripts, so no persistence migration was required. Generic conversation reducers remain only for Claude until its owner is cut over in Phases 4–6. |
 
 ### Phase 0 baseline
 
@@ -383,3 +384,14 @@ Append durable lessons after each completed provider cutover. At minimum record
 which compatibility assumptions were wrong, which differential assertions
 caught real regressions, and which interfaces gave Claw less knowledge of
 provider internals.
+
+- A provider reset followed by provider-native deltas is both smaller and more
+  reliable than reconstructing the same conversation from app-owned semantic
+  events. The reset must be bounded; publishing the complete live surface on
+  every change recreated the memory and transport costs of the shadow model.
+- Claw still needs provider-derived activity, settings, goals, diffs, and
+  subagent topology for product chrome. Those are projections, not transcript
+  ownership: none can create, replace, or mutate a provider message or turn.
+- Tests that asserted exact Codex tool, compaction, or message conversion in
+  Claw were duplication, not protection. SDK tests own those semantics; Claw
+  tests now protect routing, provider-frame delivery, and overlay correlation.

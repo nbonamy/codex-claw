@@ -5,12 +5,10 @@ import type {
   Agent,
   AgentStatus,
   ApprovalPreset,
-  BackendApprovalRequest,
   BackendModelOption,
   BackendPluginSummary,
   BackendRuntimeStatus,
   BackendSkillSummary,
-  ClientRequest,
   ClientRequestResponse,
   ConversationSummary,
   DevicePairingSession,
@@ -18,7 +16,6 @@ import type {
   RendererMessage,
   RendererMessagePart,
   RendererToolPart,
-  RendererToolPartUpdate,
   PairedDevice,
   SendPromptOptions,
   CodexAuthentication,
@@ -39,8 +36,6 @@ import type {
   CodexConversationEvent,
   CodexConversationSummary,
   CodexConversationSnapshot,
-  CodexSurfaceApproval,
-  CodexSurfaceClientRequest,
   CodexSurfaceEvent,
   CodexSurfaceReviewTarget,
   CodexSurfaceSnapshot,
@@ -50,7 +45,6 @@ import type {
   SurfaceMessage,
   SurfaceMessagePart,
   SurfaceMessageToolPart,
-  SurfaceMessageToolPartUpdate,
 } from '@codex-app-sdk/core/surface';
 import {
   invokeCodexConversationBridgeOperation,
@@ -66,8 +60,6 @@ const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
 
 type AgentConversation = {
   agent: Agent;
-  completedCompactionItemIds: Set<string>;
-  compactionStartedTurnIds: Set<string>;
   handle: CodexConversation;
   suppressEvents: boolean;
   unsubscribe: () => void;
@@ -347,7 +339,7 @@ export class CodexSurfaceAgentAdapter {
     );
     return {
       threadId: session.handle.id,
-      messages: historicalSurfaceMessages(snapshot.messages, agent.id),
+      messages: [],
       activeTurnId: snapshot.activeTurnId,
     };
   }
@@ -359,7 +351,7 @@ export class CodexSurfaceAgentAdapter {
     );
     return {
       threadId: session.handle.id,
-      messages: historicalSurfaceMessages(snapshot.messages, agent.id),
+      messages: [],
       activeTurnId: snapshot.activeTurnId,
     };
   }
@@ -371,7 +363,7 @@ export class CodexSurfaceAgentAdapter {
     );
     return {
       threadId: session.handle.id,
-      messages: historicalSurfaceMessages(snapshot.messages, agent.id),
+      messages: [],
       activeTurnId: snapshot.activeTurnId,
     };
   }
@@ -439,10 +431,10 @@ export class CodexSurfaceAgentAdapter {
   }
 
   async resumeConversation(agent: Agent, threadId: string) {
-    const session = await this.bindAndLoad(agent, threadId, false);
+    await this.bindAndLoad(agent, threadId);
     return {
       threadId,
-      messages: historicalSurfaceMessages(session.handle.getSnapshot().messages, agent.id),
+      messages: [],
     };
   }
 
@@ -459,7 +451,7 @@ export class CodexSurfaceAgentAdapter {
     this.bindRuntime(targetAgent, result.conversationId, false);
     return {
       threadId: result.conversationId,
-      messages: historicalSurfaceMessages(result.snapshot.messages, targetAgent.id),
+      messages: [],
       activeTurnId: result.snapshot.activeTurnId,
     };
   }
@@ -475,12 +467,12 @@ export class CodexSurfaceAgentAdapter {
         // This adapter already owns the live session and receives its events in
         // the background. Keep that richer in-memory transcript authoritative
         // instead of replacing it with load's five-turn bootstrap page.
-        this.emitHistory(existing, currentSnapshot.messages, undefined, { preserveKnownTurns: true });
+        this.publishConversationSnapshot(existing, currentSnapshot);
         return threadId;
       }
       const hydratedAt = this.historyHydratedAtByAgentId.get(agent.id) ?? 0;
       if (Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) {
-        this.emitHistory(existing, currentSnapshot.messages, undefined, { preserveKnownTurns: true });
+        this.publishConversationSnapshot(existing, currentSnapshot);
         return threadId;
       }
 
@@ -492,14 +484,14 @@ export class CodexSurfaceAgentAdapter {
         const snapshot = existing.handle.getSnapshot();
         // Publish load's full initial page now. Older messages remain behind
         // the SDK's demand-paging cursor until the conversation requests them.
-        this.publishInitial(existing, snapshot, true, true);
+        this.publishInitial(existing, snapshot);
         existing.suppressEvents = wasSuppressingEvents;
       } finally {
         existing.suppressEvents = wasSuppressingEvents;
       }
       return threadId;
     }
-    await this.bindAndLoad(agent, threadId, true);
+    await this.bindAndLoad(agent, threadId);
     this.historyHydratedAtByAgentId.set(agent.id, Date.now());
     return threadId;
   }
@@ -557,7 +549,7 @@ export class CodexSurfaceAgentAdapter {
       return existing;
     }
     if (existing) this.forgetAgentSession(agent.id);
-    if (requestedThreadId) return this.bindAndLoad(agent, requestedThreadId, false);
+    if (requestedThreadId) return this.bindAndLoad(agent, requestedThreadId);
 
     await this.start();
     const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
@@ -595,14 +587,12 @@ export class CodexSurfaceAgentAdapter {
   private async bindAndLoad(
     agent: Agent,
     threadId: string,
-    emitHistory: boolean,
   ): Promise<AgentConversation> {
     const existing = this.sessionsByAgentId.get(agent.id);
     if (existing && existing.handle.id === threadId) {
       existing.agent = agent;
       const snapshot = existing.handle.getSnapshot();
-      if (emitHistory) this.publishInitial(existing, snapshot, true);
-      else this.rememberPending(existing, snapshot);
+      this.publishInitial(existing, snapshot);
       return existing;
     }
 
@@ -627,11 +617,7 @@ export class CodexSurfaceAgentAdapter {
       this.publishQuickChatConversationTitle(session, snapshot.conversations.find(
         (conversation) => conversation.id === threadId,
       ));
-      if (emitHistory) this.publishInitial(session, snapshot, true);
-      else {
-        this.rememberPending(session, snapshot);
-        this.publishConversationSnapshot(session, snapshot);
-      }
+      this.publishInitial(session, snapshot);
       session.suppressEvents = false;
 
       const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
@@ -645,15 +631,6 @@ export class CodexSurfaceAgentAdapter {
         await invokeCodexConversationBridgeOperation(
           this.surface, session.handle.id, 'updateConversationSettings', [{ serviceTier: requestedServiceTier }],
         );
-      }
-      if (emitHistory) {
-        if (interruptedTurnId && !resumedActiveGoal) {
-          this.emitThread(session, {
-            type: 'turn.completed',
-            turnId: interruptedTurnId,
-            payload: { status: 'interrupted' },
-          });
-        }
       }
       return session;
     } catch (error) {
@@ -674,8 +651,6 @@ export class CodexSurfaceAgentAdapter {
     const handle = this.surface.conversation(threadId);
     const session: AgentConversation = {
       agent,
-      completedCompactionItemIds: new Set(),
-      compactionStartedTurnIds: new Set(),
       handle,
       suppressEvents,
       unsubscribe: () => undefined,
@@ -694,24 +669,16 @@ export class CodexSurfaceAgentAdapter {
       this.forgetAgentSession(agent.id);
       throw error;
     }
-    if (publishInitial) this.publishInitial(session, handle.getSnapshot(), false, false, false);
+    if (publishInitial) this.publishInitial(session, handle.getSnapshot(), false);
     return session;
   }
 
   private publishInitial(
     session: AgentConversation,
     snapshot: CodexConversationSnapshot,
-    emitHistory: boolean,
-    preserveKnownTurns = false,
     publishProviderSnapshot = true,
   ): void {
     this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
-    if (emitHistory) {
-      this.emitHistory(session, snapshot.messages, undefined, {
-        completeStreaming: snapshot.activeTurnId === null,
-        preserveKnownTurns,
-      });
-    }
     this.emitSettings(
       session,
       snapshot.approvalPreset,
@@ -726,7 +693,7 @@ export class CodexSurfaceAgentAdapter {
     }
     if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
     this.emitStatus(session, statusFromSnapshot(snapshot));
-    this.rememberPending(session, snapshot, true);
+    this.rememberPending(session, snapshot);
     if (publishProviderSnapshot) this.publishConversationSnapshot(session, snapshot);
   }
 
@@ -749,15 +716,12 @@ export class CodexSurfaceAgentAdapter {
   private rememberPending(
     session: AgentConversation,
     snapshot: CodexConversationSnapshot,
-    emit = false,
   ): void {
     for (const request of snapshot.clientRequests) {
       this.clientRequestOwners.set(request.id, session);
-      if (emit) this.emitClientRequest(session, request);
     }
     for (const approval of snapshot.approvals) {
       this.approvalOwners.set(approval.id, session);
-      if (emit) this.emitApprovalRequested(session, approval);
     }
   }
 
@@ -860,13 +824,6 @@ export class CodexSurfaceAgentAdapter {
       case 'conversation.summaryUpserted':
       case 'conversation.summaryRemoved':
         return;
-      case 'conversation.historyReplaced':
-        if (event.origin === 'action') return;
-        this.emitHistory(session, event.payload.messages, event.occurredAt, { preserveKnownTurns: true });
-        return;
-      case 'conversation.historyPrepended':
-        this.emitHistory(session, event.payload.messages, event.occurredAt, { preserveKnownMessages: true });
-        return;
       case 'conversation.activityChanged':
         this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
@@ -917,81 +874,8 @@ export class CodexSurfaceAgentAdapter {
         this.emitSubagentActivity(session, event);
         return;
       }
-      case 'turn.started':
-        this.emitThread(session, {
-          type: 'turn.started', turnId: event.turnId,
-          payload: { status: 'inProgress', startedAt: event.payload.startedAt }, ...metadata,
-        });
-        return;
       case 'turn.completed':
-        this.emitThread(session, {
-          type: 'turn.completed', turnId: event.turnId,
-          payload: { ...event.payload }, ...metadata,
-        });
         void this.refreshQuickChatConversationTitle(session);
-        return;
-      case 'turn.error':
-        this.emitThread(session, {
-          type: 'error', turnId: event.turnId,
-          payload: { message: event.payload.error.message, ...event.payload }, ...metadata,
-        });
-        return;
-      case 'message.appended':
-        if (event.payload.message.role === 'user') {
-          const [message] = surfaceMessages([event.payload.message], session.agent.id);
-          if (!message) return;
-          this.emitThread(session, {
-            type: 'message.userSubmitted',
-            turnId: event.turnId,
-            payload: { message },
-            ...metadata,
-          });
-          return;
-        }
-        this.emitAppendedMessage(session, event.payload.message, event.turnId, event.occurredAt);
-        return;
-      case 'message.delta':
-        this.emitThread(session, {
-          type: 'message.delta', turnId: event.turnId,
-          payload: {
-            messageId: event.payload.messageId,
-            itemId: event.payload.itemId,
-            delta: event.payload.delta,
-            ...(event.payload.phase ? { phase: event.payload.phase } : {}),
-          },
-          ...metadata,
-        });
-        return;
-      case 'message.updated': {
-        const [message] = surfaceMessages([event.payload.message], session.agent.id);
-        if (!message) return;
-        this.emitThread(session, {
-          type: 'message.updated', turnId: event.turnId,
-          payload: { message },
-          ...metadata,
-        });
-        return;
-      }
-      case 'tool.started':
-        this.emitThread(session, {
-          type: 'item.started', turnId: event.turnId,
-          payload: { messageId: event.payload.messageId, toolPart: rendererToolPart(event.payload.toolPart) },
-          ...metadata,
-        });
-        return;
-      case 'tool.updated':
-        this.emitThread(session, {
-          type: 'item.updated', turnId: event.turnId,
-          payload: { messageId: event.payload.messageId, ...rendererToolUpdate(event.payload.update) },
-          ...metadata,
-        });
-        return;
-      case 'tool.completed':
-        this.emitThread(session, {
-          type: 'item.completed', turnId: event.turnId,
-          payload: { messageId: event.payload.messageId, toolPart: rendererToolPart(event.payload.toolPart) },
-          ...metadata,
-        });
         return;
       case 'file.activity':
         this.emitThread(session, {
@@ -1000,85 +884,19 @@ export class CodexSurfaceAgentAdapter {
           ...metadata,
         });
         return;
-      case 'plan.delta':
-        this.emitThread(session, {
-          type: 'turn.proposedPlanDelta', turnId: event.turnId,
-          payload: { itemId: event.payload.itemId, delta: event.payload.delta, markdown: event.payload.markdown },
-          ...metadata,
-        });
-        return;
-      case 'plan.updated':
-        this.emitThread(session, {
-          type: 'turn.planUpdated', turnId: event.turnId,
-          payload: {
-            explanation: event.payload.explanation,
-            plan: event.payload.steps.map((step) => ({ ...step })),
-            markdown: event.payload.markdown,
-            status: event.payload.status,
-          },
-          ...metadata,
-        });
-        return;
-      case 'plan.completed':
-        this.emitThread(session, {
-          type: 'turn.proposedPlanCompleted', turnId: event.turnId,
-          payload: { itemId: event.payload.itemId, markdown: event.payload.markdown }, ...metadata,
-        });
-        return;
-      case 'context.compactionStarted':
-        // Manual compaction emits an action-origin start against the last known
-        // turn before app-server reports the actual compaction item. The
-        // notification turn is authoritative; accepting both can render two
-        // markers and leave the speculative one running forever.
-        if (event.origin === 'action') return;
-        if (session.compactionStartedTurnIds.has(event.turnId)) return;
-        session.compactionStartedTurnIds.add(event.turnId);
-        this.emitThread(session, {
-          type: 'context.compactionStarted', turnId: event.turnId,
-          payload: { itemId: event.payload.itemId }, ...metadata,
-        });
-        return;
-      case 'context.compactionCompleted':
-        if (event.payload.itemId && session.completedCompactionItemIds.has(event.payload.itemId)) return;
-        if (event.payload.itemId) session.completedCompactionItemIds.add(event.payload.itemId);
-        if (!session.compactionStartedTurnIds.delete(event.turnId)) {
-          this.emitThread(session, {
-            type: 'context.compactionStarted', turnId: event.turnId,
-            payload: { itemId: event.payload.itemId }, ...metadata,
-          });
-        }
-        this.emitThread(session, {
-          type: 'context.compactionCompleted', turnId: event.turnId,
-          payload: { itemId: event.payload.itemId }, ...metadata,
-        });
-        return;
       case 'approval.requested':
         this.approvalOwners.set(event.payload.approval.id, session);
-        this.emitApprovalRequested(session, event.payload.approval, event.occurredAt);
         return;
       case 'approval.resolved':
         this.approvalOwners.delete(event.payload.approval.id);
-        this.emitThread(session, {
-          type: 'backendApproval.resolved', turnId: event.turnId,
-          payload: {
-            approval: backendApproval(event.payload.approval),
-            decision: event.payload.decision,
-            scope: event.payload.scope,
-            reason: event.payload.reason,
-          },
-          ...metadata,
-        });
         return;
       case 'clientRequest.requested':
         this.clientRequestOwners.set(event.payload.request.id, session);
-        this.emitClientRequest(session, event.payload.request, event.occurredAt);
         return;
       case 'clientRequest.resolved':
         this.clientRequestOwners.delete(event.payload.request.id);
-        this.emitThread(session, {
-          type: 'clientRequest.resolved', turnId: event.turnId,
-          payload: { id: event.payload.request.id }, ...metadata,
-        });
+        return;
+      default:
         return;
     }
   }
@@ -1096,76 +914,6 @@ export class CodexSurfaceAgentAdapter {
         revision,
         event: structuredClone(event),
       },
-    });
-  }
-
-  private emitAppendedMessage(
-    session: AgentConversation,
-    message: SurfaceMessage,
-    turnId: string | undefined,
-    occurredAt: string,
-  ): void {
-    if (!turnId) {
-      this.emitHistory(session, session.handle.getSnapshot().messages, occurredAt);
-      return;
-    }
-    if (message.parts.some((part) => part.type === 'reasoning')) {
-      const [rendered] = surfaceMessages([message], session.agent.id);
-      if (rendered) {
-        this.emitThread(session, {
-          type: 'message.updated', turnId, payload: { message: rendered }, occurredAt,
-        });
-      }
-      return;
-    }
-    for (const part of message.parts) {
-      if (part.type === 'text' && part.text) {
-        this.emitThread(session, {
-          type: 'message.delta', turnId,
-          payload: {
-            messageId: message.id,
-            itemId: part.itemId,
-            delta: part.text,
-            ...(part.phase ? { phase: part.phase } : {}),
-          },
-          occurredAt,
-        });
-      } else if (part.type === 'tool') {
-        this.emitThread(session, {
-          type: part.status === 'running' ? 'item.started' : 'item.completed', turnId,
-          payload: { messageId: message.id, toolPart: rendererToolPart(part) }, occurredAt,
-        });
-      } else if (part.type === 'attachment' || part.type === 'status') {
-        this.emitHistory(session, session.handle.getSnapshot().messages, occurredAt);
-        return;
-      }
-    }
-  }
-
-  private emitHistory(
-    session: AgentConversation,
-    messages: readonly SurfaceMessage[],
-    occurredAt?: string,
-    options: {
-      completeStreaming?: boolean;
-      preserveKnownMessages?: boolean;
-      preserveKnownTurns?: boolean;
-    } = {},
-  ): void {
-    const preserveHistory = options.preserveKnownMessages || options.preserveKnownTurns;
-    const historyState = (session.handle.getSnapshot() as CodexConversationSnapshot & {
-      historyState?: { hasOlder?: boolean };
-    }).historyState;
-    this.emitThread(session, {
-      type: 'thread.historyLoaded',
-      payload: {
-        messages: historicalSurfaceMessages(messages, session.agent.id, options.completeStreaming),
-        replace: !preserveHistory,
-        ...(typeof historyState?.hasOlder === 'boolean' ? { hasOlderMessages: historyState.hasOlder } : {}),
-        ...(options.preserveKnownTurns ? { preserveKnownTurns: true } : {}),
-        ...(options.preserveKnownMessages ? { preserveKnownMessages: true } : {}),
-      },
-      ...(occurredAt ? { occurredAt } : {}),
     });
   }
 
@@ -1214,59 +962,6 @@ export class CodexSurfaceAgentAdapter {
   private emitStatus(session: AgentConversation, status: AgentStatus, occurredAt?: string): void {
     this.emitThread(session, {
       type: 'agent.statusChanged', payload: status,
-      ...(occurredAt ? { occurredAt } : {}),
-    });
-  }
-
-  private emitClientRequest(
-    session: AgentConversation,
-    request: CodexSurfaceClientRequest,
-    occurredAt?: string,
-  ): void {
-    if (request.kind === 'ask_user') {
-      const payload: Extract<ClientRequest, { kind: 'ask_user' }> = {
-        id: request.id,
-        kind: 'ask_user',
-        payload: {
-          request: {
-            itemId: request.itemId,
-            questions: request.payload.request.questions.map((question) => ({
-              ...question,
-              options: question.options?.map((option) => ({ ...option })) ?? null,
-            })),
-          },
-        },
-      };
-      this.emitThread(session, {
-        type: 'toolInput.requested',
-        turnId: request.turnId ?? undefined,
-        payload,
-        ...(occurredAt ? { occurredAt } : {}),
-      });
-      return;
-    }
-    const payload: Extract<ClientRequest, { kind: 'confirm_tool' }> = {
-      id: request.id,
-      kind: 'confirm_tool',
-      payload: { confirmation: { ...request.payload.confirmation } },
-    };
-    this.emitThread(session, {
-      type: 'approval.requested',
-      turnId: request.turnId ?? undefined,
-      payload,
-      ...(occurredAt ? { occurredAt } : {}),
-    });
-  }
-
-  private emitApprovalRequested(
-    session: AgentConversation,
-    approval: CodexSurfaceApproval,
-    occurredAt?: string,
-  ): void {
-    this.emitThread(session, {
-      type: 'backendApproval.requested',
-      turnId: approval.turnId,
-      payload: { approval: backendApproval(approval) },
       ...(occurredAt ? { occurredAt } : {}),
     });
   }
@@ -1526,25 +1221,6 @@ function authenticationFromSurface(
   };
 }
 
-function backendApproval(approval: CodexSurfaceApproval): BackendApprovalRequest {
-  return {
-    id: approval.id,
-    kind: approval.kind,
-    conversationId: approval.conversationId,
-    ...(approval.turnId ? { turnId: approval.turnId } : {}),
-    itemId: approval.itemId,
-    title: approval.title,
-    ...(approval.description ? { description: approval.description } : {}),
-    ...(approval.command ? { command: approval.command } : {}),
-    ...(approval.cwd ? { cwd: approval.cwd } : {}),
-    ...(approval.requestedPermissions
-      ? { requestedPermissions: approval.requestedPermissions.map((permission) => ({ ...permission })) }
-      : {}),
-    ...(approval.allowedScopes ? { allowedScopes: [...approval.allowedScopes] } : {}),
-    ...(approval.canDeny === undefined ? {} : { canDeny: approval.canDeny }),
-  };
-}
-
 function resultTurnId(
   snapshot: CodexConversationSnapshot,
   beforeTurnIds: readonly string[],
@@ -1674,23 +1350,6 @@ function rendererToolPart(part: SurfaceMessageToolPart, omitPayloads = false): R
     ...(input !== undefined ? { input } : {}),
     ...(output !== undefined ? { output } : {}),
     ...(metadata ? { metadata } : {}),
-  };
-}
-
-function rendererToolUpdate(update: SurfaceMessageToolPartUpdate): RendererToolPartUpdate {
-  const { fallbackToolPart } = update;
-  const metadata = boundedToolMetadata(update.metadata);
-  const input = toolInputProjection(update.input);
-  const output = toolOutputProjection(update.output);
-  return {
-    itemId: update.itemId,
-    ...(update.title !== undefined ? { title: boundedToolLabel(update.title) } : {}),
-    ...(update.status !== undefined ? { status: update.status } : {}),
-    ...(update.statusText !== undefined ? { statusText: update.statusText === null ? null : boundedToolStatus(update.statusText, update.status ?? 'running') } : {}),
-    ...(input !== undefined ? { input } : {}),
-    ...(output !== undefined ? { output } : {}),
-    ...(metadata ? { metadata } : {}),
-    ...(fallbackToolPart ? { fallbackToolPart: rendererToolPart(fallbackToolPart) } : {}),
   };
 }
 
