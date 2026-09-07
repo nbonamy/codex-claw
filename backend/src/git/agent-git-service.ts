@@ -399,6 +399,8 @@ export class AgentGitService {
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
     const target = selectMergeTarget(worktrees, current.folder);
     let targetFolder = target?.path;
+    let targetBranch = target?.branch;
+    let switchTargetBranch = false;
     if (!targetFolder) {
       if (current.isLinkedWorktree) throw new Error('A base worktree is required before merging.');
       const branches = (await this.runGit(folder, ['branch', '--format=%(refname:short)'])).stdout
@@ -407,9 +409,21 @@ export class AgentGitService {
         .filter(Boolean);
       const baseBranch = integrationBranches.find((branch) => branch !== current.branch && branches.includes(branch));
       if (!baseBranch) throw new Error('Create a local base branch before merging.');
-      await this.runGit(current.folder, ['switch', baseBranch]);
       targetFolder = current.folder;
+      targetBranch = baseBranch;
+      switchTargetBranch = true;
     }
+    if (!targetBranch) throw new Error('Check out the base branch before merging.');
+    const branchIsCurrent = await this.runGit(
+      targetFolder,
+      ['merge-base', '--is-ancestor', targetBranch, current.branch],
+    ).then(() => true, () => false);
+    if (!branchIsCurrent) {
+      throw new Error(
+        `${current.branch} is not up to date with ${targetBranch}. Update the branch with ${targetBranch} before merging.`,
+      );
+    }
+    if (switchTargetBranch) await this.runGit(current.folder, ['switch', targetBranch]);
     await this.runGit(targetFolder, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', '--no-ff', current.branch]);
     if (strategy === 'squash') await this.runGit(targetFolder, ['commit', '-m', normalizedCommitMessage!]);
     if (deleteWorktree) await this.runGit(targetFolder, ['worktree', 'remove', current.folder]);

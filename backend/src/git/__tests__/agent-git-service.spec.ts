@@ -609,6 +609,7 @@ describe('agent git service parsers', () => {
     });
     const service = new AgentGitService(() => new Date(), runGit);
     await expect(service.merge('/repo-feature', 'squash', true, true, 'feat: combine the workflow')).resolves.toBe('/repo');
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--squash', 'feature']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', 'feat: combine the workflow']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
@@ -624,6 +625,32 @@ describe('agent git service parsers', () => {
 
     await expect(service.merge('/repo-feature', 'squash', false, false, '  ')).rejects.toThrow('Enter a squash commit message.');
     expect(runGit).not.toHaveBeenCalled();
+  });
+
+  it('refuses to merge before main is an ancestor of the feature branch', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote') return { stdout: '' };
+      if (args[0] === 'status') return { stdout: '## feature\n' };
+      if (args[0] === 'worktree') {
+        return { stdout: 'worktree /repo\nHEAD main-head\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD feature-head\nbranch refs/heads/feature\n' };
+      }
+      if (args[0] === 'merge-base' && args[1] === '--is-ancestor') {
+        throw new Error('not an ancestor');
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.merge('/repo-feature', 'merge', true, true)).rejects.toThrow(
+      'feature is not up to date with main. Update the branch with main before merging.',
+    );
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature']);
+    expect(runGit.mock.calls.some(([, args]) => (
+      args[0] === 'merge' || args[0] === 'worktree' && args[1] === 'remove' || args[0] === 'branch' && args[1] === '-d'
+    ))).toBe(false);
   });
 
   it('rejects worktree cleanup from a primary checkout', async () => {
@@ -706,7 +733,11 @@ describe('agent git service parsers', () => {
     const service = new AgentGitService(() => new Date(), runGit);
 
     await expect(service.merge('/repo', 'merge', false, false)).resolves.toBe('/repo');
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature/demo']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['switch', 'main']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--no-ff', 'feature/demo']);
+    const freshnessCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'merge-base');
+    const switchCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'switch');
+    expect(freshnessCall).toBeLessThan(switchCall);
   });
 });
