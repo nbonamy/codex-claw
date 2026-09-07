@@ -37,9 +37,10 @@ weight, and predictable geometry over decorative cards or explanatory copy.
 
 - **Components** own ephemeral interaction and derived presentation state such
   as an open popover, active tab, local query, or filtered local rows.
-- **`vue/src/app-state.ts`** owns renderer state shared across surfaces and the
-  client replica of server-authored app state. It is the public renderer-state
-  facade and event router, not the owner of every async workflow.
+- **`vue/src/app-state.ts`** owns renderer state shared across surfaces, the
+  client replica of server-authored app state, and the registry of per-agent
+  provider conversation replicas. It routes provider reset/delta frames to the
+  matching provider reducer; it does not interpret or reconstruct transcripts.
 - **Colocated composables** own reusable stateful behavior such as async
   loading, caching, request lifecycle, and mutations used by a focused surface.
 - **Renderer view models** stay beside the surface when their projection exists
@@ -137,6 +138,12 @@ conversation and composer surface. Extend it through its controller, slots, and
 typed actions. Keep Claw's wrapper limited to app-state mapping and product
 routing; the SDK retains its leaf UI, CSS, attachment, clipboard, and
 transcription code.
+
+Codex panes receive the SDK-owned snapshot and invoke targeted SDK bridge
+operations for the pane's conversation. Claude panes receive the Claude host's
+provider snapshot. Never add a global message list or a provider-neutral
+conversation reducer to `app-state.ts`; Claw-only overlays should read the
+provider frame or consume an explicit coordination projection.
 
 For app-owned MCP icons, phase-aware titles, and bounded presentation metadata,
 follow [Custom MCP Tools](custom-tools.md).

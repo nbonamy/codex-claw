@@ -88,11 +88,12 @@ type AgentStatus =
   | { type: "error"; message: string }
 ```
 
-Codex app-server owns the conversation transcript and thread history in
-`CODEX_HOME`. Codex Claw owns only product state: teams, agents, selected
-folders, the global source folder, view preferences, theme
-preference, workspace identity, current-conversation display metadata, and
-backend session metadata such as the Codex thread id. Persisted Git remote
+Codex app-server owns Codex conversation state and thread history in
+`CODEX_HOME`. The Claude conversation host owns the normalized Agent SDK
+session transcript. Codex Claw owns only product state: teams, agents,
+selected folders, the global source folder, view preferences, theme
+preference, workspace identity, provider conversation references, and Claw
+metadata. `AppSnapshot` contains no provider transcript. Persisted Git remote
 identities are canonical and credential-free.
 
 On a fresh install, create a default team when no teams exist. Do not create a
@@ -202,14 +203,21 @@ automations, work integrations, and the provider-neutral `AgentBackendDriver` se
 remain in Claw. The SDK backend is embedded in `clawd`; it is not another
 process and does not replace Claw's existing Claude driver boundary.
 
-Snapshot mutation is also backend-owned. `clawd` applies backend events to the
-authoritative snapshot and is the only process that persists it. Electron
-fetches fresh snapshots from `clawd` only while synchronizing or forwarding one
-to the renderer, then retains a metadata-only shell with no transcript bodies.
-The renderer replays the same sequenced, app-owned events through the shared
-deterministic reducer to maintain its volatile presentation replica. Incremental
-events do not carry the full snapshot: doing so makes streaming traffic grow
-with total conversation history and can saturate the clawd-to-Electron pipe.
+Product snapshot mutation is backend-owned. `clawd` applies coordination
+events to the authoritative `AppSnapshot` and is the only process that persists
+it. Provider conversations follow a separate path: the Codex SDK owns its
+snapshot and reducer, while the Claude conversation host owns one Claude
+snapshot and reducer. `clawd` transports one bounded provider reset followed by
+revisioned provider-native deltas. Electron forwards those frames without
+reducing them, and the renderer maintains one per-agent provider replica.
+Streaming therefore never grows an app snapshot or crosses a shared Claw
+transcript reducer.
+
+Claw may derive read-only coordination projections such as sidebar activity,
+plans, diffs, file activity, unread state, and agent status from provider
+events. Those projections cannot construct, replace, or mutate provider
+messages or turns.
+
 Electron-native affordances consume a backend
 derived `ClientState` for details such as source-folder dialog defaults and
 whether display sleep should be prevented; Electron runs the native APIs but
@@ -379,20 +387,22 @@ Closing a Claw agent removes app-owned state and releases its live runtime but
 does not archive or delete the provider conversation. The conversation remains
 available in its provider's history.
 
-`BackendEvent` is produced by backend drivers inside `clawd`. Codex and Claude
-get their own drivers/adapters that emit the same app-owned `BackendEvent`
-shape. That is the seam we want; a generic lowest-common-denominator provider
-model is not.
+`BackendEvent` is produced by backend drivers inside `clawd`. Coordination
+events use app-owned payloads. Conversation traffic uses app-owned outer frames
+(`codex.conversation*` or `claude.conversation*`) containing the matching
+provider snapshot or event. The outer frame provides agent identity, provider
+identity, and revision ordering without translating conversation semantics into
+a generic lowest-common-denominator model.
 
 #### Backend Feature Rule
 
 Backend-dependent features must be added through the app seam, not directly in
 renderer UI. The required path is:
 
-1. Define an app-owned shared contract that describes product behavior rather
-   than provider protocol. Examples include `RendererMessage`,
-   `ConversationSummary`, `BackendConversationRef`, `BackendModelOption`, and
-   `BackendSkillSummary`.
+1. Define an app-owned shared contract for product behavior outside the
+   transcript. Examples include `ConversationSummary`,
+   `BackendConversationRef`, `BackendModelOption`, and `BackendSkillSummary`.
+   Provider-owned conversation snapshots and events remain provider-specific.
 2. Add or extend an optional `AgentBackendDriver` method or declared backend
    capability behind `clawd`. Optional methods are the parity boundary when
    Codex and Claude do not support the same feature yet.
@@ -404,8 +414,8 @@ renderer UI. The required path is:
    empty data, but must not import Codex/Claude protocol types or know where a
    backend stores history.
 5. Test the seam: fake backend-driver routing in controller tests, concrete
-   provider adapter/session tests for protocol behavior, and renderer component
-   tests against app-owned data.
+   provider host tests for protocol behavior, provider replica revision tests,
+   and renderer component tests for Claw-owned decorations.
 
 Conversation history is the canonical example. The searchable Resume Session
 dialog opened from the sidebar agent menu renders `ConversationSummary` rows
@@ -522,44 +532,21 @@ to it. Prompt values must be URL encoded. Submission is the default because the
 scheme is an automation interface. Add `submit=false` to prefill and focus the
 composer without submitting. A link with no prompt only selects the agent.
 
-```ts
-type MainToRendererEvent = {
-  seq: number
-  agentId?: string
-  backend?: AgentBackend
-  backendSessionId?: string
-  threadId?: string
-  turnId?: string
-  type:
-    | "backend.statusChanged"
-    | "agent.updated"
-    | "agent.statusChanged"
-    | "thread.started"
-    | "thread.historyLoaded"
-    | "thread.settingsUpdated"
-    | "thread.modeUpdated"
-    | "thread.goalUpdated"
-    | "thread.goalCleared"
-    | "thread.tokenUsageUpdated"
-    | "turn.started"
-    | "turn.planUpdated"
-    | "turn.completed"
-    | "message.steer"
-    | "context.compactionStarted"
-    | "account.rateLimitsUpdated"
-    | "skills.changed"
-    | "message.delta"
-    | "item.started"
-    | "item.updated"
-    | "item.completed"
-    | "diff.updated"
-    | "approval.requested"
-    | "toolInput.requested"
-    | "error"
-  payload: unknown
-  occurredAt: string
-}
-```
+`MainToRendererEvent` has two deliberate categories:
+
+- app-owned coordination events such as `snapshot.updated`,
+  `agent.statusChanged`, prompt queue updates, diffs, file activity, Git state,
+  runtime catalogs, and side-panel requests;
+- provider conversation frames:
+  `codex.conversationSnapshotChanged`,
+  `codex.conversationEventReceived`,
+  `claude.conversationSnapshotChanged`, and
+  `claude.conversationEventReceived`.
+
+Every frame carries the app-owned sequence and timestamp. Provider frames also
+carry agent identity, provider conversation identity where applicable, and a
+provider-replica revision. Their payload is validated at the protocol boundary
+but remains owned by the corresponding provider module.
 
 On renderer reload, the client calls `snapshot/get` and receives the current
 authoritative app state, the last backend event sequence number, and
@@ -880,36 +867,23 @@ working without changing the user's selection. Electron keys native browser
 views by both agent id and browser id; the current UI uses a stable `primary`
 id but the host is ready for multiple browser tabs per agent.
 
-Agent selection is optimistic only when the renderer already has hydrated
-messages for that agent. First startup and the first visit to an uncached
-conversation keep the history loader visible until the full-item 50-turn
-bootstrap page arrives, then reveal that recent transcript immediately. The
-The default lazy loading strategy keeps the app-server cursor inside the SDK and
-requests older pages only when the user reaches the top. Claw also selects lazy
-rendering, so the DOM remains bounded while eager rendering remains available
-for hosts that need every supplied message mounted. Eager loading can be
-selected independently when a host needs the full history in memory. Because
-app-server history can omit tool items that were observed live, lifecycle
-hydration may add previously unknown turns but never rewrites a turn already in
-Claw memory. Git status and agent-specific catalogs still reconcile in the
-background. Selection requests carry a monotonic renderer token so a stale
-response from a rapid earlier switch cannot replace the current agent.
-Live agent transcripts remain cached in `clawd` for fifteen minutes after the
-latest selection or backend activity. The SDK supplies the optional generic TTL
-cache, activity clock, and sweep lifecycle; Claw supplies the agent policy. Claw
-only evicts an inactive, idle transcript with no queued prompt or pending
-approval. Eviction drops the in-memory messages and live SDK session handle but
-also asks the SDK surface to forget its local conversation runtime; it never
-deletes or archives the app-server thread. It does not serialize or persist a
-second transcript copy. Drafts, attachments,
-queues, side-panel state, and browser state are separate and remain untouched.
-Selecting an evicted agent follows the normal provider history hydration path.
-Conversations with an active turn stay memory-authoritative and reconcile
-through their live backend events.
-Global snapshot notifications and hot-path acknowledgements contain metadata
-only. They are merged into the existing renderer state without replacing the
-root snapshot or cached message array, so an unrelated agent, queue, automation, or
-status change cannot clone and invalidate a long active transcript.
+Agent selection reuses that agent's provider replica when available. First
+startup and the first visit to an uncached conversation keep the history loader
+visible until the provider snapshot arrives. Codex paging cursors and history
+reconciliation remain inside the SDK; Claude hydration remains inside its
+conversation host. Claw selects lazy rendering so the DOM stays bounded while
+the provider retains the complete in-memory snapshot it needs.
+
+Git status and agent-specific catalogs still reconcile in the background.
+Selection requests carry a monotonic renderer token so a stale response from a
+rapid earlier switch cannot replace the current agent. Provider runtimes decide
+their own in-memory lifecycle; Claw persists only the conversation reference and
+rehydrates through the provider after restart. Drafts, attachments, queues,
+side-panel state, and browser state remain separate Claw state.
+
+Global snapshot notifications contain only product and coordination state. An
+unrelated agent, queue, automation, or status change therefore cannot clone,
+invalidate, or resurrect the active provider transcript.
 
 Dragging a work item onto an agent records provider-neutral assignment metadata
 in `workBacklog.assignments`, keyed by provider and provider-generated item id,

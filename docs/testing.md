@@ -258,18 +258,20 @@ The unqualified typecheck, lint, and test commands cover every workspace.
 For protocol or persistence changes, run focused tests for the touched module
 and the full coverage gate.
 
-## Conversation Performance Benchmark
+## Conversation Ownership Verification
 
-Run `npm run benchmark:conversation` from the Claw repository to exercise the
-two performance ownership boundaries without launching Electron:
+Provider suites own exact transcript semantics. Claw tests only the boundaries
+it owns:
 
-- Claw hydrates five long agent transcripts and reduces 2,000 interleaved
-  app-owned streaming events into the renderer replica.
-- The SDK uses an isolated temporary Codex home, cold-loads five 200-turn
-  conversations through a fake app-server transport, subscribes to every
-  conversation, and routes 500 interleaved app-server deltas.
+- targeted provider operations never cross agent or conversation identity;
+- one provider reset followed by revisioned deltas produces one renderer row
+  per provider message;
+- stale or gapped revisions trigger provider rehydration;
+- Electron forwards provider frames without reducing conversation state;
+- app snapshot persistence and synchronization remain transcript-free;
+- Claw projections such as plans, diffs, unread state, and sidebar activity are
+  read-only and cannot resurrect or mutate provider turns.
 
-The command reports latency and throughput for both layers. Compare runs on the
-same machine and power state; it is a diagnostic benchmark, not a wall-clock CI
-threshold. Functional tests continue to assert event isolation and stable
-active-transcript identity so correctness does not depend on benchmark timing.
+Use captured long-conversation fixtures for deterministic performance or memory
+regressions. Do not reintroduce a Claw transcript reducer solely to benchmark
+provider traffic.

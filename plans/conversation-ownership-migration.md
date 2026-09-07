@@ -373,6 +373,7 @@ new path is measurably smaller, and provider behavior has one owner.
 | 2026-09-06 | Phase 3 | Complete | Codex adapter no longer emits Claw transcript, turn, tool, request, approval, queue, compaction, or history projections; turn actions return no reconstructed transcript; renderer workspace state derives from the provider snapshot; Knip is clean; all 2,075 workspace tests pass | `chore: remove codex conversation shadow state` | 594 net lines removed in this checkpoint. Claw state persistence already excluded all transcripts, so no persistence migration was required. Generic conversation reducers remain only for Claude until its owner is cut over in Phases 4–6. |
 | 2026-09-06 | Phase 4 | Complete | Existing Claude coverage maps send, streamed/final text, tools, permissions, questions, plan mode, compaction, context, errors, transcript hydration/resume/read, and interruption; new concurrent-agent regression proves session/event isolation; focused 28-test suite and backend typecheck pass | `test: characterize claude conversation ownership` | The ownership audit fixes the seam: a concrete Claude conversation host owns transcript state and emits revisioned frames; `ClaudeBackendDriver` retains only provider catalog/runtime and Claw integration concerns. |
 | 2026-09-06 | Phase 5 | Complete | Claude host emits one revisioned provider snapshot followed by immutable provider deltas; the renderer applies them through the shared Claude replica and never writes the global transcript; Codex and Claude routes remain isolated; 2,086 workspace tests, all workspace typechecks, Stylelint, and Knip pass | `feat: delegate claude conversations to agent sdk` | The provider catalog is separated from the deep conversation host. Claw coordination consumes provider events through a small read-only view, while delegated reports explicitly read the provider-owned transcript. |
+| 2026-09-06 | Phase 6 | Complete | `AppSnapshot` and persistence contain no messages; Electron forwards provider frames without reducing them; the renderer owns only per-agent provider replicas; transcript TTL, shared transcript reducers, direct conversation events, metadata snapshot aliases, duplicate routing, benchmarks, and duplicated semantic suites are removed; all 2,011 workspace tests, typechecks, Stylelint, Knip, and diff checks pass | `9e9c842` | 7,102 net lines removed in this checkpoint. The surviving 861-line conversation reducer/tool/transcript code is explicitly Claude-owned, while app-owned snapshot reduction is an 84-line coordination module. |
 
 ### Phase 0 baseline
 
@@ -428,3 +429,14 @@ provider internals.
 - A provider-owned transcript does not prevent Claw features from reading it.
   Handoff reports now request the provider transcript explicitly instead of
   relying on an accidentally synchronized global copy.
+- A transcript-free snapshot eliminates the need for a second metadata-only
+  snapshot contract. Once provider frames carry conversation state, one
+  validated `AppSnapshot` is sufficient for local, remote, Electron, and web
+  coordination.
+- Removing the shared engine also exposed dead infrastructure that looked
+  operationally important only because the old ownership model existed: the
+  transcript TTL service, conversation benchmark, broad event validators, and
+  thousands of duplicated semantic tests disappeared with the second writer.
+- Remote snapshot validation belongs in the one canonical agent snapshot route.
+  Collapsing the old metadata/full routers initially exposed this invariant;
+  the malformed-remote-snapshot regression now protects it directly.
