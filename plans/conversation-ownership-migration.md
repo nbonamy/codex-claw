@@ -287,6 +287,30 @@ Commit checkpoint:
 feat: delegate claude conversations to agent sdk
 ```
 
+### Phase 4 ownership audit
+
+| Behavior | Current owner(s) | Intended owner |
+| --- | --- | --- |
+| Session start, resume, interruption, and permission response correlation | `ClaudeBackendDriver` and `ClaudeAgentSdkTransport` | Claude conversation host around the Agent SDK transport |
+| Stream text, final-text deduplication, tool input/result normalization, and file activity | `ClaudeBackendDriver`, then the shared Claw conversation reducer | Claude conversation host; file activity remains a Claw overlay projection |
+| Transcript discovery and hydration | `transcript-history-adapter`, `ClaudeBackendDriver`, backend `AppSnapshot`, renderer `AppSnapshot` | Claude conversation host loads once and publishes one provider snapshot |
+| Active turn, messages, tool/request lifecycle, compaction, errors, and plan content | `ActiveClaudeTurn`, backend shared reducer, renderer shared reducer | One Claude conversation replica driven by host events |
+| Models, skills, permission defaults, runtime health, and developer instructions | `ClaudeBackendDriver` | Driver remains the Claw integration adapter; these are not conversation transcript state |
+| Sidebar status, context usage, plan review, git diff, and file activity | Derived from conversation events into Claw state | Explicit read-only Claw projections from the host |
+
+The Claude conversation host is a concrete deep module, not a new provider
+interface hierarchy. Its external interface is the conversation subset already
+required by `AgentBackendDriver`: send, interrupt, hydrate/resume/read, respond,
+forget, subscribe, and close. The real Agent SDK transport and the existing fake
+transport form its internal seam. The host owns event ordering and the immutable
+conversation frame; callers do not construct or mutate messages.
+
+The cutover will first extract the existing conversation event union as a named
+type without changing its fields. A Claude frame can then carry a revisioned
+conversation event without defining a second semantic vocabulary. Both backend
+and renderer use one Claude replica implementation; the global `AppSnapshot`
+reducer is no longer a writer for Claude conversations.
+
 ### Phase 6 — remove the legacy shared engine
 
 1. Delete unused `RendererMessage` construction and conversation reducers.
@@ -347,6 +371,7 @@ new path is measurably smaller, and provider behavior has one owner.
 | 2026-09-06 | Phase 1 | Complete | SDK targeted bridge `93d2ae3`; one targeted subscription per agent; concurrent A/B snapshots carry independent identity and monotonic per-agent revisions; reconnect regression; Core/backend/Vue focused tests and typechecks pass | `4940076` | Generic Electron/Web backend-event adapters already carry the app-owned snapshot frame, so no provider protocol leaked across those boundaries. SDK operations are invoked through the targeted bridge where renderer attachment resolution is not required. |
 | 2026-09-06 | Phase 2 | Complete | SDK replica `33f24a3`; Claw consumes one bounded reset plus revisioned SDK events; divergent legacy rows cannot win; real dev send streamed one user row and one assistant row; no new buffer overflow; Core 285, Backend 597, Vue 884, and Electron runtime 19 tests pass; all four lint/typecheck gates pass | `3535ddd` | The live 1.97 MB snapshot flood forced the correct reset-plus-delta design. The old Claw Codex reducer still runs only as a temporary metadata/overlay bridge and is removed in Phase 3. |
 | 2026-09-06 | Phase 3 | Complete | Codex adapter no longer emits Claw transcript, turn, tool, request, approval, queue, compaction, or history projections; turn actions return no reconstructed transcript; renderer workspace state derives from the provider snapshot; Knip is clean; all 2,075 workspace tests pass | `chore: remove codex conversation shadow state` | 594 net lines removed in this checkpoint. Claw state persistence already excluded all transcripts, so no persistence migration was required. Generic conversation reducers remain only for Claude until its owner is cut over in Phases 4–6. |
+| 2026-09-06 | Phase 4 | Complete | Existing Claude coverage maps send, streamed/final text, tools, permissions, questions, plan mode, compaction, context, errors, transcript hydration/resume/read, and interruption; new concurrent-agent regression proves session/event isolation; focused 28-test suite and backend typecheck pass | `test: characterize claude conversation ownership` | The ownership audit fixes the seam: a concrete Claude conversation host owns transcript state and emits revisioned frames; `ClaudeBackendDriver` retains only provider catalog/runtime and Claw integration concerns. |
 
 ### Phase 0 baseline
 

@@ -141,6 +141,50 @@ describe('ClaudeBackendDriver', () => {
     }));
   });
 
+  it('keeps concurrent Claude conversations isolated by agent and session', async () => {
+    const transport = createConcurrentFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const secondAgent: Agent = {
+      ...agent,
+      id: 'agent-claude-second',
+      name: 'Claude Second',
+      folder: '/Users/nbonamy/src/second',
+    };
+    const events: Array<{ agentId?: string; backendSessionId?: string; type: string; payload: unknown }> = [];
+    driver.onEvent((event) => events.push(event));
+
+    const firstSend = driver.sendPrompt(agent, 'first prompt');
+    const secondSend = driver.sendPrompt(secondAgent, 'second prompt');
+    transport.emit(agent.id, { type: 'system', subtype: 'init', session_id: 'session-first' });
+    transport.emit(secondAgent.id, { type: 'system', subtype: 'init', session_id: 'session-second' });
+    await Promise.all([firstSend, secondSend]);
+    events.length = 0;
+
+    transport.emit(agent.id, {
+      type: 'assistant',
+      session_id: 'session-first',
+      message: { content: [{ type: 'text', text: 'first answer' }] },
+    });
+    transport.emit(secondAgent.id, {
+      type: 'assistant',
+      session_id: 'session-second',
+      message: { content: [{ type: 'text', text: 'second answer' }] },
+    });
+
+    expect(events.filter((event) => event.type === 'message.delta')).toStrictEqual([
+      expect.objectContaining({
+        agentId: agent.id,
+        backendSessionId: 'session-first',
+        payload: { delta: 'first answer' },
+      }),
+      expect.objectContaining({
+        agentId: secondAgent.id,
+        backendSessionId: 'session-second',
+        payload: { delta: 'second answer' },
+      }),
+    ]);
+  });
+
   it('routes Claude compact commands and publishes context usage and compaction lifecycle', async () => {
     const transport = createFakeTransport();
     transport.getContextUsage.mockResolvedValue({
@@ -1213,6 +1257,28 @@ function createFakeTransport(): ClaudeTurnTransport & {
     listModels: vi.fn().mockResolvedValue(null),
     getContextUsage: vi.fn().mockResolvedValue(null),
     readContextUsage: vi.fn().mockResolvedValue(null),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createConcurrentFakeTransport(): ClaudeTurnTransport & {
+  emit(ownerId: string, message: ClaudeSdkMessage): void;
+} {
+  const listeners = new Map<string, (message: ClaudeSdkMessage) => void>();
+  return {
+    startTurn: (params, listener) => {
+      if (!params.ownerId) throw new Error('Concurrent Claude tests require an owner id.');
+      listeners.set(params.ownerId, listener);
+      return {
+        done: new Promise<void>(() => undefined),
+        interrupt: vi.fn().mockResolvedValue(undefined),
+      };
+    },
+    emit: (ownerId, message) => {
+      const listener = listeners.get(ownerId);
+      if (!listener) throw new Error(`No Claude turn for ${ownerId}.`);
+      listener(message);
+    },
     close: vi.fn().mockResolvedValue(undefined),
   };
 }
