@@ -7,7 +7,7 @@ import {
 } from '../../../../scripts/runtime-artifacts.mjs';
 
 const releaseConfig = {
-  version: '0.151.0',
+  version: '0.153.4',
   targets: [
     { platform: 'darwin', arch: 'arm64' },
     { platform: 'linux', arch: 'x64' },
@@ -21,7 +21,7 @@ describe('runtime artifacts', () => {
       arch: 'x64',
     });
     expect(() => selectCodexReleaseTarget(releaseConfig, 'linux', 'arm64')).toThrow(
-      'Bundled Codex 0.151.0 does not support linux/arm64.',
+      'Bundled Codex 0.153.4 does not support linux/arm64.',
     );
   });
 

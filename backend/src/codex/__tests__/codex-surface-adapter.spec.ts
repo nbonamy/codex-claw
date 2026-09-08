@@ -43,6 +43,7 @@ class FakeTransport implements RpcTransport {
   completeTurnsImmediately = false;
   completedTurnAgentMessage: string | null = null;
   emitTurnSettingsUpdated = false;
+  includeAstraModel = false;
   includeLunaModel = false;
   resumedServiceTier: string | null = 'fast';
   turnsListDelayMs = 0;
@@ -131,10 +132,17 @@ class FakeTransport implements RpcTransport {
           id: `gpt-${this.modelVersion}`, model: `gpt-${this.modelVersion}`,
           displayName: `GPT-${this.modelVersion}`, description: 'Test', hidden: false,
           supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
-          defaultReasoningEffort: 'medium', isDefault: true, inputModalities: ['text'], supportsPersonality: true,
+          defaultReasoningEffort: 'medium', isDefault: !this.includeAstraModel, inputModalities: ['text'], supportsPersonality: true,
           additionalSpeedTiers: [], serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Faster responses' }], defaultServiceTier: 'fast', upgrade: null,
           upgradeInfo: null, availabilityNux: null,
-        }, ...(this.includeLunaModel ? [{
+        }, ...(this.includeAstraModel ? [{
+          id: 'gpt-6-astra', model: 'gpt-6-astra',
+          displayName: 'GPT-6 Astra', description: 'Latest test model', hidden: false,
+          supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'Deep reasoning' }],
+          defaultReasoningEffort: 'high', isDefault: true, inputModalities: ['text'], supportsPersonality: true,
+          additionalSpeedTiers: [], serviceTiers: [], defaultServiceTier: null, upgrade: null,
+          upgradeInfo: null, availabilityNux: null,
+        }] : []), ...(this.includeLunaModel ? [{
           id: 'gpt-5.6-luna', model: 'gpt-5.6-luna',
           displayName: 'GPT-5.6 Luna', description: 'Fast test model', hidden: false,
           supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }],
@@ -1525,6 +1533,21 @@ describe('CodexSurfaceAgentAdapter', () => {
     transport.modelVersion = 2;
     await expect(adapter.listModels()).resolves.toMatchObject([{ id: 'gpt-2' }]);
     expect(transport.sent.filter((message) => 'method' in message && message.method === 'model/list').length).toBe(3);
+  });
+
+  it('forwards Astra from the SDK model catalog without app-owned filtering', async () => {
+    const { adapter, transport } = createAdapter();
+    transport.includeAstraModel = true;
+
+    await expect(adapter.listModels()).resolves.toContainEqual(expect.objectContaining({
+      id: 'gpt-6-astra',
+      model: 'gpt-6-astra',
+      displayName: 'GPT-6 Astra',
+      defaultReasoningEffort: 'high',
+    }));
+    expect(lastRequest(transport, 'model/list')).toMatchObject({
+      params: { includeHidden: false },
+    });
   });
 
   it('retains a completed-immediately turn id', async () => {
