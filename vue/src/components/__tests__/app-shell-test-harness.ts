@@ -96,6 +96,7 @@ export function mountShell(overrides: Partial<{
   unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
+  queuedPrompts: import('@codex-claw/core/contracts').AgentQueuedPrompt[];
   codexConversationSnapshot: CodexConversationSnapshot | null;
   claudeConversationSnapshot: ClaudeConversationSnapshot | null;
   chooseAgentFolder: () => Promise<string | null>;
@@ -165,6 +166,7 @@ export function mountShell(overrides: Partial<{
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },
+      queuedPrompts: overrides.queuedPrompts ?? snapshot.queuedPrompts ?? [],
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       cloneSourceRepository: overrides.cloneSourceRepository ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createSourceWorktree: overrides.createSourceWorktree ?? vi.fn().mockResolvedValue({ name: '', path: '' }),

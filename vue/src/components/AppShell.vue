@@ -1301,9 +1301,7 @@ const conversationPaneState: CodexConversationPaneState = {
         : props.goal ?? null;
     },
     get queuedPrompts() {
-      return currentAgent.value?.backend === 'codex'
-        ? props.codexConversationSnapshot?.queuedPrompts ?? []
-        : props.queuedPrompts;
+      return props.queuedPrompts;
     },
     get contextUsage() { return providerConversation.value?.contextUsage ?? currentAgent.value?.contextUsage ?? null; },
   },
@@ -1346,6 +1344,7 @@ const conversationPaneState: CodexConversationPaneState = {
   },
 };
 const conversationPaneActions: CodexConversationPaneActions = {
+  cancel: () => emit('interrupt-agent'),
   clearGoal: () => emit('clear-goal'),
   clientResponse: (response) => emit('client-response', response),
   deleteTurn: (turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
@@ -1368,6 +1367,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
   openVisualization: (visualization) => agentWorkspace.value?.openConversationVisualization(visualization),
   resolveApproval: forwardApprovalResolution,
   retryTurn: (turnId) => props.retryTurnAction?.(turnId) ?? emit('retry-turn', turnId),
+  sendFollowUp: forwardCodexPrompt,
   steer: forwardCodexSteerPrompt,
   steerQueuedPrompt: (promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
   updateQueuedPrompt: (promptId, prompt) => emit('update-queued-prompt', promptId, prompt),

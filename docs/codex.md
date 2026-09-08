@@ -206,6 +206,13 @@ reference to the targeted SDK surface and emits a fresh provider snapshot. The
 renderer creates one SDK replica for that agent and applies only contiguous
 provider revisions; a gap triggers rehydration.
 
+Claw's cross-agent prompt admission queue remains app-owned coordination state:
+it decides whether a prompt starts now or waits for the agent, persists that
+pending work, and passes the active agent's queued prompts into the SDK pane for
+generic queue presentation and interaction. This is distinct from any
+provider-native queue represented by the SDK conversation snapshot; Claw must
+not substitute the provider snapshot's queue for its own admitted prompts.
+
 The Resume Session dialog opened from an agent's sidebar menu uses `thread/list`
 with that agent's folder as an exact `cwd` filter, `archived: false`, and
 newest-first `updated_at` sorting. `clawd` sends app-owned

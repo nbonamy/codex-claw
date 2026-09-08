@@ -569,6 +569,20 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['hello']]);
   });
 
+  it('renders the active agent queued prompts above the composer', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.queuedPrompts = [{
+      id: 'queued-visible',
+      agentId: snapshot.activeAgentId!,
+      text: 'Run the focused tests next',
+      createdAt: '2026-09-08T00:00:00.000Z',
+    }];
+
+    const wrapper = mountShell({ snapshot, realConversationPane: true });
+
+    expect(wrapper.get('[aria-label="Queued prompt"]').text()).toContain('Run the focused tests next');
+  });
+
   it('uses the promise-returning prompt action when the host provides one', async () => {
     const snapshot = createInitialSnapshot();
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
@@ -750,6 +764,10 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.text()).toContain('Updated through the stable controller.');
 
     const actions = conversationControllerActions(wrapper);
+    await actions.cancel?.();
+    expect(wrapper.emitted('interrupt-agent')).toStrictEqual([[]]);
+    await actions.sendFollowUp?.('Continue with the fixes');
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['Continue with the fixes']]);
     await actions.forkTurn?.('turn-3');
     expect(wrapper.emitted('fork-turn')).toStrictEqual([['turn-3']]);
     await actions.updateQueuedPrompt?.('queued-1', 'Edited queued prompt');
@@ -805,10 +823,13 @@ describe('AppShell authentication and conversation', () => {
     }]]);
     expect(wrapper.emitted('select-model')).toStrictEqual([['gpt-5.1']]);
     expect(wrapper.emitted('select-service-tier')).toStrictEqual([[null]]);
-    expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
-      'review context',
-      { attachments: [{ type: 'file', reference: 'electron-attachment:context' }] },
-    ]]);
+    expect(wrapper.emitted('sendPrompt')).toStrictEqual([
+      ['Continue with the fixes'],
+      [
+        'review context',
+        { attachments: [{ type: 'file', reference: 'electron-attachment:context' }] },
+      ],
+    ]);
     expect(openExternal).toHaveBeenCalledWith(
       'https://example.com/docs',
       '_blank',
