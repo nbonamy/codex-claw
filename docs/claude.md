@@ -57,8 +57,8 @@ type AgentBackendDriver = {
   interrupt(agent: Agent): Promise<BackendSendResult>
   respondToRequest(response: ClientRequestResponse): Promise<void>
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>
-  listConversations?(agent: Agent): Promise<ConversationSummary[]>
-  resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>
+  listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>
+  resumeConversation?(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult>
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>
   steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>

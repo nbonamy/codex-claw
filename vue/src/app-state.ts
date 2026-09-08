@@ -3,7 +3,7 @@ import { translate } from './i18n';
 import { computed, ref } from 'vue';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
@@ -869,20 +869,23 @@ export function useAppState() {
       : codexClawApi.readConversationMessages(plainConversationRef(ref), agentId);
   }
 
-  async function listAgentConversations(agentId: string): Promise<ConversationSummary[]> {
+  async function listAgentConversations(agentId: string, input?: ConversationListInput): Promise<ConversationSummary[]> {
     if (!codexClawApi?.listAgentConversations) {
       return [];
     }
 
-    return codexClawApi.listAgentConversations(agentId);
+    return codexClawApi.listAgentConversations(agentId, input);
   }
 
-  async function resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<void> {
+  async function resumeAgentConversation(agentId: string, target: ConversationResumeTarget): Promise<void> {
     if (!codexClawApi?.resumeAgentConversation) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.resumeAgentConversation(agentId, plainConversationRef(ref)));
+    adoptBackgroundSnapshot(await codexClawApi.resumeAgentConversation(agentId, {
+      ref: plainConversationRef(target.ref),
+      storageState: target.storageState,
+    }));
     resetAgentHistory(agentId);
     synchronizeComposerSelectionForAgent(agentId);
     await loadActiveAgentCatalogs();

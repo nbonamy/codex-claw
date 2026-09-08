@@ -50,7 +50,7 @@ describe('AppShell work routing', () => {
 
     const dialog = wrapper.getComponent({ name: 'ConversationHistoryDialog' });
     expect(dialog.props('agent')).toStrictEqual(targetAgent);
-    expect(listAgentConversations).toHaveBeenCalledWith(targetAgent.id);
+    expect(listAgentConversations).toHaveBeenCalledWith(targetAgent.id, undefined);
 
     dialog.vm.$emit('close');
     await nextTick();

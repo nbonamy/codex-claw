@@ -57,6 +57,18 @@ export type BackendConversationRef =
     sessionId: string;
   };
 
+export type ConversationStorageState = 'active' | 'archived';
+
+export type ConversationListInput = {
+  searchTerm?: string;
+  limit?: number;
+};
+
+export type ConversationResumeTarget = {
+  ref: BackendConversationRef;
+  storageState: ConversationStorageState;
+};
+
 export type ConversationSummary = {
   id: string;
   sessionId?: string;
@@ -69,6 +81,7 @@ export type ConversationSummary = {
   createdAt?: string;
   updatedAt: string;
   messageCount: number;
+  storageState: ConversationStorageState;
   ref: BackendConversationRef;
 };
 

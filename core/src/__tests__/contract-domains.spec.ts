@@ -130,6 +130,9 @@ const contractModules = {
       'ClientRequestResponse',
       'ConfirmToolRequest',
       'ConversationFileLink',
+      'ConversationListInput',
+      'ConversationResumeTarget',
+      'ConversationStorageState',
       'ConversationSummary',
       'PromptAttachment',
       'PromptSkillInput',
@@ -249,7 +252,7 @@ describe('contract domain ownership', () => {
       .flatMap((module) => [...module.exports])
       .sort();
 
-    expect(exportsByPath.get(barrelPath)).toHaveLength(213);
+    expect(exportsByPath.get(barrelPath)).toHaveLength(216);
     expect(exportsByPath.get(barrelPath)).toEqual(expect.arrayContaining(expectedMovedExports));
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());
@@ -344,6 +347,9 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.ThreadPlanStep>().toEqualTypeOf<ConversationContracts.ThreadPlanStep>();
     expectTypeOf<Contracts.ThreadPlan>().toEqualTypeOf<ConversationContracts.ThreadPlan>();
     expectTypeOf<Contracts.BackendConversationRef>().toEqualTypeOf<ConversationContracts.BackendConversationRef>();
+    expectTypeOf<Contracts.ConversationListInput>().toEqualTypeOf<ConversationContracts.ConversationListInput>();
+    expectTypeOf<Contracts.ConversationResumeTarget>().toEqualTypeOf<ConversationContracts.ConversationResumeTarget>();
+    expectTypeOf<Contracts.ConversationStorageState>().toEqualTypeOf<ConversationContracts.ConversationStorageState>();
     expectTypeOf<Contracts.ConversationSummary>().toEqualTypeOf<ConversationContracts.ConversationSummary>();
     expectTypeOf<Contracts.SubagentStatus>().toEqualTypeOf<ConversationContracts.SubagentStatus>();
     expectTypeOf<Contracts.SubagentOperationKind>().toEqualTypeOf<ConversationContracts.SubagentOperationKind>();

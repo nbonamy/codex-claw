@@ -166,9 +166,17 @@ session use `thread/start`, then set the conversation title to the Claw agent
 name with `thread/name/set` before the first `turn/start`. The generic backend
 seam repeats title synchronization after storing the new session, but the
 Codex adapter treats an already-matching title as a no-op. Editing the Claw
-agent name updates the active conversation title as well. Closing a Claw agent
-releases its live runtime and removes app-owned state without archiving the
-Codex conversation, which remains available in Codex history.
+agent name updates the active conversation title as well.
+
+Claw maintains one non-archived Codex conversation per live agent. Restarting
+an agent archives its current conversation before clearing the provider
+reference. Closing an agent archives its conversation before removing
+app-owned state. If archiving fails, the restart or close fails without
+detaching the agent. On startup, `clawd` reconciles the isolated Claw
+`CODEX_HOME`: top-level conversations not referenced by a live local agent are
+archived through the SDK, while an attached conversation found in the archived
+catalog is restored after an interrupted lifecycle transaction. Claw never
+scans or moves rollout files itself.
 `thread/settings/updated`
 confirms the active thread settings and should update the app-owned
 agent/session mapping so the id is saved in backend-owned state and reused
@@ -213,14 +221,16 @@ generic queue presentation and interaction. This is distinct from any
 provider-native queue represented by the SDK conversation snapshot; Claw must
 not substitute the provider snapshot's queue for its own admitted prompts.
 
-The Resume Session dialog opened from an agent's sidebar menu uses `thread/list`
-with that agent's folder as an exact `cwd` filter, `archived: false`, and
-newest-first `updated_at` sorting. `clawd` sends app-owned
-`ConversationSummary` objects through backend RPC, which Electron forwards over
-typed IPC. Clicking a session row calls `thread/resume`, stores the returned
-`{ kind: "codex", threadId }` session on the agent, publishes the SDK snapshot
-for that thread, and routes the next prompt to it. Resume is allowed only while
-the agent is idle.
+The Resume Session dialog opened from an agent's sidebar menu searches both
+active and archived SDK conversation catalogs with the agent folder as an
+exact `cwd` filter. `ConversationSummary.storageState` tells the UI which rows
+are archived; the only active row shown is the agent's current conversation.
+Selecting an archived row first calls the SDK unarchive operation, loads it,
+then archives the displaced conversation before persisting the new
+`{ kind: "codex", threadId }` reference. A failed load rearchives the target
+and restores the current runtime. Resume is allowed only while the agent is
+idle. Claude keeps its existing transcript behavior until its provider exposes
+an archive primitive.
 
 Fork Agent calls the SDK conversation handle's high-level `fork()` operation,
 which owns `thread/fork` and returns a new conversation id plus its snapshot.

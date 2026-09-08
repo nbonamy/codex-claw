@@ -118,8 +118,8 @@ export function mountShell(overrides: Partial<{
   clearAutomationHistory: (automationId: string) => Promise<void>;
   deleteAutomationExecution: (automationId: string, executionId: string) => Promise<void>;
   deleteAutomation: (automationId: string) => Promise<void>;
-  listAgentConversations: (agentId: string) => Promise<ConversationSummary[]>;
-  resumeAgentConversation: (agentId: string, ref: BackendConversationRef) => Promise<void>;
+  listAgentConversations: (agentId: string, input?: import('@codex-claw/core/contracts').ConversationListInput) => Promise<ConversationSummary[]>;
+  resumeAgentConversation: (agentId: string, target: import('@codex-claw/core/contracts').ConversationResumeTarget) => Promise<void>;
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   openAgentGitDiff: (agentId: string) => Promise<void>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;

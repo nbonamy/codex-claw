@@ -1,13 +1,13 @@
 import { computed, ref, watch } from 'vue';
-import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@codex-claw/core/contracts';
 
 type SessionTranslation = (key: string, params?: Record<string, number>) => string;
 
 type SessionHistoryOptions = {
   agent: () => Agent;
   visible: () => boolean;
-  listConversations: (agentId: string) => Promise<ConversationSummary[]>;
-  resumeConversation: (agentId: string, ref: BackendConversationRef) => Promise<void>;
+  listConversations: (agentId: string, input?: ConversationListInput) => Promise<ConversationSummary[]>;
+  resumeConversation: (agentId: string, target: ConversationResumeTarget) => Promise<void>;
   translate: SessionTranslation;
 };
 
@@ -19,6 +19,7 @@ export function useSessionHistory(options: SessionHistoryOptions) {
   const error = ref<string | null>(null);
   const resumingSessionId = ref<string | null>(null);
   let requestId = 0;
+  let queryTimer: ReturnType<typeof setTimeout> | null = null;
 
   const filteredSessions = computed(() => {
     const normalizedQuery = query.value.trim().toLocaleLowerCase();
@@ -33,6 +34,7 @@ export function useSessionHistory(options: SessionHistoryOptions) {
     ([visible]) => {
       if (!visible) {
         requestId += 1;
+        if (queryTimer) clearTimeout(queryTimer);
         return;
       }
       query.value = '';
@@ -40,6 +42,12 @@ export function useSessionHistory(options: SessionHistoryOptions) {
     },
     { immediate: true },
   );
+
+  watch(query, () => {
+    if (!options.visible()) return;
+    if (queryTimer) clearTimeout(queryTimer);
+    queryTimer = setTimeout(() => { void refresh(); }, 200);
+  });
 
   async function refresh(): Promise<void> {
     const currentRequestId = requestId + 1;
@@ -49,7 +57,10 @@ export function useSessionHistory(options: SessionHistoryOptions) {
     error.value = null;
 
     try {
-      const nextSessions = await options.listConversations(options.agent().id);
+      const nextSessions = await options.listConversations(options.agent().id, {
+        searchTerm: query.value.trim(),
+        limit: 100,
+      });
       if (requestId === currentRequestId) {
         sessions.value = nextSessions.filter((session) => !session.parentConversationId);
       }
@@ -67,7 +78,10 @@ export function useSessionHistory(options: SessionHistoryOptions) {
     resumingSessionId.value = session.id;
     error.value = null;
     try {
-      await options.resumeConversation(options.agent().id, session.ref);
+      await options.resumeConversation(options.agent().id, {
+        ref: session.ref,
+        storageState: session.storageState,
+      });
       return true;
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : translate('sessions.resumeError');

@@ -159,6 +159,7 @@ export async function listClaudeTranscriptSummaries(
       title: transcriptSummary.title,
       updatedAt: file.updatedAt,
       messageCount: transcriptSummary.messageCount,
+      storageState: 'active',
       ref: {
         backend: 'claude',
         folder,

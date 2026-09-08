@@ -513,6 +513,7 @@ describe('useAppState', () => {
       title: 'hello again',
       updatedAt: '2026-06-09T10:00:00.000Z',
       messageCount: 1,
+      storageState: 'archived',
       ref: { backend: 'codex', threadId: 'thread-dina' },
     }];
     const listAgentConversations = vi.fn().mockResolvedValue(conversations);
@@ -545,11 +546,15 @@ describe('useAppState', () => {
       backend: 'codex' as const,
       threadId: 'thread-dina',
     });
-    await state.resumeAgentConversation('agent-dina', reactiveConversationRef as BackendConversationRef);
+    const target = { ref: reactiveConversationRef as BackendConversationRef, storageState: 'archived' as const };
+    await state.resumeAgentConversation('agent-dina', target);
 
-    expect(listAgentConversations).toHaveBeenCalledWith('agent-dina');
-    expect(resumeAgentConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-dina' });
-    expect(resumeAgentConversation.mock.calls.at(-1)?.[1]).not.toBe(reactiveConversationRef);
+    expect(listAgentConversations).toHaveBeenCalledWith('agent-dina', undefined);
+    expect(resumeAgentConversation).toHaveBeenCalledWith('agent-dina', {
+      ref: { backend: 'codex', threadId: 'thread-dina' },
+      storageState: 'archived',
+    });
+    expect(resumeAgentConversation.mock.calls.at(-1)?.[1].ref).not.toBe(reactiveConversationRef);
     expect(state.snapshot.value).toStrictEqual(resumedSnapshot);
     expect(state.isActiveAgentHistoryFailed.value).toBe(false);
   });
@@ -608,9 +613,12 @@ describe('useAppState', () => {
     expect(state.selectedModelId.value).toBe('haiku');
 
     await state.resumeAgentConversation('agent-dina', {
-      backend: 'claude',
-      folder: remoteSnapshot.agents[0].folder!,
-      sessionId: 'claude-session-sonnet',
+      ref: {
+        backend: 'claude',
+        folder: remoteSnapshot.agents[0].folder!,
+        sessionId: 'claude-session-sonnet',
+      },
+      storageState: 'active',
     });
 
     expect(state.selectedModelId.value).toBe('sonnet');

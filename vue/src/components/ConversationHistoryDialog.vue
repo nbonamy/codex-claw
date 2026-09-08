@@ -43,6 +43,7 @@
             <MessageCircleIcon aria-hidden="true" />
             <strong :class="{ 'conversation-history-dialog__title--empty': !session.title.trim() }">{{ history.sessionTitle(session) }}</strong>
             <span v-if="history.isCurrentSession(session)" class="conversation-history-dialog__badge">{{ t('sessions.current') }}</span>
+            <span v-else-if="session.storageState === 'archived'" class="conversation-history-dialog__badge">{{ t('sessions.archived') }}</span>
             <small>{{ relativeSessionDate(session.updatedAt, Date.now(), t) }}</small>
           </button>
         </template>
@@ -55,14 +56,14 @@
 import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
-import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@codex-claw/core/contracts';
 import { MessageCircleIcon } from '../shared/icons/app-icons';
 import { relativeSessionDate, useSessionHistory } from './use-session-history';
 
 const props = withDefaults(defineProps<{
   agent: Agent;
-  listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
-  resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
+  listConversations?: (agentId: string, input?: ConversationListInput) => Promise<ConversationSummary[]>;
+  resumeConversation?: (agentId: string, target: ConversationResumeTarget) => Promise<void>;
   visible: boolean;
 }>(), {
   listConversations: async () => [],

@@ -25,6 +25,7 @@ describe('AgentGitWorkflowService', () => {
     const stage = vi.fn();
     const service = new AgentGitWorkflowService({
       applyEvent: vi.fn(),
+      archiveSession: vi.fn(),
       delegatedWorkReports: {} as DelegatedWorkReportPort,
       driverRequest: vi.fn(),
       forgetSession: vi.fn(),
@@ -42,5 +43,46 @@ describe('AgentGitWorkflowService', () => {
       params: { agentId: agent.id, input: { paths: ['file.ts'], confirmed: false } },
     }, agent)).rejects.toThrow('Staging files requires explicit confirmation.');
     expect(stage).not.toHaveBeenCalled();
+  });
+
+  it('archives the provider session before closing an agent after a merged-branch push', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent: Agent = {
+      id: 'agent-1', name: 'Agent', folder: '/repo', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-1' }, status: { type: 'idle' },
+      createdAt: '2026-09-08T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z',
+    };
+    snapshot.agents = [agent];
+    snapshot.teams[0]!.agentIds = [agent.id];
+    const archiveSession = vi.fn().mockResolvedValue(undefined);
+    const persistAndEmitSnapshot = vi.fn().mockResolvedValue(snapshot);
+    const push = vi.fn().mockResolvedValue(undefined);
+    const workflow = vi.fn().mockResolvedValue({
+      branch: 'main', detached: false, remote: 'origin', upstream: 'origin/main',
+      remoteUrl: 'git@github.com:owner/repo.git', repository: 'owner/repo', ahead: 0, behind: 0, files: [],
+    });
+    const service = new AgentGitWorkflowService({
+      applyEvent: vi.fn(),
+      archiveSession,
+      delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(),
+      forgetSession: vi.fn(),
+      getSnapshot: () => snapshot,
+      getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
+      git: { push, workflow } as unknown as AgentGitService,
+      persistAndEmitSnapshot,
+      refreshGitStatus: vi.fn(),
+      refreshWorkspaceIdentity: vi.fn(),
+    });
+
+    await service.execute({
+      method: backendMethods.agentGitPush,
+      agentId: agent.id,
+      params: { input: { confirmed: true, target: 'mergeTarget', closeAgentAfterPush: true } },
+    }, agent);
+
+    expect(archiveSession).toHaveBeenCalledWith(agent);
+    expect(snapshot.agents).toStrictEqual([]);
+    expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
   });
 });

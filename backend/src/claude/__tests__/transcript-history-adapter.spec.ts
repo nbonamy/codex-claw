@@ -328,6 +328,7 @@ describe('listClaudeTranscriptSummaries', () => {
         title: '/plan ship history',
         updatedAt: '2026-06-09T11:00:00.000Z',
         messageCount: 1,
+        storageState: 'active',
         ref: { backend: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'session-new' },
       },
       {
@@ -335,6 +336,7 @@ describe('listClaudeTranscriptSummaries', () => {
         title: 'older prompt',
         updatedAt: '2026-06-09T10:00:00.000Z',
         messageCount: 2,
+        storageState: 'active',
         ref: { backend: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'session-old' },
       },
     ]);

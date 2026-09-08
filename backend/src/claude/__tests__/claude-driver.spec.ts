@@ -462,7 +462,7 @@ describe('ClaudeBackendDriver', () => {
     await expect(driver.interrupt(agent)).rejects.toThrow('No active Claude turn');
     await expect(driver.respondToRequest({ id: 'request-1', payload: {} })).rejects.toThrow('no longer pending');
     await expect(driver.hydrateAgent(agent)).resolves.toBeNull();
-    await expect(driver.resumeConversation(agent, { backend: 'codex', threadId: 'thread-1' })).rejects.toThrow('non-Claude');
+    await expect(driver.resumeConversation(agent, { ref: { backend: 'codex', threadId: 'thread-1' }, storageState: 'active' })).rejects.toThrow('non-Claude');
     await expect(driver.readConversationMessages({ backend: 'codex', threadId: 'thread-1' }, agent.id)).rejects.toThrow('non-Claude');
 
     const first = driver.sendPrompt(agent, 'first');
@@ -791,9 +791,12 @@ describe('ClaudeBackendDriver', () => {
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     await expect(driver.resumeConversation(agent, {
-      backend: 'claude',
-      folder: '/Users/nbonamy/src/codex-claw',
-      sessionId: 'claude-session-existing',
+      ref: {
+        backend: 'claude',
+        folder: '/Users/nbonamy/src/codex-claw',
+        sessionId: 'claude-session-existing',
+      },
+      storageState: 'active',
     })).resolves.toStrictEqual({
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
     });
@@ -828,9 +831,12 @@ describe('ClaudeBackendDriver', () => {
     const driver = new ClaudeBackendDriver(transport, historyLoader);
 
     await expect(driver.resumeConversation(agent, {
-      backend: 'claude',
-      folder: '/Users/nbonamy/src/id8',
-      sessionId: 'claude-session-existing',
+      ref: {
+        backend: 'claude',
+        folder: '/Users/nbonamy/src/id8',
+        sessionId: 'claude-session-existing',
+      },
+      storageState: 'active',
     })).rejects.toThrow('Claude conversation folder does not match the agent folder.');
     expect(historyLoader).not.toHaveBeenCalled();
   });

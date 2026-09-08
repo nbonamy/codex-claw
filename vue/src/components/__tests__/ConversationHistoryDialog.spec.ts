@@ -22,6 +22,7 @@ const sessions: ConversationSummary[] = [
     title: 'Current work',
     updatedAt: '2026-06-10T09:30:00.000Z',
     messageCount: 12,
+    storageState: 'active',
     ref: { backend: 'codex', threadId: 'thread-current' },
   },
   {
@@ -29,6 +30,7 @@ const sessions: ConversationSummary[] = [
     title: 'Older work',
     updatedAt: '2026-06-10T09:00:00.000Z',
     messageCount: 4,
+    storageState: 'archived',
     ref: { backend: 'codex', threadId: 'thread-old' },
   },
 ];
@@ -62,7 +64,7 @@ describe('ConversationHistoryDialog', () => {
     expect(wrapper.get('.el-dialog__header [aria-label="Filter sessions"]').attributes('placeholder')).toBe('Filter sessions');
 
     const rows = wrapper.findAll('.conversation-history-dialog__row');
-    expect(rows.map((row) => row.text())).toStrictEqual(['Current workCurrent30m ago', 'Older work1h ago']);
+    expect(rows.map((row) => row.text())).toStrictEqual(['Current workCurrent30m ago', 'Older workArchived1h ago']);
     expect(rows[0]!.attributes('disabled')).toBeDefined();
 
     await wrapper.get('[aria-label="Filter sessions"]').setValue('older');
@@ -70,7 +72,10 @@ describe('ConversationHistoryDialog', () => {
     await wrapper.get('.conversation-history-dialog__row').trigger('click');
     await flushPromises();
 
-    expect(resumeConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-old' });
+    expect(resumeConversation).toHaveBeenCalledWith('agent-dina', {
+      ref: { backend: 'codex', threadId: 'thread-old' },
+      storageState: 'archived',
+    });
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 });

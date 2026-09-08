@@ -28,6 +28,7 @@ type AgentGitWorkIntegrationsPort = {
 
 export type AgentGitWorkflowServiceOptions = {
   applyEvent: (event: BackendEvent) => void;
+  archiveSession: (agent: Agent) => Promise<void>;
   delegatedWorkReports: DelegatedWorkReportPort;
   driverRequest: (agent: Agent, method: string, params: unknown) => Promise<unknown>;
   forgetSession: (agent: Agent) => Promise<void>;
@@ -89,6 +90,7 @@ export class AgentGitWorkflowService {
         await this.options.git.push(pushFolder, workflow.remote, workflow.branch, !workflow.upstream);
         const result = await this.workflow(agent, { refreshStatus: true });
         if (input.closeAgentAfterPush === true) {
+          await this.options.archiveSession(agent);
           closeAgentInSnapshot(this.options.getSnapshot(), agentId);
           await this.options.persistAndEmitSnapshot();
         }
@@ -315,6 +317,7 @@ export class AgentGitWorkflowService {
     }
     if (deleteWorktree) {
       if (input.pushAfter !== true) {
+        await this.options.archiveSession(agent);
         closeAgentInSnapshot(this.options.getSnapshot(), agentId);
       }
       await this.options.persistAndEmitSnapshot();

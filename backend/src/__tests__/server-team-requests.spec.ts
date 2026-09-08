@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
+import { BackendDriverRpc } from '../driver-rpc';
 import {
   createTestSnapshot,
   readyRemoteConnection,
@@ -81,6 +85,65 @@ describe('ClawBackendServer', () => {
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
     ]));
+  });
+
+  it('archives every attached session before deleting a local team', async () => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-dina',
+      teamId: 'team-test',
+      name: 'Dina',
+      folder: '/repo',
+      backend: 'codex' as const,
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      status: { type: 'idle' as const },
+      createdAt: '2026-09-08T00:00:00.000Z',
+      updatedAt: '2026-09-08T00:00:00.000Z',
+    };
+    snapshot.teams[0]!.agentIds = [agent.id];
+    snapshot.agents = [agent];
+    snapshot.activeAgentId = agent.id;
+    snapshot.teams.push({
+      id: 'team-keep',
+      name: 'Keep',
+      color: '#7158D4',
+      agentIds: [],
+    });
+    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
+    const forgetAgentSession = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: agent.backendSession }),
+      interrupt: async () => ({ backendSession: agent.backendSession }),
+      respondToRequest: async () => undefined,
+      archiveAgentConversation,
+      forgetAgentSession,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'delete-local-team',
+      method: backendMethods.teamDelete,
+      params: { teamId: 'team-test' },
+    })).resolves.toMatchObject({
+      result: {
+        teams: [{ id: 'team-keep' }],
+        agents: [],
+      },
+    });
+
+    expect(archiveAgentConversation).toHaveBeenCalledWith(agent);
+    expect(forgetAgentSession).toHaveBeenCalledWith(agent.id);
+    await server.close();
   });
 
   it('rejects changing a team connection after agents exist', async () => {

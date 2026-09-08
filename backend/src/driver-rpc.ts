@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -242,6 +242,19 @@ export class BackendDriverRpc {
         this.requireDriver(backend).forgetAgentSession?.(agentId);
         return null;
       }
+      case backendMethods.driverConversationArchive: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        await driver.archiveAgentConversation?.(agent);
+        return null;
+      }
+      case backendMethods.driverConversationsReconcile: {
+        const record = requireRecord(params);
+        const backend = requireBackend(record.backend);
+        const agents = Array.isArray(record.agents) ? record.agents.map((agent) => requireAgent(agent, 'agent')) : [];
+        await this.requireDriver(backend).reconcileConversations?.(agents);
+        return null;
+      }
       case backendMethods.driverInterrupt: {
         const { agent } = requireAgentParams(params);
         return this.requireDriver(agent.backend).interrupt(agent);
@@ -267,8 +280,9 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationsList: {
         const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
-        return driver.listConversations ? driver.listConversations(agent) : [];
+        return driver.listConversations ? driver.listConversations(agent, record.input as ConversationListInput | undefined) : [];
       }
       case backendMethods.driverConversationResume: {
         const { agent } = requireAgentParams(params);
@@ -277,7 +291,7 @@ export class BackendDriverRpc {
         if (!driver.resumeConversation) {
           throw unsupportedBackendFeature(agent, 'conversation resume');
         }
-        return driver.resumeConversation(agent, record.ref as never);
+        return driver.resumeConversation(agent, record.target as ConversationResumeTarget);
       }
       case backendMethods.driverConversationFork: {
         const { agent } = requireAgentParams(params);

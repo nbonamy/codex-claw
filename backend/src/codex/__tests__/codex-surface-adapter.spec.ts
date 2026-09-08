@@ -51,6 +51,7 @@ class FakeTransport implements RpcTransport {
   readonly summaryTurnsByThreadId = new Map<string, Record<string, unknown>[]>();
   readonly threadMetadataByThreadId = new Map<string, Record<string, unknown>>();
   readonly staleActiveThreadIds = new Set<string>();
+  readonly failedResumeThreadIds = new Set<string>();
   readonly goalsByThreadId = new Map<string, Record<string, unknown>>();
   private readonly listeners = new Set<(message: unknown) => void>();
   private readonly errorListeners = new Set<(error: Error) => void>();
@@ -59,6 +60,13 @@ class FakeTransport implements RpcTransport {
     this.sent.push(message);
     if (!('id' in message) || !('method' in message)) return;
     const params = 'params' in message ? message.params : undefined;
+    if (message.method === 'thread/resume') {
+      const threadId = String((params as { threadId: string }).threadId);
+      if (this.failedResumeThreadIds.delete(threadId)) {
+        queueMicrotask(() => this.emit({ id: message.id, error: { code: -32603, message: `Cannot resume ${threadId}` } }));
+        return;
+      }
+    }
     queueMicrotask(() => {
       void Promise.resolve(this.response(message.method, params)).then((result) => {
         this.emit({ id: message.id, result });
@@ -230,7 +238,9 @@ class FakeTransport implements RpcTransport {
       case 'account/logout': return {};
       case 'account/rateLimits/read': return {};
       case 'thread/list': return {
-        data: [thread('thread-a', '/workspace/a'), thread('thread-b', '/workspace/b')],
+        data: (params as { archived?: boolean } | undefined)?.archived
+          ? [thread('thread-b', '/workspace/b')]
+          : [thread('thread-a', '/workspace/a'), thread('thread-b', '/workspace/b')],
         nextCursor: null,
       };
       case 'thread/start': {
@@ -263,6 +273,11 @@ class FakeTransport implements RpcTransport {
             this.threadMetadataByThreadId.get(threadId),
           ),
         };
+      }
+      case 'thread/archive': return {};
+      case 'thread/unarchive': {
+        const threadId = String((params as { threadId: string }).threadId);
+        return { thread: thread(threadId, `/workspace/${threadId.at(-1)}`) };
       }
       case 'thread/turns/list': {
         const threadId = String((params as { threadId: string }).threadId);
@@ -471,7 +486,10 @@ describe('CodexSurfaceAgentAdapter', () => {
       displayName: 'Dropbox',
       enabled: true,
     }]);
-    await expect(adapter.listConversations(agentA)).resolves.toHaveLength(2);
+    await expect(adapter.listConversations(agentA)).resolves.toStrictEqual([
+      expect.objectContaining({ id: 'thread-a', storageState: 'active' }),
+      expect.objectContaining({ id: 'thread-b', storageState: 'archived' }),
+    ]);
     await expect(adapter.readConversationMessages('thread-a', 'agent-a')).resolves.toStrictEqual([]);
 
     await adapter.setConversationTitle(agentA, 'Renamed');
@@ -501,6 +519,60 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(lastRequest(transport, 'thread/name/set')).toBeDefined();
     adapter.forgetAgentSession('agent-missing');
     adapter.forgetAgentSession('agent-a');
+  });
+
+  it('restores an archived conversation before archiving the displaced active conversation', async () => {
+    const { adapter, transport } = createAdapter();
+
+    await adapter.resumeConversation(agentA, {
+      ref: { backend: 'codex', threadId: 'thread-b' },
+      storageState: 'archived',
+    });
+
+    const lifecycle = transport.sent.flatMap((message) => (
+      'method' in message && ['thread/unarchive', 'thread/resume', 'thread/archive'].includes(message.method)
+        ? [{ method: message.method, params: message.params }]
+        : []
+    ));
+    expect(lifecycle).toStrictEqual([
+      { method: 'thread/unarchive', params: { threadId: 'thread-b' } },
+      expect.objectContaining({ method: 'thread/resume', params: expect.objectContaining({ threadId: 'thread-b' }) }),
+      { method: 'thread/archive', params: { threadId: 'thread-a' } },
+    ]);
+  });
+
+  it('rearchives a restored target and keeps the current conversation when target loading fails', async () => {
+    const { adapter, transport } = createAdapter();
+    transport.failedResumeThreadIds.add('thread-b');
+
+    await expect(adapter.resumeConversation(agentA, {
+      ref: { backend: 'codex', threadId: 'thread-b' },
+      storageState: 'archived',
+    })).rejects.toThrow('Cannot resume thread-b');
+
+    const resumes = transport.sent.filter((message) => 'method' in message && message.method === 'thread/resume');
+    expect(resumes).toHaveLength(2);
+    expect(resumes[0]).toMatchObject({ params: { threadId: 'thread-b' } });
+    expect(resumes[1]).toMatchObject({ params: { threadId: 'thread-a' } });
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({ params: { threadId: 'thread-b' } });
+  });
+
+  it('archives unowned top-level Codex conversations during reconciliation', async () => {
+    const { adapter, transport } = createAdapter();
+
+    await adapter.reconcileConversations([agentA]);
+
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({ params: { threadId: 'thread-b' } });
+  });
+
+  it('unarchives a still-referenced conversation during reconciliation', async () => {
+    const { adapter, transport } = createAdapter();
+    const agentB = createAgent('agent-b', 'thread-b', '/workspace/b');
+
+    await adapter.reconcileConversations([agentB]);
+
+    expect(lastRequest(transport, 'thread/unarchive')).toMatchObject({ params: { threadId: 'thread-b' } });
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({ params: { threadId: 'thread-a' } });
   });
 
   it('creates new agent conversations as user threads in their assigned folder', async () => {
@@ -1806,7 +1878,10 @@ describe('CodexSurfaceAgentAdapter', () => {
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.resumeConversation(agentA, 'thread-a');
+    await adapter.resumeConversation(agentA, {
+      ref: { backend: 'codex', threadId: 'thread-a' },
+      storageState: 'active',
+    });
     const cachedHandle = surface.conversation('thread-a');
     adapter.forgetAgentSession(agentA.id);
     expect(surface.conversation('thread-a')).not.toBe(cachedHandle);

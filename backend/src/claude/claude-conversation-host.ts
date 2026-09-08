@@ -11,6 +11,7 @@ import type {
   ClientRequestResponse,
   ClaudeConversationEvent,
   ClaudeConversationSnapshot,
+  ConversationResumeTarget,
   ConversationSummary,
   RendererMessage,
   RendererToolPart,
@@ -328,7 +329,8 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     });
   }
 
-  async resumeConversation(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult> {
+  async resumeConversation(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult> {
+    const ref = target.ref;
     if (ref.backend !== 'claude') {
       throw new Error('Claude cannot resume non-Claude conversation history.');
     }

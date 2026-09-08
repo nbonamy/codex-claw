@@ -16,6 +16,8 @@ import type {
   BackendSkillSummary,
   ClientRequestResponse,
   ConversationSummary,
+  ConversationListInput,
+  ConversationResumeTarget,
   DevicePairingSession,
   DevicePairingStatus,
   MainToRendererEvent,
@@ -101,12 +103,14 @@ export type AgentBackendDriver = {
   setApprovalPreset?(agent: Agent, preset: ApprovalPreset): Promise<BackendApprovalPresetResult>;
   setPermissionMode?(agent: Agent, mode: string): Promise<BackendPermissionModeResult>;
   forgetAgentSession?(agentId: string): void;
+  archiveAgentConversation?(agent: Agent): Promise<void>;
+  reconcileConversations?(agents: Agent[]): Promise<void>;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToRequest(response: ClientRequestResponse): Promise<void>;
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>;
   loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;
-  listConversations?(agent: Agent): Promise<ConversationSummary[]>;
-  resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>;
+  listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>;
+  resumeConversation?(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult>;
   compressSession?(agent: Agent): Promise<BackendSessionCompressionResult>;
   forkConversation?(agent: Agent, targetAgent: Agent, turnId?: string): Promise<BackendConversationForkResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;

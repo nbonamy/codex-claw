@@ -219,6 +219,7 @@ describe('ClawBackendServer', () => {
     snapshot.agents = [agent];
     snapshot.activeAgentId = agent.id;
     const forgetAgentSession = vi.fn();
+    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -228,6 +229,7 @@ describe('ClawBackendServer', () => {
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
       forgetAgentSession,
+      archiveAgentConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -245,6 +247,9 @@ describe('ClawBackendServer', () => {
       params: { agentId: agent.id },
     })).resolves.toMatchObject({ result: { agents: [] } });
 
+    expect(archiveAgentConversation).toHaveBeenCalledWith(expect.objectContaining({
+      backendSession: { kind: 'codex', threadId: 'thread-dina' },
+    }));
     expect(forgetAgentSession).toHaveBeenCalledWith(agent.id);
     expect(snapshot.agents).toStrictEqual([]);
     expect(saveSnapshot).toHaveBeenCalledOnce();
@@ -544,6 +549,7 @@ describe('ClawBackendServer', () => {
       title: 'Read docs',
       updatedAt: '2026-06-09T10:00:00.000Z',
       messageCount: 3,
+      storageState: 'active' as const,
       ref: { backend: 'codex' as const, threadId: 'thread-dina' },
     }];
     const messages = [{
@@ -584,6 +590,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:01.000Z',
       messageCount: 1,
+      storageState: 'active' as const,
       ref,
     }));
     const driver: AgentBackendDriver = {
@@ -687,7 +694,7 @@ describe('ClawBackendServer', () => {
     expect(listModels).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(listPlugins).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(listSkills).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(listConversations).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(listConversations).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), undefined);
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-child' }, 'agent-dina');
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-grandchild' }, 'agent-dina');

@@ -305,6 +305,7 @@ export const messages = {
     },
     sessions: {
       current: 'Current',
+      archived: 'Archived',
       currentTitle: 'Current session',
       filter: 'Filter sessions',
       loading: 'Loading sessions…',

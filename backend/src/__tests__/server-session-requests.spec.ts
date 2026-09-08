@@ -12,6 +12,116 @@ import {
 
 describe('ClawBackendServer', () => {
 
+  it('reconciles unowned Codex conversations once before serving snapshots', async () => {
+    const snapshot = createTestSnapshot();
+    const reconcileConversations = vi.fn().mockResolvedValue(undefined);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
+      respondToRequest: async () => undefined,
+      reconcileConversations,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await server.handleMessage({ jsonrpc: '2.0', id: 'snapshot-1', method: 'snapshot/get' });
+    await server.handleMessage({ jsonrpc: '2.0', id: 'snapshot-2', method: 'snapshot/get' });
+
+    expect(reconcileConversations).toHaveBeenCalledOnce();
+    expect(reconcileConversations).toHaveBeenCalledWith(snapshot.agents.filter((agent) => agent.backend === 'codex'));
+    await server.close();
+  });
+
+  it('keeps the current session attached when restart archiving fails', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-current' }, status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const forgetAgentSession = vi.fn();
+    const saveSnapshot = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
+      respondToRequest: async () => undefined,
+      archiveAgentConversation: async () => { throw new Error('Archive failed'); },
+      forgetAgentSession,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot, saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'restart-agent', method: 'agent/restart', params: { agentId: 'agent-dina' },
+    })).rejects.toThrow('Archive failed');
+
+    expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-current' });
+    expect(forgetAgentSession).not.toHaveBeenCalled();
+    expect(saveSnapshot).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('restores the previous provider session when persisting a switch fails', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-old' }, status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const resumeConversation = vi.fn()
+      .mockResolvedValueOnce({ backendSession: { kind: 'codex', threadId: 'thread-new' } })
+      .mockResolvedValueOnce({ backendSession: { kind: 'codex', threadId: 'thread-old' } });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-old' } }),
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-old' } }),
+      respondToRequest: async () => undefined,
+      resumeConversation,
+      reconcileConversations: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version', snapshot, saveSnapshot: vi.fn().mockRejectedValue(new Error('Disk full')),
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'resume-agent', method: 'agent/conversation/resume',
+      params: {
+        agentId: 'agent-dina',
+        target: { ref: { backend: 'codex', threadId: 'thread-new' }, storageState: 'archived' },
+      },
+    })).rejects.toThrow('Disk full');
+
+    expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-old' });
+    expect(resumeConversation).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      backendSession: { kind: 'codex', threadId: 'thread-new' },
+    }), {
+      ref: { backend: 'codex', threadId: 'thread-old' },
+      storageState: 'archived',
+    });
+    await server.close();
+  });
+
   it('owns agent restart and conversation resume mutations', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -27,6 +137,8 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     const forgetAgentSession = vi.fn();
+    const archivedAgents: unknown[] = [];
+    const archiveAgentConversation = vi.fn(async (agent) => { archivedAgents.push(structuredClone(agent)); });
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-new' },
     });
@@ -42,6 +154,7 @@ describe('ClawBackendServer', () => {
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
       forgetAgentSession,
+      archiveAgentConversation,
       compressSession,
       resumeConversation,
       setConversationTitle,
@@ -72,7 +185,13 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'resume-agent',
       method: 'agent/conversation/resume',
-      params: { agentId: 'agent-dina', ref: { backend: 'codex', threadId: 'thread-new' } },
+      params: {
+        agentId: 'agent-dina',
+        target: {
+          ref: { backend: 'codex', threadId: 'thread-new' },
+          storageState: 'archived',
+        },
+      },
     })).resolves.toMatchObject({
       result: {
         agents: [{ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-new' } }],
@@ -90,7 +209,13 @@ describe('ClawBackendServer', () => {
     });
 
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
-    expect(resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), { backend: 'codex', threadId: 'thread-new' });
+    expect(archivedAgents).toContainEqual(expect.objectContaining({
+      backendSession: { kind: 'codex', threadId: 'thread-old' },
+    }));
+    expect(resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
+      ref: { backend: 'codex', threadId: 'thread-new' },
+      storageState: 'archived',
+    });
     expect(compressSession).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-dina',
     }));

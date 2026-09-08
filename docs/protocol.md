@@ -128,7 +128,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/fork` | `{ agentId, turnId? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at a stable turn id, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
-| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
+| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Archives the attached provider conversation when supported, then removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
@@ -147,12 +147,12 @@ This keeps the synchronization barrier bounded even for very long threads.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `agent/restart` | `{ agentId }` | `AppSnapshot` | Forgets the provider session reference and releases its live conversation host. |
+| `agent/restart` | `{ agentId }` | `AppSnapshot` | Archives the attached provider conversation when supported, then forgets its reference and releases the live conversation host. |
 | `agent/session/compress` | `{ agentId }` | `AppSnapshot` | For an idle Codex agent, creates a replacement conversation, submits the generated handoff as hidden context in its initial prompt, archives the old conversation only after that prompt is accepted, and updates the persisted provider reference. Provider transcripts remain SDK-owned. |
 | `agent/history/hydrate` | `{ agentId }` | `AppSnapshot` | Lazily restores provider-owned session state without selecting the agent; the conversation arrives in a provider snapshot frame. |
 | `agent/history/load-older` | `{ agentId }` | `{ hasOlder }` | Asks the provider owner to load one older history page; the result arrives through provider-native deltas. |
-| `agent/conversations/list` | `{ agentId }` | `ConversationSummary[]` | Lists provider history through the active agent backend. |
-| `agent/conversation/resume` | `{ agentId, ref: BackendConversationRef }` | `AppSnapshot` | Validates backend match and idle status, updates the provider reference, and publishes a provider conversation reset. |
+| `agent/conversations/list` | `{ agentId, input?: { searchTerm?, limit? } }` | `ConversationSummary[]` | Searches provider history through the active agent backend. Codex returns the current active row plus archived rows, tagged by `storageState`. |
+| `agent/conversation/resume` | `{ agentId, target: ConversationResumeTarget }` | `AppSnapshot` | Validates backend match and idle status, restores an archived target when needed, archives the displaced conversation, updates the provider reference, and publishes a provider conversation reset. |
 | `agent/conversation/messages/get` | `{ agentId, ref }` | `RendererMessage[]` | Reads historical messages through the owning backend. |
 | `agent/prompt/send` | `{ agentId, prompt, options? }` | `AppSnapshot` | Starts a backend turn when idle, or appends to the backend-owned per-agent queue while busy. |
 | `agent/prompt/steer` | `{ agentId, prompt }` | `AppSnapshot` | Sends active-turn steering through the provider owner; provider events update the conversation replica. |

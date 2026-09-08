@@ -4,7 +4,7 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendSessionCompressionResult } from '@codex-claw/core/backend-driver';
@@ -116,6 +116,7 @@ export class ClawBackendServer {
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
+  private conversationsReconciliation?: Promise<void>;
 
   constructor(options: ClawBackendServerOptions) {
     this.version = options.version;
@@ -206,6 +207,10 @@ export class ClawBackendServer {
     });
     this.agentGitWorkflows = new AgentGitWorkflowService({
       applyEvent: (event) => this.applyAndEmitBackendEvent(event),
+      archiveSession: async (agent) => {
+        if (!agent.backendSession) return;
+        await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+      },
       delegatedWorkReports: this.delegatedWorkReports,
       driverRequest: (agent, method, params) => this.handleAgentDriverRequest(agent, method, params),
       forgetSession: async (agent) => {
@@ -252,6 +257,7 @@ export class ClawBackendServer {
       case backendMethods.snapshotGet:
         await this.initializeSourceFolderIfNeeded();
         await this.ensureRemoteControlStatus();
+        void this.reconcileConversationsOnce();
         await this.agentWorkspaces.reconcile();
         void this.subagentIdentities.backfill();
         const snapshot = await this.remoteTeams.clientSnapshot();
@@ -706,6 +712,7 @@ export class ClawBackendServer {
             );
           }
           if (existingAgent.backendSession) {
+            await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent: existingAgent });
             await this.driverRpc?.handle(backendMethods.driverSessionForget, {
               backend: existingAgent.backend,
               agentId,
@@ -755,8 +762,13 @@ export class ClawBackendServer {
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentSkillsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverSkillsList, { agent }));
       }
       case backendMethods.agentConversationsList: {
-        const agentId = requireAgentId(message.params);
-        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentConversationsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverConversationsList, { agent }));
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const input = conversationListInput(params.input);
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentConversationsList, { agentId, input }, async (agent) => {
+          await this.reconcileConversationsOnce();
+          return this.handleAgentDriverRequest(agent, backendMethods.driverConversationsList, { agent, input });
+        });
       }
       case backendMethods.agentConversationMessagesGet: {
         const params = requireRecord(message.params);
@@ -825,8 +837,11 @@ export class ClawBackendServer {
       case backendMethods.agentRestart: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentRestart, { agentId }, async (agent) => {
-          restartAgentConversation(this.snapshot, agentId);
+          if (agent.backendSession) {
+            await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+          }
           await this.driverRpc?.handle(backendMethods.driverSessionForget, { backend: agent.backend, agentId });
+          restartAgentConversation(this.snapshot, agentId);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -846,24 +861,55 @@ export class ClawBackendServer {
       case backendMethods.agentConversationResume: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        const ref = params.ref;
-        if (!isBackendConversationRef(ref)) {
+        const target = params.target as ConversationResumeTarget | undefined;
+        const ref = target?.ref;
+        if (!target || !isBackendConversationRef(ref) || (target.storageState !== 'active' && target.storageState !== 'archived')) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
         }
-        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentConversationResume, { agentId, ref }, async (agent) => {
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentConversationResume, { agentId, target }, async (agent) => {
+          await this.reconcileConversationsOnce();
           if (ref.backend !== agent.backend) {
             throw new Error('Conversation backend does not match the agent backend.');
           }
           if (agent.status.type !== 'idle') {
             throw new Error('Agent must be idle before resuming a conversation.');
           }
-          const result = await this.handleAgentDriverRequest(agent, backendMethods.driverConversationResume, { agent, ref }) as BackendConversationResumeResult;
+          const previousAgent = structuredClone(agent);
+          const previousRef = conversationRefFromAgent(previousAgent);
+          const result = await this.handleAgentDriverRequest(agent, backendMethods.driverConversationResume, { agent, target }) as BackendConversationResumeResult;
           const resumedAgent = resumeAgentConversationInSnapshot(this.snapshot, agentId, result.backendSession);
           if (!resumedAgent) {
             throw new Error(`Agent not found: ${agentId}`);
           }
           this.agentConversations.setTitle(resumedAgent.id);
-          return this.persistAndEmitSnapshot();
+          try {
+            return await this.persistAndEmitSnapshot();
+          } catch (error) {
+            const switchedAgent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+            if (switchedAgent) {
+              if (previousRef) {
+                await this.handleAgentDriverRequest(switchedAgent, backendMethods.driverConversationResume, {
+                  agent: switchedAgent,
+                  target: { ref: previousRef, storageState: 'archived' },
+                }).catch((rollbackError) => warnMain('sessions', 'conversation switch rollback failed', {
+                  detail: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                }));
+              } else {
+                await this.handleAgentDriverRequest(switchedAgent, backendMethods.driverConversationArchive, {
+                  agent: switchedAgent,
+                }).catch((rollbackError) => warnMain('sessions', 'new conversation rollback failed', {
+                  detail: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                }));
+                await this.driverRpc?.handle(backendMethods.driverSessionForget, {
+                  backend: switchedAgent.backend,
+                  agentId,
+                });
+              }
+            }
+            const agentIndex = this.snapshot.agents.findIndex((candidate) => candidate.id === agentId);
+            if (agentIndex >= 0) this.snapshot.agents[agentIndex] = previousAgent;
+            throw error;
+          }
         });
       }
       case backendMethods.agentSessionCompress: {
@@ -1183,6 +1229,19 @@ export class ClawBackendServer {
           });
           this.remoteTeams.rememberSnapshot(pointer.connectionId, remoteSnapshot);
           this.ensureLocalFallbackBeforeRemovingTeam(teamId);
+        } else if (existingTeam) {
+          const agents = existingTeam.agentIds
+            .map((agentId) => this.snapshot.agents.find((candidate) => candidate.id === agentId))
+            .filter((agent): agent is Agent => agent !== undefined && agent.backendSession !== undefined);
+          for (const agent of agents) {
+            await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+          }
+          for (const agent of agents) {
+            await this.driverRpc?.handle(backendMethods.driverSessionForget, {
+              backend: agent.backend,
+              agentId: agent.id,
+            });
+          }
         }
         const team = closeTeamInSnapshot(this.snapshot, teamId);
         if (!team) {
@@ -1855,6 +1914,27 @@ export class ClawBackendServer {
     await this.requireDriverRpc().handle(backendMethods.agentFolderValidate, { folder });
   }
 
+  private async reconcileConversationsOnce(): Promise<void> {
+    if (!this.driverRpc) return;
+    if (this.conversationsReconciliation) return this.conversationsReconciliation;
+    const reconciliation = (async () => {
+      const localCodexAgents = this.snapshot.agents.filter((agent) => agent.backend === 'codex' && !this.remoteTeams.connectionIdForAgent(agent));
+      try {
+        await this.driverRpc!.handle(backendMethods.driverConversationsReconcile, {
+          backend: 'codex',
+          agents: localCodexAgents,
+        });
+      } catch (error) {
+        this.conversationsReconciliation = undefined;
+        warnMain('sessions', 'conversation archive reconciliation failed', {
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+    this.conversationsReconciliation = reconciliation;
+    return reconciliation;
+  }
+
   private async initializeSourceFolderIfNeeded(): Promise<void> {
     if ((this.snapshot.sourceFolder.initialized && this.snapshot.sourceFolder.path.trim()) || !this.driverRpc) {
       return;
@@ -2490,6 +2570,24 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     candidate.folder.trim().length > 0 &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
+}
+
+function conversationListInput(value: unknown): ConversationListInput | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid conversation list input.');
+  }
+  const record = value as Record<string, unknown>;
+  if (record.searchTerm !== undefined && typeof record.searchTerm !== 'string') {
+    throw new Error('Conversation search term must be a string.');
+  }
+  if (record.limit !== undefined && (!Number.isInteger(record.limit) || Number(record.limit) < 1)) {
+    throw new Error('Conversation list limit must be a positive integer.');
+  }
+  return {
+    ...(typeof record.searchTerm === 'string' ? { searchTerm: record.searchTerm } : {}),
+    ...(typeof record.limit === 'number' ? { limit: record.limit } : {}),
+  };
 }
 
 function planReviewPreview(markdown: string): { title: AppText; content: string } {

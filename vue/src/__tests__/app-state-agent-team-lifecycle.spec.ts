@@ -681,7 +681,10 @@ describe('useAppState', () => {
     await expect(state.deleteAutomation('missing')).resolves.toBeUndefined();
     await expect(state.readConversationMessages({ backend: 'codex', threadId: 'thread' }, 'agent-dina')).resolves.toStrictEqual([]);
     await expect(state.listAgentConversations('agent-dina')).resolves.toStrictEqual([]);
-    await state.resumeAgentConversation('agent-dina', { backend: 'codex', threadId: 'thread' });
+    await state.resumeAgentConversation('agent-dina', {
+      ref: { backend: 'codex', threadId: 'thread' },
+      storageState: 'archived',
+    });
     await state.updateSettings({});
     await state.setCodexResourceSharing({ enabled: true });
     await expect(state.getPluginStatus()).resolves.toStrictEqual({ chromeEnabled: false });

@@ -188,9 +188,12 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });
     const forgetAgentSession = vi.fn();
+    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
+    const reconcileConversations = vi.fn().mockResolvedValue(undefined);
     const respondToRequest = vi.fn().mockResolvedValue(undefined);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
       clearGoal,
+      archiveAgentConversation,
       compressSession,
       forgetAgentSession,
       forkConversation,
@@ -199,6 +202,7 @@ describe('BackendDriverRpc', () => {
       deleteTurn,
       editTurn,
       retryTurn,
+      reconcileConversations,
       resumeConversation,
       setApprovalPreset,
       setGoal,
@@ -238,7 +242,8 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-updated' },
       activeTurnId: 'turn-new',
     });
-    await expect(rpc.handle('driver/conversation/resume', { agent, ref })).resolves.toStrictEqual({
+    const target = { ref, storageState: 'archived' as const };
+    await expect(rpc.handle('driver/conversation/resume', { agent, target })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
     });
     await expect(rpc.handle('driver/session/compress', { agent })).resolves.toStrictEqual({
@@ -251,6 +256,8 @@ describe('BackendDriverRpc', () => {
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });
     await expect(rpc.handle('driver/session/forget', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
+    await expect(rpc.handle('driver/conversation/archive', { agent })).resolves.toBeNull();
+    await expect(rpc.handle('driver/conversations/reconcile', { backend: 'codex', agents: [agent] })).resolves.toBeNull();
     await expect(rpc.handle('driver/clientRequest/respond', {
       backend: 'codex',
       response: { id: 'approval-1', payload: { decision: 'allow' } },
@@ -264,11 +271,13 @@ describe('BackendDriverRpc', () => {
     expect(deleteTurn).toHaveBeenCalledWith(agent, 'turn-1');
     expect(editTurn).toHaveBeenCalledWith(agent, 'turn-1', 'edited');
     expect(retryTurn).toHaveBeenCalledWith(agent, 'turn-1');
-    expect(resumeConversation).toHaveBeenCalledWith(agent, ref);
+    expect(resumeConversation).toHaveBeenCalledWith(agent, target);
     expect(compressSession).toHaveBeenCalledWith(agent);
     expect(forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
     expect(forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 'turn-5');
     expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(archiveAgentConversation).toHaveBeenCalledWith(agent);
+    expect(reconcileConversations).toHaveBeenCalledWith([agent]);
     expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
   });
 

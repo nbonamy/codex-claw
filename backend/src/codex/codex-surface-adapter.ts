@@ -10,6 +10,8 @@ import type {
   BackendRuntimeStatus,
   BackendSkillSummary,
   ClientRequestResponse,
+  ConversationListInput,
+  ConversationResumeTarget,
   ConversationSummary,
   DevicePairingSession,
   DevicePairingStatus,
@@ -457,9 +459,26 @@ export class CodexSurfaceAgentAdapter {
     return { hasOlder: page.hasOlder };
   }
 
-  async listConversations(agent: Agent): Promise<ConversationSummary[]> {
-    const conversations = await this.surface.listConversations({ ...agentCwd(agent), limit: 30 });
-    for (const conversation of conversations) {
+  async listConversations(agent: Agent, input: ConversationListInput = {}): Promise<ConversationSummary[]> {
+    const limit = input.limit ?? 100;
+    const options = {
+      ...agentCwd(agent),
+      limit,
+      ...(input.searchTerm?.trim() ? { searchTerm: input.searchTerm.trim() } : {}),
+    };
+    const [active, archived] = await Promise.all([
+      this.surface.listConversations(options),
+      this.surface.listConversations({ ...options, archived: true }),
+    ]);
+    const currentThreadId = codexThreadId(agent);
+    const conversations = [
+      ...active.filter((conversation) => conversation.id === currentThreadId).map((conversation) => ({ conversation, storageState: 'active' as const })),
+      ...archived.map((conversation) => ({ conversation, storageState: 'archived' as const })),
+    ].sort((left, right) => {
+      if (left.storageState !== right.storageState) return left.storageState === 'active' ? -1 : 1;
+      return right.conversation.updatedAt.localeCompare(left.conversation.updatedAt);
+    });
+    for (const { conversation } of conversations) {
       this.conversationSummaries.set(conversation.id, conversation);
       const owner = this.subagentOwners.get(conversation.id);
       const session = owner ? this.sessionsByAgentId.get(owner.agentId) : undefined;
@@ -467,14 +486,58 @@ export class CodexSurfaceAgentAdapter {
         this.emitSubagentIdentity(session, conversation);
       }
     }
-    return conversations.map(conversationSummary);
+    return conversations.map(({ conversation, storageState }) => conversationSummary(conversation, storageState));
   }
 
-  async resumeConversation(agent: Agent, threadId: string) {
-    await this.bindAndLoad(agent, threadId);
+  async resumeConversation(agent: Agent, target: ConversationResumeTarget) {
+    if (target.ref.backend !== 'codex') throw new Error('Codex cannot resume a non-Codex conversation.');
+    const threadId = target.ref.threadId;
+    const previousThreadId = codexThreadId(agent);
+    const targetWasArchived = target.storageState === 'archived';
+    if (targetWasArchived) await this.surface.unarchiveConversation(threadId);
+    try {
+      await this.bindAndLoad(agent, threadId);
+      if (previousThreadId && previousThreadId !== threadId) {
+        await this.surface.archiveConversation(previousThreadId);
+      }
+    } catch (error) {
+      if (previousThreadId && previousThreadId !== threadId) {
+        await this.bindAndLoad(agent, previousThreadId).catch(() => undefined);
+      }
+      if (targetWasArchived) {
+        await this.surface.archiveConversation(threadId).catch(() => undefined);
+      }
+      throw error;
+    }
     return {
       threadId,
     };
+  }
+
+  async archiveAgentConversation(agent: Agent): Promise<void> {
+    const threadId = codexThreadId(agent);
+    if (!threadId) return;
+    await this.surface.archiveConversation(threadId);
+  }
+
+  async reconcileConversations(agents: Agent[]): Promise<void> {
+    const retainedThreadIds = new Set(agents.flatMap((agent) => {
+      const threadId = codexThreadId(agent);
+      return threadId ? [threadId] : [];
+    }));
+    const [active, archived] = await Promise.all([
+      this.surface.listConversations(),
+      this.surface.listConversations({ archived: true }),
+    ]);
+    for (const conversation of archived) {
+      if (retainedThreadIds.has(conversation.id)) {
+        await this.surface.unarchiveConversation(conversation.id);
+      }
+    }
+    for (const conversation of active) {
+      if (conversation.parentConversationId || retainedThreadIds.has(conversation.id)) continue;
+      await this.surface.archiveConversation(conversation.id);
+    }
   }
 
   async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string) {
@@ -1256,7 +1319,10 @@ function epochTimestampToIso(value: bigint): string {
   return date.toISOString();
 }
 
-function conversationSummary(conversation: CodexConversationSummary): ConversationSummary {
+function conversationSummary(
+  conversation: CodexConversationSummary,
+  storageState: ConversationSummary['storageState'] = 'active',
+): ConversationSummary {
   return {
     id: conversation.id,
     ...(conversation.sessionId ? { sessionId: conversation.sessionId } : {}),
@@ -1269,6 +1335,7 @@ function conversationSummary(conversation: CodexConversationSummary): Conversati
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
     messageCount: conversation.turnCount,
+    storageState,
     ref: { backend: 'codex', threadId: conversation.id },
   };
 }

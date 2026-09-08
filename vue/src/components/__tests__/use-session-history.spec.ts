@@ -1,7 +1,7 @@
 import { effectScope, ref } from 'vue';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Agent, BackendConversationRef, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@codex-claw/core/contracts';
 import { relativeSessionDate, useSessionHistory } from '../use-session-history';
 
 const agent: Agent = {
@@ -22,6 +22,7 @@ const sessions: ConversationSummary[] = [
     title: 'Current work',
     updatedAt: '2026-06-10T09:30:00.000Z',
     messageCount: 12,
+    storageState: 'active',
     ref: { backend: 'codex', threadId: 'thread-current' },
   },
   {
@@ -29,6 +30,7 @@ const sessions: ConversationSummary[] = [
     title: 'Older work',
     updatedAt: '2026-06-10T09:00:00.000Z',
     messageCount: 4,
+    storageState: 'archived',
     ref: { backend: 'codex', threadId: 'thread-old' },
   },
   {
@@ -37,6 +39,7 @@ const sessions: ConversationSummary[] = [
     title: 'Scout',
     updatedAt: '2026-06-10T09:45:00.000Z',
     messageCount: 2,
+    storageState: 'archived',
     ref: { backend: 'codex', threadId: 'thread-child' },
   },
 ];
@@ -55,7 +58,7 @@ describe('useSessionHistory', () => {
     const { history } = createHistory({ listConversations });
     await flushPromises();
 
-    expect(listConversations).toHaveBeenCalledWith('agent-dina');
+    expect(listConversations).toHaveBeenCalledWith('agent-dina', { searchTerm: '', limit: 100 });
     expect(history.sessions.value.map((session) => session.id)).toStrictEqual(['thread-current', 'thread-old']);
     expect(history.isCurrentSession(sessions[0]!)).toBe(true);
     expect(history.canResume(sessions[0]!)).toBe(false);
@@ -77,7 +80,10 @@ describe('useSessionHistory', () => {
     await flushPromises();
 
     await expect(history.resume(sessions[1]!)).resolves.toBe(true);
-    expect(resumeConversation).toHaveBeenCalledWith('agent-dina', { backend: 'codex', threadId: 'thread-old' });
+    expect(resumeConversation).toHaveBeenCalledWith('agent-dina', {
+      ref: { backend: 'codex', threadId: 'thread-old' },
+      storageState: 'archived',
+    });
 
     agentRef.value = { ...agentRef.value, status: { type: 'working' } };
     await expect(history.resume(sessions[1]!)).resolves.toBe(false);
@@ -101,8 +107,8 @@ describe('useSessionHistory', () => {
 });
 
 function createHistory(overrides: {
-  listConversations?: (agentId: string) => Promise<ConversationSummary[]>;
-  resumeConversation?: (agentId: string, ref: BackendConversationRef) => Promise<void>;
+  listConversations?: (agentId: string, input?: ConversationListInput) => Promise<ConversationSummary[]>;
+  resumeConversation?: (agentId: string, target: ConversationResumeTarget) => Promise<void>;
 } = {}) {
   const agentRef = ref(agent);
   const visible = ref(true);

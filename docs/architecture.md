@@ -371,8 +371,10 @@ type AgentBackendDriver = {
   interrupt(agent: Agent): Promise<BackendSendResult>
   respondToRequest(response: ClientRequestResponse): Promise<void>
   hydrateAgent?(agent: Agent): Promise<BackendSession | null>
-  listConversations?(agent: Agent): Promise<ConversationSummary[]>
-  resumeConversation?(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult>
+  archiveAgentConversation?(agent: Agent): Promise<void>
+  reconcileConversations?(agents: Agent[]): Promise<void>
+  listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>
+  resumeConversation?(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult>
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>
   steerPrompt?(agent: Agent, prompt: string): Promise<BackendSendResult>
   rollbackToTurn?(agent: Agent, turnId: string): Promise<BackendRollbackResult>
@@ -383,9 +385,13 @@ type AgentBackendDriver = {
 }
 ```
 
-Closing a Claw agent removes app-owned state and releases its live runtime but
-does not archive or delete the provider conversation. The conversation remains
-available in its provider's history.
+For providers with archive support, every live agent owns exactly one
+non-archived conversation. Restart and close archive the attached conversation
+before clearing app-owned state. Startup reconciliation archives unreferenced
+top-level conversations in the provider home through the driver and restores
+any archived conversation still referenced by a live agent. Resume searches
+archived history and performs a compensating switch: restore and load the
+target, archive the displaced conversation, then persist the new reference.
 
 `BackendEvent` is produced by backend drivers inside `clawd`. Coordination
 events use app-owned payloads. Conversation traffic uses app-owned outer frames
@@ -419,10 +425,10 @@ renderer UI. The required path is:
 
 Conversation history is the canonical example. The searchable Resume Session
 dialog opened from the sidebar agent menu renders `ConversationSummary` rows
-and sends a `BackendConversationRef` to main. Codex implements that with
-`thread/list` and `thread/resume`; Claude implements it by scanning local JSONL
-transcripts and resuming a session id. The renderer does not know either
-storage model.
+and sends a `ConversationResumeTarget` to main. Codex implements that with the
+SDK's active/archived lists, unarchive, archive, and resume operations; Claude
+implements it by scanning local JSONL transcripts and resuming a session id.
+The renderer knows only the app-owned `storageState`, not either storage model.
 
 ### Preload
 
@@ -447,8 +453,8 @@ type CodexClawApi = {
   selectTeam(teamId: string): Promise<AppSnapshot>
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>
-  listAgentConversations(agentId: string): Promise<ConversationSummary[]>
-  resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>
+  listAgentConversations(agentId: string, input?: ConversationListInput): Promise<ConversationSummary[]>
+  resumeAgentConversation(agentId: string, target: ConversationResumeTarget): Promise<AppSnapshot>
   duplicateAgent(agentId: string): Promise<AppSnapshot>
   forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>

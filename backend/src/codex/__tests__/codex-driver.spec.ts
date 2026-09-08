@@ -215,6 +215,7 @@ describe('CodexBackendDriver', () => {
       title: 'hello',
       updatedAt: '2026-06-09T10:00:00.000Z',
       messageCount: 1,
+      storageState: 'active' as const,
       ref: { backend: 'codex' as const, threadId: 'thread-dina' },
     }];
     const sessionManager = createSessionManager({
@@ -231,11 +232,12 @@ describe('CodexBackendDriver', () => {
     const driver = new CodexBackendDriver(sessionManager);
 
     await expect(driver.listConversations(agent)).resolves.toStrictEqual(conversations);
-    await expect(driver.resumeConversation(agent, { backend: 'codex', threadId: 'thread-dina' })).resolves.toStrictEqual({
+    const target = { ref: { backend: 'codex' as const, threadId: 'thread-dina' }, storageState: 'archived' as const };
+    await expect(driver.resumeConversation(agent, target)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
     });
-    expect(sessionManager.listConversations).toHaveBeenCalledWith(agent);
-    expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, 'thread-dina');
+    expect(sessionManager.listConversations).toHaveBeenCalledWith(agent, undefined);
+    expect(sessionManager.resumeConversation).toHaveBeenCalledWith(agent, target);
     await expect(driver.forkConversation(agent, targetAgent)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });

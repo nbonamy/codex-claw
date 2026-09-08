@@ -276,6 +276,7 @@ describe('AppController', () => {
       title: 'Read docs',
       updatedAt: '2026-06-09T10:00:00.000Z',
       messageCount: 3,
+      storageState: 'archived',
       ref: { backend: 'codex', threadId: 'thread-dina' },
     }];
     const request = vi.fn().mockResolvedValue(conversations);
@@ -284,7 +285,7 @@ describe('AppController', () => {
     await controller.initialize();
 
     await expect(listAgentConversations(controller, 'agent-dina')).resolves.toStrictEqual(conversations);
-    expect(request).toHaveBeenCalledWith('agent/conversations/list', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/conversations/list', { agentId: 'agent-dina', input: undefined });
   });
 
   it('routes agent conversation resume through clawd', async () => {
@@ -296,13 +297,13 @@ describe('AppController', () => {
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
-    const ref = { backend: 'codex' as const, threadId: 'thread-dina' };
+    const target = { ref: { backend: 'codex' as const, threadId: 'thread-dina' }, storageState: 'archived' as const };
 
     await controller.initialize();
 
-    await expect(resumeAgentConversation(controller, 'agent-dina', ref)).resolves.toBe(backendSnapshot);
+    await expect(resumeAgentConversation(controller, 'agent-dina', target)).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', ref });
+    expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', target });
   });
 
   it('lets clawd validate busy agent conversation resume', async () => {
@@ -310,12 +311,12 @@ describe('AppController', () => {
     snapshot.agents[0].status = { type: 'working' };
     const request = vi.fn().mockRejectedValue(new Error('Agent must be idle before resuming a conversation.'));
     const controller = new AppController(snapshot, createBackendClient({ request }));
-    const ref = { backend: 'codex' as const, threadId: 'thread-dina' };
+    const target = { ref: { backend: 'codex' as const, threadId: 'thread-dina' }, storageState: 'archived' as const };
 
     await controller.initialize();
 
-    await expect(resumeAgentConversation(controller, 'agent-dina', ref)).rejects.toThrow('Agent must be idle before resuming a conversation.');
-    expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', ref });
+    await expect(resumeAgentConversation(controller, 'agent-dina', target)).rejects.toThrow('Agent must be idle before resuming a conversation.');
+    expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', target });
   });
 
   it('lets clawd reject unrecorded historical conversation refs', async () => {
@@ -455,11 +456,11 @@ async function listAgentConversations(
 async function resumeAgentConversation(
   controller: AppController,
   agentId: string,
-  ref: BackendConversationRef,
+  target: import('@codex-claw/core/contracts').ConversationResumeTarget,
 ): Promise<AppSnapshot> {
   return (controller as unknown as {
-    resumeAgentConversation(agentId: string, ref: unknown): Promise<AppSnapshot>;
-  }).resumeAgentConversation(agentId, ref);
+    resumeAgentConversation(agentId: string, target: unknown): Promise<AppSnapshot>;
+  }).resumeAgentConversation(agentId, target);
 }
 
 async function steerPrompt(

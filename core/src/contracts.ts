@@ -78,6 +78,8 @@ import type {
   ClientRequest,
   ClientRequestResponse,
   ConfirmToolRequest,
+  ConversationListInput,
+  ConversationResumeTarget,
   ConversationSummary,
   PromptAttachment,
   RendererMessage,
@@ -219,6 +221,9 @@ export type {
   ClientRequest,
   ClientRequestResponse,
   ConfirmToolRequest,
+  ConversationListInput,
+  ConversationResumeTarget,
+  ConversationStorageState,
   ConversationFileLink,
   ConversationSummary,
   PromptAttachment,
@@ -1114,8 +1119,8 @@ export type CodexClawApi = {
   clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
   deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot>;
   deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot>;
-  listAgentConversations(agentId: string): Promise<ConversationSummary[]>;
-  resumeAgentConversation(agentId: string, ref: BackendConversationRef): Promise<AppSnapshot>;
+  listAgentConversations(agentId: string, input?: ConversationListInput): Promise<ConversationSummary[]>;
+  resumeAgentConversation(agentId: string, target: ConversationResumeTarget): Promise<AppSnapshot>;
   readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;

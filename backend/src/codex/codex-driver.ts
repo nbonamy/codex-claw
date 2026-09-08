@@ -10,6 +10,8 @@ import type {
   BackendSession,
   BackendSkillSummary,
   ClientRequestResponse,
+  ConversationListInput,
+  ConversationResumeTarget,
   ConversationSummary,
   RendererMessage,
   SendPromptOptions,
@@ -259,19 +261,27 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.readConversationSummary(agent, ref.threadId);
   }
 
-  async listConversations(agent: Agent): Promise<ConversationSummary[]> {
-    return this.sessionManager.listConversations(agent);
+  async listConversations(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]> {
+    return this.sessionManager.listConversations(agent, input);
   }
 
-  async resumeConversation(agent: Agent, ref: BackendConversationRef): Promise<BackendConversationResumeResult> {
-    if (ref.backend !== 'codex') {
+  async resumeConversation(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult> {
+    if (target.ref.backend !== 'codex') {
       throw new Error('Codex cannot resume non-Codex conversation history.');
     }
 
-    const result = await this.sessionManager.resumeConversation(agent, ref.threadId);
+    const result = await this.sessionManager.resumeConversation(agent, target);
     return {
       backendSession: codexBackendSession(result.threadId),
     };
+  }
+
+  async archiveAgentConversation(agent: Agent): Promise<void> {
+    await this.sessionManager.archiveAgentConversation(agent);
+  }
+
+  async reconcileConversations(agents: Agent[]): Promise<void> {
+    await this.sessionManager.reconcileConversations(agents);
   }
 
   async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string): Promise<BackendConversationForkResult> {
