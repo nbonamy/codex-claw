@@ -4,6 +4,52 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.17.0] - 2026-09-08
+
+### New features
+
+- Compress Session starts a fresh conversation with a condensed handoff of
+  completed work, key decisions, and next steps. The original conversation is
+  archived, and the new session keeps the agent's model and reasoning settings.
+- Closing or restarting a Codex agent now archives its retired session. Resume
+  Session searches both active and archived conversations in the agent's folder
+  and restores archived sessions when selected.
+- Save favorite model, reasoning-effort, and speed combinations directly from
+  the model menu. Favorites can be reordered or removed in a dedicated dialog.
+- The bundled Codex runtime now includes GPT-6-Astra where available to your
+  account.
+
+### Improvements and fixes
+
+- Codex conversations now group assistant work by turn, with clearer separation
+  between intermediate activity and the final response.
+- Improved conversation loading after restart, with automatic retries for
+  transient failures and a visible Retry screen when history cannot be loaded.
+  Missing optional skill metadata no longer prevents conversations from loading.
+- Editing, deleting, retrying, and forking conversation turns now use the
+  provider's authoritative history. Long rollback operations have more time to
+  finish, and action failures remain visible without discarding the session.
+- Fixed first-prompt and Thinking indicator flicker during new conversation
+  creation, duplicate user messages, and duplicate compaction indicators.
+- Restored queued prompts above the composer, cancellation, and follow-up
+  actions. Model selection keeps the menu open to choose reasoning effort, and
+  favorites correctly apply Fast mode.
+- Merge now checks that branches include the latest target-branch commit
+  before merging. Squash-merge cleanup no longer prevents a
+  requested push, and merge and pull-request dialogs warn about uncommitted work.
+- Automated work selection now considers eligible items across the configured
+  repositories before creating agents and isolated worktrees. Completed workers
+  remain available for review or continuation.
+- Spoken acknowledgments can be limited to dictated prompts, and acknowledgments
+  that will not play are labeled as skipped. Celebrations only play for the
+  selected agent.
+- Agent headers avoid repeating unnamed agents' branch names and show their
+  repository context immediately after creation. Update badges no longer appear
+  while merely checking for updates.
+- Removed the obsolete Bench, legacy backlog and issue-creation screens, and
+  Prepare Work flow. Temporarily hidden the unstable current-turn diff summary
+  above the composer.
+
 ## [0.16.0] - 2026-09-03
 
 ### New features

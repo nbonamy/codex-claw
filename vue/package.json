@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/vue",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Reusable Vue product shell for Codex Claw hosts.",
   "private": true,
   "type": "module",
@@ -30,7 +30,7 @@
   "dependencies": {
     "@codex-app-sdk/core": "file:../../codex-app-sdk/packages/core",
     "@codex-app-sdk/vue": "file:../../codex-app-sdk/packages/vue",
-    "@codex-claw/core": "0.16.0",
+    "@codex-claw/core": "0.17.0",
     "@tabler/icons-vue": "^3.44.0",
     "canvas-confetti": "^1.9.4",
     "element-plus": "^2.13.6",
