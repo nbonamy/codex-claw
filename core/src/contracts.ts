@@ -2,6 +2,7 @@ import type {
   AgentBackend,
   AppText,
   ApprovalPreset,
+  ReasoningEffort,
 } from './contracts/shared';
 import type {
   CodexConversationEvent,
@@ -441,6 +442,13 @@ export type SpokenAnnouncementQueueResult = {
   reason?: 'suppressed' | 'unsupported' | 'rateLimited' | 'superseded';
 };
 
+export type ModelFavorite = {
+  backend: AgentBackend;
+  modelId: string;
+  reasoningEffort: ReasoningEffort | null;
+  serviceTier: string | null;
+};
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
@@ -455,6 +463,7 @@ export type AppGeneralSettings = {
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
   collapsedRepositoryKeys: string[];
+  modelFavorites: ModelFavorite[];
   shareCodexSkillsAndPlugins: boolean;
   worktreeInitializationMode: WorktreeInitializationMode;
   sessionCompressionWarningEnabled: boolean;

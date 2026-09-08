@@ -988,6 +988,12 @@ describe('AppStatePersistence', () => {
       claudeCodeEnabled: true,
       agentListCompact: true,
       collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
+      modelFavorites: [{
+        backend: 'codex',
+        modelId: 'gpt-5.6-terra',
+        reasoningEffort: 'high',
+        serviceTier: 'priority',
+      }],
       shareCodexSkillsAndPlugins: false,
       sessionCompressionWarningEnabled: false,
       worktreeInitializationMode: 'repository',

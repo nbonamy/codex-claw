@@ -1,4 +1,4 @@
-import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
+import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
 
 export const defaultPluginSettings: AppPluginSettings = {
@@ -26,6 +26,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   claudeCodeEnabled: false,
   agentListCompact: false,
   collapsedRepositoryKeys: [],
+  modelFavorites: [],
   shareCodexSkillsAndPlugins: true,
   worktreeInitializationMode: 'automatic',
   sessionCompressionWarningEnabled: true,
@@ -114,6 +115,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     claudeCodeEnabled: value.claudeCodeEnabled === true,
     agentListCompact: value.agentListCompact === true,
     collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
+    modelFavorites: normalizeModelFavorites(value.modelFavorites),
     shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
     worktreeInitializationMode: normalizeWorktreeInitializationMode(value.worktreeInitializationMode),
     sessionCompressionWarningEnabled: value.sessionCompressionWarningEnabled !== false,
@@ -154,6 +156,40 @@ function normalizeStringList(value: unknown, maximum: number): string[] {
     .map((candidate) => candidate.trim())
     .filter((candidate) => candidate.length > 0 && candidate.length <= 4_096))]
     .slice(0, maximum);
+}
+
+function normalizeModelFavorites(value: unknown): ModelFavorite[] {
+  if (!Array.isArray(value)) return [];
+  const favorites: ModelFavorite[] = [];
+  const seen = new Set<string>();
+  for (const candidate of value) {
+    if (!isRecord(candidate)) continue;
+    const backend = candidate.backend === 'codex' || candidate.backend === 'claude'
+      ? candidate.backend
+      : null;
+    const modelId = normalizeFavoriteValue(candidate.modelId);
+    const reasoningEffort = candidate.reasoningEffort === null
+      ? null
+      : normalizeFavoriteValue(candidate.reasoningEffort);
+    const normalizedServiceTier = candidate.serviceTier === null
+      ? null
+      : normalizeFavoriteValue(candidate.serviceTier);
+    const serviceTier = normalizedServiceTier === 'default' ? null : normalizedServiceTier;
+    if (!backend || !modelId || reasoningEffort === undefined || serviceTier === undefined) continue;
+    const favorite: ModelFavorite = { backend, modelId, reasoningEffort, serviceTier };
+    const key = JSON.stringify(favorite);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    favorites.push(favorite);
+    if (favorites.length >= 20) break;
+  }
+  return favorites;
+}
+
+function normalizeFavoriteValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized && normalized.length <= 256 ? normalized : undefined;
 }
 
 export function normalizeAppshotSettings(value: unknown): AppshotSettings {

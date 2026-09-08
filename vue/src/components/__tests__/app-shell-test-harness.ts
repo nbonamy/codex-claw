@@ -11,7 +11,7 @@ import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
@@ -88,6 +88,10 @@ export async function clickPortaledMenuItem(label: string): Promise<void> {
 export function mountShell(overrides: Partial<{
   snapshot: AppSnapshot;
   agentFiles: AgentFileSearchItem[];
+  backendModels: BackendModelOption[];
+  selectedModelId: string | null;
+  selectedReasoningEffort: ReasoningEffort | null;
+  selectedServiceTier: string | null;
   previewAgentFile: (agentId: string, path: string) => Promise<AgentFilePreviewResult>;
   unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
@@ -145,6 +149,10 @@ export function mountShell(overrides: Partial<{
       activeAgent: snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId) ?? null,
       unreadAgentIds: overrides.unreadAgentIds ?? [],
       agentFiles: overrides.agentFiles ?? [],
+      backendModels: overrides.backendModels ?? [],
+      selectedModelId: overrides.selectedModelId ?? null,
+      selectedReasoningEffort: overrides.selectedReasoningEffort ?? null,
+      selectedServiceTier: overrides.selectedServiceTier ?? null,
       codexConversationSnapshot: overrides.codexConversationSnapshot ?? null,
       claudeConversationSnapshot: overrides.claudeConversationSnapshot ?? null,
       isLoading: false,

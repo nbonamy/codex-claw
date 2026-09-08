@@ -13,6 +13,7 @@ export {
   IconArrowsVertical as ArrowsVerticalIcon,
   IconBrandOpenai as BrandOpenaiIcon,
   IconBrandSpeedtest as BrandSpeedTest,
+  IconBolt as BoltIcon,
   IconCheck as CheckIcon,
   IconChevronDown as ChevronDown,
   IconChevronRight as ChevronRightIcon,

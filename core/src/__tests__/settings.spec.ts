@@ -29,6 +29,7 @@ describe('settings contracts', () => {
       spokenAnnouncementScope: 'all',
       spokenAnnouncementVoice: 'bf_emma',
       collapsedRepositoryKeys: [],
+      modelFavorites: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
@@ -118,6 +119,7 @@ describe('settings contracts', () => {
       spokenAnnouncementScope: 'selected',
       spokenAnnouncementVoice: 'af_heart',
       collapsedRepositoryKeys: [],
+      modelFavorites: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
@@ -161,6 +163,23 @@ describe('settings contracts', () => {
     expect(normalizeGeneralSettings({
       collapsedRepositoryKeys: [' remote:github.com/openai/codex ', '', 'remote:github.com/openai/codex'],
     }).collapsedRepositoryKeys).toStrictEqual(['remote:github.com/openai/codex']);
+  });
+
+  it('normalizes and deduplicates model favorites', () => {
+    expect(normalizeGeneralSettings({
+      modelFavorites: [
+        { backend: 'codex', modelId: ' terra ', reasoningEffort: ' medium ', serviceTier: ' priority ' },
+        { backend: 'codex', modelId: 'terra', reasoningEffort: 'medium', serviceTier: 'priority' },
+        { backend: 'codex', modelId: 'sol', reasoningEffort: 'high', serviceTier: 'default' },
+        { backend: 'claude', modelId: 'sonnet', reasoningEffort: null, serviceTier: null },
+        { backend: 'missing', modelId: 'ignored', reasoningEffort: null, serviceTier: null },
+        { backend: 'codex', modelId: '', reasoningEffort: null, serviceTier: null },
+      ],
+    }).modelFavorites).toStrictEqual([
+      { backend: 'codex', modelId: 'terra', reasoningEffort: 'medium', serviceTier: 'priority' },
+      { backend: 'codex', modelId: 'sol', reasoningEffort: 'high', serviceTier: null },
+      { backend: 'claude', modelId: 'sonnet', reasoningEffort: null, serviceTier: null },
+    ]);
   });
 
   it('normalizes worktree initialization policy', () => {

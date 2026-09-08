@@ -284,6 +284,13 @@
       :resume-conversation="resumeAgentConversation"
       @close="resumeSessionAgentId = null"
     />
+    <ModelFavoritesDialog
+      :favorites="managedModelFavorites"
+      :models="backendModels"
+      :visible="modelFavoritesDialogVisible"
+      @change="updateManagedModelFavorites"
+      @close="modelFavoritesDialogVisible = false"
+    />
     <AgentDialog
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
@@ -364,7 +371,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -389,6 +396,7 @@ import AgentWorkspace from './AgentWorkspace.vue';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
+import ModelFavoritesDialog from './ModelFavoritesDialog.vue';
 import type { SettingsTab } from './settings-tabs';
 import {
   createCodexConversationPaneController,
@@ -407,7 +415,15 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
-import { ShieldCheckIcon } from '../shared/icons/app-icons';
+import { BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
+import {
+  copyModelFavorite,
+  modelFavoriteEffortLabel,
+  modelFavoriteFastTierLabel,
+  modelFavoriteKey,
+  modelFavoriteModelLabel,
+  sameModelFavorite,
+} from './model-favorites';
 import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
 import { useRepositorySession } from './use-repository-session';
@@ -720,6 +736,8 @@ const agentWorkspace = ref<{
 } | null>(null);
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
+const modelFavoritesDialogVisible = ref(false);
+const modelFavoritesDialogBackend = ref<ModelFavorite['backend'] | null>(null);
 const resumeSessionAgentId = ref<string | null>(null);
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
@@ -1169,6 +1187,87 @@ const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
     items: modes.map((mode) => permissionModeMenuItem(mode, props.permissionMode)),
   }];
 });
+const currentModelFavorite = computed<ModelFavorite | null>(() => {
+  const agent = currentAgent.value;
+  const model = props.backendModels.find((candidate) => candidate.id === props.selectedModelId)
+    ?? props.backendModels.find((candidate) => candidate.isDefault)
+    ?? props.backendModels[0]
+    ?? null;
+  if (!agent || !model) return null;
+  return {
+    backend: agent.backend,
+    modelId: model.id,
+    reasoningEffort: props.selectedReasoningEffort
+      ?? model.defaultReasoningEffort
+      ?? model.supportedReasoningEfforts?.[0]?.reasoningEffort
+      ?? null,
+    serviceTier: props.selectedServiceTier === 'default' ? null : props.selectedServiceTier,
+  };
+});
+const visibleModelFavorites = computed(() => {
+  const agent = currentAgent.value;
+  if (!agent) return [];
+  const availableModelIds = new Set(props.backendModels.map((model) => model.id));
+  return props.snapshot.general.modelFavorites.filter((favorite) => (
+    favorite.backend === agent.backend && availableModelIds.has(favorite.modelId)
+  ));
+});
+const managedModelFavorites = computed(() => (
+  modelFavoritesDialogBackend.value
+    ? props.snapshot.general.modelFavorites.filter((favorite) => favorite.backend === modelFavoritesDialogBackend.value)
+    : []
+));
+const modelFavoriteMenuItems = computed<CodexComposerMenuItem[]>(() => {
+  const current = currentModelFavorite.value;
+  if (!current) return [];
+  const favorites = visibleModelFavorites.value;
+  const currentIsFavorite = favorites.some((favorite) => sameModelFavorite(favorite, current));
+  const items: CodexComposerMenuItem[] = [];
+  if (favorites.length > 0) {
+    items.push({
+      id: 'model-favorites-heading',
+      type: 'heading',
+      label: translate('surface.appShell.favorites'),
+      actions: [{
+        id: 'model-favorite-add',
+        type: 'action',
+        label: translate('surface.appShell.addCurrentToFavorites'),
+        icon: PlusIcon,
+        disabled: currentIsFavorite,
+        payload: { kind: 'model-favorite-add', favorite: current },
+      }, {
+        id: 'model-favorite-manage',
+        type: 'action',
+        label: translate('surface.appShell.manageFavorites'),
+        icon: PencilIcon,
+        payload: { kind: 'model-favorite-manage' },
+      }],
+    });
+    items.push(...favorites.map((favorite) => {
+      const fastTierLabel = modelFavoriteFastTierLabel(favorite, props.backendModels);
+      return {
+        closeOnSelect: true,
+        id: `model-favorite:${modelFavoriteKey(favorite)}`,
+        label: modelFavoriteModelLabel(favorite, props.backendModels),
+        payload: { kind: 'model-favorite-select', favorite },
+        type: 'action' as const,
+        value: modelFavoriteEffortLabel(favorite),
+        valueAppearance: 'badge' as const,
+        valueIcon: fastTierLabel ? BoltIcon : undefined,
+        valueIconLabel: fastTierLabel || undefined,
+      };
+    }));
+  } else {
+    items.push({
+      id: 'model-favorite-add',
+      type: 'action',
+      label: translate('surface.appShell.addCurrentToFavorites'),
+      icon: PlusIcon,
+      payload: { kind: 'model-favorite-add', favorite: current },
+    });
+  }
+  return items;
+});
 const conversationPaneState: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return conversationKey.value; },
@@ -1218,6 +1317,7 @@ const conversationPaneState: CodexConversationPaneState = {
     },
     get approvalPreset() { return props.approvalPreset; },
     get leadingMenuItems() { return permissionModeMenuItems.value; },
+    get modelMenuItems() { return modelFavoriteMenuItems.value; },
     get planMode() { return props.planMode; },
     get selectedModelId() { return props.selectedModelId; },
     get selectedReasoningEffort() { return props.selectedReasoningEffort; },
@@ -1255,6 +1355,11 @@ const conversationPaneActions: CodexConversationPaneActions = {
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   menuSelect: (item) => {
+    const favoriteCommand = modelFavoriteCommand(item.payload);
+    if (favoriteCommand) {
+      void handleModelFavoriteCommand(favoriteCommand);
+      return;
+    }
     const command = permissionModeCommand(item.payload);
     if (command) emit('select-permission-mode', command.mode);
   },
@@ -1277,6 +1382,56 @@ const conversationPaneActions: CodexConversationPaneActions = {
     if (settings.serviceTier !== undefined) emit('select-service-tier', settings.serviceTier);
   },
 };
+
+type ModelFavoriteCommand =
+  | { kind: 'model-favorite-add' | 'model-favorite-select'; favorite: ModelFavorite }
+  | { kind: 'model-favorite-manage' };
+
+function modelFavoriteCommand(payload: unknown): ModelFavoriteCommand | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+  const kind = record.kind;
+  if (kind === 'model-favorite-manage') return { kind };
+  if (kind !== 'model-favorite-add' && kind !== 'model-favorite-select') return null;
+  const favorite = record.favorite;
+  if (!favorite || typeof favorite !== 'object' || Array.isArray(favorite)) return null;
+  return { kind, favorite: copyModelFavorite(favorite as ModelFavorite) };
+}
+
+async function handleModelFavoriteCommand(command: ModelFavoriteCommand): Promise<void> {
+  if (command.kind === 'model-favorite-manage') {
+    modelFavoritesDialogBackend.value = currentAgent.value?.backend ?? null;
+    modelFavoritesDialogVisible.value = modelFavoritesDialogBackend.value !== null;
+    return;
+  }
+  if (command.kind === 'model-favorite-select') {
+    emit('select-model', command.favorite.modelId);
+    if (command.favorite.reasoningEffort !== null) {
+      emit('select-reasoning-effort', command.favorite.reasoningEffort);
+    }
+    emit('select-service-tier', command.favorite.serviceTier);
+    return;
+  }
+  const existing = props.snapshot.general.modelFavorites.map(copyModelFavorite);
+  const modelFavorites = [
+    ...existing.filter((favorite) => !sameModelFavorite(favorite, command.favorite)),
+    copyModelFavorite(command.favorite),
+  ];
+  await props.updateSettings({ general: { modelFavorites } });
+}
+
+async function updateManagedModelFavorites(favorites: ModelFavorite[]): Promise<void> {
+  const backend = modelFavoritesDialogBackend.value;
+  if (!backend) return;
+  const existing = props.snapshot.general.modelFavorites.map(copyModelFavorite);
+  const firstBackendIndex = existing.findIndex((favorite) => favorite.backend === backend);
+  const withoutBackend = existing.filter((favorite) => favorite.backend !== backend);
+  const insertionIndex = firstBackendIndex < 0
+    ? withoutBackend.length
+    : existing.slice(0, firstBackendIndex).filter((favorite) => favorite.backend !== backend).length;
+  withoutBackend.splice(insertionIndex, 0, ...favorites.map(copyModelFavorite));
+  await props.updateSettings({ general: { modelFavorites: withoutBackend } });
+}
 
 function permissionModeMenuItem(
   mode: BackendPermissionModeOption,
@@ -1316,6 +1471,7 @@ const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
+  || modelFavoritesDialogVisible.value
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value

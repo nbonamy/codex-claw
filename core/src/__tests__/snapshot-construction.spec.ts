@@ -171,6 +171,7 @@ function expectedEmptySnapshot(): AppSnapshot {
       claudeCodeEnabled: false,
       agentListCompact: false,
       collapsedRepositoryKeys: [],
+      modelFavorites: [],
       shareCodexSkillsAndPlugins: true,
       sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',
