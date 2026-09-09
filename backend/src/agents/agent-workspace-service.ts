@@ -13,6 +13,8 @@ export type AgentWorkspaceServiceOptions = {
 /** Owns workspace identity reconciliation and deduplicated Git status refreshes. */
 export class AgentWorkspaceService {
   private readonly gitStatusRefreshes = new Map<string, Promise<boolean>>();
+  private readonly scheduledGitRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
+  private closed = false;
   private reconciliation: Promise<void> | null = null;
 
   constructor(private readonly options: AgentWorkspaceServiceOptions) {}
@@ -60,12 +62,37 @@ export class AgentWorkspaceService {
   refreshGitStatus(agentId: string): Promise<boolean> {
     const existing = this.gitStatusRefreshes.get(agentId);
     if (existing) return existing;
+    const scheduled = this.scheduledGitRefreshes.get(agentId);
+    if (scheduled) clearTimeout(scheduled);
+    this.scheduledGitRefreshes.delete(agentId);
 
     const refresh = this.performGitStatusRefresh(agentId).finally(() => {
       if (this.gitStatusRefreshes.get(agentId) === refresh) this.gitStatusRefreshes.delete(agentId);
     });
     this.gitStatusRefreshes.set(agentId, refresh);
     return refresh;
+  }
+
+  scheduleGitStatusRefresh(agentId: string): void {
+    if (this.closed || this.scheduledGitRefreshes.has(agentId)) return;
+    const timer = setTimeout(() => {
+      void (async () => {
+        // A change arriving during a read must trigger a fresh read afterwards.
+        await this.gitStatusRefreshes.get(agentId);
+        this.scheduledGitRefreshes.delete(agentId);
+        if (!this.closed && this.options.getSnapshot().activeAgentId === agentId) {
+          await this.refreshGitStatus(agentId);
+        }
+      })().catch(() => { this.scheduledGitRefreshes.delete(agentId); });
+    }, 500);
+    timer.unref();
+    this.scheduledGitRefreshes.set(agentId, timer);
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const timer of this.scheduledGitRefreshes.values()) clearTimeout(timer);
+    this.scheduledGitRefreshes.clear();
   }
 
   private async performGitStatusRefresh(agentId: string): Promise<boolean> {

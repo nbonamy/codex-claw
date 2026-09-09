@@ -1643,6 +1643,7 @@ export class ClawBackendServer {
   }
 
   async close(): Promise<void> {
+    this.agentWorkspaces.close();
     this.delegatedWorkReports.close();
     this.agentPrompts.close();
     this.unsubscribeDriverEvents?.();
@@ -2001,7 +2002,11 @@ export class ClawBackendServer {
       }
     }
     if (event.agentId === this.snapshot.activeAgentId && shouldRefreshGitStatusForEvent(fullEvent)) {
-      void this.agentWorkspaces.refreshGitStatus(event.agentId);
+      if (providerConversationEventView(fullEvent).type === 'turn.completed') {
+        void this.agentWorkspaces.refreshGitStatus(event.agentId);
+      } else {
+        this.agentWorkspaces.scheduleGitStatusRefresh(event.agentId);
+      }
     }
   }
 
@@ -2620,7 +2625,16 @@ function shouldPersistSnapshotForEvent(event: MainToRendererEvent): boolean {
 }
 
 function shouldRefreshGitStatusForEvent(event: MainToRendererEvent): boolean {
-  return providerConversationEventView(event).type === 'turn.completed';
+  const view = providerConversationEventView(event);
+  if (view.type === 'turn.completed' || view.type === 'diff.updated' || view.type === 'conversation.diffUpdated') return true;
+  if (!isRecord(view.payload)) return false;
+  if (view.type === 'file.activity') {
+    return view.payload.status === 'completed' &&
+      (view.payload.action === 'edit' || view.payload.action === 'create' || view.payload.action === 'delete');
+  }
+  // Shell commands can mutate files without publishing structured file activity.
+  return view.type === 'tool.completed' && isRecord(view.payload.toolPart) &&
+    (view.payload.toolPart.kind === 'command' || view.payload.toolPart.kind === 'fileChange');
 }
 
 function clientStateFromSnapshot(snapshot: AppSnapshot, remoteControlStatus: DevicePairingStatus): ClientState {

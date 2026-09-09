@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -11,8 +11,10 @@ import {
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
+  afterEach(() => vi.useRealTimers());
 
-  it('refreshes git status only when the active agent turn completes', async () => {
+  it('coalesces active workspace changes during a turn and refreshes again at completion', async () => {
+    vi.useFakeTimers();
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina', 'agent-jesse'];
     snapshot.activeAgentId = 'agent-dina';
@@ -22,6 +24,11 @@ describe('ClawBackendServer', () => {
         teamId: 'team-test',
         name: 'Dina',
         folder: '/Users/nbonamy/src/codex-claw',
+        workspace: {
+          kind: 'git', folder: '/Users/nbonamy/src/codex-claw', repositoryName: 'codex-claw',
+          repositoryRoot: '/Users/nbonamy/src/codex-claw', branch: 'main', isLinkedWorktree: false,
+          primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw', updatedAt: '',
+        },
         backend: 'codex',
         status: { type: 'working' },
         backendSession: { kind: 'codex', threadId: 'thread-dina' },
@@ -104,6 +111,44 @@ describe('ClawBackendServer', () => {
       { status: 'completed' },
     ));
     await Promise.resolve();
+    expect(getGitStatus).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(getGitStatus).toHaveBeenCalledOnce();
+    expect(snapshot.agentGitStatuses['agent-dina']).toMatchObject({ addedLines: 3, removedLines: 1 });
+    getGitStatus.mockClear();
+
+    for (const action of ['edit', 'create']) {
+      emitEvent(codexConversationEvent('agent-dina', 'thread-dina', 'turn-test', 'file.activity', {
+        messageId: 'assistant-turn-test', itemId: 'file', path: '/repo/file', action, status: 'completed',
+      }));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(getGitStatus).toHaveBeenCalledOnce();
+      getGitStatus.mockClear();
+    }
+    emitEvent(codexConversationEvent('agent-dina', 'thread-dina', 'turn-test', 'conversation.diffUpdated', { diff: null }));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(getGitStatus).toHaveBeenCalledOnce();
+    getGitStatus.mockClear();
+
+    for (const kind of ['command', 'fileChange']) {
+      emitEvent(codexConversationEvent('agent-dina', 'thread-dina', 'turn-test', 'tool.completed', {
+        messageId: 'assistant-turn-test',
+        toolPart: { type: 'tool', id: kind, title: kind, kind, status: 'completed' },
+      }));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(getGitStatus).toHaveBeenCalledOnce();
+      getGitStatus.mockClear();
+    }
+    emitEvent(codexConversationEvent('agent-dina', 'thread-dina', 'turn-test', 'tool.completed', {
+      messageId: 'assistant-turn-test',
+      toolPart: { type: 'tool', id: 'search', title: 'search', kind: 'webSearch', status: 'completed' },
+    }));
+    for (const [action, status] of [['read', 'completed'], ['edit', 'running'], ['edit', 'failed']]) {
+      emitEvent(codexConversationEvent('agent-dina', 'thread-dina', 'turn-test', 'file.activity', {
+        messageId: 'assistant-turn-test', itemId: 'file', path: '/repo/file', action, status,
+      }));
+    }
+    await vi.advanceTimersByTimeAsync(500);
     expect(getGitStatus).not.toHaveBeenCalled();
 
     emitEvent({
