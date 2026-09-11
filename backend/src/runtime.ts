@@ -14,6 +14,7 @@ import { SshConnectionService } from './connections/ssh-connections';
 import { AutomationRunner } from './automations/runner';
 import { RuntimeScheduler } from './scheduling/runtime-scheduler';
 import { ClawMcpService } from './mcp/service';
+import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
 import { backendProviderTokensFilePath, ensureBackendCodexHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
@@ -64,6 +65,15 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     undefined,
     async (input) => (await worktreeManager.create(input)).worktree,
   );
+  const workIntegrations = new WorkIntegrationManager({
+    drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],
+    getSnapshot: () => snapshot,
+    openExternal: (url) => options.requestClient(backendMethods.clientExternalOpen, { url }),
+    saveSnapshot: () => saveBackendSnapshot(snapshot),
+    tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
+  });
+  await workIntegrations.hydrateConnections();
+  const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
   const mcpService = new ClawMcpService({
     snapshot,
     computerUse: computerUseAvailable ? {
@@ -77,6 +87,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       open: (input) => options.requestClient(backendMethods.clientBrowserOpen, input),
       execute: (input) => options.requestClient(backendMethods.clientBrowserExecute, input),
     } : undefined,
+    hostedMcpGateway,
     queueSpokenAnnouncement: (input) => options.requestClient(backendMethods.clientSpokenAnnouncementQueue, input),
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
     worktreeManager,
@@ -84,20 +95,13 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
+    hostedMcpServerUrls: () => mcpService.hostedMcpServerUrls(),
     generalSettings: snapshot.general,
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
   let server: ClawBackendServer;
-  const workIntegrations = new WorkIntegrationManager({
-    drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],
-    getSnapshot: () => snapshot,
-    openExternal: (url) => options.requestClient(backendMethods.clientExternalOpen, { url }),
-    saveSnapshot: () => saveBackendSnapshot(snapshot),
-    tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
-  });
-  await workIntegrations.hydrateConnections();
   const automationRunner = new AutomationRunner({
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,

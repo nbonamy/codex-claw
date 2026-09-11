@@ -35,8 +35,21 @@ export class WorkIntegrationManager {
     for (const provider of providers) {
       const driver = this.driver(provider);
       const connection = this.snapshot().workBacklog.connections.find((candidate) => candidate.provider === provider);
-      const token = await this.options.tokenStore.get(provider);
-      if (token) {
+      const storedToken = await this.options.tokenStore.get(provider);
+      if (storedToken) {
+        let token = storedToken;
+        if (tokenNeedsRefresh(token)) {
+          try {
+            token = await this.refreshConnectedToken(provider, token);
+          } catch {
+            changed = this.setConnection({
+              provider,
+              status: 'disconnected',
+              detail: { key: 'workProvider.authorizationExpired', params: { provider: providerLabel(provider) } },
+            }) || changed;
+            continue;
+          }
+        }
         changed = this.setConnection({
           provider,
           status: 'connected',
@@ -102,6 +115,20 @@ export class WorkIntegrationManager {
 
   async githubConnected(): Promise<boolean> {
     return Boolean(await this.options.tokenStore.get('github'));
+  }
+
+  isConnected(provider: WorkProviderKind): boolean {
+    return this.snapshot().workBacklog.connections.some(
+      (connection) => connection.provider === provider && connection.status === 'connected',
+    );
+  }
+
+  async authorizationHeader(
+    provider: WorkProviderKind,
+    options: { forceRefresh?: boolean } = {},
+  ): Promise<string> {
+    const token = await this.connectedToken(provider, options.forceRefresh === true);
+    return `${token.tokenType || 'Bearer'} ${token.accessToken}`;
   }
 
   async connect(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
@@ -294,7 +321,7 @@ export class WorkIntegrationManager {
     return null;
   }
 
-  private async connectedToken(provider: WorkProviderKind): Promise<WorkProviderToken> {
+  private async connectedToken(provider: WorkProviderKind, forceRefresh = false): Promise<WorkProviderToken> {
     const token = await this.options.tokenStore.get(provider);
     if (!token) {
       this.setConnection({
@@ -306,14 +333,25 @@ export class WorkIntegrationManager {
       throw new Error(`${providerLabel(provider)} is not connected.`);
     }
 
-    if (!tokenNeedsRefresh(token)) return token;
+    if (!forceRefresh && !tokenNeedsRefresh(token)) return token;
 
+    try {
+      return await this.refreshConnectedToken(provider, token);
+    } catch (error) {
+      await this.markReconnectRequired(provider);
+      throw error;
+    }
+  }
+
+  private async refreshConnectedToken(
+    provider: WorkProviderKind,
+    token: WorkProviderToken,
+  ): Promise<WorkProviderToken> {
     const existingRefresh = this.tokenRefreshes.get(provider);
     if (existingRefresh) return existingRefresh;
 
     const driver = this.driver(provider);
     if (!driver.refreshToken || !token.refreshToken || refreshTokenExpired(token)) {
-      await this.markReconnectRequired(provider);
       throw new Error(`${providerLabel(provider)} needs to be reconnected.`);
     }
 
@@ -321,10 +359,6 @@ export class WorkIntegrationManager {
       .then(async (refreshedToken) => {
         await this.options.tokenStore.set(refreshedToken);
         return refreshedToken;
-      })
-      .catch(async (error: unknown) => {
-        await this.markReconnectRequired(provider);
-        throw error;
       })
       .finally(() => {
         if (this.tokenRefreshes.get(provider) === refresh) {

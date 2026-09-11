@@ -1,9 +1,10 @@
-# MCP Server
+# MCP Servers
 
-Codex Claw owns a local MCP server for agent-to-agent collaboration. This is an
-app collaboration surface, not a Codex-specific protocol. Codex is the first
-backend client, but a future Claude Code backend should use the same Claw MCP
-tools where possible and translate only the backend-specific enablement path.
+Codex Claw owns local MCP endpoints for agent-to-agent collaboration and for
+credentialed access to provider-hosted MCP servers. These are app surfaces,
+not Codex-specific protocols. Codex and Claude receive the same Claw-owned
+endpoints through their session-local configuration; each backend translates
+only that configuration into its native launch contract.
 
 ## Boundary
 
@@ -15,6 +16,10 @@ side panel. The renderer never talks to MCP directly.
 Backend responsibilities:
 
 - start and stop the MCP server;
+- proxy installed provider-hosted MCP servers without exposing credentials to
+  Codex, Claude, or renderer state;
+- obtain provider credentials from the existing work integration and refresh
+  them before an upstream request or once after an upstream `401`;
 - expose only tools backed by real Claw product behavior;
 - keep message inboxes and connection state;
 - enforce team visibility;
@@ -60,10 +65,67 @@ Auxiliary endpoints:
 - `GET /health` returns a simple health response.
 - `GET /` returns debug agent state for local development.
 - `POST /mcp` handles MCP requests.
+- `/mcp/providers/<provider>` transparently proxies the provider's Streamable
+  HTTP MCP endpoint when that provider is installed and connected.
 
 `GET /mcp` and `DELETE /mcp` are rejected because the current implementation is
 stateless per HTTP request while Claw's process-local coordinator owns the
 collaboration state.
+
+Provider endpoints preserve Streamable HTTP methods, session headers, response
+content types, and response bodies. They replace any caller authorization with
+a current Claw-owned provider credential. The upstream token never appears in
+backend session config, MCP tool input/output, renderer state, or logs.
+
+## Hosted MCP Gateway
+
+Provider-hosted MCP servers are represented by a small backend-owned catalog.
+The catalog contains public transport facts such as the server id and upstream
+URL plus the work integration that owns its credential. It does not duplicate
+provider tool schemas or implement provider APIs. The gateway is a transparent
+reverse MCP proxy:
+
+```text
+Codex or Claude
+  -> agent-scoped Claw loopback MCP URL
+  -> clawd hosted MCP gateway
+  -> current credential from WorkIntegrationManager
+  -> provider-hosted MCP server
+```
+
+The first catalog entry is GitHub. Connecting the existing GitHub integration
+currently also installs its hosted MCP server. A newly started or resumed agent
+then receives a local server named `github`, preserving GitHub's native tool
+names under the backend's normal MCP namespace. Disconnecting GitHub disables
+the catalog entry for future session configuration; an already-running session
+keeps its local URL but calls fail until GitHub is reconnected.
+
+Claw also launches its Codex app-server with
+`plugins."github@openai-curated-remote".enabled=false`. This process-local
+override prevents the globally installed GitHub plugin from contributing a
+second GitHub tool surface inside Claw. It does not edit the shared Codex config
+or disable the plugin in ChatGPT and other Codex clients.
+
+For each Codex thread, Claw disables the ChatGPT GitHub connector only when the
+same thread receives Claw's authenticated `github` MCP proxy. If Claw has no
+usable GitHub integration, it leaves the ChatGPT connector enabled as a
+fallback so the model can still access GitHub even though Claw-specific GitHub
+features are unavailable. The choice is session-local and never changes the
+user's shared Codex or ChatGPT configuration.
+
+`WorkIntegrationManager` is the runtime credential authority. The gateway asks it
+for an authorization header on every upstream request, so the ordinary expiry
+check and concurrent refresh de-duplication apply to both Claw's GitHub product
+features and GitHub MCP calls. If GitHub MCP rejects a credential with `401`,
+the gateway asks the manager to rotate it and retries that request exactly once.
+Refresh failure marks the shared GitHub connection as requiring reconnection.
+
+Do not configure a provider's remote URL or bearer token directly in Codex,
+Claude, or user-global MCP settings. That would expose a rotating secret to the
+harness, split credential ownership, and make Claw unable to refresh an active
+session safely. Future Apps should add catalog/install state and provider auth
+adapters behind this gateway; they should not add provider-specific transcript,
+tool-schema, or API wrappers to the renderer.
 
 ## Backend Enablement
 
@@ -81,6 +143,17 @@ overrides, then passes the Claw MCP server through each agent's
   "mcp_servers.codex_claw.default_tools_approval_mode": "approve"
 }
 ```
+
+When GitHub is connected, the same extension also adds:
+
+```json
+{
+  "mcp_servers.github.url": "http://127.0.0.1:<port>/mcp/providers/github?agentId=<agent-id>"
+}
+```
+
+Only `codex_claw` collaboration tools receive Claw's automatic approval mode.
+Hosted provider tools keep the backend's normal approval behavior.
 
 The agent id in the MCP URL is the app's session-local caller identity. Tool
 calls infer the caller from the URL instead of asking the model to provide its
@@ -193,7 +266,8 @@ claude -p "<prompt>" \
 ```
 
 The `--allowed-tools` pattern authorizes only tools from the `codex_claw` MCP
-server.
+server. Connected hosted servers are added to `mcpServers`, but are not added to
+that allowlist, so their normal permission flow remains intact.
 
 `clawd` also adds developer instructions that give the backend agent its Claw
 agent ID/name/folder and advertise the product workflows models do not reliably
@@ -476,6 +550,11 @@ visible IDs, names, and folders so the agent can recover cleanly.
 ## Security
 
 - Bind to `127.0.0.1`.
+- Keep provider access and refresh tokens in the backend token store. Never put
+  them in harness configuration, query parameters, app snapshots, renderer
+  contracts, tool results, or logs.
+- Replace, rather than forward, any client-supplied `Authorization` header at
+  the hosted MCP boundary.
 - Do not expose filesystem, worktree, panel, or process-control tools until
   Claw owns those product capabilities. `display-markdown` is allowed because
   Claw now owns a constrained Markdown side panel and agent-folder-limited file
@@ -491,6 +570,8 @@ Cover MCP behavior at three layers:
 - coordinator contract tests for session connection, visibility, messaging,
   broadcasts, status, and errors;
 - Streamable HTTP MCP round-trip tests for tool listing and tool calls;
+- hosted gateway tests for header filtering, provider credential injection,
+  upstream session forwarding, and one-time refresh/retry after `401`;
 - backend session tests proving the MCP server URL and developer instructions
   are injected into backend session startup.
 

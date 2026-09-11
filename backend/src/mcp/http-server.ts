@@ -7,6 +7,7 @@ import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { createCodexClawMcpServer } from './tools';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
+import type { HostedMcpGateway, HostedMcpServerId } from './hosted-mcp-gateway';
 
 const maxBodyBytes = 1024 * 1024;
 
@@ -15,6 +16,7 @@ export type ClawMcpHttpServerOptions = {
   computerUse?: ComputerUseClient;
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
+  hostedMcpGateway?: HostedMcpGateway;
   host?: string;
   port?: number;
 };
@@ -24,6 +26,7 @@ export class ClawMcpHttpServer {
   private readonly computerUse: ComputerUseClient | undefined;
   private readonly computerUseEnabled: () => boolean;
   private readonly browser: InAppBrowserClient | undefined;
+  private readonly hostedMcpGateway: HostedMcpGateway | undefined;
   private readonly host: string;
   private readonly port: number;
   private server: http.Server | null = null;
@@ -34,6 +37,7 @@ export class ClawMcpHttpServer {
     this.computerUse = options.computerUse;
     this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
     this.browser = options.browser;
+    this.hostedMcpGateway = options.hostedMcpGateway;
     this.host = options.host ?? '127.0.0.1';
     this.port = options.port ?? 0;
   }
@@ -81,6 +85,11 @@ export class ClawMcpHttpServer {
     });
   }
 
+  hostedMcpServerUrls(): Record<string, string> {
+    if (!this.url || !this.hostedMcpGateway) return {};
+    return this.hostedMcpGateway.enabledServerUrls(this.url);
+  }
+
   private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? '/', `http://${this.host}`);
 
@@ -97,6 +106,12 @@ export class ClawMcpHttpServer {
 
       if (request.method === 'POST' && url.pathname === '/mcp') {
         await this.handleMcpPost(request, response, url);
+        return;
+      }
+
+      const hostedServerId = hostedMcpServerId(url.pathname);
+      if (hostedServerId && this.hostedMcpGateway?.hasServer(hostedServerId)) {
+        await this.handleHostedMcpRequest(request, response, url, hostedServerId);
         return;
       }
 
@@ -172,9 +187,53 @@ export class ClawMcpHttpServer {
       await closeTransport();
     }
   }
+
+  private async handleHostedMcpRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+    url: URL,
+    serverId: HostedMcpServerId,
+  ): Promise<void> {
+    const gateway = this.hostedMcpGateway;
+    if (!gateway) {
+      writeText(response, 404, 'Not found');
+      return;
+    }
+    const agentId = url.searchParams.get('agentId');
+    if (!agentId) {
+      writeJsonRpcError(response, 400, -32000, 'Bad Request: missing Codex Claw agent identity');
+      return;
+    }
+
+    const body = request.method === 'POST' ? await readBody(request) : undefined;
+    const startedAt = Date.now();
+    logMain('mcp-http', 'hosted request', { serverId, agentId, method: request.method });
+    const upstream = await gateway.forward(serverId, {
+      method: request.method ?? 'POST',
+      headers: new Headers(request.headers as Record<string, string>),
+      ...(body ? { body } : {}),
+    });
+    await writeUpstreamResponse(response, upstream);
+    logMain('mcp-http', 'hosted response', {
+      serverId,
+      agentId,
+      method: request.method,
+      status: upstream.status,
+      durationMs: Date.now() - startedAt,
+    });
+  }
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  const raw = (await readBody(request)).toString('utf8');
+  if (!raw.trim()) {
+    return undefined;
+  }
+
+  return JSON.parse(raw) as unknown;
+}
+
+async function readBody(request: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
@@ -187,12 +246,29 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
     chunks.push(buffer);
   }
 
-  const raw = Buffer.concat(chunks).toString('utf8');
-  if (!raw.trim()) {
-    return undefined;
-  }
+  return Buffer.concat(chunks);
+}
 
-  return JSON.parse(raw) as unknown;
+function hostedMcpServerId(pathname: string): string | null {
+  const match = /^\/mcp\/providers\/([^/]+)$/.exec(pathname);
+  return match?.[1] ?? null;
+}
+
+async function writeUpstreamResponse(response: ServerResponse, upstream: Response): Promise<void> {
+  const headers: Record<string, string> = {};
+  for (const name of ['cache-control', 'content-type', 'mcp-session-id'] as const) {
+    const value = upstream.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  response.writeHead(upstream.status, headers);
+  if (!upstream.body) {
+    response.end();
+    return;
+  }
+  for await (const chunk of upstream.body as unknown as AsyncIterable<Uint8Array>) {
+    response.write(Buffer.from(chunk));
+  }
+  response.end();
 }
 
 function isStatelessMcpRequest(body: unknown): boolean {

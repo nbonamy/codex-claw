@@ -11,6 +11,7 @@ export type ClaudeTurnParams = {
   permissionMode?: string | null;
   appendSystemPrompt?: string | null;
   mcpServerUrl?: string | null;
+  hostedMcpServerUrls?: Readonly<Record<string, string>>;
   allowedTools?: string[];
   attachments?: readonly PromptAttachment[];
 };

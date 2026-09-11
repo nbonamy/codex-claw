@@ -508,6 +508,9 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport, async () => null, {
       clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+      hostedMcpServerUrls: () => ({
+        github: 'http://127.0.0.1:4321/mcp/providers/github',
+      }),
       celebrationsEnabled: () => false,
     });
 
@@ -515,6 +518,9 @@ describe('ClaudeBackendDriver', () => {
 
     expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude',
+      hostedMcpServerUrls: {
+        github: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-claude',
+      },
       allowedTools: ['mcp__codex_claw__*'],
       appendSystemPrompt: expect.stringContaining('Use the codex_claw MCP server for agent collaboration.'),
     });

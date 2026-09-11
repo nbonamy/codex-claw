@@ -496,13 +496,21 @@ function claudeQueryOptions(
     ...(permissionMode ? { permissionMode } : {}),
     ...(permissionMode === 'bypassPermissions' ? { allowDangerouslySkipPermissions: true } : {}),
     ...(resumeSessionId ? { resume: resumeSessionId } : { sessionId }),
-    ...(params.mcpServerUrl
+    ...(params.mcpServerUrl || Object.keys(params.hostedMcpServerUrls ?? {}).length > 0
       ? {
           mcpServers: {
-            codex_claw: {
-              type: 'http',
-              url: params.mcpServerUrl,
-            },
+            ...(params.mcpServerUrl ? {
+              codex_claw: {
+                type: 'http' as const,
+                url: params.mcpServerUrl,
+              },
+            } : {}),
+            ...Object.fromEntries(
+              Object.entries(params.hostedMcpServerUrls ?? {}).map(([serverId, url]) => [
+                serverId,
+                { type: 'http' as const, url },
+              ]),
+            ),
           },
         }
       : {}),

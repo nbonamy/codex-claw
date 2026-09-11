@@ -116,6 +116,66 @@ describe('WorkIntegrationManager', () => {
     expect(saveSnapshot).toHaveBeenCalledOnce();
   });
 
+  it('refreshes an expired credential before hydrating it as connected', async () => {
+    const snapshot = createInitialSnapshot();
+    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    await tokenStore.set({
+      provider: 'github',
+      accessToken: 'ghu_expired',
+      tokenType: 'bearer',
+      expiresAt: '2026-07-31T00:00:00.000Z',
+      refreshToken: 'ghr_refresh_1',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    });
+    const refreshedToken: WorkProviderToken = {
+      provider: 'github',
+      accessToken: 'ghu_fresh',
+      tokenType: 'bearer',
+      expiresAt: '2099-08-02T00:00:00.000Z',
+      refreshToken: 'ghr_refresh_2',
+      accountLabel: 'nbonamy',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    };
+    const driver = fakeDriver({ refreshedToken });
+    const manager = createManager({ driver, snapshot, tokenStore });
+
+    await manager.hydrateConnections();
+
+    expect(driver.refreshToken).toHaveBeenCalledOnce();
+    expect(manager.isConnected('github')).toBe(true);
+    expect(snapshot.workBacklog.connections).toStrictEqual([{
+      provider: 'github',
+      status: 'connected',
+      accountLabel: 'nbonamy',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    }]);
+    await expect(tokenStore.get('github')).resolves.toStrictEqual(refreshedToken);
+  });
+
+  it('does not hydrate an expired unrefreshable credential as connected', async () => {
+    const snapshot = createInitialSnapshot();
+    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    await tokenStore.set({
+      provider: 'github',
+      accessToken: 'ghu_expired',
+      tokenType: 'bearer',
+      expiresAt: '2026-07-31T00:00:00.000Z',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    });
+    const manager = createManager({ snapshot, saveSnapshot, tokenStore });
+
+    await manager.hydrateConnections();
+
+    expect(manager.isConnected('github')).toBe(false);
+    expect(snapshot.workBacklog.connections).toStrictEqual([{
+      provider: 'github',
+      status: 'disconnected',
+      detail: { key: 'workProvider.authorizationExpired', params: { provider: 'GitHub' } },
+    }]);
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+  });
+
   it('rotates one expired token for concurrent provider requests', async () => {
     const snapshot = createInitialSnapshot();
     const tokenStore = new MemoryWorkIntegrationTokenStore();
@@ -150,6 +210,40 @@ describe('WorkIntegrationManager', () => {
     expect(driver.refreshToken).toHaveBeenCalledOnce();
     expect(driver.listRepositories).toHaveBeenCalledWith(refreshedToken);
     expect(driver.listItems).toHaveBeenCalledWith(refreshedToken, 'nbonamy/codex-claw');
+    await expect(tokenStore.get('github')).resolves.toStrictEqual(refreshedToken);
+  });
+
+  it('supplies backend-only authorization and can force rotation after a hosted MCP 401', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.workBacklog.connections = [{
+      provider: 'github',
+      status: 'connected',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    }];
+    const tokenStore = new MemoryWorkIntegrationTokenStore();
+    await tokenStore.set({
+      provider: 'github',
+      accessToken: 'ghu_current',
+      tokenType: 'bearer',
+      expiresAt: '2099-08-02T00:00:00.000Z',
+      refreshToken: 'ghr_refresh_1',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    });
+    const refreshedToken: WorkProviderToken = {
+      provider: 'github',
+      accessToken: 'ghu_rotated',
+      tokenType: 'bearer',
+      expiresAt: '2099-08-03T00:00:00.000Z',
+      refreshToken: 'ghr_refresh_2',
+      connectedAt: '2026-07-30T00:00:00.000Z',
+    };
+    const driver = fakeDriver({ refreshedToken });
+    const manager = createManager({ driver, snapshot, tokenStore });
+
+    expect(manager.isConnected('github')).toBe(true);
+    await expect(manager.authorizationHeader('github')).resolves.toBe('bearer ghu_current');
+    await expect(manager.authorizationHeader('github', { forceRefresh: true })).resolves.toBe('bearer ghu_rotated');
+    expect(driver.refreshToken).toHaveBeenCalledOnce();
     await expect(tokenStore.get('github')).resolves.toStrictEqual(refreshedToken);
   });
 

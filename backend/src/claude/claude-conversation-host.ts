@@ -95,6 +95,7 @@ type UnsequencedClaudeConversationEvent<Event extends ClaudeConversationEvent = 
 type ClaudeHistoryLoader = (agent: Agent) => Promise<ClaudeTranscriptHistory | null>;
 type ClaudeBackendDriverOptions = {
   clawMcpServerUrl?: string | null;
+  hostedMcpServerUrls?: () => Readonly<Record<string, string>>;
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
@@ -170,6 +171,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         options,
         existingSessionId,
         this.driverOptions.clawMcpServerUrl,
+        this.driverOptions.hostedMcpServerUrls?.(),
         this.driverOptions.pluginSettings?.(),
         {
           celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
@@ -546,6 +548,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
           {},
           sessionId,
           this.driverOptions.clawMcpServerUrl,
+          this.driverOptions.hostedMcpServerUrls?.(),
           this.driverOptions.pluginSettings?.(),
           {
             celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
@@ -1211,6 +1214,7 @@ function claudeTurnParams(
   options: SendPromptOptions,
   existingSessionId: string | null,
   clawMcpServerUrl: string | null | undefined,
+  hostedMcpServerUrls: Readonly<Record<string, string>> | undefined,
   pluginSettings?: AppPluginSettings,
   effects: AgentEffectInstructionSettings = {},
 ): ClaudeTurnParams {
@@ -1227,6 +1231,12 @@ function claudeTurnParams(
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
     appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings, effects),
     mcpServerUrl,
+    hostedMcpServerUrls: Object.fromEntries(
+      Object.entries(hostedMcpServerUrls ?? {}).map(([serverId, serverUrl]) => [
+        serverId,
+        agentScopedMcpUrl(serverUrl, agent.id),
+      ]),
+    ),
     allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
     ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),
   };

@@ -79,6 +79,9 @@ describe('ClaudeAgentSdkTransport', () => {
       permissionMode: 'default',
       appendSystemPrompt: 'Claw instructions',
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
+      hostedMcpServerUrls: {
+        github: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-1',
+      },
       allowedTools: ['mcp__codex_claw__*'],
     }, (message) => firstMessages.push(message));
 
@@ -99,6 +102,10 @@ describe('ClaudeAgentSdkTransport', () => {
         codex_claw: {
           type: 'http',
           url: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
+        },
+        github: {
+          type: 'http',
+          url: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-1',
         },
       },
       env: expect.objectContaining({

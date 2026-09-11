@@ -18,7 +18,14 @@ describe('codex-config', () => {
   it('enables the required event feature without creating a partial MCP server config', () => {
     expect(buildCodexClawMcpConfigOverrides()).toStrictEqual([
       'features.apply_patch_streaming_events=true',
+      'plugins."github@openai-curated-remote".enabled=false',
     ]);
+  });
+
+  it('disables the global GitHub plugin only in Claw app-server', () => {
+    expect(buildCodexClawMcpConfigOverrides()).toContain(
+      'plugins."github@openai-curated-remote".enabled=false',
+    );
   });
 
   it('enables the host bridge only when Chrome is enabled', () => {
@@ -36,6 +43,37 @@ describe('codex-config', () => {
       },
       developerInstructions: expect.stringContaining('Your Codex Claw agent ID is agent-dina.'),
     });
+  });
+
+  it('adds connected hosted MCP servers without auto-approving their tools', () => {
+    const config = buildCodexClawThreadConfig(
+      agent,
+      'http://127.0.0.1:8767/mcp',
+      undefined,
+      {},
+      { github: 'http://127.0.0.1:8767/mcp/providers/github' },
+    );
+
+    expect(config.config).toMatchObject({
+      'mcp_servers.github.url': 'http://127.0.0.1:8767/mcp/providers/github?agentId=agent-dina',
+      'apps.connector_76869538009648d5b282a4bb21c3d157.enabled': false,
+    });
+    expect(config.config).not.toHaveProperty('mcp_servers.github.default_tools_approval_mode');
+  });
+
+  it('keeps the ChatGPT GitHub connector available when Claw has no GitHub MCP connection', () => {
+    const config = buildCodexClawThreadConfig(
+      agent,
+      'http://127.0.0.1:8767/mcp',
+      undefined,
+      {},
+      {},
+    );
+
+    expect(config.config).not.toHaveProperty(
+      'apps.connector_76869538009648d5b282a4bb21c3d157.enabled',
+    );
+    expect(config.config).not.toHaveProperty('mcp_servers.github.url');
   });
 
   it('directs GUI automation to Claw MCP rather than the built-in Codex Computer Use skill', () => {

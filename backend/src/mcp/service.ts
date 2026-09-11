@@ -39,6 +39,7 @@ import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
+import type { HostedMcpGateway } from './hosted-mcp-gateway';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -49,6 +50,7 @@ export type ClawMcpServiceOptions = {
   computerUse?: ComputerUseClient;
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
+  hostedMcpGateway?: HostedMcpGateway;
   queueSpokenAnnouncement?: (input: SpokenAnnouncementRequest) => Promise<SpokenAnnouncementQueueResult>;
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
@@ -103,6 +105,7 @@ export class ClawMcpService {
       computerUse: options.computerUse,
       computerUseEnabled: this.computerUseEnabled,
       browser: options.browser,
+      hostedMcpGateway: options.hostedMcpGateway,
     });
   }
 
@@ -128,6 +131,10 @@ export class ClawMcpService {
 
   stop(): Promise<void> {
     return this.server.stop();
+  }
+
+  hostedMcpServerUrls(): Record<string, string> {
+    return this.server.hostedMcpServerUrls();
   }
 
   sendMessage(fromAgentId: string, toAgentId: string, content: string): void {

@@ -4,6 +4,7 @@
   "private": true,
   "devDependencies": {
     "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
     "knip": "6.33.0",
     "postcss-html": "^1.8.1",
@@ -56,17 +57,19 @@
     "release-notes:generate": "node scripts/release-notes.mjs generate",
     "start:electron": "npm run start -w @codex-claw/electron",
     "start:web": "npm run start -w @codex-claw/web",
-    "test": "npm run test --workspaces",
-    "test:ai": "npm run test --workspaces -- --silent --reporter=../scripts/vitest-ai-reporter.ts",
+    "test": "npm run test --workspaces && npm run test:scripts",
+    "test:ai": "npm run test --workspaces -- --silent --reporter=../scripts/vitest-ai-reporter.ts && npm run test:scripts",
     "test:coverage": "npm run test:coverage --workspaces",
     "test:coverage:electron": "npm run test:coverage -w @codex-claw/electron",
     "test:coverage:web": "npm run test:coverage -w @codex-claw/web",
     "test:electron": "npm run test -w @codex-claw/electron",
+    "test:scripts": "node --test scripts/*.test.mjs",
     "test:watch:electron": "npm run test:watch -w @codex-claw/electron",
     "test:web": "npm run test -w @codex-claw/web",
     "test:website": "node --test website/site.test.mjs",
     "typecheck": "npm run typecheck --workspaces",
     "typecheck:electron": "npm run typecheck -w @codex-claw/electron",
-    "typecheck:web": "npm run typecheck -w @codex-claw/web"
+    "typecheck:web": "npm run typecheck -w @codex-claw/web",
+    "verify:github-mcp-token": "node scripts/verify-github-mcp-token.mjs"
   }
 }

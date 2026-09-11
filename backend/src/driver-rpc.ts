@@ -19,6 +19,7 @@ import { cloneSourceRepository } from './clone-source-repository';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
+  hostedMcpServerUrls?: () => Readonly<Record<string, string>>;
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
@@ -38,6 +39,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
     ['codex', new CodexBackendDriver(codexSessionManager)],
     ['claude', new ClaudeBackendDriver(undefined, undefined, {
       clawMcpServerUrl: options.clawMcpServerUrl ?? null,
+      hostedMcpServerUrls: options.hostedMcpServerUrls,
       pluginSettings: options.pluginSettings,
       celebrationsEnabled: options.celebrationsEnabled,
     })],
@@ -68,6 +70,7 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
             {
               celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
             },
+            options.hostedMcpServerUrls?.() ?? {},
           )
           : {}
       ),

@@ -7,6 +7,7 @@ import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { WorktreeManager } from '../../worktrees/worktree-manager';
 import { ClawMcpService } from '../service';
+import { HostedMcpGateway } from '../hosted-mcp-gateway';
 
 describe('ClawMcpService', () => {
   let service: ClawMcpService | null = null;
@@ -81,6 +82,47 @@ describe('ClawMcpService', () => {
     await service.stop();
     await service.stop();
     service = null;
+  });
+
+  it('proxies hosted GitHub MCP traffic without exposing the shared credential', async () => {
+    const fetchUpstream = vi.fn<typeof fetch>().mockResolvedValue(new Response(
+      JSON.stringify({ jsonrpc: '2.0', id: 1, result: { tools: [] } }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json', 'mcp-session-id': 'github-session' },
+      },
+    ));
+    const hostedMcpGateway = new HostedMcpGateway({
+      credentials: {
+        isConnected: () => true,
+        authorizationHeader: vi.fn().mockResolvedValue('bearer ghu_secret'),
+      },
+      fetch: fetchUpstream,
+    });
+    service = new ClawMcpService({ snapshot: createInitialSnapshot(), hostedMcpGateway });
+    const mcpUrl = await service.start();
+    expect(service.hostedMcpServerUrls()).toStrictEqual({
+      github: `${new URL(mcpUrl).origin}/mcp/providers/github`,
+    });
+
+    const providerUrl = `${service.hostedMcpServerUrls().github}?agentId=agent-dina`;
+    const response = await fetch(providerUrl, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        authorization: 'Bearer client-value',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('mcp-session-id')).toBe('github-session');
+    await expect(response.json()).resolves.toMatchObject({ result: { tools: [] } });
+    const upstreamHeaders = new Headers(fetchUpstream.mock.calls[0]?.[1]?.headers);
+    expect(upstreamHeaders.get('authorization')).toBe('bearer ghu_secret');
+    expect(upstreamHeaders.get('authorization')).not.toContain('client-value');
+    await expect(fetch(`${service.hostedMcpServerUrls().github}`, { method: 'POST' })).resolves.toMatchObject({ status: 400 });
   });
 
   it('serves Claw collaboration tools from clawd and delivers teammate messages through backend drivers', async () => {

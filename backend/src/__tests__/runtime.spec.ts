@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   backendProviderTokensFilePath: vi.fn(),
   mcpStart: vi.fn(),
   mcpStop: vi.fn(),
+  mcpHostedServerUrls: vi.fn(),
   mcpSetDriverRpc: vi.fn(),
   mcpSetEventSink: vi.fn(),
   mcpHandleBackendEvent: vi.fn(),
@@ -84,6 +85,7 @@ vi.mock('../mcp/service', () => ({
     constructor(options: unknown) { mocks.mcpOptions.push(options); }
     start = mocks.mcpStart;
     stop = mocks.mcpStop;
+    hostedMcpServerUrls = mocks.mcpHostedServerUrls;
     setDriverRpc = mocks.mcpSetDriverRpc;
     setEventSink = mocks.mcpSetEventSink;
     handleBackendEvent = mocks.mcpHandleBackendEvent;
@@ -176,6 +178,7 @@ vi.mock('../git/agent-git-service', () => ({
 import { createClawdRuntime } from '../runtime';
 
 type McpOptions = {
+  hostedMcpGateway?: unknown;
   resolveWorkspaceIdentity(folder: string): Promise<unknown>;
   queueSpokenAnnouncement(input: unknown): Promise<unknown>;
   computerUse?: {
@@ -255,6 +258,9 @@ describe('clawd runtime', () => {
     mocks.backendProviderTokensFilePath.mockReturnValue('/tmp/provider-tokens.json');
     mocks.mcpStart.mockResolvedValue('http://127.0.0.1:4242/mcp');
     mocks.mcpStop.mockResolvedValue(undefined);
+    mocks.mcpHostedServerUrls.mockReturnValue({
+      github: 'http://127.0.0.1:4242/mcp/providers/github',
+    });
     mocks.hydrateConnections.mockResolvedValue(undefined);
     mocks.githubConnected.mockResolvedValue(false);
     mocks.serverClose.mockResolvedValue(undefined);
@@ -287,6 +293,7 @@ describe('clawd runtime', () => {
     expect(mocks.mcpSetEventSink).toHaveBeenCalledOnce();
 
     const mcp = mocks.mcpOptions[0] as McpOptions;
+    expect(mcp.hostedMcpGateway).toBeDefined();
     await mcp.resolveWorkspaceIdentity('/src/claw');
     expect(mocks.agentGitServices[0]?.identity).toHaveBeenCalledWith('/src/claw');
     await mcp.computerUse!.execute({ command: 'click' });
@@ -307,6 +314,13 @@ describe('clawd runtime', () => {
       backendMethods.clientBrowserExecute,
       backendMethods.clientSpokenAnnouncementQueue,
     ]);
+
+    const driverOptions = mocks.createDefaultBackendDrivers.mock.calls[0]?.[0] as {
+      hostedMcpServerUrls(): Record<string, string>;
+    };
+    expect(driverOptions.hostedMcpServerUrls()).toStrictEqual({
+      github: 'http://127.0.0.1:4242/mcp/providers/github',
+    });
 
     const server = mocks.serverOptions[0] as ServerOptions;
     expect(server.agentGitService).toBe(mocks.agentGitServices[0]);
