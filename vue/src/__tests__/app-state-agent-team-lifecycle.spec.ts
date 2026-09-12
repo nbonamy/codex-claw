@@ -261,8 +261,22 @@ describe('useAppState', () => {
     expect(selectAgent).toHaveBeenNthCalledWith(2, 'agent-dina');
   });
 
-  it('updates agent selection immediately while keeping team selection loading', async () => {
+  it('updates agent and team selection immediately while loading their conversations', async () => {
     const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents.push({
+      ...remoteSnapshot.agents[0],
+      id: 'agent-joel',
+      teamId: 'team-other',
+      name: 'Joel',
+      backendSession: { kind: 'codex', threadId: 'thread-joel' },
+    });
+    remoteSnapshot.teams.push({
+      id: 'team-other',
+      name: 'Other',
+      avatar: 'OT',
+      color: '#123456',
+      agentIds: ['agent-joel'],
+    });
     const agentSelection = deferred<AppSnapshot>();
     const teamSelection = deferred<AppSnapshot>();
     const selectAgent = vi.fn().mockReturnValue(agentSelection.promise);
@@ -290,16 +304,21 @@ describe('useAppState', () => {
     expect(state.isLoading.value).toBe(false);
     expect(state.activeAgent.value?.id).toBe('agent-jesse');
 
-    const teamPromise = state.selectTeam('team-codex-claw');
-    expect(state.isLoading.value).toBe(true);
+    const teamPromise = state.selectTeam('team-other');
+    expect(state.isLoading.value).toBe(false);
+    expect(state.snapshot.value.activeTeamId).toBe('team-other');
+    expect(state.activeAgent.value?.id).toBe('agent-joel');
+    expect(state.isHydratingActiveAgentHistory.value).toBe(true);
+    expect(selectTeam).toHaveBeenCalledWith('team-other');
     teamSelection.resolve({
       ...remoteSnapshot,
-      activeAgentId: 'agent-dina',
-      activeTeamId: 'team-codex-claw',
+      activeAgentId: 'agent-joel',
+      activeTeamId: 'team-other',
     });
     await teamPromise;
     expect(state.isLoading.value).toBe(false);
-    expect(state.activeAgent.value?.id).toBe('agent-dina');
+    expect(state.activeAgent.value?.id).toBe('agent-joel');
+    expect(state.isHydratingActiveAgentHistory.value).toBe(false);
   });
 
   it('tracks unread agent threads and keeps the Dock badge in sync with window focus', async () => {

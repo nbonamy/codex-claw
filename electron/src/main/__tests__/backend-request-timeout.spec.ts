@@ -9,6 +9,7 @@ describe('backendRequestTimeoutMs', () => {
     expect(backendRequestTimeoutMs(backendMethods.agentHistoryLoadOlder, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentConversationMessagesGet, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentSelect, 5_000)).toBe(120_000);
+    expect(backendRequestTimeoutMs(backendMethods.teamSelect, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentFork, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitMessageGenerate, 5_000)).toBe(120_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitMerge, 5_000)).toBe(120_000);

@@ -12,6 +12,7 @@ const longRunningRequestMethods = new Set<string>([
   backendMethods.agentHistoryHydrate,
   backendMethods.agentHistoryLoadOlder,
   backendMethods.agentSelect,
+  backendMethods.teamSelect,
   backendMethods.agentTurnDelete,
   backendMethods.agentTurnEdit,
   backendMethods.agentTurnRetry,

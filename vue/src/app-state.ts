@@ -5,6 +5,7 @@ import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGeneratio
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { selectTeam as selectTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -558,12 +559,7 @@ export function useAppState() {
     }
 
     const requestId = ++agentSelectionRequestId;
-    const selectedAgent = snapshot.value.agents.find((agent) => agent.id === agentId);
-    const needsHistory = Boolean(selectedAgent?.backendSession && (
-      selectedAgent.backendSession.kind === 'codex'
-        ? codexConversationFramesByAgentId.value[agentId]?.threadId !== selectedAgent.backendSession.threadId
-        : claudeConversationFramesByAgentId.value[agentId]?.snapshot.sessionId !== selectedAgent.backendSession.sessionId
-    ));
+    const needsHistory = agentNeedsHistory(agentId);
     rememberActiveComposerConfiguration();
     snapshot.value = selectAgentInSnapshot(snapshot.value, agentId);
     markAgentRead(agentId);
@@ -743,10 +739,20 @@ export function useAppState() {
       return;
     }
 
-    await selectSnapshotWithLoading(() => codexClawApi!.selectTeam(teamId));
-    if (snapshot.value.activeAgentId) {
-      markAgentRead(snapshot.value.activeAgentId);
+    const requestId = ++agentSelectionRequestId;
+    rememberActiveComposerConfiguration();
+    snapshot.value = selectTeamInSnapshot(snapshot.value, teamId);
+    const selectedAgentId = snapshot.value.activeAgentId;
+    const needsHistory = selectedAgentId ? agentNeedsHistory(selectedAgentId) : false;
+    if (selectedAgentId) {
+      markAgentRead(selectedAgentId);
+      restoreComposerConfiguration(selectedAgentId);
+      if (needsHistory) markAgentHistoryHydrating(selectedAgentId, true);
+      void loadActiveAgentCatalogs(selectedAgentId);
+    } else {
+      clearActiveComposerConfiguration();
     }
+    await refreshTeamSelection(teamId, requestId, selectedAgentId, needsHistory);
   }
 
   async function getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot> {
@@ -1926,13 +1932,34 @@ function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent,
   };
 }
 
-async function selectSnapshotWithLoading(selectSnapshot: () => Promise<AppSnapshot>): Promise<void> {
-  isLoading.value = true;
+function agentNeedsHistory(agentId: string): boolean {
+  const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+  if (!agent?.backendSession) return false;
+  return agent.backendSession.kind === 'codex'
+    ? codexConversationFramesByAgentId.value[agentId]?.threadId !== agent.backendSession.threadId
+    : claudeConversationFramesByAgentId.value[agentId]?.snapshot.sessionId !== agent.backendSession.sessionId;
+}
+
+async function refreshTeamSelection(
+  teamId: string,
+  requestId: number,
+  selectedAgentId: string | null,
+  needsHistory: boolean,
+): Promise<void> {
   try {
-    snapshot.value = await selectSnapshot();
-    await loadActiveAgentCatalogs();
+    const nextSnapshot = await codexClawApi!.selectTeam(teamId);
+    if (requestId === agentSelectionRequestId) {
+      adoptNavigationSnapshot(nextSnapshot);
+      const activeAgentId = snapshot.value.activeAgentId;
+      if (activeAgentId) {
+        markAgentRead(activeAgentId);
+        synchronizeComposerSelectionForAgent(activeAgentId);
+      }
+    }
+  } catch {
+    // The optimistic selection remains visible; the next snapshot/event will reconcile it.
   } finally {
-    isLoading.value = false;
+    if (selectedAgentId && needsHistory) markAgentHistoryHydrating(selectedAgentId, false);
   }
 }
 
