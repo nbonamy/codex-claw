@@ -4,6 +4,54 @@ import type { MainToRendererEvent } from '@codex-claw/core/contracts';
 import { ClientRequestRegistry } from './client-request-registry';
 
 describe('ClientRequestRegistry', () => {
+  it('routes a zero-id request carried by a provider-owned Codex conversation event', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backend = 'codex';
+    const registry = new ClientRequestRegistry({
+      getSnapshot: () => snapshot,
+      remoteConnectionIdForAgent: () => null,
+    });
+
+    registry.record({
+      seq: 1,
+      occurredAt: '2026-09-13T23:01:12.000Z',
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-1',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 2,
+        event: {
+          seq: 2,
+          occurredAt: '2026-09-13T23:01:12.000Z',
+          origin: 'notification',
+          conversationId: 'thread-1',
+          turnId: 'turn-1',
+          type: 'clientRequest.requested',
+          payload: {
+            request: {
+              id: '0',
+              kind: 'ask_user',
+              conversationId: 'thread-1',
+              turnId: 'turn-1',
+              itemId: 'question-1',
+              payload: {
+                request: {
+                  itemId: 'question-1',
+                  delivery: 'tool',
+                  blocking: true,
+                  questions: [],
+                },
+              },
+            },
+          },
+        },
+      },
+    } as MainToRendererEvent);
+
+    expect(registry.owner('0')).toStrictEqual({ kind: 'driver', backend: 'codex' });
+  });
+
   it('routes a request carried by a provider-owned Claude conversation event', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backend = 'claude';

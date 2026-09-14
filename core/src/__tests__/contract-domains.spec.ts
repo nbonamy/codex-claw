@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { SurfaceMessageQuestionPart } from '@codex-app-sdk/core/surface';
 import ts from 'typescript';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import * as ContractValues from '../contracts';
@@ -378,6 +379,8 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.RendererMessageAttachment>().toEqualTypeOf<ConversationContracts.RendererMessageAttachment>();
     expectTypeOf<Contracts.RendererMessageMedia>().toEqualTypeOf<ConversationContracts.RendererMessageMedia>();
     expectTypeOf<Contracts.RendererMessagePart>().toEqualTypeOf<ConversationContracts.RendererMessagePart>();
+    expectTypeOf<Extract<Contracts.RendererMessagePart, { type: 'question' }>>()
+      .toEqualTypeOf<SurfaceMessageQuestionPart>();
     expectTypeOf<Contracts.RendererToolPart>().toEqualTypeOf<ConversationContracts.RendererToolPart>();
     expectTypeOf<Contracts.RendererToolPartUpdate>().toEqualTypeOf<ConversationContracts.RendererToolPartUpdate>();
     expectTypeOf<Contracts.RendererMessage>().toEqualTypeOf<ConversationContracts.RendererMessage>();

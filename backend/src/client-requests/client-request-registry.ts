@@ -27,7 +27,8 @@ export class ClientRequestRegistry {
     if (
       conversationEvent.type !== 'approval.requested' &&
       event.type !== 'backendApproval.requested' &&
-      conversationEvent.type !== 'toolInput.requested'
+      conversationEvent.type !== 'toolInput.requested' &&
+      conversationEvent.type !== 'clientRequest.requested'
     ) {
       return;
     }
@@ -57,7 +58,10 @@ export class ClientRequestRegistry {
 
 function requestIdFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  return nonBlankRequestId('id' in payload && typeof payload.id === 'string' ? payload.id : undefined);
+  const directId = nonBlankRequestId('id' in payload && typeof payload.id === 'string' ? payload.id : undefined);
+  if (directId) return directId;
+  if (!('request' in payload)) return null;
+  return requestIdFromPayload(payload.request);
 }
 
 function nonBlankRequestId(value: string | undefined): string | null {

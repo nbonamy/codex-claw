@@ -1,3 +1,4 @@
+import type { SurfaceMessageQuestionPart } from '@codex-app-sdk/core/surface';
 import type { ReasoningEffort } from './shared';
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
@@ -276,6 +277,7 @@ export type RendererMessageMedia = {
 export type RendererMessagePart =
   | { type: 'attachment'; attachment: RendererMessageAttachment }
   | { type: 'media'; media: RendererMessageMedia; itemId?: string }
+  | SurfaceMessageQuestionPart
   | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
   | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'final_answer' }
   | {
@@ -387,12 +389,15 @@ export type AskUserQuestion = {
   isOther: boolean;
   isSecret: boolean;
   multiSelect?: boolean;
-  options: AskUserQuestionOption[] | null;
+  options: readonly AskUserQuestionOption[] | null;
 };
 
 export type AskUserRequest = {
   itemId: string;
-  questions: AskUserQuestion[];
+  delivery?: 'tool' | 'async';
+  blocking?: boolean;
+  questions: readonly AskUserQuestion[];
+  autoResolutionMs?: number;
 };
 
 export type AskUserAnswers = Record<string, { answers: string[] }>;
@@ -408,6 +413,9 @@ export type ClientRequest =
   | {
     id: string;
     kind: 'ask_user';
+    conversationId?: string;
+    turnId?: string;
+    itemId?: string;
     payload: {
       request: AskUserRequest;
     };
