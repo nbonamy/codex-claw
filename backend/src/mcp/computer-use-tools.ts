@@ -19,6 +19,7 @@ type ComputerUseCommand =
   | 'get_app_state'
   | 'launch_app'
   | 'list_apps'
+  | 'list_windows'
   | 'paste'
   | 'perform_secondary_action'
   | 'press_key'
@@ -34,12 +35,12 @@ const COMPUTER_USE_GUIDE = `# Codex Claw Computer Use
 Use only the \`codex_claw\` Computer Use tools. Do not load Codex's built-in Computer Use skill or call \`sky.*\`; those control a different host.
 
 1. Start with \`computer-use-status\`. Request Accessibility or Screen Recording only when the returned status requires it.
-2. Target a named app directly when known. Otherwise list running apps, find an installed app, or launch it. Focus an app before physical clicks and drags; keyboard actions target the requested process directly.
-3. Inspect with \`computer-use-get-app-state\` before deciding what to do. Its first result is a full hierarchy; later results are diffs. Leading numbers are session-stable \`element_index\` values. If you lost the diff baseline, request \`disableDiff=true\`.
+2. Target a named app directly when known. Otherwise list running apps, find an installed app, or launch it. Then call \`computer-use-list-windows\`, select the intended \`window_id\`, and pass that explicit ID to window state, window screenshots, focus, and every action. Refresh the window list after opening or closing a window; never retry against another window implicitly.
+3. Inspect the selected window with \`computer-use-get-app-state\` before deciding what to do. Its first result is a full hierarchy; later results are per-window diffs. Leading numbers are session-stable \`element_index\` values. If you lost the diff baseline, request \`disableDiff=true\`.
 4. Clicks use AXPress by default and do not move the hardware pointer. Use \`physical=true\` only for a visible Electron/web control after AXPress reports success but a fresh inspection confirms that nothing changed. Physical clicks require the app to be frontmost and unobstructed.
-5. Native menus: inspect with \`accessibilityScope="menu_bar"\`, activate an \`AXMenuBarItem\` by semantic selector, and call \`computer-use-dismiss\` before returning to app content or typing. There is no mouse-move or hover tool.
+5. Native menus: read-only inspection with \`accessibilityScope="menu_bar"\` needs no window ID and returns no screenshot. Menu actions still require the selected \`window_id\`. Activate an \`AXMenuBarItem\` by semantic selector, and call \`computer-use-dismiss\` before returning to app content or typing. There is no mouse-move or hover tool.
 6. Before typing, inspect again and confirm the intended editable control is focused. Prefer \`set-value\` for ordinary controls, \`type-text\` for keyboard semantics, and \`paste\` for rich or large content. A successful tool call proves delivery, not that the UI changed as intended; inspect after each state-changing action.
-7. \`computer-use-get-app-state\` includes a screenshot by default. Set \`includeScreenshot=false\` when AX state is sufficient. Screenshot coordinates are absolute macOS logical screen points; use the returned bounds and scale factor rather than preview pixels.
+7. \`computer-use-get-app-state\` includes the selected window's screenshot by default. Set \`includeScreenshot=false\` when AX state is sufficient. Screenshot coordinates are absolute macOS logical screen points; use the returned bounds and scale factor rather than preview pixels.
 8. Call \`computer-use-stop\` when finished. Otherwise the visual session closes after 30 seconds of inactivity; every Computer Use call resets that timer.`;
 
 export function registerComputerUseTools(server: McpServer, computerUse: ComputerUseClient): void {
@@ -73,6 +74,11 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
     inputSchema: {},
   }, () => execute(computerUse, 'list_apps', {}));
 
+  server.registerTool('computer-use-list-windows', {
+    description: 'List a running app\'s windows and their session-local window IDs before inspecting, focusing, or acting on one.',
+    inputSchema: optionalAppSchema,
+  }, (arguments_) => execute(computerUse, 'list_windows', arguments_));
+
   server.registerTool('computer-use-find-apps', {
     description: 'Find installed macOS applications by optional name, path, or bundle identifier.',
     inputSchema: optionalAppSchema,
@@ -87,41 +93,23 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
   }, (arguments_) => execute(computerUse, 'launch_app', arguments_));
 
   server.registerTool('computer-use-focus-app', {
-    description: 'Bring a running macOS application to the foreground by name, bundle identifier, or pid.',
-    inputSchema: {
-      app: z.string().optional(),
-      bundleIdentifier: z.string().optional(),
-      pid: z.number().int().positive().optional(),
-    },
-  }, (arguments_) => execute(computerUse, 'focus_app', arguments_));
+    description: 'Bring one explicitly selected app window to the foreground.',
+    inputSchema: windowTargetSchema,
+  }, (arguments_) => executeWindowTargeted(computerUse, 'focus_app', arguments_));
 
   server.registerTool('computer-use-get-app-state', {
-    description: 'Observe a target app with compact Accessibility state and a screenshot by default. Returns a full hierarchy first, then revisioned diffs with session-stable element indexes.',
-    inputSchema: {
-      ...optionalAppSchema,
-      accessibilityScope: accessibilityScopeSchema,
-      disableDiff: z.boolean().optional().describe('Force a full hierarchy when the prior diff baseline is unavailable.'),
-      includeDebug: z.boolean().optional(),
-      includeScreenshot: z.boolean().optional().describe('Include the target window screenshot. Defaults to true.'),
-      maxDepth: z.number().int().positive().max(30).optional(),
-      maxNodes: z.number().int().positive().max(10_000).optional(),
-      maxTextCharacters: z.number().int().positive().max(100_000).optional(),
-      rootElementIndex: z.number().int().nonnegative().optional(),
-    },
-  }, (arguments_) => computerUseAppStateResult(
-    () => computerUse.execute({ command: 'get_app_state', arguments: arguments_ }),
-  ));
+    description: 'Observe one explicitly selected app window with compact Accessibility state and a screenshot by default. Read-only menu-bar inspection is app-wide and needs no window ID.',
+    inputSchema: appStateInputSchema,
+  }, (arguments_) => arguments_.accessibilityScope === 'menu_bar'
+    ? computerUseAppStateResult(() => computerUse.execute({ command: 'get_app_state', arguments: arguments_ }))
+    : computerUseWindowAppStateResult(computerUse, arguments_));
 
   server.registerTool('computer-use-screenshot', {
-    description: 'Capture a target app window or entire macOS display as a PNG with coordinate metadata.',
-    inputSchema: {
-      ...optionalAppSchema,
-      displayId: z.number().int().positive().optional(),
-      scope: z.enum(['window', 'screen']).optional().describe('Capture one app window, or an entire display including its menu bar. Defaults to window.'),
-    },
-  }, (arguments_) => computerUseScreenshotResult(
-    () => computerUse.execute({ command: 'screenshot', arguments: arguments_ }),
-  ));
+    description: 'Capture an explicitly selected app window or an entire macOS display as a PNG with coordinate metadata.',
+    inputSchema: screenshotInputSchema,
+  }, (arguments_) => arguments_.scope === 'screen'
+    ? computerUseScreenshotResult(() => computerUse.execute({ command: 'screenshot', arguments: arguments_ }))
+    : computerUseWindowScreenshotResult(computerUse, arguments_));
 
   server.registerTool('computer-use-click', {
     description: 'Activate an app control by a latest-observation element index, semantic selector, or absolute logical screen coordinates.',
@@ -131,12 +119,12 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       mouse_button: z.enum(['left', 'right', 'middle']).optional(),
       physical: z.boolean().optional().describe('Send a real foreground mouse click instead of AXPress. Use for visible Electron/web controls or after verifying AXPress did not change the UI.'),
     },
-  }, (arguments_) => execute(computerUse, 'click', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'click', arguments_));
 
   server.registerTool('computer-use-dismiss', {
     description: 'Dismiss an active native menu or popover with its Accessibility cancel action.',
     inputSchema: semanticOrIndexedTargetSchema,
-  }, (arguments_) => execute(computerUse, 'dismiss', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'dismiss', arguments_));
 
   server.registerTool('computer-use-press-key', {
     description: 'Send one key or X-keysym-style chord directly to a running app process.',
@@ -144,15 +132,15 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       ...keyboardTargetSchema,
       key: z.string().min(1).max(200),
     },
-  }, (arguments_) => execute(computerUse, 'press_key', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'press_key', arguments_));
 
   server.registerTool('computer-use-type-text', {
     description: 'Type literal text into the focused macOS Accessibility element. Use newline for Return and tab for Tab.',
     inputSchema: {
-      ...optionalAppSchema,
+      ...windowTargetSchema,
       text: z.string().min(1).max(100_000),
     },
-  }, (arguments_) => execute(computerUse, 'type_text', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'type_text', arguments_));
 
   server.registerTool('computer-use-paste', {
     description: 'Paste plain text, Markdown, or HTML into a running app while preserving the existing pasteboard when possible.',
@@ -161,7 +149,7 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       format: z.enum(['text', 'md', 'html']).optional(),
       text: z.string().max(100_000),
     },
-  }, (arguments_) => execute(computerUse, 'paste', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'paste', arguments_));
 
   server.registerTool('computer-use-set-value', {
     description: 'Set AXValue on an indexed, settable element from the latest app observation. Do not use this for rich web editors.',
@@ -170,7 +158,7 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       element_index: z.number().int().nonnegative(),
       value: z.string().max(100_000),
     },
-  }, (arguments_) => execute(computerUse, 'set_value', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'set_value', arguments_));
 
   server.registerTool('computer-use-select-text', {
     description: 'Select an exact text match or place the insertion cursor in an indexed editable element from the latest observation.',
@@ -182,7 +170,7 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       suffix: z.string().optional(),
       text: z.string().min(1).max(100_000),
     },
-  }, (arguments_) => execute(computerUse, 'select_text', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'select_text', arguments_));
 
   server.registerTool('computer-use-scroll', {
     description: 'Scroll an indexed element from the latest observation or the current view.',
@@ -191,18 +179,18 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       direction: z.enum(['up', 'down', 'left', 'right']).optional(),
       pages: z.number().int().positive().max(100).optional(),
     },
-  }, (arguments_) => execute(computerUse, 'scroll', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'scroll', arguments_));
 
   server.registerTool('computer-use-drag', {
     description: 'Drag between absolute macOS logical screen coordinates while the target app is foreground and unobstructed.',
     inputSchema: {
-      ...optionalAppSchema,
+      ...windowTargetSchema,
       from_x: z.number().finite(),
       from_y: z.number().finite(),
       to_x: z.number().finite(),
       to_y: z.number().finite(),
     },
-  }, (arguments_) => execute(computerUse, 'drag', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'drag', arguments_));
 
   server.registerTool('computer-use-perform-secondary-action', {
     description: 'Invoke a non-primary Accessibility action advertised by an indexed element in the latest observation.',
@@ -211,7 +199,7 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
       action: z.string().min(1).max(200),
       element_index: z.number().int().nonnegative(),
     },
-  }, (arguments_) => execute(computerUse, 'perform_secondary_action', arguments_));
+  }, (arguments_) => executeWindowTargeted(computerUse, 'perform_secondary_action', arguments_));
 }
 
 const optionalAppSchema = {
@@ -224,10 +212,52 @@ const optionalAppSchema = {
 const accessibilityScopeSchema = z.enum(['application', 'menu_bar']).optional()
   .describe('Target the application accessibility tree or its native menu bar. Defaults to application.');
 
-const keyboardTargetSchema = {
-  app: z.string().min(1).optional(),
-  pid: z.number().int().positive().optional(),
+const windowIdSchema = z.number().int().positive()
+  .describe('Session-local window ID returned by computer-use-list-windows.');
+
+const windowTargetSchema = {
+  ...optionalAppSchema,
+  window_id: windowIdSchema,
 };
+
+const keyboardTargetSchema = windowTargetSchema;
+
+const appStateOptionsSchema = {
+  ...optionalAppSchema,
+  disableDiff: z.boolean().optional().describe('Force a full hierarchy when the prior diff baseline is unavailable.'),
+  includeDebug: z.boolean().optional(),
+  includeScreenshot: z.boolean().optional().describe('Include the selected window screenshot. Defaults to true for application scope.'),
+  maxDepth: z.number().int().positive().max(30).optional(),
+  maxNodes: z.number().int().positive().max(10_000).optional(),
+  maxTextCharacters: z.number().int().positive().max(100_000).optional(),
+  rootElementIndex: z.number().int().nonnegative().optional(),
+};
+
+const appStateInputSchema = z.union([
+  z.object({
+    ...appStateOptionsSchema,
+    accessibilityScope: z.literal('menu_bar'),
+    window_id: windowIdSchema.optional(),
+  }),
+  z.object({
+    ...appStateOptionsSchema,
+    accessibilityScope: z.literal('application').optional(),
+    window_id: windowIdSchema,
+  }),
+]);
+
+const screenshotInputSchema = z.union([
+  z.object({
+    ...optionalAppSchema,
+    displayId: z.number().int().positive().optional(),
+    scope: z.literal('screen'),
+  }),
+  z.object({
+    ...optionalAppSchema,
+    scope: z.literal('window').optional(),
+    window_id: windowIdSchema,
+  }),
+]);
 
 const semanticSelectorSchema = z.object({
   description: z.string().optional(),
@@ -241,7 +271,7 @@ const semanticSelectorSchema = z.object({
 });
 
 const actionTargetSchema = {
-  ...optionalAppSchema,
+  ...windowTargetSchema,
   accessibilityScope: accessibilityScopeSchema,
   element_index: z.number().int().nonnegative().optional(),
   selector: semanticSelectorSchema.optional()
@@ -251,7 +281,7 @@ const actionTargetSchema = {
 };
 
 const indexedTargetSchema = {
-  ...optionalAppSchema,
+  ...windowTargetSchema,
   accessibilityScope: accessibilityScopeSchema,
   element_index: z.number().int().nonnegative().optional(),
 };
@@ -263,6 +293,42 @@ const semanticOrIndexedTargetSchema = {
 
 function execute(computerUse: ComputerUseClient, command: ComputerUseCommand, arguments_: Record<string, unknown>) {
   return computerUseResult(() => computerUse.execute({ command, arguments: arguments_ }));
+}
+
+function executeWindowTargeted(
+  computerUse: ComputerUseClient,
+  command: ComputerUseCommand,
+  arguments_: Record<string, unknown>,
+): Promise<CallToolResult> {
+  const invalid = invalidWindowIdResult(arguments_);
+  return invalid ? Promise.resolve(invalid) : execute(computerUse, command, arguments_);
+}
+
+function computerUseWindowAppStateResult(
+  computerUse: ComputerUseClient,
+  arguments_: Record<string, unknown>,
+): Promise<CallToolResult> {
+  const invalid = invalidWindowIdResult(arguments_);
+  return invalid
+    ? Promise.resolve(invalid)
+    : computerUseAppStateResult(() => computerUse.execute({ command: 'get_app_state', arguments: arguments_ }));
+}
+
+function computerUseWindowScreenshotResult(
+  computerUse: ComputerUseClient,
+  arguments_: Record<string, unknown>,
+): Promise<CallToolResult> {
+  const invalid = invalidWindowIdResult(arguments_);
+  return invalid
+    ? Promise.resolve(invalid)
+    : computerUseScreenshotResult(() => computerUse.execute({ command: 'screenshot', arguments: arguments_ }));
+}
+
+function invalidWindowIdResult(arguments_: Record<string, unknown>): CallToolResult | null {
+  const windowId = arguments_.window_id;
+  return typeof windowId === 'number' && Number.isInteger(windowId) && windowId > 0
+    ? null
+    : errorToolResult('invalid_request: window_id must be a positive integer returned by computer-use-list-windows.');
 }
 
 async function computerUseResult(run: () => Promise<unknown>) {

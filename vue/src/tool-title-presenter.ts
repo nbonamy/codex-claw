@@ -26,6 +26,7 @@ const TOOL_KEYS: Record<string, string> = {
   'computer-use-guide': 'computerUseGuide',
   'computer-use-launch-app': 'computerUseLaunchApp',
   'computer-use-list-apps': 'computerUseListApps',
+  'computer-use-list-windows': 'computerUseListWindows',
   'computer-use-paste': 'computerUsePaste',
   'computer-use-perform-secondary-action': 'computerUsePerformSecondaryAction',
   'computer-use-press-key': 'computerUsePressKey',
@@ -177,6 +178,10 @@ function computerUseTarget(tool: string, args: Record<string, unknown>, result: 
     case 'computer-use-list-apps': {
       const count = resultArrayLength(result, 'apps');
       return count === undefined ? 'open apps' : `${count} open apps`;
+    }
+    case 'computer-use-list-windows': {
+      const count = resultArrayLength(result, 'windows');
+      return count === undefined ? `${app} windows` : `${count} ${app} windows`;
     }
     case 'computer-use-scroll': {
       const direction = firstString(args.direction);

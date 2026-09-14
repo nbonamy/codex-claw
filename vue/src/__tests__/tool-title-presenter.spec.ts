@@ -12,6 +12,7 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.browser-screenshot', {}, 'running', 'Capturing page screenshot'],
     ['codex_claw.browser-open', { url: 'https://example.com' }, 'completed', 'Opened https://example.com'],
     ['mcp__codex_claw__computer_use_launch_app', { path: '/Applications/Codex Claw.app' }, 'completed', 'Launched Codex Claw'],
+    ['mcp__codex_claw__computer_use_list_windows', { app: 'Safari' }, 'completed', 'Listed Safari windows'],
     ['mcp__codex_claw__computer_use_get_app_state', { app: 'Codex Claw' }, 'completed', 'Inspected Codex Claw'],
     ['mcp__codex_claw__computer_use_guide', {}, 'running', 'Loading Computer Use guide'],
     ['mcp__codex_claw__computer_use_guide', {}, 'completed', 'Loaded Computer Use guide'],

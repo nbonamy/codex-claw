@@ -316,11 +316,11 @@ describe('ClawMcpService', () => {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'computer-use-get-app-state', arguments: { app: 'TextEdit', maxNodes: 200 } },
+      params: { name: 'computer-use-get-app-state', arguments: { app: 'TextEdit', window_id: 1, maxNodes: 200 } },
     });
     expect(execute).toHaveBeenCalledWith({
       command: 'get_app_state',
-      arguments: { app: 'TextEdit', maxNodes: 200 },
+      arguments: { app: 'TextEdit', window_id: 1, maxNodes: 200 },
     });
     expect(stateResponse.result.content[0].text).toBe('{"apps":[]}');
 

@@ -49,13 +49,13 @@ process.stdin.on('data', (chunk) => {
   it('runs the product-neutral pilot through a narrow command contract', async () => {
     await expect(executeComputerUseCommand({
       command: 'get_app_state',
-      arguments: { app: 'TextEdit' },
+      arguments: { app: 'TextEdit', window_id: 1 },
       options: options(),
     })).resolves.toMatchObject({
       ok: true,
       result: {
         accessibilityTrusted: false,
-        arguments: { app: 'TextEdit' },
+        arguments: { app: 'TextEdit', window_id: 1 },
         command: 'get_app_state',
       },
     });
@@ -77,6 +77,7 @@ process.stdin.on('data', (chunk) => {
     'perform_secondary_action',
     'paste',
     'select_text',
+    'list_windows',
   ])('accepts the v2 %s command', (command) => {
     expect(isComputerUseCommand(command)).toBe(true);
   });
@@ -84,7 +85,7 @@ process.stdin.on('data', (chunk) => {
   it('preserves v2 stable error codes from the helper', async () => {
     await expect(executeComputerUseCommand({
       command: 'click',
-      arguments: { app: 'TextEdit', element_index: 99, failCode: 'stale_element' },
+      arguments: { app: 'TextEdit', window_id: 1, element_index: 99, failCode: 'stale_element' },
       options: options(),
     })).resolves.toStrictEqual({
       error: 'Action failed.',
@@ -99,6 +100,7 @@ process.stdin.on('data', (chunk) => {
     'request_screen_capture',
     'screenshot',
     'list_apps',
+    'list_windows',
     'find_apps',
   ] as const)('never shows the virtual cursor for %s commands', async (command) => {
     await expect(executeComputerUseCommand({
@@ -117,20 +119,20 @@ process.stdin.on('data', (chunk) => {
   it('preserves cursor visibility for interactive commands', async () => {
     await expect(executeComputerUseCommand({
       command: 'click',
-      arguments: { showCursor: true, x: 10, y: 20 },
+      arguments: { window_id: 1, showCursor: true, x: 10, y: 20 },
       options: options(),
     })).resolves.toMatchObject({
       ok: true,
       result: {
-        arguments: { showCursor: true, x: 10, y: 20 },
+        arguments: { window_id: 1, showCursor: true, x: 10, y: 20 },
         command: 'click',
       },
     });
   });
 
   it('keeps one lazy helper session alive across Computer Use commands', async () => {
-    const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
-    const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });
+    const first = await executeComputerUseCommand({ command: 'click', arguments: { window_id: 1, x: 1, y: 1 }, options: options() });
+    const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit', window_id: 1 }, options: options() });
 
     expect(first).toMatchObject({ ok: true });
     expect(second).toMatchObject({ ok: true });
@@ -140,12 +142,12 @@ process.stdin.on('data', (chunk) => {
   it('passes stable element indexes without synthesizing v1 traversal arguments', async () => {
     await executeComputerUseCommand({
       command: 'get_app_state',
-      arguments: { app: 'System Settings', maxDepth: 8, maxNodes: 500 },
+      arguments: { app: 'System Settings', window_id: 1, maxDepth: 8, maxNodes: 500 },
       options: options(),
     });
     const click = await executeComputerUseCommand({
       command: 'click',
-      arguments: { app: 'System Settings', element_index: 33 },
+      arguments: { app: 'System Settings', window_id: 1, element_index: 33 },
       options: options(),
     });
 
@@ -154,6 +156,7 @@ process.stdin.on('data', (chunk) => {
       result: {
         arguments: {
           app: 'System Settings',
+          window_id: 1,
           element_index: 33,
         },
       },
@@ -161,8 +164,8 @@ process.stdin.on('data', (chunk) => {
   });
 
   it('preserves the helper-owned diff baseline across observations', async () => {
-    const first = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });
-    const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });
+    const first = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit', window_id: 1 }, options: options() });
+    const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit', window_id: 1 }, options: options() });
 
     expect(first).toMatchObject({ ok: true, result: { stateKind: 'full', stateRevision: 1 } });
     expect(second).toMatchObject({ ok: true, result: { baseRevision: 1, stateKind: 'diff', stateRevision: 2 } });
@@ -180,7 +183,7 @@ process.stdin.on('data', (chunk) => {
 
   it('resets the idle TTL after a screenshot', async () => {
     const shortTtlOptions = () => ({ ...options(), idleTtlMs: 200 });
-    const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: shortTtlOptions() });
+    const first = await executeComputerUseCommand({ command: 'click', arguments: { window_id: 1, x: 1, y: 1 }, options: shortTtlOptions() });
     await new Promise((resolve) => setTimeout(resolve, 80));
     const screenshot = await executeComputerUseCommand({ command: 'screenshot', arguments: {}, options: shortTtlOptions() });
     await new Promise((resolve) => setTimeout(resolve, 80));
@@ -191,9 +194,9 @@ process.stdin.on('data', (chunk) => {
   });
 
   it('starts a new session after an explicit stop', async () => {
-    const first = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
+    const first = await executeComputerUseCommand({ command: 'click', arguments: { window_id: 1, x: 1, y: 1 }, options: options() });
     stopComputerUseHelper();
-    const second = await executeComputerUseCommand({ command: 'click', arguments: { x: 1, y: 1 }, options: options() });
+    const second = await executeComputerUseCommand({ command: 'click', arguments: { window_id: 1, x: 1, y: 1 }, options: options() });
 
     expect((first as { result: { pid: number } }).result.pid).not.toBe((second as { result: { pid: number } }).result.pid);
   });

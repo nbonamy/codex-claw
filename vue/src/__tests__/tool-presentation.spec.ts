@@ -19,6 +19,7 @@ describe('Claw tool presentation', () => {
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
     ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],
+    ['computer-use-list-windows', DeviceDesktopIcon, 'Listed Safari windows'],
     ['computer-use-dismiss', DeviceDesktopIcon, 'Dismissed native menu'],
     ['computer-use-press-key', DeviceDesktopIcon, 'Pressed Return in Safari'],
     ['computer-use-paste', DeviceDesktopIcon, 'Pasted content in Safari'],
@@ -43,8 +44,10 @@ describe('Claw tool presentation', () => {
           ? { title: 'Review notes' }
           : tool === 'computer-use-get-app-state'
             ? { app: 'Codex Claw' }
-            : tool === 'computer-use-press-key'
-              ? { app: 'Safari', key: 'Return' }
+            : tool === 'computer-use-list-windows'
+              ? { app: 'Safari' }
+              : tool === 'computer-use-press-key'
+                ? { app: 'Safari', key: 'Return' }
               : tool === 'computer-use-paste' || tool === 'computer-use-drag'
                 ? { app: 'Safari' }
                 : tool === 'computer-use-select-text' || tool === 'computer-use-perform-secondary-action'

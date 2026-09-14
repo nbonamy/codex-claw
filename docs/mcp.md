@@ -212,7 +212,7 @@ agent -> codex_claw MCP -> clawd -> client/computerUse RPC -> Electron main -> n
 
 Tools are `computer-use-guide`, `computer-use-status`, `computer-use-request-accessibility`,
 `computer-use-request-screen-recording`,
-`computer-use-list-apps`, `computer-use-find-apps`,
+`computer-use-list-apps`, `computer-use-list-windows`, `computer-use-find-apps`,
 `computer-use-launch-app`, `computer-use-focus-app`,
 `computer-use-get-app-state`, `computer-use-screenshot`, `computer-use-click`,
 `computer-use-dismiss`,
@@ -225,21 +225,40 @@ first Computer Use action. The guide returns the cross-tool workflow and
 fallback rules on demand, keeping individual MCP descriptions focused on their
 own contracts without permanently loading detailed operating instructions.
 
+Window targeting is explicit. Agents call `computer-use-list-windows` for the
+selected app, choose its positive session-local `window_id`, and pass that ID
+to application state, window screenshots, focus, and every action, including
+native menu actions. There is no implicit current-window fallback. Opening or
+closing a window invalidates assumptions about the list, so agents list again
+instead of silently retrying against another window. Read-only menu-bar state,
+full-screen screenshots, discovery, app launch, status, and permission commands
+do not require a window ID.
+
+Closed or foreign IDs return `window_not_found`; cross-window elements or
+coordinates return `window_mismatch`; keyboard focus verification can return
+`window_focus_failed`; and window capture can return
+`window_capture_ambiguous` when the exact Accessibility-to-ScreenCaptureKit
+match is unavailable. These errors require refreshing `computer-use-list-windows`,
+not falling back to another window.
+
 `computer-use-get-app-state` returns one coherent observation: compact
 Accessibility hierarchy text and, by default, the target-window screenshot.
-The first observation for a target/configuration is full; later observations
-are `+`/`~`/`-` diffs with `stateRevision` and `baseRevision`. Leading numbers
-are helper-session-stable `element_index` values. `disableDiff: true` forces a
-new full baseline, while `includeScreenshot: false` avoids capture when the AX
-state is sufficient. A screenshot failure leaves the Accessibility result
-usable and reports `screenshotError`; screenshot bytes are emitted as MCP image
-content and removed from structured JSON.
+The first observation for a window/configuration is full; later observations
+are per-window `+`/`~`/`-` diffs with `stateRevision` and `baseRevision`.
+Leading numbers are helper-session-stable `element_index` values.
+`rootElementIndex` and indexed actions are valid only in the selected window.
+`disableDiff: true` forces a new full baseline, while
+`includeScreenshot: false` avoids capture when the AX state is sufficient. A
+screenshot failure leaves the Accessibility result usable and reports
+`screenshotError`; screenshot bytes are emitted as MCP image content and
+removed from structured JSON.
 
 `computer-use-screenshot` remains available for explicit window or full-screen
-capture. Window scope targets the frontmost or explicitly selected application;
-screen scope captures the main or explicitly selected display, including the
-menu bar. Screenshot results state the captured region's absolute macOS logical
-bounds, image scale factor, and pixel-to-screen conversion next to the image.
+capture. Window scope requires an explicit `window_id` from the current helper
+session; screen scope captures the main or explicitly selected display,
+including the menu bar. Screenshot results state the captured region's
+absolute macOS logical bounds, image scale factor, and pixel-to-screen
+conversion next to the image.
 Coordinate actions always use absolute logical screen points from the top-left
 of the main display; they never use window-relative positions or screenshot
 pixels. Displays left of or above the main display can have negative origins.
@@ -261,8 +280,9 @@ inspect and activate native application menus through AX without moving the
 user's pointer. After using a native menu, `computer-use-dismiss` applies its
 AX cancel action before the agent continues typing or acting in the app.
 
-Keyboard operations (`press-key`, `type-text`, and `paste`) post directly to an
-explicit app or PID and do not require foreground focus. `set-value` handles
+Keyboard operations (`press-key`, `type-text`, and `paste`) select and verify
+the explicit window before posting to its app process; selection may raise the
+window. `set-value` handles
 ordinary settable AX controls; `select-text` provides exact UTF-16-safe text or
 cursor placement with optional context. `perform-secondary-action` invokes
 only actions advertised by the latest observed element. Physical clicks and
@@ -274,7 +294,7 @@ request permission before inspection/actions and refresh app state before
 acting on an indexed element. Normal MCP approval applies to each call.
 
 Electron keeps one helper process alive for the Computer Use session so stable
-element IDs and diff baselines stay valid. The native virtual cursor keeps its
+window IDs, element IDs, and per-window diff baselines stay valid. The native virtual cursor keeps its
 existing show trigger, then remains visible for that session. Every Computer
 Use call, including a screenshot, resets the 30-second inactivity timeout.
 Screenshots temporarily hide the cursor while capturing and restore it

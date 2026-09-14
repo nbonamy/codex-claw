@@ -14,6 +14,7 @@ const computerUseCommands = [
   'request_screen_capture',
   'screenshot',
   'list_apps',
+  'list_windows',
   'find_apps',
   'launch_app',
   'focus_app',
@@ -38,6 +39,7 @@ const cursorlessComputerUseCommands = new Set<ComputerUseCommand>([
   'request_screen_capture',
   'screenshot',
   'list_apps',
+  'list_windows',
   'find_apps',
 ]);
 

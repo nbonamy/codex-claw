@@ -55,6 +55,7 @@ const COMPUTER_USE_TOOLS = new Set([
   'computer-use-guide',
   'computer-use-launch-app',
   'computer-use-list-apps',
+  'computer-use-list-windows',
   'computer-use-paste',
   'computer-use-perform-secondary-action',
   'computer-use-press-key',

@@ -748,6 +748,11 @@ export const messages = {
               failed: 'Failed listing {target}',
               running: 'Listing {target}',
             },
+            computerUseListWindows: {
+              completed: 'Listed {target}',
+              failed: 'Failed listing {target}',
+              running: 'Listing {target}',
+            },
             computerUsePaste: {
               completed: 'Pasted content in {target}',
               failed: 'Failed pasting content in {target}',
