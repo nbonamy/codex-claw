@@ -711,6 +711,11 @@ export const messages = {
               failed: 'Failed dismissing native menu',
               running: 'Dismissing native menu',
             },
+            computerUseDrag: {
+              completed: 'Dragged in {target}',
+              failed: 'Failed dragging in {target}',
+              running: 'Dragging in {target}',
+            },
             computerUseFindApps: {
               completed: 'Found {target}',
               failed: 'Failed finding {target}',
@@ -741,6 +746,21 @@ export const messages = {
               failed: 'Failed listing {target}',
               running: 'Listing {target}',
             },
+            computerUsePaste: {
+              completed: 'Pasted content in {target}',
+              failed: 'Failed pasting content in {target}',
+              running: 'Pasting content in {target}',
+            },
+            computerUsePerformSecondaryAction: {
+              completed: 'Performed secondary action on {target}',
+              failed: 'Failed performing secondary action on {target}',
+              running: 'Performing secondary action on {target}',
+            },
+            computerUsePressKey: {
+              completed: 'Pressed {target}',
+              failed: 'Failed pressing {target}',
+              running: 'Pressing {target}',
+            },
             computerUseRequestAccessibility: {
               completed: 'Requested macOS Accessibility access for Computer Use',
               failed: 'Failed requesting macOS Accessibility access for Computer Use',
@@ -755,6 +775,11 @@ export const messages = {
               completed: 'Scrolled {target}',
               failed: 'Failed scrolling {target}',
               running: 'Scrolling {target}',
+            },
+            computerUseSelectText: {
+              completed: 'Selected text in {target}',
+              failed: 'Failed selecting text in {target}',
+              running: 'Selecting text in {target}',
             },
             computerUseScreenshot: {
               completed: 'Captured {target}',

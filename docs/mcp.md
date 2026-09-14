@@ -166,8 +166,6 @@ override authorizes only Claw's own collaboration tools; it does not authorize
 all Codex shell/file operations and does not mutate the user's global MCP
 config.
 
-## Computer Use
-
 ## In-app Browser
 
 The same MCP server exposes an agent-scoped `browser-open` tool that accepts an
@@ -185,9 +183,16 @@ mounted but hidden, so browser MCP work can continue in the background. The
 renderer never receives page DOM, cookies, screenshots, or arbitrary
 page-script access.
 
+## Computer Use
+
 Computer Use is a local macOS capability exposed through the same Claw MCP
 server. The shared native helper lives in `~/src/computer-use/macos`; Codex
-Claw packages its own signed `Codex Claw Computer Use.app` copy.
+Claw packages its own signed `Codex Claw Computer Use.app` copy. The release
+artifact and checksum are pinned in `computer-use-release.json`; local helper
+development remains available through `npm run build:computer-use:local`.
+Claw and the bundled helper move together on the v2 contract; there is no v1
+compatibility layer or protocol negotiation. The version returned by status is
+diagnostic only.
 
 Computer Use tools are omitted from an agent's MCP server unless the user
 enables Computer Use in Settings -> Plugins. Chrome is a separate bundled
@@ -211,24 +216,35 @@ Tools are `computer-use-guide`, `computer-use-status`, `computer-use-request-acc
 `computer-use-launch-app`, `computer-use-focus-app`,
 `computer-use-get-app-state`, `computer-use-screenshot`, `computer-use-click`,
 `computer-use-dismiss`,
-`computer-use-type-text`, `computer-use-set-value`, and
-`computer-use-scroll`.
+`computer-use-press-key`, `computer-use-type-text`, `computer-use-paste`,
+`computer-use-set-value`, `computer-use-select-text`, `computer-use-scroll`,
+`computer-use-drag`, and `computer-use-perform-secondary-action`.
 
 The developer prompt tells agents to call `computer-use-guide` before their
 first Computer Use action. The guide returns the cross-tool workflow and
 fallback rules on demand, keeping individual MCP descriptions focused on their
 own contracts without permanently loading detailed operating instructions.
 
-`computer-use-screenshot` returns MCP image content rather than embedding PNG
-base64 in text. Its `window` scope targets the frontmost or explicitly selected
-application; its `screen` scope captures the main or explicitly selected
-display, including the menu bar. Screenshot results state the captured region's
-absolute macOS logical bounds, the image scale factor, and the pixel-to-screen
-conversion next to the image. Coordinate actions always use absolute logical
-screen points from the top-left of the main display; they never use
-window-relative positions or screenshot pixels. Displays left of or above the
-main display can have negative origins. Screenshot capture is gated by the helper's separately reported
-Screen Recording trust, surfaced in General -> System permissions.
+`computer-use-get-app-state` returns one coherent observation: compact
+Accessibility hierarchy text and, by default, the target-window screenshot.
+The first observation for a target/configuration is full; later observations
+are `+`/`~`/`-` diffs with `stateRevision` and `baseRevision`. Leading numbers
+are helper-session-stable `element_index` values. `disableDiff: true` forces a
+new full baseline, while `includeScreenshot: false` avoids capture when the AX
+state is sufficient. A screenshot failure leaves the Accessibility result
+usable and reports `screenshotError`; screenshot bytes are emitted as MCP image
+content and removed from structured JSON.
+
+`computer-use-screenshot` remains available for explicit window or full-screen
+capture. Window scope targets the frontmost or explicitly selected application;
+screen scope captures the main or explicitly selected display, including the
+menu bar. Screenshot results state the captured region's absolute macOS logical
+bounds, image scale factor, and pixel-to-screen conversion next to the image.
+Coordinate actions always use absolute logical screen points from the top-left
+of the main display; they never use window-relative positions or screenshot
+pixels. Displays left of or above the main display can have negative origins.
+Screenshot capture is gated by the helper's separately reported Screen
+Recording trust, surfaced in General -> System permissions.
 
 `computer-use-click` uses Accessibility `AXPress` by default. Agents may set
 `physical: true` for a visible Electron/web control known to require actual
@@ -236,24 +252,35 @@ mouse input, or after an `AXPress` reports success but refreshed state shows no
 change. Physical clicks require the target app to remain frontmost and the
 target position to remain unobstructed.
 
-For dialogs and live interfaces, `computer-use-click` accepts a semantic AX
-selector (`role`, `title`, `description`, `value`, `subrole`, and optional
-occurrence). Prefer this to a numeric element index when the tree can change
-between inspection and action. `accessibilityScope: "menu_bar"` lets agents
+Indexed actions validate the latest observation and target app PID, returning
+`stale_element` rather than redirecting an obsolete index. Click and dismiss
+also accept semantic AX selectors (`role`, `title`, `description`, `value`,
+`subrole`, and optional occurrence) for dialogs and menus. Right and middle
+clicks use physical mouse events. `accessibilityScope: "menu_bar"` lets agents
 inspect and activate native application menus through AX without moving the
 user's pointer. After using a native menu, `computer-use-dismiss` applies its
 AX cancel action before the agent continues typing or acting in the app.
-Computer Use intentionally exposes no mouse-move/hover action.
+
+Keyboard operations (`press-key`, `type-text`, and `paste`) post directly to an
+explicit app or PID and do not require foreground focus. `set-value` handles
+ordinary settable AX controls; `select-text` provides exact UTF-16-safe text or
+cursor placement with optional context. `perform-secondary-action` invokes
+only actions advertised by the latest observed element. Physical clicks and
+`drag` require the target app to remain frontmost and unobstructed. Computer
+Use intentionally exposes no mouse-move/hover action.
 
 The helper reports its own Accessibility trust. Agents must check status or
 request permission before inspection/actions and refresh app state before
 acting on an indexed element. Normal MCP approval applies to each call.
 
-The native virtual cursor keeps its existing show trigger, then remains visible
-for the Computer Use session. Every Computer Use call, including a screenshot,
-resets the 30-second inactivity timeout. Screenshots temporarily hide the
-cursor while capturing and restore it afterward. `computer-use-stop` closes
-the session immediately; inactivity closes it automatically.
+Electron keeps one helper process alive for the Computer Use session so stable
+element IDs and diff baselines stay valid. The native virtual cursor keeps its
+existing show trigger, then remains visible for that session. Every Computer
+Use call, including a screenshot, resets the 30-second inactivity timeout.
+Screenshots temporarily hide the cursor while capturing and restore it
+afterward. `computer-use-stop` closes the session immediately; inactivity
+closes it automatically, so the next interaction must begin with a fresh app
+observation.
 
 For Claude, `clawd` passes the same request-scoped agent URL through the Claude
 CLI instead of mutating global Claude Code config:

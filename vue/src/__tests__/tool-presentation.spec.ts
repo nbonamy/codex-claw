@@ -20,6 +20,11 @@ describe('Claw tool presentation', () => {
     ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],
     ['computer-use-dismiss', DeviceDesktopIcon, 'Dismissed native menu'],
+    ['computer-use-press-key', DeviceDesktopIcon, 'Pressed Return in Safari'],
+    ['computer-use-paste', DeviceDesktopIcon, 'Pasted content in Safari'],
+    ['computer-use-select-text', DeviceDesktopIcon, 'Selected text in control #7 in Safari'],
+    ['computer-use-drag', DeviceDesktopIcon, 'Dragged in Safari'],
+    ['computer-use-perform-secondary-action', DeviceDesktopIcon, 'Performed secondary action on control #7 in Safari'],
     ['computer-use-screenshot', DeviceDesktopIcon, 'Captured main display screenshot'],
     ['computer-use-request-screen-recording', DeviceDesktopIcon, 'Requested macOS Screen Recording access for Computer Use'],
     ['send-message', MessageIcon, 'Sent message to codex-app-sdk'],
@@ -38,13 +43,19 @@ describe('Claw tool presentation', () => {
           ? { title: 'Review notes' }
           : tool === 'computer-use-get-app-state'
             ? { app: 'Codex Claw' }
-            : tool === 'computer-use-screenshot'
-              ? { scope: 'screen' }
-              : tool === 'celebrate'
-                ? { kind: 'stars' }
-                : tool === 'announce'
-                  ? { phase: 'start', text: 'private phrase' }
-                : {};
+            : tool === 'computer-use-press-key'
+              ? { app: 'Safari', key: 'Return' }
+              : tool === 'computer-use-paste' || tool === 'computer-use-drag'
+                ? { app: 'Safari' }
+                : tool === 'computer-use-select-text' || tool === 'computer-use-perform-secondary-action'
+                  ? { app: 'Safari', element_index: 7 }
+                  : tool === 'computer-use-screenshot'
+                    ? { scope: 'screen' }
+                    : tool === 'celebrate'
+                      ? { kind: 'stars' }
+                      : tool === 'announce'
+                        ? { phase: 'start', text: 'private phrase' }
+                        : {};
 
     expect(presentClawTool(context(tool, args), translate)).toStrictEqual({ icon, title });
   });

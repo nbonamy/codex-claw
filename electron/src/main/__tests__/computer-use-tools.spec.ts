@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { computerUseSessionTimeoutMs, executeComputerUseCommand, getComputerUseStatus, resolveComputerUseHelperAppPath, stopComputerUseHelper } from '../computer-use-tools';
+import { computerUseSessionTimeoutMs, executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, resolveComputerUseHelperAppPath, stopComputerUseHelper } from '../computer-use-tools';
 
 describe('Computer Use desktop helper', () => {
   let tempDir: string;
@@ -13,6 +13,7 @@ describe('Computer Use desktop helper', () => {
     pilotPath = path.join(tempDir, 'pilot');
     fs.writeFileSync(pilotPath, `#!/usr/bin/env node
 let input = '';
+let stateRevision = 0;
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => {
   input += chunk;
@@ -20,7 +21,15 @@ process.stdin.on('data', (chunk) => {
   while (newline >= 0) {
     const request = JSON.parse(input.slice(0, newline));
     input = input.slice(newline + 1);
-    process.stdout.write(JSON.stringify({ id: request.id, ok: true, result: { command: request.command, arguments: request.arguments, accessibilityTrusted: false, pid: process.pid } }) + '\\n');
+    if (request.arguments?.failCode) {
+      process.stdout.write(JSON.stringify({ id: request.id, ok: false, error: { code: request.arguments.failCode, message: 'Action failed.' } }) + '\\n');
+      newline = input.indexOf('\\n');
+      continue;
+    }
+    const state = request.command === 'get_app_state'
+      ? { stateKind: stateRevision === 0 ? 'full' : 'diff', stateRevision: ++stateRevision, ...(stateRevision > 1 ? { baseRevision: stateRevision - 1 } : {}) }
+      : {};
+    process.stdout.write(JSON.stringify({ id: request.id, ok: true, result: { command: request.command, arguments: request.arguments, accessibilityTrusted: false, pid: process.pid, version: '2.0.0', ...state } }) + '\\n');
     newline = input.indexOf('\\n');
   }
 });
@@ -56,8 +65,31 @@ process.stdin.on('data', (chunk) => {
     await expect(getComputerUseStatus(options())).resolves.toMatchObject({
       accessibilityTrusted: false,
       available: true,
+      helperVersion: '2.0.0',
       helperPath: pilotPath,
       platform: 'darwin',
+    });
+  });
+
+  it.each([
+    'press_key',
+    'drag',
+    'perform_secondary_action',
+    'paste',
+    'select_text',
+  ])('accepts the v2 %s command', (command) => {
+    expect(isComputerUseCommand(command)).toBe(true);
+  });
+
+  it('preserves v2 stable error codes from the helper', async () => {
+    await expect(executeComputerUseCommand({
+      command: 'click',
+      arguments: { app: 'TextEdit', element_index: 99, failCode: 'stale_element' },
+      options: options(),
+    })).resolves.toStrictEqual({
+      error: 'Action failed.',
+      errorCode: 'stale_element',
+      ok: false,
     });
   });
 
@@ -105,7 +137,7 @@ process.stdin.on('data', (chunk) => {
     expect((first as { result: { pid: number } }).result.pid).toBe((second as { result: { pid: number } }).result.pid);
   });
 
-  it('reuses the latest app-state traversal limits when resolving an element index', async () => {
+  it('passes stable element indexes without synthesizing v1 traversal arguments', async () => {
     await executeComputerUseCommand({
       command: 'get_app_state',
       arguments: { app: 'System Settings', maxDepth: 8, maxNodes: 500 },
@@ -123,61 +155,18 @@ process.stdin.on('data', (chunk) => {
         arguments: {
           app: 'System Settings',
           element_index: 33,
-          maxDepth: 8,
-          maxNodes: 500,
         },
       },
     });
   });
 
-  it('does not reuse traversal limits for a different app', async () => {
-    await executeComputerUseCommand({
-      command: 'get_app_state',
-      arguments: { app: 'System Settings', maxDepth: 8 },
-      options: options(),
-    });
-    const click = await executeComputerUseCommand({
-      command: 'click',
-      arguments: { app: 'TextEdit', element_index: 33 },
-      options: options(),
-    });
+  it('preserves the helper-owned diff baseline across observations', async () => {
+    const first = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });
+    const second = await executeComputerUseCommand({ command: 'get_app_state', arguments: { app: 'TextEdit' }, options: options() });
 
-    expect(click).toMatchObject({
-      ok: true,
-      result: {
-        arguments: {
-          app: 'TextEdit',
-          element_index: 33,
-        },
-      },
-    });
-  });
-
-  it('retains traversal limits when the helper restarts after its idle TTL', async () => {
-    const shortTtlOptions = () => ({ ...options(), idleTtlMs: 20 });
-    const state = await executeComputerUseCommand({
-      command: 'get_app_state',
-      arguments: { app: 'System Settings', maxDepth: 8 },
-      options: shortTtlOptions(),
-    });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const click = await executeComputerUseCommand({
-      command: 'click',
-      arguments: { app: 'System Settings', element_index: 33 },
-      options: shortTtlOptions(),
-    });
-
-    expect((state as { result: { pid: number } }).result.pid).not.toBe((click as { result: { pid: number } }).result.pid);
-    expect(click).toMatchObject({
-      ok: true,
-      result: {
-        arguments: {
-          app: 'System Settings',
-          element_index: 33,
-          maxDepth: 8,
-        },
-      },
-    });
+    expect(first).toMatchObject({ ok: true, result: { stateKind: 'full', stateRevision: 1 } });
+    expect(second).toMatchObject({ ok: true, result: { baseRevision: 1, stateKind: 'diff', stateRevision: 2 } });
+    expect((first as { result: { pid: number } }).result.pid).toBe((second as { result: { pid: number } }).result.pid);
   });
 
   it('starts a new helper after the idle TTL expires', async () => {

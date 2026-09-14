@@ -46,7 +46,7 @@ describe('captureAppshot', () => {
       command: 'screenshot',
     }));
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({
-      arguments: expect.objectContaining({ pid: 42, showCursor: false }),
+      arguments: expect.objectContaining({ includeScreenshot: false, pid: 42, showCursor: false }),
       command: 'get_app_state',
     }));
   });
@@ -67,7 +67,7 @@ describe('captureAppshot', () => {
     const execute = vi.fn(async ({ command }: { command: string }) => command === 'request_screen_capture'
       ? { ok: true as const, result: {} }
       : command === 'screenshot'
-        ? { ok: false as const, error: 'Screen Recording permission is missing.', errorCode: 'permission_denied' as const }
+        ? { ok: false as const, error: 'Permission is missing.', errorCode: 'screen_capture_not_granted' as const }
         : { ok: false as const, error: 'Accessibility denied', errorCode: 'permission_denied' as const });
 
     await expect(captureAppshot({

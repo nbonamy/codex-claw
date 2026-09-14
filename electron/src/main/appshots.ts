@@ -39,13 +39,17 @@ export async function captureAppshot(options: CaptureAppshotOptions = {}): Promi
     execute({ command: 'screenshot', arguments: { pid, scope: 'window' }, options: helperOptions }),
     execute({
       command: 'get_app_state',
-      arguments: { pid, maxDepth: 16, maxNodes: 3_000, maxTextCharacters: 30_000, showCursor: false },
+      arguments: { pid, includeScreenshot: false, maxDepth: 16, maxNodes: 3_000, maxTextCharacters: 30_000, showCursor: false },
       options: helperOptions,
     }),
   ]);
 
   if (!screenshot.ok) {
-    if (screenshot.errorCode === 'permission_denied' || screenshot.error.includes('Screen Recording')) {
+    if (
+      screenshot.errorCode === 'permission_denied'
+      || screenshot.errorCode === 'screen_capture_not_granted'
+      || screenshot.error.includes('Screen Recording')
+    ) {
       await execute({ command: 'request_screen_capture', arguments: {}, options: helperOptions });
       throw new Error('Allow Screen Recording for Codex Claw Computer Use, then try the Appshot again.');
     }

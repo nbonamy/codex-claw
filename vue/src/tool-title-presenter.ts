@@ -19,15 +19,20 @@ const TOOL_KEYS: Record<string, string> = {
   'check-messages': 'checkMessages',
   'computer-use-click': 'computerUseClick',
   'computer-use-dismiss': 'computerUseDismiss',
+  'computer-use-drag': 'computerUseDrag',
   'computer-use-find-apps': 'computerUseFindApps',
   'computer-use-focus-app': 'computerUseFocusApp',
   'computer-use-get-app-state': 'computerUseGetAppState',
   'computer-use-guide': 'computerUseGuide',
   'computer-use-launch-app': 'computerUseLaunchApp',
   'computer-use-list-apps': 'computerUseListApps',
+  'computer-use-paste': 'computerUsePaste',
+  'computer-use-perform-secondary-action': 'computerUsePerformSecondaryAction',
+  'computer-use-press-key': 'computerUsePressKey',
   'computer-use-request-accessibility': 'computerUseRequestAccessibility',
   'computer-use-request-screen-recording': 'computerUseRequestScreenRecording',
   'computer-use-scroll': 'computerUseScroll',
+  'computer-use-select-text': 'computerUseSelectText',
   'computer-use-screenshot': 'computerUseScreenshot',
   'computer-use-set-value': 'computerUseSetValue',
   'computer-use-status': 'computerUseStatus',
@@ -174,11 +179,10 @@ function computerUseTarget(tool: string, args: Record<string, unknown>, result: 
       return count === undefined ? 'open apps' : `${count} open apps`;
     }
     case 'computer-use-scroll': {
-      const deltaY = finiteNumber(args.deltaY);
-      const direction = deltaY === undefined || deltaY === 0 ? '' : deltaY > 0 ? ' down' : ' up';
+      const direction = firstString(args.direction);
       return elementIndex === undefined
-        ? `${direction.trimStart()}${direction ? ' in ' : ''}${app}`
-        : `control #${elementIndex}${direction} in ${app}`;
+        ? `${direction ?? ''}${direction ? ' in ' : ''}${app}`
+        : `control #${elementIndex}${direction ? ` ${direction}` : ''} in ${app}`;
     }
     case 'computer-use-screenshot': {
       if (args.scope === 'screen') {
@@ -188,7 +192,15 @@ function computerUseTarget(tool: string, args: Record<string, unknown>, result: 
       return `${app} window screenshot`;
     }
     case 'computer-use-set-value':
+    case 'computer-use-select-text':
+    case 'computer-use-perform-secondary-action':
       return elementIndex === undefined ? `app control in ${app}` : `control #${elementIndex} in ${app}`;
+    case 'computer-use-press-key': {
+      const key = firstString(args.key);
+      return key ? `${key} in ${app}` : app;
+    }
+    case 'computer-use-drag':
+    case 'computer-use-paste':
     case 'computer-use-type-text':
       return app;
     default:

@@ -20,9 +20,14 @@ const computerUseCommands = [
   'get_app_state',
   'click',
   'dismiss',
+  'press_key',
   'type_text',
+  'paste',
   'set_value',
+  'select_text',
   'scroll',
+  'drag',
+  'perform_secondary_action',
 ] as const;
 
 export type ComputerUseCommand = (typeof computerUseCommands)[number];
@@ -43,20 +48,13 @@ export type ComputerUseStatus = {
   error?: string;
   helperAppPath?: string;
   helperPath?: string;
+  helperVersion?: string;
   platform: NodeJS.Platform;
 };
 
-type ComputerUseErrorCode = 'client_error' | 'permission_denied' | 'timeout' | 'tool_unavailable';
-
 export type ComputerUseResult =
   | { ok: true; result: unknown }
-  | { error: string; errorCode: ComputerUseErrorCode; ok: false };
-
-type AppStateContext = {
-  appIdentities: Set<string>;
-  pilotPath: string;
-  traversalArguments: Record<string, unknown>;
-};
+  | { error: string; errorCode: string; ok: false };
 
 export type ComputerUseOptions = {
   appPath: string;
@@ -69,7 +67,6 @@ export type ComputerUseOptions = {
 };
 
 let livePilot: PersistentPilot | null = null;
-let lastAppStateContext: AppStateContext | null = null;
 
 export async function getComputerUseStatus(options: ComputerUseOptions): Promise<ComputerUseStatus> {
   if (options.platform !== 'darwin') {
@@ -93,6 +90,7 @@ export async function getComputerUseStatus(options: ComputerUseOptions): Promise
     available: true,
     helperAppPath: helperAppPathFromPilotPath(helperPath),
     helperPath,
+    ...(typeof result?.version === 'string' ? { helperVersion: result.version } : {}),
     platform: options.platform,
   };
 }
@@ -129,19 +127,14 @@ export async function executeComputerUseCommand(input: {
     return failure('tool_unavailable', 'Computer Use helper is not built. Run npm run build:computer-use.');
   }
 
-  if (input.command === 'get_app_state') lastAppStateContext = null;
   const commandArguments = cursorlessComputerUseCommands.has(input.command)
     ? { ...input.arguments, showCursor: false }
     : input.arguments;
-  const arguments_ = argumentsWithAppStateContext(input.command, commandArguments, pilotPath);
   const response = await runPilotRequest(pilotPath, {
-    arguments: arguments_,
+    arguments: commandArguments,
     command: input.command,
     id: crypto.randomUUID(),
   }, input.options.idleTtlMs ?? computerUseSessionTimeoutMs);
-  if (response.ok && input.command === 'get_app_state') {
-    lastAppStateContext = appStateContext(pilotPath, input.arguments, response.result);
-  }
   return response;
 }
 
@@ -149,7 +142,6 @@ export async function executeComputerUseCommand(input: {
 export function stopComputerUseHelper(): void {
   livePilot?.stop();
   livePilot = null;
-  lastAppStateContext = null;
 }
 
 export function isComputerUseCommand(value: unknown): value is ComputerUseCommand {
@@ -197,63 +189,6 @@ function runPilotRequest(pilotPath: string, request: Record<string, unknown>, id
     });
   }
   return livePilot.request(request);
-}
-
-function argumentsWithAppStateContext(
-  command: ComputerUseCommand,
-  arguments_: Record<string, unknown>,
-  pilotPath: string,
-): Record<string, unknown> {
-  if (!['click', 'scroll', 'set_value'].includes(command) || !Number.isInteger(arguments_.element_index)) {
-    return arguments_;
-  }
-
-  const context = lastAppStateContext;
-  if (!context || context.pilotPath !== pilotPath || !targetsSameApp(context.appIdentities, arguments_)) {
-    return arguments_;
-  }
-
-  return { ...context.traversalArguments, ...arguments_ };
-}
-
-function appStateContext(
-  pilotPath: string,
-  arguments_: Record<string, unknown>,
-  result: unknown,
-): AppStateContext {
-  const traversalArguments = Object.fromEntries(
-    ['maxDepth', 'maxNodes', 'rootElementIndex']
-      .filter((key) => Object.hasOwn(arguments_, key))
-      .map((key) => [key, arguments_[key]]),
-  );
-  const appIdentities = appIdentityValues(arguments_);
-  const resultApp = record(record(result)?.app);
-  if (resultApp) {
-    for (const identity of appIdentityValues({
-      app: resultApp.localizedName,
-      bundleIdentifier: resultApp.bundleIdentifier,
-      pid: resultApp.pid,
-    })) {
-      appIdentities.add(identity);
-    }
-  }
-  return { appIdentities, pilotPath, traversalArguments };
-}
-
-function targetsSameApp(snapshotIdentities: Set<string>, arguments_: Record<string, unknown>): boolean {
-  const actionIdentities = appIdentityValues(arguments_);
-  if (actionIdentities.size === 0) return true;
-  return [...actionIdentities].some((identity) => snapshotIdentities.has(identity));
-}
-
-function appIdentityValues(arguments_: Record<string, unknown>): Set<string> {
-  const identities = new Set<string>();
-  for (const key of ['app', 'bundleIdentifier', 'path', 'pid']) {
-    const value = arguments_[key];
-    if (typeof value === 'string' && value.length > 0) identities.add(`${key}:${value}`);
-    if (key === 'pid' && typeof value === 'number' && Number.isInteger(value)) identities.add(`${key}:${value}`);
-  }
-  return identities;
 }
 
 class PersistentPilot {
@@ -364,14 +299,11 @@ function parseResponse(line: string): ComputerUseResult {
   }
 }
 
-function normalizeErrorCode(code: string | undefined): ComputerUseErrorCode {
-  if (code === 'accessibility_not_granted' || code === 'screen_capture_not_granted' || code === 'permission_denied') return 'permission_denied';
-  if (code === 'timeout') return 'timeout';
-  if (code === 'tool_unavailable') return 'tool_unavailable';
-  return 'client_error';
+function normalizeErrorCode(code: string | undefined): string {
+  return code || 'client_error';
 }
 
-function failure(errorCode: ComputerUseErrorCode, error: string): ComputerUseResult {
+function failure(errorCode: string, error: string): ComputerUseResult {
   return { error, errorCode, ok: false };
 }
 
