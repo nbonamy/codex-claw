@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.17.0",
+  "currentVersion": "0.18.0",
   "releases": [
+    {
+      "version": "0.18.0",
+      "releasedAt": "2026-09-13",
+      "sourceSha256": "7381d2d7f6705aeaec3d1c629c3a76a9103de71be0b49d13d353c178f0e90721",
+      "markdown": "### New features\n\n- Connected GitHub accounts now give Codex and Claude agents access to\n  GitHub's hosted MCP tools through Claw-managed, automatically refreshed\n  credentials. Claw avoids duplicate GitHub tool surfaces while preserving the\n  ChatGPT connector as a fallback when its own GitHub connection is unavailable.\n- Create an empty Git-backed project directly from the Add Project menu.\n- Choose which changes to review from the agent header: the current branch,\n  all uncommitted work, unstaged or staged changes, the latest turn, or an\n  individual recent commit.\n\n### Improvements and fixes\n\n- Switching teams now updates immediately and shows the selected conversation's\n  loading state instead of blocking navigation or briefly appearing empty.\n- Git statistics refresh while an active agent edits files, and Git reviews now\n  load reliably without clone errors or hiding valid branch and commit diffs.\n- Assistant activity keeps its original order around final responses, and\n  generated media produced during a turn stays grouped with its collapsible\n  work details."
+    },
     {
       "version": "0.17.0",
       "releasedAt": "2026-09-08",

@@ -4,6 +4,29 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.18.0] - 2026-09-13
+
+### New features
+
+- Connected GitHub accounts now give Codex and Claude agents access to
+  GitHub's hosted MCP tools through Claw-managed, automatically refreshed
+  credentials. Claw avoids duplicate GitHub tool surfaces while preserving the
+  ChatGPT connector as a fallback when its own GitHub connection is unavailable.
+- Create an empty Git-backed project directly from the Add Project menu.
+- Choose which changes to review from the agent header: the current branch,
+  all uncommitted work, unstaged or staged changes, the latest turn, or an
+  individual recent commit.
+
+### Improvements and fixes
+
+- Switching teams now updates immediately and shows the selected conversation's
+  loading state instead of blocking navigation or briefly appearing empty.
+- Git statistics refresh while an active agent edits files, and Git reviews now
+  load reliably without clone errors or hiding valid branch and commit diffs.
+- Assistant activity keeps its original order around final responses, and
+  generated media produced during a turn stays grouped with its collapsible
+  work details.
+
 ## [0.17.0] - 2026-09-08
 
 ### New features
