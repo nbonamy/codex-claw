@@ -71,7 +71,7 @@ export function applyRuntimeEventToSnapshot(
   }
 
   if (event.type === 'agent.statusChanged') {
-    setAgentStatus(snapshot, event.agentId, event.payload);
+    setAgentStatus(snapshot, event.agentId, event.payload, event.occurredAt);
     return;
   }
 

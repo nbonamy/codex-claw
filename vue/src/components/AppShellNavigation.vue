@@ -2,7 +2,9 @@
   <TeamRail
     :teams="snapshot.teams"
     :unread-team-ids="unreadTeamIds"
-    :active-team-id="cockpitVisible || automationsVisible || settingsVisible ? null : (activeTeam?.id ?? null)"
+    :working-team-ids="workingTeamIds"
+    :active-team-id="backlogVisible || cockpitVisible || automationsVisible || settingsVisible ? null : (activeTeam?.id ?? null)"
+    :backlog-active="backlogVisible"
     :cockpit-active="cockpitVisible"
     :automations-active="automationsVisible"
     :settings-active="settingsVisible"
@@ -22,6 +24,7 @@
     @quit="quit"
     @reorder-teams="$emit('reorder-teams', $event)"
     @select-cockpit="openCockpit"
+    @select-backlog="openBacklog"
     @select-automations="openAutomations"
     @select-team="selectTeamFromRail"
     @toggle-speech-mute="$emit('toggle-speech-mute')"
@@ -103,6 +106,7 @@ const props = defineProps<{
   agentSidebarWidth: number;
   authentication: CodexAuthentication | null;
   automationsVisible: boolean;
+  backlogVisible: boolean;
   cockpitVisible: boolean;
   currentAgent: Agent | null;
   forkableAgentIds: string[];
@@ -114,6 +118,7 @@ const props = defineProps<{
   snapshot: AppSnapshot;
   unreadAgentIds?: string[];
   unreadTeamIds: string[];
+  workingTeamIds: string[];
 }>();
 
 const emit = defineEmits<{
@@ -135,6 +140,7 @@ const emit = defineEmits<{
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'new-team': [];
   'open-automations': [];
+  'open-backlog': [];
   'open-cockpit': [];
   'open-in': [payload: { agentId: string; application: OpenInApplication }];
   'open-settings': [];
@@ -170,6 +176,7 @@ const {
   agentSidebarWidth,
   authentication,
   automationsVisible,
+  backlogVisible,
   cockpitVisible,
   currentAgent,
   forkableAgentIds,
@@ -181,6 +188,7 @@ const {
   snapshot,
   unreadAgentIds,
   unreadTeamIds,
+  workingTeamIds,
 } = toRefs(props);
 
 function createQuickChat(): void {
@@ -201,6 +209,10 @@ function openAgentIn(agentId: string, application: OpenInApplication): void {
 
 function openAutomations(): void {
   emit('open-automations');
+}
+
+function openBacklog(): void {
+  emit('open-backlog');
 }
 
 function openCockpit(): void {

@@ -32,6 +32,7 @@
       :agent-sidebar-width="agentSidebarWidth"
       :authentication="authentication"
       :automations-visible="automationsVisible"
+      :backlog-visible="backlogVisible"
       :cockpit-visible="cockpitVisible"
       :current-agent="currentAgent"
       :forkable-agent-ids="forkableAgentIds"
@@ -43,6 +44,7 @@
       :snapshot="snapshot"
       :unread-agent-ids="unreadAgentIds"
       :unread-team-ids="unreadTeamIds"
+      :working-team-ids="workingTeamIds"
       @close-team="$emit('close-team', $event)"
       @close-agent="$emit('close-agent', $event)"
       @compress-session="$emit('compress-session', $event)"
@@ -61,6 +63,7 @@
       @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @new-team="openNewTeam"
       @open-automations="openAutomations"
+      @open-backlog="openBacklog"
       @open-cockpit="openCockpit"
       @open-in="openAgentIn($event.agentId, $event.application)"
       @open-settings="openSettings"
@@ -148,29 +151,38 @@
         v-else-if="cockpitVisible"
         :agents="snapshot.agents"
         :forkable-agent-ids="forkableAgentIds"
-        :default-team-id="snapshot.activeTeamId"
         :repository-icons="snapshot.general.repositoryIcons"
-        :start-work-items-action="startCockpitWorkItems"
         :teams="snapshot.teams"
-        :work-backlog="cockpitWorkBacklog"
+        :view-mode="snapshot.general.cockpitAgentViewMode"
         @add-agent="openNewAgent"
-        @assign-work-item-to-new-agent="openNewAgentForWorkItem"
-        @assign-work-item="assignExistingAgentWorkItem"
         @close-agent="$emit('close-agent', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
+        @restart-agent="$emit('restart-agent', $event)"
+        @select-agent="selectAgentFromCockpit"
+        @select-team="selectTeamFromRail"
+        @update-view-mode="updateCockpitAgentViewMode"
+      />
+      <BacklogView
+        v-else-if="backlogVisible"
+        :agents="snapshot.agents"
+        :default-team-id="snapshot.activeTeamId"
+        :repository-icons="snapshot.general.repositoryIcons"
+        :start-work-items-action="startCockpitWorkItems"
+        :teams="snapshot.teams"
+        :work-backlog="cockpitWorkBacklog"
+        @assign-work-item-to-new-agent="openNewAgentForWorkItem"
+        @assign-work-item="assignExistingAgentWorkItem"
         @refresh-work-items="refreshWorkItems"
         @change-work-items-page="changeGlobalWorkItemsPage"
         @select-global-scope="selectGlobalBacklogScope"
-        @restart-agent="$emit('restart-agent', $event)"
         @select-work-tag="selectWorkTagForCockpit"
         @select-work-assignee="selectWorkAssigneeForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
-        @select-team="selectTeamFromRail"
       />
       <AgentWorkspace
         v-else
@@ -378,7 +390,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -392,6 +404,7 @@ import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import NewProjectDialog from './NewProjectDialog.vue';
 import CockpitView from './CockpitView.vue';
+import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
 import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
@@ -719,7 +732,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-type AppSurface = 'agent' | 'cockpit' | 'automations' | 'settings';
+type AppSurface = 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
@@ -787,7 +800,7 @@ const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const whatsNewVisible = ref(false);
 const editingTeamId = ref<string | null>(null);
-let cockpitInitialized = false;
+let backlogInitialized = false;
 const activeTeam = computed<Team | null>(() => {
   const selectedTeam = props.snapshot.activeTeamId
     ? props.snapshot.teams.find((team) => team.id === props.snapshot.activeTeamId) ?? null
@@ -980,9 +993,17 @@ const unreadTeamIds = computed(() => {
   const unreadAgentIdSet = new Set(props.unreadAgentIds);
   return props.snapshot.teams
     .filter((team) => (
-      (activeSurface.value === 'cockpit' || team.id !== activeTeam.value?.id)
+      (activeSurface.value !== 'agent' || team.id !== activeTeam.value?.id)
       && team.agentIds.some((agentId) => unreadAgentIdSet.has(agentId))
     ))
+    .map((team) => team.id);
+});
+const workingTeamIds = computed(() => {
+  const workingAgentIds = new Set(props.snapshot.agents
+    .filter((agent) => agent.status.type === 'working')
+    .map((agent) => agent.id));
+  return props.snapshot.teams
+    .filter((team) => team.agentIds.some((agentId) => workingAgentIds.has(agentId)))
     .map((team) => team.id);
 });
 const forkableAgentIds = computed(() => props.snapshot.agents
@@ -1481,6 +1502,7 @@ const pendingNewAgentWorktreeBranchName = computed(() => (
 ));
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
+const backlogVisible = computed(() => activeSurface.value === 'backlog');
 const automationsVisible = computed(() => activeSurface.value === 'automations');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
@@ -1786,10 +1808,14 @@ async function resolveSelectedTeam(teamId: string | null | undefined, newTeamNam
   return teamId?.trim() || props.snapshot.activeTeamId;
 }
 
-async function openCockpit(): Promise<void> {
-  if (cockpitVisible.value && cockpitInitialized) return;
+function openCockpit(): void {
   activeSurface.value = 'cockpit';
-  cockpitInitialized = true;
+}
+
+async function openBacklog(): Promise<void> {
+  if (backlogVisible.value && backlogInitialized) return;
+  activeSurface.value = 'backlog';
+  backlogInitialized = true;
   await initializeCockpitBacklog();
 }
 
@@ -1960,6 +1986,10 @@ async function updateRepositoryIcon(payload: {
 
 async function updateCollapsedRepositories(collapsedRepositoryKeys: string[]): Promise<void> {
   await updateSettings({ general: { collapsedRepositoryKeys } });
+}
+
+function updateCockpitAgentViewMode(cockpitAgentViewMode: CockpitAgentViewMode): void {
+  void updateSettings({ general: { cockpitAgentViewMode } });
 }
 
 async function setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<void> {

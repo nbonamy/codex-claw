@@ -1,11 +1,11 @@
 <template>
   <main class="cockpit-agents">
     <section
-      v-for="section in teamSections"
-      :key="section.team.id"
+      v-for="section in agentSections"
+      :key="section.id"
       class="cockpit-agents__team"
     >
-      <header class="cockpit-agents__team-header">
+      <header v-if="section.team" class="cockpit-agents__team-header">
         <span
           class="cockpit-agents__team-marker"
           :style="{ backgroundColor: section.team.color ?? defaultTeamColor }"
@@ -40,7 +40,7 @@
       <p v-if="section.agents.length === 0" class="cockpit-agents__empty">{{ $t('surface.cockpitAgentsView.noAgents') }}</p>
 
       <div
-        :ref="(element) => setGridRef(section.team.id, element)"
+        :ref="(element) => setGridRef(section.id, element)"
         class="cockpit-agents__grid"
       >
         <CockpitAgentCard
@@ -50,13 +50,14 @@
           :repository-icon="repositoryIconForAgent(agent, repositoryIcons)"
           :dragged-work-item="null"
           :drop-target="false"
+          :show-last-activity="mode === 'recent'"
           @open-agent-menu="openAgentMenu"
           @prompt="emit('prompt-agent', $event)"
-          @select="emit('select-agent', { agentId: agent.id, teamId: section.team.id })"
+          @select="selectAgent(agent)"
         />
 
         <CockpitAddAgentTile
-          v-if="section.showGridAdd"
+          v-if="section.team && section.showGridAdd"
           :dragged-work-item="null"
           :team-id="section.team.id"
           @new-agent="emit('add-agent', $event)"
@@ -81,7 +82,7 @@
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, Team } from '@codex-claw/core/contracts';
+import type { Agent, AgentStatus, CockpitAgentViewMode, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import AgentContextMenu from './AgentContextMenu.vue';
@@ -89,24 +90,29 @@ import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import CockpitAddAgentTile from './CockpitAddAgentTile.vue';
 import CockpitAgentCard from './CockpitAgentCard.vue';
 import NewAgentButton from './NewAgentButton.vue';
+import { projectCockpitAgentSections } from './cockpit-agent-layout';
 
 type StatusSummaryItem = { count: number; label: string; status: AgentStatus['type'] };
-type TeamSection = {
+type AgentSectionLayout = {
   agents: Agent[];
+  id: string;
   showGridAdd: boolean;
   showHeaderAdd: boolean;
   statusSummary: StatusSummaryItem[];
-  team: Team;
+  team: Team | null;
 };
 
 const DEFAULT_GRID_COLUMNS = 3;
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   agents: Agent[];
   forkableAgentIds?: string[];
+  mode?: CockpitAgentViewMode;
   repositoryIcons?: Record<string, string>;
   teams: Team[];
-}>();
+}>(), {
+  mode: 'teams',
+});
 
 const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 
@@ -124,7 +130,7 @@ const emit = defineEmits<{
 }>();
 
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
-const columnsByTeam = ref<Record<string, number>>({});
+const columnsBySection = ref<Record<string, number>>({});
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuPosition = ref({ x: 0, y: 0 });
 const gridElements = new Map<string, HTMLElement>();
@@ -140,17 +146,18 @@ const contextMenuMoveTargets = computed(() => {
   const agent = contextMenuAgent.value;
   return agent ? props.teams.filter((team) => team.id !== agent.teamId) : [];
 });
-const teamSections = computed<TeamSection[]>(() => props.teams.map((team) => {
-  const agents = team.agentIds
-    .map((agentId) => agentsById.value.get(agentId))
-    .filter((agent): agent is Agent => Boolean(agent));
-  const columns = columnsByTeam.value[team.id] ?? DEFAULT_GRID_COLUMNS;
+const mode = computed(() => props.mode);
+const agentSections = computed<AgentSectionLayout[]>(() => projectCockpitAgentSections({
+  agents: props.agents,
+  mode: props.mode,
+  teams: props.teams,
+}).map((section) => {
+  const columns = columnsBySection.value[section.id] ?? DEFAULT_GRID_COLUMNS;
   return {
-    agents,
-    showGridAdd: agents.length === 0 || agents.length % columns !== 0,
-    showHeaderAdd: agents.length > 0 && agents.length % columns === 0,
-    statusSummary: statusCounts(agents),
-    team,
+    ...section,
+    showGridAdd: Boolean(section.team) && (section.agents.length === 0 || section.agents.length % columns !== 0),
+    showHeaderAdd: Boolean(section.team) && section.agents.length > 0 && section.agents.length % columns === 0,
+    statusSummary: statusCounts(section.agents),
   };
 }));
 
@@ -158,8 +165,8 @@ onMounted(() => {
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const teamId = entry.target instanceof HTMLElement ? entry.target.dataset.teamId : undefined;
-        if (teamId) measureGridColumns(teamId, entry.target as HTMLElement);
+        const sectionId = entry.target instanceof HTMLElement ? entry.target.dataset.sectionId : undefined;
+        if (sectionId) measureGridColumns(sectionId, entry.target as HTMLElement);
       }
     });
     for (const element of gridElements.values()) resizeObserver.observe(element);
@@ -172,42 +179,49 @@ onBeforeUnmount(() => {
   gridElements.clear();
 });
 
-watch(() => props.teams.map((team) => team.id).join('\0'), () => void nextTick(measureAllGrids));
+watch(() => `${props.mode}\0${props.teams.map((team) => team.id).join('\0')}`, () => void nextTick(measureAllGrids));
 
-function setGridRef(teamId: string, element: Element | ComponentPublicInstance | null): void {
+function setGridRef(sectionId: string, element: Element | ComponentPublicInstance | null): void {
   const htmlElement = element instanceof HTMLElement
     ? element
     : (element as ComponentPublicInstance | null)?.$el instanceof HTMLElement
       ? (element as ComponentPublicInstance).$el as HTMLElement
       : null;
-  const previous = gridElements.get(teamId);
+  const previous = gridElements.get(sectionId);
   if (previous && previous !== htmlElement) resizeObserver?.unobserve(previous);
   if (!htmlElement) {
-    gridElements.delete(teamId);
+    gridElements.delete(sectionId);
     return;
   }
-  htmlElement.dataset.teamId = teamId;
-  gridElements.set(teamId, htmlElement);
+  htmlElement.dataset.sectionId = sectionId;
+  gridElements.set(sectionId, htmlElement);
   resizeObserver?.observe(htmlElement);
-  measureGridColumns(teamId, htmlElement);
+  measureGridColumns(sectionId, htmlElement);
 }
 
 function measureAllGrids(): void {
-  for (const [teamId, element] of gridElements) measureGridColumns(teamId, element);
+  for (const [sectionId, element] of gridElements) measureGridColumns(sectionId, element);
 }
 
-function measureGridColumns(teamId: string, element: HTMLElement): void {
+function measureGridColumns(sectionId: string, element: HTMLElement): void {
   const styles = getComputedStyle(element);
   const tileWidth = Number.parseFloat(styles.getPropertyValue('--cockpit-tile-width')) || 320;
   const gap = Number.parseFloat(styles.columnGap) || 12;
   const width = element.clientWidth || element.getBoundingClientRect().width;
   const columns = width > 0 ? Math.max(1, Math.floor((width + gap) / (tileWidth + gap))) : DEFAULT_GRID_COLUMNS;
-  if (columnsByTeam.value[teamId] !== columns) columnsByTeam.value = { ...columnsByTeam.value, [teamId]: columns };
+  if (columnsBySection.value[sectionId] !== columns) {
+    columnsBySection.value = { ...columnsBySection.value, [sectionId]: columns };
+  }
 }
 
 function openAgentMenu(payload: { agentId: string; x: number; y: number }): void {
   contextMenuAgentId.value = payload.agentId;
   contextMenuPosition.value = { x: payload.x, y: payload.y };
+}
+
+function selectAgent(agent: Agent): void {
+  const teamId = agent.teamId ?? props.teams.find((team) => team.agentIds.includes(agent.id))?.id;
+  if (teamId) emit('select-agent', { agentId: agent.id, teamId });
 }
 
 function emitContextAgentAction(action: AgentContextMenuAction): void {

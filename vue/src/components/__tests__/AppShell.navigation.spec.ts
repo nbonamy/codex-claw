@@ -325,23 +325,52 @@ describe('AppShell navigation and teams', () => {
       .toContain('team-rail__team--unread');
   });
 
-  it('opens cockpit from the first rail item and navigates back to an agent', async () => {
+  it('derives working teams from their active agents', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.status = { type: 'working' };
+    snapshot.agents[1]!.status = { type: 'idle' };
+
     const wrapper = mountShell({ snapshot });
+
+    expect(wrapper.getComponent({ name: 'TeamRail' }).props('workingTeamIds'))
+      .toStrictEqual(['team-codex-claw']);
+  });
+
+  it('opens cockpit from the rail and navigates back to an agent', async () => {
+    const snapshot = createInitialSnapshot();
+    const loadWorkRepositories = vi.fn().mockResolvedValue([]);
+    const loadGlobalWorkItems = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 });
+    const wrapper = mountShell({ snapshot, loadGlobalWorkItems, loadWorkRepositories });
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
 
-    expect(wrapper.find('.cockpit-view').exists()).toBe(true);
+    expect(wrapper.find('.agent-cockpit').exists()).toBe(true);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
+    expect(loadWorkRepositories).not.toHaveBeenCalled();
+    expect(loadGlobalWorkItems).not.toHaveBeenCalled();
 
     await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
 
-    expect(wrapper.find('.cockpit-view').exists()).toBe(false);
+    expect(wrapper.find('.agent-cockpit').exists()).toBe(false);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
     expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
+  it('persists the selected Cockpit agent ordering', async () => {
+    const snapshot = createInitialSnapshot();
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, updateSettings });
+
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    wrapper.getComponent({ name: 'CockpitView' }).vm.$emit('update-view-mode', 'recent');
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { cockpitAgentViewMode: 'recent' },
+    });
   });
 
   it('opens automations from the rail without keeping a team active', async () => {
@@ -450,8 +479,8 @@ describe('AppShell navigation and teams', () => {
       },
     });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('assign-work-item', {
       agentId: 'agent-dina',
       item,
     });
@@ -484,7 +513,7 @@ describe('AppShell navigation and teams', () => {
     const loadGlobalWorkItems = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 });
     const wrapper = mountShell({ snapshot, loadWorkRepositories, loadWorkItems, loadGlobalWorkItems });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
     await flushPromises();
 
     expect(loadWorkRepositories).toHaveBeenCalledWith('github');
@@ -508,7 +537,7 @@ describe('AppShell navigation and teams', () => {
     const confirm = vi.spyOn(ElMessageBox, 'confirm');
     const wrapper = mountShell({ snapshot, loadWorkRepositories, loadGlobalWorkItems });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
     await flushPromises();
 
     expect(confirm).not.toHaveBeenCalled();
@@ -534,10 +563,10 @@ describe('AppShell navigation and teams', () => {
       loadGlobalWorkItems,
       workRepositoriesByProvider: { github: [repository] },
     });
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
     await flushPromises();
 
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('select-global-scope', 'all');
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('select-global-scope', 'all');
     await flushPromises();
 
     expect(window.localStorage.getItem('cockpitGlobalScope:github')).toBe('all');
@@ -560,9 +589,9 @@ describe('AppShell navigation and teams', () => {
       loadGlobalWorkItems,
     });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
     await flushPromises();
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('change-work-items-page', 2);
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('change-work-items-page', 2);
     await flushPromises();
 
     expect(loadGlobalWorkItems).toHaveBeenNthCalledWith(2, 'github', undefined, {
@@ -570,7 +599,7 @@ describe('AppShell navigation and teams', () => {
     });
     expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [second], page: 2, totalItems: 26 });
 
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('change-work-items-page', 1);
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('change-work-items-page', 1);
     await flushPromises();
     expect(loadGlobalWorkItems).toHaveBeenCalledTimes(2);
     expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [first], page: 1, totalItems: 26 });

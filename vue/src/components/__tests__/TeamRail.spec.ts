@@ -42,6 +42,7 @@ describe('TeamRail', () => {
     });
 
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('[aria-label="Backlog"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').text()).toBe('SK');
     expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
@@ -53,6 +54,8 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.find('.team-rail__header').exists()).toBe(true);
     expect(wrapper.get('.team-rail__body').find('[aria-label="Cockpit"]').exists()).toBe(true);
+    expect(wrapper.get('.team-rail__body').findAll('button').slice(0, 2).map((button) => button.attributes('aria-label')))
+      .toStrictEqual(['Backlog', 'Cockpit']);
   });
 
   it('marks when the adjacent agent sidebar is expanded', () => {
@@ -84,12 +87,39 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Codex Claw"]').find('.team-rail__unread-indicator').exists()).toBe(false);
   });
 
+  it('reuses the corner dot for working activity with unread taking precedence', () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-claw',
+      unreadTeamIds: ['team-sk'],
+      workingTeamIds: ['team-sk', 'team-claw'],
+    });
+
+    const workingUnread = wrapper.get('[aria-label="Skwad, agents working, unread activity"]');
+    const activeWorking = wrapper.get('[aria-label="Codex Claw, agents working"]');
+    expect(workingUnread.get('.team-rail__unread-indicator').classes())
+      .not.toContain('team-rail__unread-indicator--working');
+    expect(workingUnread.findAll('.team-rail__unread-indicator')).toHaveLength(1);
+    expect(activeWorking.find('.team-rail__unread-indicator').exists()).toBe(false);
+    expect(activeWorking.classes()).toContain('team-rail__team--active');
+
+    const workingOnly = mountRail({
+      teams,
+      activeTeamId: 'team-claw',
+      workingTeamIds: ['team-sk'],
+    }).get('[aria-label="Skwad, agents working"]');
+    expect(workingOnly.get('.team-rail__unread-indicator').classes())
+      .toContain('team-rail__unread-indicator--working');
+  });
+
   it('renders team identities and the create action as rounded squares', () => {
     expect(teamRailSource()).toMatch(/\.team-rail__team \{[\s\S]*?border-radius: var\(--radius-lg\);/);
     expect(teamRailSource()).toMatch(/\.team-rail__new \{[\s\S]*?border-radius: var\(--radius-lg\);/);
     expect(teamRailSource()).toMatch(/\.team-rail__team--active \{[\s\S]*?outline-offset: 2px;/);
     const unreadIndicatorStyles = teamRailSource().match(/\.team-rail__unread-indicator \{([^}]*)\}/)?.[1];
     expect(unreadIndicatorStyles).not.toContain('border:');
+    expect(teamRailSource()).toMatch(/\.team-rail__unread-indicator--working \{[^}]*background: var\(--color-warning\);[^}]*animation: team-working-color-pulse/);
+    expect(teamRailSource()).toMatch(/prefers-reduced-motion: reduce[\s\S]*?\.team-rail__unread-indicator--working \{[^}]*animation: none;/);
   });
 
   it('falls back to team initials when no avatar is set', () => {
@@ -142,6 +172,21 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.emitted('select-cockpit')).toStrictEqual([[]]);
+  });
+
+  it('emits backlog selection and marks it active', async () => {
+    const wrapper = mountRail({
+      teams,
+      activeTeamId: 'team-sk',
+      backlogActive: true,
+    });
+
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+
+    expect(wrapper.get('[aria-label="Backlog"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[aria-label="Backlog"]').classes()).toContain('team-rail__backlog--active');
+    expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
+    expect(wrapper.emitted('select-backlog')).toStrictEqual([[]]);
   });
 
   it('refreshes the cockpit icon from team colors', async () => {
@@ -477,6 +522,7 @@ describe('TeamRail', () => {
 function mountRail(props: {
   teams: Team[];
   activeTeamId: string | null;
+  backlogActive?: boolean;
   cockpitActive?: boolean;
   automationsActive?: boolean;
   rateLimits?: AccountRateLimits;
@@ -485,6 +531,7 @@ function mountRail(props: {
   spokenAnnouncementsEnabled?: boolean;
   spokenAnnouncementsMuted?: boolean;
   unreadTeamIds?: string[];
+  workingTeamIds?: string[];
 }) {
   const wrapper = mount(TeamRail, {
     attachTo: document.body,

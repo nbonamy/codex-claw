@@ -41,4 +41,25 @@ describe('CockpitAgentsView', () => {
 
     expect(wrapper.emitted('add-agent')).toStrictEqual([['team-codex-claw']]);
   });
+
+  it('shows one recent grid without team creation affordances', () => {
+    const snapshot = createInitialSnapshot();
+    const agents = snapshot.agents.map((agent, index) => ({
+      ...agent,
+      updatedAt: index === 0 ? '2026-09-14T12:00:00.000Z' : '2026-09-14T13:00:00.000Z',
+    }));
+    const wrapper = mount(CockpitAgentsView, {
+      props: { agents, mode: 'recent', teams: snapshot.teams },
+      global: { plugins: [ElementPlus] },
+    });
+
+    expect(wrapper.findAll('.cockpit-agents__team')).toHaveLength(1);
+    expect(wrapper.find('.cockpit-agents__team-header').exists()).toBe(false);
+    expect(wrapper.find('.cockpit-view__add-card').exists()).toBe(false);
+    expect(wrapper.findAll('.cockpit-view__agent-card').map((card) => card.text())).toStrictEqual([
+      expect.stringContaining('Jesse'),
+      expect.stringContaining('Dina'),
+    ]);
+    expect(wrapper.text()).toContain('Active');
+  });
 });

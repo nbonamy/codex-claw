@@ -65,6 +65,8 @@ export const messages = {
       },
       teamColor: 'Use color {color}',
       teamUnread: '{team}, unread activity',
+      teamWorking: '{team}, agents working',
+      teamWorkingUnread: '{team}, agents working, unread activity',
       version: 'Version {version}',
       misc: {
         assignAnyway: 'Assign Anyway',

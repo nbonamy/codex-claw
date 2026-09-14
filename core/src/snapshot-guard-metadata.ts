@@ -85,6 +85,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'statusText', isString) &&
     isAgentStatus(value.status) &&
     typeof value.createdAt === 'string' &&
+    optional(value, 'lastActivityAt', isString) &&
     typeof value.updatedAt === 'string';
 }
 
@@ -489,6 +490,7 @@ function isGeneralSettings(value: unknown): boolean {
     typeof value.codexBinaryPath === 'string' &&
     typeof value.claudeCodeEnabled === 'boolean' &&
     typeof value.agentListCompact === 'boolean' &&
+    includes(['teams', 'recent'], value.cockpitAgentViewMode) &&
     isArrayOf(value.collapsedRepositoryKeys, isString) &&
     typeof value.shareCodexSkillsAndPlugins === 'boolean' &&
     typeof value.sessionCompressionWarningEnabled === 'boolean' &&

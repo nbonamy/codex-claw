@@ -400,11 +400,11 @@ describe('AppShell work routing', () => {
       },
     });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    const cockpit = wrapper.findComponent({ name: 'CockpitView' });
-    cockpit.vm.$emit('select-work-repository', 'nbonamy/codex-claw');
-    cockpit.vm.$emit('select-work-assignee', 'nbonamy');
-    cockpit.vm.$emit('select-work-tag', 'bug');
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    const backlog = wrapper.findComponent({ name: 'BacklogView' });
+    backlog.vm.$emit('select-work-repository', 'nbonamy/codex-claw');
+    backlog.vm.$emit('select-work-assignee', 'nbonamy');
+    backlog.vm.$emit('select-work-tag', 'bug');
     await flushPromises();
 
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(1, {
@@ -443,8 +443,8 @@ describe('AppShell work routing', () => {
     };
     const wrapper = mountShell({ snapshot });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('assign-work-item', {
       agentId: 'agent-dina',
       item,
     });
@@ -474,8 +474,8 @@ describe('AppShell work routing', () => {
     };
     const wrapper = mountShell({ snapshot });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item', {
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('assign-work-item', {
       agentId: 'agent-dina',
       item,
     });
@@ -576,8 +576,8 @@ describe('AppShell work routing', () => {
       }],
     });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    wrapper.findComponent({ name: 'CockpitView' }).vm.$emit('assign-work-item-to-new-agent', { item });
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('assign-work-item-to-new-agent', { item });
     await flushPromises();
 
     const agentDialog = wrapper.findComponent({ name: 'AgentDialog' });
@@ -652,8 +652,8 @@ describe('AppShell work routing', () => {
       }],
     });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    const startWorkItemsAction = wrapper.findComponent({ name: 'CockpitView' }).props('startWorkItemsAction') as (input: {
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    const startWorkItemsAction = wrapper.findComponent({ name: 'BacklogView' }).props('startWorkItemsAction') as (input: {
       action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string;
     }) => Promise<void>;
     await startWorkItemsAction({ action: 'fix', items: [first, second], teamId: 'team-codex-claw' });
@@ -722,8 +722,8 @@ describe('AppShell work routing', () => {
       }],
     });
 
-    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
-    const startWorkItemsAction = wrapper.findComponent({ name: 'CockpitView' }).props('startWorkItemsAction') as (input: {
+    await wrapper.get('[aria-label="Backlog"]').trigger('click');
+    const startWorkItemsAction = wrapper.findComponent({ name: 'BacklogView' }).props('startWorkItemsAction') as (input: {
       action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string;
     }) => Promise<void>;
     await startWorkItemsAction({ action: 'fix', items: [listedItem], teamId: 'team-codex-claw' });

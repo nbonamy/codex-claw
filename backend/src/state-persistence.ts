@@ -40,6 +40,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   plan?: ThreadPlan;
   goal?: ThreadGoal;
   statusText?: string;
+  lastActivityAt?: string;
   teamId?: string;
 };
 
@@ -163,6 +164,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
+    ...(agent.lastActivityAt ? { lastActivityAt: agent.lastActivityAt } : {}),
     updatedAt: agent.updatedAt,
   };
 }
@@ -349,6 +351,7 @@ function sanitizeAgent(value: unknown): Agent | null {
 
   const createdAt = typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString();
   const updatedAt = typeof value.updatedAt === 'string' ? value.updatedAt : createdAt;
+  const lastActivityAt = typeof value.lastActivityAt === 'string' ? value.lastActivityAt : updatedAt;
   const contextUsage = sanitizeContextUsage(value.contextUsage);
   const backend = sanitizeBackend(value.backend) ?? 'codex';
   const backendSession = sanitizeBackendSession(value.backendSession, backend);
@@ -383,6 +386,7 @@ function sanitizeAgent(value: unknown): Agent | null {
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,
+    lastActivityAt,
     updatedAt,
   };
 }

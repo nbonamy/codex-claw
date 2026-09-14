@@ -15,6 +15,7 @@ function mountNavigation() {
       agentSidebarWidth: 260,
       authentication: null,
       automationsVisible: false,
+      backlogVisible: false,
       cockpitVisible: false,
       currentAgent: snapshot.agents[0] ?? null,
       forkableAgentIds: [],
@@ -26,6 +27,7 @@ function mountNavigation() {
       snapshot,
       unreadAgentIds: [],
       unreadTeamIds: [],
+      workingTeamIds: [],
     },
   });
 }
@@ -36,10 +38,14 @@ describe('AppShellNavigation', () => {
     const rail = wrapper.getComponent({ name: 'TeamRail' });
 
     rail.vm.$emit('new-team');
+    rail.vm.$emit('select-backlog');
+    rail.vm.$emit('select-cockpit');
     rail.vm.$emit('select-team', 'team-codex-claw');
     rail.vm.$emit('toggle-speech-mute');
 
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
+    expect(wrapper.emitted('open-backlog')).toStrictEqual([[]]);
+    expect(wrapper.emitted('open-cockpit')).toStrictEqual([[]]);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
     expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
   });

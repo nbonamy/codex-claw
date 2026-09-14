@@ -290,6 +290,7 @@ describe('AppStatePersistence', () => {
       mcpSessionId: 'mcp-session',
       statusText: 'Registered',
       status: { type: 'working', detail: 'busy' },
+      lastActivityAt: '2026-06-04T23:59:00.000Z',
     };
     snapshot.workBacklog.assignments = {
       'github:nbonamy/codex-claw#12': {
@@ -363,6 +364,7 @@ describe('AppStatePersistence', () => {
     expect(writtenAgent).not.toHaveProperty('isRegistered');
     expect(writtenAgent).not.toHaveProperty('mcpSessionId');
     expect(writtenAgent.statusText).toBe('Registered');
+    expect(writtenAgent.lastActivityAt).toBe('2026-06-04T23:59:00.000Z');
     expect(writtenAgent).not.toHaveProperty('status');
   });
 
@@ -434,6 +436,7 @@ describe('AppStatePersistence', () => {
       mcpSessionId: 'mcp-session',
       statusText: 'Registered',
       status: { type: 'working', detail: 'busy' },
+      lastActivityAt: '2026-06-04T23:59:00.000Z',
     };
 
     const persisted = persistedStateFromSnapshot(snapshot);
@@ -523,6 +526,7 @@ describe('AppStatePersistence', () => {
       statusText: 'Registered',
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
+      lastActivityAt: '2026-06-04T23:59:00.000Z',
       updatedAt: '2026-06-05T00:00:00.000Z',
     });
     expect(restored.backendRuntimes).toStrictEqual(createEmptySnapshot().backendRuntimes);
@@ -955,6 +959,7 @@ describe('AppStatePersistence', () => {
     expect(restored.activeTeamId).toBe('team-codex-claw');
     expect(restored.teams[0].color).toBe('#1B4FB2');
     expect(restored.teams[0].agentIds).toStrictEqual(['agent-jules']);
+    expect(restored.agents[0].lastActivityAt).toBe('now');
   });
 
   it('persists and restores normalized appearance settings', () => {
@@ -987,6 +992,7 @@ describe('AppStatePersistence', () => {
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       agentListCompact: true,
+      cockpitAgentViewMode: 'recent',
       collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
       modelFavorites: [{
         backend: 'codex',

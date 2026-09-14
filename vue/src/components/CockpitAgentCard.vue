@@ -19,6 +19,11 @@
         :name="displayName"
         size="lg"
       />
+      <FolderRootIcon
+        v-else
+        class="cockpit-view__repository-icon"
+        aria-hidden="true"
+      />
       <div class="cockpit-view__agent-title">
         <strong>{{ displayName }}</strong>
         <span v-if="agent.folder">{{ folderBasename(agent.folder) }}</span>
@@ -33,6 +38,7 @@
 
     <div class="cockpit-view__agent-body">
       <strong>{{ agentStatusText(agent, t) }}</strong>
+      <span v-if="showLastActivity">{{ lastActivity }}</span>
     </div>
 
     <form
@@ -63,14 +69,16 @@ import { useI18n } from 'vue-i18n';
 import type { Agent, WorkItem } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
-import { SendIcon } from '../shared/icons/app-icons';
+import { FolderRootIcon, SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
+import { relativeSessionDate } from './use-session-history';
 
 const props = defineProps<{
   agent: Agent;
   repositoryIcon?: string;
   draggedWorkItem: WorkItem | null;
   dropTarget: boolean;
+  showLastActivity?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -90,6 +98,12 @@ const canReceivePrompt = computed(() => agentCanReceivePrompt(props.agent));
 const canSubmitPrompt = computed(() => canReceivePrompt.value && Boolean(promptDraft.value.trim()));
 const dropReady = computed(() => Boolean(props.draggedWorkItem && canReceivePrompt.value));
 const displayName = computed(() => agentDisplayName(props.agent));
+const showLastActivity = computed(() => props.showLastActivity ?? false);
+const lastActivity = computed(() => t('surface.cockpitAgentsView.lastActive', {
+  time: relativeSessionDate(props.agent.lastActivityAt ?? props.agent.updatedAt, Date.now(), (key, params) => (
+    params ? t(key, params) : t(key)
+  )),
+}));
 
 function submitPrompt(): void {
   if (!canSubmitPrompt.value) {
@@ -235,6 +249,14 @@ function dropWorkItem(event: DragEvent): void {
   gap: var(--space-8);
   padding-bottom: var(--space-8);
   border-bottom: 1px solid var(--color-border);
+}
+
+.cockpit-view__repository-icon {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  justify-self: center;
+  color: var(--color-text-muted);
+  stroke-width: 1.8;
 }
 
 .cockpit-view__agent-title {

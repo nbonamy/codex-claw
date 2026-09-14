@@ -16,6 +16,7 @@ describe('settings contracts', () => {
       spokenAnnouncementVoice: 'bf_emma',
       preventSleepWhenAgentsRun: false,
       agentListCompact: true,
+      cockpitAgentViewMode: 'recent',
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
@@ -33,6 +34,7 @@ describe('settings contracts', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
+      cockpitAgentViewMode: 'recent',
       shareCodexSkillsAndPlugins: true,
       worktreeInitializationMode: 'automatic',
       sessionCompressionWarningEnabled: true,
@@ -52,6 +54,7 @@ describe('settings contracts', () => {
       .toBe('af_heart');
     expect(normalizeGeneralSettings({ sessionCompressionWarningEnabled: false }).sessionCompressionWarningEnabled)
       .toBe(false);
+    expect(normalizeGeneralSettings({ cockpitAgentViewMode: 'invalid' }).cockpitAgentViewMode).toBe('teams');
     expect(normalizeGeneralSettings(null)).toStrictEqual(defaultGeneralSettings);
     expect(normalizeAppshotSettings(null)).toStrictEqual(defaultAppshotSettings);
     expect(normalizePluginSettings([])).toStrictEqual(defaultPluginSettings);
@@ -123,6 +126,7 @@ describe('settings contracts', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,
+      cockpitAgentViewMode: 'teams',
       shareCodexSkillsAndPlugins: true,
       sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',

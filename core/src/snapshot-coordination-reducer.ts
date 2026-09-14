@@ -54,7 +54,7 @@ export function applyCoordinationEventToSnapshot(
     setAgentStatusInSnapshot(snapshot, event.agentId, {
       type: 'awaitingInput',
       detail: event.payload.approval.title,
-    });
+    }, event.occurredAt);
     return;
   }
 

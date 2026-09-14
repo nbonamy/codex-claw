@@ -389,6 +389,8 @@ export type Agent = {
   statusText?: string;
   status: AgentStatus;
   createdAt: string;
+  /** Last meaningful runtime activity, independent of metadata hydration. */
+  lastActivityAt?: string;
   updatedAt: string;
 };
 
@@ -462,6 +464,8 @@ export type ModelFavorite = {
   serviceTier: string | null;
 };
 
+export type CockpitAgentViewMode = 'teams' | 'recent';
+
 export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
@@ -475,6 +479,7 @@ export type AppGeneralSettings = {
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
   agentListCompact: boolean;
+  cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];
   modelFavorites: ModelFavorite[];
   shareCodexSkillsAndPlugins: boolean;

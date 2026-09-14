@@ -161,13 +161,17 @@ export const surfaceMessages = {
   "cockpitAgentsView": {
     "addAgent": "Add agent",
     "noAgents": "No agents",
+    "layout": "Agent layout",
+    "teams": "Teams",
+    "recent": "Recent",
+    "lastActive": "Active {time}",
     "awaitingInput": "Awaiting input",
     "error": "Error",
     "errors": "Errors"
   },
   "cockpitView": {
     "cockpit": "Cockpit",
-    "cockpitNavigation": "Cockpit navigation",
+    "backlogNavigation": "Backlog navigation",
     "backlog": "Backlog",
     "agents": "Agents",
     "repositories": "Repositories",
@@ -811,6 +815,7 @@ export const surfaceMessages = {
   "teamRail": {
     "teams": "Teams",
     "cockpit": "Cockpit",
+    "backlog": "Backlog",
     "createTeam": "Create team",
     "automations": "Automations",
     "muteSpokenAcknowledgments": "Mute spoken acknowledgments (⇧⌘M)",

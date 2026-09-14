@@ -9,6 +9,17 @@
 
     <div class="team-rail__body">
       <button
+        class="team-rail__backlog"
+        :class="{ 'team-rail__backlog--active': backlogActive }"
+        type="button"
+        :aria-label="$t('surface.teamRail.backlog')"
+        :aria-pressed="backlogActive"
+        @click="emit('select-backlog')"
+      >
+        <BacklogIcon aria-hidden="true" />
+      </button>
+
+      <button
         class="team-rail__cockpit"
         :class="{ 'team-rail__cockpit--active': cockpitActive }"
         type="button"
@@ -31,7 +42,7 @@
         type="button"
         v-bind="teamReorder.dragItemAttributes(team.id)"
         :style="{ backgroundColor: team.color ?? defaultTeamColor }"
-        :aria-label="isTeamUnread(team.id) ? $t('dynamic.teamUnread', { team: team.name }) : team.name"
+        :aria-label="teamAriaLabel(team)"
         :aria-pressed="isTeamActive(team.id)"
         @click="emit('select-team', team.id)"
         @contextmenu.prevent="openTeamMenu(team.id, $event)"
@@ -43,8 +54,9 @@
       >
         {{ team.avatar ?? teamInitials(team.name) }}
         <span
-          v-if="isTeamUnread(team.id)"
+          v-if="showsTeamActivityIndicator(team.id)"
           class="team-rail__unread-indicator"
+          :class="{ 'team-rail__unread-indicator--working': !isTeamUnread(team.id) }"
           aria-hidden="true"
         />
       </button>
@@ -120,11 +132,12 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { teamInitials } from '@codex-claw/core/team-manager';
-import { AutomationIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
+import { AutomationIcon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
@@ -134,6 +147,7 @@ import { confirmCloseTeam, confirmDisconnectTeam } from './team-close-confirmati
 const props = defineProps<{
   teams: Team[];
   activeTeamId: string | null;
+  backlogActive?: boolean;
   cockpitActive?: boolean;
   automationsActive?: boolean;
   rateLimits?: AccountRateLimits;
@@ -143,6 +157,7 @@ const props = defineProps<{
   spokenAnnouncementsMuted?: boolean;
   agentSidebarExpanded?: boolean;
   unreadTeamIds?: string[];
+  workingTeamIds?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -156,6 +171,7 @@ const emit = defineEmits<{
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];
   'select-cockpit': [];
+  'select-backlog': [];
   'select-automations': [];
   'select-team': [teamId: string];
   'toggle-speech-mute': [];
@@ -169,6 +185,7 @@ const contextMenuTeam = computed(() => (
 ));
 const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
 const unreadTeamIdSet = computed(() => new Set(props.unreadTeamIds ?? []));
+const workingTeamIdSet = computed(() => new Set(props.workingTeamIds ?? []));
 const teamReorder = useListReorderDrag<string>({
   itemIds: () => props.teams.map((team) => team.id),
   onDrop: ({ draggedId, beforeId }) => {
@@ -194,11 +211,28 @@ function selectEditTeam(teamId: string): void {
 }
 
 function isTeamActive(teamId: string): boolean {
-  return !props.cockpitActive && !props.automationsActive && !props.settingsActive && teamId === props.activeTeamId;
+  return !props.backlogActive && !props.cockpitActive && !props.automationsActive && !props.settingsActive && teamId === props.activeTeamId;
 }
 
 function isTeamUnread(teamId: string): boolean {
   return teamId !== props.activeTeamId && unreadTeamIdSet.value.has(teamId);
+}
+
+function isTeamWorking(teamId: string): boolean {
+  return workingTeamIdSet.value.has(teamId);
+}
+
+function showsTeamActivityIndicator(teamId: string): boolean {
+  return teamId !== props.activeTeamId && (isTeamUnread(teamId) || isTeamWorking(teamId));
+}
+
+function teamAriaLabel(team: Team): string {
+  const unread = isTeamUnread(team.id);
+  const working = isTeamWorking(team.id);
+  if (unread && working) return translate('dynamic.teamWorkingUnread', { team: team.name });
+  if (working) return translate('dynamic.teamWorking', { team: team.name });
+  if (unread) return translate('dynamic.teamUnread', { team: team.name });
+  return team.name;
 }
 
 async function requestCloseTeam(teamId: string): Promise<void> {
@@ -349,6 +383,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit,
+.team-rail__backlog,
 .team-rail__automations,
 .team-rail__speech-mute {
   width: var(--team-rail-button-size);
@@ -362,12 +397,15 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   cursor: pointer;
 }
 
-.team-rail__cockpit:not(.team-rail__cockpit--active) {
+.team-rail__cockpit:not(.team-rail__cockpit--active),
+.team-rail__backlog:not(.team-rail__backlog--active) {
   opacity: 0.6;
 }
 
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
+.team-rail__backlog:hover,
+.team-rail__backlog:focus-visible,
 .team-rail__automations:hover,
 .team-rail__automations:focus-visible,
 .team-rail__speech-mute:hover,
@@ -377,6 +415,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit--active,
+.team-rail__backlog--active,
 .team-rail__automations--active,
 .team-rail__speech-mute--active {
   color: var(--team-rail-icon-active-color);
@@ -384,11 +423,14 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit:hover,
-.team-rail__cockpit:focus-visible {
+.team-rail__cockpit:focus-visible,
+.team-rail__backlog:hover,
+.team-rail__backlog:focus-visible {
   opacity: 1;
 }
 
 .team-rail__automations svg,
+.team-rail__backlog svg,
 .team-rail__speech-mute svg,
 .team-rail__new svg,
 :deep() .settings-menu__trigger svg {
@@ -450,6 +492,23 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   border-radius: var(--radius-full);
   background: var(--color-error);
   pointer-events: none;
+}
+
+.team-rail__unread-indicator--working {
+  background: var(--color-warning);
+  animation: team-working-color-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes team-working-color-pulse {
+  50% {
+    opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-rail__unread-indicator--working {
+    animation: none;
+  }
 }
 
 .team-rail__new {

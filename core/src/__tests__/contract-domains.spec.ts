@@ -258,7 +258,7 @@ describe('contract domain ownership', () => {
       .flatMap((module) => [...module.exports])
       .sort();
 
-    expect(exportsByPath.get(barrelPath)).toHaveLength(221);
+    expect(exportsByPath.get(barrelPath)).toHaveLength(222);
     expect(exportsByPath.get(barrelPath)).toEqual(expect.arrayContaining(expectedMovedExports));
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());

@@ -201,10 +201,19 @@ function normalizedOptionalString(value: string | null | undefined): string | un
   return normalized || undefined;
 }
 
-function setAgentStatus(snapshot: AppSnapshot, agentId: string, status: AgentStatus): void {
+function setAgentStatus(
+  snapshot: AppSnapshot,
+  agentId: string,
+  status: AgentStatus,
+  occurredAt = new Date().toISOString(),
+): void {
   const agent = findAgent(snapshot, agentId);
   if (agent) {
+    const wasActive = agent.status.type !== 'idle';
     agent.status = status;
+    if (wasActive || status.type !== 'idle') {
+      agent.lastActivityAt = occurredAt;
+    }
     agent.updatedAt = new Date().toISOString();
   }
 }

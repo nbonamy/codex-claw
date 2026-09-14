@@ -8,9 +8,22 @@ type CockpitAgentCardProps = {
   agent: Agent;
   draggedWorkItem: WorkItem | null;
   dropTarget: boolean;
+  showLastActivity?: boolean;
 };
 
 describe('CockpitAgentCard', () => {
+  it('uses the default repository icon when no custom icon is configured', async () => {
+    const wrapper = mountCard();
+
+    expect(wrapper.find('.cockpit-view__repository-icon').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'AgentAvatar' }).exists()).toBe(false);
+
+    await wrapper.setProps({ repositoryIcon: '🦞' });
+
+    expect(wrapper.find('.cockpit-view__repository-icon').exists()).toBe(false);
+    expect(wrapper.getComponent({ name: 'AgentAvatar' }).props('avatar')).toBe('🦞');
+  });
+
   it('submits prompts for idle agents and clears the draft', async () => {
     const agent = idleAgent();
     const wrapper = mountCard({ agent });
@@ -110,6 +123,19 @@ describe('CockpitAgentCard', () => {
 
     expect(dragEnter.defaultPrevented).toBe(false);
     expect(wrapper.emitted('assign-work-item')).toBeUndefined();
+  });
+
+  it('shows last activity only when requested by the overview mode', async () => {
+    const agent = idleAgent();
+    agent.lastActivityAt = new Date().toISOString();
+    agent.updatedAt = '2020-01-01T00:00:00.000Z';
+    const wrapper = mountCard({ agent });
+
+    expect(wrapper.text()).not.toContain('Active now');
+
+    await wrapper.setProps({ showLastActivity: true });
+
+    expect(wrapper.text()).toContain('Active now');
   });
 });
 

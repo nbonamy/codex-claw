@@ -614,6 +614,7 @@ describe('snapshot runtime reducer', () => {
       } as unknown as SnapshotEventOwnedBy<'runtime'>);
 
       expect(snapshot.agents[0].updatedAt).toBe('2026-06-05T01:00:00.000Z');
+      expect(snapshot.agents[0].lastActivityAt).toBe('2026-06-05T00:00:01.000Z');
       expect(snapshot.agentGitStatuses['unknown-agent']).toStrictEqual({
         folder: '/tmp/unknown',
         branch: null,
@@ -629,6 +630,37 @@ describe('snapshot runtime reducer', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('does not treat an idle startup status as agent activity', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].lastActivityAt = '2026-06-04T20:00:00.000Z';
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: snapshot.agents[0].id,
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+      occurredAt: '2026-06-05T08:00:00.000Z',
+    });
+
+    expect(snapshot.agents[0].lastActivityAt).toBe('2026-06-04T20:00:00.000Z');
+  });
+
+  it('records when an agent finishes meaningful activity', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = { type: 'working' };
+    snapshot.agents[0].lastActivityAt = '2026-06-05T07:00:00.000Z';
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: snapshot.agents[0].id,
+      type: 'agent.statusChanged',
+      payload: { type: 'idle' },
+      occurredAt: '2026-06-05T08:00:00.000Z',
+    });
+
+    expect(snapshot.agents[0].lastActivityAt).toBe('2026-06-05T08:00:00.000Z');
   });
 
   it('processes backlog updates without an envelope agent id', () => {
