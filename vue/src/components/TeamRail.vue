@@ -429,8 +429,19 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   opacity: 1;
 }
 
+.team-rail__backlog {
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+}
+
+.team-rail__backlog--active {
+  border-color: currentColor;
+  background: var(--color-primary-container);
+}
+
 .team-rail__automations svg,
-.team-rail__backlog svg,
 .team-rail__speech-mute svg,
 .team-rail__new svg,
 :deep() .settings-menu__trigger svg {
@@ -438,6 +449,11 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--icon-xl);
   stroke-width: 1.25px;
   transform: scale(1.15);
+}
+
+.team-rail__backlog svg {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
 }
 
 .team-rail__team::before,

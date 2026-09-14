@@ -185,6 +185,7 @@ describe('TeamRail', () => {
 
     expect(wrapper.get('[aria-label="Backlog"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Backlog"]').classes()).toContain('team-rail__backlog--active');
+    expect(wrapper.get('[aria-label="Backlog"]').findComponent({ name: 'BacklogIcon' }).exists()).toBe(true);
     expect(wrapper.get('[aria-label="Skwad"]').classes()).not.toContain('team-rail__team--active');
     expect(wrapper.emitted('select-backlog')).toStrictEqual([[]]);
   });
@@ -281,6 +282,11 @@ describe('TeamRail', () => {
     expect(teamRailSource()).toContain('transform: scale(1.15);');
     expect(teamRailSource()).toContain('.team-rail__new svg');
     expect(teamRailSource()).toContain('.team-rail__speech-mute svg');
+    expect(teamRailSource()).toContain('.team-rail__backlog {');
+    expect(teamRailSource()).toContain('padding: 0;');
+    expect(teamRailSource()).toContain('border: 1px solid var(--color-border-strong);');
+    expect(teamRailSource()).toContain('.team-rail__backlog svg {');
+    expect(teamRailSource()).toContain('width: var(--icon-xl);');
     expect(teamRailSource()).toContain('CockpitIcon');
     expect(teamRailSource()).not.toContain('DashboardIcon');
     expect(teamRailSource()).toContain('.team-rail__cockpit:not(.team-rail__cockpit--active)');
