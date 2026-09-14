@@ -5,20 +5,31 @@
         <h1>{{ $t('surface.cockpitView.agents') }}</h1>
         <span>{{ agents.length }}</span>
       </div>
-      <el-tabs
-        v-model="selectedViewMode"
-        class="agent-cockpit__mode"
-        :aria-label="$t('surface.cockpitAgentsView.layout')"
+      <el-popover
+        v-model:visible="modeMenuOpen"
+        placement="bottom-end"
+        trigger="click"
+        :width="188"
+        popper-class="claw-popover agent-cockpit__mode-popover"
       >
-        <el-tab-pane
-          :label="$t('surface.cockpitAgentsView.teams')"
-          name="teams"
+        <template #reference>
+          <button
+            class="agent-cockpit__mode-trigger"
+            type="button"
+            :aria-label="$t('surface.cockpitAgentsView.layout')"
+            :aria-expanded="modeMenuOpen"
+          >
+            <span>{{ modeLabel }}</span>
+            <ChevronDown aria-hidden="true" />
+          </button>
+        </template>
+        <AppMenu
+          class="app-menu--embedded"
+          :ariaLabel="$t('surface.cockpitAgentsView.layout')"
+          :items="modeMenuItems"
+          @select="selectMode"
         />
-        <el-tab-pane
-          :label="$t('surface.cockpitAgentsView.recent')"
-          name="recent"
-        />
-      </el-tabs>
+      </el-popover>
     </header>
 
     <CockpitAgentsView
@@ -42,8 +53,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Agent, CockpitAgentViewMode, Team } from '@codex-claw/core/contracts';
+import { ChevronDown } from '../shared/icons/app-icons';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
+import { translate } from '../i18n';
 import CockpitAgentsView from './CockpitAgentsView.vue';
 
 const props = defineProps<{
@@ -68,12 +83,28 @@ const emit = defineEmits<{
   'update-view-mode': [mode: CockpitAgentViewMode];
 }>();
 
-const selectedViewMode = computed({
-  get: () => props.viewMode,
-  set: (value: string) => {
-    if (value === 'teams' || value === 'recent') emit('update-view-mode', value);
+const modeMenuOpen = ref(false);
+const modeLabel = computed(() => translate(`surface.cockpitAgentsView.${props.viewMode}`));
+const modeMenuItems = computed<AppMenuItem[]>(() => [
+  {
+    checked: props.viewMode === 'teams',
+    id: 'teams',
+    label: translate('surface.cockpitAgentsView.teams'),
+    type: 'radio',
   },
-});
+  {
+    checked: props.viewMode === 'recent',
+    id: 'recent',
+    label: translate('surface.cockpitAgentsView.recent'),
+    type: 'radio',
+  },
+]);
+
+function selectMode(itemId: string): void {
+  if (itemId !== 'teams' && itemId !== 'recent') return;
+  modeMenuOpen.value = false;
+  emit('update-view-mode', itemId);
+}
 </script>
 
 <style scoped>
@@ -111,10 +142,9 @@ const selectedViewMode = computed({
 
 .agent-cockpit__header h1 {
   margin: 0;
-  font-size: var(--font-size-28);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-32);
-  letter-spacing: -0.02em;
+  font-size: var(--font-size-16);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-20);
 }
 
 .agent-cockpit__header span {
@@ -127,29 +157,34 @@ const selectedViewMode = computed({
   text-align: center;
 }
 
-.agent-cockpit__mode {
-  flex: 0 0 auto;
+.agent-cockpit__mode-trigger {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
   -webkit-app-region: no-drag;
 }
 
-.agent-cockpit__mode :deep(.el-tabs__header) {
-  margin: 0;
+.agent-cockpit__mode-trigger:hover,
+.agent-cockpit__mode-trigger:focus-visible,
+.agent-cockpit__mode-trigger[aria-expanded="true"] {
+  color: var(--color-text);
+  background: var(--color-surface-low);
+  outline: 0;
 }
 
-.agent-cockpit__mode :deep(.el-tabs__content) {
-  display: none;
-}
-
-.agent-cockpit__mode :deep(.el-tabs__active-bar) {
-  display: none;
-}
-
-.agent-cockpit__mode :deep(.el-tabs__nav-wrap::after) {
-  display: none;
-}
-
-.agent-cockpit__mode :deep(.el-tabs__item:focus-visible) {
-  color: var(--color-primary);
-  box-shadow: none;
+.agent-cockpit__mode-trigger svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  stroke-width: 1.75px;
 }
 </style>
