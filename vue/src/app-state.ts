@@ -607,7 +607,7 @@ export function useAppState() {
       throw new Error(translate('surface.app-state.gitDiffPreviewIsNotAvailable'));
     }
 
-    await codexClawApi.openAgentGitDiff(agentId, target);
+    await codexClawApi.openAgentGitDiff(agentId, target ? { ...target } : undefined);
   }
 
   async function getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow> {

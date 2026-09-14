@@ -906,6 +906,24 @@ describe('useAppState', () => {
     expect(state.activeHistoryHasOlder.value).toBe(false);
   });
 
+  it('normalizes reactive Git diff targets before crossing the preload boundary', async () => {
+    const openAgentGitDiff = vi.fn(async (_agentId: string, target?: object) => {
+      structuredClone(target);
+    });
+    stubElectronTestWindow({ codexClaw: { openAgentGitDiff } satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+
+    await expect(state.openAgentGitDiff(
+      'agent-dina',
+      reactive({ type: 'branch' as const, baseRef: 'origin/main' }),
+    )).resolves.toBeUndefined();
+
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina', {
+      type: 'branch',
+      baseRef: 'origin/main',
+    });
+  });
+
   it('recovers from optional desktop operation failures without leaving stale loading state', async () => {
     const initialSnapshot = createInitialSnapshot();
     const history = deferred<{ hasOlder: boolean }>();

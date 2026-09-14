@@ -222,7 +222,7 @@ describe('AgentHeader', () => {
     });
 
     expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Changes vs main');
-    expect(wrapper.find('.git-diff-control__icon').exists()).toBe(true);
+    expect(wrapper.find('.git-diff-control__icon').exists()).toBe(false);
     await wrapper.get('[aria-label="Choose repository diff"]').trigger('click');
     const menu = wrapper.getComponent({ name: 'AppMenu' });
     expect(menu.props('items')).toEqual(expect.arrayContaining([
@@ -253,6 +253,8 @@ describe('AgentHeader', () => {
 
     expect(wrapper.find('.git-workflow-control').exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(false);
+    expect(wrapper.find('.git-diff-control__open').exists()).toBe(false);
+    expect(wrapper.find('.git-diff-control__menu-trigger').exists()).toBe(true);
   });
 
   it('does not duplicate repository backlog navigation in the agent header', () => {

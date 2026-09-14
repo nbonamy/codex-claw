@@ -1,13 +1,17 @@
 <template>
-  <div ref="root" class="git-diff-control">
+  <div
+    ref="root"
+    class="git-diff-control"
+    :class="{ 'git-diff-control--menu-only': !hasSelectedChanges }"
+  >
     <button
+      v-if="hasSelectedChanges"
       class="git-diff-control__open"
       type="button"
       :aria-label="$t('surface.agentHeader.openRepositoryDiff')"
       :title="selectedLabel"
       @click="emit('open', selectedTarget)"
     >
-      <FileDiffIcon class="git-diff-control__icon" aria-hidden="true" />
       <CodexAnimatedDiffStat
         v-if="selectedSummary.addedLines"
         kind="added"
@@ -69,6 +73,7 @@ const fallbackSummary = computed<AgentGitDiffSummary>(() => ({
   changedFiles: props.gitStatus.changedFiles,
 }));
 const selectedSummary = computed(() => summaryFor(selectedTarget.value));
+const hasSelectedChanges = computed(() => selectedSummary.value.addedLines > 0 || selectedSummary.value.removedLines > 0);
 const selectedLabel = computed(() => selectedLabelFor(selectedTarget.value));
 const menuItems = computed<AppMenuItem[]>(() => {
   const catalog = props.gitStatus.diffCatalog;
@@ -228,13 +233,8 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0 var(--space-2) 0 var(--space-4);
+  padding: 0 var(--space-6);
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
-}
-
-.git-diff-control__icon {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
 }
 
 .git-diff-control__menu-trigger {
@@ -244,6 +244,12 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
   padding: 0;
   border-left: 1px solid var(--color-border) !important;
   border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.git-diff-control--menu-only .git-diff-control__menu-trigger {
+  width: 32px;
+  border-left: 0 !important;
+  border-radius: var(--radius-lg);
 }
 
 .git-diff-control__menu-trigger svg {

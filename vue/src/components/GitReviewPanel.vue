@@ -91,7 +91,7 @@ const displayedSummary = computed(() => props.panel.summary ?? {
   changedFiles: props.gitStatus?.changedFiles ?? 0,
 });
 const visibleDiff = computed(() => {
-  if (!props.panel.sections) return props.panel.diff;
+  if (!props.panel.sections?.length) return props.panel.diff;
   return props.panel.sections
     .filter((section) => visibleScopes.value[section.scope] && section.diff.trim())
     .map((section) => section.diff.trimEnd())

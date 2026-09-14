@@ -261,9 +261,19 @@ describe('AppShell workspace and plans', () => {
       removedLines: 23,
       hasUntracked: false,
       state: 'dirty',
+      diffCatalog: {
+        defaultTarget: { type: 'branch', baseRef: 'origin/main' },
+        branch: { baseRef: 'origin/main', addedLines: 45, removedLines: 23, changedFiles: 1 },
+        uncommitted: { addedLines: 45, removedLines: 23, changedFiles: 1 },
+        unstaged: { addedLines: 45, removedLines: 23, changedFiles: 1 },
+        staged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        commits: [],
+      },
       updatedAt: '2026-06-05T00:00:00.000Z',
     };
-    const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
+    const openAgentGitDiff = vi.fn(async (_agentId: string, target?: object) => {
+      structuredClone(target);
+    });
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
@@ -279,7 +289,7 @@ describe('AppShell workspace and plans', () => {
 
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
-    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'uncommitted' });
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'branch', baseRef: 'origin/main' });
     expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Review');
     expect(wrapper.get('.git-diff-preview-panel').attributes('aria-busy')).toBe('true');
 
@@ -292,6 +302,9 @@ describe('AppShell workspace and plans', () => {
         scope: 'workingTree',
         title: 'Git Diff',
         subtitle: '/Users/nbonamy/src/id8',
+        target: { type: 'branch', baseRef: 'origin/main' },
+        summary: { addedLines: 45, removedLines: 23, changedFiles: 1 },
+        sections: [],
         diff: [
           'diff --git a/src/main.ts b/src/main.ts',
           '--- a/src/main.ts',

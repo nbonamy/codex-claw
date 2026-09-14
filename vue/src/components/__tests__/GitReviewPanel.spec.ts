@@ -71,7 +71,7 @@ describe('GitReviewPanel', () => {
           folder: '/repo', ahead: 0, behind: 0, changedFiles: 1, addedLines: 2, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '2026-08-01T00:00:00.000Z',
         },
         panel: {
-          kind: 'gitDiff', title: 'Branch changes', diff, state: 'idle',
+          kind: 'gitDiff', title: 'Branch changes', diff, sections: [], state: 'idle',
           target: { type: 'branch', baseRef: 'origin/main' },
           summary: { addedLines: 12, removedLines: 5, changedFiles: 3 },
         },
@@ -79,6 +79,7 @@ describe('GitReviewPanel', () => {
     });
 
     expect(wrapper.get('[aria-label="Diff statistics"]').text()).toBe('+12-5');
+    expect(wrapper.text()).toContain('src/main.ts');
   });
 
   it('supports wrapping and collapsing the review from its options menu', async () => {
