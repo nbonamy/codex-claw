@@ -5,6 +5,7 @@
     :agent="currentAgent"
     :repository-icon="repositoryIconForAgent(currentAgent, snapshot.general.repositoryIcons)"
     :git-status="currentAgentGitStatus"
+    :last-turn-git-diff="lastTurnGitDiff"
     :backend-runtime="currentBackendRuntime"
     :workspace-open="rightWorkspaceVisible"
     :is-loading="isLoading"
@@ -26,7 +27,7 @@
     @expand-sidebar="emit('expand-sidebar')"
     @toggle-execution-plan="toggleExecutionPlan"
     @toggle-workspace="toggleRightWorkspace"
-    @open-git-diff="openAgentGitDiffPreview"
+    @open-git-diff="openAgentGitDiffPreview(currentAgent.id, $event)"
     @open-in="openAgentIn(currentAgent.id, $event)"
     @select-subagent="openSubagent(currentAgent.id, $event)"
     @install-update="emit('install-update')"
@@ -102,7 +103,7 @@
       @toggle-files-pane="toggleFileExplorer(agent.id)"
       @resize-files-pane="rightWorkspaceFor(agent.id).filesPaneWidth = $event"
       @open-link="openConversationLink"
-      @refresh-git-diff="openAgentGitDiffPreview(agent.id)"
+      @refresh-git-diff="openAgentGitDiffPreview(agent.id, $event)"
       @refresh-backlog="loadRepositoryBacklog(agent.id)"
       @select-tab="selectRightWorkspaceTab(agent.id, $event)"
       @send-prompt="forwardPrompt"
@@ -121,6 +122,7 @@ import type {
   Agent,
   AgentFileSearchItem,
   AgentGitCommitInput,
+  AgentGitDiffTarget,
   AgentGitMergeInput,
   AgentGitMessageGenerationInput,
   AgentGitMessageGenerationResult,
@@ -191,7 +193,7 @@ const props = defineProps<{
     input: AgentGitMessageGenerationInput,
   ) => Promise<AgentGitMessageGenerationResult>;
   getAgentGitWorkflow: (agentId: string) => Promise<AgentGitWorkflow>;
-  handleStartWorkAction: (action: 'github' | 'local' | 'url') => void;
+  handleStartWorkAction: (action: 'new' | 'github' | 'local' | 'url') => void;
   isAgentEmpty: boolean;
   isConversationLoading: boolean;
   historyLoadFailed: boolean;
@@ -208,7 +210,7 @@ const props = defineProps<{
   hasRunningPlanTool: boolean;
   latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
-  openAgentGitDiffPreview: (agentId?: string) => Promise<void>;
+  openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;
   openFilePreview: (link: ConversationFileLink) => Promise<void>;
@@ -385,8 +387,15 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
   return props.rightWorkspaceFor(agentId);
 }
 
-function openAgentGitDiffPreview(agentId?: string): Promise<void> {
-  return props.openAgentGitDiffPreview(agentId);
+const lastTurnGitDiff = computed(() => {
+  const turnId = props.latestConversationTurnId;
+  const diff = turnId ? props.snapshot.turnGitDiffs[turnId] : null;
+  if (!diff || diff.agentId !== props.currentAgent?.id || !diff.diff) return null;
+  return diff;
+});
+
+function openAgentGitDiffPreview(agentId?: string, target?: AgentGitDiffTarget): Promise<void> {
+  return props.openAgentGitDiffPreview(agentId, target);
 }
 
 function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {

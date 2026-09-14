@@ -74,23 +74,6 @@ describe('BackendDriverRpc', () => {
     expect(listPlugins).toHaveBeenCalledWith(agent);
   });
 
-  it('routes structured git diffs to the agent backend driver', async () => {
-    const agent = createAgent();
-    const result = {
-      diff: 'staged diff\nunstaged diff\nuntracked diff',
-      sections: [
-        { scope: 'staged' as const, diff: 'staged diff' },
-        { scope: 'unstaged' as const, diff: 'unstaged diff' },
-        { scope: 'untracked' as const, diff: 'untracked diff' },
-      ],
-    };
-    const getGitDiff = vi.fn().mockResolvedValue(result);
-    const rpc = new BackendDriverRpc(new Map([['codex', createDriver({ getGitDiff })]]));
-
-    await expect(rpc.handle('driver/git/diff/get', { agent })).resolves.toStrictEqual(result);
-    expect(getGitDiff).toHaveBeenCalledWith(agent);
-  });
-
   it('routes only advertised permission modes to the backend driver', async () => {
     const agent: Agent = {
       ...createAgent(),

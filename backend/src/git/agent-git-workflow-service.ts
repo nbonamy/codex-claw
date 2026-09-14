@@ -1,10 +1,11 @@
 import { closeAgentInSnapshot, updateAgentFolder } from '@codex-claw/core/agent-manager';
-import { unsupportedBackendFeature, type BackendEvent } from '@codex-claw/core/backend-driver';
+import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { agentGitBackendMethods, backendMethods, type AgentGitBackendMethod } from '@codex-claw/core/backend-protocol/methods';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import type {
   Agent,
   AgentGitDiff,
+  AgentGitDiffTarget,
   AgentGitMessageGenerationResult,
   AgentGitOperationProgress,
   AgentGitPullRequest,
@@ -48,7 +49,7 @@ export class AgentGitWorkflowService {
     const { method, agentId, params } = request;
     switch (method) {
       case backendMethods.agentGitDiffOpen:
-        await this.openDiff(agent);
+        await this.openDiff(agent, parseGitDiffTarget(params.target));
         return true;
       case backendMethods.agentGitWorkflowGet:
         return this.workflow(agent);
@@ -122,34 +123,40 @@ export class AgentGitWorkflowService {
     }
   }
 
-  private async openDiff(agent: Agent): Promise<void> {
-    const title = 'Git Diff';
+  private async openDiff(agent: Agent, target: AgentGitDiffTarget): Promise<void> {
+    const title = gitDiffTitle(target);
     const subtitle = agent.folder;
 
     try {
-      const review = await this.options.driverRequest(agent, backendMethods.driverGitDiffGet, { agent }) as AgentGitDiff | null;
-      if (review === null) {
+      if (target.type === 'turn') {
+        const turnDiff = this.options.getSnapshot().turnGitDiffs[target.turnId];
+        if (!turnDiff || turnDiff.agentId !== agent.id || !turnDiff.diff) {
+          throw new Error('The selected turn does not have a Git diff.');
+        }
         this.options.applyEvent({
           agentId: agent.id,
           type: 'sidePanel.gitDiffRequested',
           payload: {
             kind: 'gitDiff',
+            target,
+            summary: { addedLines: turnDiff.addedLines, removedLines: turnDiff.removedLines, changedFiles: 0 },
             scope: 'workingTree',
             title,
             subtitle,
-            diff: '',
-            state: 'error',
-            error: unsupportedBackendFeature(agent, 'git diff preview').message,
+            diff: turnDiff.diff,
           },
         });
         return;
       }
+      const review = await this.options.git.diff(requireAgentFolder(agent), target) as AgentGitDiff;
 
       this.options.applyEvent({
         agentId: agent.id,
         type: 'sidePanel.gitDiffRequested',
         payload: {
           kind: 'gitDiff',
+          target,
+          summary: review.summary,
           scope: 'workingTree',
           title,
           subtitle,
@@ -163,6 +170,7 @@ export class AgentGitWorkflowService {
         type: 'sidePanel.gitDiffRequested',
         payload: {
           kind: 'gitDiff',
+          target,
           scope: 'workingTree',
           title,
           subtitle,
@@ -335,6 +343,32 @@ export class AgentGitWorkflowService {
       type: 'git.operationProgress',
       payload: { operation, phase } satisfies AgentGitOperationProgress,
     });
+  }
+}
+
+function parseGitDiffTarget(value: unknown): AgentGitDiffTarget {
+  if (value === undefined) return { type: 'uncommitted' };
+  const record = requireRecord(value);
+  const type = requireString(record.type, 'Git diff target type');
+  if (type === 'branch') {
+    return typeof record.baseRef === 'string' && record.baseRef.trim()
+      ? { type, baseRef: record.baseRef }
+      : { type };
+  }
+  if (type === 'uncommitted' || type === 'unstaged' || type === 'staged') return { type };
+  if (type === 'commit') return { type, sha: requireString(record.sha, 'commit SHA') };
+  if (type === 'turn') return { type, turnId: requireString(record.turnId, 'turn ID') };
+  throw new Error(`Unsupported Git diff target: ${type}`);
+}
+
+function gitDiffTitle(target: AgentGitDiffTarget): string {
+  switch (target.type) {
+    case 'branch': return 'Branch changes';
+    case 'uncommitted': return 'Uncommitted changes';
+    case 'unstaged': return 'Unstaged changes';
+    case 'staged': return 'Staged changes';
+    case 'commit': return `Commit ${target.sha.slice(0, 8)}`;
+    case 'turn': return 'Last turn';
   }
 }
 

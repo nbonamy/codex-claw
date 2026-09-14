@@ -11,6 +11,7 @@ import {
   isString,
   optional,
 } from './snapshot-guard-primitives';
+import type { AgentGitDiffTarget } from './contracts/git';
 
 export function isRendererMessage(value: unknown): boolean {
   return isRecord(value) &&
@@ -138,8 +139,39 @@ export function isAgentGitStatus(value: unknown): boolean {
     typeof value.removedLines === 'number' &&
     typeof value.hasUntracked === 'boolean' &&
     includes(['clean', 'dirty', 'unknown'], value.state) &&
+    optional(value, 'diffCatalog', isAgentGitDiffCatalog) &&
     typeof value.updatedAt === 'string' &&
     optional(value, 'error', isString);
+}
+
+function isAgentGitDiffCatalog(value: unknown): boolean {
+  if (!isRecord(value) || !isAgentGitDiffTarget(value.defaultTarget)) return false;
+  return value.defaultTarget.type !== 'commit' && value.defaultTarget.type !== 'turn' &&
+    optional(value, 'branch', (branch) => isRecord(branch) && isAgentGitDiffSummary(branch) && typeof branch.baseRef === 'string') &&
+    isAgentGitDiffSummary(value.uncommitted) &&
+    isAgentGitDiffSummary(value.unstaged) &&
+    isAgentGitDiffSummary(value.staged) &&
+    Array.isArray(value.commits) && value.commits.every((commit) => (
+      isAgentGitDiffSummary(commit) &&
+      typeof commit.sha === 'string' &&
+      typeof commit.shortSha === 'string' &&
+      typeof commit.subject === 'string'
+    ));
+}
+
+function isAgentGitDiffTarget(value: unknown): value is AgentGitDiffTarget {
+  if (!isRecord(value) || typeof value.type !== 'string') return false;
+  if (value.type === 'branch') return optional(value, 'baseRef', isString);
+  if (value.type === 'uncommitted' || value.type === 'unstaged' || value.type === 'staged') return true;
+  if (value.type === 'commit') return typeof value.sha === 'string';
+  return value.type === 'turn' && typeof value.turnId === 'string';
+}
+
+function isAgentGitDiffSummary(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.addedLines === 'number' &&
+    typeof value.removedLines === 'number' &&
+    typeof value.changedFiles === 'number';
 }
 
 export function isTurnGitDiff(value: unknown): boolean {

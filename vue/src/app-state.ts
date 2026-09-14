@@ -159,6 +159,7 @@ const {
 const sourceRepositoryState = createSourceRepositoryState({ getSnapshot: () => snapshot.value });
 const {
   clone: cloneSourceRepository,
+  create: createSourceRepository,
   createWorktree: createSourceWorktree,
   error: sourceRepositoryError,
   list: listSourceRepositories,
@@ -601,12 +602,12 @@ export function useAppState() {
     return codexClawApi.previewAgentFile(agentId, filePath);
   }
 
-  async function openAgentGitDiff(agentId: string): Promise<void> {
+  async function openAgentGitDiff(agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
     if (!codexClawApi?.openAgentGitDiff) {
       throw new Error(translate('surface.app-state.gitDiffPreviewIsNotAvailable'));
     }
 
-    await codexClawApi.openAgentGitDiff(agentId);
+    await codexClawApi.openAgentGitDiff(agentId, target);
   }
 
   async function getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow> {
@@ -1335,6 +1336,7 @@ export function useAppState() {
     listSourceFolders,
     listSourceRepositories,
     cloneSourceRepository,
+    createSourceRepository,
     listSourceBranches,
     listSourceWorktrees,
     suggestSourceWorktreePath,
@@ -1902,6 +1904,8 @@ function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { 
   sidePanelRequest.value = {
     kind: 'gitDiff',
     diff: event.payload.diff,
+    ...(event.payload.target ? { target: event.payload.target } : {}),
+    ...(event.payload.summary ? { summary: event.payload.summary } : {}),
     ...(sections ? { sections } : {}),
     ...(event.payload.scope === 'workingTree' || event.payload.scope === 'turn' ? { scope: event.payload.scope } : {}),
     ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),

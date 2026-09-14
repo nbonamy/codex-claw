@@ -293,7 +293,7 @@ const emit = defineEmits<{
   'resume-session': [agentId: string];
   'restart-agent': [agentId: string];
   'select-agent': [agentId: string];
-  'start-work': [action: 'github' | 'local' | 'url'];
+  'start-work': [action: 'new' | 'github' | 'local' | 'url'];
   'create-quick-chat': [];
   'update-repository-icon': [payload: { repositoryKey: string; repositoryRoot: string; icon: string | undefined }];
 }>();

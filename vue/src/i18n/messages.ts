@@ -241,9 +241,19 @@ export const messages = {
     startWork: {
       addProject: 'Add project',
       addProjectFrom: 'Add project from',
+      newProject: 'New project…',
       githubRepository: 'GitHub repository…',
       localFolder: 'Local folder or repository…',
       repositoryUrl: 'Repository URL…',
+    },
+    newProjectDialog: {
+      cancel: 'Cancel',
+      create: 'Create project',
+      description: 'Creates a folder in this team’s source directory and initializes a Git repository.',
+      invalidName: 'Use a single folder name without slashes.',
+      name: 'Project name',
+      namePlaceholder: 'my-project',
+      title: 'New project',
     },
     repositories: {
       githubOnboarding: {
@@ -329,6 +339,13 @@ export const messages = {
         invalidName: 'Repository URL does not contain a valid repository name.',
         sourceFolderMissing: 'Source folder is not configured.',
         urlRequired: 'Repository URL is required.',
+      },
+      createRepository: {
+        alreadyExists: '{repository} already exists in the source folder.',
+        discoveryFailed: 'Created {repository}, but could not discover it in the source folder.',
+        invalidName: 'Project name must be a single folder name.',
+        nameRequired: 'Project name is required.',
+        sourceFolderMissing: 'Source folder is not configured.',
       },
       git: {
         pullRequestChangesRequired: 'This branch has no committed changes. Commit your work before creating a pull request.',

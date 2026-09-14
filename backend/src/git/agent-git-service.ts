@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentGitDiff, AgentGitDiffSection, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
+import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
 import { AppError } from '@codex-claw/core/app-error';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import type { AgentGitStatus } from '@codex-claw/core/contracts';
@@ -76,15 +76,23 @@ export class AgentGitService {
       const stagedDiff = parseNumstat(stagedNumstat.stdout);
       const unstagedDiff = parseNumstat(unstagedNumstat.stdout);
       const untrackedDiff = await untrackedNumstat(this.runGit, folder, untrackedFilesResult.stdout.split('\0').filter(Boolean));
-      const diff = {
-        addedLines: stagedDiff.addedLines + unstagedDiff.addedLines + untrackedDiff.addedLines,
-        removedLines: stagedDiff.removedLines + unstagedDiff.removedLines + untrackedDiff.removedLines,
-      };
+      const trackedUncommitted = await this.runGit(folder, ['diff', 'HEAD', '--numstat', '--'])
+        .then((result) => parseNumstatSummary(result.stdout))
+        .catch(() => combineSummaries(stagedDiff, unstagedDiff));
+      const diff = combineSummaries(trackedUncommitted, untrackedDiff);
       const changed = parseChangedFiles(statusResult.stdout);
       const isDirty = changed.changedFiles > 0 || diff.addedLines > 0 || diff.removedLines > 0;
       const commonDirectory = commonDirectoryResult.stdout.trim();
       const repository = commonDirectory ? fileName(dirname(resolve(folder, commonDirectory))) : undefined;
       const githubRepository = githubRepositoryFromRemotes(remotesResult.stdout);
+      const diffCatalog = await this.diffCatalog(folder, {
+        branch: branch.branch,
+        remote: branch.upstream?.split('/')[0] ?? remoteNameFromRemotes(remotesResult.stdout),
+        staged: parseNumstatSummary(stagedNumstat.stdout),
+        unstaged: combineSummaries(parseNumstatSummary(unstagedNumstat.stdout), untrackedDiff),
+        untracked: { ...untrackedDiff, changedFiles: untrackedFilesResult.stdout.split('\0').filter(Boolean).length },
+        uncommitted: { ...diff, changedFiles: changed.changedFiles },
+      });
 
       return {
         folder,
@@ -97,6 +105,7 @@ export class AgentGitService {
         ahead: branch.ahead ?? 0,
         behind: branch.behind ?? 0,
         state: isDirty ? 'dirty' : 'clean',
+        diffCatalog,
         updatedAt,
       };
     } catch (error) {
@@ -115,12 +124,51 @@ export class AgentGitService {
     }
   }
 
-  async diff(folder: string): Promise<AgentGitDiff> {
+  async diff(folder: string, target: Exclude<AgentGitDiffTarget, { type: 'turn' }> = { type: 'uncommitted' }): Promise<AgentGitDiff> {
+    if (target.type === 'branch') {
+      const workflow = await this.workflow(folder);
+      if (!workflow.branch) throw new Error('Check out a branch before viewing branch changes.');
+      const baseRef = target.baseRef ?? await this.resolveBaseRef(folder, workflow.branch, workflow.remote);
+      await this.assertCommitRef(folder, baseRef);
+      const mergeBase = (await this.runGit(folder, ['merge-base', 'HEAD', baseRef])).stdout.trim();
+      const [tracked, trackedNumstat, untracked] = await Promise.all([
+        this.runGit(folder, ['diff', '--no-ext-diff', mergeBase, '--']),
+        this.runGit(folder, ['diff', '--numstat', mergeBase, '--']),
+        this.untrackedDiff(folder),
+      ]);
+      return diffResult({ ...target, baseRef }, joinDiffOutputs([tracked.stdout, untracked.diff]), combineSummaries(parseNumstatSummary(trackedNumstat.stdout), untracked.summary));
+    }
+
+    if (target.type === 'commit') {
+      await this.assertCommitRef(folder, target.sha);
+      const [diff, numstat] = await Promise.all([
+        this.runGit(folder, ['show', '--format=', '--no-ext-diff', target.sha, '--']),
+        this.runGit(folder, ['show', '--format=', '--numstat', target.sha, '--']),
+      ]);
+      return diffResult(target, diff.stdout, parseNumstatSummary(numstat.stdout));
+    }
+
     const sections = await this.diffSections(folder);
-    return {
-      diff: joinDiffOutputs(sections.map((section) => section.diff)),
-      sections,
-    };
+    const selected = target.type === 'staged'
+      ? sections.filter((section) => section.scope === 'staged')
+      : target.type === 'unstaged'
+        ? sections.filter((section) => section.scope !== 'staged')
+        : sections;
+    const trackedSections = selected.filter((section) => section.scope !== 'untracked');
+    const untracked = sections.find((section) => section.scope === 'untracked');
+    const diff = target.type === 'uncommitted'
+      ? joinDiffOutputs([
+        (await this.runGit(folder, ['diff', 'HEAD', '--no-ext-diff', '--']).catch(() => ({ stdout: joinDiffOutputs(trackedSections.map((section) => section.diff)) }))).stdout,
+        untracked?.diff ?? '',
+      ])
+      : joinDiffOutputs(selected.map((section) => section.diff));
+    const numstat = target.type === 'uncommitted'
+      ? await this.runGit(folder, ['diff', 'HEAD', '--numstat', '--']).then((result) => parseNumstatSummary(result.stdout)).catch(() => summaryFromSections(trackedSections))
+      : summaryFromSections(selected);
+    const summary = target.type === 'uncommitted' && untracked
+      ? combineSummaries(numstat, summaryFromSections([untracked]))
+      : numstat;
+    return { target, summary, diff, sections: selected };
   }
 
   async diffSections(folder: string): Promise<AgentGitDiffSection[]> {
@@ -148,6 +196,57 @@ export class AgentGitService {
       { scope: 'unstaged', diff: unstaged.stdout },
       { scope: 'untracked', diff: joinDiffOutputs(untrackedDiffs) },
     ];
+  }
+
+  private async diffCatalog(
+    folder: string,
+    input: {
+      branch?: string;
+      remote?: string;
+      staged: AgentGitDiffSummary;
+      unstaged: AgentGitDiffSummary;
+      untracked: AgentGitDiffSummary;
+      uncommitted: AgentGitDiffSummary;
+    },
+  ): Promise<AgentGitDiffCatalog> {
+    let branch: (AgentGitDiffSummary & { baseRef: string }) | undefined;
+    let commits: AgentGitCommitSummary[] = [];
+    if (input.branch) {
+      try {
+        const baseRef = await this.resolveBaseRef(folder, input.branch, input.remote);
+        const mergeBase = (await this.runGit(folder, ['merge-base', 'HEAD', baseRef])).stdout.trim();
+        const [branchNumstat, commitLog] = await Promise.all([
+          this.runGit(folder, ['diff', '--numstat', mergeBase, '--']),
+          this.runGit(folder, ['log', '--max-count=20', '--format=%x1e%H%x1f%h%x1f%s', '--numstat', `${baseRef}..HEAD`, '--']),
+        ]);
+        branch = { baseRef, ...combineSummaries(parseNumstatSummary(branchNumstat.stdout), input.untracked) };
+        commits = parseCommitSummaries(commitLog.stdout);
+      } catch {
+        // Repositories without a conventional base still expose working-tree comparisons.
+      }
+    }
+    return {
+      defaultTarget: branch ? { type: 'branch', baseRef: branch.baseRef } : { type: 'uncommitted' },
+      ...(branch ? { branch } : {}),
+      uncommitted: input.uncommitted,
+      unstaged: input.unstaged,
+      staged: input.staged,
+      commits,
+    };
+  }
+
+  private async untrackedDiff(folder: string): Promise<{ diff: string; summary: AgentGitDiffSummary }> {
+    const paths = (await this.runGit(folder, ['ls-files', '--others', '--exclude-standard', '-z', '--'])).stdout.split('\0').filter(Boolean);
+    const diffs: string[] = [];
+    for (const file of paths) {
+      diffs.push((await this.runGit(folder, ['diff', '--no-index', '--no-ext-diff', '--', process.platform === 'win32' ? 'NUL' : '/dev/null', file])).stdout);
+    }
+    return { diff: joinDiffOutputs(diffs), summary: { ...await untrackedNumstat(this.runGit, folder, paths), changedFiles: paths.length } };
+  }
+
+  private async assertCommitRef(folder: string, ref: string): Promise<void> {
+    if (!ref.trim() || ref.startsWith('-')) throw new Error('Enter a valid Git reference.');
+    await this.runGit(folder, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
   }
 
   async commitMessageContext(
@@ -194,7 +293,7 @@ export class AgentGitService {
     const workflow = await this.workflow(folder);
     if (!workflow.branch || workflow.detached) throw new Error('Create or check out a branch before generating a pull request.');
     if (isIntegrationBranch(workflow.branch)) throw new Error('Create a feature branch before generating a pull request.');
-    const baseRef = await this.resolvePullRequestBase(folder, workflow.branch, workflow.remote);
+    const baseRef = await this.resolveBaseRef(folder, workflow.branch, workflow.remote);
     const [commits, stat, diff] = await Promise.all([
       this.runGit(folder, ['log', '--format=%h %s%n%b', `${baseRef}..HEAD`]),
       this.runGit(folder, ['diff', '--stat', `${baseRef}...HEAD`, '--']),
@@ -431,7 +530,7 @@ export class AgentGitService {
     return targetFolder;
   }
 
-  private async resolvePullRequestBase(folder: string, branch: string, remote?: string): Promise<string> {
+  private async resolveBaseRef(folder: string, branch: string, remote?: string): Promise<string> {
     if (remote) {
       const remoteHead = (await this.runGit(folder, ['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`])
         .catch(() => ({ stdout: '' }))).stdout.trim();
@@ -501,6 +600,13 @@ function githubRepositoryFromRemotes(output: string): string | null {
   return null;
 }
 
+function remoteNameFromRemotes(output: string): string | undefined {
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim().split(/\s+/u)[0])
+    .find(Boolean);
+}
+
 function fileName(value: string): string {
   return value.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) ?? value;
 }
@@ -513,6 +619,46 @@ function joinDiffOutputs(diffs: string[]): string {
     output += diff;
   }
   return output;
+}
+
+function diffResult(target: AgentGitDiffTarget, diff: string, summary: AgentGitDiffSummary): AgentGitDiff {
+  return { target, summary, diff, sections: [] };
+}
+
+function summaryFromSections(sections: AgentGitDiffSection[]): AgentGitDiffSummary {
+  return sections.reduce((total, section) => combineSummaries(total, parseUnifiedDiffSummary(section.diff)), emptyDiffSummary());
+}
+
+function parseUnifiedDiffSummary(diff: string): AgentGitDiffSummary {
+  let addedLines = 0;
+  let removedLines = 0;
+  const files = new Set<string>();
+  for (const line of diff.split(/\r?\n/u)) {
+    if (line.startsWith('diff --git ')) files.add(line);
+    else if (line.startsWith('+') && !line.startsWith('+++')) addedLines += 1;
+    else if (line.startsWith('-') && !line.startsWith('---')) removedLines += 1;
+  }
+  return { addedLines, removedLines, changedFiles: files.size };
+}
+
+function combineSummaries(...summaries: Array<Pick<AgentGitDiffSummary, 'addedLines' | 'removedLines'> & Partial<Pick<AgentGitDiffSummary, 'changedFiles'>>>): AgentGitDiffSummary {
+  return summaries.reduce<AgentGitDiffSummary>((total, summary) => ({
+    addedLines: total.addedLines + summary.addedLines,
+    removedLines: total.removedLines + summary.removedLines,
+    changedFiles: total.changedFiles + (summary.changedFiles ?? 0),
+  }), emptyDiffSummary());
+}
+
+function emptyDiffSummary(): AgentGitDiffSummary {
+  return { addedLines: 0, removedLines: 0, changedFiles: 0 };
+}
+
+export function parseCommitSummaries(output: string): AgentGitCommitSummary[] {
+  return output.split('\x1e').map((record) => record.trim()).filter(Boolean).map((record) => {
+    const [header = '', ...numstat] = record.split(/\r?\n/u);
+    const [sha = '', shortSha = '', subject = ''] = header.split('\x1f');
+    return { sha, shortSha, subject, ...parseNumstatSummary(numstat.join('\n')) };
+  }).filter((commit) => Boolean(commit.sha));
 }
 
 async function untrackedNumstat(runGit: AgentGitRunner, folder: string, paths: string[]): Promise<{ addedLines: number; removedLines: number }> {
@@ -602,6 +748,13 @@ export function parseNumstat(output: string): Pick<AgentGitStatus, 'addedLines' 
   }
 
   return { addedLines, removedLines };
+}
+
+function parseNumstatSummary(output: string): AgentGitDiffSummary {
+  return {
+    ...parseNumstat(output),
+    changedFiles: output.split(/\r?\n/u).filter((line) => line.trim()).length,
+  };
 }
 
 function numericStat(value: string | undefined): number {

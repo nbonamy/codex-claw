@@ -22,7 +22,8 @@ describe('ClawBackendServer', () => {
       teamId: 'team-test',
       name: 'Dina',
       folder: '/Users/nbonamy/src/codex-claw',
-      backend: 'codex',
+      backend: 'claude',
+      backendDefaults: { kind: 'claude' },
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
@@ -49,14 +50,12 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-08-11T00:00:00.000Z',
     });
     const driver: AgentBackendDriver = {
-      backend: 'codex',
-      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
-      getCapabilities: () => codexBackendCapabilities,
-      sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
+      backend: 'claude',
+      getRuntimeStatus: () => ({ backend: 'claude', status: 'running' }),
+      getCapabilities: () => claudeBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
+      interrupt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
       respondToRequest: async () => undefined,
-      getGitDiff,
-      getGitStatus,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -66,7 +65,8 @@ describe('ClawBackendServer', () => {
       pid: 123,
       snapshot,
       onEvent: (event) => events.push(event),
-      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      driverRpc: new BackendDriverRpc(new Map([['claude', driver]])),
+      agentGitService: { diff: getGitDiff, status: getGitStatus } as unknown as AgentGitService,
     });
 
     await expect(server.handleMessage({
@@ -76,7 +76,7 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({ result: true });
 
-    expect(getGitDiff).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitDiff).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', { type: 'uncommitted' });
     expect(getGitStatus).not.toHaveBeenCalled();
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
@@ -84,7 +84,8 @@ describe('ClawBackendServer', () => {
       payload: {
         kind: 'gitDiff',
         scope: 'workingTree',
-        title: 'Git Diff',
+        target: { type: 'uncommitted' },
+        title: 'Uncommitted changes',
         subtitle: '/Users/nbonamy/src/codex-claw',
         diff: 'diff --git a/a.ts b/a.ts\n',
         sections: [
@@ -150,7 +151,6 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      getGitStatus,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -160,7 +160,7 @@ describe('ClawBackendServer', () => {
       version: 'test-version',
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
-      agentGitService: { workflow } as unknown as AgentGitService,
+      agentGitService: { workflow, status: getGitStatus } as unknown as AgentGitService,
       workIntegrations: {
         githubConnected: vi.fn().mockResolvedValue(true),
         findPullRequest,
@@ -382,17 +382,18 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      getGitDiff: vi.fn().mockResolvedValue(null),
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
     const events: unknown[] = [];
+    const diff = vi.fn().mockRejectedValue(new Error('Git diff failed.'));
     const server = new ClawBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
       onEvent: (event) => events.push(event),
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { diff } as unknown as AgentGitService,
     });
 
     await server.handleMessage({
@@ -406,7 +407,7 @@ describe('ClawBackendServer', () => {
       type: 'sidePanel.gitDiffRequested',
       payload: expect.objectContaining({
         state: 'error',
-        error: 'Codex does not support git diff preview.',
+        error: 'Git diff failed.',
       }),
     }));
     await server.close();

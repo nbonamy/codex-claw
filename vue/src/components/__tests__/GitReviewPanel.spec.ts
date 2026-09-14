@@ -61,6 +61,26 @@ describe('GitReviewPanel', () => {
     expect(wrapper.emitted('refresh')).toStrictEqual([[]]);
   });
 
+  it('shows statistics for the selected comparison instead of the working tree', () => {
+    const wrapper = mount(GitReviewPanel, {
+      props: {
+        agent: {
+          id: 'agent-1', teamId: 'team-1', name: 'Dina', folder: '/repo', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+        gitStatus: {
+          folder: '/repo', ahead: 0, behind: 0, changedFiles: 1, addedLines: 2, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+        panel: {
+          kind: 'gitDiff', title: 'Branch changes', diff, state: 'idle',
+          target: { type: 'branch', baseRef: 'origin/main' },
+          summary: { addedLines: 12, removedLines: 5, changedFiles: 3 },
+        },
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Diff statistics"]').text()).toBe('+12-5');
+  });
+
   it('supports wrapping and collapsing the review from its options menu', async () => {
     const wrapper = mount(GitReviewPanel, {
       props: {

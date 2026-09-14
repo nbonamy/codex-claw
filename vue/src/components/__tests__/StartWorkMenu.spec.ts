@@ -20,6 +20,7 @@ describe('StartWorkMenu', () => {
     await wrapper.get('[aria-label="Add project"]').trigger('click');
 
     expect(document.body.textContent).toContain('Add project from');
+    expect(document.body.textContent).toContain('New project…');
     expect(document.body.textContent).toContain('Local folder or repository…');
     expect(document.body.textContent).toContain('GitHub repository…');
     expect(document.body.textContent).toContain('Repository URL…');

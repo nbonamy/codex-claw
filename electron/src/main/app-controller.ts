@@ -291,6 +291,14 @@ export class AppController {
       }
     });
 
+    ipc.handle(ipcChannels.createSourceRepository, async (_event, input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => {
+      try {
+        return await this.createSourceRepository(input);
+      } catch (error) {
+        throw encodedAppError(error);
+      }
+    });
+
     ipc.handle(ipcChannels.listSourceBranches, async (_event, repoPath: string, remoteConnectionId?: string) => {
       return this.listSourceBranches(repoPath, remoteConnectionId);
     });
@@ -1342,6 +1350,10 @@ export class AppController {
 
   private async cloneSourceRepository(input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput): Promise<SourceRepository> {
     return this.requireBackendClient().request<SourceRepository>(backendMethods.sourceRepositoryClone, { input });
+  }
+
+  private async createSourceRepository(input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput): Promise<SourceRepository> {
+    return this.requireBackendClient().request<SourceRepository>(backendMethods.sourceRepositoryCreate, { input });
   }
 
   private async listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<import('@codex-claw/core/contracts').SourceBranch[]> {

@@ -119,6 +119,7 @@ describe('ClawBackendServer', () => {
       [backendMethods.settingsCodexResourceSharingSet, { input: { enabled: false, mode: 'later' } }, 'sharing'],
       [backendMethods.sourceWorktreesList, { repoPath: '' }, 'repoPath'],
       [backendMethods.sourceRepositoryClone, { input: { url: '' } }, 'url'],
+      [backendMethods.sourceRepositoryCreate, { input: { name: 42 } }, 'name'],
       [backendMethods.sourceWorktreeCreate, { input: { repoPath: '', branchName: '' } }, 'configured'],
       [backendMethods.workProviderConnect, { provider: 'linear' }, 'work integrations'],
       [backendMethods.snapshotAutomationsGet, { location: { kind: 'elsewhere' } }, 'location'],
@@ -677,7 +678,7 @@ describe('ClawBackendServer', () => {
     }));
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' })).resolves.toMatchObject({
       result: {
-        lastEventSeq: 2,
+        lastEventSeq: 3,
       },
     });
   });

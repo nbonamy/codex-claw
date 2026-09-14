@@ -91,6 +91,47 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalled();
   });
 
+  it('creates repositories inside the runtime-owned source folder and records them as recent', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = {
+      path: '/Users/nbonamy/src',
+      initialized: true,
+      recentRepoNames: [],
+    };
+    const repository = {
+      name: 'fresh-project',
+      path: '/Users/nbonamy/src/fresh-project',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/fresh-project' }],
+    };
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(repository),
+      onEvent: vi.fn(() => () => undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BackendDriverRpc;
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      driverRpc,
+      saveSnapshot,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'source-repository-create',
+      method: backendMethods.sourceRepositoryCreate,
+      params: { input: { name: 'fresh-project' } },
+    })).resolves.toMatchObject({ result: repository });
+
+    expect(driverRpc.handle).toHaveBeenCalledWith(backendMethods.sourceRepositoryCreate, {
+      sourceFolderPath: '/Users/nbonamy/src',
+      name: 'fresh-project',
+    });
+    expect(snapshot.sourceFolder.recentRepoNames).toContain('fresh-project');
+    expect(saveSnapshot).toHaveBeenCalled();
+  });
+
   it('routes source repository discovery to selected SSH connections', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];

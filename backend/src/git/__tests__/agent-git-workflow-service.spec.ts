@@ -45,6 +45,46 @@ describe('AgentGitWorkflowService', () => {
     expect(stage).not.toHaveBeenCalled();
   });
 
+  it('opens provider turn diffs without asking the provider to rebuild repository state', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0] as Agent;
+    snapshot.turnGitDiffs['turn-1'] = {
+      agentId: agent.id,
+      turnId: 'turn-1',
+      addedLines: 2,
+      removedLines: 1,
+      diff: 'turn diff',
+      updatedAt: '2026-09-13T00:00:00.000Z',
+    };
+    const applyEvent = vi.fn();
+    const diff = vi.fn();
+    const service = new AgentGitWorkflowService({
+      applyEvent,
+      archiveSession: vi.fn(),
+      delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(),
+      forgetSession: vi.fn(),
+      getSnapshot: () => snapshot,
+      getWorkIntegrations: vi.fn(),
+      git: { diff } as unknown as AgentGitService,
+      persistAndEmitSnapshot: vi.fn(),
+      refreshGitStatus: vi.fn(),
+      refreshWorkspaceIdentity: vi.fn(),
+    });
+
+    await service.execute({
+      method: backendMethods.agentGitDiffOpen,
+      agentId: agent.id,
+      params: { target: { type: 'turn', turnId: 'turn-1' } },
+    }, agent);
+
+    expect(diff).not.toHaveBeenCalled();
+    expect(applyEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'sidePanel.gitDiffRequested',
+      payload: expect.objectContaining({ target: { type: 'turn', turnId: 'turn-1' }, diff: 'turn diff' }),
+    }));
+  });
+
   it('archives the provider session before closing an agent after a merged-branch push', async () => {
     const snapshot = createInitialSnapshot();
     const agent: Agent = {

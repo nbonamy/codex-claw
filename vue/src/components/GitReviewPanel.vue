@@ -14,8 +14,8 @@
       </div>
 
       <div class="git-review-panel__stats" :aria-label="$t('surface.gitReviewPanel.diffStatistics')">
-        <span class="git-review-panel__added">+{{ gitStatus?.addedLines ?? 0 }}</span>
-        <span class="git-review-panel__removed">-{{ gitStatus?.removedLines ?? 0 }}</span>
+        <span class="git-review-panel__added">+{{ displayedSummary.addedLines }}</span>
+        <span class="git-review-panel__removed">-{{ displayedSummary.removedLines }}</span>
       </div>
 
       <div ref="actionsRoot" class="git-review-panel__actions">
@@ -85,6 +85,11 @@ const visibleScopes = ref<Record<AgentGitDiffScope, boolean>>({
   untracked: true,
 });
 const repositoryName = computed(() => fileBasename(props.gitStatus?.folder ?? props.agent.folder ?? ''));
+const displayedSummary = computed(() => props.panel.summary ?? {
+  addedLines: props.gitStatus?.addedLines ?? 0,
+  removedLines: props.gitStatus?.removedLines ?? 0,
+  changedFiles: props.gitStatus?.changedFiles ?? 0,
+});
 const visibleDiff = computed(() => {
   if (!props.panel.sections) return props.panel.diff;
   return props.panel.sections

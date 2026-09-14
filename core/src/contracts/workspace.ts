@@ -54,6 +54,11 @@ export type CloneSourceRepositoryInput = {
   remoteConnectionId?: string;
 };
 
+export type CreateSourceRepositoryInput = {
+  name: string;
+  remoteConnectionId?: string;
+};
+
 export type SourceFolderEntry = {
   name: string;
   path: string;

@@ -8,6 +8,7 @@ import type {
   AgentGitPullRequestInput,
   AgentGitPushInput,
   AgentGitStageInput,
+  AgentGitDiffTarget,
   AgentGitWorkflow,
   AppSnapshot,
   ClientState,
@@ -80,7 +81,7 @@ export type ClawBackendRequestMap = {
     result: ClientState;
   };
   [backendMethods.agentGitDiffOpen]: {
-    params: { agentId: string };
+    params: { agentId: string; target?: AgentGitDiffTarget };
     result: true;
   };
   [backendMethods.agentGitWorkflowGet]: {

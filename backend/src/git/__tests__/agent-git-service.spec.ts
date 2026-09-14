@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
-import { AgentGitService, parseBranchStatus, parseChangedFiles, parseNumstat, parsePorcelainFiles } from '../agent-git-service';
+import { AgentGitService, parseBranchStatus, parseChangedFiles, parseCommitSummaries, parseNumstat, parsePorcelainFiles } from '../agent-git-service';
 
 describe('agent git service parsers', () => {
   it('parses branch tracking status', () => {
@@ -35,6 +35,63 @@ describe('agent git service parsers', () => {
     });
   });
 
+  it('parses recent commits with their individual diff statistics', () => {
+    expect(parseCommitSummaries([
+      '\x1eaaaaaaaa\x1faaaaaaa\x1ffirst commit',
+      '',
+      '3\t1\ta.ts',
+      '\x1ebbbbbbbb\x1fbbbbbbb\x1fsecond commit',
+      '',
+      '2\t0\tb.ts',
+    ].join('\n'))).toStrictEqual([
+      { sha: 'aaaaaaaa', shortSha: 'aaaaaaa', subject: 'first commit', addedLines: 3, removedLines: 1, changedFiles: 1 },
+      { sha: 'bbbbbbbb', shortSha: 'bbbbbbb', subject: 'second commit', addedLines: 2, removedLines: 0, changedFiles: 1 },
+    ]);
+  });
+
+  it('builds provider-neutral staged, commit, and branch comparisons', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      const command = args.join(' ');
+      if (command === 'rev-parse --show-toplevel') return { stdout: '/repo\n' };
+      if (command === 'symbolic-ref --quiet --short HEAD') return { stdout: 'feature\n' };
+      if (command === 'rev-parse --abbrev-ref --symbolic-full-name @{upstream}') return { stdout: 'origin/feature\n' };
+      if (command === 'remote') return { stdout: 'origin\n' };
+      if (command === 'remote get-url origin') return { stdout: 'git@github.com:owner/repo.git\n' };
+      if (command === 'status --porcelain=v1 -z') return { stdout: '' };
+      if (command === 'status --porcelain=v1 --branch') return { stdout: '## feature...origin/feature\n' };
+      if (command === 'worktree list --porcelain') return { stdout: 'worktree /repo\nbranch refs/heads/feature\n' };
+      if (command === 'symbolic-ref --quiet --short refs/remotes/origin/HEAD') return { stdout: 'origin/main\n' };
+      if (command === 'rev-parse --verify --quiet origin/main^{commit}') return { stdout: 'base-sha\n' };
+      if (command === 'merge-base HEAD origin/main') return { stdout: 'base-sha\n' };
+      if (command === 'diff --no-ext-diff base-sha --') return { stdout: 'branch diff\n' };
+      if (command === 'diff --numstat base-sha --') return { stdout: '4\t2\ta.ts\n' };
+      if (command === 'diff --cached --no-ext-diff --') return { stdout: 'staged diff\n' };
+      if (command === 'diff --no-ext-diff --') return { stdout: 'unstaged diff\n' };
+      if (command === 'diff --cached --numstat --' || command === 'diff --numstat --') return { stdout: '' };
+      if (command === 'ls-files --others --exclude-standard -z --') return { stdout: '' };
+      if (command === 'rev-parse --verify --quiet abcdef12^{commit}') return { stdout: 'abcdef12\n' };
+      if (command === 'show --format= --no-ext-diff abcdef12 --') return { stdout: 'commit diff\n' };
+      if (command === 'show --format= --numstat abcdef12 --') return { stdout: '7\t3\tb.ts\n' };
+      throw new Error(`Unexpected git command: ${command}`);
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.diff('/repo', { type: 'staged' })).resolves.toMatchObject({
+      target: { type: 'staged' },
+      diff: 'staged diff\n',
+    });
+    await expect(service.diff('/repo', { type: 'commit', sha: 'abcdef12' })).resolves.toMatchObject({
+      target: { type: 'commit', sha: 'abcdef12' },
+      summary: { addedLines: 7, removedLines: 3, changedFiles: 1 },
+      diff: 'commit diff\n',
+    });
+    await expect(service.diff('/repo', { type: 'branch' })).resolves.toMatchObject({
+      target: { type: 'branch', baseRef: 'origin/main' },
+      summary: { addedLines: 4, removedLines: 2, changedFiles: 1 },
+      diff: 'branch diff\n',
+    });
+  });
+
   it('reviews staged and unstaged tracked changes against HEAD', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'status') {
@@ -50,13 +107,18 @@ describe('agent git service parsers', () => {
     const service = new AgentGitService(() => new Date('2026-08-01T00:00:00.000Z'), runGit);
 
     await expect(service.status('/repo')).resolves.toMatchObject({
-      addedLines: 8,
-      removedLines: 3,
+      addedLines: 5,
+      removedLines: 2,
       changedFiles: 2,
       state: 'dirty',
+      diffCatalog: {
+        uncommitted: { addedLines: 5, removedLines: 2, changedFiles: 2 },
+        unstaged: { addedLines: 5, removedLines: 2, changedFiles: 1 },
+        staged: { addedLines: 3, removedLines: 1, changedFiles: 1 },
+      },
     });
     await expect(service.diff('/repo')).resolves.toMatchObject({
-      diff: '3\t1\tsrc/b.ts\ndiff --git a/src/a.ts b/src/a.ts\n',
+      diff: 'diff --git a/src/a.ts b/src/a.ts\n',
       sections: [
         { scope: 'staged', diff: '3\t1\tsrc/b.ts\n' },
         { scope: 'unstaged', diff: 'diff --git a/src/a.ts b/src/a.ts\n' },
@@ -182,6 +244,7 @@ describe('agent git service parsers', () => {
 
   it('reviews staged plus unstaged diffs before the first commit', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'diff' && args[1] === 'HEAD') throw new Error('bad revision HEAD');
       if (args.includes('--cached')) {
         return { stdout: 'staged diff' };
       }

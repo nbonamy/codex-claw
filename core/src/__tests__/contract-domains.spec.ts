@@ -32,9 +32,13 @@ const contractModules = {
       'AgentCloseInput',
       'AgentGitBranchInput',
       'AgentGitCommitInput',
+      'AgentGitCommitSummary',
       'AgentGitDiff',
+      'AgentGitDiffCatalog',
       'AgentGitDiffScope',
       'AgentGitDiffSection',
+      'AgentGitDiffSummary',
+      'AgentGitDiffTarget',
       'AgentGitFile',
       'AgentGitMergeInput',
       'AgentGitMessageGenerationInput',
@@ -58,6 +62,7 @@ const contractModules = {
       'AgentFileSearchItem',
       'AgentWorkspaceIdentity',
       'CloneSourceRepositoryInput',
+      'CreateSourceRepositoryInput',
       'CreateSourceWorktreeInput',
       'SourceBranch',
       'SourceFolderEntry',
@@ -252,7 +257,7 @@ describe('contract domain ownership', () => {
       .flatMap((module) => [...module.exports])
       .sort();
 
-    expect(exportsByPath.get(barrelPath)).toHaveLength(216);
+    expect(exportsByPath.get(barrelPath)).toHaveLength(221);
     expect(exportsByPath.get(barrelPath)).toEqual(expect.arrayContaining(expectedMovedExports));
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());

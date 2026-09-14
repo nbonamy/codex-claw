@@ -276,6 +276,13 @@
       @open-authorization="openGitHubAuthorization"
       @select-repository="selectWorkRepository"
     />
+    <NewProjectDialog
+      :visible="newProjectDialogVisible"
+      :busy="newProjectBusy"
+      :error="newProjectError"
+      @close="closeNewProjectDialog"
+      @create="createNewProject"
+    />
     <ConversationHistoryDialog
       v-if="resumeSessionAgent"
       :agent="resumeSessionAgent"
@@ -371,7 +378,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -383,6 +390,7 @@ import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
+import NewProjectDialog from './NewProjectDialog.vue';
 import CockpitView from './CockpitView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
 import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
@@ -486,13 +494,14 @@ const props = withDefaults(defineProps<{
   sourceRepositories?: SourceRepository[];
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
   cloneSourceRepository?: (input: CloneSourceRepositoryInput) => Promise<SourceRepository>;
+  createSourceRepository?: (input: CreateSourceRepositoryInput) => Promise<SourceRepository>;
   listSourceBranches?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   listSourceWorktrees?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
-  openAgentGitDiff?: (agentId: string) => Promise<void>;
+  openAgentGitDiff?: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<void>;
   getAgentGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   generateAgentGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
   stageAgentGitFiles?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitStageInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
@@ -595,6 +604,7 @@ const props = withDefaults(defineProps<{
   sourceRepositories: () => [],
   listSourceRepositories: async () => [],
   cloneSourceRepository: async () => { throw new Error(translate('surface.appShell.repositoryCloningIsNotAvailable')); },
+  createSourceRepository: async () => { throw new Error(translate('surface.appShell.repositoryCreationIsNotAvailable')); },
   listSourceBranches: async () => [],
   suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
@@ -737,6 +747,9 @@ const agentWorkspace = ref<{
 const settingsActiveTab = ref<SettingsTab>('general');
 const agentDialogVisible = ref(false);
 const modelFavoritesDialogVisible = ref(false);
+const newProjectDialogVisible = ref(false);
+const newProjectBusy = ref(false);
+const newProjectError = ref<string | null>(null);
 const modelFavoritesDialogBackend = ref<ModelFavorite['backend'] | null>(null);
 const resumeSessionAgentId = ref<string | null>(null);
 const agentDialogMode = ref<'create' | 'edit'>('create');
@@ -1011,7 +1024,9 @@ const workspacePreviews = useWorkspacePreviews({
   closeTab: closeRightWorkspaceTab,
   currentAgent: () => currentAgent.value,
   getSnapshot: () => props.snapshot,
-  openAgentGitDiff: (agentId) => props.openAgentGitDiff(agentId),
+  openAgentGitDiff: (agentId, target) => target
+    ? props.openAgentGitDiff(agentId, target)
+    : props.openAgentGitDiff(agentId),
   openTab: openRightWorkspaceTab,
   previewAgentFile: (agentId, filePath) => props.previewAgentFile(agentId, filePath),
   workspaceFor: rightWorkspaceFor,
@@ -1024,8 +1039,8 @@ const {
   openMarkdown: openMarkdownRequest,
   openSidePanel: openSidePanelRequest,
 } = workspacePreviews;
-function openAgentGitDiffPreview(agentId = currentAgent.value?.id): Promise<void> {
-  return agentId ? openAgentGitDiffForAgent(agentId) : Promise.resolve();
+function openAgentGitDiffPreview(agentId = currentAgent.value?.id, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
+  return agentId ? openAgentGitDiffForAgent(agentId, target) : Promise.resolve();
 }
 const imageAnnotation = useImageAnnotation({
   composerAttachments: () => props.composerAttachments,
@@ -1472,6 +1487,7 @@ const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
   || modelFavoritesDialogVisible.value
+  || newProjectDialogVisible.value
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
@@ -1631,12 +1647,48 @@ async function createQuickChat(): Promise<void> {
   }
 }
 
-async function handleStartWorkAction(action: 'github' | 'local' | 'url'): Promise<void> {
+async function handleStartWorkAction(action: 'new' | 'github' | 'local' | 'url'): Promise<void> {
+  if (action === 'new') {
+    newProjectError.value = null;
+    newProjectDialogVisible.value = true;
+    return;
+  }
   if (action === 'local') {
     await openLocalRepositorySession();
     return;
   }
   await openRepositoryAcquire(action);
+}
+
+function closeNewProjectDialog(): void {
+  if (newProjectBusy.value) return;
+  newProjectDialogVisible.value = false;
+  newProjectError.value = null;
+}
+
+async function createNewProject(name: string): Promise<void> {
+  const { teamId } = repositorySessionContext(null);
+  const remoteConnectionId = activeTeam.value?.remoteConnectionId;
+  newProjectBusy.value = true;
+  newProjectError.value = null;
+  try {
+    const repository = await props.createSourceRepository({
+      name,
+      ...(remoteConnectionId ? { remoteConnectionId } : {}),
+    });
+    await props.createAgent({
+      name: null,
+      folder: repository.path,
+      backend: 'codex',
+      sourceRepositoryName: repository.name,
+      ...(teamId ? { teamId } : {}),
+    });
+    newProjectDialogVisible.value = false;
+  } catch (error) {
+    newProjectError.value = localizedErrorMessage(error, t);
+  } finally {
+    newProjectBusy.value = false;
+  }
 }
 
 async function openLocalRepositorySession(): Promise<void> {

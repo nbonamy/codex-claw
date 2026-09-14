@@ -25,7 +25,7 @@ export type WorkspacePreviewOptions = {
   closeTab: (agentId: string, tab: RightWorkspaceTab) => void;
   currentAgent: () => Agent | null;
   getSnapshot: () => AppSnapshot;
-  openAgentGitDiff: (agentId: string) => Promise<void>;
+  openAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<void>;
   openTab: (tab: RightWorkspaceTab, agentId?: string) => void;
   previewAgentFile: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   workspaceFor: (agentId: string) => AgentRightWorkspaceState;
@@ -162,20 +162,21 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
     }
   }
 
-  async function openAgentGitDiff(agentId: string): Promise<void> {
+  async function openAgentGitDiff(agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
     const agent = agentForId(agentId);
     if (!agent?.folder) return;
 
     const workspace = options.workspaceFor(agent.id);
-    workspace.gitReviewPanel = gitReviewPanel(agent.folder, 'loading', null);
+    workspace.gitReviewPanel = gitReviewPanel(agent.folder, 'loading', null, target);
     options.openTab('review', agent.id);
     try {
-      await options.openAgentGitDiff(agent.id);
+      await options.openAgentGitDiff(agent.id, target);
     } catch (error) {
       workspace.gitReviewPanel = gitReviewPanel(
         agent.folder,
         'error',
         error instanceof Error ? error.message : String(error),
+        target,
       );
     }
   }
@@ -232,6 +233,8 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
     const subtitle = localizedText(request.subtitle, translate);
     options.workspaceFor(agentId).gitReviewPanel = {
       kind: 'gitDiff',
+      ...(request.target ? { target: request.target } : {}),
+      ...(request.summary ? { summary: request.summary } : {}),
       title: localizedText(request.title, translate) ?? translate('surface.appShell.review'),
       ...(subtitle ? { subtitle } : {}),
       diff: request.diff,
@@ -264,9 +267,11 @@ function gitReviewPanel(
   folder: string,
   state: 'loading' | 'error',
   error: string | null,
+  target?: import('@codex-claw/core/contracts').AgentGitDiffTarget,
 ): SidePanelGitDiffState {
   return {
     kind: 'gitDiff',
+    ...(target ? { target } : {}),
     title: translate('surface.appShell.review'),
     subtitle: folder,
     diff: '',

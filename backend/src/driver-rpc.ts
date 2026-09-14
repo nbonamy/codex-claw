@@ -16,6 +16,7 @@ import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { cloneSourceRepository } from './clone-source-repository';
+import { createSourceRepository } from './create-source-repository';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -147,16 +148,6 @@ export class BackendDriverRpc {
           throw new Error('Agent folder must be a directory.');
         }
         return null;
-      }
-      case backendMethods.driverGitStatusGet: {
-        const { agent } = requireAgentParams(params);
-        const driver = this.requireDriver(agent.backend);
-        return driver.getGitStatus ? driver.getGitStatus(agent) : null;
-      }
-      case backendMethods.driverGitDiffGet: {
-        const { agent } = requireAgentParams(params);
-        const driver = this.requireDriver(agent.backend);
-        return driver.getGitDiff ? driver.getGitDiff(agent) : null;
       }
       case backendMethods.driverTextGenerate: {
         const { agent } = requireAgentParams(params);
@@ -397,6 +388,13 @@ export class BackendDriverRpc {
         return cloneSourceRepository(
           requireString(record.sourceFolderPath, 'sourceFolderPath'),
           requireString(record.url, 'url'),
+        );
+      }
+      case backendMethods.sourceRepositoryCreate: {
+        const record = requireRecord(params);
+        return createSourceRepository(
+          requireString(record.sourceFolderPath, 'sourceFolderPath'),
+          requireString(record.name, 'name'),
         );
       }
       case backendMethods.sourceFoldersList: {

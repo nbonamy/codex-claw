@@ -47,7 +47,6 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      getGitStatus,
       hydrateAgent,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -61,6 +60,7 @@ describe('ClawBackendServer', () => {
       saveSnapshot,
       onEvent: (event) => events.push(event),
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { status: getGitStatus } as unknown as AgentGitService,
     });
 
     await expect(server.handleMessage({
@@ -240,7 +240,6 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      getGitStatus,
       hydrateAgent,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -250,6 +249,7 @@ describe('ClawBackendServer', () => {
       pid: 123,
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { status: getGitStatus } as unknown as AgentGitService,
     });
 
     const response = await server.handleMessage({
@@ -352,7 +352,6 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      getGitStatus,
       hydrateAgent,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -361,7 +360,7 @@ describe('ClawBackendServer', () => {
       version: 'test-version',
       pid: 123,
       snapshot,
-      agentGitService: { identity } as unknown as AgentGitService,
+      agentGitService: { identity, status: getGitStatus } as unknown as AgentGitService,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
@@ -388,7 +387,7 @@ describe('ClawBackendServer', () => {
     expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
     expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/multi-llm-ts');
     expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/other-project');
-    expect(getGitStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' } }));
+    expect(getGitStatus).toHaveBeenCalledWith('/Users/nbonamy/src/multi-llm-ts');
     await server.close();
   });
 });

@@ -148,7 +148,7 @@ const emit = defineEmits<{
   'resume-session': [agentId: string];
   'select-agent': [agentId: string];
   'select-team': [teamId: string];
-  'start-work': [action: 'github' | 'local' | 'url'];
+  'start-work': [action: 'new' | 'github' | 'local' | 'url'];
   'toggle-speech-mute': [];
   'update-collapsed-repositories': [repositoryKeys: string[]];
   'update-repository-icon': [
@@ -191,7 +191,7 @@ function createRepositorySessionOnBranch(payload: RepositorySessionPayload & { b
   emit('create-agent-on-branch', payload);
 }
 
-function handleStartWorkAction(action: 'github' | 'local' | 'url'): void {
+function handleStartWorkAction(action: 'new' | 'github' | 'local' | 'url'): void {
   emit('start-work', action);
 }
 

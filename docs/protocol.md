@@ -133,7 +133,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
-| `agent/git/diff/open` | `{ agentId }` | `true` | Emits a working-tree review event from backend-owned git state. |
+| `agent/git/diff/open` | `{ agentId, target? }` | `true` | Emits a review event from backend-owned Git state. Targets are branch (the default when a base branch is available), uncommitted, unstaged, staged, an exact commit, or a provider-supplied turn diff. |
 | `agent/git/workflow/get` | `{ agentId }` | `AgentGitWorkflow` | Reads local branch, remote, staged/unstaged files, linked-worktree state, and GitHub connection without spending remote API quota. |
 | `agent/git/stage` | `{ agentId, input: { paths, confirmed } }` | `AgentGitWorkflow` | Stages explicitly selected repository-relative paths; rejects unconfirmed requests. |
 | `agent/git/commit` | `{ agentId, input: { message, confirmed } }` | `AgentGitWorkflow` | Creates a commit from the index with an explicit message and confirmation. |
@@ -187,6 +187,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `settings/codexResourceSharing/set` | `{ input: { enabled: true } \| { enabled: false, mode: "fresh" \| "copy" \| "keep" } }` | `AppSnapshot` | Links or isolates Claw skills/plugins; folder-changing modes require idle chats. |
 | `source/folders/list` | `{ path?, remoteConnectionId? }` | `SourceFolderListing` | Lists child directories from local or remote `clawd`; when `path` is omitted, the target backend starts at its `$HOME`. Used by renderer fake folder pickers without desktop filesystem access. |
 | `source/repositories/list` | `{ remoteConnectionId? }` | `SourceRepository[]` | Scans the configured source folder in local `clawd` or the selected remote `clawd`; each repository may include a canonical credential-free `remoteIdentity` for exact remote matching. |
+| `source/repository/create` | `{ input: { name, remoteConnectionId? } }` | `SourceRepository` | Creates one direct child of the local or remote source folder, runs `git init`, and returns the discovered repository. Local creations persist recent repo metadata. |
 | `source/worktree/path/suggest` | `{ input: { repoPath, branchName, remoteConnectionId? } }` | `string` | Backend-owned path policy in local or remote location. |
 | `source/worktrees/list` | `{ repoPath, remoteConnectionId? }` | `SourceWorktree[]` | Runs `git worktree list --porcelain` in local or remote `clawd`. |
 | `source/worktree/create` | `{ input: CreateSourceWorktreeInput }` | `SourceWorktree` | Runs `git worktree add` in local or remote `clawd`. Local creations persist recent repo metadata. |
@@ -290,8 +291,6 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
 | `driver/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
 | `agent/folder/validate` | `{ folder }` | `null` |
-| `driver/git/status/get` | `{ agent }` | `AgentGitStatus | null` |
-| `driver/git/diff/get` | `{ agent }` | `AgentGitDiff | null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
 | `driver/session/compress` | `{ agent }` | `BackendSessionCompressionResult` |
@@ -316,6 +315,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/skills/list` | `{ agent }` | `BackendSkillSummary[]` |
 | `source/folder/detect` | none | `string | null` |
 | `source/repositories/list` | `{ sourceFolderPath }` | `SourceRepository[]` |
+| `source/repository/create` | `{ sourceFolderPath, name }` | `SourceRepository` |
 | `source/worktree/path/suggest` | `{ input: { repoPath, branchName } }` | `string` |
 | `source/worktrees/list` | `{ repoPath }` | `SourceWorktree[]` |
 | `source/worktree/create` | `{ input: CreateSourceWorktreeInput }` | `SourceWorktree` |

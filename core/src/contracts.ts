@@ -16,7 +16,9 @@ import type {
   AgentCloseInput,
   AgentGitBranchInput,
   AgentGitCommitInput,
+  AgentGitDiffTarget,
   AgentGitDiffSection,
+  AgentGitDiffSummary,
   AgentGitMergeInput,
   AgentGitMessageGenerationInput,
   AgentGitMessageGenerationResult,
@@ -34,6 +36,7 @@ import type {
   AgentFileSearchItem,
   AgentWorkspaceIdentity,
   CloneSourceRepositoryInput,
+  CreateSourceRepositoryInput,
   CreateSourceWorktreeInput,
   SourceBranch,
   SourceFolderListInput,
@@ -129,8 +132,12 @@ export type {
   AgentGitBranchInput,
   AgentGitCommitInput,
   AgentGitDiff,
+  AgentGitCommitSummary,
+  AgentGitDiffCatalog,
+  AgentGitDiffSummary,
   AgentGitDiffScope,
   AgentGitDiffSection,
+  AgentGitDiffTarget,
   AgentGitFile,
   AgentGitMergeInput,
   AgentGitMessageGenerationInput,
@@ -150,6 +157,7 @@ export type {
   AgentFileSearchItem,
   AgentWorkspaceIdentity,
   CloneSourceRepositoryInput,
+  CreateSourceRepositoryInput,
   CreateSourceWorktreeInput,
   SourceBranch,
   SourceFolderEntry,
@@ -500,6 +508,8 @@ export type SidePanelMarkdownRequest = {
 
 export type SidePanelGitDiffRequest = {
   kind: 'gitDiff';
+  target?: AgentGitDiffTarget;
+  summary?: AgentGitDiffSummary;
   scope?: 'workingTree' | 'turn';
   title?: AppText;
   subtitle?: AppText | null;
@@ -1084,7 +1094,7 @@ export type CodexClawApi = {
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
-  openAgentGitDiff(agentId: string): Promise<void>;
+  openAgentGitDiff(agentId: string, target?: AgentGitDiffTarget): Promise<void>;
   getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow>;
   generateAgentGitMessage(agentId: string, input: AgentGitMessageGenerationInput): Promise<AgentGitMessageGenerationResult>;
   stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow>;
@@ -1101,6 +1111,7 @@ export type CodexClawApi = {
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
   cloneSourceRepository(input: CloneSourceRepositoryInput): Promise<SourceRepository>;
+  createSourceRepository(input: CreateSourceRepositoryInput): Promise<SourceRepository>;
   listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]>;
   listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]>;
   suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string>;

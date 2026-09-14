@@ -95,11 +95,13 @@ describe('useAppState', () => {
       path: '/Users/nbonamy/src/codex-claw-source-folder',
     });
     const cloneSourceRepository = vi.fn().mockResolvedValue(repositories[0]);
+    const createSourceRepository = vi.fn().mockResolvedValue(repositories[0]);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         listSourceRepositories,
         cloneSourceRepository,
+        createSourceRepository,
         listSourceWorktrees,
         createSourceWorktree,
         onEvent: vi.fn(),
@@ -129,7 +131,9 @@ describe('useAppState', () => {
     expect(cloneSourceRepository).toHaveBeenCalledWith({
       url: 'https://github.com/nbonamy/codex-claw',
     });
-    expect(listSourceRepositories).toHaveBeenCalledTimes(3);
+    await expect(state.createSourceRepository({ name: 'codex-claw' })).resolves.toStrictEqual(repositories[0]);
+    expect(createSourceRepository).toHaveBeenCalledWith({ name: 'codex-claw' });
+    expect(listSourceRepositories).toHaveBeenCalledTimes(4);
   });
 
   it('uses source repository fallbacks when preload helpers are unavailable', async () => {
@@ -671,6 +675,7 @@ describe('useAppState', () => {
     await expect(state.listSourceFolders()).resolves.toStrictEqual({ path: '', parentPath: null, entries: [] });
     await expect(state.listSourceRepositories()).resolves.toStrictEqual([]);
     await expect(state.cloneSourceRepository({ url: 'https://github.com/nbonamy/repo' })).rejects.toThrow('Repository cloning is not available.');
+    await expect(state.createSourceRepository({ name: 'repo' })).rejects.toThrow('Project creation is not available.');
     await expect(state.listSourceWorktrees('/repo')).resolves.toStrictEqual([]);
     await expect(state.suggestSourceWorktreePath({ repoPath: '/repo', branchName: 'feature' })).resolves.toBe('');
     await expect(state.chooseSourceWorktreeDestination('/repo-feature')).resolves.toBeNull();

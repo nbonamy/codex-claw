@@ -222,6 +222,13 @@ function expectSidePanelMarkdown(value: unknown, path: string): void {
 function expectSidePanelGitDiff(value: unknown, path: string): void {
   expectRecord(value, path);
   expectLiteral(value.kind, ['gitDiff'], `${path}.kind`);
+  expectOptional(value, 'target', path, expectGitDiffTarget);
+  expectOptional(value, 'summary', path, (candidate, candidatePath) => {
+    expectRecord(candidate, candidatePath);
+    expectNumber(candidate.addedLines, `${candidatePath}.addedLines`);
+    expectNumber(candidate.removedLines, `${candidatePath}.removedLines`);
+    expectNumber(candidate.changedFiles, `${candidatePath}.changedFiles`);
+  });
   expectOptional(value, 'scope', path, (candidate, candidatePath) =>
     expectLiteral(candidate, ['workingTree', 'turn'], candidatePath),
   );
@@ -239,6 +246,14 @@ function expectSidePanelGitDiff(value: unknown, path: string): void {
   expectOptional(value, 'error', path, (candidate, candidatePath) =>
     expectNullable(candidate, candidatePath, expectString),
   );
+}
+
+function expectGitDiffTarget(value: unknown, path: string): void {
+  expectRecord(value, path);
+  expectLiteral(value.type, ['branch', 'uncommitted', 'unstaged', 'staged', 'commit', 'turn'], `${path}.type`);
+  if (value.type === 'branch') expectOptional(value, 'baseRef', path, expectString);
+  if (value.type === 'commit') expectString(value.sha, `${path}.sha`);
+  if (value.type === 'turn') expectString(value.turnId, `${path}.turnId`);
 }
 
 function expectAgentCreationProgress(value: unknown, path: string): void {

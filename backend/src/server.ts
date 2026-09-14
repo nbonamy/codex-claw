@@ -4,7 +4,7 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitStatus, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, AppText, BackendConversationRef, ClientRequestResponse, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendSessionCompressionResult } from '@codex-claw/core/backend-driver';
@@ -142,7 +142,7 @@ export class ClawBackendServer {
         type: 'git.statusUpdated',
         payload: status,
       }),
-      getGitStatus: (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverGitStatusGet, { agent }) as Promise<AgentGitStatus | null>,
+      getGitStatus: (agent) => this.agentGitService.status(requireAgentFolder(agent)),
       getSnapshot: () => this.snapshot,
       persistSnapshot: () => this.persistSnapshotOnly(),
       resolveIdentity: typeof this.agentGitService.identity === 'function'
@@ -1373,6 +1373,33 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
         }
       }
+      case backendMethods.sourceRepositoryCreate: {
+        const input = requireSourceRepositoryCreateInput(message.params);
+        const location = this.locationFromRemoteConnectionId(input.remoteConnectionId ?? null);
+        try {
+          const repository = await this.requestInLocation(
+            location,
+            backendMethods.sourceRepositoryCreate,
+            { input: { name: input.name } },
+            async () => {
+              await this.initializeSourceFolderIfNeeded();
+              const sourceFolderPath = this.snapshot.sourceFolder.path.trim();
+              if (!sourceFolderPath) throw new Error('Choose a source folder before creating a project.');
+              return this.requireDriverRpc().handle(backendMethods.sourceRepositoryCreate, {
+                sourceFolderPath,
+                name: input.name,
+              }) as Promise<SourceRepository> | SourceRepository;
+            },
+          );
+          if (location.kind === 'local') {
+            this.addRecentSourceRepository(repository.name);
+            await this.persistAndEmitSnapshot();
+          }
+          return createClawRpcResult(message.id, repository);
+        } catch (error) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+        }
+      }
       case backendMethods.sourceFoldersList: {
         const input = requireSourceFolderListInput(message.params);
         const request = {
@@ -2415,6 +2442,15 @@ function requireSourceRepositoryCloneInput(params: unknown): CloneSourceReposito
   const input = requireRecord(record.input);
   return {
     url: requireString(input.url, 'url'),
+    ...(optionalTrimmedString(input.remoteConnectionId) ? { remoteConnectionId: optionalTrimmedString(input.remoteConnectionId)! } : {}),
+  };
+}
+
+function requireSourceRepositoryCreateInput(params: unknown): CreateSourceRepositoryInput {
+  const record = requireRecord(params);
+  const input = requireRecord(record.input);
+  return {
+    name: requireString(input.name, 'name'),
     ...(optionalTrimmedString(input.remoteConnectionId) ? { remoteConnectionId: optionalTrimmedString(input.remoteConnectionId)! } : {}),
   };
 }

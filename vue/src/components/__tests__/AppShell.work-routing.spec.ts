@@ -259,6 +259,36 @@ describe('AppShell work routing', () => {
     expect(createQuickChat).toHaveBeenCalledWith({ teamId: 'team-codex-claw' });
   });
 
+  it('creates a new Git project and opens an agent in it', async () => {
+    const snapshot = createInitialSnapshot();
+    const repository: SourceRepository = {
+      name: 'fresh-project',
+      path: '/Users/nbonamy/src/fresh-project',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/fresh-project' }],
+    };
+    const createSourceRepository = vi.fn().mockResolvedValue(repository);
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, createSourceRepository, createAgent });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'new');
+    await flushPromises();
+    const dialog = wrapper.getComponent({ name: 'NewProjectDialog' });
+    expect(dialog.props('visible')).toBe(true);
+
+    dialog.vm.$emit('create', 'fresh-project');
+    await flushPromises();
+
+    expect(createSourceRepository).toHaveBeenCalledWith({ name: 'fresh-project' });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/Users/nbonamy/src/fresh-project',
+      backend: 'codex',
+      sourceRepositoryName: 'fresh-project',
+      teamId: 'team-codex-claw',
+    });
+    expect(dialog.props('visible')).toBe(false);
+  });
+
   it('clones a GitHub repository before opening its contextual session picker', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];

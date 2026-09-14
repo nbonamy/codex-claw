@@ -53,31 +53,14 @@
     </div>
 
     <div class="agent-header__activity">
-      <span
-        v-if="hasHeaderGitStatus"
+      <GitDiffControl
+        v-if="gitReviewAvailable && agent && gitStatus"
         class="agent-header__git-status"
-      >
-        <button
-          v-if="gitStatus?.addedLines || gitStatus?.removedLines"
-          class="agent-header__git-diff"
-          :aria-label="$t('surface.agentHeader.openRepositoryDiff')"
-          type="button"
-          @click="emit('open-git-diff')"
-        >
-          <CodexAnimatedDiffStat
-            v-if="gitStatus?.addedLines"
-            kind="added"
-            :label="$t('surface.agentHeader.addedLines')"
-            :value="gitStatus?.addedLines ?? 0"
-          />
-          <CodexAnimatedDiffStat
-            v-if="gitStatus?.removedLines"
-            kind="deleted"
-            :label="$t('surface.agentHeader.removedLines')"
-            :value="gitStatus?.removedLines ?? 0"
-          />
-        </button>
-      </span>
+        :agent-id="agent.id"
+        :git-status="gitStatus"
+        :last-turn-git-diff="lastTurnGitDiff"
+        @open="emit('open-git-diff', $event)"
+      />
       <GitWorkflowControl
         v-if="gitReviewAvailable && agent"
         ref="gitWorkflowControl"
@@ -137,22 +120,23 @@
 import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
 import { computed, ref } from 'vue';
-import type { Agent, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitDiffTarget, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog, TurnGitDiff } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
-import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
 import OpenInControl from '../shared/OpenInControl.vue';
 import SubagentControl from './SubagentControl.vue';
 import GitWorkflowControl from './GitWorkflowControl.vue';
+import GitDiffControl from './GitDiffControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 
 const props = defineProps<{
   agent: Agent | null;
   repositoryIcon?: string;
   gitStatus?: AgentGitStatus | null;
+  lastTurnGitDiff?: TurnGitDiff | null;
   backendRuntime: BackendRuntimeStatus;
   workspaceOpen?: boolean;
   isLoading: boolean;
@@ -177,7 +161,7 @@ const emit = defineEmits<{
   'expand-sidebar': [];
   'toggle-workspace': [];
   'toggle-execution-plan': [];
-  'open-git-diff': [];
+  'open-git-diff': [target: AgentGitDiffTarget];
   'install-update': [];
   'open-in': [application: OpenInApplication];
   'select-subagent': [conversationId: string];
@@ -256,11 +240,6 @@ const agentStatusDetail = computed(() => {
     case 'idle':
       return translate('surface.agentHeader.readyToGetGoing');
   }
-});
-
-const hasHeaderGitStatus = computed(() => {
-  const gitStatus = props.gitStatus;
-  return Boolean(gitStatus && gitStatus.state !== 'unknown' && (gitStatus.addedLines || gitStatus.removedLines));
 });
 
 const gitReviewAvailable = computed(() => {
@@ -389,42 +368,6 @@ const gitReviewAvailable = computed(() => {
 .agent-header__workspace :deep(svg) {
   width: var(--icon-md);
   height: var(--icon-md);
-}
-
-.agent-header__git-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-4);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-13);
-}
-
-.agent-header__git-status > span:first-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.agent-header__git-diff {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-}
-
-.agent-header__git-diff:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
 }
 
 .agent-header:has(.agent-header__expand) {

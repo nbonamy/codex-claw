@@ -1,6 +1,7 @@
 import type {
   AppSnapshot,
   CloneSourceRepositoryInput,
+  CreateSourceRepositoryInput,
   CreateSourceWorktreeInput,
   SourceBranch,
   SourceRepository,
@@ -49,6 +50,15 @@ export function createSourceRepositoryState(options: { getSnapshot: () => AppSna
     return repository;
   }
 
+  async function create(input: CreateSourceRepositoryInput): Promise<SourceRepository> {
+    if (!codexClawApi?.createSourceRepository) {
+      throw new Error(translate('surface.app-state.repositoryCreationIsNotAvailable'));
+    }
+    const repository = await codexClawApi.createSourceRepository(input);
+    await load();
+    return repository;
+  }
+
   async function createWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree> {
     if (!codexClawApi?.createSourceWorktree) {
       throw new Error(translate('surface.app-state.sourceWorktreeCreationIsNotAvailable'));
@@ -68,6 +78,7 @@ export function createSourceRepositoryState(options: { getSnapshot: () => AppSna
 
   return {
     clone,
+    create,
     createWorktree,
     error,
     list,

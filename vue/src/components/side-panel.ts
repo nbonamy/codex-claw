@@ -29,6 +29,8 @@ export type SidePanelImageState = SidePanelBaseState & {
 
 export type SidePanelGitDiffState = SidePanelBaseState & {
   kind: 'gitDiff';
+  target?: import('@codex-claw/core/contracts').AgentGitDiffTarget;
+  summary?: import('@codex-claw/core/contracts').AgentGitDiffSummary;
   diff: string;
   sections?: AgentGitDiffSection[];
 };

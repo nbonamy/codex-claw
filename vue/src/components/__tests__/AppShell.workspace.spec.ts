@@ -279,7 +279,7 @@ describe('AppShell workspace and plans', () => {
 
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
-    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'uncommitted' });
     expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Review');
     expect(wrapper.get('.git-diff-preview-panel').attributes('aria-busy')).toBe('true');
 

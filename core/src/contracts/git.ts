@@ -11,8 +11,38 @@ export type AgentGitStatus = {
   removedLines: number;
   hasUntracked: boolean;
   state: 'clean' | 'dirty' | 'unknown';
+  diffCatalog?: AgentGitDiffCatalog;
   updatedAt: string;
   error?: string;
+};
+
+export type AgentGitDiffTarget =
+  | { type: 'branch'; baseRef?: string }
+  | { type: 'uncommitted' }
+  | { type: 'unstaged' }
+  | { type: 'staged' }
+  | { type: 'commit'; sha: string }
+  | { type: 'turn'; turnId: string };
+
+export type AgentGitDiffSummary = {
+  addedLines: number;
+  removedLines: number;
+  changedFiles: number;
+};
+
+export type AgentGitCommitSummary = AgentGitDiffSummary & {
+  sha: string;
+  shortSha: string;
+  subject: string;
+};
+
+export type AgentGitDiffCatalog = {
+  defaultTarget: Exclude<AgentGitDiffTarget, { type: 'commit' | 'turn' }>;
+  branch?: AgentGitDiffSummary & { baseRef: string };
+  uncommitted: AgentGitDiffSummary;
+  unstaged: AgentGitDiffSummary;
+  staged: AgentGitDiffSummary;
+  commits: AgentGitCommitSummary[];
 };
 
 export type AgentGitDiffScope = 'staged' | 'unstaged' | 'untracked';
@@ -23,6 +53,8 @@ export type AgentGitDiffSection = {
 };
 
 export type AgentGitDiff = {
+  target: AgentGitDiffTarget;
+  summary: AgentGitDiffSummary;
   diff: string;
   sections: AgentGitDiffSection[];
 };

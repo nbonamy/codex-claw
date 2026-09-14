@@ -98,6 +98,7 @@ describe('ipc channels', () => {
       listSourceFolders: 'source-folder:folders:list',
       listSourceRepositories: 'source-folder:repositories:list',
       cloneSourceRepository: 'source-folder:repository:clone',
+      createSourceRepository: 'source-folder:repository:create',
       listSourceBranches: 'source-folder:branches:list',
       listSourceWorktrees: 'source-folder:worktrees:list',
       suggestSourceWorktreePath: 'source-folder:worktree-path:suggest',

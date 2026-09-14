@@ -122,7 +122,9 @@ is also present under the source folder. Orphan worktrees are ignored.
 Discovery does not run `git` and must tolerate missing, unreadable, detached,
 or malformed git metadata.
 
-Listing and creating worktrees are backend operations. Discovery can show
+Creating a project, and listing and creating worktrees, are backend operations.
+Project creation makes one direct child of the configured source folder and
+runs `git init` there. Discovery can show
 shallow worktree hints from source-folder metadata, but an explicit worktree
 list runs `git worktree list --porcelain` inside `clawd`. Creating a worktree
 runs through the shared backend worktree manager, which creates the checkout,
@@ -147,9 +149,9 @@ detection. Existing worktrees are not initialized again. Local and remote
 worktrees follow the same contract on the `clawd` that owns their filesystem.
 
 The renderer uses source repositories only as creation affordances: Settings
-chooses or clears the source folder; **Add project** can open a discovered
-local repository, clone a connected GitHub repository, or clone an explicit
-repository URL; and repository-level session creation can use the default
+chooses or clears the source folder; **Add project** can create a Git repository,
+open a discovered local repository, clone a connected GitHub repository, or
+clone an explicit repository URL; and repository-level session creation can use the default
 branch or create a named worktree. The Claw MCP server exposes the same
 app-owned operations with `list-repos`, `list-worktrees`, `create-worktree`,
 and `create-agent`.
@@ -500,16 +502,18 @@ Renderer layers:
   with opaque `codex-claw-media` URLs at the renderer boundary and serves only
   paths previously registered by main; the renderer never receives a local
   filesystem path or broad file access;
-- git status and turn diff display consume runtime snapshot state. Repo git
-  status is requested through the active `AgentBackendDriver` capability and is
-  not persisted; turn diff state comes from app-owned backend events such as
-  Codex `turn/diff/updated`;
+- git status and repository comparisons are provider-neutral `clawd` behavior
+  owned by `AgentGitService`, not backend-driver capabilities. Runtime status
+  exposes branch, uncommitted, unstaged, staged, and recent-commit summaries;
+  providers may additionally contribute their native current-turn diff through
+  app-owned events such as Codex `turn/diff/updated`;
 - side-panel previews are read-only app artifacts. Markdown and source file
   links request backend-owned agent resources by agent id; Electron must not
   resolve or pass local workspace roots for file previews. Source highlighting
   uses Shiki. GitHub Review is a right-workspace tab: clicking the active
-  agent's git statistics requests the complete tracked working-tree diff from
-  `clawd`, then parses and renders every file with Claw-owned Vue components;
+  agent's git statistics can select branch, uncommitted, unstaged, staged,
+  recent-commit, or last-turn changes from `clawd`, then parses and renders
+  every file with Claw-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.
 
 Streaming preserves structural identity outside the row that changed. The

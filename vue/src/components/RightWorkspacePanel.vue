@@ -109,7 +109,7 @@
       :agent="agent"
       :git-status="gitStatus"
       :panel="gitPanel"
-      @refresh="emit('refreshGitDiff')"
+      @refresh="emit('refreshGitDiff', gitPanel.target)"
     />
 
     <RepositoryBacklogPanel
@@ -348,7 +348,7 @@ const emit = defineEmits<{
   openTab: [tab: RightWorkspaceTab];
   openIn: [payload: { application: OpenInApplication; filePath: string }];
   openLink: [link: CodexConversationLink];
-  refreshGitDiff: [];
+  refreshGitDiff: [target?: import('@codex-claw/core/contracts').AgentGitDiffTarget];
   refreshBacklog: [];
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];

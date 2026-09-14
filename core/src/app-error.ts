@@ -4,6 +4,11 @@ export type AppErrorCode =
   | 'clone.invalidName'
   | 'clone.sourceFolderMissing'
   | 'clone.urlRequired'
+  | 'createRepository.alreadyExists'
+  | 'createRepository.discoveryFailed'
+  | 'createRepository.invalidName'
+  | 'createRepository.nameRequired'
+  | 'createRepository.sourceFolderMissing'
   | 'git.pullRequestChangesRequired';
 
 export const appErrorCodes: readonly AppErrorCode[] = [
@@ -12,6 +17,11 @@ export const appErrorCodes: readonly AppErrorCode[] = [
   'clone.invalidName',
   'clone.sourceFolderMissing',
   'clone.urlRequired',
+  'createRepository.alreadyExists',
+  'createRepository.discoveryFailed',
+  'createRepository.invalidName',
+  'createRepository.nameRequired',
+  'createRepository.sourceFolderMissing',
   'git.pullRequestChangesRequired',
 ];
 

@@ -3,7 +3,6 @@ import type {
   ApprovalPreset,
   BackendCapabilities,
   BackendConversationRef,
-  AgentGitStatus,
   BackendModelOption,
   BackendPluginSummary,
   BackendRuntimeStatus,
@@ -22,9 +21,7 @@ import type {
   PairedDevice,
 } from '@codex-claw/core/contracts';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendSessionCompressionResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
-import { AgentGitService } from '../git/agent-git-service';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
 type CodexPromptCommand = { type: 'review'; prompt: string };
@@ -34,7 +31,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   constructor(
     private readonly sessionManager: CodexSurfaceAgentAdapter,
-    private readonly gitService = new AgentGitService(),
   ) {}
 
   getRuntimeStatus(): BackendRuntimeStatus {
@@ -59,14 +55,6 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   getCapabilities(agent: Agent): BackendCapabilities {
     return this.sessionManager.getCapabilities?.(agent) ?? codexBackendCapabilities;
-  }
-
-  async getGitStatus(agent: Agent): Promise<AgentGitStatus> {
-    return this.gitService.status(requireAgentFolder(agent));
-  }
-
-  async getGitDiff(agent: Agent) {
-    return this.gitService.diff(requireAgentFolder(agent));
   }
 
   async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult> {

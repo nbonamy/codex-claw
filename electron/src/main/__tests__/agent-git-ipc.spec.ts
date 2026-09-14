@@ -6,6 +6,27 @@ import type { ClawBackendClientPort } from '../backend-client';
 import { decodeAppErrorDescriptor } from '@codex-claw/core/app-error';
 
 describe('agent Git IPC', () => {
+  it('forwards the selected Git diff target', async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const ipc = {
+      handle: vi.fn((registeredChannel: string, handler: (...args: unknown[]) => unknown) => {
+        handlers.set(registeredChannel, handler);
+      }),
+    } as unknown as Parameters<typeof registerAgentGitIpcHandlers>[0];
+    const backend = {
+      request: vi.fn().mockResolvedValue(true),
+    } as unknown as ClawBackendClientPort;
+    registerAgentGitIpcHandlers(ipc, () => backend);
+
+    const handler = handlers.get(ipcChannels.openAgentGitDiff);
+    expect(handler).toBeDefined();
+    await expect(handler?.({}, 'agent-1', { type: 'staged' })).resolves.toBeUndefined();
+    expect(backend.request).toHaveBeenCalledWith(backendMethods.agentGitDiffOpen, {
+      agentId: 'agent-1',
+      target: { type: 'staged' },
+    });
+  });
+
   it.each([
     [ipcChannels.openAgentGitDiff, backendMethods.agentGitDiffOpen, [], undefined],
     [ipcChannels.getAgentGitWorkflow, backendMethods.agentGitWorkflowGet, [], { repository: 'repo' }],

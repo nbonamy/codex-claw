@@ -193,7 +193,48 @@ describe('AgentHeader', () => {
 
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
-    expect(wrapper.emitted('open-git-diff')).toStrictEqual([[]]);
+    expect(wrapper.emitted('open-git-diff')).toStrictEqual([[{ type: 'uncommitted' }]]);
+  });
+
+  it('switches among repository and provider turn diff targets', async () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'feature',
+      ahead: 1,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 4,
+      removedLines: 2,
+      hasUntracked: false,
+      state: 'dirty',
+      diffCatalog: {
+        defaultTarget: { type: 'branch', baseRef: 'origin/main' },
+        branch: { baseRef: 'origin/main', addedLines: 8, removedLines: 3, changedFiles: 2 },
+        uncommitted: { addedLines: 4, removedLines: 2, changedFiles: 1 },
+        unstaged: { addedLines: 1, removedLines: 0, changedFiles: 1 },
+        staged: { addedLines: 3, removedLines: 2, changedFiles: 1 },
+        commits: [{ sha: 'abcdef123456', shortSha: 'abcdef1', subject: 'ship it', addedLines: 5, removedLines: 1, changedFiles: 1 }],
+      },
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+    await wrapper.setProps({
+      lastTurnGitDiff: { agentId: agent.id, turnId: 'turn-1', addedLines: 2, removedLines: 1, diff: 'turn diff', updatedAt: '2026-06-05T00:00:01.000Z' },
+    });
+
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Changes vs main');
+    expect(wrapper.find('.git-diff-control__icon').exists()).toBe(true);
+    await wrapper.get('[aria-label="Choose repository diff"]').trigger('click');
+    const menu = wrapper.getComponent({ name: 'AppMenu' });
+    expect(menu.props('items')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'branch', label: 'Branch', checked: true }),
+      expect.objectContaining({ id: 'turn', label: 'Last turn' }),
+      expect.objectContaining({ id: 'commits', type: 'submenu' }),
+    ]));
+    menu.vm.$emit('select', 'staged');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Staged');
+    expect(wrapper.emitted('open-git-diff')).toContainEqual([{ type: 'staged' }]);
   });
 
   it('keeps Git actions available for a clean repository', () => {
@@ -555,7 +596,7 @@ describe('AgentHeader', () => {
 
     const activity = wrapper.get('.agent-header__activity');
     expect([...activity.element.children].map((child) => child.className)).toStrictEqual([
-      'agent-header__git-status',
+      'git-diff-control agent-header__git-status',
       'git-workflow-control agent-header__git-actions',
       'open-in-control',
       'subagent-control',

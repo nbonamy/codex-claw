@@ -15,10 +15,11 @@ describe('AgentEmptyState', () => {
     expect(wrapper.text()).toContain('Choose a source to start a session');
     expect(wrapper.get('.agent-empty-state__mark img').attributes('alt')).toBe('Codex Claw');
     expect(wrapper.find('.agent-sidebar__new').exists()).toBe(false);
-    expect(wrapper.getComponent({ name: 'AppMenu' }).props('items')).toHaveLength(3);
+    expect(wrapper.getComponent({ name: 'AppMenu' }).props('items')).toHaveLength(4);
 
     const actions = wrapper.findAll('[role="menuitem"]');
     expect(actions.map((action) => action.text())).toStrictEqual([
+      'New project…',
       'Local folder or repository…',
       'GitHub repository…',
       'Repository URL…',
@@ -26,6 +27,6 @@ describe('AgentEmptyState', () => {
 
     for (const action of actions) await action.trigger('click');
 
-    expect(wrapper.emitted('start-work')).toStrictEqual([['local'], ['github'], ['url']]);
+    expect(wrapper.emitted('start-work')).toStrictEqual([['new'], ['local'], ['github'], ['url']]);
   });
 });

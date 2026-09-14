@@ -4,6 +4,7 @@ import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import type { AgentGitService } from '../git/agent-git-service';
 import { CodexBackendDriver } from '../codex/codex-driver';
 import type { CodexSurfaceAgentAdapter } from '../codex/codex-surface-adapter';
 import {
@@ -67,7 +68,6 @@ describe('ClawBackendServer', () => {
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       respondToRequest: async () => undefined,
-      getGitStatus,
       onEvent: (listener) => {
         emitEvent = listener;
         return () => undefined;
@@ -79,6 +79,7 @@ describe('ClawBackendServer', () => {
       pid: 123,
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      agentGitService: { status: getGitStatus } as unknown as AgentGitService,
     });
 
     emitEvent({
