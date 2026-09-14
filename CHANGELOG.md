@@ -4,6 +4,11 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.19.1] - 2026-09-14
+
+- Computer Use actions can now observe their settled result in the same call, wait for expected text, and type, replace, or submit directly into a targeted field without foregrounding the app.
+- Computer Use now recovers cleanly from lost observations without repeating delivered actions, returns more compact contextual state, and opts into screenshots only when visual context is useful.
+
 ## [0.19.0] - 2026-09-14
 
 ### New features
