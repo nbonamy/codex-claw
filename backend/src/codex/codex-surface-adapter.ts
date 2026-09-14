@@ -1644,7 +1644,9 @@ function statusFromSnapshot(snapshot: CodexConversationSnapshot): AgentStatus {
       return { type: 'awaitingInput', detail: { key: 'backend.awaitingUserInput' } };
     }
   }
-  if (snapshot.clientRequests.length > 0 || snapshot.approvals.length > 0) {
+  if (snapshot.clientRequests.some((request) => (
+    request.kind !== 'ask_user' || request.payload.request.blocking !== false
+  )) || snapshot.approvals.length > 0) {
     return { type: 'awaitingInput', detail: { key: 'backend.awaitingUserInput' } };
   }
   return snapshot.busy || snapshot.goal?.status === 'active' ? { type: 'working' } : { type: 'idle' };

@@ -23,7 +23,8 @@ export type ClawBackendProcessClientOptions = {
 
 export type WatchBackendFile = (filePath: string, listener: () => void) => { close(): void };
 
-const BACKEND_SHUTDOWN_TIMEOUT_MS = 5_000;
+// Allow the SDK's 12s EOF shutdown plus bounded signal escalation to finish.
+const BACKEND_SHUTDOWN_TIMEOUT_MS = 15_000;
 
 export class ClawBackendProcessClient {
   private readonly command: ClawBackendProcessCommand;

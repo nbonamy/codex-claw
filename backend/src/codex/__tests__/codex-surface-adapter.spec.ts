@@ -1631,7 +1631,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
   });
 
-  it('interrupts an orphaned active turn before hydrating a cold conversation', async () => {
+  it('accepts SDK recovery of orphaned history without interrupting an idle provider', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     transport.staleActiveThreadIds.add('thread-a');
@@ -1639,16 +1639,16 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     await adapter.hydrateAgent(agentA);
 
-    expect(lastRequest(transport, 'turn/interrupt')).toMatchObject({
-      params: { threadId: 'thread-a', turnId: 'turn-thread-a' },
-    });
+    expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     }));
     expect(events.slice().reverse().find((event) => event.type === 'codex.conversationSnapshotChanged')).toMatchObject({
-      payload: { snapshot: { activeTurnId: null, busy: false } },
+      payload: { snapshot: { activeTurnId: null, busy: false,
+        turns: expect.arrayContaining([expect.objectContaining({ id: 'turn-thread-a', status: 'interrupted' })]),
+      } },
     });
   });
 
@@ -1693,6 +1693,31 @@ describe('CodexSurfaceAgentAdapter', () => {
       agentId: 'agent-a',
       type: 'agent.statusChanged',
       payload: { type: 'working' },
+    }));
+  });
+
+  it('does not block agent status on a non-blocking SDK question', async () => {
+    const { adapter, transport } = createAdapter();
+    const events: BackendEvent[] = [];
+    adapter.onEvent((event) => events.push(event));
+    await adapter.hydrateAgent(agentA);
+    await adapter.sendPrompt(agentA, 'Start work');
+    events.length = 0;
+    transport.emit({ method: 'item/completed', params: {
+      threadId: 'thread-a', turnId: 'turn-thread-a',
+      item: { type: 'agentMessage', id: 'async-question', text: 'Which option?',
+        phase: null, memoryCitation: null, delivery: 'async',
+        questions: [{ title: 'Which option?', options: null }],
+      },
+    } });
+    expect(events.filter((event) => event.type === 'agent.statusChanged')).not.toContainEqual(
+      expect.objectContaining({ payload: expect.objectContaining({ type: 'awaitingInput' }) }),
+    );
+    transport.emit({ method: 'turn/completed', params: {
+      threadId: 'thread-a', turn: turn('turn-thread-a', 'completed'),
+    } });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'agent.statusChanged', agentId: 'agent-a', payload: { type: 'idle' },
     }));
   });
 

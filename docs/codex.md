@@ -93,6 +93,11 @@ Connection flow:
 7. Stream notifications and server requests into the session manager.
 8. Cleanly interrupt, stop, or shut down when the app exits.
 
+Electron allows up to 15 seconds for `clawd` shutdown. The SDK closes app-server
+stdin first to allow provider-owned history flushing before bounded signal
+escalation. Optional SDK questions do not hold the agent in `awaitingInput`;
+that status is reserved for blocking requests and approvals.
+
 Codex Claw always gives the SDK an isolated Codex home at
 `~/.codex-claw/codex-home` (or `$CODEX_CLAW_HOME/codex-home`). Threads, config,
 and auth remain isolated so Claw cannot pollute the normal Codex CLI/Desktop

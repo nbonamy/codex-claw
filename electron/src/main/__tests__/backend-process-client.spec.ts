@@ -5,6 +5,24 @@ import * as mainLog from '../log';
 import { ClawBackendProcessClient } from '../backend-process-client';
 
 describe('ClawBackendProcessClient', () => {
+  it('waits for provider history flush before finishing shutdown', async () => {
+    vi.useFakeTimers();
+    const child = createFakeChildProcess();
+    child.kill.mockImplementation(() => true);
+    const client = new ClawBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+      spawnProcess: vi.fn().mockReturnValue(child),
+    });
+    await client.start();
+    const finished = vi.fn();
+    const closing = client.close().then(finished);
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(finished).not.toHaveBeenCalled();
+    child.emit('exit', 0, null);
+    await closing;
+    expect(finished).toHaveBeenCalledOnce();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
