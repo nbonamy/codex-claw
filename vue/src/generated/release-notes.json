@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.18.0",
+  "currentVersion": "0.19.0",
   "releases": [
+    {
+      "version": "0.19.0",
+      "releasedAt": "2026-09-14",
+      "sourceSha256": "524e44831ea5962e9ec655dad231f14c2c8fe55aba544083de9b7a82b2ce59cc",
+      "markdown": "### New features\n\n- Backlog and Agents now have separate global rail entries. Backlog remains the\n  operator inbox for connected work, while the new agent Cockpit shows every\n  agent grouped by team or ranked by current and recent activity, with quick\n  prompts available directly from each card.\n- Codex agents can ask non-blocking questions inline while continuing to work.\n  Option and free-text answers stay attached to the question and restore with\n  conversation history.\n- Computer Use is upgraded to v2.0.1 with explicit window selection, stable\n  element observations and state diffs, combined accessibility and screenshot\n  capture, plus keyboard shortcuts, drag, paste, text selection, secondary\n  actions, and right or middle clicks.\n\n### Improvements and fixes\n\n- Returning to a previously viewed conversation now restores its rendered\n  history and scroll position across agent and team switches.\n- Cockpit Recent mode prioritizes agents currently working before idle agents,\n  and persisted activity times keep its ordering meaningful after restart.\n  Team icons show active work without overriding unread indicators.\n- Asynchronous questions and active-turn state now reconcile correctly after a\n  restart. Optional questions no longer leave agents waiting for input, and\n  graceful SDK shutdown gives provider history time to flush.\n- Context-compaction markers now settle cleanly and retain their position among\n  surrounding activity. Duplicate skill mentions are suppressed, and composer\n  menu chevrons align consistently.\n- Refined the Cockpit layout menu, title hierarchy, and Backlog rail icon for a\n  denser, quieter workspace."
+    },
     {
       "version": "0.18.0",
       "releasedAt": "2026-09-13",

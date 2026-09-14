@@ -4,6 +4,38 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.19.0] - 2026-09-14
+
+### New features
+
+- Backlog and Agents now have separate global rail entries. Backlog remains the
+  operator inbox for connected work, while the new agent Cockpit shows every
+  agent grouped by team or ranked by current and recent activity, with quick
+  prompts available directly from each card.
+- Codex agents can ask non-blocking questions inline while continuing to work.
+  Option and free-text answers stay attached to the question and restore with
+  conversation history.
+- Computer Use is upgraded to v2.0.1 with explicit window selection, stable
+  element observations and state diffs, combined accessibility and screenshot
+  capture, plus keyboard shortcuts, drag, paste, text selection, secondary
+  actions, and right or middle clicks.
+
+### Improvements and fixes
+
+- Returning to a previously viewed conversation now restores its rendered
+  history and scroll position across agent and team switches.
+- Cockpit Recent mode prioritizes agents currently working before idle agents,
+  and persisted activity times keep its ordering meaningful after restart.
+  Team icons show active work without overriding unread indicators.
+- Asynchronous questions and active-turn state now reconcile correctly after a
+  restart. Optional questions no longer leave agents waiting for input, and
+  graceful SDK shutdown gives provider history time to flush.
+- Context-compaction markers now settle cleanly and retain their position among
+  surrounding activity. Duplicate skill mentions are suppressed, and composer
+  menu chevrons align consistently.
+- Refined the Cockpit layout menu, title hierarchy, and Backlog rail icon for a
+  denser, quieter workspace.
+
 ## [0.18.0] - 2026-09-13
 
 ### New features
