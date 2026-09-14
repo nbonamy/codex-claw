@@ -37,13 +37,14 @@ Use only the \`codex_claw\` Computer Use tools. Do not load Codex's built-in Com
 1. Start with \`computer-use-status\`. Request Accessibility or Screen Recording only when the returned status requires it.
 2. Target a named app directly when known. Otherwise list running apps, find an installed app, or launch it. Then call \`computer-use-list-windows\`, select the intended \`window_id\`, and pass that explicit ID to window state, window screenshots, focus, and every action. Refresh the window list after opening or closing a window; never retry against another window implicitly.
 3. Inspect the selected window with \`computer-use-get-app-state\` before deciding what to do. Its first result is a full hierarchy; later results are per-window diffs. Leading numbers are session-stable \`element_index\` values. If you lost the diff baseline, request \`disableDiff=true\`.
-4. Clicks use AXPress by default and do not move the hardware pointer. Use \`physical=true\` only for a visible Electron/web control after AXPress reports success but a fresh inspection confirms that nothing changed. Physical clicks require the app to be frontmost and unobstructed.
+4. AX clicks and reads work in background windows. Do not call focus-app before them. Use \`physical=true\` only after AXPress did not change the observed UI; physical input requires the foreground. Keyboard input verifies the selected window without activating the app.
 5. Native menus: read-only inspection with \`accessibilityScope="menu_bar"\` needs no window ID and returns no screenshot. Menu actions still require the selected \`window_id\`. Activate an \`AXMenuBarItem\` by semantic selector, and call \`computer-use-dismiss\` before returning to app content or typing. There is no mouse-move or hover tool.
-6. Before typing, inspect again and confirm the intended editable control is focused. Prefer \`set-value\` for ordinary controls, \`type-text\` for keyboard semantics, and \`paste\` for rich or large content. A successful tool call proves delivery, not that the UI changed as intended; inspect after each state-changing action.
-7. \`computer-use-get-app-state\` includes the selected window's screenshot by default. Set \`includeScreenshot=false\` when AX state is sufficient. Screenshot coordinates are absolute macOS logical screen points; use the returned bounds and scale factor rather than preview pixels.
+6. Prefer targeted type-text with element_index, replace=true, and submit=true for search fields and address bars. It verifies editable focus internally; no separate click/focus observation is needed. For untargeted typing, first confirm the focused control. Use paste for rich content.
+7. Set observe={} on an action to return its settled AX state in the same call; observe={waitForText:"expected text"} waits for a known result. Batch deterministic operations and observe before the next decision. Delivery success does not prove the intended outcome: check actionResult, settling.timedOut, and the returned UI. Do not retry a non-idempotent action merely because observation failed. Observations default to text only; request includeScreenshot=true when visual context helps. Keep traversal settings consistent for diff reuse; use rootElementIndex for a subtree. Screenshot coordinates are absolute macOS logical points, not preview pixels.
 8. Call \`computer-use-stop\` when finished. Otherwise the visual session closes after 30 seconds of inactivity; every Computer Use call resets that timer.`;
 
 export function registerComputerUseTools(server: McpServer, computerUse: ComputerUseClient): void {
+  if (!observationRecovery.has(computerUse)) observationRecovery.set(computerUse, { generation: 0, scopes: new Map() });
   server.registerTool('computer-use-guide', {
     description: 'Load the required operating guide before using any other Computer Use tool in this session.',
     inputSchema: {},
@@ -76,32 +77,32 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
 
   server.registerTool('computer-use-list-windows', {
     description: 'List a running app\'s windows and their session-local window IDs before inspecting, focusing, or acting on one.',
-    inputSchema: optionalAppSchema,
+    inputSchema: z.strictObject(optionalAppSchema),
   }, (arguments_) => execute(computerUse, 'list_windows', arguments_));
 
   server.registerTool('computer-use-find-apps', {
     description: 'Find installed macOS applications by optional name, path, or bundle identifier.',
-    inputSchema: optionalAppSchema,
+    inputSchema: z.strictObject(optionalAppSchema),
   }, (arguments_) => execute(computerUse, 'find_apps', arguments_));
 
   server.registerTool('computer-use-launch-app', {
     description: 'Launch an installed macOS application by bundle identifier or .app path.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       bundleIdentifier: z.string().optional(),
       path: z.string().optional(),
-    },
+    }),
   }, (arguments_) => execute(computerUse, 'launch_app', arguments_));
 
   server.registerTool('computer-use-focus-app', {
-    description: 'Bring one explicitly selected app window to the foreground.',
-    inputSchema: windowTargetSchema,
+    description: 'Explicitly bring a window to the foreground only when the task needs it. AX reads/clicks do not require this; physical actions handle their own activation.',
+    inputSchema: z.strictObject(windowTargetSchema),
   }, (arguments_) => executeWindowTargeted(computerUse, 'focus_app', arguments_));
 
   server.registerTool('computer-use-get-app-state', {
-    description: 'Observe one explicitly selected app window with compact Accessibility state and a screenshot by default. Read-only menu-bar inspection is app-wide and needs no window ID.',
+    description: 'Read a selected background window: compact full/diff AX text, optional screenshot and waitForText condition. Use stable options for diff reuse. Read-only menu-bar inspection needs no window ID.',
     inputSchema: appStateInputSchema,
   }, (arguments_) => arguments_.accessibilityScope === 'menu_bar'
-    ? computerUseAppStateResult(() => computerUse.execute({ command: 'get_app_state', arguments: arguments_ }))
+    ? observeAppState(computerUse, arguments_)
     : computerUseWindowAppStateResult(computerUse, arguments_));
 
   server.registerTool('computer-use-screenshot', {
@@ -112,93 +113,96 @@ export function registerComputerUseTools(server: McpServer, computerUse: Compute
     : computerUseWindowScreenshotResult(computerUse, arguments_));
 
   server.registerTool('computer-use-click', {
-    description: 'Activate an app control by a latest-observation element index, semantic selector, or absolute logical screen coordinates.',
-    inputSchema: {
+    description: 'Click a control using AX in the background, without focusing the app. Use observe={} to receive the resulting state in this call. Physical clicks explicitly require foreground input.',
+    inputSchema: z.strictObject({
       ...actionTargetSchema,
       click_count: z.number().int().min(1).max(3).optional(),
       mouse_button: z.enum(['left', 'right', 'middle']).optional(),
       physical: z.boolean().optional().describe('Send a real foreground mouse click instead of AXPress. Use for visible Electron/web controls or after verifying AXPress did not change the UI.'),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'click', arguments_));
 
   server.registerTool('computer-use-dismiss', {
     description: 'Dismiss an active native menu or popover with its Accessibility cancel action.',
-    inputSchema: semanticOrIndexedTargetSchema,
+    inputSchema: z.strictObject(semanticOrIndexedTargetSchema),
   }, (arguments_) => executeWindowTargeted(computerUse, 'dismiss', arguments_));
 
   server.registerTool('computer-use-press-key', {
     description: 'Send one key or X-keysym-style chord directly to a running app process.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...keyboardTargetSchema,
       key: z.string().min(1).max(200),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'press_key', arguments_));
 
   server.registerTool('computer-use-type-text', {
-    description: 'Type literal text into the focused macOS Accessibility element. Use newline for Return and tab for Tab.',
-    inputSchema: {
+    description: 'Type into an indexed editable control with internal focus verification; replace=true replaces its contents and submit=true presses Return. No app activation or preliminary focus call needed. Use observe to verify the result.',
+    inputSchema: z.strictObject({
       ...windowTargetSchema,
-      text: z.string().min(1).max(100_000),
-    },
+      element_index: z.number().int().nonnegative().optional(),
+      replace: z.boolean().optional(),
+      submit: z.boolean().optional(),
+      text: z.string().max(100_000),
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'type_text', arguments_));
 
   server.registerTool('computer-use-paste', {
     description: 'Paste plain text, Markdown, or HTML into a running app while preserving the existing pasteboard when possible.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...keyboardTargetSchema,
       format: z.enum(['text', 'md', 'html']).optional(),
       text: z.string().max(100_000),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'paste', arguments_));
 
   server.registerTool('computer-use-set-value', {
     description: 'Set AXValue on an indexed, settable element from the latest app observation. Do not use this for rich web editors.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...indexedTargetSchema,
       element_index: z.number().int().nonnegative(),
       value: z.string().max(100_000),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'set_value', arguments_));
 
   server.registerTool('computer-use-select-text', {
     description: 'Select an exact text match or place the insertion cursor in an indexed editable element from the latest observation.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...indexedTargetSchema,
       element_index: z.number().int().nonnegative(),
       prefix: z.string().optional(),
       selection_type: z.enum(['text', 'cursor_before', 'cursor_after']).optional(),
       suffix: z.string().optional(),
       text: z.string().min(1).max(100_000),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'select_text', arguments_));
 
   server.registerTool('computer-use-scroll', {
     description: 'Scroll an indexed element from the latest observation or the current view.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...indexedTargetSchema,
       direction: z.enum(['up', 'down', 'left', 'right']).optional(),
       pages: z.number().int().positive().max(100).optional(),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'scroll', arguments_));
 
   server.registerTool('computer-use-drag', {
     description: 'Drag between absolute macOS logical screen coordinates while the target app is foreground and unobstructed.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...windowTargetSchema,
       from_x: z.number().finite(),
       from_y: z.number().finite(),
       to_x: z.number().finite(),
       to_y: z.number().finite(),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'drag', arguments_));
 
   server.registerTool('computer-use-perform-secondary-action', {
     description: 'Invoke a non-primary Accessibility action advertised by an indexed element in the latest observation.',
-    inputSchema: {
+    inputSchema: z.strictObject({
       ...indexedTargetSchema,
       action: z.string().min(1).max(200),
       element_index: z.number().int().nonnegative(),
-    },
+    }),
   }, (arguments_) => executeWindowTargeted(computerUse, 'perform_secondary_action', arguments_));
 }
 
@@ -218,6 +222,11 @@ const windowIdSchema = z.number().int().positive()
 const windowTargetSchema = {
   ...optionalAppSchema,
   window_id: windowIdSchema,
+  observe: z.strictObject({
+    includeScreenshot: z.boolean().optional(),
+    waitForText: z.string().min(1).max(500).optional(),
+    timeoutMs: z.number().int().min(1).max(15_000).optional(),
+  }).optional().describe('Return a settled AX observation after successful delivery, optionally waiting for expected text. Prefer this over a separate get-app-state call.'),
 };
 
 const keyboardTargetSchema = windowTargetSchema;
@@ -226,25 +235,22 @@ const appStateOptionsSchema = {
   ...optionalAppSchema,
   disableDiff: z.boolean().optional().describe('Force a full hierarchy when the prior diff baseline is unavailable.'),
   includeDebug: z.boolean().optional(),
-  includeScreenshot: z.boolean().optional().describe('Include the selected window screenshot. Defaults to true for application scope.'),
+  includeScreenshot: z.boolean().optional().describe('Include the selected window screenshot. Defaults to false.'),
+  waitForText: z.string().min(1).max(500).optional(),
+  timeoutMs: z.number().int().min(1).max(15_000).optional(),
   maxDepth: z.number().int().positive().max(30).optional(),
   maxNodes: z.number().int().positive().max(10_000).optional(),
   maxTextCharacters: z.number().int().positive().max(100_000).optional(),
   rootElementIndex: z.number().int().nonnegative().optional(),
 };
 
-const appStateInputSchema = z.union([
-  z.object({
-    ...appStateOptionsSchema,
-    accessibilityScope: z.literal('menu_bar'),
-    window_id: windowIdSchema.optional(),
-  }),
-  z.object({
-    ...appStateOptionsSchema,
-    accessibilityScope: z.literal('application').optional(),
-    window_id: windowIdSchema,
-  }),
-]);
+const appStateInputSchema = z.strictObject({
+  ...appStateOptionsSchema,
+  accessibilityScope: accessibilityScopeSchema,
+  window_id: windowIdSchema.optional().describe('Required for application scope; omit only for read-only menu_bar inspection.'),
+}).refine((input) => input.accessibilityScope === 'menu_bar' || input.window_id !== undefined, {
+  message: 'window_id is required for application observations',
+});
 
 const screenshotInputSchema = z.union([
   z.object({
@@ -259,7 +265,7 @@ const screenshotInputSchema = z.union([
   }),
 ]);
 
-const semanticSelectorSchema = z.object({
+const semanticSelectorSchema = z.strictObject({
   description: z.string().optional(),
   occurrence: z.number().int().positive().optional(),
   role: z.string().optional().describe('Raw macOS Accessibility role, for example AXButton or AXMenuBarItem.'),
@@ -295,13 +301,27 @@ function execute(computerUse: ComputerUseClient, command: ComputerUseCommand, ar
   return computerUseResult(() => computerUse.execute({ command, arguments: arguments_ }));
 }
 
-function executeWindowTargeted(
+async function executeWindowTargeted(
   computerUse: ComputerUseClient,
   command: ComputerUseCommand,
   arguments_: Record<string, unknown>,
 ): Promise<CallToolResult> {
   const invalid = invalidWindowIdResult(arguments_);
-  return invalid ? Promise.resolve(invalid) : execute(computerUse, command, arguments_);
+  if (invalid) return invalid;
+  const { observe, ...actionArguments } = arguments_;
+  if (!observe) return execute(computerUse, command, actionArguments);
+  try {
+    const delivered = await computerUse.execute({ command, arguments: actionArguments });
+    if (isFailure(delivered)) return errorToolResult(computerUseFailureMessage(delivered));
+    const actionResult = isSuccess(delivered) ? delivered.result : delivered;
+    if (record(actionResult)?.success === false) return errorToolResult(String(record(actionResult)?.error ?? 'Action failed.'));
+    const { app, pid, path, bundleIdentifier, window_id } = actionArguments;
+    const observation = await observeAppState(computerUse,
+      { app, pid, path, bundleIdentifier, window_id, includeScreenshot: false, ...record(observe) });
+    return { ...observation, structuredContent: { ...observation.structuredContent, actionResult, actionDelivered: true } };
+  } catch (error) {
+    return errorToolResult(error instanceof Error ? error.message : String(error));
+  }
 }
 
 function computerUseWindowAppStateResult(
@@ -311,7 +331,25 @@ function computerUseWindowAppStateResult(
   const invalid = invalidWindowIdResult(arguments_);
   return invalid
     ? Promise.resolve(invalid)
-    : computerUseAppStateResult(() => computerUse.execute({ command: 'get_app_state', arguments: arguments_ }));
+    : observeAppState(computerUse, { includeScreenshot: false, ...arguments_ });
+}
+
+const observationRecovery = new WeakMap<ComputerUseClient, { generation: number; scopes: Map<string, number> }>();
+
+async function observeAppState(computerUse: ComputerUseClient, arguments_: Record<string, unknown>): Promise<CallToolResult> {
+  const recovery = observationRecovery.get(computerUse)!;
+  const key = JSON.stringify(['app', 'pid', 'path', 'bundleIdentifier', 'window_id', 'accessibilityScope',
+    'rootElementIndex', 'maxDepth', 'maxNodes', 'maxTextCharacters'].map((field) => arguments_[field] ?? null));
+  const generation = recovery.generation;
+  const needsBaseline = (recovery.scopes.get(key) ?? 0) < generation;
+  const result = await computerUseAppStateResult(() => computerUse.execute({
+    command: 'get_app_state', arguments: { ...arguments_, ...(needsBaseline ? { disableDiff: true } : {}) },
+  }));
+  // A timed-out request can still advance the helper's history. Recover every
+  // scope independently; observing a different window must not consume recovery.
+  if (result.isError) recovery.generation += 1;
+  else recovery.scopes.set(key, generation);
+  return result;
 }
 
 function computerUseWindowScreenshotResult(
@@ -338,7 +376,10 @@ async function computerUseResult(run: () => Promise<unknown>) {
       return errorToolResult(computerUseFailureMessage(result));
     }
     if (isSuccess(result)) {
-      return structuredToolResult(result.result, { text: JSON.stringify(result.result) });
+      if (record(result.result)?.success === false) {
+        return errorToolResult(String(record(result.result)?.error ?? 'Computer Use action failed.'));
+      }
+      return structuredToolResult(result.result);
     }
     return structuredToolResult(result);
   } catch (error) {
@@ -355,11 +396,12 @@ async function computerUseAppStateResult(run: () => Promise<unknown>): Promise<C
     if (!payload) return errorToolResult('Computer Use returned invalid app state.');
 
     const screenshot = screenshotProjection(payload.screenshot);
+    const { text: hierarchyText, contextSnapshot: _contextSnapshot, ...metadata } = payload;
     const structuredContent = {
-      ...payload,
+      ...metadata,
       ...(Object.hasOwn(payload, 'screenshot') ? { screenshot: screenshot?.metadata ?? null } : {}),
     };
-    const text = typeof payload.text === 'string' ? payload.text : JSON.stringify(structuredContent);
+    const text = typeof hierarchyText === 'string' ? hierarchyText : 'Observation metadata returned in structuredContent.';
     return {
       content: [
         { type: 'text', text },

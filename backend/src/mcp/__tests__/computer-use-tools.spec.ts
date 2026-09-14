@@ -21,7 +21,7 @@ describe('Computer Use MCP tools', () => {
       handlers.set(name, handler);
     }),
   };
-  const computerUse: ComputerUseClient = {
+  let computerUse: ComputerUseClient = {
     status: vi.fn(),
     requestAccessibility: vi.fn(),
     stop: vi.fn(),
@@ -32,6 +32,7 @@ describe('Computer Use MCP tools', () => {
     handlers.clear();
     definitions.clear();
     vi.clearAllMocks();
+    computerUse = { status: vi.fn(), requestAccessibility: vi.fn(), stop: vi.fn(), execute: vi.fn() };
     registerComputerUseTools(server as unknown as McpServer, computerUse);
   });
 
@@ -47,6 +48,20 @@ describe('Computer Use MCP tools', () => {
     });
     const result = guideResult as { content: Array<{ text: string }> };
     expect(result.content[0]?.text.trim().length).toBeGreaterThan(0);
+  });
+
+  it('recovers each baseline after a lost observation without repeating an action', async () => {
+    vi.mocked(computerUse.execute)
+      .mockRejectedValueOnce(new Error('stdio request timed out'))
+      .mockResolvedValue({ ok: true, result: { text: 'full tree', stateKind: 'full', stateRevision: 8 } });
+    const state = handlers.get('computer-use-get-app-state')!;
+    await state({ app: 'Safari', window_id: 1 });
+    await state({ app: 'Safari', window_id: 2 });
+    await state({ app: 'Safari', window_id: 1 });
+    await state({ app: 'Safari', window_id: 1 });
+    const inputs = vi.mocked(computerUse.execute).mock.calls.map(([input]) => input.arguments);
+    expect(inputs.map((input) => input.disableDiff)).toStrictEqual([undefined, true, true, undefined]);
+    expect(vi.mocked(computerUse.execute).mock.calls.every(([input]) => input.command === 'get_app_state')).toBe(true);
   });
 
   it('accepts semantic click selectors and constrains accessibility scope', () => {
@@ -171,7 +186,7 @@ describe('Computer Use MCP tools', () => {
 
     await handlers.get(tool)?.(arguments_);
 
-    expect(computerUse.execute).toHaveBeenCalledWith({ command, arguments: arguments_ });
+    expect(computerUse.execute).toHaveBeenCalledWith({ command, arguments: command === 'get_app_state' && 'window_id' in arguments_ ? { includeScreenshot: false, ...arguments_ } : arguments_ });
   });
 
   it('rejects missing window IDs before application observation or mutation side effects', async () => {
@@ -301,7 +316,6 @@ describe('Computer Use MCP tools', () => {
         stateKind: 'diff',
         stateRevision: 3,
         baseRevision: 2,
-        text: '~ 7 AXButton "Save"',
         screenshot: {
           scope: 'window',
           window: { bounds: { x: 100, y: 200, width: 800, height: 600 } },
@@ -345,7 +359,6 @@ describe('Computer Use MCP tools', () => {
         window_id: 7,
         stateKind: 'full',
         stateRevision: 1,
-        text: '1 AXApplication "Claw"',
         screenshot: null,
         screenshotError: { code: 'screen_capture_not_granted', message: 'Screen Recording is not granted.' },
       },
@@ -369,7 +382,7 @@ describe('Computer Use MCP tools', () => {
     });
 
     await expect(handlers.get('computer-use-list-apps')?.({})).resolves.toStrictEqual({
-      content: [{ type: 'text', text: '{"apps":[{"name":"Claw"}]}' }],
+      content: [{ type: 'text', text: STRUCTURED_TOOL_RESULT_NOTICE }],
       structuredContent: { apps: [{ name: 'Claw' }] },
       isError: false,
     });
@@ -390,7 +403,7 @@ describe('Computer Use MCP tools', () => {
     vi.mocked(computerUse.execute).mockResolvedValue({ ok: true, result });
 
     await expect(handlers.get('computer-use-list-windows')?.({ app: 'Claw' })).resolves.toStrictEqual({
-      content: [{ type: 'text', text: JSON.stringify(result) }],
+      content: [{ type: 'text', text: STRUCTURED_TOOL_RESULT_NOTICE }],
       structuredContent: result,
       isError: false,
     });
@@ -445,9 +458,79 @@ describe('Computer Use MCP tools', () => {
   function inputShape(tool: string): Record<string, ZodType> {
     const inputSchema = definitions.get(tool)?.inputSchema;
     expect(inputSchema, tool).toBeDefined();
-    expect(inputSchema, tool).not.toHaveProperty('safeParse');
+    if (inputSchema && 'shape' in inputSchema) return inputSchema.shape as unknown as Record<string, ZodType>;
     return inputSchema as Record<string, ZodType>;
   }
+
+  it('rejects misspelled observation and action arguments rather than stripping them', () => {
+    expect(normalizedInputSchema('computer-use-get-app-state').safeParse({ window_id: 1, root_element_index: 4 }).success).toBe(false);
+    expect(normalizedInputSchema('computer-use-click').safeParse({ window_id: 1, element_indx: 4 }).success).toBe(false);
+    expect(normalizedInputSchema('computer-use-type-text').safeParse({ window_id: 1, element_index: 4, text: 'hello', replace: true, submit: true, observe: { waitForText: 'Results' } }).success).toBe(true);
+  });
+
+  it('delivers an action and observes the same window without focusing it or duplicating text', async () => {
+    vi.mocked(computerUse.execute)
+      .mockResolvedValueOnce({ ok: true, result: { success: true, method: 'ax_press' } })
+      .mockResolvedValueOnce({ ok: true, result: { text: '~ 4 Added', contextSnapshot: { text: 'private baseline' }, stateKind: 'diff', settling: { timedOut: false } } });
+    const result = await handlers.get('computer-use-click')?.({ app: 'Safari', window_id: 3, element_index: 4, observe: { waitForText: 'Added' } });
+    expect(computerUse.execute).toHaveBeenNthCalledWith(1, { command: 'click', arguments: { app: 'Safari', window_id: 3, element_index: 4 } });
+    expect(computerUse.execute).toHaveBeenNthCalledWith(2, { command: 'get_app_state', arguments: { app: 'Safari', pid: undefined, path: undefined, bundleIdentifier: undefined, window_id: 3, includeScreenshot: false, waitForText: 'Added' } });
+    expect(result).toStrictEqual({ content: [{ type: 'text', text: '~ 4 Added' }], structuredContent: { stateKind: 'diff', settling: { timedOut: false }, actionDelivered: true, actionResult: { success: true, method: 'ax_press' } }, isError: false });
+  });
+
+  it('preserves delivery information when subsequent observation fails', async () => {
+    vi.mocked(computerUse.execute)
+      .mockResolvedValueOnce({ ok: true, result: { success: true } })
+      .mockRejectedValueOnce(new Error('window closed'));
+    const result = await handlers.get('computer-use-click')?.({ window_id: 1, element_index: 2, observe: {} });
+    expect(result).toMatchObject({ isError: true, structuredContent: { actionDelivered: true, actionResult: { success: true } } });
+    expect(computerUse.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('never observes or retries a rejected action', async () => {
+    vi.mocked(computerUse.execute).mockResolvedValue({ ok: false, error: 'stale', errorCode: 'stale_element' });
+    expect(await handlers.get('computer-use-click')?.({ window_id: 1, element_index: 2, observe: {} })).toMatchObject({ isError: true });
+    expect(computerUse.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, 'Unable to focus'])('reports nested helper failures with or without details', async (error) => {
+    vi.mocked(computerUse.execute).mockResolvedValue({ ok: true, result: { success: false, error } });
+    for (const observe of [undefined, {}]) {
+      expect(await handlers.get('computer-use-focus-app')?.({ window_id: 1, observe })).toMatchObject({ isError: true });
+    }
+    expect(computerUse.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([new Error('disconnected'), 'disconnected'])('handles transport failures in action, observation and screenshot paths', async (error) => {
+    vi.mocked(computerUse.execute).mockRejectedValue(error);
+    for (const name of ['computer-use-click', 'computer-use-get-app-state', 'computer-use-screenshot']) {
+      expect(await handlers.get(name)?.({ window_id: 1, observe: {} })).toMatchObject({ isError: true, content: [{ type: 'text', text: 'disconnected' }] });
+    }
+  });
+
+  it.each([null, { ok: false, error: 'closed' }, { ok: true, result: null }])('rejects missing and failed observation and screenshot payloads', async (payload) => {
+    vi.mocked(computerUse.execute).mockResolvedValue(payload);
+    for (const name of ['computer-use-get-app-state', 'computer-use-screenshot']) {
+      expect(await handlers.get(name)?.({ window_id: 1 })).toMatchObject({ isError: true });
+    }
+  });
+
+  it('preserves a direct action result and timeout metadata without claiming completion', async () => {
+    vi.mocked(computerUse.execute)
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ text: 'Still loading', settling: { timedOut: true } });
+    expect(await handlers.get('computer-use-click')?.({ window_id: 1, element_index: 2, observe: {} })).toStrictEqual({
+      content: [{ type: 'text', text: 'Still loading' }],
+      structuredContent: { actionDelivered: true, actionResult: { success: true }, settling: { timedOut: true } }, isError: false,
+    });
+  });
+
+  it('retains usable screenshot bytes when optional coordinate metadata is unavailable', async () => {
+    vi.mocked(computerUse.execute).mockResolvedValue({ scope: 'window', image: { dataBase64: 'png' }, window: { bounds: { x: 'bad', y: 0, width: -1, height: 10 } } });
+    expect(await handlers.get('computer-use-screenshot')?.({ window_id: 1 })).toMatchObject({ isError: false, content: [expect.anything(), { type: 'image', mimeType: 'image/png', data: 'png' }] });
+    vi.mocked(computerUse.execute).mockResolvedValue({ text: 'usable', screenshot: { image: { width: 10 } } });
+    expect(await handlers.get('computer-use-get-app-state')?.({ window_id: 1 })).toMatchObject({ content: [{ type: 'text', text: 'usable' }], isError: false });
+  });
 
   function normalizedInputSchema(tool: string): ZodType {
     const inputSchema = definitions.get(tool)?.inputSchema;

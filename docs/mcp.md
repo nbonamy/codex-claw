@@ -242,16 +242,39 @@ match is unavailable. These errors require refreshing `computer-use-list-windows
 not falling back to another window.
 
 `computer-use-get-app-state` returns one coherent observation: compact
-Accessibility hierarchy text and, by default, the target-window screenshot.
+Accessibility hierarchy text, with screenshots opt-in (`includeScreenshot: true`).
 The first observation for a window/configuration is full; later observations
-are per-window `+`/`~`/`-` diffs with `stateRevision` and `baseRevision`.
+are per-window `+`/`~` diffs and compact removed-ID ranges, with `stateRevision`
+and `baseRevision`. A full baseline replaces a diff when it is smaller.
 Leading numbers are helper-session-stable `element_index` values.
 `rootElementIndex` and indexed actions are valid only in the selected window.
 `disableDiff: true` forces a new full baseline, while
 `includeScreenshot: false` avoids capture when the AX state is sufficient. A
 screenshot failure leaves the Accessibility result usable and reports
 `screenshotError`; screenshot bytes are emitted as MCP image content and
-removed from structured JSON.
+removed from structured JSON. Hierarchy text is emitted only once, in text
+content; structured metadata excludes duplicate text and context snapshots.
+
+Window-targeted actions accept `observe: {}` to return a settled observation in
+the same call. `observe` may include `includeScreenshot`, `waitForText`, and
+`timeoutMs` (1–15000); standalone observations accept the same readiness options.
+The helper checks bounded AX stability, not application-level success. Inspect
+the resulting state and `settling.timedOut`. Combined responses preserve
+`actionDelivered: true` and `actionResult` if the following observation fails;
+do not blindly retry an already-delivered action. Tool schemas reject unknown
+arguments so misspelled targeting and observation options cannot be ignored.
+Native Computer Use callbacks have a 35-second outer deadline, allowing the
+helper's 30-second transport deadline to return its result. Other callbacks
+retain their existing deadline. If an observation response is lost, the MCP
+adapter forces a new full baseline on the next read of each scope; it never
+replays the action. Web loading state participates in readiness, and explicit
+text conditions need not wait for unrelated content to stop changing.
+
+AX inspection and actions do not require foregrounding the app. Targeted
+`computer-use-type-text` accepts `element_index`, `replace`, and `submit`,
+verifies editable focus internally, and stops if focus is lost. Background
+keyboard targeting does not raise the window; physical input still requires
+foreground activation.
 
 `computer-use-screenshot` remains available for explicit window or full-screen
 capture. Window scope requires an explicit `window_id` from the current helper

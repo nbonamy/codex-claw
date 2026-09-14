@@ -3,6 +3,45 @@ import { describe, expect, it, vi } from 'vitest';
 import { startStdioRpcServer, StdioRpcPeer } from '../stdio';
 
 describe('stdio JSON-RPC transport', () => {
+  it.each([
+    ['client/external/open', undefined, 5000],
+    ['client/computerUse/execute', undefined, 35000],
+    ['client/computerUse/execute', 100, 100],
+  ] as const)('keeps a bounded deadline for %s (%s)', async (method, requestTimeoutMs, deadline) => {
+    vi.useFakeTimers();
+    const peer = new StdioRpcPeer({ input: new PassThrough(), output: new PassThrough(), onMessage: () => undefined, requestTimeoutMs });
+    peer.start();
+    try {
+      const result = peer.request(method);
+      const assertion = expect(result).rejects.toThrow(`stdio request timed out: ${method}`);
+      await vi.advanceTimersByTimeAsync(deadline);
+      await assertion;
+    } finally { peer.stop(); vi.useRealTimers(); }
+  });
+
+  it('allows native computer-use observations to finish beyond five seconds', async () => {
+    vi.useFakeTimers();
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const writes: string[] = [];
+    output.on('data', (chunk) => writes.push(chunk.toString()));
+    const peer = new StdioRpcPeer({ input, output, onMessage: () => undefined });
+    peer.start();
+    try {
+      const settled = vi.fn();
+      const result = peer.request('client/computerUse/execute', { command: 'get_app_state', arguments: { timeoutMs: 15000 } });
+      void result.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(16000);
+      expect(settled).not.toHaveBeenCalled();
+      const request = JSON.parse(writes[0]!);
+      input.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stateRevision: 5 } })}\n`);
+      await expect(result).resolves.toStrictEqual({ stateRevision: 5 });
+    } finally {
+      peer.stop();
+      vi.useRealTimers();
+    }
+  });
+
   it('writes one JSON-RPC response per request line', async () => {
     const input = new PassThrough();
     const output = new PassThrough();

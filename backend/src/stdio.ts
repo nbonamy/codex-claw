@@ -82,7 +82,9 @@ export class StdioRpcPeer {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`stdio request timed out: ${method}`));
-      }, this.options.requestTimeoutMs ?? 5_000);
+      // Native helper requests have a 30s inner deadline; the outer callback
+      // must leave room for that response (including a helper timeout error).
+      }, this.options.requestTimeoutMs ?? (method.startsWith('client/computerUse/') ? 35_000 : 5_000));
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),
