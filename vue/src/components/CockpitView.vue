@@ -95,10 +95,11 @@ const selectedViewMode = computed({
 }
 
 .agent-cockpit__header {
-  min-height: 76px;
+  height: var(--workbench-appbar-height);
+  flex: 0 0 var(--workbench-appbar-height);
   justify-content: space-between;
   gap: var(--space-16);
-  padding: var(--space-8) var(--space-20);
+  padding: 0 var(--space-20);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
 }
@@ -137,5 +138,18 @@ const selectedViewMode = computed({
 
 .agent-cockpit__mode :deep(.el-tabs__content) {
   display: none;
+}
+
+.agent-cockpit__mode :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+.agent-cockpit__mode :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.agent-cockpit__mode :deep(.el-tabs__item:focus-visible) {
+  color: var(--color-primary);
+  box-shadow: none;
 }
 </style>

@@ -30,6 +30,9 @@ export function projectCockpitAgentSections(input: {
 }
 
 function compareRecentAgents(left: Agent, right: Agent): number {
+  const working = Number(right.status.type === 'working') - Number(left.status.type === 'working');
+  if (working !== 0) return working;
+
   const updatedAt = Date.parse(right.lastActivityAt ?? right.updatedAt)
     - Date.parse(left.lastActivityAt ?? left.updatedAt);
   if (Number.isFinite(updatedAt) && updatedAt !== 0) return updatedAt;

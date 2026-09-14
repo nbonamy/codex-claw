@@ -39,4 +39,20 @@ describe('projectCockpitAgentSections', () => {
       agents[0]?.id,
     ]);
   });
+
+  it('places working agents before newer idle agents in Recent mode', () => {
+    const snapshot = createInitialSnapshot();
+    const agents = snapshot.agents.map((agent, index) => ({
+      ...agent,
+      lastActivityAt: index === 0 ? '2026-09-14T12:00:00.000Z' : '2026-09-14T13:00:00.000Z',
+      status: index === 0 ? { type: 'working' as const } : { type: 'idle' as const },
+    }));
+
+    const sections = projectCockpitAgentSections({ agents, mode: 'recent', teams: snapshot.teams });
+
+    expect(sections[0]?.agents.map((agent) => agent.id)).toStrictEqual([
+      agents[0]?.id,
+      agents[1]?.id,
+    ]);
+  });
 });
