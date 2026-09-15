@@ -517,7 +517,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 
 @keyframes team-working-color-pulse {
   50% {
-    opacity: 0.75;
+    filter: brightness(0.75);
   }
 }
 

@@ -119,6 +119,9 @@ describe('TeamRail', () => {
     const unreadIndicatorStyles = teamRailSource().match(/\.team-rail__unread-indicator \{([^}]*)\}/)?.[1];
     expect(unreadIndicatorStyles).not.toContain('border:');
     expect(teamRailSource()).toMatch(/\.team-rail__unread-indicator--working \{[^}]*background: var\(--color-warning\);[^}]*animation: team-working-color-pulse/);
+    const workingPulseStyles = teamRailSource().match(/@keyframes team-working-color-pulse \{([\s\S]*?)\n\}/)?.[1];
+    expect(workingPulseStyles).toContain('filter: brightness(0.75);');
+    expect(workingPulseStyles).not.toContain('opacity:');
     expect(teamRailSource()).toMatch(/prefers-reduced-motion: reduce[\s\S]*?\.team-rail__unread-indicator--working \{[^}]*animation: none;/);
   });
 
