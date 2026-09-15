@@ -9,18 +9,19 @@
   >
     <div class="remote-folder-picker-dialog__content">
       <div class="remote-folder-picker-dialog__path">
-        <input
+        <el-input
           v-model="folderPath"
-          class="claw-form-dialog__text-input"
+          size="small"
           type="text"
           :aria-label="$t('surface.remoteFolderPickerDialog.remoteFolderPath')"
           :placeholder="$t('surface.remoteFolderPickerDialog.hOME')"
           @keydown.enter.prevent="loadFolders(folderPath)"
         />
         <el-button
+          size="small"
           :loading="loading"
           @click="loadFolders(folderPath)"
-        > {{ $t('surface.remoteFolderPickerDialog.go') }} </el-button>
+        > {{ $t('surface.remoteFolderPickerDialog.openPath') }} </el-button>
       </div>
 
       <p
@@ -192,7 +193,6 @@ function reset(): void {
   flex-direction: column;
   max-height: 300px;
   overflow: auto;
-  border: 1px solid var(--color-border);
 }
 
 .remote-folder-picker-dialog__row {
@@ -201,17 +201,16 @@ function reset(): void {
   align-items: center;
   gap: var(--space-8);
   width: 100%;
-  padding: var(--space-8) var(--space-10);
+  min-height: 28px;
+  padding: var(--space-4) var(--space-6);
   border: 0;
-  border-bottom: 1px solid var(--color-border);
+  border-radius: var(--space-4);
   color: var(--color-text);
   background: transparent;
   text-align: left;
   cursor: pointer;
-}
-
-.remote-folder-picker-dialog__row:last-child {
-  border-bottom: 0;
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
 }
 
 .remote-folder-picker-dialog__row:hover,

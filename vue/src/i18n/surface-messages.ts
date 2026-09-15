@@ -518,9 +518,9 @@ export const surfaceMessages = {
     "planReview": "Plan review"
   },
   "remoteFolderPickerDialog": {
+    "openPath": "Open path",
     "remoteFolderPath": "Remote folder path",
     "hOME": "$HOME",
-    "go": "Go",
     "loadingFolders": "Loading folders...",
     "noFolders": "No folders",
     "cancel": "Cancel",
