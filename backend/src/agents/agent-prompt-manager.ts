@@ -14,6 +14,7 @@ export type AgentPromptManagerOptions = {
 
 /** Owns prompt admission, queued delivery, and bounded retry scheduling. */
 export class AgentPromptManager {
+  private readonly inFlightQueuedPrompts = new Set<string>();
   private readonly retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(private readonly options: AgentPromptManagerOptions) {}
@@ -69,6 +70,7 @@ export class AgentPromptManager {
   }
 
   dequeue(agentId: string, promptId: string): void {
+    this.inFlightQueuedPrompts.delete(queuedPromptKey(agentId, promptId));
     this.clearRetry(promptId);
     this.options.applyEvent({ agentId, type: 'agent.promptDequeued', payload: { ids: [promptId] } });
   }
@@ -76,37 +78,49 @@ export class AgentPromptManager {
   close(): void {
     for (const timer of this.retryTimers.values()) clearTimeout(timer);
     this.retryTimers.clear();
+    this.inFlightQueuedPrompts.clear();
   }
 
   private start(agent: Agent, prompt: string, promptOptions?: SendPromptOptions, queuedPromptId?: string): AppSnapshot {
     const snapshot = this.options.getSnapshot();
+    const inFlightKey = queuedPromptId ? queuedPromptKey(agent.id, queuedPromptId) : undefined;
+    if (inFlightKey && this.inFlightQueuedPrompts.has(inFlightKey)) return snapshot;
     if (queuedPromptId) this.clearRetry(queuedPromptId);
     const queuedPrompt = queuedPromptId
       ? (snapshot.queuedPrompts ?? []).find((candidate) => candidate.id === queuedPromptId)
       : undefined;
+    if (inFlightKey) this.inFlightQueuedPrompts.add(inFlightKey);
     this.options.onPromptStarting?.(agent.id, promptOptions);
 
-    return sendAgentPrompt(
-      snapshot,
-      this.options.driverForAgent(agent),
-      agent.id,
-      prompt,
-      promptOptions,
-      this.options.applyEvent,
-      {
-        appendUserMessage: !queuedPrompt || (!queuedPrompt.submitted && (queuedPrompt.attempts ?? 0) === 0),
-        onBackendSessionUpdated: async (_result, wasNewSession) => {
-          this.options.setNewConversationTitle(agent.id, wasNewSession);
-          await this.options.persistSnapshot();
+    try {
+      return sendAgentPrompt(
+        snapshot,
+        this.options.driverForAgent(agent),
+        agent.id,
+        prompt,
+        promptOptions,
+        this.options.applyEvent,
+        {
+          appendUserMessage: !queuedPrompt || (!queuedPrompt.submitted && (queuedPrompt.attempts ?? 0) === 0),
+          onBackendSessionUpdated: async (_result, wasNewSession) => {
+            this.options.setNewConversationTitle(agent.id, wasNewSession);
+            await this.options.persistSnapshot();
+          },
+          onPromptStarted: () => {
+            if (queuedPromptId) this.dequeue(agent.id, queuedPromptId);
+          },
+          onPromptFailed: (error) => {
+            if (queuedPromptId) {
+              this.inFlightQueuedPrompts.delete(queuedPromptKey(agent.id, queuedPromptId));
+              this.scheduleRetry(agent.id, queuedPromptId, error);
+            }
+          },
         },
-        onPromptStarted: () => {
-          if (queuedPromptId) this.dequeue(agent.id, queuedPromptId);
-        },
-        onPromptFailed: (error) => {
-          if (queuedPromptId) this.scheduleRetry(agent.id, queuedPromptId, error);
-        },
-      },
-    );
+      );
+    } catch (error) {
+      if (inFlightKey) this.inFlightQueuedPrompts.delete(inFlightKey);
+      throw error;
+    }
   }
 
   private scheduleRetry(agentId: string, promptId: string, error: Error): void {
@@ -149,4 +163,8 @@ export class AgentPromptManager {
 
 function canStartPrompt(agent: Agent): boolean {
   return agent.status.type !== 'working' && agent.status.type !== 'awaitingInput';
+}
+
+function queuedPromptKey(agentId: string, promptId: string): string {
+  return `${agentId}:${promptId}`;
 }

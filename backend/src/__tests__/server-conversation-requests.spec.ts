@@ -287,6 +287,8 @@ describe('ClawBackendServer', () => {
     expect(sendPrompt).not.toHaveBeenCalled();
     expect(onPromptStarting).not.toHaveBeenCalled();
 
+    // The provider conversation may already be idle before its completion event reaches Claw.
+    snapshot.agents[0]!.status = { type: 'idle' };
     server.emitEvent({
       agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina',
       type: 'codex.conversationEventReceived',
@@ -315,6 +317,7 @@ describe('ClawBackendServer', () => {
       attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
       inputMethod: 'dictated',
     });
+    expect(sendPrompt).toHaveBeenCalledTimes(1);
     expect(onPromptStarting).toHaveBeenCalledWith('agent-dina', {
       attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
       inputMethod: 'dictated',
