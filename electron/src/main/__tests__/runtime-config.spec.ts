@@ -212,7 +212,7 @@ describe('runtime config', () => {
     );
 
     expect(releaseConfig.repository).toBe('nbonamy/computer-use');
-    expect(releaseConfig.version).toBe('2.0.1');
+    expect(releaseConfig.version).toBe('2.0.2');
     expect(releaseConfig.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(prepareScript).toContain('Computer Use release checksum mismatch');
     expect(prepareScript).toContain("process.env.COMPUTER_USE_LOCAL === '1'");
