@@ -311,8 +311,12 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
     label: mainT('menu.view'),
     submenu: [
       {
-        label: mainT('menu.compressSession'),
+        label: mainT('menu.goToAgent'),
         accelerator: 'CommandOrControl+K',
+        click: () => callbacks.sendAppCommand({ type: 'open-agent-palette' }),
+      },
+      {
+        label: mainT('menu.compressSession'),
         click: () => callbacks.sendAppCommand({ type: 'compress-active-session' }),
       },
       {

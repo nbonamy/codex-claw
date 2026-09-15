@@ -147,11 +147,50 @@ describe('AppShell dialogs and commands', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', metaKey: true, cancelable: true }));
     await flushPromises();
     const quickOpen = wrapper.getComponent({ name: 'FileQuickOpen' });
-    await quickOpen.get('.file-quick-open__results button').trigger('click');
+    await quickOpen.get('.quick-open-dialog__item').trigger('click');
     await flushPromises();
 
     expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'src/main.ts');
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('main.ts');
+  });
+
+  it('opens the agent palette with Command-K and switches teams for the selected unread agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({
+      id: 'team-skwad',
+      name: 'Skwad',
+      agentIds: ['agent-other'],
+    });
+    snapshot.agents.push({
+      id: 'agent-other',
+      teamId: 'team-skwad',
+      name: 'Other Agent',
+      folder: '/workspace/other',
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    });
+    const wrapper = mountShell({ snapshot, unreadAgentIds: ['agent-other'] });
+
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 'k',
+      metaKey: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(shortcut);
+    await nextTick();
+
+    expect(shortcut.defaultPrevented).toBe(true);
+    const palette = wrapper.getComponent({ name: 'AgentQuickOpen' });
+    expect(palette.get('.agent-quick-open__copy strong').text()).toBe('Other Agent');
+    await palette.get('input').setValue('skwad');
+    await palette.get('input').trigger('keydown.enter');
+    await nextTick();
+
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-skwad']]);
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-other']]);
+    expect(wrapper.findComponent({ name: 'AgentQuickOpen' }).exists()).toBe(false);
   });
 
   it('toggles spoken acknowledgment mute with Shift-Command-M', async () => {
@@ -273,6 +312,11 @@ describe('AppShell dialogs and commands', () => {
     wrapper.getComponent({ name: 'WhatsNewDialog' }).vm.$emit('close');
     await nextTick();
     expect(wrapper.getComponent({ name: 'WhatsNewDialog' }).props('visible')).toBe(false);
+    listener({ type: 'open-agent-palette' });
+    await nextTick();
+    expect(wrapper.findComponent({ name: 'AgentQuickOpen' }).exists()).toBe(true);
+    wrapper.getComponent({ name: 'AgentQuickOpen' }).vm.$emit('close');
+    await nextTick();
     listener({ type: 'new-team' });
     await nextTick();
     expect(wrapper.text()).toContain('Create Team');

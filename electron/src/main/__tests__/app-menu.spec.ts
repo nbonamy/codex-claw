@@ -73,6 +73,7 @@ describe('app menu', () => {
     ]);
     expect(menu.find((item) => item.role === 'editMenu')).toBeDefined();
     expect(menuLabels(submenu(menu, 'View'))).toStrictEqual([
+      'Go to Agent...',
       'Compress Session',
       'Review',
       'Browser',
@@ -113,6 +114,7 @@ describe('app menu', () => {
       ['File', 'Close Agent'],
       ['File', 'Close Team'],
       ['File', 'Quit'],
+      ['View', 'Go to Agent...'],
       ['View', 'Compress Session'],
       ['View', 'Review'],
       ['View', 'Browser'],
@@ -125,14 +127,15 @@ describe('app menu', () => {
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(2, { type: 'close-active-agent' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(3, { type: 'close-active-team' });
     expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(4, { type: 'quit' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, { type: 'compress-active-session' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'open-review' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'open-browser' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'cycle-teams' });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-agents', direction: 1 });
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: -1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(5, { type: 'open-agent-palette' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(6, { type: 'compress-active-session' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(7, { type: 'open-review' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(8, { type: 'open-browser' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(9, { type: 'cycle-teams' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(10, { type: 'cycle-agents', direction: 1 });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'cycle-agents', direction: -1 });
     clickItem(menu, 'Help', 'What’s New');
-    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(11, { type: 'open-whats-new' });
+    expect(nextCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, { type: 'open-whats-new' });
   });
 
   it('uses the expected file menu accelerators', () => {
@@ -142,7 +145,8 @@ describe('app menu', () => {
     expect(menuItem(menu, 'File', 'Close Agent')?.accelerator).toBe('CommandOrControl+W');
     expect(menuItem(menu, 'File', 'Close Team')?.accelerator).toBe('CommandOrControl+Shift+W');
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');
-    expect(menuItem(menu, 'View', 'Compress Session')?.accelerator).toBe('CommandOrControl+K');
+    expect(menuItem(menu, 'View', 'Go to Agent...')?.accelerator).toBe('CommandOrControl+K');
+    expect(menuItem(menu, 'View', 'Compress Session')?.accelerator).toBeUndefined();
     expect(menuItem(menu, 'View', 'Review')?.accelerator).toBe('CommandOrControl+G');
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
   });
@@ -245,6 +249,7 @@ describe('app menu', () => {
     const releaseMenu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(debugMenu, 'View'))).toStrictEqual([
+      'Go to Agent...',
       'Compress Session',
       'Review',
       'Browser',

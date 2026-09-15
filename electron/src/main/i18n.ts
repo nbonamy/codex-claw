@@ -10,6 +10,7 @@ const messages = {
     'menu.duplicateAgent': 'Duplicate Agent',
     'menu.editAgent': 'Edit Agent',
     'menu.file': 'File',
+    'menu.goToAgent': 'Go to Agent...',
     'menu.help': 'Help',
     'menu.installUpdate': 'Install Update and Relaunch',
     'menu.newTeam': 'New Team',

@@ -46,6 +46,13 @@ export const surfaceMessages = {
   "agentEmptyState": {
     "codexClaw": "Codex Claw"
   },
+  "agentQuickOpen": {
+    "openAgent": "Open agent",
+    "searchAgents": "Search agents",
+    "placeholder": "Go to agent…",
+    "noMatchingAgents": "No matching agents.",
+    "noTeam": "No team"
+  },
   "agentHeader": {
     "showAgentSidebar": "Show agent sidebar",
     "noAgent": "No agent",

@@ -8,7 +8,7 @@ describe('FileQuickOpen', () => {
       { name: 'README.md', path: 'README.md' },
       { name: 'main.ts', path: 'src/main.ts' },
     ] } });
-    const input = wrapper.find('input');
+    const input = wrapper.get('input');
     await input.setValue('src');
     await input.trigger('keydown.enter');
     expect(wrapper.emitted('select')).toStrictEqual([['src/main.ts']]);

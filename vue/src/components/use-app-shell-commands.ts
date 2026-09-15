@@ -43,6 +43,7 @@ type AppShellCommandOptions = {
     focusComposer: () => void;
     newTeam: () => void;
     openAgentSurface: () => void;
+    openAgentPalette: () => void;
     openBrowser: (command: Extract<AppCommand, { type: 'open-browser' }>) => void;
     openDebugImageAnnotation: (imageDataUrl?: string, pixelRatio?: 1 | 2) => void | Promise<void>;
     openDebugOperationProgress: (
@@ -94,9 +95,23 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     if (showOnboardingGate.value) {
       return;
     }
-    if (isModalDialogVisible.value || !isAgentWorkspaceVisible.value) {
+    if (isModalDialogVisible.value) {
       return;
     }
+
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === 'k'
+    ) {
+      event.preventDefault();
+      resetQuickAgentShortcuts();
+      options.actions.openAgentPalette();
+      return;
+    }
+
+    if (!isAgentWorkspaceVisible.value) return;
 
     if (event.key === 'Meta') {
       startQuickAgentShortcutReveal(event);
@@ -242,6 +257,12 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'open-whats-new') {
       options.actions.openWhatsNew();
+      return;
+    }
+
+    if (command.type === 'open-agent-palette') {
+      if (showOnboardingGate.value || isModalDialogVisible.value) return;
+      options.actions.openAgentPalette();
       return;
     }
 

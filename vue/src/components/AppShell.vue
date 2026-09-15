@@ -379,6 +379,14 @@
       @close="fileQuickOpenVisible = false"
       @select="currentAgent && openFilePreviewForAgent(currentAgent.id, $event)"
     />
+    <AgentQuickOpen
+      v-if="agentQuickOpenVisible"
+      :agents="snapshot.agents"
+      :teams="snapshot.teams"
+      :unread-agent-ids="unreadAgentIds ?? []"
+      @close="agentQuickOpenVisible = false"
+      @select="selectAgentFromPalette"
+    />
   </main>
 </template>
 
@@ -408,6 +416,7 @@ import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
 import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
+import AgentQuickOpen from './AgentQuickOpen.vue';
 import AutomationsView from './AutomationsView.vue';
 import TeamDialog from './TeamDialog.vue';
 import AppShellNavigation from './AppShellNavigation.vue';
@@ -745,6 +754,7 @@ const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const fileQuickOpenVisible = ref(false);
+const agentQuickOpenVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
 const debugAgentCreationProgress = ref<AgentCreationProgress | null>(null);
 const debugAgentCreationTimers: Array<ReturnType<typeof setTimeout>> = [];
@@ -1515,6 +1525,7 @@ const isModalDialogVisible = computed(() => (
   || imageAnnotationVisible.value
   || debugAgentCreationProgress.value !== null
   || fileQuickOpenVisible.value
+  || agentQuickOpenVisible.value
   || props.codexResourceSharingMigrationRequired
 ));
 const { quickAgentShortcutsVisible } = useAppShellCommands({
@@ -1539,6 +1550,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     editAgent: openEditAgent,
     focusComposer: () => agentWorkspace.value?.focusComposer(),
     newTeam: openNewTeam,
+    openAgentPalette: () => { agentQuickOpenVisible.value = true; },
     openAgentSurface: () => { activeSurface.value = 'agent'; },
     openBrowser: (command) => agentWorkspace.value?.handleBrowserOpenCommand(command),
     openDebugImageAnnotation,
@@ -1891,6 +1903,12 @@ function selectAgentFromShell(agentId: string): void {
 function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): void {
   activeSurface.value = 'agent';
   emit('select-team', payload.teamId);
+  emit('select-agent', payload.agentId);
+}
+
+function selectAgentFromPalette(payload: { agentId: string; teamId: string }): void {
+  activeSurface.value = 'agent';
+  if (payload.teamId !== activeTeam.value?.id) emit('select-team', payload.teamId);
   emit('select-agent', payload.agentId);
 }
 
