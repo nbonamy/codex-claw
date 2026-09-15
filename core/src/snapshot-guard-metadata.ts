@@ -460,6 +460,8 @@ function isRemoteConnection(value: unknown): boolean {
     optional(value, 'port', isNumber) &&
     optional(value, 'identityFile', isString) &&
     includes(['saved', 'checking', 'ready', 'error'], value.status) &&
+    optional(value, 'clawdVersion', isString) &&
+    optional(value, 'codexVersion', isString) &&
     optional(value, 'detail', isString) &&
     optional(value, 'sourceFolderPath', isString) &&
     optional(value, 'transport', isRemoteConnectionTransport) &&

@@ -977,12 +977,12 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.addSshConnection(input));
   }
 
-  async function checkRemoteConnection(connectionId: string): Promise<void> {
+  async function checkRemoteConnection(connectionId: string, inspectOnly?: boolean): Promise<void> {
     if (!codexClawApi?.checkRemoteConnection) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.checkRemoteConnection(connectionId));
+    adoptBackgroundSnapshot(await codexClawApi.checkRemoteConnection(connectionId, inspectOnly));
   }
 
   async function updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<void> {

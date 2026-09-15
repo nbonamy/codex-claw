@@ -261,6 +261,27 @@ describe('AppController', () => {
     expect(openExternal).toHaveBeenCalledWith(login.authUrl);
   });
 
+  it('keeps remote device-code authentication targeted and does not auto-open a browser', async () => {
+    const request = vi.fn().mockResolvedValue({ loginId: 'device-login', verificationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD' });
+    const openExternal = vi.fn();
+    const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }), fakeAppLifecycle(), async () => undefined, openExternal);
+    const auth = controller as unknown as {
+      getCodexAuthentication(id: string): Promise<unknown>;
+      startCodexChatGptDeviceCodeLogin(id: string): Promise<unknown>;
+      cancelCodexChatGptLogin(id: string, loginId: string): Promise<unknown>;
+    };
+    await auth.getCodexAuthentication('wall-e');
+    await auth.startCodexChatGptDeviceCodeLogin('wall-e');
+    await auth.cancelCodexChatGptLogin('wall-e', 'device-login');
+    expect(request.mock.calls).toEqual([
+      [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
+      [backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId: 'wall-e' }],
+      [backendMethods.codexChatGptLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'device-login' }],
+    ]);
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(() => auth.startCodexChatGptDeviceCodeLogin('')).toThrow('remote connection');
+  });
+
   it('restarts the app when the Codex executable setting changes', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {

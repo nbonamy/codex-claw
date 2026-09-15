@@ -120,8 +120,12 @@ export class CodexSurfaceAgentAdapter {
     return this.surface.startChatGptLogin();
   }
 
-  async cancelChatGptLogin(): Promise<CodexAuthentication> {
-    return authenticationFromSurface((await this.surface.cancelLogin()).authentication);
+  async startChatGptDeviceCodeLogin() {
+    return this.surface.startChatGptDeviceCodeLogin();
+  }
+
+  async cancelChatGptLogin(loginId?: string): Promise<CodexAuthentication> {
+    return authenticationFromSurface((await this.surface.cancelLogin(loginId)).authentication);
   }
 
   async logout(): Promise<CodexAuthentication> {

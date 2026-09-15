@@ -14,6 +14,22 @@ import {
 
 describe('ClawBackendServer', () => {
 
+  it('inspects remote versions without closing or upgrading the connection', async () => {
+    const snapshot = createTestSnapshot();
+    const connection = readyRemoteConnection();
+    snapshot.remoteConnections.connections = [connection];
+    const sshConnections = {
+      inspectVersions: vi.fn().mockResolvedValue({ ...connection, clawdVersion: '0.19.1', codexVersion: '0.143.0', detail: 'versions' }),
+      checkConnection: vi.fn(),
+    };
+    const remoteClients = { closeConnection: vi.fn() };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never, remoteClients: remoteClients as never });
+    const result = await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'connections/sync', params: { connectionId: connection.id, inspectOnly: true } });
+    expect(result).toMatchObject({ result: { remoteConnections: { connections: [expect.objectContaining({ codexVersion: '0.143.0' })] } } });
+    expect(remoteClients.closeConnection).not.toHaveBeenCalled();
+    expect(sshConnections.checkConnection).not.toHaveBeenCalled();
+  });
+
   it('routes SSH connection discovery and persistence through clawd', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
@@ -1059,6 +1075,32 @@ describe('ClawBackendServer', () => {
           shouldPreventDisplaySleepForRemoteAccess: false,
         },
       }),
+    ]);
+
+    events.length = 0;
+    const onRemoteEvent = remoteClients.request.mock.calls[0]?.[3];
+    onRemoteEvent?.({
+      seq: 3,
+      type: 'models.changed',
+      backend: remoteAgent.backend,
+      payload: { models: [] },
+      occurredAt: '2026-06-13T00:00:02.000Z',
+      snapshot: remoteSnapshot,
+    });
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'models.changed', agentId: remoteAgent.id }),
+    ]);
+    events.length = 0;
+    onRemoteEvent?.({
+      seq: 4,
+      type: 'skills.changed',
+      backend: remoteAgent.backend,
+      payload: { skills: [], cwd: remoteAgent.folder },
+      occurredAt: '2026-06-13T00:00:03.000Z',
+      snapshot: remoteSnapshot,
+    });
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'skills.changed', agentId: remoteAgent.id }),
     ]);
   });
 });

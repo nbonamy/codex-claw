@@ -123,6 +123,12 @@ export type CodexChatGptLogin = {
   authUrl: string;
 };
 
+export type CodexChatGptDeviceCodeLogin = {
+  loginId: string;
+  verificationUrl: string;
+  userCode: string;
+};
+
 export type BackendReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;

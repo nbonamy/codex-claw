@@ -229,7 +229,9 @@ class FakeTransport implements RpcTransport {
         account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
         requiresOpenaiAuth: true,
       };
-      case 'account/login/start': return {
+      case 'account/login/start': return (params as { type: string }).type === 'chatgptDeviceCode' ? {
+        type: 'chatgptDeviceCode', loginId: 'device-login-1', verificationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH',
+      } : {
         type: 'chatgpt',
         loginId: 'login-1',
         authUrl: 'https://auth.openai.com/login',
@@ -456,6 +458,15 @@ describe('CodexSurfaceAgentAdapter', () => {
     expect(lastRequest(transport, 'account/login/start')).toBeDefined();
     expect(lastRequest(transport, 'account/login/cancel')).toBeDefined();
     expect(lastRequest(transport, 'account/logout')).toBeDefined();
+  });
+
+  it('delegates device login and targeted cancellation to the SDK', async () => {
+    const { adapter, transport } = createAdapter();
+    await expect(adapter.startChatGptDeviceCodeLogin()).resolves.toEqual({
+      loginId: 'device-login-1', verificationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH',
+    });
+    await adapter.cancelChatGptLogin('device-login-1');
+    expect(lastRequest(transport, 'account/login/cancel')).toMatchObject({ params: { loginId: 'device-login-1' } });
   });
 
   it('supports the full public conversation lifecycle', async () => {

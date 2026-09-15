@@ -42,7 +42,7 @@ describe('RepositoryAcquireDialog', () => {
     expect(wrapper.get('.el-dialog').classes()).toContain('claw-dialog--compact');
     const resultsRegion = wrapper.get('.repository-acquire-dialog__body');
     expect(resultsRegion.classes()).toContain('repository-acquire-dialog__scroll-region');
-    expect(wrapper.text()).toContain('On this machine');
+    expect(wrapper.text()).toContain('Already cloned');
     expect(wrapper.text()).toContain('Open');
     expect(wrapper.text()).toContain('Clone');
     expect(wrapper.findComponent({ name: 'GitHubIcon' }).exists()).toBe(true);
@@ -81,7 +81,7 @@ describe('RepositoryAcquireDialog', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('On this machine');
+    expect(wrapper.text()).not.toContain('Already cloned');
     expect(wrapper.text()).toContain('Clone');
   });
 

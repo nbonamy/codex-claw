@@ -143,6 +143,7 @@ describe('ipc channels', () => {
       getCodexAuthentication: 'codex:authentication:get',
       cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
       startCodexChatGptLogin: 'codex:authentication:chatgpt:start',
+      startCodexChatGptDeviceCodeLogin: 'codex:authentication:deviceCode:start',
       logoutCodex: 'codex:authentication:logout',
       getUpdateStatus: 'app:update-status:get',
       installUpdate: 'app:update:install',

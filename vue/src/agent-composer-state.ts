@@ -4,7 +4,6 @@ import {
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
   Agent,
-  AgentBackend,
   AgentFileSearchItem,
   AppSnapshot,
   BackendCapabilities,
@@ -63,7 +62,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
   ));
 
   const loadsByAgentId = new Map<string, Promise<void>>();
-  const modelCache = new AsyncCatalogCache<AgentBackend, BackendModelOption>((value) => ({ ...value }));
+  const modelCache = new AsyncCatalogCache<string, BackendModelOption>((value) => ({ ...value }));
   const skillCache = new AsyncCatalogCache<string, BackendSkillSummary>((value) => ({ ...value }));
   const pluginCache = new AsyncCatalogCache<string, BackendPluginSummary>((value) => ({ ...value }));
   const fileCache = new AsyncCatalogCache<string, AgentFileSearchItem>((value) => ({ ...value }));
@@ -241,7 +240,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     await loadCatalog({
       agentId: agent.id,
       cache: modelCache,
-      key: agent.backend,
+      key: modelKey(agent),
       session: source,
       source: source.listBackendModels,
       load: () => source.listBackendModels!(agent.id),
@@ -314,7 +313,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     await loadCatalog({
       agentId: agent.id,
       cache: fileCache,
-      key: agent.folder,
+      key: catalogKey(agent),
       session: source,
       source: source.listAgentFiles,
       load: () => source.listAgentFiles!(agent.id),
@@ -413,7 +412,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     const skills = event.payload.skills.map((skill) => ({ ...skill }));
     const agents = snapshot().agents.filter((agent) => (
       agent.backend === 'codex' &&
-      (event.agentId === agent.id || (!event.agentId && (cwd === null || agent.folder === cwd)))
+      (event.agentId === agent.id || (!event.agentId && !connectionId(agent) && (cwd === null || agent.folder === cwd)))
     ));
     for (const agent of agents) {
       const cache = skillCache.entry(catalogKey(agent));
@@ -426,14 +425,29 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
 
   function applyModelsChanged(event: Extract<ComposerMainEvent, { type: 'models.changed' }>): void {
     const models = event.payload.models.map((model) => ({ ...model }));
-    const cache = modelCache.entry(event.backend);
+    const owner = event.agentId ? snapshot().agents.find((agent) => agent.id === event.agentId) : undefined;
+    if (event.agentId && !owner) return;
+    const key = owner ? modelKey(owner) : JSON.stringify([event.backend, 'local']);
+    const cache = modelCache.entry(key);
     if (cache.status === 'loaded' && JSON.stringify(cache.value) === JSON.stringify(models)) return;
-    modelCache.replace(event.backend, models);
+    modelCache.replace(key, models);
     for (const agent of snapshot().agents) {
-      if (agent.backend !== event.backend) continue;
+      if (modelKey(agent) !== key) continue;
       syncModels(agent.id, cache);
       if (agent.id === snapshot().activeAgentId) restore(agent.id);
     }
+  }
+
+  function connectionId(agent: Agent): string | undefined {
+    return snapshot().teams.find((team) => team.id === agent.teamId)?.remoteConnectionId;
+  }
+
+  function modelKey(agent: Agent): string {
+    return JSON.stringify([agent.backend, connectionId(agent) ?? 'local']);
+  }
+
+  function catalogKey(agent: Agent): string {
+    return JSON.stringify([modelKey(agent), agent.folder]);
   }
 
   function syncMode(event: ComposerModeEvent): void {
@@ -526,10 +540,6 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     skillCatalogStatus,
     synchronizeAgentSelection,
   };
-}
-
-function catalogKey(agent: Agent): string {
-  return `${agent.backend}:${agent.folder}`;
 }
 
 function selectDefaultModel(configuration: AgentComposerConfiguration): void {

@@ -20,7 +20,7 @@ describe('AgentEmptyState', () => {
     const actions = wrapper.findAll('[role="menuitem"]');
     expect(actions.map((action) => action.text())).toStrictEqual([
       'New project…',
-      'Local folder or repository…',
+      'Existing folder or repository…',
       'GitHub repository…',
       'Repository URL…',
     ]);

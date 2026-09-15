@@ -6,6 +6,8 @@ import { spawn } from 'node:child_process';
 import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate } from '@codex-claw/core/contracts';
 import { createEntityId } from '@codex-claw/core/ids';
 import { backendProviderTokensFilePath } from '../state';
+import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { remoteCodexInstallCommand, remoteCodexVersionCommand } from './remote-codex-install';
 
 type ExecResult = {
   stdout: string;
@@ -61,15 +63,20 @@ export class SshConnectionService {
     };
 
     try {
+      await (this.deps.run ?? runCommand)('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', next.host, remoteCodexInstallCommand()], { timeoutMs: 360_000 });
       await this.installRemoteClawd(next.host);
       await this.syncRemoteProviderTokens(next.host);
-      const version = await this.remoteClawdVersion(next.host);
+      const clawdVersion = await this.remoteClawdVersion(next.host);
+      const codexVersion = await this.remoteCodexVersion(next.host, bundledCodexVersion);
+      if (codexVersion !== bundledCodexVersion) throw new Error('Remote Codex version verification failed. Check whether remote Settings overrides the Codex executable path.');
       next = {
         ...next,
         status: 'ready',
-        detail: version ? `Ready (${version})` : 'Ready',
+        ...(clawdVersion ? { clawdVersion } : {}),
+        codexVersion,
+        detail: `Ready (clawd ${clawdVersion}, Codex ${codexVersion})`,
         installedAt: checkedAt,
-        transport: sshStdioTransport(next.host),
+        transport: sshStdioTransport(next.host, codexVersion),
         updatedAt: checkedAt,
         lastCheckedAt: checkedAt,
       };
@@ -85,6 +92,20 @@ export class SshConnectionService {
     }
 
     return next;
+  }
+
+  async inspectVersions(connection: RemoteConnection): Promise<RemoteConnection> {
+    const [clawdVersion, codexVersion] = await Promise.all([
+      this.remoteClawdVersion(connection.host),
+      this.remoteCodexVersion(connection.host, connection.codexVersion),
+    ]);
+    return { ...connection, clawdVersion, codexVersion,
+      detail: `Ready (clawd ${clawdVersion}, Codex ${codexVersion || 'unknown'})` };
+  }
+
+  private async remoteCodexVersion(host: string, managedVersion?: string): Promise<string> {
+    const result = await this.run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, remoteCodexVersionCommand(managedVersion)]);
+    return /^codex-cli\s+(\S+)/u.exec(result.stdout.trim())?.[1] ?? '';
   }
 
   private async installRemoteClawd(host: string): Promise<void> {
@@ -161,7 +182,7 @@ export class SshConnectionService {
       host,
       `node ${remoteClawdPath} --version`,
     ]);
-    return result.stdout.trim();
+    return result.stdout.trim().replace(/^clawd\s+/u, '');
   }
 
   private async resolveLocalClawdScript(): Promise<string> {
@@ -228,13 +249,16 @@ export function parseSshConfig(content: string, configPath?: string): SshHostCan
   return hosts.sort((a, b) => a.host.localeCompare(b.host));
 }
 
-export function sshStdioTransport(host: string): RemoteConnection['transport'] {
+export function sshStdioTransport(host: string, codexVersion?: string): RemoteConnection['transport'] {
+  if (codexVersion && !/^\d+\.\d+\.\d+$/u.test(codexVersion)) throw new Error('Invalid remote Codex version.');
   return {
     type: 'ssh-stdio',
     command: 'ssh',
     args: [
       host,
-      `node ${remoteClawdPath} connect || exec node ${remoteClawdPath} --stdio`,
+      codexVersion
+        ? `CODEX_CLAW_BUNDLED_CODEX_PATH="$HOME/.codex-claw/codex/${codexVersion}/bin/codex" exec node ${remoteClawdPath} --stdio`
+        : `node ${remoteClawdPath} connect || exec node ${remoteClawdPath} --stdio`,
     ],
   };
 }

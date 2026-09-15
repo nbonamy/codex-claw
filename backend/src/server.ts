@@ -404,10 +404,21 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.connectionsSync: {
+        if (isRecord(message.params) && message.params.inspectOnly !== undefined && typeof message.params.inspectOnly !== 'boolean') {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'inspectOnly must be a boolean.');
+        }
         const connectionId = requireConnectionId(message.params);
         const connection = this.snapshot.remoteConnections.connections.find((candidate) => candidate.id === connectionId);
         if (!connection) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
+        }
+        if (isRecord(message.params) && message.params.inspectOnly === true) {
+          const inspected = await this.sshConnections.inspectVersions(connection);
+          // Do not replace a connection edited or deleted while SSH was probing.
+          this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
+            candidate === connection ? { ...candidate, clawdVersion: inspected.clawdVersion, codexVersion: inspected.codexVersion, detail: inspected.detail } : candidate
+          ));
+          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.remoteClients.closeConnection(connectionId);
         const checked = await this.sshConnections.checkConnection(connection);
@@ -1309,15 +1320,30 @@ export class ClawBackendServer {
       case backendMethods.settingsPluginStatusGet:
         return createClawRpcResult(message.id, await this.inspectPluginStatus());
       case backendMethods.codexAuthenticationGet:
-        return createClawRpcResult(
-          message.id,
-          await this.requireDriverRpc().handle(backendMethods.driverCodexAuthenticationGet, undefined),
-        );
       case backendMethods.codexChatGptLoginCancel:
-        return createClawRpcResult(
-          message.id,
-          await this.requireDriverRpc().handle(backendMethods.driverCodexChatGptLoginCancel, undefined),
-        );
+      case backendMethods.codexChatGptDeviceCodeLoginStart: {
+        if (isRecord(message.params) && message.params.remoteConnectionId !== undefined
+          && (typeof message.params.remoteConnectionId !== 'string' || !message.params.remoteConnectionId.trim())) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'remoteConnectionId must be a non-empty string.');
+        }
+        const remoteConnectionId = requireOptionalConnectionId(message.params);
+        const loginId = isRecord(message.params) ? message.params.loginId : undefined;
+        if (loginId !== undefined && (typeof loginId !== 'string' || !loginId.trim())) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'loginId must be a non-empty string.');
+        }
+        if (remoteConnectionId && message.method === backendMethods.codexChatGptLoginCancel && !loginId) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Remote cancellation requires a loginId.');
+        }
+        const driverMethod = message.method === backendMethods.codexAuthenticationGet
+          ? backendMethods.driverCodexAuthenticationGet
+          : message.method === backendMethods.codexChatGptLoginCancel
+            ? backendMethods.driverCodexChatGptLoginCancel
+            : backendMethods.driverCodexChatGptDeviceCodeLoginStart;
+        const params = loginId ? { loginId } : undefined;
+        return this.respondInLocation(message.id,
+          this.locationFromRemoteConnectionId(remoteConnectionId), message.method, params,
+          () => this.requireDriverRpc().handle(driverMethod, params));
+      }
       case backendMethods.codexChatGptLoginStart:
         return createClawRpcResult(
           message.id,
@@ -1821,6 +1847,19 @@ export class ClawBackendServer {
   }
 
   private forwardRemoteBackendEvent(connectionId: string, event: ClawBackendEvent): void {
+    // Catalog broadcasts belong to one host. Scope them to its projected agents
+    // before crossing the client boundary, which otherwise treats them as local.
+    if (!event.agentId && (event.type === 'models.changed' || event.type === 'skills.changed')) {
+      const projected = this.remoteTeams.clientSnapshotFromKnownRemotes();
+      const teamIds = new Set(projected.teams.filter((team) => team.remoteConnectionId === connectionId).map((team) => team.id));
+      for (const agent of projected.agents) {
+        if (agent.teamId && teamIds.has(agent.teamId) && agent.backend === event.backend) {
+          if (event.type === 'skills.changed' && event.payload.cwd && event.payload.cwd !== agent.folder) continue;
+          this.forwardRemoteBackendEvent(connectionId, { ...event, agentId: agent.id });
+        }
+      }
+      return;
+    }
     const {
       clientState: _clientState,
       occurredAt: _occurredAt,

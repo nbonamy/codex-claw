@@ -9,7 +9,24 @@ import { sshStdioTransport } from '../ssh-connections';
 
 describe('RemoteClawdClientManager', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('allows remote catalogs to finish after the old fifteen-second deadline', async () => {
+    vi.useFakeTimers();
+    const child = createChildProcess();
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+    const result = manager.request(readyConnection(), backendMethods.agentPluginsList, { agentId: 'remote' });
+    const resolved = vi.fn();
+    const rejected = vi.fn();
+    void result.then(resolved, rejected);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(rejected).not.toHaveBeenCalled();
+    const request = JSON.parse(child.stdinLines()[0]!) as { id: number };
+    child.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result: [] })}\n`);
+    await expect(result).resolves.toStrictEqual([]);
+    await manager.close();
   });
 
   it('normalizes persisted SSH stdio transports to the daemon-first command', async () => {
@@ -36,6 +53,49 @@ describe('RemoteClawdClientManager', () => {
       jsonrpc: '2.0',
       method: 'source/worktrees/list',
       params: { repoPath: '/home/nicolas/src/codex-claw' },
+    });
+    await manager.close();
+  });
+
+  it('does not warn when daemon-first SSH falls back after a missing remote socket', async () => {
+    const child = createChildProcess();
+    const warn = vi.spyOn(mainLog, 'warnMain');
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+
+    const result = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const request = JSON.parse(child.stdinLines()[0]!) as { id: number };
+    child.process.stderr.write('clawd daemon socket unavailable: connect ENOENT /home/mnmt/.codex-claw/clawd.sock\n');
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: request.id,
+      result: { ok: true },
+    })}\n`);
+
+    await expect(result).resolves.toStrictEqual({ ok: true });
+    expect(warn).not.toHaveBeenCalled();
+    await manager.close();
+  });
+
+  it('still warns for actionable remote stderr', async () => {
+    const child = createChildProcess();
+    const warn = vi.spyOn(mainLog, 'warnMain');
+    const manager = new RemoteClawdClientManager({ spawnProcess: vi.fn(() => child.process) as never });
+
+    const result = manager.request(readyConnection(), 'backend/health/get');
+    await vi.waitFor(() => expect(child.stdinLines()).toHaveLength(1));
+    const request = JSON.parse(child.stdinLines()[0]!) as { id: number };
+    child.process.stderr.write('remote helper failed to load configuration\n');
+    child.stdout.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: request.id,
+      result: { ok: true },
+    })}\n`);
+
+    await expect(result).resolves.toStrictEqual({ ok: true });
+    expect(warn).toHaveBeenCalledWith('remote-clawd', '', {
+      connectionId: 'connection-devbox',
+      detail: 'remote helper failed to load configuration',
     });
     await manager.close();
   });

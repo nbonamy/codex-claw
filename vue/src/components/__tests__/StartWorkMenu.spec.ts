@@ -21,7 +21,7 @@ describe('StartWorkMenu', () => {
 
     expect(document.body.textContent).toContain('Add project from');
     expect(document.body.textContent).toContain('New project…');
-    expect(document.body.textContent).toContain('Local folder or repository…');
+    expect(document.body.textContent).toContain('Existing folder or repository…');
     expect(document.body.textContent).toContain('GitHub repository…');
     expect(document.body.textContent).toContain('Repository URL…');
     expect(wrapper.findComponent({ name: 'GitHubIcon' }).exists()).toBe(true);

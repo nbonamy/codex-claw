@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceFolderListInput } from '@codex-claw/core/contracts';
 import { codexPairingUrl } from '../../device-pairing';
 import SettingsConnectionsPanel from '../SettingsConnectionsPanel.vue';
+import { bundledCodexVersion } from '@codex-claw/core/codex-release';
 
 describe('codexPairingUrl', () => {
   it('wraps the opaque code in the ChatGPT Codex pairing deep link', () => {
@@ -153,6 +154,53 @@ describe('SettingsConnectionsPanel', () => {
       },
     );
     expect(removeRemoteConnection).toHaveBeenCalledWith('connection-devbox');
+  });
+
+  it('offers to upgrade an SSH connection when its clawd version differs', async () => {
+    const checkRemoteConnection = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: {
+        appVersion: '0.19.1',
+        connections: [{
+          id: 'connection-outdated',
+          kind: 'ssh',
+          name: 'wall-e',
+          host: 'wall-e',
+          status: 'ready',
+          detail: 'Ready (clawd 0.15.0)',
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        }, {
+          id: 'connection-current',
+          kind: 'ssh',
+          name: 'eve',
+          host: 'eve',
+          status: 'ready',
+          clawdVersion: '0.19.1',
+          codexVersion: bundledCodexVersion,
+          detail: 'Ready (clawd 0.19.1)',
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        }],
+        checkRemoteConnection,
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    });
+
+    const upgrade = wrapper.get('.settings-connections-panel__upgrade');
+    expect(upgrade.text()).toBe('Upgrade');
+    await upgrade.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('.settings-connections-panel__upgrade')).toHaveLength(1);
+    expect(checkRemoteConnection).toHaveBeenCalledWith('connection-current', true);
+    expect(checkRemoteConnection).toHaveBeenCalledWith('connection-outdated');
+    await wrapper.setProps({ connections: [{ ...wrapper.props('connections')![1]!, codexVersion: '0.143.0' }] });
+    expect(wrapper.findAll('.settings-connections-panel__upgrade')).toHaveLength(1);
+    await wrapper.setProps({ connections: [{ ...wrapper.props('connections')![0]!, codexVersion: bundledCodexVersion }] });
+    expect(wrapper.find('.settings-connections-panel__upgrade').exists()).toBe(false);
   });
 
   it('loads ssh hosts and adds the selected connection', async () => {

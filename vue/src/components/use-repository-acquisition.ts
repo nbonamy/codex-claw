@@ -1,6 +1,7 @@
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import type {
   CloneSourceRepositoryInput,
+  SourceBranch,
   SourceRepository,
   Team,
   WorkIntegrationConnection,
@@ -16,11 +17,15 @@ export type RepositoryAcquisitionOptions = {
   catalog: () => WorkRepository[] | undefined;
   catalogError: () => string | null;
   catalogStatus: () => CatalogStatus;
+  chooseLocalFolder: () => Promise<string | null>;
   cloneRepository: (input: CloneSourceRepositoryInput) => Promise<SourceRepository>;
   connectGitHub: () => Promise<void>;
   errorMessage: (error: unknown) => string;
   githubConnection: () => WorkIntegrationConnection;
+  listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
+  listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
   loadGitHubRepositories: () => Promise<WorkRepository[] | void>;
+  openFolder: (folder: string, teamId?: string) => Promise<void>;
   openGitHubAuthorization: () => Promise<void>;
   openRepository: (repository: SourceRepository, teamId?: string) => Promise<void>;
   sourceRepositories: () => SourceRepository[];
@@ -31,9 +36,11 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
   const visible = ref(false);
   const mode = ref<'github' | 'url'>('github');
   const repositories = ref<WorkRepository[]>([]);
+  const sourceRepositories = ref<SourceRepository[]>([]);
   const loading = ref(false);
   const busy = ref(false);
   const error = ref<string | null>(null);
+  const remoteFolderPickerVisible = ref(false);
 
   const displayError = computed(() => (
     error.value ?? (mode.value === 'github' ? options.catalogError() : null)
@@ -53,8 +60,15 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
     visible.value = true;
     error.value = null;
     repositories.value = [];
-    if (nextMode === 'github' && options.githubConnection().status === 'connected') {
-      await loadCatalog();
+    sourceRepositories.value = [];
+    if (nextMode === 'github') {
+      loading.value = true;
+      await loadSourceRepositories();
+      if (options.githubConnection().status === 'connected') {
+        await loadCatalog();
+      } else {
+        loading.value = false;
+      }
     }
   }
 
@@ -91,7 +105,7 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
   async function select(repository: WorkRepository): Promise<void> {
     const identity = canonicalGitRemoteIdentity(repository.url);
     const local = identity
-      ? options.sourceRepositories().find((candidate) => candidate.remoteIdentity === identity)
+      ? sourceRepositories.value.find((candidate) => candidate.remoteIdentity === identity)
       : undefined;
     if (local) {
       close();
@@ -111,6 +125,57 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
       close();
       await options.openRepository(repository, team?.id ?? options.activeTeamId());
     });
+  }
+
+  async function openExistingFolder(): Promise<void> {
+    const team = options.activeTeam();
+    if (team?.remoteConnectionId) {
+      remoteFolderPickerVisible.value = true;
+      return;
+    }
+
+    const folder = await options.chooseLocalFolder();
+    if (folder) await openExistingFolderPath(folder);
+  }
+
+  function closeRemoteFolderPicker(): void {
+    remoteFolderPickerVisible.value = false;
+  }
+
+  async function selectRemoteFolder(folder: string): Promise<void> {
+    closeRemoteFolderPicker();
+    await openExistingFolderPath(folder);
+  }
+
+  async function openExistingFolderPath(folder: string): Promise<void> {
+    const team = options.activeTeam();
+    const remoteConnectionId = team?.remoteConnectionId?.trim() || undefined;
+    const repository: SourceRepository = {
+      name: folder.split(/[\\/]/u).filter(Boolean).at(-1) ?? 'workspace',
+      path: folder,
+      worktrees: [],
+    };
+    try {
+      const branches = await options.listSourceBranches(folder, remoteConnectionId);
+      if (branches.length > 0) {
+        await options.openRepository(repository, team?.id ?? options.activeTeamId());
+        return;
+      }
+    } catch {
+      // A plain folder remains a valid session workspace.
+    }
+    await options.openFolder(folder, team?.id ?? options.activeTeamId());
+  }
+
+  async function loadSourceRepositories(): Promise<void> {
+    const remoteConnectionId = options.activeTeam()?.remoteConnectionId?.trim() || undefined;
+    try {
+      sourceRepositories.value = remoteConnectionId
+        ? await options.listSourceRepositories(remoteConnectionId)
+        : options.sourceRepositories();
+    } catch (cause) {
+      error.value = options.errorMessage(cause);
+    }
   }
 
   async function runBusy(action: () => Promise<void>): Promise<void> {
@@ -143,6 +208,7 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
   return {
     busy,
     catalogLoading,
+    closeRemoteFolderPicker,
     displayError,
     error,
     mode,
@@ -153,6 +219,10 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
     connect,
     open,
     openAuthorization,
+    openExistingFolder,
+    remoteFolderPickerVisible,
     select,
+    selectRemoteFolder,
+    sourceRepositories,
   };
 }

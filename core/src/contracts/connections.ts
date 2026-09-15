@@ -26,6 +26,8 @@ export type RemoteConnection = {
   port?: number;
   identityFile?: string;
   status: RemoteConnectionStatus;
+  clawdVersion?: string;
+  codexVersion?: string;
   detail?: string;
   sourceFolderPath?: string;
   transport?: RemoteConnectionTransport;

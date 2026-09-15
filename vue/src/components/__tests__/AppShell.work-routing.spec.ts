@@ -289,6 +289,77 @@ describe('AppShell work routing', () => {
     expect(dialog.props('visible')).toBe(false);
   });
 
+  it('creates new Git projects on the active remote team devbox', async () => {
+    const snapshot = remoteEmptyTeamSnapshot();
+    const repository: SourceRepository = {
+      name: 'fresh-project',
+      path: '/home/nicolas/src/fresh-project',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/fresh-project' }],
+    };
+    const createSourceRepository = vi.fn().mockResolvedValue(repository);
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, createSourceRepository, createAgent });
+
+    wrapper.getComponent({ name: 'AgentEmptyState' }).vm.$emit('start-work', 'new');
+    await flushPromises();
+    wrapper.getComponent({ name: 'NewProjectDialog' }).vm.$emit('create', 'fresh-project');
+    await flushPromises();
+
+    expect(createSourceRepository).toHaveBeenCalledWith({
+      name: 'fresh-project',
+      remoteConnectionId: 'connection-devbox',
+    });
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/home/nicolas/src/fresh-project',
+      backend: 'codex',
+      sourceRepositoryName: 'fresh-project',
+      teamId: 'team-remote',
+    });
+  });
+
+  it('browses and opens existing folders on the active remote team devbox', async () => {
+    const snapshot = remoteEmptyTeamSnapshot();
+    const chooseAgentFolder = vi.fn();
+    const listSourceFolders = vi.fn().mockResolvedValue({
+      path: '/home/nicolas',
+      parentPath: '/home',
+      entries: [{ name: 'src', path: '/home/nicolas/src' }],
+    });
+    const listSourceBranches = vi.fn().mockResolvedValue([]);
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      chooseAgentFolder,
+      createAgent,
+      listSourceBranches,
+      listSourceFolders,
+    });
+
+    wrapper.getComponent({ name: 'AgentEmptyState' }).vm.$emit('start-work', 'local');
+    await flushPromises();
+
+    const folderPicker = wrapper.getComponent({ name: 'RemoteFolderPickerDialog' });
+    expect(folderPicker.props('visible')).toBe(true);
+    expect(folderPicker.props('remoteConnectionId')).toBe('connection-devbox');
+    expect(listSourceFolders).toHaveBeenCalledWith({ remoteConnectionId: 'connection-devbox' });
+    expect(chooseAgentFolder).not.toHaveBeenCalled();
+
+    folderPicker.vm.$emit('select', '/home/nicolas/src/existing-project');
+    await flushPromises();
+
+    expect(listSourceBranches).toHaveBeenCalledWith(
+      '/home/nicolas/src/existing-project',
+      'connection-devbox',
+    );
+    expect(createAgent).toHaveBeenCalledWith({
+      name: null,
+      folder: '/home/nicolas/src/existing-project',
+      backend: 'codex',
+      teamId: 'team-remote',
+    });
+  });
+
   it('clones a GitHub repository before opening its contextual session picker', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
@@ -333,6 +404,61 @@ describe('AppShell work routing', () => {
     expect(cloneSourceRepository).toHaveBeenCalledWith({ url: githubRepository.url });
     expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/new-project', undefined);
     expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('repositoryName')).toBe('new-project');
+  });
+
+  it('discovers and clones GitHub repositories in the active remote team location', async () => {
+    const snapshot = remoteEmptyTeamSnapshot();
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
+    const githubRepository: WorkRepository = {
+      provider: 'github',
+      id: 'nbonamy/new-project',
+      owner: 'nbonamy',
+      name: 'new-project',
+      fullName: 'nbonamy/new-project',
+      url: 'https://github.com/nbonamy/new-project',
+      isPrivate: true,
+    };
+    const loadWorkRepositories = vi.fn().mockResolvedValue([githubRepository]);
+    const listSourceRepositories = vi.fn().mockResolvedValue([]);
+    const cloneSourceRepository = vi.fn().mockResolvedValue({
+      name: 'new-project',
+      path: '/home/nicolas/src/new-project',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/new-project' }],
+    });
+    const listSourceBranches = vi.fn().mockResolvedValue([
+      { name: 'main', isDefault: true, worktreePath: '/home/nicolas/src/new-project' },
+    ]);
+    const wrapper = mountShell({
+      snapshot,
+      sourceRepositories: [{
+        name: 'local-match-that-must-be-ignored',
+        path: '/Users/nbonamy/src/new-project',
+        remoteIdentity: 'github.com/nbonamy/new-project',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/new-project' }],
+      }],
+      cloneSourceRepository,
+      listSourceBranches,
+      listSourceRepositories,
+      loadWorkRepositories,
+    });
+
+    wrapper.getComponent({ name: 'AgentEmptyState' }).vm.$emit('start-work', 'github');
+    await flushPromises();
+
+    expect(listSourceRepositories).toHaveBeenCalledWith('connection-devbox');
+    expect(loadWorkRepositories).toHaveBeenCalledWith('github');
+
+    wrapper.getComponent({ name: 'RepositoryAcquireDialog' }).vm.$emit('select-repository', githubRepository);
+    await flushPromises();
+
+    expect(cloneSourceRepository).toHaveBeenCalledWith({
+      url: githubRepository.url,
+      remoteConnectionId: 'connection-devbox',
+    });
+    expect(listSourceBranches).toHaveBeenCalledWith(
+      '/home/nicolas/src/new-project',
+      'connection-devbox',
+    );
   });
 
   it('opens an existing checkout only when its remote matches the selected GitHub repository', async () => {
@@ -939,3 +1065,19 @@ describe('AppShell work routing', () => {
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
   });
 });
+
+function remoteEmptyTeamSnapshot() {
+  const snapshot = createInitialSnapshot();
+  snapshot.teams = [{
+    id: 'team-remote',
+    name: 'Devbox',
+    color: 'blue',
+    agentIds: [],
+    remoteConnectionId: 'connection-devbox',
+    remoteTeamId: 'remote-team',
+  }];
+  snapshot.agents = [];
+  snapshot.activeTeamId = 'team-remote';
+  snapshot.activeAgentId = null;
+  return snapshot;
+}

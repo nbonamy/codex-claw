@@ -1,5 +1,17 @@
 // Component-scoped renderer copy. Keep keys stable when editing messages.
 export const surfaceMessages = {
+  "remoteCodexAuth": {
+    "connected": "Codex connected",
+    "connect": "Connect ChatGPT",
+    "checking": "Checking Codex account…",
+    "instructions": "Open the sign-in page and enter this code:",
+    "open": "Open sign-in page",
+    "copy": "Copy device code",
+    "copied": "Device code copied",
+    "copyFailed": "Could not copy. Select the code and copy it manually.",
+    "cancel": "Cancel",
+    "retry": "Retry account check"
+  },
   "app": {
     "applyingResourceChanges": "Applying resource changes…",
     "restartingTheBackendAndReconnectingYourChats": "Restarting the backend and reconnecting your chats."
@@ -625,6 +637,7 @@ export const surfaceMessages = {
     "connect": "Connect",
     "delete": "Delete",
     "sSHSettings": "SSH settings",
+    "upgrade": "Upgrade",
     "syncing": "Syncing...",
     "sync": "Sync",
     "ready": "Ready",

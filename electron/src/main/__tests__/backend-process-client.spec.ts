@@ -63,6 +63,9 @@ describe('ClawBackendProcessClient', () => {
   });
 
   it.each([
+    backendMethods.snapshotGet,
+    backendMethods.agentPluginsList,
+    backendMethods.agentPromptSend,
     backendMethods.agentTurnDelete,
     backendMethods.agentTurnEdit,
     backendMethods.agentTurnRetry,

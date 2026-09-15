@@ -33,7 +33,20 @@
           <div>
             <strong>{{ connection.name }}</strong>
             <span>{{ connectionLabel(connection) }}</span>
-            <em v-if="connection.detail">{{ connection.detail }}</em>
+            <span
+              v-if="connection.detail"
+              class="settings-connections-panel__detail"
+            >
+              <em>{{ connection.detail }}</em>
+              <button
+                v-if="canUpgrade(connection)"
+                class="settings-connections-panel__upgrade"
+                type="button"
+                :disabled="checkingConnectionId === connection.id"
+                @click="checkConnection(connection.id)"
+              >{{ $t('surface.settingsConnectionsPanel.upgrade') }}</button>
+            </span>
+            <RemoteCodexAuthentication v-if="connection.status === 'ready'" :connection="connection" />
           </div>
         </div>
         <div class="settings-connections-panel__actions">
@@ -192,7 +205,8 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { bundledCodexVersion } from '@codex-claw/core/codex-release';
 import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -200,13 +214,15 @@ import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shar
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
+import RemoteCodexAuthentication from './RemoteCodexAuthentication.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
 import SettingsSection from './SettingsSection.vue';
 
 const props = withDefaults(defineProps<{
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
-  checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  appVersion?: string;
+  checkRemoteConnection?: (connectionId: string, inspectOnly?: boolean) => Promise<void>;
   connections?: RemoteConnection[];
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
@@ -380,6 +396,27 @@ function connectionMenuItems(connection: RemoteConnection): AppMenuItem[] {
   }];
 }
 
+onMounted(async () => {
+  // Inspection never installs software or interrupts the remote session.
+  for (const connection of props.connections) {
+    if (connection.status === 'ready') {
+      try { await props.checkRemoteConnection(connection.id, true); } catch { /* Keep the last known status. */ }
+    }
+  }
+});
+
+function canUpgrade(connection: RemoteConnection): boolean {
+  const remoteVersion = connectionClawdVersion(connection);
+  return connection.status === 'ready'
+    && Boolean((remoteVersion && props.appVersion && remoteVersion !== props.appVersion)
+      || connection.codexVersion !== bundledCodexVersion);
+}
+
+function connectionClawdVersion(connection: RemoteConnection): string | null {
+  if (connection.clawdVersion) return connection.clawdVersion;
+  return /\bclawd\s+([^,)]+)/u.exec(connection.detail ?? '')?.[1]?.trim() ?? null;
+}
+
 function selectConnectionMenuItem(connection: RemoteConnection, itemId: string): void {
   openMenuConnectionId.value = null;
   if (itemId === 'check') {
@@ -516,6 +553,32 @@ function statusLabel(status: RemoteConnection['status']): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settings-connections-panel__detail {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.settings-connections-panel__upgrade {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.settings-connections-panel__upgrade:hover,
+.settings-connections-panel__upgrade:focus-visible {
+  text-decoration: underline;
+}
+
+.settings-connections-panel__upgrade:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .settings-connections-panel__actions {

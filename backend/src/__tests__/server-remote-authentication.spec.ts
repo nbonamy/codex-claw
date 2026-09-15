@@ -1,0 +1,40 @@
+import { describe, expect, it, vi } from 'vitest';
+import { ClawBackendServer } from '../server';
+import { createTestSnapshot, readyRemoteConnection } from './server-test-fixtures';
+
+describe('host-targeted Codex authentication', () => {
+  it.each([
+    ['codex/authentication/get', undefined, { account: null, requiresOpenaiAuth: true, login: { status: 'idle', error: null } }],
+    ['codex/authentication/deviceCode/start', undefined, { loginId: 'remote-login', verificationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD' }],
+    ['codex/authentication/chatgpt/cancel', { loginId: 'remote-login' }, { account: null, requiresOpenaiAuth: true, login: { status: 'cancelled', error: null } }],
+  ] as const)('routes %s to the selected host, never the local account', async (method, params, response) => {
+    const snapshot = createTestSnapshot();
+    const connection = readyRemoteConnection();
+    snapshot.remoteConnections.connections = [connection];
+    const remoteClients = { request: vi.fn().mockResolvedValue(response) };
+    const driverRpc = { handle: vi.fn(), onEvent: vi.fn(() => () => undefined) };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, remoteClients: remoteClients as never, driverRpc: driverRpc as never });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { remoteConnectionId: connection.id, ...params } })).resolves.toEqual({ jsonrpc: '2.0', id: 1, result: response });
+    expect(remoteClients.request).toHaveBeenCalledWith(connection, method, params, expect.any(Function));
+    expect(driverRpc.handle).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown remote instead of signing in locally', async () => {
+    const driverRpc = { handle: vi.fn(), onEvent: vi.fn(() => () => undefined) };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot: createTestSnapshot(), driverRpc: driverRpc as never });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'codex/authentication/deviceCode/start', params: { remoteConnectionId: 'missing' } })).resolves.toMatchObject({ error: { message: 'Remote connection not found: missing' } });
+    expect(driverRpc.handle).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['codex/authentication/get', { remoteConnectionId: '' }],
+    ['codex/authentication/deviceCode/start', { remoteConnectionId: 42 }],
+    ['codex/authentication/chatgpt/cancel', { remoteConnectionId: 'wall-e' }],
+    ['codex/authentication/chatgpt/cancel', { loginId: '' }],
+  ])('rejects invalid targeting for %s', async (method, params) => {
+    const driverRpc = { handle: vi.fn(), onEvent: vi.fn(() => () => undefined) };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot: createTestSnapshot(), driverRpc: driverRpc as never });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: method as string, params })).resolves.toMatchObject({ error: { code: -32602 } });
+    expect(driverRpc.handle).not.toHaveBeenCalled();
+  });
+});

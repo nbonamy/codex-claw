@@ -120,6 +120,15 @@ flow, and the renderer refreshes account state until the SDK observes
 the active account and exposes `account/logout`. Raw Codex account protocol
 types and authentication files never cross into the renderer.
 
+SSH connection settings expose a separate, host-targeted Codex account check
+and **Connect ChatGPT** action. The latter invokes the SDK's
+`startChatGptDeviceCodeLogin()` on that host and displays its verification URL
+and user code. Claw polls the SDK account view while that UI is pending and
+passes the exact login ID when cancelling; it never implements token exchange,
+copies credentials, or owns token refresh. These remote account results do not
+replace the local desktop's account state. Both local and SSH access use the
+same isolated Claw Codex home on the target host.
+
 The General settings Advanced section can store a Codex executable path. A
 non-empty value is passed as the executable for
 `codex app-server --listen stdio://` and always wins. Empty uses the pinned

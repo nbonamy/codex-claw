@@ -69,6 +69,7 @@
         />
         <SettingsConnectionsPanel
           v-else-if="activeTab === 'connections'"
+          :app-version="appVersion"
           :connections="remoteConnections"
           :settings="generalSettings"
           :update-settings="updateSettings"
@@ -106,6 +107,9 @@ import SettingsPluginsPanel from './SettingsPluginsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';
 import type { SettingsTab } from './settings-tabs';
 import { clawHostCapabilities } from '../platform-api';
+import appPackage from '../../package.json';
+
+const appVersion = appPackage.version;
 
 withDefaults(defineProps<{
   activeTab?: SettingsTab;
@@ -127,7 +131,7 @@ withDefaults(defineProps<{
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
-  checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  checkRemoteConnection?: (connectionId: string, inspectOnly?: boolean) => Promise<void>;
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
   getDevicePairingStatus?: () => Promise<DevicePairingStatus>;

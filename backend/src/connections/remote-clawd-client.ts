@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendRequestTimeoutMs } from '@codex-claw/core/backend-protocol/request-timeout';
 import {
   decodeClawBackendEvent,
   type ClawBackendEvent,
@@ -94,6 +95,7 @@ export class RemoteClawdClientManager {
 class RemoteClawdClient {
   private process: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
+  private stderrBuffer = '';
   private nextRequestId = 1;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private eventSink: ((event: ClawBackendEvent) => void) | null = null;
@@ -127,21 +129,44 @@ class RemoteClawdClient {
     });
     this.process = child;
     child.stdout.on('data', (chunk) => this.handleStdout(chunk));
-    child.stderr.on('data', (chunk) => {
-      warnMain('remote-clawd', '', {
-        connectionId: this.connection.id,
-        detail: chunk.toString().trim(),
-      });
-    });
+    child.stderr.on('data', (chunk) => this.handleStderr(chunk));
     child.once('exit', (code, signal) => {
+      this.flushStderr();
       this.process = null;
       this.rejectPending(new Error(`remote clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
       this.onStopped();
     });
     child.once('error', (error) => {
+      this.flushStderr();
       this.process = null;
       this.rejectPending(error);
       this.onStopped();
+    });
+  }
+
+  private handleStderr(chunk: Buffer | string): void {
+    this.stderrBuffer += chunk.toString();
+    const lines = this.stderrBuffer.split(/\r?\n/u);
+    this.stderrBuffer = lines.pop() ?? '';
+    for (const line of lines) {
+      this.logStderrLine(line);
+    }
+  }
+
+  private flushStderr(): void {
+    const trailing = this.stderrBuffer;
+    this.stderrBuffer = '';
+    this.logStderrLine(trailing);
+  }
+
+  private logStderrLine(line: string): void {
+    const detail = line.trim();
+    if (!detail || detail.startsWith('clawd daemon socket unavailable:')) {
+      return;
+    }
+    warnMain('remote-clawd', '', {
+      connectionId: this.connection.id,
+      detail,
     });
   }
 
@@ -156,9 +181,7 @@ class RemoteClawdClient {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`remote clawd request timed out: ${method}`));
-      }, method === backendMethods.agentSessionCompress
-        ? Math.max(this.options.requestTimeoutMs ?? 15_000, 10 * 60_000)
-        : this.options.requestTimeoutMs ?? 15_000);
+      }, backendRequestTimeoutMs(method, this.options.requestTimeoutMs ?? 15_000));
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),

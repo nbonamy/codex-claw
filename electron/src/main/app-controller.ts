@@ -180,8 +180,8 @@ export class AppController {
       return this.addSshConnection(input);
     });
 
-    ipc.handle(ipcChannels.checkRemoteConnection, async (_event, connectionId: string) => {
-      return this.checkRemoteConnection(connectionId);
+    ipc.handle(ipcChannels.checkRemoteConnection, async (_event, connectionId: string, inspectOnly?: boolean) => {
+      return this.checkRemoteConnection(connectionId, inspectOnly);
     });
 
     ipc.handle(ipcChannels.updateRemoteConnection, async (_event, connectionId: string, input: UpdateRemoteConnectionInput) => {
@@ -460,8 +460,11 @@ export class AppController {
       return this.setCodexResourceSharing(input);
     });
     ipc.handle(ipcChannels.getPluginStatus, () => this.getPluginStatus());
-    ipc.handle(ipcChannels.getCodexAuthentication, () => this.getCodexAuthentication());
-    ipc.handle(ipcChannels.cancelCodexChatGptLogin, () => this.cancelCodexChatGptLogin());
+    ipc.handle(ipcChannels.getCodexAuthentication, (_event, remoteConnectionId?: string) => this.getCodexAuthentication(remoteConnectionId));
+    ipc.handle(ipcChannels.cancelCodexChatGptLogin, (_event, remoteConnectionId?: string, loginId?: string) => this.cancelCodexChatGptLogin(remoteConnectionId, loginId));
+    ipc.handle(ipcChannels.startCodexChatGptDeviceCodeLogin, (_event, remoteConnectionId: string) => {
+      return this.startCodexChatGptDeviceCodeLogin(remoteConnectionId);
+    });
     ipc.handle(ipcChannels.startCodexChatGptLogin, () => this.startCodexChatGptLogin());
     ipc.handle(ipcChannels.logoutCodex, () => this.logoutCodex());
     ipc.handle(ipcChannels.getUpdateStatus, () => this.desktopUpdateStatus);
@@ -683,8 +686,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsSshCreate, { input }));
   }
 
-  private async checkRemoteConnection(connectionId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsSync, { connectionId }));
+  private async checkRemoteConnection(connectionId: string, inspectOnly?: boolean): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsSync, { connectionId, ...(inspectOnly ? { inspectOnly: true } : {}) }));
   }
 
   private async updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot> {
@@ -911,12 +914,18 @@ export class AppController {
     return this.requireBackendClient().request<AppPluginStatus>(backendMethods.settingsPluginStatusGet);
   }
 
-  private getCodexAuthentication(): Promise<CodexAuthentication> {
-    return this.requireBackendClient().request(backendMethods.codexAuthenticationGet);
+  private getCodexAuthentication(remoteConnectionId?: string): Promise<CodexAuthentication> {
+    return this.requireBackendClient().request(backendMethods.codexAuthenticationGet, remoteConnectionId ? { remoteConnectionId } : undefined);
   }
 
-  private cancelCodexChatGptLogin(): Promise<CodexAuthentication> {
-    return this.requireBackendClient().request(backendMethods.codexChatGptLoginCancel);
+  private startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<import('@codex-claw/core/contracts').CodexChatGptDeviceCodeLogin> {
+    if (typeof remoteConnectionId !== 'string' || !remoteConnectionId.trim()) throw new Error('A remote connection is required.');
+    return this.requireBackendClient().request(backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId });
+  }
+
+  private cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication> {
+    return this.requireBackendClient().request(backendMethods.codexChatGptLoginCancel,
+      remoteConnectionId || loginId ? { ...(remoteConnectionId ? { remoteConnectionId } : {}), ...(loginId ? { loginId } : {}) } : undefined);
   }
 
   private async startCodexChatGptLogin(): Promise<CodexChatGptLogin> {

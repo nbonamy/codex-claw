@@ -67,6 +67,8 @@ describe('snapshot guards', () => {
       { name: 'work backlog provider settings', mutate: (snapshot) => { snapshot.workBacklog.providerSettings.github!.oauthClientId = 42 as never; } },
       { name: 'work backlog assignment', mutate: (snapshot) => { snapshot.workBacklog.assignments.item!.status = 'working' as never; } },
       { name: 'remote connection', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.status = 'connected' as never; } },
+      { name: 'remote clawd version', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.clawdVersion = 42 as never; } },
+      { name: 'remote Codex version', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.codexVersion = 42 as never; } },
       { name: 'remote transport', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.transport!.args = [42 as never]; } },
       { name: 'general settings', mutate: (snapshot) => { snapshot.general.celebrationsEnabled = 'yes' as never; } },
       { name: 'plugin settings', mutate: (snapshot) => { snapshot.general.plugins!.chromeEnabled = 'yes' as never; } },

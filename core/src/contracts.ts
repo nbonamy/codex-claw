@@ -65,6 +65,7 @@ import type {
   BackendSkillSummary,
   CodexAuthentication,
   CodexChatGptLogin,
+  CodexChatGptDeviceCodeLogin,
   CodexThreadSettings,
 } from './contracts/backend';
 import type {
@@ -200,6 +201,7 @@ export type {
   CodexApprovalsReviewer,
   CodexAuthentication,
   CodexChatGptLogin,
+  CodexChatGptDeviceCodeLogin,
   CodexThreadSettings,
 } from './contracts/backend';
 export {
@@ -1076,7 +1078,7 @@ export type CodexClawApi = {
   getSnapshotState(): Promise<RendererSnapshotState>;
   listSshHosts(): Promise<SshHostCandidate[]>;
   addSshConnection(input: AddSshConnectionInput): Promise<AppSnapshot>;
-  checkRemoteConnection(connectionId: string): Promise<AppSnapshot>;
+  checkRemoteConnection(connectionId: string, inspectOnly?: boolean): Promise<AppSnapshot>;
   updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot>;
   removeRemoteConnection(connectionId: string): Promise<AppSnapshot>;
   getDevicePairingStatus(): Promise<DevicePairingStatus>;
@@ -1160,8 +1162,9 @@ export type CodexClawApi = {
   getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;
   setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;
   getPluginStatus(): Promise<AppPluginStatus>;
-  getCodexAuthentication(): Promise<CodexAuthentication>;
-  cancelCodexChatGptLogin(): Promise<CodexAuthentication>;
+  getCodexAuthentication(remoteConnectionId?: string): Promise<CodexAuthentication>;
+  cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;
+  startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<CodexChatGptDeviceCodeLogin>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;
   logoutCodex(): Promise<CodexAuthentication>;
   getUpdateStatus(): Promise<DesktopUpdateStatus>;

@@ -4,20 +4,20 @@ import { backendRequestTimeoutMs } from '../backend-request-timeout';
 
 describe('backendRequestTimeoutMs', () => {
   it('allows known long-running operations to outlive ordinary request timeouts', () => {
-    expect(backendRequestTimeoutMs(backendMethods.agentDelete, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentHistoryHydrate, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentHistoryLoadOlder, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentConversationMessagesGet, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentSelect, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.teamSelect, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentFork, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentGitMessageGenerate, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentGitMerge, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentGitPullRequestCreate, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentTurnDelete, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentTurnEdit, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentTurnRetry, 5_000)).toBe(120_000);
-    expect(backendRequestTimeoutMs(backendMethods.agentSessionCompress, 5_000)).toBe(600_000);
-    expect(backendRequestTimeoutMs(backendMethods.snapshotGet, 5_000)).toBe(5_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentDelete, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentHistoryHydrate, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentHistoryLoadOlder, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentConversationMessagesGet, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentSelect, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.teamSelect, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentFork, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentGitMessageGenerate, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentGitMerge, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentGitPullRequestCreate, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentTurnDelete, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentTurnEdit, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentTurnRetry, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.agentSessionCompress, 5_000)).toBe(605_000);
+    expect(backendRequestTimeoutMs(backendMethods.snapshotGet, 5_000)).toBe(125_000);
   });
 });

@@ -38,6 +38,14 @@ The shared request map is being adopted one product domain at a time; all
 app-level `agent/git/*` methods currently have compile-time parameter and result
 contracts used by the Electron adapter and backend routing seam.
 
+Operation deadlines are shared in `core/src/backend-protocol/request-timeout.ts`
+by the Electron and SSH clients. Startup snapshots, provider catalogs, and slow
+agent operations use the longer deadline; Electron adds a response grace period
+so a remote timeout can reach the desktop before its own request expires.
+Remote model/skill broadcasts are scoped to projected agents before forwarding.
+Client catalog caches distinguish local and remote hosts, even when both use the
+same provider and folder path.
+
 This protocol version is a breaking dev-mode cleanup. There are no legacy
 aliases for older names such as `agent/listFiles` or `backend/event`; stale
 local or remote `clawd` daemons must be restarted or
@@ -208,11 +216,19 @@ and `~/sources` first.
 
 ## Client To `clawd`: Remote Connections
 
+Codex authentication reads (`codex/authentication/get`) and cancellation
+(`codex/authentication/chatgpt/cancel`) accept an optional `remoteConnectionId`;
+omitting it retains the local flow. `codex/authentication/deviceCode/start`
+routes to the SDK device-code login on the selected host and returns
+`{ loginId, verificationUrl, userCode }`. Cancellation additionally accepts
+`loginId`, so a client cancels its own pending flow rather than another login.
+Only the selected host's SDK/app-server stores and refreshes credentials.
+
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `connections/sshHosts/list` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
 | `connections/ssh/create` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
-| `connections/sync` | `{ connectionId }` | `AppSnapshot` | Syncs a saved SSH connection: closes any cached remote stdio client, uploads the bundled `clawd` script, mirrors `provider-tokens.json`, records the daemon-first SSH transport, reads the installed version, then asks the remote `clawd` to run `workProvider/connections/reload`. Sync does not start or restart a persistent remote daemon. Remote `clawd` hydrates `workBacklog.connections` from the mirrored tokens instead of copying local `state.json`. The renderer labels this action `Sync`. |
+| `connections/sync` | `{ connectionId, inspectOnly? }` | `AppSnapshot` | With `inspectOnly: true`, probes and records `clawdVersion` and `codexVersion` without installing or closing a session. Otherwise closes the cached remote client, installs the desktop-pinned Codex package into `~/.codex-claw/codex/<version>` after SHA-256 and executable-version verification, uploads bundled `clawd`, and mirrors provider tokens. The managed transport starts a fresh one-shot clawd with its bundled Codex path, avoiding stale persistent daemons. It then reloads remote provider connections. Settings probes versions when opened and offers Upgrade if either differs (or Codex is unknown). Explicit custom Codex executable settings remain authoritative. The user's standalone CLI, shell profiles, and conversation data are not modified. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
 | `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and removes local team pointers attached to it. Remote teams, agents, messages, and automations keep running on the SSH host. If every local team used that connection, local `clawd` creates one empty local fallback team first. |
 

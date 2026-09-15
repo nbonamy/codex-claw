@@ -3,6 +3,17 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { invokeClawWebOperation } from '../server/operations';
 
 describe('Claw web operations', () => {
+  it('preserves the host and login identity for remote authentication', async () => {
+    const request = vi.fn().mockResolvedValue({});
+    await invokeClawWebOperation({ request }, 'getCodexAuthentication', ['wall-e']);
+    await invokeClawWebOperation({ request }, 'startCodexChatGptDeviceCodeLogin', ['wall-e']);
+    await invokeClawWebOperation({ request }, 'cancelCodexChatGptLogin', ['wall-e', 'login-1']);
+    expect(request.mock.calls).toEqual([
+      [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
+      [backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId: 'wall-e' }],
+      [backendMethods.codexChatGptLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'login-1' }],
+    ]);
+  });
   it('maps allowlisted product operations to clawd methods', async () => {
     const request = vi.fn().mockResolvedValue({ ok: true });
 

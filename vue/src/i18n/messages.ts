@@ -245,7 +245,7 @@ export const messages = {
       addProjectFrom: 'Add project from',
       newProject: 'New project…',
       githubRepository: 'GitHub repository…',
-      localFolder: 'Local folder or repository…',
+      localFolder: 'Existing folder or repository…',
       repositoryUrl: 'Repository URL…',
     },
     newProjectDialog: {
@@ -275,7 +275,7 @@ export const messages = {
         githubRepository: 'GitHub repository',
         loading: 'Loading repositories…',
         noMatch: 'No matching repositories.',
-        onMachine: 'On this machine',
+        onMachine: 'Already cloned',
         open: 'Open',
         privateRepository: 'Private repository',
         repositories: 'Repositories',

@@ -168,6 +168,81 @@ describe('ClawBackendServer', () => {
     );
   });
 
+  it('routes source repository creation to the selected SSH connection', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const repository = {
+      name: 'fresh-project',
+      path: '/home/nicolas/src/fresh-project',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/fresh-project' }],
+    };
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue(repository),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-source-repository-create',
+      method: backendMethods.sourceRepositoryCreate,
+      params: { input: { name: 'fresh-project', remoteConnectionId: 'connection-devbox' } },
+    })).resolves.toMatchObject({ result: repository });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      backendMethods.sourceRepositoryCreate,
+      { input: { name: 'fresh-project' } },
+      expect.any(Function),
+    );
+    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual([]);
+  });
+
+  it('routes source repository cloning to the selected SSH connection', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const repository = {
+      name: 'new-project',
+      path: '/home/nicolas/src/new-project',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/new-project' }],
+    };
+    const remoteClients = {
+      request: vi.fn().mockResolvedValue(repository),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      pid: 123,
+      snapshot,
+      remoteClients: remoteClients as never,
+    });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'remote-source-repository-clone',
+      method: backendMethods.sourceRepositoryClone,
+      params: {
+        input: {
+          url: 'https://github.com/nbonamy/new-project',
+          remoteConnectionId: 'connection-devbox',
+        },
+      },
+    })).resolves.toMatchObject({ result: repository });
+
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      backendMethods.sourceRepositoryClone,
+      { input: { url: 'https://github.com/nbonamy/new-project' } },
+      expect.any(Function),
+    );
+    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual([]);
+  });
+
   it('routes source folder listing to selected SSH connections', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];

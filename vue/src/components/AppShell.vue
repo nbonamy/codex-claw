@@ -278,7 +278,7 @@
       :connection="githubConnection"
       :authorization="workProviderAuthorization"
       :repositories="repositoryAcquireRepositories"
-      :local-repository-identities="sourceRepositories.flatMap((repository) => repository.remoteIdentity ? [repository.remoteIdentity] : [])"
+      :local-repository-identities="repositoryAcquireSourceRepositories.flatMap((repository) => repository.remoteIdentity ? [repository.remoteIdentity] : [])"
       :loading="repositoryAcquireCatalogLoading"
       :busy="repositoryAcquireBusy"
       :error="repositoryAcquireDisplayError"
@@ -287,6 +287,13 @@
       @connect="connectGitHub"
       @open-authorization="openGitHubAuthorization"
       @select-repository="selectWorkRepository"
+    />
+    <RemoteFolderPickerDialog
+      :list-source-folders="listSourceFolders"
+      :remote-connection-id="activeTeam?.remoteConnectionId ?? ''"
+      :visible="repositoryAcquireRemoteFolderVisible"
+      @close="closeRepositoryAcquireRemoteFolder"
+      @select="selectRepositoryAcquireRemoteFolder"
     />
     <NewProjectDialog
       :visible="newProjectDialogVisible"
@@ -410,6 +417,7 @@ import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
+import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import NewProjectDialog from './NewProjectDialog.vue';
 import CockpitView from './CockpitView.vue';
 import BacklogView from './BacklogView.vue';
@@ -544,7 +552,7 @@ const props = withDefaults(defineProps<{
   getPluginStatus?: () => Promise<import('@codex-claw/core/contracts').AppPluginStatus>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
-  checkRemoteConnection?: (connectionId: string) => Promise<void>;
+  checkRemoteConnection?: (connectionId: string, inspectOnly?: boolean) => Promise<void>;
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
   getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
@@ -947,11 +955,22 @@ const repositoryAcquisition = useRepositoryAcquisition({
   catalog: () => props.workRepositoriesByProvider.github,
   catalogError: () => props.workBacklogError,
   catalogStatus: () => props.workBacklogStatus,
+  chooseLocalFolder: () => props.chooseAgentFolder(),
   cloneRepository: (input) => props.cloneSourceRepository(input),
   connectGitHub: () => props.connectWorkProvider('github'),
   errorMessage: (error) => localizedErrorMessage(error, t),
   githubConnection: () => githubConnection.value,
+  listSourceBranches: (repoPath, remoteConnectionId) => props.listSourceBranches(repoPath, remoteConnectionId),
+  listSourceRepositories: (remoteConnectionId) => props.listSourceRepositories(remoteConnectionId),
   loadGitHubRepositories: () => props.loadWorkRepositories('github'),
+  openFolder: async (folder, teamId) => {
+    await props.createAgent({
+      name: null,
+      folder,
+      backend: 'codex',
+      ...(teamId ? { teamId } : {}),
+    });
+  },
   openGitHubAuthorization: () => props.openWorkProviderAuthorization('github'),
   openRepository: (repository, teamId) => openRepositorySessionSource({
     teamId,
@@ -965,14 +984,19 @@ const {
   catalogLoading: repositoryAcquireCatalogLoading,
   cloneAndOpen: cloneRepositoryAndOpen,
   close: closeRepositoryAcquire,
+  closeRemoteFolderPicker: closeRepositoryAcquireRemoteFolder,
   connect: connectGitHub,
   displayError: repositoryAcquireDisplayError,
   error: repositoryAcquireError,
   mode: repositoryAcquireMode,
   open: openRepositoryAcquire,
   openAuthorization: openGitHubAuthorization,
+  openExistingFolder: openExistingRepositoryFolder,
+  remoteFolderPickerVisible: repositoryAcquireRemoteFolderVisible,
   repositories: repositoryAcquireRepositories,
   select: selectWorkRepository,
+  selectRemoteFolder: selectRepositoryAcquireRemoteFolder,
+  sourceRepositories: repositoryAcquireSourceRepositories,
   visible: repositoryAcquireVisible,
 } = repositoryAcquisition;
 const activeTeamAgents = computed(() => {
@@ -1688,7 +1712,7 @@ async function handleStartWorkAction(action: 'new' | 'github' | 'local' | 'url')
     return;
   }
   if (action === 'local') {
-    await openLocalRepositorySession();
+    await openExistingRepositoryFolder();
     return;
   }
   await openRepositoryAcquire(action);
@@ -1701,8 +1725,7 @@ function closeNewProjectDialog(): void {
 }
 
 async function createNewProject(name: string): Promise<void> {
-  const { teamId } = repositorySessionContext(null);
-  const remoteConnectionId = activeTeam.value?.remoteConnectionId;
+  const { remoteConnectionId, teamId } = repositorySessionContext(null);
   newProjectBusy.value = true;
   newProjectError.value = null;
   try {
@@ -1723,32 +1746,6 @@ async function createNewProject(name: string): Promise<void> {
   } finally {
     newProjectBusy.value = false;
   }
-}
-
-async function openLocalRepositorySession(): Promise<void> {
-  const folder = await props.chooseAgentFolder();
-  if (!folder) return;
-  const repositoryName = folder.split(/[\\/]/u).filter(Boolean).at(-1) ?? 'workspace';
-  const { teamId } = repositorySessionContext(null);
-  try {
-    const branches = await props.listSourceBranches(folder);
-    if (branches.length > 0) {
-      await openRepositorySessionSource({
-        teamId,
-        repositoryName,
-        repositoryRoot: folder,
-      });
-      return;
-    }
-  } catch {
-    // A plain folder remains a valid session workspace.
-  }
-  await props.createAgent({
-    name: null,
-    folder,
-    backend: 'codex',
-    ...(teamId ? { teamId } : {}),
-  });
 }
 
 function completeGitHubOnboardingStep(): void {

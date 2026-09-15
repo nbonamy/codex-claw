@@ -45,8 +45,12 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.startChatGptLogin();
   }
 
-  cancelChatGptLogin(): Promise<CodexAuthentication> {
-    return this.sessionManager.cancelChatGptLogin();
+  startChatGptDeviceCodeLogin() {
+    return this.sessionManager.startChatGptDeviceCodeLogin();
+  }
+
+  cancelChatGptLogin(loginId?: string): Promise<CodexAuthentication> {
+    return this.sessionManager.cancelChatGptLogin(loginId);
   }
 
   logout(): Promise<CodexAuthentication> {

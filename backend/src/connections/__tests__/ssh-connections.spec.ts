@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SshConnectionService, parseSshConfig, sshStdioTransport } from '../ssh-connections';
+import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { remoteCodexVersionCommand } from '../remote-codex-install';
 
 describe('ssh connections', () => {
   it('parses concrete hosts from ssh config', () => {
@@ -51,6 +53,9 @@ Host bad;alias
 
   it('syncs the clawd package and stores the daemon-first stdio transport', async () => {
     const run = vi.fn(async (command: string, args: string[]) => {
+      if (command === 'ssh' && args.at(-1)?.includes('bin/codex" --version')) {
+        return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
+      }
       if (command === 'ssh' && args.at(-1)?.includes('--version')) {
         return { stdout: 'clawd 0.1.0\n', stderr: '' };
       }
@@ -79,8 +84,10 @@ Host bad;alias
       user: 'nicolas',
       port: 2222,
       status: 'ready',
-      detail: 'Ready (clawd 0.1.0)',
-      transport: sshStdioTransport('devbox'),
+      clawdVersion: '0.1.0',
+      codexVersion: bundledCodexVersion,
+      detail: `Ready (clawd 0.1.0, Codex ${bundledCodexVersion})`,
+      transport: sshStdioTransport('devbox', bundledCodexVersion),
       installedAt: '2026-06-14T10:00:00.000Z',
       lastCheckedAt: '2026-06-14T10:00:00.000Z',
       createdAt: '2026-06-14T10:00:00.000Z',
@@ -130,6 +137,9 @@ Host bad;alias
 
   it('removes remote provider tokens when no local token file exists', async () => {
     const run = vi.fn(async (command: string, args: string[]) => {
+      if (command === 'ssh' && args.at(-1)?.includes('bin/codex" --version')) {
+        return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
+      }
       if (command === 'ssh' && args.at(-1)?.includes('--version')) {
         return { stdout: 'clawd 0.1.0\n', stderr: '' };
       }
@@ -177,5 +187,18 @@ Host bad;alias
       status: 'error',
       detail: 'Permission denied (publickey).',
     });
+  });
+
+  it('inspects versions without copying, installing, or restarting anything', async () => {
+    const run = vi.fn(async (_command: string, args: string[]) => ({
+      stdout: args.at(-1)?.startsWith('node ') ? 'clawd 0.19.1' : 'codex-cli 0.143.0', stderr: '',
+    }));
+    const service = new SshConnectionService({ run });
+    const connection = { id: 'remote', kind: 'ssh' as const, host: 'devbox', name: 'Dev', status: 'ready' as const, createdAt: '', updatedAt: '' };
+    await expect(service.inspectVersions(connection)).resolves.toMatchObject({ clawdVersion: '0.19.1', codexVersion: '0.143.0' });
+    expect(run.mock.calls.map(([command, args]) => [command, args.at(-1)])).toEqual([
+      ['ssh', 'node ~/.codex-claw/clawd.mjs --version'],
+      ['ssh', remoteCodexVersionCommand()],
+    ]);
   });
 });
