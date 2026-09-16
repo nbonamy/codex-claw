@@ -4,6 +4,35 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.19.2] - 2026-09-15
+
+### New features
+
+- Press Command-K to search and jump to any agent across teams. Results show
+  repository and team context, prioritize unread agents and then recent
+  activity, and switch teams automatically when needed.
+- Remote teams can now create Git projects, browse existing folders, and clone
+  GitHub repositories directly on their devbox. Connection settings detect
+  mismatched Claw and Codex versions, upgrade both managed runtimes together,
+  and support ChatGPT device-code sign-in without moving tokens through Claw.
+- Personalization settings can edit the global developer instructions used by
+  Codex or Claude, with an explicit option to replace both. Git settings now
+  accept custom guidance for generated commit messages and pull request titles
+  and descriptions.
+
+### Improvements and fixes
+
+- Codex conversations use reasoning summaries as activity labels and correctly
+  reopen a completed work group when an asynchronous answer resumes the turn.
+  Codex memory support is enabled for new app-server sessions.
+- Queued prompts are delivered only once when turn completion and idle events
+  arrive together.
+- Remote folder selection is more compact and direct, while longer remote
+  discovery, authentication, prompt, and repository operations have enough
+  time to finish without spurious request timeouts.
+- Active-team rail indicators now pulse by brightness without fading, and Git
+  worktree initialization is grouped with the rest of the Git settings.
+
 ## [0.19.1] - 2026-09-14
 
 - Computer Use actions can now observe their settled result in the same call, wait for expected text, and type, replace, or submit directly into a targeted field without foregrounding the app.

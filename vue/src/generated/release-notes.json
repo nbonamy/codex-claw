@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.19.1",
+  "currentVersion": "0.19.2",
   "releases": [
+    {
+      "version": "0.19.2",
+      "releasedAt": "2026-09-15",
+      "sourceSha256": "a629f1c29646540e6f4d9a7e1bf0bd08e10f03af6f26e91021af47306f79988f",
+      "markdown": "### New features\n\n- Press Command-K to search and jump to any agent across teams. Results show\n  repository and team context, prioritize unread agents and then recent\n  activity, and switch teams automatically when needed.\n- Remote teams can now create Git projects, browse existing folders, and clone\n  GitHub repositories directly on their devbox. Connection settings detect\n  mismatched Claw and Codex versions, upgrade both managed runtimes together,\n  and support ChatGPT device-code sign-in without moving tokens through Claw.\n- Personalization settings can edit the global developer instructions used by\n  Codex or Claude, with an explicit option to replace both. Git settings now\n  accept custom guidance for generated commit messages and pull request titles\n  and descriptions.\n\n### Improvements and fixes\n\n- Codex conversations use reasoning summaries as activity labels and correctly\n  reopen a completed work group when an asynchronous answer resumes the turn.\n  Codex memory support is enabled for new app-server sessions.\n- Queued prompts are delivered only once when turn completion and idle events\n  arrive together.\n- Remote folder selection is more compact and direct, while longer remote\n  discovery, authentication, prompt, and repository operations have enough\n  time to finish without spurious request timeouts.\n- Active-team rail indicators now pulse by brightness without fading, and Git\n  worktree initialization is grouped with the rest of the Git settings."
+    },
     {
       "version": "0.19.1",
       "releasedAt": "2026-09-14",
