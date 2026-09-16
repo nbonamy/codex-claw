@@ -4,6 +4,28 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import SettingsInstructionsPanel from '../SettingsInstructionsPanel.vue';
 afterEach(() => vi.useRealTimers());
+it('updates the worktree initialization policy', async () => {
+  const updateSettings = vi.fn().mockResolvedValue(undefined);
+  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings }, global: { plugins: [ElementPlus] } });
+  await flushPromises();
+  const section = wrapper.findAllComponents({ name: 'SettingsSection' })
+    .find((candidate) => candidate.text().includes('Worktrees'));
+  expect(section).toBeDefined();
+  const row = section!.findAllComponents({ name: 'SettingsRow' })
+    .find((candidate) => candidate.text().includes('Worktree initialization'));
+  expect(row).toBeDefined();
+  const select = row!.findComponent({ name: 'ElSelect' });
+  expect(select.classes()).toContain('settings-instructions__worktree-select');
+  expect(row!.text()).toContain("Use repository instructions when available; otherwise copy local environment files and detect setup from the project's tech stack");
+  expect(select.get('.el-select__placeholder').text()).toBe('Auto-detect');
+  expect(select.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toStrictEqual([
+    'Auto-detect',
+    'Repo instructions only',
+    'Disabled',
+  ]);
+  await select.vm.$emit('update:modelValue', 'repository');
+  expect(updateSettings).toHaveBeenCalledWith({ general: { worktreeInitializationMode: 'repository' } });
+});
 it('keeps autosave quiet while a write is pending', async () => {
   vi.useFakeTimers();
   let finish!: () => void;

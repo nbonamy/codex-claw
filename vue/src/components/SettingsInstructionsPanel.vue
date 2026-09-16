@@ -1,11 +1,38 @@
 <template>
   <SettingsPanelFrame :title="$t('surface.instructionSettings.git')" title-id="settings-git-title">
+    <SettingsSection
+      class="settings-instructions__worktree-section"
+      :title="$t('surface.instructionSettings.worktrees')"
+      title-id="settings-git-worktrees-title"
+    >
+      <SettingsRow
+        :title="$t('surface.instructionSettings.worktreeInitialization')"
+        :description="$t('surface.instructionSettings.prepareNewWorktreesBeforeAgentsStart')"
+      >
+        <template #control>
+          <el-select
+            class="settings-instructions__worktree-select"
+            :model-value="settings.worktreeInitializationMode"
+            :aria-label="$t('surface.instructionSettings.worktreeInitialization')"
+            @update:model-value="updateWorktreeInitializationMode"
+          >
+            <el-option :label="$t('surface.instructionSettings.worktreeInitializationAutomatic')" value="automatic" />
+            <el-option :label="$t('surface.instructionSettings.worktreeInitializationRepository')" value="repository" />
+            <el-option :label="$t('surface.instructionSettings.worktreeInitializationDisabled')" value="off" />
+          </el-select>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
     <div class="settings-instructions__fields">
-      <label v-for="field in fields" :key="field" class="settings-instructions__field">
-        <span class="settings-instructions__title">{{ $t(`surface.instructionSettings.${field}`) }}</span>
-        <span class="settings-instructions__description">{{ $t(`surface.instructionSettings.${field}Description`) }}</span>
-        <el-input v-model="draft[field]" type="textarea" :rows="6" :placeholder="$t(`surface.instructionSettings.${field}Placeholder`)" :aria-label="$t(`surface.instructionSettings.${field}`)" @input="schedule({ ...draft })" />
-      </label>
+      <SettingsTextareaField
+        v-for="field in fields"
+        :key="field"
+        :model-value="draft[field]"
+        :title="$t(`surface.instructionSettings.${field}`)"
+        :description="$t(`surface.instructionSettings.${field}Description`)"
+        :placeholder="$t(`surface.instructionSettings.${field}Placeholder`)"
+        @update:model-value="updateInstruction(field, $event)"
+      />
     </div>
     <p v-if="error" role="alert">{{ error }}</p>
   </SettingsPanelFrame>
@@ -14,8 +41,11 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 import { useDebouncedSave } from '../shared/use-debounced-save';
-import type { AppGeneralSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import type { AppGeneralSettings, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsRow from './SettingsRow.vue';
+import SettingsSection from './SettingsSection.vue';
+import SettingsTextareaField from './SettingsTextareaField.vue';
 
 const props = defineProps<{
   settings: AppGeneralSettings;
@@ -30,6 +60,13 @@ const { schedule, error } = useDebouncedSave(async (general: typeof draft) => {
   await props.updateSettings({ general });
   Object.assign(persisted, general);
 });
+function updateWorktreeInitializationMode(value: WorktreeInitializationMode): void {
+  void props.updateSettings?.({ general: { worktreeInitializationMode: value } });
+}
+function updateInstruction(field: Field, value: string): void {
+  draft[field] = value;
+  schedule({ ...draft });
+}
 watch(() => [props.settings.commitMessageInstructions, props.settings.pullRequestInstructions], () => {
   for (const field of Object.keys(draft) as Field[]) {
     if (draft[field] === persisted[field]) draft[field] = props.settings[field];
@@ -39,9 +76,7 @@ watch(() => [props.settings.commitMessageInstructions, props.settings.pullReques
 </script>
 
 <style scoped>
-.settings-instructions__fields { display: flex; flex-direction: column; gap: var(--space-32); }
-.settings-instructions__field { display: flex; flex-direction: column; gap: var(--space-6); color: var(--color-text); }
-.settings-instructions__title { font-size: var(--font-size-16); font-weight: var(--font-weight-medium); }
-.settings-instructions__description { color: var(--color-text-muted); font-size: var(--font-size-13); line-height: var(--line-height-20); margin-bottom: var(--space-6); }
-.settings-instructions__field :deep(.el-textarea__inner) { border-radius: var(--radius-lg); font-size: var(--font-size-13); padding: var(--space-8) var(--space-10); }
+.settings-instructions__worktree-section { margin-bottom: var(--space-24); }
+.settings-instructions__worktree-select { width: 280px; max-width: 100%; }
+.settings-instructions__fields { display: flex; flex-direction: column; gap: var(--space-24); }
 </style>

@@ -19,6 +19,7 @@ describe('SettingsGeneralPanel', () => {
     await wrapper.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
 
     expect(wrapper.text()).toContain('Prevent sleep while agents run');
+    expect(wrapper.text()).not.toContain('Worktree initialization');
     expect(updateSettings).toHaveBeenCalledWith({
       general: {
         preventSleepWhenAgentsRun: false,
@@ -170,30 +171,6 @@ describe('SettingsGeneralPanel', () => {
     finishPreview({ queued: true });
     await flushPromises();
     expect(preview.props('disabled')).toBe(false);
-  });
-
-  it('updates the worktree initialization policy', async () => {
-    const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ updateSettings });
-    await flushPromises();
-
-    const row = wrapper.findAllComponents({ name: 'SettingsRow' })
-      .find((candidate) => candidate.text().includes('Worktree initialization'));
-    expect(row).toBeDefined();
-    const select = row!.findComponent({ name: 'ElSelect' });
-    expect(select.classes()).toContain('settings-general-panel__worktree-select');
-    expect(row!.text()).toContain("Use repository instructions when available; otherwise copy local environment files and detect setup from the project's tech stack");
-    expect(select.get('.el-select__placeholder').text()).toBe('Auto-detect');
-    expect(select.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toStrictEqual([
-      'Auto-detect',
-      'Repo instructions only',
-      'Disabled',
-    ]);
-    await select.vm.$emit('update:modelValue', 'repository');
-
-    expect(updateSettings).toHaveBeenCalledWith({
-      general: { worktreeInitializationMode: 'repository' },
-    });
   });
 
   it('toggles the background service through Settings', async () => {

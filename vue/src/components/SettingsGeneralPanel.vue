@@ -71,32 +71,6 @@
           />
         </template>
       </SettingsRow>
-      <SettingsRow
-        :title="$t('surface.settingsGeneralPanel.worktreeInitialization')"
-        :description="$t('surface.settingsGeneralPanel.prepareNewWorktreesBeforeAgentsStart')"
-      >
-        <template #control>
-          <el-select
-            class="settings-general-panel__worktree-select"
-            :model-value="settings.worktreeInitializationMode"
-            :aria-label="$t('surface.settingsGeneralPanel.worktreeInitialization')"
-            @update:model-value="updateWorktreeInitializationMode"
-          >
-            <el-option
-              :label="$t('surface.settingsGeneralPanel.worktreeInitializationAutomatic')"
-              value="automatic"
-            />
-            <el-option
-              :label="$t('surface.settingsGeneralPanel.worktreeInitializationRepository')"
-              value="repository"
-            />
-            <el-option
-              :label="$t('surface.settingsGeneralPanel.worktreeInitializationDisabled')"
-              value="off"
-            />
-          </el-select>
-        </template>
-      </SettingsRow>
     </SettingsSection>
 
     <SettingsSection
@@ -315,7 +289,7 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
+import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import { defaultSourceFolderState } from '@codex-claw/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
@@ -588,12 +562,6 @@ async function previewVoice(): Promise<void> {
   }
 }
 
-function updateWorktreeInitializationMode(value: WorktreeInitializationMode): void {
-  void props.updateSettings?.({
-    general: { worktreeInitializationMode: value },
-  });
-}
-
 async function updateDaemonEnabled(value: boolean | string | number): Promise<void> {
   const enabled = value === true;
   daemonOperation.value = enabled ? 'installing' : 'uninstalling';
@@ -630,11 +598,6 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
 </script>
 
 <style scoped>
-.settings-general-panel__worktree-select {
-  width: 280px;
-  max-width: 100%;
-}
-
 .settings-general-panel__speech-scope-select {
   width: 220px;
   max-width: 100%;

@@ -129,7 +129,7 @@ component is single-use.
 | --- | --- | --- |
 | Emoji, grapheme, or cropped-image identity | `IdentityPicker` | `vue/src/shared/identity/IdentityPicker.vue` |
 | Searchable compact picker | Header filter plus list body | GitHub mode in `RepositoryAcquireDialog`; `RepositorySessionSourceDialog` |
-| Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow` | `vue/src/components/Settings*.vue` |
+| Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/Settings*.vue` |
 | Dense structured data | `AppDataList` | `vue/src/components/AppDataList.vue` |
 | Operation feedback | `GitOperationFeedback` | `vue/src/components/GitOperationFeedback.vue` |
 
