@@ -2,6 +2,14 @@
 
 Status: desktop extraction plus initial web host, 2026-08-07.
 
+Contract update, 2026-09-16: the semantic remediation separates domain facts,
+provider frames, client effects and local transport events; navigation/preferences
+are client-scoped, runtime loading is explicit, and review/input have targeted
+lifecycles. [Protocol](protocol.md) is authoritative for current names and
+payloads; historical extraction checkpoints below describe the migration's
+earlier state. The [semantic audit](../plans/backend-semantics-audit.md) records
+the complete baseline-to-current mapping.
+
 This document is the architecture record for extracting most of Codex Claw's
 Electron main process into a separate TypeScript backend process, tentatively
 still called `clawd`.
@@ -106,7 +114,7 @@ Current implementation checkpoint:
   transcript-free snapshot metadata for menus and native effects.
   `snapshot/get` also returns a transcript-free snapshot (`messages: []`) so
   reconnect synchronization stays bounded; the renderer restores the selected
-  transcript through lazy `agent/history/hydrate` events. Electron does not
+  transcript through lazy `agent/conversation/load` events. Electron does not
   keep transcript bodies, read or write `state.json`, keep a local snapshot
   service shim, or validate agent folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
@@ -202,17 +210,17 @@ Current implementation checkpoint:
   for models, skills, conversation lists, and automation-created conversation
   messages by agent/ref ids; backend resolves agents and validates stored
   conversation refs before calling provider drivers.
-- `clawd` owns manual git diff preview requests. Electron forwards
-  `agent/git/diff/open`, and the backend resolves the agent, calls the provider
-  git-diff capability, and emits an app-owned working-tree review event. Turn
-  diffs use the same event family with an explicit turn scope so the renderer
-  does not confuse automatic turn updates with a user-opened repository review.
+- `clawd` owns Git diff reads. Electron and web forward `agent/git/diff/get`;
+  the backend resolves the agent and returns Git-service data or a stored turn
+  diff, without presentation side effects. The client owns opening a review,
+  loading/error state and stale-response protection. Automatic turn diffs remain
+  domain data updates rather than instructions to open a pane.
 - `clawd` owns persisted-session hydration on agent selection and git-status
   refreshes after agent create/update/select and provider turn/diff/completion
   events. Electron receives the resulting snapshot/events instead of calling
   provider drivers for status or history hydration.
 - `clawd` owns client request ownership and response routing. Electron forwards
-  renderer approval/user-input responses as `client/request/respond`; the backend
+  renderer approval/user-input responses as `agent/request/respond`; the backend
   remembers which provider emitted the request and dispatches to that provider.
 - `clawd` owns spoken-announcement MCP policy and persisted settings checks.
   Electron rechecks volatile selected-agent and foreground eligibility, cancels
@@ -535,12 +543,12 @@ Initial request methods should mirror today's `CodexClawApi` surface, but with
 names that describe backend ownership:
 
 - `snapshot/get`
-- `team/create`, `team/update`, `team/reorder`, `team/delete`, `team/select`
-- `agent/create`, `agent/update`, `agent/delete`, `agent/select`,
-  `agent/restart`, `agent/prompt/send`, `agent/prompt/steer`, `agent/interrupt`,
+- `team/create`, `team/update`, `client/teamOrder/update`, `team/delete`, `client/navigation/selectTeam`
+- `agent/create`, `agent/update`, `agent/delete`, `client/navigation/selectAgent`,
+  `agent/conversation/reset`, `agent/prompt/send`, `agent/prompt/steer`, `agent/interrupt`,
   `agent/turn/delete`, `agent/turn/edit`, `agent/turn/retry`
-- `client/request/respond`
-- `agent/folder/validate`, `agent/models/list`, `agent/skills/list`,
+- `agent/request/respond`
+- `workspace/folder/validate`, `agent/models/list`, `agent/skills/list`,
   `agent/conversations/list`, `agent/conversation/resume`,
   `agent/conversation/messages/get`
 - `snapshot/automations/get`, `automation/create`, `automation/update`,
@@ -552,7 +560,7 @@ names that describe backend ownership:
   the workspace root from its snapshot so desktop, mobile, and future web
   clients never transmit local filesystem roots as read authority.
 - `git/status`, `git/diff`
-- `workProvider/connect`, `workProvider/connection/complete`,
+- `workProvider/connect`, `workProvider/authorization/poll`,
   `workProvider/connections/reload`, `workProvider/disconnect`,
   `workProvider/repositories/list`, `workProvider/backlog/configure`,
   `workProvider/items/list`

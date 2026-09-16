@@ -1,4 +1,4 @@
-import type { Agent, AppSnapshot, MainToRendererEvent, RendererMessage } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 
@@ -102,7 +102,7 @@ export class DelegatedWorkReportService {
     }
   }
 
-  handleEvent(event: MainToRendererEvent): void {
+  handleEvent(event: BackendPublishedEvent): void {
     if (!event.agentId) return;
     const pending = this.pending.get(event.agentId);
     if (!pending) return;

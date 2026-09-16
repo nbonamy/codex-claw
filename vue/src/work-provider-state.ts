@@ -59,10 +59,8 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
       const pending = authorization.value;
       if (pending?.provider === provider && clawPlatformActions.openExternal) {
         await clawPlatformActions.openExternal(pending.verificationUri);
-      } else if (codexClawApi?.openWorkProviderAuthorization) {
-        options.adoptSnapshot(await codexClawApi.openWorkProviderAuthorization(provider));
       } else {
-        return;
+        throw new Error('Start authorization before opening the provider login page.');
       }
       scheduleAuthorizationPoll(provider);
       status.value = 'loaded';
@@ -74,7 +72,7 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function completeConnection(provider: WorkProviderKind): Promise<void> {
-    if (codexClawApi?.completeWorkProviderConnection) {
+    if (codexClawApi?.pollWorkProviderAuthorization) {
       await pollConnection(provider, { userInitiated: true });
     }
   }
@@ -220,11 +218,11 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function pollConnection(provider: WorkProviderKind, pollOptions: { userInitiated?: boolean } = {}): Promise<void> {
-    if (!codexClawApi?.completeWorkProviderConnection) return;
+    if (!codexClawApi?.pollWorkProviderAuthorization) return;
     if (pollOptions.userInitiated) status.value = 'loading';
     error.value = null;
     try {
-      options.adoptSnapshot(await codexClawApi.completeWorkProviderConnection(provider));
+      options.adoptSnapshot(await codexClawApi.pollWorkProviderAuthorization(provider));
       const current = connection(provider);
       if (current?.status === 'connected') {
         clearAuthorizationPoll(provider);

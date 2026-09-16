@@ -3,6 +3,44 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { invokeClawWebOperation } from '../server/operations';
 
 describe('Claw web operations', () => {
+  it('separates settings policy and client preferences, including single-part and empty updates', async () => {
+    const request = vi.fn().mockResolvedValue({ snapshot: { teams: [] }, marker: 'updated' });
+    const backend = { request };
+    await invokeClawWebOperation(backend, 'updateSettings', [{ general: { preventSleepWhenAgentsRun: false, agentListCompact: true }, theme: { mode: 'dark' } }]);
+    expect(request.mock.calls).toStrictEqual([
+      [backendMethods.settingsUpdate, { input: { general: { preventSleepWhenAgentsRun: false } } }],
+      [backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: true }, theme: { mode: 'dark' } } }],
+    ]);
+    request.mockClear();
+    await invokeClawWebOperation(backend, 'updateSettings', [{ sourceFolder: { path: '/repo' } }]);
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.settingsUpdate, { input: { sourceFolder: { path: '/repo' } } });
+    request.mockClear();
+    await invokeClawWebOperation(backend, 'updateSettings', [{ theme: { mode: 'light' } }]);
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.clientPreferencesUpdate, { input: { theme: { mode: 'light' } } });
+    request.mockClear();
+    await expect(invokeClawWebOperation(backend, 'updateSettings', [{}])).resolves.toStrictEqual({ teams: [] });
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.snapshotGet);
+  });
+
+  it('distinguishes inspection from synchronization and connecting from creating a remote team', async () => {
+    const request = vi.fn().mockResolvedValue({});
+    await invokeClawWebOperation({ request }, 'checkRemoteConnection', ['devbox', true]);
+    await invokeClawWebOperation({ request }, 'checkRemoteConnection', ['devbox', false]);
+    const input = { name: 'Remote', remoteConnectionId: 'devbox', remoteTeamId: 'existing' };
+    await invokeClawWebOperation({ request }, 'createTeam', [input]);
+    expect(request.mock.calls).toStrictEqual([
+      [backendMethods.connectionsRuntimeInspect, { connectionId: 'devbox' }],
+      [backendMethods.connectionsRuntimeSync, { connectionId: 'devbox' }],
+      [backendMethods.teamConnect, { input }],
+    ]);
+  });
+  it('returns diff query data and preserves the selected target', async () => {
+    const target = { type: 'commit', sha: 'abc123' };
+    const diff = { target, summary: { addedLines: 1, removedLines: 0, changedFiles: 1 }, diff: 'patch', sections: [] };
+    const request = vi.fn().mockResolvedValue(diff);
+    await expect(invokeClawWebOperation({ request }, 'getAgentGitDiff', ['agent-1', target])).resolves.toStrictEqual(diff);
+    expect(request).toHaveBeenCalledWith(backendMethods.agentGitDiffGet, { agentId: 'agent-1', target });
+  });
   it('forwards fixed engine selection and explicit overwrite confirmation', async () => {
     const request = vi.fn().mockResolvedValue(undefined);
     await invokeClawWebOperation({ request }, 'readEngineInstructions', ['codex']);
@@ -21,7 +59,7 @@ describe('Claw web operations', () => {
     expect(request.mock.calls).toEqual([
       [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
       [backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId: 'wall-e' }],
-      [backendMethods.codexChatGptLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'login-1' }],
+      [backendMethods.codexLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'login-1' }],
     ]);
   });
   it('maps allowlisted product operations to clawd methods', async () => {
@@ -93,7 +131,7 @@ describe('Claw web operations', () => {
       [backendMethods.sourceRepositoryClone, { input: { url: 'https://github.com/nbonamy/codex-claw' } }],
       [backendMethods.agentFork, { agentId: 'agent-1' }],
       [backendMethods.agentDuplicate, { agentId: 'agent-1', options: { select: false } }],
-      [backendMethods.repositoryReorder, { input: { teamId: 'team-1', repositoryRoot: '/repo-b', beforeRepositoryRoot: '/repo-a' } }],
+      [backendMethods.clientRepositoryOrderUpdate, { input: { teamId: 'team-1', repositoryRoot: '/repo-b', beforeRepositoryRoot: '/repo-a' } }],
       [backendMethods.workProviderItemsList, { provider: 'github', location: { kind: 'remote' } }],
       [backendMethods.workProviderGlobalItemsList, { provider: 'github', query: { assignment: 'all', page: 2 } }],
       [backendMethods.settingsPluginStatusGet, undefined],

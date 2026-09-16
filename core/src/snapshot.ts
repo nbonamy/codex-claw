@@ -12,10 +12,9 @@ export {
 
 export function applyMainEventToSnapshot(snapshot: AppSnapshot, event: MainToRendererEvent): void {
   if (
-    event.type === 'thread.started' &&
+    event.type === 'agent.conversationAttached' &&
     event.agentId &&
-    event.threadId &&
-    snapshot.subagentTrees[event.agentId]?.rootConversationId !== event.threadId
+    snapshot.subagentTrees[event.agentId]?.rootConversationId !== event.conversationId
   ) {
     delete snapshot.subagentTrees[event.agentId];
   }

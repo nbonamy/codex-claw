@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type { AppSnapshot } from '@codex-claw/core/contracts';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import {
@@ -39,7 +38,7 @@ describe('ClawBackendServer', () => {
         getCapabilities: () => codexBackendCapabilities,
         sendPrompt,
         interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-        respondToRequest: async () => undefined,
+        respondToAgentRequest: async () => undefined,
         setConversationTitle,
         onEvent: () => () => undefined,
         close: async () => undefined,
@@ -121,7 +120,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       setConversationTitle,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -211,7 +210,7 @@ describe('ClawBackendServer', () => {
       sendPrompt,
       tryHandlePromptCommand,
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -254,7 +253,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt,
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -359,7 +358,7 @@ describe('ClawBackendServer', () => {
       sendPrompt: vi.fn(),
       steerPrompt,
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -417,7 +416,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt,
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -484,7 +483,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       editTurn,
       retryTurn,
       onEvent: () => () => undefined,

@@ -38,9 +38,9 @@ type AgentComposerConfiguration = {
 
 type ComposerMainEvent = Extract<
   MainToRendererEvent,
-  { type: 'models.changed' | 'skills.changed' | 'thread.modeUpdated' | 'thread.settingsUpdated' }
+  { type: 'models.changed' | 'skills.changed' | 'conversation.modeUpdated' | 'conversation.settingsUpdated' }
 >;
-type ComposerModeEvent = Extract<ComposerMainEvent, { type: 'thread.modeUpdated' | 'thread.settingsUpdated' }>;
+type ComposerModeEvent = Extract<ComposerMainEvent, { type: 'conversation.modeUpdated' | 'conversation.settingsUpdated' }>;
 
 export function createAgentComposerState(options: { getSnapshot: () => AppSnapshot }) {
   const backendModels = ref<BackendModelOption[]>([]);
@@ -278,7 +278,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     const source = codexClawApi;
     const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
     const initial = agentId ? configuration(agentId) : null;
-    if (!agent || !source?.listBackendPlugins) {
+    if (!agent || !source?.listBackendPlugins || !capabilitiesForAgent(agent).plugins) {
       if (initial) {
         initial.plugins = [];
         if (agentId === snapshot().activeAgentId) restore(agentId!);
@@ -344,8 +344,8 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
       case 'skills.changed':
         applySkillsChanged(event);
         return;
-      case 'thread.modeUpdated':
-      case 'thread.settingsUpdated':
+      case 'conversation.modeUpdated':
+      case 'conversation.settingsUpdated':
         syncMode(event);
         return;
       default: {
@@ -451,9 +451,9 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
   }
 
   function syncMode(event: ComposerModeEvent): void {
-    if (event.type === 'thread.settingsUpdated') {
+    if (event.type === 'conversation.settingsUpdated') {
       const agentId = event.agentId ?? snapshot().activeAgentId;
-      const settings = event.payload.threadSettings;
+      const settings = event.payload.settings;
       if (!agentId) return;
       const current = configuration(agentId);
       if (settings.model !== undefined) current.selectedModelId = settings.model;

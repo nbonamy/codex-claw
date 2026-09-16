@@ -1,3 +1,4 @@
+import { approvalAgentRequest, approvalOutcome } from '@codex-claw/core/agent-request';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { ClawBackendEvent as RpcClawBackendEvent } from '../backend-protocol/rpc';
 import {
@@ -103,16 +104,15 @@ function createFixtures(): EventFixtures {
   const turn = { ...codexThread, turnId: 'turn-1' };
 
   return {
+    'plan.reviewResolved': {
+      ...base, agentId: 'agent-1', type: 'plan.reviewResolved',
+      payload: { reviewId: 'review-1', resolution: 'accept' },
+    },
     'backend.statusChanged': {
       ...base,
       type: 'backend.statusChanged',
       backend: 'codex',
       payload: { backend: 'codex', status: 'running' },
-    },
-    'client.connectionChanged': {
-      ...base,
-      type: 'client.connectionChanged',
-      payload: { status: 'connected' },
     },
     'snapshot.updated': {
       ...base,
@@ -123,7 +123,7 @@ function createFixtures(): EventFixtures {
       ...base,
       type: 'account.rateLimitsUpdated',
       backend: 'codex',
-      payload: {
+      payload: { rateLimits: {
         limitId: null,
         limitName: null,
         primary: null,
@@ -132,11 +132,11 @@ function createFixtures(): EventFixtures {
         individualLimit: null,
         planType: null,
         rateLimitReachedType: null,
-      },
+      } },
     },
-    'devicePairing.statusChanged': {
+    'remoteControl.statusChanged': {
       ...base,
-      type: 'devicePairing.statusChanged',
+      type: 'remoteControl.statusChanged',
       payload: { status: 'connected' },
     },
     'models.changed': {
@@ -262,19 +262,20 @@ function createFixtures(): EventFixtures {
         },
       },
     },
-    'sidePanel.markdownRequested': {
+    'client.markdownDisplayRequested': {
       ...agent,
-      type: 'sidePanel.markdownRequested',
+      type: 'client.markdownDisplayRequested',
       payload: { kind: 'markdown', content: '# Plan' },
     },
-    'sidePanel.gitDiffRequested': {
+    'plan.readyForReview': {
       ...agent,
-      type: 'sidePanel.gitDiffRequested',
-      payload: { kind: 'gitDiff', diff: '' },
+      type: 'plan.readyForReview',
+      turnId: 'turn-1',
+      payload: { markdown: '# Plan', itemId: 'plan-1' },
     },
-    'celebration.requested': {
+    'client.celebrationRequested': {
       ...agent,
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind: 'stars' },
     },
     'agentCreation.progress': {
@@ -306,9 +307,9 @@ function createFixtures(): EventFixtures {
         rect: { x: 1, y: 2, width: 3, height: 4 },
       },
     },
-    'workBacklog.assignmentUpdated': {
+    'workItem.assignmentUpdated': {
       ...base,
-      type: 'workBacklog.assignmentUpdated',
+      type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
         itemId: '7',
@@ -316,11 +317,6 @@ function createFixtures(): EventFixtures {
         assignedAt: occurredAt,
         status: 'inProgress',
       },
-    },
-    'clientRequest.resolved': {
-      ...codexThread,
-      type: 'clientRequest.resolved',
-      payload: { id: 'request-1' },
     },
     'agent.updated': {
       ...agent,
@@ -332,26 +328,26 @@ function createFixtures(): EventFixtures {
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     },
-    'thread.started': {
+    'agent.conversationAttached': { conversationId: 'thread-1',
       ...codexThread,
-      type: 'thread.started',
+      type: 'agent.conversationAttached',
       payload: { cwd: '/repo' },
     },
-    'thread.settingsUpdated': {
+    'conversation.settingsUpdated': {
       ...codexThread,
-      type: 'thread.settingsUpdated',
-      payload: { threadSettings: {} },
+      type: 'conversation.settingsUpdated',
+      payload: { settings: {} },
     },
-    'thread.modeUpdated': {
+    'conversation.modeUpdated': {
       ...codexThread,
-      type: 'thread.modeUpdated',
+      type: 'conversation.modeUpdated',
       payload: { mode: 'plan' },
     },
-    'thread.goalUpdated': {
+    'conversation.goalUpdated': {
       ...agent,
       threadId: 'thread-1',
-      type: 'thread.goalUpdated',
-      payload: {
+      type: 'conversation.goalUpdated',
+      payload: { goal: {
         threadId: 'thread-1',
         objective: 'Ship',
         status: 'active',
@@ -360,18 +356,18 @@ function createFixtures(): EventFixtures {
         timeUsedSeconds: 0,
         createdAt: 1,
         updatedAt: 1,
-      },
+      } },
     },
-    'thread.goalCleared': { ...agent, type: 'thread.goalCleared', payload: {} },
-    'thread.tokenUsageUpdated': {
+    'conversation.goalCleared': { ...agent, type: 'conversation.goalCleared', payload: {} },
+    'conversation.contextUsageUpdated': {
       ...codexThread,
-      type: 'thread.tokenUsageUpdated',
-      payload: usage,
+      type: 'conversation.contextUsageUpdated',
+      payload: { contextUsage: usage },
     },
-    'thread.historyHydrationFailed': {
+    'conversation.historyLoadFailed': {
       ...agent,
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'History unavailable' },
     },
     'subagent.operationChanged': {
       ...codexThread,
@@ -435,14 +431,14 @@ function createFixtures(): EventFixtures {
       type: 'agent.promptDequeued',
       payload: { ids: ['prompt-1'] },
     },
-    'diff.updated': {
+    'conversation.turnDiffUpdated': {
       ...turn,
-      type: 'diff.updated',
+      type: 'conversation.turnDiffUpdated',
       payload: { addedLines: 1, removedLines: 0, diff: '+line' },
     },
-    'file.activity': {
+    'workspace.fileActivityDetected': {
       ...turn,
-      type: 'file.activity',
+      type: 'workspace.fileActivityDetected',
       payload: {
         messageId: 'message-1',
         itemId: 'item-1',
@@ -456,15 +452,15 @@ function createFixtures(): EventFixtures {
       type: 'git.statusUpdated',
       payload: gitStatus,
     },
-    'backendApproval.requested': {
+    'agentRequest.created': {
       ...codexThread,
-      type: 'backendApproval.requested',
-      payload: { approval },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest(approval) },
     },
-    'backendApproval.resolved': {
+    'agentRequest.resolved': {
       ...codexThread,
-      type: 'backendApproval.resolved',
-      payload: { approval, decision: 'approve', scope: 'once', reason: 'host' },
+      type: 'agentRequest.resolved',
+      payload: { id: (approval).id, outcome: approvalOutcome('approve', 'once', 'host') },
     },
   };
 }
@@ -473,7 +469,6 @@ describe('Claw backend event decoder', () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
-    expect(Object.keys(fixtures)).toHaveLength(40);
     for (const event of Object.values(fixtures)) {
       expect(decodeClawBackendEvent(event)).toBe(event);
     }
@@ -551,7 +546,7 @@ describe('Claw backend event decoder', () => {
         retryAt: '2026-09-04T12:01:00.000Z',
       },
     };
-    const richApproval = {
+    const richApproval: import('../contracts').BackendApprovalRequest = {
       id: 'approval-permissions',
       kind: 'permissions',
       conversationId: 'thread-1',
@@ -569,18 +564,16 @@ describe('Claw backend event decoder', () => {
       canDeny: true,
     };
     const requested = {
-      ...fixtures['backendApproval.requested'],
+      ...fixtures['agentRequest.created'],
       turnId: 'turn-1',
-      payload: { approval: richApproval },
+      payload: { request: approvalAgentRequest(richApproval) },
     };
     const resolved = {
-      ...fixtures['backendApproval.resolved'],
+      ...fixtures['agentRequest.resolved'],
       turnId: 'turn-1',
       payload: {
-        approval: richApproval,
-        decision: null,
-        scope: null,
-        reason: 'surface_disconnected',
+        id: richApproval.id,
+        outcome: { kind: 'cancelled', reason: 'surface_disconnected' },
       },
     };
 
@@ -753,17 +746,17 @@ describe('Claw backend event decoder', () => {
     );
   });
 
-  it('keeps history hydration failure payloads strictly empty', () => {
-    const event = createFixtures()['thread.historyHydrationFailed'];
+  it('requires an actionable history load failure description', () => {
+    const event = createFixtures()['conversation.historyLoadFailed'];
 
     expect(() => decodeClawBackendEvent({
       ...event,
       payload: { detail: 'provider diagnostics stay in backend logs' },
-    })).toThrow('$.payload: expected an empty object');
+    })).toThrow('$.payload.error: expected a string');
   });
 
   it('rejects missing required provider context', () => {
-    const event = createFixtures()['diff.updated'];
+    const event = createFixtures()['conversation.turnDiffUpdated'];
     const malformed = { ...event, turnId: undefined };
 
     expect(() => decodeClawBackendEvent(malformed)).toThrow(
@@ -787,7 +780,7 @@ describe('Claw backend event decoder', () => {
 
   it('never includes payload values in validation errors', () => {
     const secret = 'sk-secret-do-not-log';
-    const event = createFixtures()['backendApproval.requested'];
+    const event = createFixtures()['agentRequest.created'];
     const malformed = { ...event, payload: { approval: { password: secret } } };
 
     let error: unknown;

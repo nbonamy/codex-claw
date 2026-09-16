@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { nextTick, reactive } from 'vue';
+import { reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { BackendConversationRef, CodexClawApi, RendererMessage, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
@@ -49,16 +49,15 @@ describe('useAppState', () => {
         expiresAt: '2026-06-09T12:05:00.000Z',
       },
     });
-    const openWorkProviderAuthorization = vi.fn().mockResolvedValue(connectingSnapshot);
-    const completeWorkProviderConnection = vi.fn().mockResolvedValue(connectedSnapshot);
+    const openExternal = vi.spyOn(window, 'open').mockReturnValue(null);
+    const pollWorkProviderAuthorization = vi.fn().mockResolvedValue(connectedSnapshot);
     const listWorkRepositories = vi.fn().mockResolvedValue([repository]);
     const configureWorkBacklog = vi.fn().mockResolvedValue(selectedSnapshot);
     const listWorkItems = vi.fn().mockResolvedValue([item]);
     stubElectronTestWindow({
       codexClaw: {
         connectWorkProvider,
-        openWorkProviderAuthorization,
-        completeWorkProviderConnection,
+        pollWorkProviderAuthorization,
         listWorkRepositories,
         configureWorkBacklog,
         listWorkItems,
@@ -73,12 +72,13 @@ describe('useAppState', () => {
     expect(state.workProviderAuthorization.value?.userCode).toBe('ABCD-1234');
 
     await state.openWorkProviderAuthorization('github');
-    expect(openWorkProviderAuthorization).toHaveBeenCalledWith('github');
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device', '_blank', 'noopener,noreferrer');
+    openExternal.mockRestore();
     expect(state.snapshot.value).toStrictEqual(connectingSnapshot);
 
     await vi.advanceTimersByTimeAsync(5_000);
 
-    expect(completeWorkProviderConnection).toHaveBeenCalledWith('github');
+    expect(pollWorkProviderAuthorization).toHaveBeenCalledWith('github');
     expect(useConfetti().bursts.value).toHaveLength(1);
     expect(listWorkRepositories).toHaveBeenCalledWith('github');
     expect(configureWorkBacklog).toHaveBeenCalledWith({
@@ -104,14 +104,14 @@ describe('useAppState', () => {
     }];
     stubElectronTestWindow({
       codexClaw: {
-        completeWorkProviderConnection: vi.fn().mockResolvedValue(connectedSnapshot),
+        pollWorkProviderAuthorization: vi.fn().mockResolvedValue(connectedSnapshot),
         listWorkRepositories: vi.fn().mockResolvedValue([]),
       } satisfies Partial<CodexClawApi>,
     });
     setFirstRunOnboardingStage('github');
     const state = useAppState();
 
-    await state.completeWorkProviderConnection('github');
+    await state.pollWorkProviderAuthorization('github');
 
     expect(useConfetti().bursts.value).toHaveLength(0);
   });
@@ -276,7 +276,7 @@ describe('useAppState', () => {
     state.snapshot.value = createInitialSnapshot();
 
     await state.connectWorkProvider('github');
-    await state.completeWorkProviderConnection('github');
+    await state.pollWorkProviderAuthorization('github');
     await state.disconnectWorkProvider('github');
     await state.loadWorkRepositories('github');
     await state.configureWorkBacklog({
@@ -299,13 +299,13 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     const connectWorkProvider = vi.fn().mockRejectedValue('connect failed');
-    const completeWorkProviderConnection = vi.fn().mockRejectedValue('finish failed');
+    const pollWorkProviderAuthorization = vi.fn().mockRejectedValue('finish failed');
     const listWorkRepositories = vi.fn().mockRejectedValue('repos failed');
     const listWorkItems = vi.fn().mockRejectedValue('items failed');
     stubElectronTestWindow({
       codexClaw: {
         connectWorkProvider,
-        completeWorkProviderConnection,
+        pollWorkProviderAuthorization,
         listWorkRepositories,
         listWorkItems,
       } satisfies Partial<CodexClawApi>,
@@ -317,7 +317,7 @@ describe('useAppState', () => {
     expect(state.workBacklogStatus.value).toBe('error');
     expect(state.workBacklogError.value).toBe('connect failed');
 
-    await expect(state.completeWorkProviderConnection('github')).rejects.toBe('finish failed');
+    await expect(state.pollWorkProviderAuthorization('github')).rejects.toBe('finish failed');
     expect(state.workBacklogError.value).toBe('finish failed');
 
     await state.loadWorkRepositories('github');
@@ -362,17 +362,17 @@ describe('useAppState', () => {
       status: 'connecting',
       detail: 'GitHub authorization is still pending.',
     }];
-    const completeWorkProviderConnection = vi.fn().mockResolvedValue(connectingSnapshot);
+    const pollWorkProviderAuthorization = vi.fn().mockResolvedValue(connectingSnapshot);
     const listWorkRepositories = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
-        completeWorkProviderConnection,
+        pollWorkProviderAuthorization,
         listWorkRepositories,
       } satisfies Partial<CodexClawApi>,
     });
     const state = useAppState();
 
-    await state.completeWorkProviderConnection('github');
+    await state.pollWorkProviderAuthorization('github');
 
     expect(state.snapshot.value.workBacklog.connections[0]?.status).toBe('connecting');
     expect(state.workBacklogStatus.value).toBe('loaded');

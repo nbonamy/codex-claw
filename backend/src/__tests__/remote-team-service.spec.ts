@@ -8,6 +8,12 @@ import {
 } from './server-test-fixtures';
 
 describe('RemoteTeamService', () => {
+  it('requires an explicit valid team instead of consulting shared navigation', () => {
+    const service = new RemoteTeamService({ clients: {} as never, getSnapshot: createTestSnapshot, onForwardedEvent: vi.fn(), onProjectedSnapshotChanged: vi.fn() });
+    expect(() => service.pointerForAgentInput({})).toThrow('target team');
+    expect(() => service.pointerForAgentInput({ teamId: 'missing' })).toThrow('Team not found');
+    expect(service.pointerForAgentInput({ teamId: 'team-test' })).toBeNull();
+  });
   it('adopts valid remote snapshots while rejecting malformed snapshot payloads', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
@@ -159,7 +165,7 @@ describe('RemoteTeamService', () => {
     expect(coldForward).not.toHaveBeenCalled();
   });
 
-  it('adopts active-agent identity from provider operation snapshots in priority order', () => {
+  it('retains client navigation when adopting remote operation snapshots', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams = [{
       id: 'team-pointer',
@@ -180,11 +186,11 @@ describe('RemoteTeamService', () => {
     remoteSnapshot.activeAgentId = null;
 
     service.adoptCreatedAgentSnapshot(pointer, remoteSnapshot);
-    expect(snapshot.activeAgentId).toBe(remoteAgent.id);
+    expect(snapshot.activeAgentId).toBeNull();
 
     delete remoteSnapshot.teams[0]!.activeAgentId;
     service.adoptCreatedAgentSnapshot(pointer, remoteSnapshot);
-    expect(snapshot.activeAgentId).toBe(remoteAgent.id);
+    expect(snapshot.activeAgentId).toBeNull();
 
     remoteSnapshot.teams[0]!.agentIds = [];
     service.adoptCreatedAgentSnapshot(pointer, remoteSnapshot);

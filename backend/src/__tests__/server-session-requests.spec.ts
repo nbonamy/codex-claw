@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
@@ -21,7 +20,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       reconcileConversations,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -31,6 +30,7 @@ describe('ClawBackendServer', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
+    await server.initialize();
     await server.handleMessage({ jsonrpc: '2.0', id: 'snapshot-1', method: 'snapshot/get' });
     await server.handleMessage({ jsonrpc: '2.0', id: 'snapshot-2', method: 'snapshot/get' });
 
@@ -47,7 +47,7 @@ describe('ClawBackendServer', () => {
       backendSession: { kind: 'codex', threadId: 'thread-current' }, status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const forgetAgentSession = vi.fn();
+    const releaseConversation = vi.fn();
     const saveSnapshot = vi.fn();
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -55,9 +55,9 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-current' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       archiveAgentConversation: async () => { throw new Error('Archive failed'); },
-      forgetAgentSession,
+      releaseConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -67,11 +67,11 @@ describe('ClawBackendServer', () => {
     });
 
     await expect(server.handleMessage({
-      jsonrpc: '2.0', id: 'restart-agent', method: 'agent/restart', params: { agentId: 'agent-dina' },
+      jsonrpc: '2.0', id: 'restart-agent', method: 'agent/conversation/reset', params: { agentId: 'agent-dina' },
     })).rejects.toThrow('Archive failed');
 
     expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-current' });
-    expect(forgetAgentSession).not.toHaveBeenCalled();
+    expect(releaseConversation).not.toHaveBeenCalled();
     expect(saveSnapshot).not.toHaveBeenCalled();
     await server.close();
   });
@@ -93,7 +93,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-old' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-old' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       resumeConversation,
       reconcileConversations: async () => undefined,
       onEvent: () => () => undefined,
@@ -136,13 +136,13 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const forgetAgentSession = vi.fn();
+    const releaseConversation = vi.fn();
     const archivedAgents: unknown[] = [];
     const archiveAgentConversation = vi.fn(async (agent) => { archivedAgents.push(structuredClone(agent)); });
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-new' },
     });
-    const compressSession = vi.fn().mockResolvedValue({
+    const replaceConversationWithSummary = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-compressed' },
     });
     const setConversationTitle = vi.fn().mockResolvedValue(undefined);
@@ -152,10 +152,10 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      forgetAgentSession,
+      respondToAgentRequest: async () => undefined,
+      releaseConversation,
       archiveAgentConversation,
-      compressSession,
+      replaceConversationWithSummary,
       resumeConversation,
       setConversationTitle,
       onEvent: () => () => undefined,
@@ -173,7 +173,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'restart-agent',
-      method: 'agent/restart',
+      method: 'agent/conversation/reset',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({
       result: {
@@ -200,7 +200,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'compress-agent-session',
-      method: 'agent/session/compress',
+      method: 'agent/conversation/replaceWithSummary',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({
       result: {
@@ -208,7 +208,7 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(releaseConversation).toHaveBeenCalledWith('agent-dina');
     expect(archivedAgents).toContainEqual(expect.objectContaining({
       backendSession: { kind: 'codex', threadId: 'thread-old' },
     }));
@@ -216,7 +216,7 @@ describe('ClawBackendServer', () => {
       ref: { backend: 'codex', threadId: 'thread-new' },
       storageState: 'archived',
     });
-    expect(compressSession).toHaveBeenCalledWith(expect.objectContaining({
+    expect(replaceConversationWithSummary).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-dina',
     }));
     expect(setConversationTitle).toHaveBeenNthCalledWith(
@@ -267,7 +267,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       forkConversation,
       setConversationTitle,
       onEvent: () => () => undefined,
@@ -350,7 +350,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       clearGoal,
       setApprovalPreset,
       setConversationTitle,
@@ -417,8 +417,8 @@ describe('ClawBackendServer', () => {
     expect(setConversationTitle).toHaveBeenCalledOnce();
     expect(setConversationTitle).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), expect.stringContaining('Dina'));
     expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'thread.goalUpdated', payload: { goal } }),
-      expect.objectContaining({ type: 'thread.goalCleared' }),
+      expect.objectContaining({ type: 'conversation.goalUpdated', payload: { goal } }),
+      expect.objectContaining({ type: 'conversation.goalCleared' }),
       expect.objectContaining({ type: 'snapshot.updated' }),
     ]));
     expect(saveSnapshot).toHaveBeenCalledTimes(3);
@@ -449,7 +449,7 @@ describe('ClawBackendServer', () => {
       setPermissionMode,
       sendPrompt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
       interrupt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -509,7 +509,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt,
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       steerPrompt,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -576,7 +576,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: vi.fn().mockRejectedValue(new Error('no active turn')),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -633,7 +633,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       deleteTurn,
       onEvent: () => () => undefined,
       close: async () => undefined,

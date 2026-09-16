@@ -1,5 +1,4 @@
 import { isAppTextDescriptor } from '../app-text';
-import { isRendererMessage } from '../snapshot-guard-collections';
 import {
   isSubagentActivityKind,
   isSubagentOperationKind,
@@ -261,37 +260,6 @@ function expectAgentUpdate(value: unknown, path: string): void {
   expectOptional(value, 'status', path, expectAgentStatus);
 }
 
-function expectCodexThreadSettings(value: unknown, path: string): void {
-  expectRecord(value, path);
-  ['cwd', 'model', 'reasoningEffort', 'approvalPolicy'].forEach((key) =>
-    expectOptional(value, key, path, expectString),
-  );
-  expectOptional(
-    value,
-    'approvalsReviewer',
-    path,
-    (candidate, candidatePath) => {
-      expectLiteral(
-        candidate,
-        ['user', 'auto_review', 'guardian_subagent'],
-        candidatePath,
-      );
-    },
-  );
-  expectOptional(value, 'serviceTier', path, (candidate, candidatePath) =>
-    expectNullable(candidate, candidatePath, expectString),
-  );
-  for (const key of ['sandboxPolicy', 'activePermissionProfile']) {
-    expectOptional(value, key, path, (candidate, candidatePath) => {
-      expectRecord(candidate, candidatePath);
-      expectString(
-        candidate[key === 'sandboxPolicy' ? 'type' : 'id'],
-        `${candidatePath}.${key === 'sandboxPolicy' ? 'type' : 'id'}`,
-      );
-    });
-  }
-}
-
 function expectSubagentOperation(value: unknown, path: string): void {
   expectRecord(value, path);
   expectString(value.id, `${path}.id`);
@@ -395,66 +363,38 @@ function expectSubagentStatusChange(value: unknown, path: string): void {
 export const agentPayloadValidators = {
   'agent.updated': expectAgentUpdate,
   'agent.statusChanged': expectAgentStatus,
-  'thread.started': (value, path) => {
+  'agent.conversationAttached': (value, path) => {
     expectRecord(value, path);
-    if (value.sessionId !== undefined || value.transport !== undefined) {
-      expectString(value.sessionId, `${path}.sessionId`);
-      expectLiteral(value.transport, ['stdio'], `${path}.transport`);
-      ['model', 'reasoningEffort'].forEach((key) =>
-        expectOptional(value, key, path, expectString),
-      );
-      return;
-    }
     expectOptional(value, 'cwd', path, expectString);
   },
-  'thread.settingsUpdated': (value, path) => {
+  'conversation.settingsUpdated': (value, path) => {
     expectRecord(value, path);
-    expectCodexThreadSettings(value.threadSettings, `${path}.threadSettings`);
+    expectRecord(value.settings, `${path}.settings`);
+    ['model', 'reasoningEffort', 'permissionMode'].forEach((key) => expectOptional(value.settings as Record<string, unknown>, key, `${path}.settings`, expectString));
+    expectOptional(value.settings, 'serviceTier', `${path}.settings`, (candidate, candidatePath) => expectNullable(candidate, candidatePath, expectString));
+    expectOptional(value.settings, 'approvalPreset', `${path}.settings`, (candidate, candidatePath) => expectLiteral(candidate, ['ask-for-approval', 'approve-for-me', 'full-access'], candidatePath));
   },
-  'thread.modeUpdated': (value, path) => {
+  'conversation.modeUpdated': (value, path) => {
     expectRecord(value, path);
     expectLiteral(value.mode, ['default', 'plan'], `${path}.mode`);
-    expectOptional(value, 'provider', path, (candidate, candidatePath) =>
-      expectLiteral(candidate, ['claude'], candidatePath),
-    );
     expectOptional(value, 'permissionMode', path, expectString);
   },
-  'thread.goalUpdated': (value, path) => {
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(value) &&
-      'goal' in value
-    ) {
-      expectGoal((value as Record<string, unknown>).goal, `${path}.goal`);
-      return;
-    }
-    expectGoal(value, path);
+  'conversation.goalUpdated': (value, path) => {
+    expectRecord(value, path);
+    expectGoal(value.goal, `${path}.goal`);
   },
-  'thread.goalCleared': (value, path) => {
+  'conversation.goalCleared': (value, path) => {
     expectRecord(value, path);
     if (Object.keys(value).length > 0)
       failEventValidation(path, 'expected an empty object');
   },
-  'thread.tokenUsageUpdated': (value, path) => {
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(value) &&
-      'contextUsage' in value
-    ) {
-      expectContextUsage(
-        (value as Record<string, unknown>).contextUsage,
-        `${path}.contextUsage`,
-      );
-      return;
-    }
-    expectContextUsage(value, path);
-  },
-  'thread.historyHydrationFailed': (value, path) => {
+  'conversation.contextUsageUpdated': (value, path) => {
     expectRecord(value, path);
-    if (Object.keys(value).length > 0)
-      failEventValidation(path, 'expected an empty object');
+    expectContextUsage(value.contextUsage, `${path}.contextUsage`);
+  },
+  'conversation.historyLoadFailed': (value, path) => {
+    expectRecord(value, path);
+    expectString(value.error, `${path}.error`);
   },
   'subagent.operationChanged': expectSubagentOperationChange,
   'subagent.activityChanged': expectSubagentActivityChange,

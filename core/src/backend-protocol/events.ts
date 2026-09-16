@@ -1,4 +1,5 @@
-import type { ClientState, MainToRendererEvent } from '../contracts';
+import type { ClientState } from '../contracts';
+import type { BackendPublishedEvent } from '../contracts/events';
 import { isClientState, isAppSnapshot } from '../snapshot-guards';
 import { agentPayloadValidators } from './event-agent-payloads';
 import { conversationPayloadValidators } from './event-conversation-payloads';
@@ -14,11 +15,11 @@ import {
   type EventValueValidator,
 } from './event-validation';
 
-type ClawBackendEventFrom<Event extends MainToRendererEvent> = Event extends MainToRendererEvent
+type ClawBackendEventFrom<Event extends BackendPublishedEvent> = Event extends BackendPublishedEvent
   ? Omit<Event, 'source'> & { clientState?: ClientState }
   : never;
 
-export type ClawBackendEvent = ClawBackendEventFrom<MainToRendererEvent>;
+export type ClawBackendEvent = ClawBackendEventFrom<BackendPublishedEvent>;
 
 type ClawBackendEventType = ClawBackendEvent['type'];
 
@@ -106,93 +107,57 @@ function expectEventContext(event: EventRecord): void {
       }
       return;
     }
-    case 'sidePanel.markdownRequested':
-    case 'sidePanel.gitDiffRequested':
-    case 'celebration.requested':
+    case 'client.markdownDisplayRequested':
+    case 'plan.reviewResolved':
+    case 'client.celebrationRequested':
     case 'agentCreation.progress':
     case 'git.operationProgress':
     case 'agent.updated':
     case 'agent.statusChanged':
-    case 'thread.goalCleared':
-    case 'thread.historyHydrationFailed':
+    case 'conversation.goalCleared':
+    case 'conversation.historyLoadFailed':
     case 'agent.promptQueued':
     case 'agent.promptRetryScheduled':
     case 'agent.promptDequeued':
     case 'git.statusUpdated':
       expectAgent(event);
       return;
-    case 'clientRequest.resolved':
-      expectAgentBackend(event);
-      return;
-    case 'thread.started':
-      expectAgentBackend(event);
-      if (event.backend === 'codex') {
-        expectRequiredString(event, 'threadId');
-        const payload = event.payload as Record<string, unknown>;
-        if (
-          payload.sessionId !== undefined ||
-          payload.transport !== undefined
-        ) {
-          failEventValidation(
-            '$.payload',
-            'expected Codex thread start payload',
-          );
-        }
-      } else {
-        expectRequiredString(event, 'backendSessionId');
-        const payload = event.payload as Record<string, unknown>;
-        if (
-          payload.sessionId === undefined ||
-          payload.transport === undefined
-        ) {
-          failEventValidation(
-            '$.payload',
-            'expected Claude thread start payload',
-          );
-        }
-      }
-      return;
-    case 'thread.settingsUpdated':
-      expectAgentBackend(event, 'codex');
-      expectRequiredString(event, 'threadId');
-      return;
-    case 'thread.modeUpdated':
-      expectAgentBackend(event);
-      if (event.backend === 'codex') {
-        expectRequiredString(event, 'threadId');
-      } else {
-        expectRequiredString(event, 'turnId');
-        const payload = event.payload as Record<string, unknown>;
-        expectLiteral(payload.provider, ['claude'], '$.payload.provider');
-        expectString(payload.permissionMode, '$.payload.permissionMode');
-      }
-      return;
-    case 'thread.goalUpdated':
+    case 'plan.readyForReview':
       expectAgent(event);
-      expectRequiredString(event, 'threadId');
+      expectRequiredString(event, 'turnId');
       return;
-    case 'thread.tokenUsageUpdated':
+    case 'agent.conversationAttached':
+      expectAgentBackend(event);
+      expectRequiredString(event, 'conversationId');
+      return;
+    case 'conversation.settingsUpdated':
+      expectAgentBackend(event);
+      return;
+    case 'conversation.modeUpdated':
+      expectAgentBackend(event);
+      return;
+    case 'conversation.goalUpdated':
+      expectAgent(event);
+      return;
+    case 'conversation.contextUsageUpdated':
     case 'subagent.operationChanged':
     case 'subagent.activityChanged':
     case 'subagent.identityChanged':
     case 'subagent.statusChanged':
       expectAgentBackend(event);
-      expectRequiredString(event, 'threadId');
       return;
-    case 'diff.updated':
-    case 'file.activity':
-      expectTurnContext(event, true);
+    case 'conversation.turnDiffUpdated':
+    case 'workspace.fileActivityDetected':
+      expectTurnContext(event, false);
       return;
-    case 'backendApproval.requested':
-    case 'backendApproval.resolved':
-      expectAgentBackend(event, 'codex');
-      expectRequiredString(event, 'threadId');
+    case 'agentRequest.created':
+    case 'agentRequest.resolved':
+      expectAgentBackend(event);
       return;
-    case 'client.connectionChanged':
     case 'snapshot.updated':
-    case 'devicePairing.statusChanged':
+    case 'remoteControl.statusChanged':
     case 'browser.annotationCreated':
-    case 'workBacklog.assignmentUpdated':
+    case 'workItem.assignmentUpdated':
       return;
   }
 }
@@ -210,6 +175,7 @@ export function decodeClawBackendEvent(value: unknown): ClawBackendEvent {
     expectLiteral(candidate, ['codex', 'claude'], path),
   );
   expectOptional(event, 'backendSessionId', '$', expectString);
+  expectOptional(event, 'conversationId', '$', expectString);
   expectOptional(event, 'threadId', '$', expectString);
   expectOptional(event, 'turnId', '$', expectString);
   expectOptional(event, 'snapshot', '$', (candidate, path) => {

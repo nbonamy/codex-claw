@@ -48,6 +48,7 @@ function desktopPlatformActions(api: CodexClawApi | undefined): Readonly<ClawPla
   return {
     launchChatGpt,
     managePlugins: launchChatGpt,
+    openExternal,
   };
 }
 

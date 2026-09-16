@@ -1,11 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
+import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import type { AddSshConnectionInput, AppSnapshot, ClientRequestResponse, CloneSourceRepositoryInput, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MoveAgentToTeamInput, PairedDevice, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
-import type { OpenInProvider } from '../open-in';
 import { currentSnapshot, createBackendClient, updateSettings } from './app-controller-test-harness';
 
 describe('AppController', () => {
@@ -26,7 +23,7 @@ describe('AppController', () => {
     await controller.initialize();
     await expect(respondToClientRequest(controller, response)).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('client/request/respond', { response });
+    expect(request).toHaveBeenCalledWith('agent/request/respond', { response: { id: response.id, outcome: { kind: 'decision', decision: 'allow' } } });
     expect(currentSnapshot(controller)).toBe(backendSnapshot);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'idle' });
   });
@@ -329,9 +326,9 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenNthCalledWith(1, 'team/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'team/update', { input: updateInput });
-    expect(request).toHaveBeenNthCalledWith(3, 'team/reorder', { input: reorderInput });
+    expect(request).toHaveBeenNthCalledWith(3, 'client/teamOrder/update', { input: reorderInput });
     expect(request).toHaveBeenNthCalledWith(4, 'team/delete', { teamId: 'team-backend' });
-    expect(request).toHaveBeenNthCalledWith(5, 'team/select', { teamId: 'team-codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(5, 'client/navigation/selectTeam', { teamId: 'team-codex-claw' });
   });
 
   it('routes agent CRUD and layout mutations through clawd', async () => {
@@ -388,11 +385,11 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(3, 'agent/duplicate', { agentId: 'agent-dina', options: { name: 'Dina gh-24', select: false } });
     expect(request).toHaveBeenNthCalledWith(4, 'agent/fork', { agentId: 'agent-dina', turnId: 'turn-4' });
     expect(request).toHaveBeenNthCalledWith(5, 'agent/team/move', { input: moveInput });
-    expect(request).toHaveBeenNthCalledWith(6, 'agent/reorder', { input: reorderInput });
-    expect(request).toHaveBeenNthCalledWith(7, 'repository/reorder', { input: reorderRepositoriesInput });
-    expect(request).toHaveBeenNthCalledWith(8, 'agent/select', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenNthCalledWith(6, 'client/agentOrder/update', { input: reorderInput });
+    expect(request).toHaveBeenNthCalledWith(7, 'client/repositoryOrder/update', { input: reorderRepositoriesInput });
+    expect(request).toHaveBeenNthCalledWith(8, 'client/navigation/selectAgent', { agentId: 'agent-dina' });
     expect(request).toHaveBeenNthCalledWith(9, 'agent/delete', { agentId: 'agent-dina' });
-    expect(request).not.toHaveBeenCalledWith('agent/folder/validate', expect.anything());
+    expect(request).not.toHaveBeenCalledWith('workspace/folder/validate', expect.anything());
   });
 
   it('routes quick-chat creation through clawd', async () => {
@@ -417,7 +414,7 @@ describe('AppController', () => {
     await controller.initialize();
     await expect(compressAgentSession(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/session/compress', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/conversation/replaceWithSummary', { agentId: 'agent-dina' });
   });
 
 
@@ -440,7 +437,8 @@ describe('AppController', () => {
 
     await expect(updateSettings(controller, input)).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('settings/update', { input });
+    expect(request).toHaveBeenCalledWith('settings/update', { input: { general: input.general } });
+    expect(request).toHaveBeenCalledWith('client/preferences/update', { input: { theme: input.theme } });
   });
 
   it('routes remote connection actions through clawd', async () => {
@@ -487,7 +485,7 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenCalledWith('connections/sshHosts/list', undefined);
     expect(request).toHaveBeenCalledWith('connections/ssh/create', { input });
-    expect(request).toHaveBeenCalledWith('connections/sync', { connectionId: 'connection-devbox' });
+    expect(request).toHaveBeenCalledWith('connections/runtime/sync', { connectionId: 'connection-devbox' });
     expect(request).toHaveBeenCalledWith('connections/update', {
       connectionId: 'connection-devbox',
       input: { sourceFolderPath: '~/src' },
@@ -509,30 +507,30 @@ describe('AppController', () => {
     };
     const devices: PairedDevice[] = [{ clientId: 'client-1', displayName: 'Nicolas’s iPhone' }];
     const request = vi.fn((method: string) => {
-      if (method === backendMethods.devicePairingStart) return Promise.resolve(session);
-      if (method === backendMethods.devicePairingStatus) return Promise.resolve(true);
-      if (method === backendMethods.devicePairingClientsList) return Promise.resolve(devices);
-      if (method === backendMethods.devicePairingClientRevoke) return Promise.resolve(null);
+      if (method === backendMethods.remoteControlPairingStart) return Promise.resolve(session);
+      if (method === backendMethods.remoteControlPairingCheck) return Promise.resolve(true);
+      if (method === backendMethods.remoteControlClientsList) return Promise.resolve(devices);
+      if (method === backendMethods.remoteControlClientRevoke) return Promise.resolve(null);
       return Promise.resolve(status);
     });
     const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));
     await controller.initialize();
 
-    await expect(getDevicePairingStatus(controller)).resolves.toBe(status);
-    await expect(enableDevicePairing(controller)).resolves.toBe(status);
-    await expect(disableDevicePairing(controller)).resolves.toBe(status);
+    await expect(getRemoteControlStatus(controller)).resolves.toBe(status);
+    await expect(enableRemoteControl(controller)).resolves.toBe(status);
+    await expect(disableRemoteControl(controller)).resolves.toBe(status);
     await expect(startDevicePairing(controller)).resolves.toBe(session);
     await expect(checkDevicePairing(controller, session)).resolves.toBe(true);
     await expect(listPairedDevices(controller, 'environment-1')).resolves.toBe(devices);
     await expect(revokePairedDevice(controller, 'environment-1', 'client-1')).resolves.toBeUndefined();
 
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingStatusGet, undefined);
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingEnable, undefined);
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingDisable, undefined);
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingStart, undefined);
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingStatus, { session });
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingClientsList, { environmentId: 'environment-1' });
-    expect(request).toHaveBeenCalledWith(backendMethods.devicePairingClientRevoke, {
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlStatusGet, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlEnable, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlDisable, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlPairingStart, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlPairingCheck, { session });
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlClientsList, { environmentId: 'environment-1' });
+    expect(request).toHaveBeenCalledWith(backendMethods.remoteControlClientRevoke, {
       environmentId: 'environment-1', clientId: 'client-1',
     });
   });
@@ -885,16 +883,16 @@ async function removeRemoteConnection(controller: AppController, connectionId: s
   }).removeRemoteConnection(connectionId);
 }
 
-function getDevicePairingStatus(controller: AppController): Promise<DevicePairingStatus> {
-  return (controller as unknown as { getDevicePairingStatus(): Promise<DevicePairingStatus> }).getDevicePairingStatus();
+function getRemoteControlStatus(controller: AppController): Promise<DevicePairingStatus> {
+  return (controller as unknown as { getRemoteControlStatus(): Promise<DevicePairingStatus> }).getRemoteControlStatus();
 }
 
-function enableDevicePairing(controller: AppController): Promise<DevicePairingStatus> {
-  return (controller as unknown as { enableDevicePairing(): Promise<DevicePairingStatus> }).enableDevicePairing();
+function enableRemoteControl(controller: AppController): Promise<DevicePairingStatus> {
+  return (controller as unknown as { enableRemoteControl(): Promise<DevicePairingStatus> }).enableRemoteControl();
 }
 
-function disableDevicePairing(controller: AppController): Promise<DevicePairingStatus> {
-  return (controller as unknown as { disableDevicePairing(): Promise<DevicePairingStatus> }).disableDevicePairing();
+function disableRemoteControl(controller: AppController): Promise<DevicePairingStatus> {
+  return (controller as unknown as { disableRemoteControl(): Promise<DevicePairingStatus> }).disableRemoteControl();
 }
 
 function startDevicePairing(controller: AppController): Promise<DevicePairingSession> {

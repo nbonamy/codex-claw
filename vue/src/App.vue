@@ -12,6 +12,7 @@
     :is-conversation-load-failed="isActiveAgentHistoryFailed"
     :retry-agent-history="retryActiveAgentHistory"
     :send-prompt-action="sendPromptWithCompression"
+    :respond-to-plan-review="respondToPlanReview"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
     :retry-turn-action="retryTurn"
@@ -66,7 +67,7 @@
     :choose-source-worktree-destination="chooseSourceWorktreeDestination"
     :create-source-worktree="createSourceWorktree"
     :preview-agent-file="previewAgentFile"
-    :open-agent-git-diff="openAgentGitDiff"
+    :get-agent-git-diff="getAgentGitDiff"
     :get-agent-git-workflow="getAgentGitWorkflow"
     :generate-agent-git-message="generateAgentGitMessage"
     :stage-agent-git-files="stageAgentGitFiles"
@@ -90,9 +91,9 @@
     :check-remote-connection="checkRemoteConnection"
     :update-remote-connection="updateRemoteConnection"
     :remove-remote-connection="removeRemoteConnection"
-    :get-device-pairing-status="getDevicePairingStatus"
-    :enable-device-pairing="enableDevicePairing"
-    :disable-device-pairing="disableDevicePairing"
+    :get-device-pairing-status="getRemoteControlStatus"
+    :enable-device-pairing="enableRemoteControl"
+    :disable-device-pairing="disableRemoteControl"
     :start-device-pairing="startDevicePairing"
     :check-device-pairing="checkDevicePairing"
     :list-paired-devices="listPairedDevices"
@@ -100,7 +101,7 @@
     :set-daemon-enabled="setDaemonEnabled"
     :connect-work-provider="connectWorkProvider"
     :open-work-provider-authorization="openWorkProviderAuthorization"
-    :complete-work-provider-connection="completeWorkProviderConnection"
+    :complete-work-provider-connection="pollWorkProviderAuthorization"
     :disconnect-work-provider="disconnectWorkProvider"
     :get-automation-snapshot="getAutomationSnapshot"
     :create-automation="createAutomation"
@@ -291,7 +292,7 @@ const {
   chooseSourceWorktreeDestination,
   createSourceWorktree,
   previewAgentFile,
-  openAgentGitDiff,
+  getAgentGitDiff,
   getAgentGitWorkflow,
   generateAgentGitMessage,
   stageAgentGitFiles,
@@ -326,9 +327,9 @@ const {
   checkRemoteConnection,
   updateRemoteConnection,
   removeRemoteConnection,
-  getDevicePairingStatus,
-  enableDevicePairing,
-  disableDevicePairing,
+  getRemoteControlStatus,
+  enableRemoteControl,
+  disableRemoteControl,
   startDevicePairing,
   checkDevicePairing,
   listPairedDevices,
@@ -336,7 +337,7 @@ const {
   setDaemonEnabled,
   connectWorkProvider,
   openWorkProviderAuthorization,
-  completeWorkProviderConnection,
+  pollWorkProviderAuthorization,
   disconnectWorkProvider,
   getAutomationSnapshot,
   createAutomation,
@@ -372,6 +373,7 @@ const {
   markDebugAgentsUnread,
   selectTeam,
   sendPrompt,
+  respondToPlanReview,
   sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,

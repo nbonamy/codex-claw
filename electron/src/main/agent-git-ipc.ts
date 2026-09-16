@@ -9,8 +9,8 @@ export function registerAgentGitIpcHandlers(
   ipc: TypedIpcMain<CodexClawIpcRequests>,
   getBackendClient: () => ClawBackendClientPort,
 ): void {
-  ipc.handle(ipcChannels.openAgentGitDiff, async (_event, agentId, target) => {
-    await requestClawBackend(getBackendClient(), backendMethods.agentGitDiffOpen, { agentId, target });
+  ipc.handle(ipcChannels.getAgentGitDiff, async (_event, agentId, target) => {
+    return requestClawBackend(getBackendClient(), backendMethods.agentGitDiffGet, { agentId, target });
   });
   ipc.handle(ipcChannels.getAgentGitWorkflow, (_event, agentId) => (
     requestClawBackend(getBackendClient(), backendMethods.agentGitWorkflowGet, { agentId })

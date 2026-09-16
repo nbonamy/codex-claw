@@ -1,17 +1,41 @@
+import { approvalAgentRequest, approvalOutcome } from '@codex-claw/core/agent-request';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
-import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { clearConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
-import { configureClawClient } from '../platform-api';
-import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { codexConversationSnapshot, codexTextMessage } from '../test/codex-conversation-fixtures';
 import { claudeConversationSnapshot } from '../test/claude-conversation-fixtures';
+import { deferred } from './app-state-test-harness';
 describe('useAppState', () => {
+  it('refreshes an already cached agent workspace on selection without clearing its conversation', async () => {
+    const base = createInitialSnapshot();
+    base.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    let listener!: (event: MainToRendererEvent) => void;
+    const loadConversationHistory = vi.fn(async () => structuredClone(base));
+    stubElectronTestWindow({ codexClaw: {
+      getSnapshot: vi.fn(async () => structuredClone(base)),
+      selectAgent: vi.fn(async (agentId: string) => ({ ...structuredClone(base), activeAgentId: agentId })),
+      loadConversationHistory,
+      onEvent: (callback) => { listener = callback; return () => undefined; },
+    } satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+    await state.loadSnapshot();
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalled());
+    listener({ seq: 1, occurredAt: 'now', type: 'codex.conversationSnapshotChanged', agentId: 'agent-dina', backend: 'codex', threadId: 'thread-1', payload: { revision: 1, snapshot: codexConversationSnapshot() } });
+    await state.selectAgent('agent-jesse');
+    const refresh = deferred<ReturnType<typeof createInitialSnapshot>>();
+    loadConversationHistory.mockImplementationOnce(() => refresh.promise);
+    loadConversationHistory.mockClear();
+    const selection = state.selectAgent('agent-dina');
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledWith('agent-dina'));
+    expect(state.activeCodexConversationSnapshot.value).not.toBeNull();
+    refresh.resolve(structuredClone(base));
+    await selection;
+  });
   afterEach(() => {
     clearConfetti();
     clearFirstRunOnboardingStage();
@@ -83,8 +107,8 @@ describe('useAppState', () => {
       backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
-      type: 'backendApproval.requested',
-      payload: { approval },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest(approval) },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     listeners[0]?.({
@@ -92,8 +116,8 @@ describe('useAppState', () => {
       agentId: 'agent-jesse',
       backend: 'codex',
       threadId: 'thread-other',
-      type: 'backendApproval.requested',
-      payload: { approval: { ...approval, id: 'approval-other', conversationId: 'thread-other' } },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest({ ...approval, id: 'approval-other', conversationId: 'thread-other' }) },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
@@ -101,6 +125,7 @@ describe('useAppState', () => {
     await state.resolveBackendApproval('approval-native-1', 'approve', 'session');
 
     expect(respondToClientRequest).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
       id: 'approval-native-1',
       payload: { decision: 'allow_conversation' },
     });
@@ -113,13 +138,14 @@ describe('useAppState', () => {
       backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
-      type: 'backendApproval.requested',
-      payload: { approval: { ...approval, id: 'approval-once' } },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest({ ...approval, id: 'approval-once' }) },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     await state.resolveBackendApproval('approval-once', 'approve', 'once');
 
     expect(respondToClientRequest).toHaveBeenNthCalledWith(2, {
+      agentId: 'agent-dina',
       id: 'approval-once',
       payload: { decision: 'allow' },
     });
@@ -130,13 +156,14 @@ describe('useAppState', () => {
       backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
-      type: 'backendApproval.requested',
-      payload: { approval: { ...approval, id: 'approval-deny' } },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest({ ...approval, id: 'approval-deny' }) },
       occurredAt: '2026-06-05T00:00:04.000Z',
     });
     await state.resolveBackendApproval('approval-deny', 'deny', 'once');
 
     expect(respondToClientRequest).toHaveBeenNthCalledWith(3, {
+      agentId: 'agent-dina',
       id: 'approval-deny',
       payload: { decision: 'deny' },
     });
@@ -172,8 +199,8 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'backendApproval.requested',
-      payload: { approval },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest(approval) },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     listeners[0]?.({
@@ -181,16 +208,16 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'backendApproval.resolved',
-      payload: { approval, decision: null, scope: null, reason: 'server' },
+      type: 'agentRequest.resolved',
+      payload: { id: (approval).id, outcome: approvalOutcome(null, null, 'server') },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     listeners[0]?.({
       seq: 3,
       agentId: 'agent-dina',
       backend: 'codex',
-      type: 'clientRequest.resolved',
-      payload: { id: 'question-1' },
+      type: 'agentRequest.resolved',
+      payload: { id: 'question-1', outcome: { kind: 'completed' } },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     listeners[0]?.({
@@ -480,6 +507,7 @@ describe('useAppState', () => {
     });
 
     expect(respondToClientRequest).toHaveBeenCalledWith({
+      agentId: 'agent-dina',
       id: 'approval-1',
       payload: {
         decision: 'allow',
@@ -537,8 +565,8 @@ describe('useAppState', () => {
       seq: 1,
       occurredAt: '2026-09-05T00:00:00.000Z',
       agentId: 'agent-dina',
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'Unable to load conversation history.' },
     });
     expect(state.isActiveAgentHistoryFailed.value).toBe(true);
 
@@ -649,8 +677,8 @@ describe('useAppState', () => {
       seq: 1,
       occurredAt: '2026-09-07T00:00:00.000Z',
       agentId: 'agent-dina',
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'Unable to load conversation history.' },
     });
     expect(state.isActiveAgentHistoryFailed.value).toBe(true);
 
@@ -841,8 +869,8 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'thread.settingsUpdated',
-      payload: { threadSettings: { model: 'gpt-5.4', reasoningEffort: 'high', serviceTier: 'fast' } },
+      type: 'conversation.settingsUpdated',
+      payload: { settings: { model: 'gpt-5.4', reasoningEffort: 'high', serviceTier: 'fast' } },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     listeners[0]?.({
@@ -850,7 +878,7 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'thread.modeUpdated',
+      type: 'conversation.modeUpdated',
       payload: { mode: 'plan' },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
@@ -870,7 +898,7 @@ describe('useAppState', () => {
       seq: 3,
       agentId: 'agent-dina',
       threadId: 'thread-1',
-      type: 'thread.goalUpdated',
+      type: 'conversation.goalUpdated',
       payload: {
         goal: {
           threadId: 'thread-1',
@@ -898,7 +926,7 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'thread.modeUpdated',
+      type: 'conversation.modeUpdated',
       payload: { mode: 'default' },
       occurredAt: '2026-06-05T00:00:04.000Z',
     });
@@ -906,7 +934,7 @@ describe('useAppState', () => {
       seq: 5,
       agentId: 'agent-dina',
       threadId: 'thread-1',
-      type: 'thread.goalCleared',
+      type: 'conversation.goalCleared',
       payload: {},
       occurredAt: '2026-06-05T00:00:05.000Z',
       snapshot: createInitialSnapshot(),
@@ -920,8 +948,8 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'thread.settingsUpdated',
-      payload: { threadSettings: { serviceTier: null } },
+      type: 'conversation.settingsUpdated',
+      payload: { settings: { serviceTier: null } },
       occurredAt: '2026-06-05T00:00:06.000Z',
     });
     expect(state.selectedServiceTier.value).toBeNull();
@@ -1122,11 +1150,11 @@ describe('useAppState', () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
+    const loadConversationHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
@@ -1135,8 +1163,8 @@ describe('useAppState', () => {
     });
     const state = useAppState();
     await state.loadSnapshot();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalled());
-    hydrateAgentHistory.mockClear();
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalled());
+    loadConversationHistory.mockClear();
 
     listeners[0]?.({
       seq: 1,
@@ -1168,7 +1196,7 @@ describe('useAppState', () => {
     });
 
     expect(state.activeCodexConversationSnapshot.value).not.toBeNull();
-    expect(hydrateAgentHistory).not.toHaveBeenCalled();
+    expect(loadConversationHistory).not.toHaveBeenCalled();
 
     listeners[0]?.({
       seq: 3,
@@ -1191,18 +1219,18 @@ describe('useAppState', () => {
     });
 
     expect(state.activeCodexConversationSnapshot.value).toBeNull();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledOnce());
   });
 
   it('invalidates and rehydrates a Codex frame when a delta targets another conversation', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
+    const loadConversationHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
@@ -1211,8 +1239,8 @@ describe('useAppState', () => {
     });
     const state = useAppState();
     await state.loadSnapshot();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalled());
-    hydrateAgentHistory.mockClear();
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalled());
+    loadConversationHistory.mockClear();
 
     listeners[0]?.({
       seq: 1,
@@ -1244,7 +1272,7 @@ describe('useAppState', () => {
     });
 
     expect(state.activeCodexConversationSnapshot.value).toBeNull();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledOnce());
   });
 
   it('advances the provider-owned Claude frame without writing the global transcript', async () => {
@@ -1258,7 +1286,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory: vi.fn().mockResolvedValue(remoteSnapshot),
+        loadConversationHistory: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
@@ -1365,11 +1393,11 @@ describe('useAppState', () => {
     remoteSnapshot.agents[0]!.backendSession = {
       kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio',
     };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
+    const loadConversationHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
@@ -1378,8 +1406,8 @@ describe('useAppState', () => {
     });
     const state = useAppState();
     await state.loadSnapshot();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalled());
-    hydrateAgentHistory.mockClear();
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalled());
+    loadConversationHistory.mockClear();
 
     listeners[0]?.({
       seq: 1,
@@ -1409,7 +1437,7 @@ describe('useAppState', () => {
     });
 
     expect(state.activeClaudeConversationSnapshot.value).not.toBeNull();
-    expect(hydrateAgentHistory).not.toHaveBeenCalled();
+    expect(loadConversationHistory).not.toHaveBeenCalled();
 
     listeners[0]?.({
       seq: 3,
@@ -1431,6 +1459,6 @@ describe('useAppState', () => {
     });
 
     expect(state.activeClaudeConversationSnapshot.value).toBeNull();
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledOnce());
   });
 });

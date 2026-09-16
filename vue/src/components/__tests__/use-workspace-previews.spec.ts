@@ -1,0 +1,64 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AgentGitDiff } from '@codex-claw/core/contracts';
+import { useRightWorkspaceState } from '../use-right-workspace-state';
+import { useWorkspacePreviews } from '../use-workspace-previews';
+
+function setup(getAgentGitDiff: (id: string) => Promise<AgentGitDiff>) {
+  const snapshot = createInitialSnapshot();
+  const agent = snapshot.agents[0]!;
+  const workspace = useRightWorkspaceState({ currentAgentId: () => snapshot.activeAgentId ?? undefined, workspaceBody: () => null });
+  const previews = useWorkspacePreviews({
+    currentAgent: () => snapshot.agents.find((item) => item.id === snapshot.activeAgentId) ?? null,
+    getSnapshot: () => snapshot,
+    getAgentGitDiff,
+    previewAgentFile: vi.fn(),
+    workspaceFor: workspace.workspaceFor,
+    openTab: workspace.openTab,
+    closeTab: workspace.closeTab,
+  });
+  return { agent, snapshot, workspace, previews };
+}
+
+const result: AgentGitDiff = {
+  target: { type: 'staged' }, diff: 'staged patch', sections: [],
+  summary: { addedLines: 1, removedLines: 0, changedFiles: 1 },
+};
+
+describe('workspace diff queries', () => {
+  it('keeps a delayed query result attached to its initiating agent', async () => {
+    let resolve!: (value: AgentGitDiff) => void;
+    const state = setup(() => new Promise((done) => { resolve = done; }));
+    const pending = state.previews.openAgentGitDiff(state.agent.id);
+    expect(state.workspace.workspaceFor(state.agent.id).gitReviewPanel?.state).toBe('loading');
+    state.snapshot.activeAgentId = state.snapshot.agents[1]!.id;
+    resolve(result);
+    await pending;
+    expect(state.workspace.workspaceFor(state.agent.id).gitReviewPanel).toMatchObject({ diff: 'staged patch', state: 'idle' });
+    expect(state.workspace.workspaceFor(state.snapshot.activeAgentId).gitReviewPanel).toBeNull();
+  });
+
+  it('ignores an older request failure after a newer target has loaded', async () => {
+    let reject!: (error: Error) => void;
+    const query = vi.fn<() => Promise<AgentGitDiff>>()
+      .mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }))
+      .mockResolvedValueOnce(result);
+    const state = setup(query);
+    const oldRequest = state.previews.openAgentGitDiff(state.agent.id, { type: 'uncommitted' });
+    await state.previews.openAgentGitDiff(state.agent.id, { type: 'staged' });
+    reject(new Error('obsolete failure'));
+    await oldRequest;
+    expect(state.workspace.workspaceFor(state.agent.id).gitReviewPanel).toMatchObject({ target: { type: 'staged' }, state: 'idle', diff: 'staged patch', error: null });
+  });
+
+  it('renders a query error locally and treats an empty diff as success', async () => {
+    const query = vi.fn<() => Promise<AgentGitDiff>>()
+      .mockRejectedValueOnce(new Error('Git unavailable'))
+      .mockResolvedValueOnce({ ...result, diff: '' });
+    const state = setup(query);
+    await state.previews.openAgentGitDiff(state.agent.id);
+    expect(state.workspace.workspaceFor(state.agent.id).gitReviewPanel).toMatchObject({ state: 'error', error: 'Git unavailable' });
+    await state.previews.openAgentGitDiff(state.agent.id);
+    expect(state.workspace.workspaceFor(state.agent.id).gitReviewPanel).toMatchObject({ state: 'idle', error: null, diff: '' });
+  });
+});

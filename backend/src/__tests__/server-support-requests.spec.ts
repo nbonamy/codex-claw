@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
@@ -152,7 +151,7 @@ describe('ClawBackendServer', () => {
   });
 
 
-  it('owns settings updates', async () => {
+  it('separates backend policy from client presentation settings', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const server = new ClawBackendServer({
@@ -162,6 +161,10 @@ describe('ClawBackendServer', () => {
       saveSnapshot,
     });
 
+    await server.handleMessage({ jsonrpc: '2.0', id: 'preferences', method: 'client/preferences/update', params: { input: {
+      general: { repositoryIcons: { 'git@github.com:nbonamy/codex-claw.git': '🦞' } },
+      theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
+    } } });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'settings-update',
@@ -171,12 +174,8 @@ describe('ClawBackendServer', () => {
           general: {
             claudeCodeEnabled: true,
             preventSleepWhenAgentsRun: false,
-            repositoryIcons: {
-              'git@github.com:nbonamy/codex-claw.git': '🦞',
-            },
           },
           sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['codex-claw', 'id8'] },
-          theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
         },
       },
     })).resolves.toMatchObject({
@@ -202,9 +201,8 @@ describe('ClawBackendServer', () => {
     });
 
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
-    expect(snapshot.general.repositoryIcons).toStrictEqual({
-      'remote:github.com/nbonamy/codex-claw': '🦞',
-    });
+    expect(snapshot.general.repositoryIcons).toStrictEqual({});
+    expect(snapshot.clientPreferences?.desktop?.general?.repositoryIcons).toStrictEqual({ 'git@github.com:nbonamy/codex-claw.git': '🦞' });
   });
 
   it('changes Codex resource sharing only while chats are idle', async () => {

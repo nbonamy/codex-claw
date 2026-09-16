@@ -50,10 +50,10 @@ describe('CodexBackendDriver', () => {
     const sessionManager = createSessionManager();
     const driver = new CodexBackendDriver(sessionManager);
 
-    await expect(driver.compressSession(agent)).resolves.toStrictEqual({
+    await expect(driver.replaceConversationWithSummary(agent)).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-compressed' },
     });
-    expect(sessionManager.compressSession).toHaveBeenCalledWith(agent);
+    expect(sessionManager.replaceConversationWithSummary).toHaveBeenCalledWith(agent);
   });
 
   it('routes review prompts through SDK slash handling', async () => {
@@ -260,7 +260,7 @@ describe('CodexBackendDriver', () => {
 
 function createSessionManager(overrides: Partial<CodexSurfaceAgentAdapter> = {}): CodexSurfaceAgentAdapter {
   return {
-    compressSession: vi.fn().mockResolvedValue({ threadId: 'thread-compressed' }),
+    replaceConversationWithSummary: vi.fn().mockResolvedValue({ threadId: 'thread-compressed' }),
     clearThreadGoal: vi.fn().mockResolvedValue({ threadId: 'thread-goal', cleared: true }),
     reviewThread: vi.fn().mockResolvedValue({ threadId: 'thread-review', turnId: 'turn-review' }),
     getRuntimeStatus: vi.fn().mockReturnValue({ backend: 'codex', status: 'notConfigured' }),

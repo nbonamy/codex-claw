@@ -29,10 +29,10 @@ type AgentGitWorkIntegrationsPort = {
 
 export type AgentGitWorkflowServiceOptions = {
   applyEvent: (event: BackendEvent) => void;
-  archiveSession: (agent: Agent) => Promise<void>;
+  archiveConversation: (agent: Agent) => Promise<void>;
   delegatedWorkReports: DelegatedWorkReportPort;
   driverRequest: (agent: Agent, method: string, params: unknown) => Promise<unknown>;
-  forgetSession: (agent: Agent) => Promise<void>;
+  releaseConversation: (agent: Agent) => Promise<void>;
   getSnapshot: () => AppSnapshot;
   getWorkIntegrations: () => AgentGitWorkIntegrationsPort;
   git: AgentGitService;
@@ -45,12 +45,11 @@ export type AgentGitWorkflowServiceOptions = {
 export class AgentGitWorkflowService {
   constructor(private readonly options: AgentGitWorkflowServiceOptions) {}
 
-  async execute(request: AgentGitRequest, agent: Agent): Promise<true | AgentGitMessageGenerationResult | AgentGitWorkflow> {
+  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow> {
     const { method, agentId, params } = request;
     switch (method) {
-      case backendMethods.agentGitDiffOpen:
-        await this.openDiff(agent, parseGitDiffTarget(params.target));
-        return true;
+      case backendMethods.agentGitDiffGet:
+        return this.getDiff(agent, parseGitDiffTarget(params.target));
       case backendMethods.agentGitWorkflowGet:
         return this.workflow(agent);
       case backendMethods.agentGitMessageGenerate:
@@ -91,7 +90,7 @@ export class AgentGitWorkflowService {
         await this.options.git.push(pushFolder, workflow.remote, workflow.branch, !workflow.upstream);
         const result = await this.workflow(agent, { refreshStatus: true });
         if (input.closeAgentAfterPush === true) {
-          await this.options.archiveSession(agent);
+          await this.options.archiveConversation(agent);
           closeAgentInSnapshot(this.options.getSnapshot(), agentId);
           await this.options.persistAndEmitSnapshot();
         }
@@ -110,7 +109,7 @@ export class AgentGitWorkflowService {
           : await this.options.git.createBranch(folder, branchName, input.createWorktree === true, pullRequestNumber as number);
         if (input.createWorktree === true) {
           updateAgentFolder(this.options.getSnapshot(), agentId, targetFolder);
-          await this.options.forgetSession(agent);
+          await this.options.releaseConversation(agent);
         }
         const workspaceChanged = await this.options.refreshWorkspaceIdentity(agentId);
         if (input.createWorktree === true || workspaceChanged) await this.options.persistAndEmitSnapshot();
@@ -123,63 +122,20 @@ export class AgentGitWorkflowService {
     }
   }
 
-  private async openDiff(agent: Agent, target: AgentGitDiffTarget): Promise<void> {
-    const title = gitDiffTitle(target);
-    const subtitle = agent.folder;
-
-    try {
-      if (target.type === 'turn') {
-        const turnDiff = this.options.getSnapshot().turnGitDiffs[target.turnId];
-        if (!turnDiff || turnDiff.agentId !== agent.id || !turnDiff.diff) {
-          throw new Error('The selected turn does not have a Git diff.');
-        }
-        this.options.applyEvent({
-          agentId: agent.id,
-          type: 'sidePanel.gitDiffRequested',
-          payload: {
-            kind: 'gitDiff',
-            target,
-            summary: { addedLines: turnDiff.addedLines, removedLines: turnDiff.removedLines, changedFiles: 0 },
-            scope: 'workingTree',
-            title,
-            subtitle,
-            diff: turnDiff.diff,
-          },
-        });
-        return;
+  private async getDiff(agent: Agent, target: AgentGitDiffTarget): Promise<AgentGitDiff> {
+    if (target.type === 'turn') {
+      const turnDiff = this.options.getSnapshot().turnGitDiffs[target.turnId];
+      if (!turnDiff || turnDiff.agentId !== agent.id || turnDiff.diff === undefined) {
+        throw new Error('The selected turn does not have a Git diff.');
       }
-      const review = await this.options.git.diff(requireAgentFolder(agent), target) as AgentGitDiff;
-
-      this.options.applyEvent({
-        agentId: agent.id,
-        type: 'sidePanel.gitDiffRequested',
-        payload: {
-          kind: 'gitDiff',
-          target,
-          summary: review.summary,
-          scope: 'workingTree',
-          title,
-          subtitle,
-          diff: review.diff,
-          sections: review.sections,
-        },
-      });
-    } catch (error) {
-      this.options.applyEvent({
-        agentId: agent.id,
-        type: 'sidePanel.gitDiffRequested',
-        payload: {
-          kind: 'gitDiff',
-          target,
-          scope: 'workingTree',
-          title,
-          subtitle,
-          diff: '',
-          state: 'error',
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
+      return {
+        target,
+        summary: { addedLines: turnDiff.addedLines, removedLines: turnDiff.removedLines, changedFiles: 0 },
+        diff: turnDiff.diff,
+        sections: [],
+      };
     }
+    return this.options.git.diff(requireAgentFolder(agent), target);
   }
 
   private async workflow(agent: Agent, options: { includePullRequest?: boolean; refreshStatus?: boolean } = {}): Promise<AgentGitWorkflow> {
@@ -317,7 +273,7 @@ export class AgentGitWorkflowService {
     };
     if (deleteWorktree) {
       updateAgentFolder(this.options.getSnapshot(), agentId, targetFolder);
-      await this.options.forgetSession(agent);
+      await this.options.releaseConversation(agent);
     }
     const result = await this.workflow(agent, { refreshStatus: true });
     if (input.reportBack === true) {
@@ -325,7 +281,7 @@ export class AgentGitWorkflowService {
     }
     if (deleteWorktree) {
       if (input.pushAfter !== true) {
-        await this.options.archiveSession(agent);
+        await this.options.archiveConversation(agent);
         closeAgentInSnapshot(this.options.getSnapshot(), agentId);
       }
       await this.options.persistAndEmitSnapshot();
@@ -359,17 +315,6 @@ function parseGitDiffTarget(value: unknown): AgentGitDiffTarget {
   if (type === 'commit') return { type, sha: requireString(record.sha, 'commit SHA') };
   if (type === 'turn') return { type, turnId: requireString(record.turnId, 'turn ID') };
   throw new Error(`Unsupported Git diff target: ${type}`);
-}
-
-function gitDiffTitle(target: AgentGitDiffTarget): string {
-  switch (target.type) {
-    case 'branch': return 'Branch changes';
-    case 'uncommitted': return 'Uncommitted changes';
-    case 'unstaged': return 'Unstaged changes';
-    case 'staged': return 'Staged changes';
-    case 'commit': return `Commit ${target.sha.slice(0, 8)}`;
-    case 'turn': return 'Last turn';
-  }
 }
 
 export function parseAgentGitRequest(method: string, value: unknown): AgentGitRequest | null {

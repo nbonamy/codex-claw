@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { AppSnapshot, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
@@ -44,6 +43,7 @@ describe('ClawBackendServer', () => {
       agentGitService: { identity } as unknown as AgentGitService,
     });
 
+    await server.initialize();
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'startup-snapshot',
@@ -113,7 +113,7 @@ describe('ClawBackendServer', () => {
       [backendMethods.agentCreate, { input: { name: '', folder: '' } }, 'name'],
       [backendMethods.agentUpdate, { input: { id: 'agent-1', name: 42 } }, 'agent name'],
       [backendMethods.agentFork, { agentId: 'agent-1', turnId: 42 }, 'turnId'],
-      [backendMethods.agentOpenInApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
+      [backendMethods.clientAgentExternalApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
       [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],
       [backendMethods.teamCreate, { input: { name: 'Team', color: 'transparent' } }, 'color'],
       [backendMethods.settingsCodexResourceSharingSet, { input: { enabled: false, mode: 'later' } }, 'sharing'],
@@ -304,19 +304,16 @@ describe('ClawBackendServer', () => {
     const result = await server.handleMessage({
       jsonrpc: '2.0',
       id: 'debug-plan-review',
-      method: backendMethods.debugPlanReviewInject,
+      method: backendMethods.debugPlanReadyForReviewInject,
       params: { agentId: 'agent-dina' },
     });
 
     expect(result).toMatchObject({ result: { agents: [{ id: 'agent-dina' }] } });
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        type: 'sidePanel.markdownRequested',
+        type: 'plan.readyForReview',
         payload: expect.objectContaining({
-          kind: 'markdown',
-          purpose: 'plan',
-          title: 'Debug plan review',
-          content: expect.stringMatching(/## Key Changes[\s\S]*## Commit Strategy/u),
+          markdown: expect.stringMatching(/## Key Changes[\s\S]*## Commit Strategy/u),
         }),
       }),
     ]));
@@ -414,15 +411,15 @@ describe('ClawBackendServer', () => {
     });
 
     await expect(server.handleMessage({
-      jsonrpc: '2.0', id: 'pairing-status', method: 'devicePairing/status/get',
+      jsonrpc: '2.0', id: 'pairing-status', method: 'remoteControl/status/get',
     })).resolves.toStrictEqual({ jsonrpc: '2.0', id: 'pairing-status', result: status });
     await expect(server.handleMessage({
-      jsonrpc: '2.0', id: 'pairing-revoke', method: 'devicePairing/client/revoke',
+      jsonrpc: '2.0', id: 'pairing-revoke', method: 'remoteControl/client/revoke',
       params: { environmentId: 'environment-1', clientId: 'client-1' },
     })).resolves.toStrictEqual({ jsonrpc: '2.0', id: 'pairing-revoke', result: status });
 
-    expect(handle).toHaveBeenCalledWith('devicePairing/status/get', undefined);
-    expect(handle).toHaveBeenCalledWith('devicePairing/client/revoke', {
+    expect(handle).toHaveBeenCalledWith('remoteControl/status/get', undefined);
+    expect(handle).toHaveBeenCalledWith('remoteControl/client/revoke', {
       environmentId: 'environment-1', clientId: 'client-1',
     });
   });
@@ -511,7 +508,7 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.general.preventSleepWhenAgentsRun = true;
     snapshot.general.preventSleepWhenRemoteAccessEnabled = true;
-    const handle = vi.fn(async (method: string) => method === backendMethods.devicePairingStatusGet ? {
+    const handle = vi.fn(async (method: string) => method === backendMethods.remoteControlStatusGet ? {
       status: 'connected',
       serverName: 'Codex remote control',
       installationId: 'installation-1',
@@ -528,6 +525,7 @@ describe('ClawBackendServer', () => {
       } as unknown as BackendDriverRpc,
     });
 
+    await server.initialize();
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'snapshot',
@@ -539,7 +537,7 @@ describe('ClawBackendServer', () => {
         },
       },
     });
-    expect(handle).toHaveBeenCalledWith(backendMethods.devicePairingStatusGet, undefined);
+    expect(handle).toHaveBeenCalledWith(backendMethods.remoteControlStatusGet, undefined);
   });
 
   it('initializes source folder state from the backend when snapshots are requested', async () => {
@@ -559,6 +557,7 @@ describe('ClawBackendServer', () => {
       } as unknown as BackendDriverRpc,
     });
 
+    await server.initialize();
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 'snapshot', method: 'snapshot/get' })).resolves.toMatchObject({
       result: {
         snapshot: {
@@ -627,7 +626,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: (listener) => {
         emitEvent = listener;
         return () => undefined;
@@ -663,7 +662,7 @@ describe('ClawBackendServer', () => {
     }]);
     emitEvent({
       backend: 'codex',
-      type: 'devicePairing.statusChanged',
+      type: 'remoteControl.statusChanged',
       payload: {
         status: 'connected',
         serverName: 'Codex remote control',
@@ -673,12 +672,12 @@ describe('ClawBackendServer', () => {
     });
     expect(events).toContainEqual(expect.objectContaining({
       seq: 2,
-      type: 'devicePairing.statusChanged',
+      type: 'remoteControl.statusChanged',
       clientState: expect.objectContaining({ shouldPreventDisplaySleepForRemoteAccess: true }),
     }));
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'snapshot/get' })).resolves.toMatchObject({
       result: {
-        lastEventSeq: 3,
+        lastEventSeq: 2,
       },
     });
   });

@@ -77,6 +77,13 @@ export type AccountRateLimits = {
 export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
 
 export type BackendCapabilities = {
+  planReview?: boolean;
+  questions?: boolean;
+  plugins?: boolean;
+  conversationArchive?: boolean;
+  conversationResume?: boolean;
+  conversationReplaceWithSummary?: boolean;
+  remoteControl?: boolean;
   attachments: boolean;
   models: boolean;
   skills: boolean;

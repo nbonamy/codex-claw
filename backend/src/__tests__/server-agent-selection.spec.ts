@@ -1,17 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
 import {
-  createTestSnapshot,
-  createTextMessage,
+  createTestSnapshot
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
 
-  it('owns agent selection hydration and git status refresh', async () => {
+  it('keeps snapshot and navigation free of implicit loading; explicit load refreshes git', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.teams[0]!.activeAgentId = 'agent-dina';
@@ -27,7 +26,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
+    const loadConversation = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
     const getGitStatus = vi.fn().mockResolvedValue({
       folder: '/Users/nbonamy/src/codex-claw',
       branch: 'main',
@@ -46,8 +45,8 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      hydrateAgent,
+      respondToAgentRequest: async () => undefined,
+      loadConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -70,12 +69,15 @@ describe('ClawBackendServer', () => {
     })).resolves.toMatchObject({
       result: { snapshot: { activeAgentId: 'agent-dina' } },
     });
-    await vi.waitFor(() => expect(getGitStatus).toHaveBeenCalledOnce());
+    expect(getGitStatus).not.toHaveBeenCalled();
+    await server.handleMessage({ jsonrpc: '2.0', id: 'navigate', method: 'client/navigation/selectAgent', params: { agentId: 'agent-dina' } });
+    expect(loadConversation).not.toHaveBeenCalled();
+    expect(getGitStatus).not.toHaveBeenCalled();
 
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'select',
-      method: 'agent/select',
+      method: 'agent/conversation/load',
       params: { agentId: 'agent-dina' },
     })).resolves.toMatchObject({
       result: {
@@ -87,10 +89,9 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
-    expect(getGitStatus).toHaveBeenCalledTimes(2);
+    expect(loadConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(getGitStatus).toHaveBeenCalledOnce();
     expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'snapshot.updated' }),
       expect.objectContaining({ type: 'git.statusUpdated', agentId: 'agent-dina' }),
     ]));
     expect(saveSnapshot).toHaveBeenCalled();
@@ -123,15 +124,15 @@ describe('ClawBackendServer', () => {
         updatedAt: '2026-06-13T00:00:00.000Z',
       },
     ];
-    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
+    const loadConversation = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      hydrateAgent,
+      respondToAgentRequest: async () => undefined,
+      loadConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -147,7 +148,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'hydrate',
-      method: 'agent/history/hydrate',
+      method: 'agent/conversation/load',
       params: { agentId: 'agent-jesse' },
     })).resolves.toMatchObject({
       result: {
@@ -159,7 +160,7 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
+    expect(loadConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
     expect(saveSnapshot).toHaveBeenCalled();
     expect(snapshot.activeAgentId).toBe('agent-dina');
     await server.close();
@@ -186,8 +187,8 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      hydrateAgent: vi.fn().mockRejectedValue(new Error('active writer: provider-only detail')),
+      respondToAgentRequest: async () => undefined,
+      loadConversation: vi.fn().mockRejectedValue(new Error('active writer: provider-only detail')),
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -203,20 +204,20 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'hydrate-failed',
-      method: 'agent/history/hydrate',
+      method: 'agent/conversation/load',
       params: { agentId: snapshot.agents[0]!.id },
     })).resolves.toMatchObject({ result: { activeAgentId: snapshot.activeAgentId } });
 
     expect(events).toContainEqual(expect.objectContaining({
       agentId: snapshot.agents[0]!.id,
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'Unable to load conversation history.' },
     }));
     expect(JSON.stringify(events)).not.toContain('provider-only detail');
     await server.close();
   });
 
-  it('revalidates a selected agent without returning provider conversation data', async () => {
+  it('explicitly loads an agent without returning provider conversation data', async () => {
     const snapshot = createTestSnapshot();
     snapshot.activeAgentId = null;
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -231,7 +232,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-stale' });
+    const loadConversation = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-stale' });
     const getGitStatus = vi.fn().mockResolvedValue(null);
     const driver: AgentBackendDriver = {
       backend: 'codex',
@@ -239,8 +240,8 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      hydrateAgent,
+      respondToAgentRequest: async () => undefined,
+      loadConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -255,21 +256,21 @@ describe('ClawBackendServer', () => {
     const response = await server.handleMessage({
       jsonrpc: '2.0',
       id: 'select-live',
-      method: 'agent/select',
+      method: 'agent/conversation/load',
       params: { agentId: 'agent-dina' },
     });
     expect(response).toMatchObject({
       result: {
-        activeAgentId: 'agent-dina',
+        activeAgentId: null,
       },
     });
     expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
-    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(loadConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(getGitStatus).toHaveBeenCalledOnce();
     await server.close();
   });
 
-  it('hydrates the selected team active agent and refreshes git status', async () => {
+  it('selects a team without loading its agents and explicitly loads only the requested agent', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams = [
       { id: 'team-test', name: 'Test Team', agentIds: ['agent-dina'], activeAgentId: 'agent-dina' },
@@ -332,7 +333,7 @@ describe('ClawBackendServer', () => {
       originUrl: `https://github.com/current-owner/${folder.split('/').at(-1)!}.git`,
       updatedAt: '2026-06-13T00:00:00.000Z',
     }));
-    const hydrateAgent = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
+    const loadConversation = vi.fn().mockResolvedValue({ kind: 'codex', threadId: 'thread-hydrated' });
     const getGitStatus = vi.fn().mockResolvedValue({
       folder: '/Users/nbonamy/src/multi-llm-ts',
       branch: 'main',
@@ -351,8 +352,8 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      hydrateAgent,
+      respondToAgentRequest: async () => undefined,
+      loadConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -367,8 +368,14 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'select-team',
-      method: 'team/select',
+      method: 'client/navigation/selectTeam',
       params: { teamId: 'team-other' },
+    })).resolves.toMatchObject({ result: { activeTeamId: 'team-other', activeAgentId: 'agent-jesse' } });
+    expect(loadConversation).not.toHaveBeenCalled();
+    expect(identity).not.toHaveBeenCalled();
+    expect(getGitStatus).not.toHaveBeenCalled();
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'load', method: 'agent/conversation/load', params: { agentId: 'agent-jesse' },
     })).resolves.toMatchObject({
       result: {
         activeTeamId: 'team-other',
@@ -376,7 +383,7 @@ describe('ClawBackendServer', () => {
         agents: [
           { id: 'agent-dina' },
           { id: 'agent-jesse', backendSession: { kind: 'codex', threadId: 'thread-hydrated' }, workspace: { branch: 'main' } },
-          { id: 'agent-sam', workspace: { branch: 'current-branch', originUrl: 'https://github.com/current-owner/other-project.git' } },
+          { id: 'agent-sam' },
         ],
         agentGitStatuses: {
           'agent-jesse': expect.objectContaining({ branch: 'main', state: 'dirty' }),
@@ -384,9 +391,9 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(hydrateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
+    expect(loadConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-jesse' }));
     expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/multi-llm-ts');
-    expect(identity).toHaveBeenCalledWith('/Users/nbonamy/src/other-project');
+    expect(identity).not.toHaveBeenCalledWith('/Users/nbonamy/src/other-project');
     expect(getGitStatus).toHaveBeenCalledWith('/Users/nbonamy/src/multi-llm-ts');
     await server.close();
   });

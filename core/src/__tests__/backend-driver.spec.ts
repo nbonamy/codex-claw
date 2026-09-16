@@ -3,19 +3,9 @@ import type {
   Agent,
   AgentFileActivity,
   AgentGitStatus,
-  AppSnapshot,
-  BackendApprovalDecision,
-  BackendApprovalRequest,
-  BackendApprovalScope,
-  BackendConnectionState,
-  BrowserAnnotation,
-  ClientRequest,
-  RendererMessage,
-  RendererToolPart,
-  RendererToolPartUpdate,
-  SendPromptOptions,
+  AppSnapshot, BrowserAnnotation, SendPromptOptions,
   SubagentOperationChange,
-  TurnGitDiff,
+  TurnGitDiff
 } from '../contracts';
 import { createEmptySnapshot } from '../snapshot';
 import {
@@ -67,10 +57,10 @@ describe('backend driver helpers', () => {
   });
 
   it('preserves typed payloads through the backend event input envelope', () => {
-    type ConnectionEvent = Extract<BackendEvent, { type: 'client.connectionChanged' }>;
+    type ConnectionEvent = Extract<BackendEvent, { type: 'snapshot.updated' }>;
 
-    expectTypeOf<ConnectionEvent['payload']>()
-      .toEqualTypeOf<BackendConnectionState>();
+    expectTypeOf<Extract<BackendEvent, { type: 'client.connectionChanged' }>>()
+      .toEqualTypeOf<never>();
     expectTypeOf<Extract<BackendEvent, { type: 'snapshot.updated' }>['payload']>()
       .toEqualTypeOf<AppSnapshot>();
     expectTypeOf<Extract<BackendEvent, { type: 'browser.annotationCreated' }>['payload']>()
@@ -81,29 +71,26 @@ describe('backend driver helpers', () => {
       .toEqualTypeOf<{
         agentId: string;
         backend: Agent['backend'];
-        threadId: string;
+        threadId?: string;
         turnId?: string;
         source?: 'backend' | 'client';
       }>();
-    type DiffUpdatedEvent = Extract<BackendEvent, { type: 'diff.updated' }>;
+    type DiffUpdatedEvent = Extract<BackendEvent, { type: 'conversation.turnDiffUpdated' }>;
     expectTypeOf<DiffUpdatedEvent['payload']>()
       .toEqualTypeOf<Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>>();
     expectTypeOf<Pick<DiffUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
-      .toEqualTypeOf<{ agentId: string; backend: Agent['backend']; threadId: string; turnId: string }>();
-    expectTypeOf<Extract<BackendEvent, { type: 'file.activity' }>['payload']>()
+      .toEqualTypeOf<{ agentId: string; backend: Agent['backend']; threadId?: string; turnId: string }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'workspace.fileActivityDetected' }>['payload']>()
       .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
     type GitStatusUpdatedEvent = Extract<BackendEvent, { type: 'git.statusUpdated' }>;
     expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
     expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{ agentId: string; backend?: Agent['backend']; threadId?: string; turnId?: string }>();
-    expectTypeOf<Extract<BackendEvent, { type: 'backendApproval.requested' }>['payload']>()
-      .toEqualTypeOf<{ approval: BackendApprovalRequest }>();
-    expectTypeOf<Extract<BackendEvent, { type: 'backendApproval.resolved' }>['payload']>()
+    expectTypeOf<Extract<BackendEvent, { type: 'agentRequest.created' }>['payload']>()
+      .toEqualTypeOf<{ request: import('../agent-request').AgentRequest }>();
+    expectTypeOf<Extract<BackendEvent, { type: 'agentRequest.resolved' }>['payload']>()
       .toEqualTypeOf<{
-        approval: BackendApprovalRequest;
-        decision: BackendApprovalDecision | null;
-        scope: BackendApprovalScope | null;
-        reason: 'host' | 'server' | 'conversation_closed' | 'conversation_removed' | 'surface_disconnected';
+        id: string; outcome: import('../agent-request').AgentRequestOutcome;
       }>();
     expectTypeOf<ConnectionEvent['seq']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<ConnectionEvent['occurredAt']>().toEqualTypeOf<string | undefined>();

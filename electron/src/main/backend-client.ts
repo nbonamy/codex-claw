@@ -5,6 +5,7 @@ import { ClawBackendSocketClient } from './backend-socket-client';
 import { warnMain } from './log';
 import { runtimeClawdBackendMode, runtimeClawdCommand, runtimeClawdSocketPath, runtimeClawdWatchFile } from './runtime-config';
 import type { SpokenAnnouncementQueue } from './spoken-announcements';
+import type { SpokenAnnouncementVoice } from '@codex-claw/core/contracts';
 
 export type ClawBackendClientPort = {
   close(): Promise<void>;
@@ -19,12 +20,14 @@ export function createRuntimeClawBackendClient(options: {
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
   spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
+  spokenAnnouncementVoice?: () => SpokenAnnouncementVoice;
 } = {}): ClawBackendClientPort | null {
   const mode = runtimeClawdBackendMode();
   const requestHandlers = createRuntimeClientRequestHandlers({
     browserExecute: options.browserExecute,
     browserOpen: options.browserOpen,
     spokenAnnouncements: options.spokenAnnouncements,
+    spokenAnnouncementVoice: options.spokenAnnouncementVoice,
   });
   const socketClient = new ClawBackendSocketClient({
     socketPath: runtimeClawdSocketPath(),

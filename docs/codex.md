@@ -238,7 +238,7 @@ lifecycle, and mutation results; Claw does not translate those into a second
 `RendererMessage` store.
 
 Existing active sessions remain SDK-memory-authoritative and are not re-resumed
-on selection. On relaunch, `agent/history/hydrate` binds the persisted thread
+on selection. On relaunch, `agent/conversation/load` binds the persisted thread
 reference to the targeted SDK surface and emits a fresh provider snapshot. The
 renderer creates one SDK replica for that agent and applies only contiguous
 provider revisions; a gap triggers rehydration.
@@ -333,7 +333,7 @@ catalog model and reasoning effort, and each prompt request sends the model plus
 Codex-specific reasoning and service tier under `backendOptions`.
 
 The selected service tier is part of the hydrated thread settings. `clawd`
-emits it through `thread.settingsUpdated`, including an explicit `null` when
+emits it through `conversation.settingsUpdated`, including an explicit `null` when
 Fast mode is disabled, so switching agents or reloading the app does not retain
 a stale toggle.
 
@@ -612,7 +612,7 @@ Mode notifications stay app-owned:
 
 - `thread/settings/updated` is still emitted for persistence/thread mapping.
 - If the thread settings include `collaborationMode.mode`, `clawd` also emits
-  `thread.modeUpdated` with `default` or `plan`.
+  `conversation.modeUpdated` with `default` or `plan`.
 - `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
   so the agent metadata and shelf stay in sync.
 - `turn/plan/updated` is the structured plan artifact event. `clawd` stores it as
@@ -672,7 +672,7 @@ Plan previews use the markdown side panel with plan-specific review actions:
 }
 ```
 
-`clawd` converts this into `thread.tokenUsageUpdated` with an app-owned
+`clawd` converts this into `conversation.contextUsageUpdated` with an app-owned
 `contextUsage` payload. `total` is cumulative thread/session usage and can
 exceed the model window after a long conversation. Context occupancy uses
 `last.totalTokens`, which is the latest active context size, divided by

@@ -1,4 +1,4 @@
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { mount, type VueWrapper } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import type {
   CodexConversationPaneActions,
@@ -122,7 +122,7 @@ export function mountShell(overrides: Partial<{
   listAgentConversations: (agentId: string, input?: import('@codex-claw/core/contracts').ConversationListInput) => Promise<ConversationSummary[]>;
   resumeAgentConversation: (agentId: string, target: import('@codex-claw/core/contracts').ConversationResumeTarget) => Promise<void>;
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
-  openAgentGitDiff: (agentId: string) => Promise<void>;
+  getAgentGitDiff: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
   loadAssignedWorkItems: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
@@ -191,7 +191,7 @@ export function mountShell(overrides: Partial<{
       listAgentConversations: overrides.listAgentConversations ?? vi.fn().mockResolvedValue([]),
       resumeAgentConversation: overrides.resumeAgentConversation ?? vi.fn().mockResolvedValue(undefined),
       readConversationMessages: overrides.readConversationMessages ?? vi.fn().mockResolvedValue([]),
-      openAgentGitDiff: overrides.openAgentGitDiff ?? vi.fn().mockResolvedValue(undefined),
+      getAgentGitDiff: overrides.getAgentGitDiff ?? vi.fn().mockResolvedValue(undefined),
       previewAgentFile: overrides.previewAgentFile ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       configureWorkBacklog: overrides.configureWorkBacklog ?? vi.fn().mockResolvedValue(undefined),
       loadWorkRepositories: overrides.loadWorkRepositories ?? vi.fn().mockResolvedValue(undefined),

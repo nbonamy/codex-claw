@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import {
@@ -51,7 +51,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       readConversationMessages,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -202,62 +202,62 @@ describe('ClawBackendServer', () => {
       1,
       snapshot.remoteConnections.connections[0],
       'snapshot/get',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       2,
       snapshot.remoteConnections.connections[0],
       'automation/create',
-      { input: createInput },
+      { ...{ input: createInput }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       3,
       snapshot.remoteConnections.connections[0],
       'workProvider/backlog/configure',
-      { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } },
+      { ...{ input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       4,
       snapshot.remoteConnections.connections[0],
       'automation/update',
-      {
+      { ...{
         input: {
           ...createInput,
           id: 'automation-remote',
           name: 'Remote regressions',
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       5,
       snapshot.remoteConnections.connections[0],
       'automation/run',
-      { automationId: 'automation-remote' },
+      { ...{ automationId: 'automation-remote' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       6,
       snapshot.remoteConnections.connections[0],
       'automation/history/clear',
-      { automationId: 'automation-remote' },
+      { ...{ automationId: 'automation-remote' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       7,
       snapshot.remoteConnections.connections[0],
       'automation/execution/delete',
-      { automationId: 'automation-remote', executionId: 'automation-exec-1' },
+      { ...{ automationId: 'automation-remote', executionId: 'automation-exec-1' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       8,
       snapshot.remoteConnections.connections[0],
       'automation/delete',
-      { automationId: 'automation-remote' },
+      { ...{ automationId: 'automation-remote' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.activeTeamId).toBe('team-test');

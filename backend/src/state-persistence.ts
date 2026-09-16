@@ -1,5 +1,7 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { isPlanReview } from '@codex-claw/core/plan-review';
+import { sanitizeClientPreferences } from '@codex-claw/core/client-preferences';
 import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
@@ -11,6 +13,7 @@ import { appText } from '@codex-claw/core/app-text';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
 
 type PersistedState = {
+  clientPreferences?: AppSnapshot['clientPreferences'];
   teams: Team[];
   agents: PersistedAgent[];
   automations?: Automation[];
@@ -38,6 +41,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   workspace?: AgentWorkspaceIdentity;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
+  planReview?: import('@codex-claw/core/plan-review').PlanReview;
   goal?: ThreadGoal;
   statusText?: string;
   lastActivityAt?: string;
@@ -122,6 +126,7 @@ export class AppStatePersistence {
 
 export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedState {
   return {
+    ...(snapshot.clientPreferences ? { clientPreferences: structuredClone(snapshot.clientPreferences) } : {}),
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
     agents: snapshot.agents.map(persistedAgentFromSnapshot),
     automations: snapshot.automations.map(cloneAutomation),
@@ -161,6 +166,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.openInApplication ? { openInApplication: agent.openInApplication } : {}),
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
+    ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
@@ -195,6 +201,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   }, localAgentIds);
   const snapshot: AppSnapshot = {
     ...seed,
+    ...(value.clientPreferences ? { clientPreferences: sanitizeClientPreferences(value.clientPreferences) } : {}),
     teams: teams.length > 0 ? teams : seed.teams,
     agents,
     automations: persistedAutomations
@@ -382,6 +389,7 @@ function sanitizeAgent(value: unknown): Agent | null {
     ...(openInApplication ? { openInApplication } : {}),
     ...(contextUsage ? { contextUsage } : {}),
     ...(plan ? { plan } : {}),
+    ...(isPlanReview(value.planReview) ? { planReview: { ...value.planReview } } : {}),
     ...(goal ? { goal } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },

@@ -182,6 +182,7 @@ const props = defineProps<{
   agentSidebarCollapsed: boolean;
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
+  respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
   currentAgent: Agent | null;
@@ -363,8 +364,7 @@ function closeExecutionPlan(): void {
 }
 
 function cancelPlanReview(agentId: string): void {
-  emit('update:planMode', false);
-  closeRightWorkspaceTab.value(agentId, 'plan');
+  if (agentId === currentAgent.value?.id) void props.respondToPlanReview?.('cancel');
 }
 
 function commentOnPlan(comments: PlanReviewComment[]): void {
@@ -372,7 +372,7 @@ function commentOnPlan(comments: PlanReviewComment[]): void {
     return;
   }
 
-  emit('sendPrompt', formatPlanCommentPrompt(comments));
+  void props.respondToPlanReview?.('revise', formatPlanCommentPrompt(comments));
 }
 
 function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {

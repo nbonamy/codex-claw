@@ -38,7 +38,7 @@ for it and should not reimplement SDK conversation state.
 `restartAgentConversation` requires an idle agent, clears all runtime state
 (including `backendSession`), and returns the agent to idle
 ([core/src/agent-manager.ts](../../core/src/agent-manager.ts#L476-L486)). The
-backend then invokes only `driverSessionForget`
+backend then invokes only `driverConversationRelease`
 ([backend/src/server.ts](../../backend/src/server.ts#L825-L831)). For Codex,
 forgetting unsubscribes the adapter and calls SDK `forgetConversation`; it does
 not call archive

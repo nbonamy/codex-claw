@@ -8,7 +8,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppCommand, CodexClawApi, SidePanelRequest } from '@codex-claw/core/contracts';
+import type { AppCommand, CodexClawApi } from '@codex-claw/core/contracts';
 import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
@@ -271,8 +271,10 @@ describe('AppShell workspace and plans', () => {
       },
       updatedAt: '2026-06-05T00:00:00.000Z',
     };
-    const openAgentGitDiff = vi.fn(async (_agentId: string, target?: object) => {
+    let resolveDiff!: (diff: import('@codex-claw/core/contracts').AgentGitDiff) => void;
+    const getAgentGitDiff = vi.fn((_agentId: string, target?: object) => {
       structuredClone(target);
+      return new Promise<import('@codex-claw/core/contracts').AgentGitDiff>((resolve) => { resolveDiff = resolve; });
     });
     const wrapper = mount(AppShell, {
       props: {
@@ -280,7 +282,7 @@ describe('AppShell workspace and plans', () => {
         activeAgent: snapshot.agents[0],
         isLoading: false,
         isSending: false,
-        openAgentGitDiff,
+        getAgentGitDiff,
       },
       global: {
         plugins: [ElementPlus, i18n],
@@ -289,19 +291,11 @@ describe('AppShell workspace and plans', () => {
 
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
-    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'branch', baseRef: 'origin/main' });
+    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'branch', baseRef: 'origin/main' });
     expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Review');
     expect(wrapper.get('.git-diff-preview-panel').attributes('aria-busy')).toBe('true');
 
-    const setShellProps = wrapper.setProps.bind(wrapper) as unknown as (props: {
-      sidePanelRequest: SidePanelRequest;
-    }) => Promise<void>;
-    await setShellProps({
-      sidePanelRequest: {
-        kind: 'gitDiff',
-        scope: 'workingTree',
-        title: 'Git Diff',
-        subtitle: '/Users/nbonamy/src/id8',
+    resolveDiff({
         target: { type: 'branch', baseRef: 'origin/main' },
         summary: { addedLines: 45, removedLines: 23, changedFiles: 1 },
         sections: [],
@@ -313,9 +307,8 @@ describe('AppShell workspace and plans', () => {
           '-const oldValue = 1;',
           '+const newValue = 2;',
         ].join('\n'),
-      },
     });
-    await nextTick();
+    await flushPromises();
 
     expect(wrapper.text()).toContain('src/main.ts');
     expect(wrapper.text()).toContain('newValue');
@@ -683,14 +676,14 @@ describe('AppShell workspace and plans', () => {
 
   it('falls back to the current git review for edit links without turn context', async () => {
     const snapshot = createInitialSnapshot();
-    const openAgentGitDiff = vi.fn().mockResolvedValue(undefined);
+    const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
         isLoading: false,
         isSending: false,
-        openAgentGitDiff,
+        getAgentGitDiff,
       },
       global: { plugins: [ElementPlus, i18n] },
     });
@@ -703,7 +696,7 @@ describe('AppShell workspace and plans', () => {
     });
     await flushPromises();
 
-    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina');
+    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina');
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Review');
   });
 
@@ -1084,6 +1077,7 @@ describe('AppShell workspace and plans', () => {
   });
 
   it('confirms a plan by exiting plan mode and sending the implementation prompt', async () => {
+    const respondToPlanReview = vi.fn().mockResolvedValue(undefined);
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
       props: {
@@ -1092,6 +1086,7 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
         planMode: true,
+        respondToPlanReview,
         sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
@@ -1107,13 +1102,32 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Plan');
     await wrapper.get('button.plan-review-footer__button--primary').trigger('click');
 
+    await flushPromises();
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
-    expect(wrapper.emitted('sendPrompt')).toStrictEqual([['implement the plan']]);
+    expect(respondToPlanReview).toHaveBeenCalledWith('accept', undefined);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
     expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).not.toContain('Plan');
   });
 
+  it('dismisses review when another client resolves the persisted proposal', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.planReview = { id: 'review-1', conversationId: null, turnId: 'turn-1', markdown: '# Plan', status: 'pending' };
+    const wrapper = mount(AppShell, { props: {
+      snapshot, activeAgent: snapshot.agents[0], isLoading: false, isSending: false,
+      sidePanelRequest: { kind: 'markdown', purpose: 'plan', title: 'Plan', content: '# Plan' },
+    }, global: { plugins: [ElementPlus, i18n] } });
+    expect(wrapper.find('.plan-review-footer').exists()).toBe(true);
+    const resolved = structuredClone(snapshot);
+    resolved.agents[0]!.planReview!.status = 'cancel';
+    await wrapper.setProps({ snapshot: resolved, activeAgent: resolved.agents[0] });
+    await flushPromises();
+    expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+  });
+
   it('cancels a plan by exiting plan mode and closing the preview', async () => {
+    const respondToPlanReview = vi.fn().mockResolvedValue(undefined);
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
       props: {
@@ -1122,6 +1136,7 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
         planMode: true,
+        respondToPlanReview,
         sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
@@ -1137,12 +1152,14 @@ describe('AppShell workspace and plans', () => {
     const cancel = wrapper.findAll('.plan-review-footer__button').find((button) => button.text() === 'Cancel');
     await cancel?.trigger('click');
 
+    await flushPromises();
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).not.toContain('Plan');
   });
 
   it('sends saved plan comments as a refinement prompt', async () => {
+    const respondToPlanReview = vi.fn().mockResolvedValue(undefined);
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
       props: {
@@ -1151,6 +1168,7 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
         planMode: true,
+        respondToPlanReview,
         sidePanelRequest: {
           kind: 'markdown',
           purpose: 'plan',
@@ -1171,10 +1189,12 @@ describe('AppShell workspace and plans', () => {
       },
     ]);
 
-    expect(wrapper.emitted('sendPrompt')).toStrictEqual([[
+    await flushPromises();
+    expect(respondToPlanReview).toHaveBeenCalledWith('revise',
       'Refine the plan using these comments:\n\n1. On: "Build it"\n   Comment: Split this into smaller steps.',
-    ]]);
-    expect(wrapper.emitted('update:planMode')).toBeUndefined();
+    );
+    await flushPromises();
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[true]]);
   });
 
   it('shows the plan preview updating overlay while a plan progress tool is running', () => {

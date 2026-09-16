@@ -173,36 +173,48 @@ export const conversationPayloadValidators = {
     expectRecord(value, path);
     expectStringArray(value.ids, `${path}.ids`);
   },
-  'diff.updated': expectGitDiff,
-  'file.activity': expectFileActivity,
+  'conversation.turnDiffUpdated': expectGitDiff,
+  'workspace.fileActivityDetected': expectFileActivity,
   'git.statusUpdated': (value, path) =>
     expectKnownShape(value, path, isAgentGitStatus, 'agent git status'),
-  'backendApproval.requested': (value, path) => {
+  'agentRequest.created': (value, path) => {
     expectRecord(value, path);
-    expectBackendApproval(value.approval, `${path}.approval`);
+    const request = value.request;
+    expectRecord(request, `${path}.request`);
+    expectString(request.id, `${path}.request.id`);
+    expectString(request.conversationId, `${path}.request.conversationId`);
+    expectOptional(request, 'turnId', `${path}.request`, expectString);
+    expectOptional(request, 'itemId', `${path}.request`, expectString);
+    expectLiteral(request.kind, ['approval', 'question', 'toolConfirmation'], `${path}.request.kind`);
+    if (request.kind === 'approval') expectBackendApproval(request.approval, `${path}.request.approval`);
+    if (request.kind === 'question') {
+      expectRecord(request.question, `${path}.request.question`);
+      expectString(request.question.itemId, `${path}.request.question.itemId`);
+      expectLiteral(request.question.delivery, ['tool', 'async'], `${path}.request.question.delivery`);
+      expectBoolean(request.question.blocking, `${path}.request.question.blocking`);
+      expectArray(request.question.questions, `${path}.request.question.questions`, (question, questionPath) => {
+        expectRecord(question, questionPath);
+        ['id', 'header', 'question'].forEach((key) => expectString(question[key], `${questionPath}.${key}`));
+      });
+    }
+    if (request.kind === 'toolConfirmation') {
+      expectRecord(request.confirmation, `${path}.request.confirmation`);
+      ['argumentsPreview', 'integrationId', 'integrationName', 'summary', 'toolName'].forEach((key) => expectString((request.confirmation as Record<string, unknown>)[key], `${path}.request.confirmation.${key}`));
+    }
   },
-  'backendApproval.resolved': (value, path) => {
+  'agentRequest.resolved': (value, path) => {
     expectRecord(value, path);
-    expectBackendApproval(value.approval, `${path}.approval`);
-    expectNullable(
-      value.decision,
-      `${path}.decision`,
-      (candidate, candidatePath) =>
-        expectLiteral(candidate, ['approve', 'deny'], candidatePath),
-    );
-    expectNullable(value.scope, `${path}.scope`, (candidate, candidatePath) =>
-      expectLiteral(candidate, ['once', 'session'], candidatePath),
-    );
-    expectLiteral(
-      value.reason,
-      [
-        'host',
-        'server',
-        'conversation_closed',
-        'conversation_removed',
-        'surface_disconnected',
-      ],
-      `${path}.reason`,
-    );
+    expectString(value.id, `${path}.id`);
+    expectRecord(value.outcome, `${path}.outcome`);
+    expectLiteral(value.outcome.kind, ['answered', 'decision', 'cancelled', 'completed'], `${path}.outcome.kind`);
+    if (value.outcome.kind === 'decision') expectLiteral(value.outcome.decision, ['allow', 'allow_conversation', 'always_allow', 'deny'], `${path}.outcome.decision`);
+    if (value.outcome.kind === 'answered') {
+      expectRecord(value.outcome.answers, `${path}.outcome.answers`);
+      for (const [id, answer] of Object.entries(value.outcome.answers)) {
+        expectRecord(answer, `${path}.outcome.answers.${id}`);
+        expectStringArray(answer.answers, `${path}.outcome.answers.${id}.answers`);
+      }
+    }
+    expectOptional(value.outcome, 'reason', `${path}.outcome`, expectString);
   },
 } satisfies Record<string, EventValueValidator>;

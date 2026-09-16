@@ -1,6 +1,7 @@
 import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
 import { spokenAnnouncementVoices } from './contracts';
+import { isPlanReview } from './plan-review';
 import {
   isSubagentActivityKind,
   isSubagentOperationKind,
@@ -37,6 +38,8 @@ export function isSnapshotMetadata(value: unknown): value is Record<string, unkn
     isNullableString(value.activeAgentId) &&
     optional(value, 'queuedPrompts', (candidate) => isArrayOf(candidate, isQueuedPrompt)) &&
     isRecordMapOf(value.backendApprovals, (candidate) => isArrayOf(candidate, isBackendApprovalRequest)) &&
+    optional(value, 'agentRequests', (candidate) => isRecordMapOf(candidate, (requests) => isArrayOf(requests, isAgentRequest))) &&
+    optional(value, 'clientPreferences', (candidate) => isRecordMapOf(candidate, isClientPreferences)) &&
     isRecordMapOf(value.agentGitStatuses, isAgentGitStatus) &&
     isRecordMapOf(value.turnGitDiffs, isTurnGitDiff) &&
     isRecordMapOf(value.subagentTrees, isSubagentTree) &&
@@ -47,6 +50,31 @@ export function isSnapshotMetadata(value: unknown): value is Record<string, unkn
     isGeneralSettings(value.general) &&
     isSourceFolder(value.sourceFolder) &&
     isTheme(value.theme);
+}
+
+function isAgentRequest(value: unknown): boolean {
+  if (!isRecord(value) || !isString(value.id) || !isString(value.conversationId)
+    || !optional(value, 'turnId', isString) || !optional(value, 'itemId', isString)) return false;
+  if (value.kind === 'approval') return isBackendApprovalRequest(value.approval);
+  if (value.kind === 'toolConfirmation') {
+    const confirmation = value.confirmation;
+    return isRecord(confirmation)
+      && ['argumentsPreview', 'integrationId', 'integrationName', 'summary', 'toolName'].every((key) => isString(confirmation[key]));
+  }
+  return value.kind === 'question' && isRecord(value.question)
+    && isString(value.question.itemId) && ['tool', 'async'].includes(value.question.delivery as string)
+    && isBoolean(value.question.blocking) && isArrayOf(value.question.questions, (question) => isRecord(question)
+      && ['id', 'header', 'question'].every((key) => isString(question[key])));
+}
+
+function isClientPreferences(value: unknown): boolean {
+  return isRecord(value)
+    && optional(value, 'activeAgentId', isNullableString) && optional(value, 'activeTeamId', isNullableString)
+    && optional(value, 'activeAgentByTeam', (candidate) => isRecordMapOf(candidate, isString))
+    && optional(value, 'teamOrder', (candidate) => isArrayOf(candidate, isString))
+    && optional(value, 'agentOrderByTeam', (candidate) => isRecordMapOf(candidate, (ids) => isArrayOf(ids, isString)))
+    && optional(value, 'externalApplications', (candidate) => isRecordMapOf(candidate, isString))
+    && optional(value, 'general', isRecord) && optional(value, 'theme', isRecord);
 }
 
 function isTeam(value: unknown): boolean {
@@ -79,6 +107,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'openInApplication', isOpenInApplication) &&
     optional(value, 'contextUsage', isAgentContextUsage) &&
     optional(value, 'plan', isThreadPlan) &&
+    optional(value, 'planReview', isPlanReview) &&
     optional(value, 'goal', isThreadGoal) &&
     optional(value, 'isRegistered', isBoolean) &&
     optional(value, 'mcpSessionId', isString) &&
@@ -301,6 +330,7 @@ function isBackendCapabilities(value: unknown): boolean {
     optional(value, 'interrupt', isBoolean) &&
     optional(value, 'history', isBoolean) &&
     optional(value, 'conversationFork', isBoolean) &&
+    ['planReview', 'questions', 'plugins', 'conversationArchive', 'conversationResume', 'conversationReplaceWithSummary', 'remoteControl'].every((key) => optional(value, key, isBoolean)) &&
     optional(value, 'deleteTurn', isBoolean) &&
     optional(value, 'editTurn', isBoolean) &&
     optional(value, 'retryTurn', isBoolean) &&

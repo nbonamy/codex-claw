@@ -67,7 +67,7 @@
       >
         <div class="agent-dialog__stacked-controls">
           <div class="claw-form-dialog__control">
-            <el-select id="agent-dialog-team" v-model="teamSelection">
+            <el-select id="agent-dialog-team" v-model="clientNavigationSelectTeamion">
               <el-option
                 v-for="team in teams"
                 :key="team.id"
@@ -81,7 +81,7 @@
             </el-select>
           </div>
           <div
-            v-if="teamSelection === newTeamOptionId"
+            v-if="clientNavigationSelectTeamion === newTeamOptionId"
             class="claw-form-dialog__control claw-form-dialog__input-control"
           >
             <input
@@ -242,7 +242,7 @@ const emit = defineEmits<{
 const name = ref('');
 const folder = ref('');
 const backend = ref<AgentBackend>('codex');
-const teamSelection = ref('');
+const clientNavigationSelectTeamion = ref('');
 const newTeamName = ref('');
 const errorMessage = ref<string | null>(null);
 const choosingFolder = ref(false);
@@ -269,10 +269,10 @@ const title = computed(() => isEditing.value ? translate('surface.agentDialog.ed
 const submitLabel = computed(() => isEditing.value ? translate('surface.agentDialog.save') : translate('surface.agentDialog.createAgent'));
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
-const selectedTeam = computed(() => teams.value.find((team) => team.id === teamSelection.value) ?? null);
+const selectedTeam = computed(() => teams.value.find((team) => team.id === clientNavigationSelectTeamion.value) ?? null);
 const selectedRemoteConnectionId = computed(() => {
   if (showTeamSelector.value) {
-    return teamSelection.value === newTeamOptionId
+    return clientNavigationSelectTeamion.value === newTeamOptionId
       ? ''
       : selectedTeam.value?.remoteConnectionId ?? '';
   }
@@ -335,7 +335,7 @@ const namePlaceholder = computed(() => {
 const customFolderOptionLabel = computed(() => folder.value && !selectedSourceRepository.value ? translate('surface.agentDialog.customFolder') : translate('surface.agentDialog.chooseFolder'));
 const teamCanSave = computed(() => (
   !showTeamSelector.value ||
-  (teamSelection.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : teamSelection.value.trim().length > 0)
+  (clientNavigationSelectTeamion.value === newTeamOptionId ? newTeamName.value.trim().length > 0 : clientNavigationSelectTeamion.value.trim().length > 0)
 ));
 const canSave = computed(() => (
   !submitting.value &&
@@ -583,10 +583,10 @@ async function submit(): Promise<void> {
         backend: backend.value,
       };
       if (showTeamSelector.value) {
-        if (teamSelection.value === newTeamOptionId) {
+        if (clientNavigationSelectTeamion.value === newTeamOptionId) {
           createInput.newTeamName = newTeamName.value;
         } else {
-          createInput.teamId = teamSelection.value;
+          createInput.teamId = clientNavigationSelectTeamion.value;
         }
       }
       const repository = selectedSourceRepository.value;
@@ -647,7 +647,7 @@ function resetForm(): void {
   name.value = props.initialAgentName.trim();
   folder.value = '';
   backend.value = 'codex';
-  teamSelection.value = initialTeamSelection();
+  clientNavigationSelectTeamion.value = initialTeamSelection();
   newTeamName.value = props.initialNewTeamName;
   selectedSourceRepositoryPath.value = '';
   selectedSourceWorktreePath.value = '';

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
@@ -24,7 +23,7 @@ describe('ClawBackendServer', () => {
     };
     const remoteClients = { closeConnection: vi.fn() };
     const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never, remoteClients: remoteClients as never });
-    const result = await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'connections/sync', params: { connectionId: connection.id, inspectOnly: true } });
+    const result = await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'connections/runtime/inspect', params: { connectionId: connection.id } });
     expect(result).toMatchObject({ result: { remoteConnections: { connections: [expect.objectContaining({ codexVersion: '0.143.0' })] } } });
     expect(remoteClients.closeConnection).not.toHaveBeenCalled();
     expect(sshConnections.checkConnection).not.toHaveBeenCalled();
@@ -148,7 +147,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'check-connection',
-      method: 'connections/sync',
+      method: 'connections/runtime/sync',
       params: { connectionId: 'connection-devbox' },
     })).resolves.toMatchObject({
       result: {
@@ -168,7 +167,7 @@ describe('ClawBackendServer', () => {
         status: 'ready',
       }),
       'workProvider/connections/reload',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
 
@@ -300,12 +299,12 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'team/create',
-      {
+      { ...{
         input: {
           name: 'Remote Core',
           color: '#46A857',
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.teams[1]).toMatchObject({
@@ -372,13 +371,13 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'agent/create',
-      {
+      { ...{
         input: {
           name: 'Dina',
           folder: '/home/mnmt/src/codex-claw',
           teamId: 'team-remote',
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.agents).toStrictEqual([]);
@@ -422,7 +421,7 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'list-quick-chat-files',
       method: 'agent/files/list',
-      params: { agentId: snapshot.activeAgentId },
+      params: { agentId: snapshot.agents.at(-1)!.id },
     })).rejects.toThrow('This session does not have a project workspace.');
   });
 
@@ -486,18 +485,18 @@ describe('ClawBackendServer', () => {
       1,
       snapshot.remoteConnections.connections[0],
       'snapshot/get',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       2,
       snapshot.remoteConnections.connections[0],
       'agent/prompt/send',
-      {
+      { ...{
         agentId: 'agent-remote',
         prompt: 'hello',
         options: undefined,
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.agents).toStrictEqual([]);
@@ -538,7 +537,7 @@ describe('ClawBackendServer', () => {
             },
           };
         }
-        if (method === 'agent/select') return malformedFullSnapshot;
+        if (method === 'client/navigation/selectAgent') return malformedFullSnapshot;
         if (method === 'agent/prompt/send') {
           onEvent?.({
             seq: 1,
@@ -579,7 +578,7 @@ describe('ClawBackendServer', () => {
     const selection = await server.handleMessage({
       jsonrpc: '2.0',
       id: 'select',
-      method: 'agent/select',
+      method: 'client/navigation/selectAgent',
       params: { agentId: remoteAgent.id },
     });
     const prompt = await server.handleMessage({
@@ -704,21 +703,21 @@ describe('ClawBackendServer', () => {
       1,
       snapshot.remoteConnections.connections[0],
       'snapshot/get',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       2,
       snapshot.remoteConnections.connections[0],
       'agent/workItem/assign',
-      { agentId: remoteAgent.id, item: sanitizedItem },
+      { ...{ agentId: remoteAgent.id, item: sanitizedItem }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       3,
       snapshot.remoteConnections.connections[0],
       'agent/workItem/assignment/delete',
-      { item: sanitizedItem },
+      { ...{ item: sanitizedItem }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.workBacklog.assignments).toStrictEqual({});
@@ -788,28 +787,28 @@ describe('ClawBackendServer', () => {
       1,
       snapshot.remoteConnections.connections[0],
       'snapshot/get',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       2,
       snapshot.remoteConnections.connections[0],
       'agent/turn/delete',
-      { agentId: 'agent-remote', turnId: 'turn-1' },
+      { ...{ agentId: 'agent-remote', turnId: 'turn-1' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       3,
       snapshot.remoteConnections.connections[0],
       'agent/turn/edit',
-      { agentId: 'agent-remote', turnId: 'turn-1', content: 'edited prompt' },
+      { ...{ agentId: 'agent-remote', turnId: 'turn-1', content: 'edited prompt' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
       4,
       snapshot.remoteConnections.connections[0],
       'agent/turn/retry',
-      { agentId: 'agent-remote', turnId: 'turn-1' },
+      { ...{ agentId: 'agent-remote', turnId: 'turn-1' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
   });

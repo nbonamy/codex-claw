@@ -104,7 +104,7 @@ describe('stdio JSON-RPC transport', () => {
       },
     });
 
-    input.write('{"jsonrpc":"2.0","id":"select-1","method":"agent/select"}\n');
+    input.write('{"jsonrpc":"2.0","id":"select-1","method":"client/navigation/selectAgent"}\n');
     await Promise.resolve();
     stop();
 
@@ -302,7 +302,7 @@ describe('stdio JSON-RPC transport', () => {
     });
     peer.start();
 
-    input.write('{"jsonrpc":"2.0","id":"hydrate-1","method":"agent/history/hydrate"}\n');
+    input.write('{"jsonrpc":"2.0","id":"hydrate-1","method":"agent/conversation/load"}\n');
     await Promise.resolve();
 
     expect(onOutputOverflow).toHaveBeenCalledWith({
@@ -310,7 +310,7 @@ describe('stdio JSON-RPC transport', () => {
       frameBytes: expect.any(Number),
       id: 'hydrate-1',
       kind: 'response',
-      method: 'agent/history/hydrate',
+      method: 'agent/conversation/load',
     });
     peer.stop();
   });

@@ -5,7 +5,7 @@ const SESSION_COMPRESSION_REQUEST_TIMEOUT_MS = 10 * 60_000;
 const longRunningRequestMethods = new Set<string>([
   backendMethods.codexAuthenticationGet,
   backendMethods.codexChatGptDeviceCodeLoginStart,
-  backendMethods.codexChatGptLoginCancel,
+  backendMethods.codexLoginCancel,
   backendMethods.snapshotGet,
   backendMethods.clientStateGet,
   backendMethods.agentModelsList,
@@ -19,20 +19,20 @@ const longRunningRequestMethods = new Set<string>([
   backendMethods.agentGitMessageGenerate,
   backendMethods.agentGitMerge,
   backendMethods.agentGitPullRequestCreate,
-  backendMethods.agentHistoryHydrate,
-  backendMethods.agentHistoryLoadOlder,
-  backendMethods.agentSelect,
-  backendMethods.teamSelect,
+  backendMethods.agentConversationLoad,
+  backendMethods.agentConversationHistoryLoadOlder,
+  backendMethods.clientNavigationSelectAgent,
+  backendMethods.clientNavigationSelectTeam,
   backendMethods.agentTurnDelete,
   backendMethods.agentTurnEdit,
   backendMethods.agentTurnRetry,
 ]);
 
 export function backendRequestTimeoutMs(method: string, defaultTimeoutMs: number): number {
-  if (method === backendMethods.connectionsSync || method === backendMethods.connectionsSshCreate) {
+  if (method === backendMethods.connectionsRuntimeSync || method === backendMethods.connectionsRuntimeInspect || method === backendMethods.connectionsSshCreate) {
     return Math.max(defaultTimeoutMs, SESSION_COMPRESSION_REQUEST_TIMEOUT_MS);
   }
-  if (method === backendMethods.agentSessionCompress) {
+  if (method === backendMethods.agentConversationReplaceWithSummary) {
     return Math.max(defaultTimeoutMs, SESSION_COMPRESSION_REQUEST_TIMEOUT_MS);
   }
   return longRunningRequestMethods.has(method)

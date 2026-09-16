@@ -1,14 +1,12 @@
+import { approvalAgentRequest } from '@codex-claw/core/agent-request';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { nextTick, reactive } from 'vue';
+import { nextTick } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
-import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
+import type { AppSnapshot, BackendApprovalRequest, CodexClawApi, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { clearConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
-import { configureClawClient } from '../platform-api';
-import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { deferred } from './app-state-test-harness';
 
 describe('useAppState', () => {
@@ -88,11 +86,11 @@ describe('useAppState', () => {
         lastBackendEventSeq: 0,
         connection: { status: 'connected' as const },
       });
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(remoteSnapshot);
+    const loadConversationHistory = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshotState,
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
@@ -119,7 +117,7 @@ describe('useAppState', () => {
     });
 
     await vi.waitFor(() => expect(state.activeAgent.value?.id).toBe('agent-dina'));
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledWith('agent-dina'));
     expect(getSnapshotState).toHaveBeenCalledTimes(2);
     expect(state.connectionState.value).toStrictEqual({ status: 'connected' });
   });
@@ -153,8 +151,8 @@ describe('useAppState', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-dina',
-      type: 'backendApproval.requested',
-      payload: { approval },
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest(approval) },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     snapshotLoad.resolve(createInitialSnapshot());
@@ -333,13 +331,13 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-persisted' };
     const hydration = deferred<AppSnapshot>();
-    const hydrateAgentHistory = vi.fn().mockReturnValue(hydration.promise);
+    const loadConversationHistory = vi.fn().mockReturnValue(hydration.promise);
     const selectAgent = vi.fn();
     const onEvent = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         selectAgent,
         onEvent,
       } satisfies Partial<CodexClawApi>,
@@ -348,7 +346,7 @@ describe('useAppState', () => {
     const state = useAppState();
     const loading = state.loadSnapshot();
 
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledWith('agent-dina'));
 
     expect(onEvent).toHaveBeenCalledOnce();
     expect(selectAgent).not.toHaveBeenCalled();
@@ -368,11 +366,11 @@ describe('useAppState', () => {
     cachedSnapshot.agents[0].status = { type: 'working' };
     const reconciledSnapshot = structuredClone(cachedSnapshot);
     reconciledSnapshot.agents[0].status = { type: 'idle' };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(reconciledSnapshot);
+    const loadConversationHistory = vi.fn().mockResolvedValue(reconciledSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(cachedSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -380,7 +378,7 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    await vi.waitFor(() => expect(hydrateAgentHistory).toHaveBeenCalledWith('agent-dina'));
+    await vi.waitFor(() => expect(loadConversationHistory).toHaveBeenCalledWith('agent-dina'));
     await vi.waitFor(() => expect(state.activeAgent.value?.status).toStrictEqual({ type: 'idle' }));
     expect(state.isSending.value).toBe(false);
   });
@@ -405,11 +403,11 @@ describe('useAppState', () => {
       model: 'claude-sonnet-5',
       reasoningEffort: 'xhigh',
     };
-    const hydrateAgentHistory = vi.fn().mockResolvedValue(hydratedSnapshot);
+    const loadConversationHistory = vi.fn().mockResolvedValue(hydratedSnapshot);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         listBackendModels: vi.fn().mockResolvedValue([
           { id: 'haiku', model: 'haiku', displayName: 'Haiku', isDefault: true },
           {
@@ -435,11 +433,11 @@ describe('useAppState', () => {
 
   it('does not hydrate startup history for agents without a persisted thread', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    const hydrateAgentHistory = vi.fn();
+    const loadConversationHistory = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -447,18 +445,18 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    expect(hydrateAgentHistory).not.toHaveBeenCalled();
+    expect(loadConversationHistory).not.toHaveBeenCalled();
     expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
   it('does not hydrate startup history when no active agent is selected', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.activeAgentId = null;
-    const hydrateAgentHistory = vi.fn();
+    const loadConversationHistory = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
-        hydrateAgentHistory,
+        loadConversationHistory,
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -466,7 +464,7 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    expect(hydrateAgentHistory).not.toHaveBeenCalled();
+    expect(loadConversationHistory).not.toHaveBeenCalled();
     expect(state.activeAgent.value).toBeNull();
   });
 

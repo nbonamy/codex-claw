@@ -52,7 +52,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'reorder-team',
-      method: 'team/reorder',
+      method: 'client/teamOrder/update',
       params: { input: { teamId, beforeTeamId: 'team-test' } },
     })).resolves.toMatchObject({
       result: {
@@ -62,7 +62,7 @@ describe('ClawBackendServer', () => {
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'select-team',
-      method: 'team/select',
+      method: 'client/navigation/selectTeam',
       params: { teamId: 'team-test' },
     })).resolves.toMatchObject({
       result: {
@@ -80,8 +80,8 @@ describe('ClawBackendServer', () => {
       },
     });
 
-    expect(saveSnapshot).toHaveBeenCalledTimes(5);
-    expect(events).toHaveLength(5);
+    expect(saveSnapshot).toHaveBeenCalledTimes(6);
+    expect(events).toHaveLength(3);
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'snapshot.updated' }),
     ]));
@@ -110,16 +110,16 @@ describe('ClawBackendServer', () => {
       agentIds: [],
     });
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
-    const forgetAgentSession = vi.fn();
+    const releaseConversation = vi.fn();
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: agent.backendSession }),
       interrupt: async () => ({ backendSession: agent.backendSession }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       archiveAgentConversation,
-      forgetAgentSession,
+      releaseConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -142,7 +142,7 @@ describe('ClawBackendServer', () => {
     });
 
     expect(archiveAgentConversation).toHaveBeenCalledWith(agent);
-    expect(forgetAgentSession).toHaveBeenCalledWith(agent.id);
+    expect(releaseConversation).toHaveBeenCalledWith(agent.id);
     await server.close();
   });
 
@@ -226,12 +226,12 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'team/create',
-      {
+      { ...{
         input: {
           name: 'Remote Core',
           color: '#46A857',
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.teams[0]).toMatchObject({
@@ -291,13 +291,13 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'snapshot/get',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).not.toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'team/create',
-      expect.anything(),
+      { ...expect.anything(), _clientId: 'remote-controller' },
       expect.any(Function),
     );
   });
@@ -346,7 +346,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'snapshot/get',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.teams[0]).toMatchObject({
@@ -390,7 +390,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'team/delete',
-      { teamId: 'team-remote' },
+      { ...{ teamId: 'team-remote' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.teams).toHaveLength(1);

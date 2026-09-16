@@ -25,7 +25,7 @@ export type WorkspacePreviewOptions = {
   closeTab: (agentId: string, tab: RightWorkspaceTab) => void;
   currentAgent: () => Agent | null;
   getSnapshot: () => AppSnapshot;
-  openAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<void>;
+  getAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
   openTab: (tab: RightWorkspaceTab, agentId?: string) => void;
   previewAgentFile: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   workspaceFor: (agentId: string) => AgentRightWorkspaceState;
@@ -35,6 +35,7 @@ export type WorkspacePreviewOptions = {
 export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
   let filePreviewRequestId = 0;
   let markdownPreviewId = 0;
+  const gitDiffRequestIds = new Map<string, number>();
 
   async function openConversationFile(link: ConversationFileLink): Promise<void> {
     const agent = options.currentAgent();
@@ -167,11 +168,21 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
     if (!agent?.folder) return;
 
     const workspace = options.workspaceFor(agent.id);
+    const requestId = (gitDiffRequestIds.get(agent.id) ?? 0) + 1;
+    gitDiffRequestIds.set(agent.id, requestId);
     workspace.gitReviewPanel = gitReviewPanel(agent.folder, 'loading', null, target);
     options.openTab('review', agent.id);
     try {
-      await options.openAgentGitDiff(agent.id, target);
+      const result = await options.getAgentGitDiff(agent.id, target);
+      if (gitDiffRequestIds.get(agent.id) !== requestId) return;
+      workspace.gitReviewPanel = {
+        ...gitReviewPanel(agent.folder, 'idle', null, result.target),
+        diff: result.diff,
+        summary: result.summary,
+        sections: result.sections,
+      };
     } catch (error) {
+      if (gitDiffRequestIds.get(agent.id) !== requestId) return;
       workspace.gitReviewPanel = gitReviewPanel(
         agent.folder,
         'error',
@@ -265,7 +276,7 @@ export function fileBasename(filePath: string): string {
 
 function gitReviewPanel(
   folder: string,
-  state: 'loading' | 'error',
+  state: 'idle' | 'loading' | 'error',
   error: string | null,
   target?: import('@codex-claw/core/contracts').AgentGitDiffTarget,
 ): SidePanelGitDiffState {

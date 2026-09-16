@@ -119,7 +119,7 @@ describe('AgentConversationService', () => {
   it('hydrates the session, refreshes workspace metadata, and synchronizes a generated title', async () => {
     const { agent, driverRequest, persistSnapshot, refreshGitStatus, refreshWorkspaceIdentity, service } = createService();
     driverRequest.mockImplementation(async (_agent, method) => (
-      method === backendMethods.driverHistoryHydrate
+      method === backendMethods.driverConversationLoad
         ? { kind: 'codex', threadId: 'thread-hydrated' }
         : undefined
     ));
@@ -154,8 +154,9 @@ describe('AgentConversationService', () => {
       expect(driverRequest).toHaveBeenCalledTimes(2);
       expect(events).toContainEqual({
         agentId: agent.id,
-        type: 'thread.historyHydrationFailed',
-        payload: {},
+        type: 'conversation.historyLoadFailed',
+        conversationId: 'thread-root',
+        payload: { error: 'Unable to load conversation history.' },
       });
       expect(JSON.stringify(events)).not.toContain('active writer');
     } finally {
@@ -181,8 +182,9 @@ describe('AgentConversationService', () => {
       expect(driverRequest).toHaveBeenCalledTimes(2);
       expect(events).not.toContainEqual({
         agentId: agent.id,
-        type: 'thread.historyHydrationFailed',
-        payload: {},
+        type: 'conversation.historyLoadFailed',
+        conversationId: 'thread-root',
+        payload: { error: 'Unable to load conversation history.' },
       });
     } finally {
       vi.useRealTimers();
@@ -198,8 +200,9 @@ describe('AgentConversationService', () => {
     expect(driverRequest).toHaveBeenCalledOnce();
     expect(events).toContainEqual({
       agentId: agent.id,
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      conversationId: 'thread-root',
+      payload: { error: 'Unable to load conversation history.' },
     });
   });
 });

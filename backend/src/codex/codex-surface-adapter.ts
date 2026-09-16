@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -20,12 +21,10 @@ import type {
   RendererToolPart,
   PairedDevice,
   SendPromptOptions,
-  CodexAuthentication,
-  CodexThreadSettings,
-  SubagentActivityChange,
+  CodexAuthentication, SubagentActivityChange,
   SubagentIdentityChange,
   SubagentOperationChange,
-  SubagentStatusChange,
+  SubagentStatusChange
 } from '@codex-claw/core/contracts';
 import type { BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -56,7 +55,7 @@ import {
 
 type AdapterListener = (event: BackendEvent) => void;
 type ThreadBackendEvent<Event extends BackendEvent = BackendEvent> = Event extends BackendEvent
-  ? Omit<Event, 'agentId' | 'backend' | 'threadId'>
+  ? Omit<Event, 'agentId' | 'backend' | 'threadId' | 'conversationId'>
   : never;
 
 const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
@@ -132,7 +131,7 @@ export class CodexSurfaceAgentAdapter {
     return authenticationFromSurface((await this.surface.logout()).authentication);
   }
 
-  async getDevicePairingStatus(): Promise<DevicePairingStatus> {
+  async getRemoteControlStatus(): Promise<DevicePairingStatus> {
     const status = await this.surface.readRemoteControlStatus();
     const requirements = await this.surface.readConfigRequirements();
     return {
@@ -141,7 +140,7 @@ export class CodexSurfaceAgentAdapter {
     };
   }
 
-  async enableDevicePairing(): Promise<DevicePairingStatus> {
+  async enableRemoteControl(): Promise<DevicePairingStatus> {
     const status = await this.surface.enableRemoteControl();
     const requirements = await this.surface.readConfigRequirements();
     return {
@@ -150,7 +149,7 @@ export class CodexSurfaceAgentAdapter {
     };
   }
 
-  async disableDevicePairing(): Promise<DevicePairingStatus> {
+  async disableRemoteControl(): Promise<DevicePairingStatus> {
     const status = await this.surface.disableRemoteControl();
     const requirements = await this.surface.readConfigRequirements();
     return {
@@ -264,7 +263,7 @@ export class CodexSurfaceAgentAdapter {
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
-  async compressSession(agent: Agent) {
+  async replaceConversationWithSummary(agent: Agent) {
     const currentSession = await this.ensureSession(agent);
     const currentSnapshot = currentSession.handle.getSnapshot();
     if (currentSnapshot.activeTurnId || currentSnapshot.busy) {
@@ -361,7 +360,7 @@ export class CodexSurfaceAgentAdapter {
     return { threadId: session.handle.id, turnId };
   }
 
-  forgetAgentSession(agentId: string): void {
+  releaseConversation(agentId: string): void {
     const session = this.sessionsByAgentId.get(agentId);
     if (!session) return;
     session.unsubscribe();
@@ -561,7 +560,7 @@ export class CodexSurfaceAgentAdapter {
     };
   }
 
-  async hydrateAgent(agent: Agent): Promise<string | null> {
+  async loadConversation(agent: Agent): Promise<string | null> {
     const threadId = codexThreadId(agent);
     if (!threadId) return null;
     const existing = this.sessionsByAgentId.get(agent.id);
@@ -602,7 +601,12 @@ export class CodexSurfaceAgentAdapter {
   }
 
   async respondToClientRequest(response: ClientRequestResponse): Promise<void> {
-    const approvalOwner = this.approvalOwners.get(response.id);
+    const { agentId, ...nativeResponse } = response;
+    const owners = [...this.approvalOwners, ...this.clientRequestOwners]
+      .filter(([key, owner]) => key === JSON.stringify([owner.agent.id, response.id]) && (!agentId || owner.agent.id === agentId));
+    if (!agentId && new Set(owners.map(([, owner]) => owner.agent.id)).size > 1) throw new Error('Agent identity is required for this request.');
+    const key = agentId ? JSON.stringify([agentId, response.id]) : owners[0]?.[0];
+    const approvalOwner = key ? this.approvalOwners.get(key) : undefined;
     if (approvalOwner) {
       const allow = response.payload?.decision !== 'deny' && response.payload?.cancelled !== true;
       const scope = response.payload?.decision === 'allow_conversation' || response.payload?.decision === 'always_allow'
@@ -613,14 +617,15 @@ export class CodexSurfaceAgentAdapter {
       );
       return;
     }
-    const requestOwner = this.clientRequestOwners.get(response.id);
+    const requestOwner = key ? this.clientRequestOwners.get(key) : undefined;
     if (requestOwner) {
       await invokeCodexConversationBridgeOperation(
-        this.surface, requestOwner.handle.id, 'respondToClientRequest', [response],
+        this.surface, requestOwner.handle.id, 'respondToClientRequest', [nativeResponse],
       );
       return;
     }
-    await this.surface.respondToClientRequest(response);
+    if (agentId) throw new Error(`Agent request '${response.id}' is no longer pending for '${agentId}'.`);
+    await this.surface.respondToClientRequest(nativeResponse);
   }
 
   onEvent(listener: AdapterListener): () => void {
@@ -653,7 +658,7 @@ export class CodexSurfaceAgentAdapter {
       existing.agent = agent;
       return existing;
     }
-    if (existing) this.forgetAgentSession(agent.id);
+    if (existing) this.releaseConversation(agent.id);
     if (requestedThreadId) return this.bindAndLoad(agent, requestedThreadId);
 
     await this.start();
@@ -782,7 +787,7 @@ export class CodexSurfaceAgentAdapter {
       }
       return session;
     } catch (error) {
-      this.forgetAgentSession(agent.id);
+      this.releaseConversation(agent.id);
       throw error;
     }
   }
@@ -794,8 +799,8 @@ export class CodexSurfaceAgentAdapter {
     suppressEvents = false,
   ): AgentConversation {
     const otherAgentId = this.agentIdsByThreadId.get(threadId);
-    if (otherAgentId && otherAgentId !== agent.id) this.forgetAgentSession(otherAgentId);
-    this.forgetAgentSession(agent.id);
+    if (otherAgentId && otherAgentId !== agent.id) this.releaseConversation(otherAgentId);
+    this.releaseConversation(agent.id);
     const handle = this.surface.conversation(threadId);
     const session: AgentConversation = {
       agent,
@@ -814,7 +819,7 @@ export class CodexSurfaceAgentAdapter {
         this.handleConversationEvent(session, notification.event);
       });
     } catch (error) {
-      this.forgetAgentSession(agent.id);
+      this.releaseConversation(agent.id);
       throw error;
     }
     if (publishInitial) {
@@ -831,7 +836,7 @@ export class CodexSurfaceAgentAdapter {
     snapshot: CodexConversationSnapshot,
     options: { publishProviderSnapshot?: boolean; publishStatus?: boolean } = {},
   ): void {
-    this.emitThread(session, { type: 'thread.started', payload: { cwd: conversationCwd(snapshot) } });
+    this.emitThread(session, { type: 'agent.conversationAttached', payload: { cwd: conversationCwd(snapshot) } });
     this.emitSettings(
       session,
       snapshot.approvalPreset,
@@ -840,9 +845,9 @@ export class CodexSurfaceAgentAdapter {
       snapshot.selectedServiceTier,
       snapshot.planMode,
     );
-    if (snapshot.goal) this.emitThread(session, { type: 'thread.goalUpdated', payload: { goal: snapshot.goal } });
+    if (snapshot.goal) this.emitThread(session, { type: 'conversation.goalUpdated', payload: { goal: snapshot.goal } });
     if (snapshot.contextUsage) {
-      this.emitThread(session, { type: 'thread.tokenUsageUpdated', payload: { contextUsage: snapshot.contextUsage } });
+      this.emitThread(session, { type: 'conversation.contextUsageUpdated', payload: { contextUsage: snapshot.contextUsage } });
     }
     if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
     if (options.publishStatus !== false) this.emitStatus(session, statusFromSnapshot(snapshot));
@@ -871,10 +876,12 @@ export class CodexSurfaceAgentAdapter {
     snapshot: CodexConversationSnapshot,
   ): void {
     for (const request of snapshot.clientRequests) {
-      this.clientRequestOwners.set(request.id, session);
+      this.clientRequestOwners.set(JSON.stringify([session.agent.id, request.id]), session);
+      this.emitThread(session, { type: 'agentRequest.created', payload: { request: requestFromClientRequest(request, { conversationId: session.handle.id }) } });
     }
     for (const approval of snapshot.approvals) {
-      this.approvalOwners.set(approval.id, session);
+      this.approvalOwners.set(JSON.stringify([session.agent.id, approval.id]), session);
+      this.emitThread(session, { type: 'agentRequest.created', payload: { request: approvalAgentRequest(approval) } });
     }
   }
 
@@ -961,7 +968,7 @@ export class CodexSurfaceAgentAdapter {
     if (event.type === 'remoteControl.statusChanged') {
       this.emit({
         backend: 'codex',
-        type: 'devicePairing.statusChanged',
+        type: 'remoteControl.statusChanged',
         payload: event.payload.status,
         occurredAt: event.occurredAt,
       });
@@ -994,13 +1001,13 @@ export class CodexSurfaceAgentAdapter {
       case 'conversation.goalChanged':
         if (event.origin === 'action') return;
         this.emitThread(session, event.payload.goal
-          ? { type: 'thread.goalUpdated', turnId: event.turnId, payload: { goal: event.payload.goal }, ...metadata }
-          : { type: 'thread.goalCleared', turnId: event.turnId, payload: {}, ...metadata });
+          ? { type: 'conversation.goalUpdated', turnId: event.turnId, payload: { goal: event.payload.goal }, ...metadata }
+          : { type: 'conversation.goalCleared', turnId: event.turnId, payload: {}, ...metadata });
         return;
       case 'conversation.contextUsageChanged':
         if (event.payload.contextUsage) {
           this.emitThread(session, {
-            type: 'thread.tokenUsageUpdated', turnId: event.turnId,
+            type: 'conversation.contextUsageUpdated', turnId: event.turnId,
             payload: { contextUsage: event.payload.contextUsage }, ...metadata,
           });
         }
@@ -1032,22 +1039,32 @@ export class CodexSurfaceAgentAdapter {
         return;
       case 'file.activity':
         this.emitThread(session, {
-          type: 'file.activity', turnId: event.turnId,
+          type: 'workspace.fileActivityDetected', turnId: event.turnId,
           payload: { ...event.payload },
           ...metadata,
         });
         return;
       case 'approval.requested':
-        this.approvalOwners.set(event.payload.approval.id, session);
+        this.approvalOwners.set(JSON.stringify([session.agent.id, event.payload.approval.id]), session);
+        this.emitThread(session, { type: 'agentRequest.created', turnId: event.turnId, payload: { request: approvalAgentRequest(event.payload.approval) }, ...metadata });
         return;
       case 'approval.resolved':
-        this.approvalOwners.delete(event.payload.approval.id);
+        this.approvalOwners.delete(JSON.stringify([session.agent.id, event.payload.approval.id]));
+        this.emitThread(session, { type: 'agentRequest.resolved', turnId: event.turnId, payload: {
+          id: event.payload.approval.id,
+          outcome: approvalOutcome(event.payload.decision, event.payload.scope, event.payload.reason),
+        }, ...metadata });
         return;
       case 'clientRequest.requested':
-        this.clientRequestOwners.set(event.payload.request.id, session);
+        this.clientRequestOwners.set(JSON.stringify([session.agent.id, event.payload.request.id]), session);
+        this.emitThread(session, { type: 'agentRequest.created', turnId: event.turnId, payload: { request: requestFromClientRequest(event.payload.request, { conversationId: session.handle.id, turnId: event.turnId }) }, ...metadata });
         return;
       case 'clientRequest.resolved':
-        this.clientRequestOwners.delete(event.payload.request.id);
+        this.clientRequestOwners.delete(JSON.stringify([session.agent.id, event.payload.request.id]));
+        this.emitThread(session, { type: 'agentRequest.resolved', turnId: event.turnId, payload: {
+          id: event.payload.request.id,
+          outcome: event.payload.response ? agentResponseFromClientResponse(event.payload.response).outcome : approvalOutcome(null, null, event.payload.reason),
+        }, ...metadata });
         return;
       default:
         return;
@@ -1081,10 +1098,10 @@ export class CodexSurfaceAgentAdapter {
   ): void {
     if (preset || selectedModelId || selectedReasoningEffort || selectedServiceTier !== undefined) {
       this.emitThread(session, {
-        type: 'thread.settingsUpdated',
+        type: 'conversation.settingsUpdated',
         payload: {
-          threadSettings: {
-            ...(preset ? threadSettingsForPreset(preset) : {}),
+          settings: {
+            ...(preset ? { approvalPreset: preset } : {}),
             ...(selectedModelId ? { model: selectedModelId } : {}),
             ...(selectedReasoningEffort ? { reasoningEffort: selectedReasoningEffort } : {}),
             ...(selectedServiceTier === undefined ? {} : { serviceTier: selectedServiceTier }),
@@ -1094,7 +1111,7 @@ export class CodexSurfaceAgentAdapter {
       });
     }
     this.emitThread(session, {
-      type: 'thread.modeUpdated',
+      type: 'conversation.modeUpdated',
       payload: { mode: planMode ? 'plan' : 'default' },
       ...(occurredAt ? { occurredAt } : {}),
     });
@@ -1106,7 +1123,7 @@ export class CodexSurfaceAgentAdapter {
     occurredAt?: string,
   ): void {
     this.emitThread(session, {
-      type: 'diff.updated', turnId: diff.turnId,
+      type: 'conversation.turnDiffUpdated', turnId: diff.turnId,
       payload: { addedLines: diff.addedLines, removedLines: diff.removedLines, diff: diff.diff },
       ...(occurredAt ? { occurredAt } : {}),
     });
@@ -1298,6 +1315,7 @@ export class CodexSurfaceAgentAdapter {
       agentId: session.agent.id,
       backend: 'codex',
       threadId: session.handle.id,
+      conversationId: session.handle.id,
     } as BackendEvent);
   }
 
@@ -1667,20 +1685,6 @@ function runtimeStatus(snapshot: CodexSurfaceSnapshot): BackendRuntimeStatus {
     return { backend: 'codex', status: 'error', detail: snapshot.error ?? 'Codex app-server failed.' };
   }
   return { backend: 'codex', status: 'notConfigured', detail: { key: 'backend.codexNotConnected' } };
-}
-
-function threadSettingsForPreset(preset: ApprovalPreset): CodexThreadSettings {
-  if (preset === 'full-access') {
-    return {
-      approvalPolicy: 'never', approvalsReviewer: 'user',
-      sandboxPolicy: { type: 'dangerFullAccess' }, activePermissionProfile: { id: ':danger-full-access' },
-    };
-  }
-  return {
-    approvalPolicy: 'on-request',
-    approvalsReviewer: preset === 'approve-for-me' ? 'auto_review' : 'user',
-    sandboxPolicy: { type: 'workspaceWrite' }, activePermissionProfile: { id: ':workspace' },
-  };
 }
 
 function effectiveApprovalPreset(

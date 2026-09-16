@@ -1,3 +1,4 @@
+import { approvalAgentRequest, approvalOutcome } from '@codex-claw/core/agent-request';
 import { describe, expect, it } from 'vitest';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../snapshot';
 import type { MainToRendererEvent } from '../contracts';
@@ -39,15 +40,22 @@ describe('snapshot coordination reducer', () => {
       title: 'Run tests',
     };
     applyMainEventToSnapshot(snapshot, event({
-      type: 'backendApproval.requested', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1',
-      payload: { approval },
+      type: 'agentRequest.created', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1',
+      payload: { request: approvalAgentRequest(approval) },
     }));
     expect(snapshot.backendApprovals['agent-1']).toEqual([approval]);
     expect(snapshot.agents[0]?.status).toMatchObject({ type: 'awaitingInput', detail: 'Run tests' });
 
     applyMainEventToSnapshot(snapshot, event({
-      type: 'backendApproval.resolved', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1',
-      payload: { approval, decision: 'approve', scope: 'once', reason: 'host' },
+      type: 'agentRequest.resolved', agentId: 'agent-1', backend: 'codex', conversationId: 'older-conversation',
+      payload: { id: approval.id, outcome: { kind: 'cancelled' } },
+    }));
+    expect(snapshot.backendApprovals['agent-1']).toEqual([approval]);
+    expect(snapshot.agentRequests?.['agent-1']).toHaveLength(1);
+
+    applyMainEventToSnapshot(snapshot, event({
+      type: 'agentRequest.resolved', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1',
+      payload: { id: (approval).id, outcome: approvalOutcome('approve', 'once', 'host') },
     }));
     expect(snapshot.backendApprovals['agent-1']).toEqual([]);
   });
@@ -55,7 +63,7 @@ describe('snapshot coordination reducer', () => {
   it('stores turn diff summaries without rewriting provider messages', () => {
     const snapshot = createEmptySnapshot();
     applyMainEventToSnapshot(snapshot, event({
-      type: 'diff.updated', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1', turnId: 'turn-1',
+      type: 'conversation.turnDiffUpdated', agentId: 'agent-1', backend: 'codex', threadId: 'thread-1', turnId: 'turn-1',
       payload: { addedLines: 3, removedLines: 1, diff: '+three\n-one' },
     }));
     expect(snapshot.turnGitDiffs['turn-1']).toEqual({

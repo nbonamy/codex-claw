@@ -80,12 +80,14 @@ describe('createClientRequestHandlers', () => {
 
   it('validates and queues a bounded provider-neutral spoken announcement', async () => {
     const queue = vi.fn().mockReturnValue({ queued: true });
+    let voice: 'bf_emma' | 'af_heart' = 'bf_emma';
     const handlers = createClientRequestHandlers({
       openExternal: vi.fn(),
       getSystemPermissionsStatus: vi.fn(),
       openAccessibilitySettings: vi.fn(),
       computerUseOptions,
       spokenAnnouncements: { queue },
+      spokenAnnouncementVoice: () => voice,
     });
 
     expect(await handlers['client/spokenAnnouncement/queue']?.({
@@ -112,12 +114,14 @@ describe('createClientRequestHandlers', () => {
       text: 'x'.repeat(161),
       voice: 'af_heart',
     })).rejects.toThrowError('Invalid text.');
-    await expect(async () => handlers['client/spokenAnnouncement/queue']?.({
+    expect(await handlers['client/spokenAnnouncement/queue']?.({
       agentId: 'agent-dina',
       phase: 'start',
       text: 'Nope.',
       voice: 'robot',
-    })).rejects.toThrowError('Invalid voice.');
+    })).toStrictEqual({ queued: true });
+    expect(queue).toHaveBeenLastCalledWith({ agentId: 'agent-dina', phase: 'start', text: 'Nope.', voice: 'bf_emma' });
+    voice = 'af_heart';
     expect(await handlers['client/spokenAnnouncement/queue']?.({
       agentId: 'agent-dina',
       phase: 'start',

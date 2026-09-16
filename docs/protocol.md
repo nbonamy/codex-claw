@@ -61,7 +61,7 @@ synced after this change.
   that the connected client must perform, currently Electron browser opening
   and macOS permission surfaces.
 - Backend-internal driver RPC: `driver/*`, `source/folder/detect`, and
-  `agent/folder/validate` are accepted by the server through the driver RPC
+  `workspace/folder/validate` are accepted by the server through the driver RPC
   fallback, but client code should prefer the app-level methods unless this
   document explicitly marks a method public.
 
@@ -104,7 +104,7 @@ barrier: subscribe first, buffer notifications while reading `snapshot/get`,
 discard buffered events at or below `lastEventSeq`, then apply only contiguous
 events above it. A gap triggers a fresh snapshot barrier. Duplicate deltas are
 therefore never replayed after reconnect or renderer reload. The selected
-conversation is restored separately through `agent/history/hydrate`, which
+conversation is restored separately through `agent/conversation/load`, which
 publishes a bounded provider snapshot followed by revisioned provider events.
 This keeps the synchronization barrier bounded even for very long threads.
 
@@ -113,9 +113,10 @@ This keeps the synchronization barrier bounded even for very long threads.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `backend/health/get` | none | `ClawBackendHealth` | Liveness and version check. |
-| `snapshot/get` | none | `ClawSnapshotGetResult` | Initializes the source folder if needed and returns the authoritative transcript-free product snapshot. |
+| `snapshot/get` | none | `ClawSnapshotGetResult` | Returns the transcript-free product snapshot projected for the requesting client. Startup maintenance is performed separately by runtime initialization. |
 | `client/state/get` | none | `ClientState` | Backend-derived client hints only. |
-| `client/request/respond` | `{ response: ClientRequestResponse }` | `AppSnapshot` | Resolves a provider-owned approval or ask-user request. |
+| `agent/request/respond` | `{ response: AgentRequestResponse }` | `AppSnapshot` | Answers a pending normalized approval/question/confirmation using a typed outcome. Include `agentId`; an untargeted response is accepted only when its request ID is unambiguous. |
+| `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
 
 ## Client To `clawd`: System
 
@@ -131,17 +132,17 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Creates the agent in the owning team's backend location. For remote-team pointers, local `clawd` forwards creation to the remote `clawd` with the remote team id and does not persist a local proxy agent. |
 | `agent/quickChat/create` | `{ input: CreateQuickChatInput }` | `AppSnapshot` | Creates a team-scoped quick chat in a private backend-managed scratch workspace and persists its non-project identity across restarts. |
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
-| `agent/select` | `{ agentId }` | `AppSnapshot` | Selects, hydrates history, and refreshes git status. |
+| `client/navigation/selectAgent` | `{ agentId }` | `AppSnapshot` | Persists this client's selection only. Conversation loading and Git refresh are explicit runtime operations. |
 | `agent/duplicate` | `{ agentId }` | `AppSnapshot` | Duplicates product agent configuration directly below the source agent. |
 | `agent/fork` | `{ agentId, turnId? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at a stable turn id, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
-| `agent/reorder` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
+| `client/agentOrder/update` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
 | `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Archives the attached provider conversation when supported, then removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-owned agent resource. The backend confines relative and absolute inputs (including resolved symlinks) to the agent workspace, caps preview bytes, and classifies text, image, binary, and oversized results. Clients must not read workspace files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
-| `agent/git/diff/open` | `{ agentId, target? }` | `true` | Emits a review event from backend-owned Git state. Targets are branch (the default when a base branch is available), uncommitted, unstaged, staged, an exact commit, or a provider-supplied turn diff. |
+| `agent/git/diff/get` | `{ agentId, target? }` | `AgentGitDiff` | Returns backend-owned diff data; failures propagate as request errors. Targets are branch, uncommitted, unstaged, staged, an exact commit, or a provider-supplied turn diff. Clients choose presentation; no panel event is emitted. |
 | `agent/git/workflow/get` | `{ agentId }` | `AgentGitWorkflow` | Reads local branch, remote, staged/unstaged files, linked-worktree state, and GitHub connection without spending remote API quota. |
 | `agent/git/stage` | `{ agentId, input: { paths, confirmed } }` | `AgentGitWorkflow` | Stages explicitly selected repository-relative paths; rejects unconfirmed requests. |
 | `agent/git/commit` | `{ agentId, input: { message, confirmed } }` | `AgentGitWorkflow` | Creates a commit from the index with an explicit message and confirmation. |
@@ -155,9 +156,9 @@ This keeps the synchronization barrier bounded even for very long threads.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `agent/restart` | `{ agentId }` | `AppSnapshot` | Archives the attached provider conversation when supported, then forgets its reference and releases the live conversation host. |
-| `agent/session/compress` | `{ agentId }` | `AppSnapshot` | For an idle Codex agent, creates a replacement conversation, submits the generated handoff as hidden context in its initial prompt, archives the old conversation only after that prompt is accepted, and updates the persisted provider reference. Provider transcripts remain SDK-owned. |
-| `agent/history/hydrate` | `{ agentId }` | `AppSnapshot` | Lazily restores provider-owned session state without selecting the agent; the conversation arrives in a provider snapshot frame. |
+| `agent/conversation/reset` | `{ agentId }` | `AppSnapshot` | Archives the attached provider conversation when supported, then forgets its reference and releases the live conversation host. |
+| `agent/conversation/replaceWithSummary` | `{ agentId }` | `AppSnapshot` | For an idle Codex agent, creates a replacement conversation, submits the generated handoff as hidden context in its initial prompt, archives the old conversation only after that prompt is accepted, and updates the persisted provider reference. Provider transcripts remain SDK-owned. |
+| `agent/conversation/load` | `{ agentId }` | `AppSnapshot` | Lazily restores provider-owned session state without selecting the agent; the conversation arrives in a provider snapshot frame. |
 | `agent/history/load-older` | `{ agentId }` | `{ hasOlder }` | Asks the provider owner to load one older history page; the result arrives through provider-native deltas. |
 | `agent/conversations/list` | `{ agentId, input?: { searchTerm?, limit? } }` | `ConversationSummary[]` | Searches provider history through the active agent backend. Codex returns the current active row plus archived rows, tagged by `storageState`. |
 | `agent/conversation/resume` | `{ agentId, target: ConversationResumeTarget }` | `AppSnapshot` | Validates backend match and idle status, restores an archived target when needed, archives the displaced conversation, updates the provider reference, and publishes a provider conversation reset. |
@@ -179,18 +180,20 @@ This keeps the synchronization barrier bounded even for very long threads.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `team/create` | `{ input: CreateTeamInput }` | `AppSnapshot` | Creates and selects a team. Omitted `remoteConnectionId` creates a local team. With `remoteConnectionId`, local `clawd` creates a real team on the remote `clawd` or connects to `input.remoteTeamId`, then persists only a local pointer `{ remoteConnectionId, remoteTeamId }`. |
+| `team/create` | `{ input: CreateTeamInput }` | `AppSnapshot` | Creates a local or remote team and selects it for the requesting client. Remote creation persists a local pointer, not a proxy runtime. |
+| `team/connect` | `{ input: CreateTeamInput }` | `AppSnapshot` | Connects a local pointer to an existing remote team; requires `remoteConnectionId` and `remoteTeamId`. |
 | `team/update` | `{ input: UpdateTeamInput }` | `AppSnapshot` | Updates name/color and, while the team has no local or remote agents, the optional team connection. Changing an empty local team to a remote connection creates a real remote team or connects to `input.remoteTeamId`, then stores the remote pointer; connection changes are rejected once either side has agents. |
-| `team/reorder` | `{ input: ReorderTeamsInput }` | `AppSnapshot` | Reorders team rail state. |
+| `client/teamOrder/update` | `{ input: ReorderTeamsInput }` | `AppSnapshot` | Reorders team rail state. |
 | `team/delete` | `{ teamId }` | `AppSnapshot` | Deletes the team in its owning backend location. For remote pointers, this calls remote `team/delete` for `remoteTeamId`, then removes the local pointer. If that pointer is the only local team, local `clawd` creates an empty Local fallback first. |
 | `team/disconnect` | `{ teamId }` | `AppSnapshot` | Removes only the local remote-team pointer and leaves the remote team/agents running. If that pointer is the only local team, local `clawd` creates an empty Local fallback first. Local teams use `team/delete`. |
-| `team/select` | `{ teamId }` | `AppSnapshot` | Selects team and active agent. |
+| `client/navigation/selectTeam` | `{ teamId }` | `AppSnapshot` | Selects team and active agent. |
 
 ## Client To `clawd`: Settings And Source Repositories
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `settings/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates general/theme/source settings. |
+| `settings/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates backend execution policy, provider configuration and source-folder settings. Rejects presentation preferences. |
+| `client/preferences/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates client-scoped appearance, ordering and presentation preferences. Rejects backend policy. |
 | `settings/codexResourceSharing/get` | none | `CodexResourceSharingStatus` | Reports whether an enabled existing home still needs explicit migration. |
 | `settings/codexResourceSharing/set` | `{ input: { enabled: true } \| { enabled: false, mode: "fresh" \| "copy" \| "keep" } }` | `AppSnapshot` | Links or isolates Claw skills/plugins; folder-changing modes require idle chats. |
 | `source/folders/list` | `{ path?, remoteConnectionId? }` | `SourceFolderListing` | Lists child directories from local or remote `clawd`; when `path` is omitted, the target backend starts at its `$HOME`. Used by renderer fake folder pickers without desktop filesystem access. |
@@ -217,7 +220,7 @@ and `~/sources` first.
 ## Client To `clawd`: Remote Connections
 
 Codex authentication reads (`codex/authentication/get`) and cancellation
-(`codex/authentication/chatgpt/cancel`) accept an optional `remoteConnectionId`;
+(`codex/authentication/login/cancel`) accept an optional `remoteConnectionId`;
 omitting it retains the local flow. `codex/authentication/deviceCode/start`
 routes to the SDK device-code login on the selected host and returns
 `{ loginId, verificationUrl, userCode }`. Cancellation additionally accepts
@@ -228,7 +231,8 @@ Only the selected host's SDK/app-server stores and refreshes credentials.
 | --- | --- | --- | --- |
 | `connections/sshHosts/list` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
 | `connections/ssh/create` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
-| `connections/sync` | `{ connectionId, inspectOnly? }` | `AppSnapshot` | With `inspectOnly: true`, probes and records `clawdVersion` and `codexVersion` without installing or closing a session. Otherwise closes the cached remote client, installs the desktop-pinned Codex package into `~/.codex-claw/codex/<version>` after SHA-256 and executable-version verification, uploads bundled `clawd`, and mirrors provider tokens. The managed transport starts a fresh one-shot clawd with its bundled Codex path, avoiding stale persistent daemons. It then reloads remote provider connections. Settings probes versions when opened and offers Upgrade if either differs (or Codex is unknown). Explicit custom Codex executable settings remain authoritative. The user's standalone CLI, shell profiles, and conversation data are not modified. |
+| `connections/runtime/inspect` | `{ connectionId }` | `AppSnapshot` | Probes and records runtime versions without installation or session closure. |
+| `connections/runtime/sync` | `{ connectionId }` | `AppSnapshot` | Closes the cached remote client, installs checksum-verified pinned Codex and bundled clawd, mirrors provider tokens and reloads provider connections. Explicit custom Codex executable settings remain authoritative; standalone CLI, shell profiles and conversation data are preserved. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
 | `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and removes local team pointers attached to it. Remote teams, agents, messages, and automations keep running on the SSH host. If every local team used that connection, local `clawd` creates one empty local fallback team first. |
 
@@ -264,8 +268,7 @@ without adopting it as the local product snapshot.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `workProvider/connect` | `{ provider }` | `WorkProviderConnectResult` | Starts provider connection such as GitHub device flow. |
-| `workProvider/authorization/open` | `{ provider }` | `AppSnapshot` | Requests browser opening through `client/external/open`. |
-| `workProvider/connection/complete` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
+| `workProvider/authorization/poll` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/connections/reload` | none | `AppSnapshot` | Rehydrates provider connection metadata from token storage after token files are mirrored, without restarting `clawd`. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |
 | `workProvider/repositories/list` | `{ provider, location? }` | `WorkRepository[]` | Lists provider repositories from local `clawd` or the selected remote automation location. |
@@ -304,20 +307,20 @@ implementation messages, not the preferred app protocol for clients.
 
 | Method | Params | Result |
 | --- | --- | --- |
-| `driver/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
-| `driver/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
-| `agent/folder/validate` | `{ folder }` | `null` |
+| `workspace/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
+| `workspace/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
+| `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
-| `driver/session/compress` | `{ agent }` | `BackendSessionCompressionResult` |
+| `driver/conversation/replaceWithSummary` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |
 | `driver/goal/update` | `{ agent, objective }` | `BackendGoalResult` |
 | `driver/goal/clear` | `{ agent }` | `BackendGoalResult` |
 | `driver/approvalPreset/update` | `{ agent, preset }` | `BackendApprovalPresetResult` |
-| `driver/session/forget` | `{ backend, agentId }` | `null` |
+| `driver/conversation/release` | `{ backend, agentId }` | `null` |
 | `driver/interrupt` | `{ agent }` | `BackendSendResult` |
-| `driver/clientRequest/respond` | `{ backend, response }` | `null` |
-| `driver/history/hydrate` | `{ agent }` | `BackendSession | null` |
+| `driver/agentRequest/respond` | `{ backend, response }` | `null` |
+| `driver/conversation/load` | `{ agent }` | `BackendSession | null` |
 | `driver/history/load-older` | `{ agent }` | `{ hasOlder }` |
 | `driver/conversations/list` | `{ agent }` | `ConversationSummary[]` |
 | `driver/conversation/resume` | `{ agent, ref }` | `BackendConversationResumeResult` |
@@ -358,32 +361,72 @@ Electron forwards these frames without reducing them. The renderer rejects
 stale or gapped revisions and rehydrates that provider conversation rather than
 replaying a Claw-owned transcript.
 
-Event `type` values are the app-owned `MainToRendererEvent['type']` union from
-`core/src/contracts.ts`. Current emitted examples include:
+Event `type` values come from `BackendPublishedEvent` in
+`core/src/contracts/events.ts`: domain facts, provider conversation frames, and
+explicit client effects are separate exported unions. The renderer composes
+these with its own `ClientTransportEvent`; `client.connectionChanged` never
+comes from clawd. Current emitted examples include:
 
 - backend and agent status: `backend.statusChanged`, `agent.updated`,
   `snapshot.updated`, `agent.statusChanged`;
 - provider conversations: `codex.conversationSnapshotChanged`,
   `codex.conversationEventReceived`, `claude.conversationSnapshotChanged`,
   `claude.conversationEventReceived`;
-- app-owned conversation-adjacent projections: `thread.modeUpdated`,
-  `thread.goalUpdated`, `thread.goalCleared`, and
-  `thread.tokenUsageUpdated`;
-- approvals and requests outside the provider transcript:
-  `backendApproval.requested`, `backendApproval.resolved`;
+- app-owned conversation-adjacent projections: `conversation.modeUpdated`,
+  `conversation.goalUpdated`, `conversation.goalCleared`, and
+  `conversation.contextUsageUpdated`;
+- input lifecycle outside the provider transcript:
+  `agentRequest.created`, `agentRequest.resolved`;
 - backend-owned prompt queue: `agent.promptQueued`, `agent.promptDequeued`,
   `agent.promptRetryScheduled`;
-- artifacts and account state: `diff.updated`, `sidePanel.markdownRequested`,
-  `sidePanel.gitDiffRequested`, `git.statusUpdated`, `git.operationProgress`,
+- artifacts and account state: `conversation.turnDiffUpdated`, `plan.readyForReview`,
+  `plan.reviewResolved`, `workspace.fileActivityDetected`,
+  `client.markdownDisplayRequested`, `git.statusUpdated`, `git.operationProgress`,
   `account.rateLimitsUpdated`, `skills.changed`;
 - native browser feedback: `browser.annotationCreated` (ephemeral element or area metadata that the renderer queues for a batched agent prompt);
-- work backlog: `workBacklog.assignmentUpdated`;
+- work backlog: `workItem.assignmentUpdated`;
 - provider-independent failures are reflected through agent/runtime status;
   provider conversation failures remain inside provider frames.
 
-Claw may inspect provider events to update a side-panel plan or another
-read-only product projection, but it never applies those events to a second
-transcript.
+Claw may inspect provider events to publish domain facts or read-only product
+projections, but it never applies those events to a second transcript.
+`plan.readyForReview` carries the agent and turn identity plus original Markdown
+and optional provider item identity. Clients decide whether and how to present
+the review; extracting a heading for a pane title is client policy. Explicit
+Markdown-display tool requests still use the separate host presentation event.
+Turn diff updates remain data events; repository diff reads return query data.
+
+`Agent.planReview` persists proposal identity, original content, conversation,
+turn/item identity and decision status. Replaying the same completion does not
+reopen a resolved proposal. The targeted response command rejects stale or
+conflicting decisions, allows an identical completed decision idempotently,
+and keeps review pending until prompt acceptance succeeds. Cancellation does
+not submit a prompt. Execution progress remains a separate projection.
+
+`AppSnapshot.agentRequests` is the runtime projection for pending approvals,
+questions and tool confirmations. Both adapters publish the same creation and
+typed resolution lifecycle, while preserving their native transcript frames.
+Provider request handles are not persisted. Answer routing uses agent/request
+identity, guards concurrent submissions, and permits retry after transport
+failure. Releases and resolutions invalidate handles.
+
+Scoped projections carry an opaque `conversationId` when bound; attachment
+requires it. Common settings carry model/effort/service tier/permission fields,
+not a Codex protocol object. Rate limits, goals and usage use exactly one wrapper:
+`{ rateLimits }`, `{ goal }`, and `{ contextUsage }`.
+
+Navigation, ordering, external-application choice, theme and presentation
+preferences are persisted under `clientPreferences`, not remote agent runtime.
+Desktop uses the `desktop` client profile; authenticated browsers have a stable
+per-browser identity. Request metadata `_clientId` selects a profile and is
+stripped before domain dispatch. Forwarded clawd calls use a separate remote
+controller profile, never the remote desktop's profile. Client commands do not
+load conversations; clients explicitly request `agent/conversation/load`.
+
+Capabilities explicitly advertise review/input, plugins, archive, resume,
+summary replacement and remote control. Unsupported archive returns
+`{ supported: false }`; unsupported history and summary reads report errors,
+not successful empty results. Provider catalog UI respects capabilities.
 
 Clients must ignore unknown event types and refresh via `snapshot/get` if they
 detect sequence gaps.

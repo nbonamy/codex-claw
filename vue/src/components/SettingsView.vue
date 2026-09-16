@@ -62,7 +62,7 @@
           :provider-settings="workProviderSettings"
           :status="workBacklogStatus"
           :update-settings="updateSettings"
-          @complete="completeWorkProviderConnection"
+          @complete="pollWorkProviderAuthorization"
           @connect="connectWorkProvider"
           @disconnect="disconnectWorkProvider"
           @open-authorization="openWorkProviderAuthorization"
@@ -86,9 +86,9 @@
           :check-remote-connection="checkRemoteConnection"
           :update-remote-connection="updateRemoteConnection"
           :remove-remote-connection="removeRemoteConnection"
-          :get-device-pairing-status="getDevicePairingStatus"
-          :enable-device-pairing="enableDevicePairing"
-          :disable-device-pairing="disableDevicePairing"
+          :get-device-pairing-status="getRemoteControlStatus"
+          :enable-device-pairing="enableRemoteControl"
+          :disable-device-pairing="disableRemoteControl"
           :start-device-pairing="startDevicePairing"
           :check-device-pairing="checkDevicePairing"
           :list-paired-devices="listPairedDevices"
@@ -142,14 +142,14 @@ withDefaults(defineProps<{
   checkRemoteConnection?: (connectionId: string, inspectOnly?: boolean) => Promise<void>;
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
-  getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
-  enableDevicePairing?: () => Promise<DevicePairingStatus>;
-  disableDevicePairing?: () => Promise<DevicePairingStatus>;
+  getRemoteControlStatus?: () => Promise<DevicePairingStatus>;
+  enableRemoteControl?: () => Promise<DevicePairingStatus>;
+  disableRemoteControl?: () => Promise<DevicePairingStatus>;
   startDevicePairing?: () => Promise<DevicePairingSession>;
   checkDevicePairing?: (session: DevicePairingSession) => Promise<boolean>;
   listPairedDevices?: (environmentId: string) => Promise<PairedDevice[]>;
   revokePairedDevice?: (environmentId: string, clientId: string) => Promise<void>;
-  completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
+  pollWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
@@ -174,9 +174,9 @@ withDefaults(defineProps<{
   checkRemoteConnection: async () => undefined,
   updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
-  getDevicePairingStatus: async () => ({ status: 'disabled' as const }),
-  enableDevicePairing: async () => ({ status: 'disabled' as const }),
-  disableDevicePairing: async () => ({ status: 'disabled' as const }),
+  getRemoteControlStatus: async () => ({ status: 'disabled' as const }),
+  enableRemoteControl: async () => ({ status: 'disabled' as const }),
+  disableRemoteControl: async () => ({ status: 'disabled' as const }),
   startDevicePairing: async () => ({ pairingCode: '', environmentId: '', expiresAt: '' }),
   checkDevicePairing: async () => false,
   listPairedDevices: async () => [],
@@ -187,7 +187,7 @@ withDefaults(defineProps<{
   daemonStatusError: null,
   chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
-  completeWorkProviderConnection: async () => undefined,
+  pollWorkProviderAuthorization: async () => undefined,
   connectWorkProvider: async () => undefined,
   disconnectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,

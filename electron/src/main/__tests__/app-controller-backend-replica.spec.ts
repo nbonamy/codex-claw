@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
+import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AppSnapshot, ClientState, MainToRendererEvent, RendererSnapshotState } from '@codex-claw/core/contracts';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
-import type { OpenInProvider } from '../open-in';
 import { callPrivate, emitBackendEvent, setMainWindowSend, currentSnapshot, createBackendClient, getSnapshot } from './app-controller-test-harness';
 
 describe('AppController', () => {
@@ -439,7 +438,7 @@ describe('AppController', () => {
       backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-1',
-      type: 'thread.tokenUsageUpdated',
+      type: 'conversation.contextUsageUpdated',
       payload: { contextUsage },
     });
     await flushMicrotasks();
@@ -501,7 +500,7 @@ describe('AppController', () => {
       backend: 'codex',
       threadId: 'thread-dina',
       turnId: 'turn-1',
-      type: 'diff.updated',
+      type: 'conversation.turnDiffUpdated',
       payload: {
         addedLines: 1,
         removedLines: 1,
@@ -510,7 +509,7 @@ describe('AppController', () => {
     });
 
     expect(send).toHaveBeenCalledWith('app:event', expect.objectContaining({
-      type: 'diff.updated',
+      type: 'conversation.turnDiffUpdated',
       payload: expect.objectContaining({ diff }),
     }));
     expect(send).not.toHaveBeenCalledWith('app:event', expect.objectContaining({
@@ -518,7 +517,7 @@ describe('AppController', () => {
     }));
   });
 
-  it('forwards side-panel requests emitted by clawd', async () => {
+  it('forwards semantic plan events without interpreting their presentation', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     await controller.initialize();
@@ -529,13 +528,9 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-1',
-      type: 'sidePanel.gitDiffRequested',
+      type: 'plan.readyForReview',
       payload: {
-        kind: 'gitDiff',
-        scope: 'turn',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
-        diff: 'diff --git a/a.ts b/a.ts\n',
+        markdown: '# Plan\n\nBuild it',
       },
     });
 
@@ -543,13 +538,9 @@ describe('AppController', () => {
       agentId: 'agent-dina',
       threadId: 'thread-dina',
       turnId: 'turn-1',
-      type: 'sidePanel.gitDiffRequested',
+      type: 'plan.readyForReview',
       payload: {
-        kind: 'gitDiff',
-        scope: 'turn',
-        title: 'Git Diff',
-        subtitle: 'Current turn',
-        diff: 'diff --git a/a.ts b/a.ts\n',
+        markdown: '# Plan\n\nBuild it',
       },
     }));
   });

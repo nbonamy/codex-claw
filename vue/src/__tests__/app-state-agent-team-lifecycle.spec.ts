@@ -1,14 +1,12 @@
+import { approvalAgentRequest } from '@codex-claw/core/agent-request';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { nextTick, reactive } from 'vue';
+import { reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
-import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, CodexClawApi, DevicePairingSession, MainToRendererEvent, SourceRepository } from '@codex-claw/core/contracts';
+import { clearConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
-import { configureClawClient } from '../platform-api';
-import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { workItem, deferred } from './app-state-test-harness';
 
 describe('useAppState', () => {
@@ -282,9 +280,9 @@ describe('useAppState', () => {
       agentIds: ['agent-joel'],
     });
     const agentSelection = deferred<AppSnapshot>();
-    const teamSelection = deferred<AppSnapshot>();
+    const clientNavigationSelectTeamion = deferred<AppSnapshot>();
     const selectAgent = vi.fn().mockReturnValue(agentSelection.promise);
-    const selectTeam = vi.fn().mockReturnValue(teamSelection.promise);
+    const selectTeam = vi.fn().mockReturnValue(clientNavigationSelectTeamion.promise);
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
@@ -314,7 +312,7 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-joel');
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
     expect(selectTeam).toHaveBeenCalledWith('team-other');
-    teamSelection.resolve({
+    clientNavigationSelectTeamion.resolve({
       ...remoteSnapshot,
       activeAgentId: 'agent-joel',
       activeTeamId: 'team-other',
@@ -413,17 +411,15 @@ describe('useAppState', () => {
       backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse-2',
-      type: 'backendApproval.requested',
-      payload: {
-        approval: {
+      type: 'agentRequest.created',
+      payload: { request: approvalAgentRequest({
           id: 'approval-jesse',
           kind: 'command',
           conversationId: 'thread-jesse',
           turnId: 'turn-jesse-2',
           itemId: 'command-jesse',
           title: 'Run tests',
-        },
-      },
+        }) },
       occurredAt: '2026-08-07T10:01:00.000Z',
     });
     expect(state.unreadAgentIds.value).toStrictEqual(['agent-jesse']);
@@ -681,7 +677,7 @@ describe('useAppState', () => {
     await expect(state.chooseSourceWorktreeDestination('/repo-feature')).resolves.toBeNull();
     await expect(state.createSourceWorktree({} as never)).rejects.toThrow('Source worktree creation is not available.');
     await expect(state.previewAgentFile('agent-dina', 'README.md')).rejects.toThrow('File preview is not available.');
-    await expect(state.openAgentGitDiff('agent-dina')).rejects.toThrow('Git diff preview is not available.');
+    await expect(state.getAgentGitDiff('agent-dina')).rejects.toThrow('Git diff preview is not available.');
     await expect(state.openAgentPath('agent-dina', 'finder')).rejects.toThrow('Open In is not available.');
     await state.createTeam({ name: 'Ignored Team', color: '#46A857' });
     await state.updateTeam({ id: 'team-codex-claw', name: 'Ignored Team', color: '#46A857' });
@@ -717,9 +713,9 @@ describe('useAppState', () => {
     await state.checkRemoteConnection('ssh-1');
     await state.updateRemoteConnection('ssh-1', {} as never);
     await state.removeRemoteConnection('ssh-1');
-    await expect(state.getDevicePairingStatus()).resolves.toStrictEqual({ status: 'disabled' });
-    await expect(state.enableDevicePairing()).resolves.toStrictEqual({ status: 'disabled' });
-    await expect(state.disableDevicePairing()).resolves.toStrictEqual({ status: 'disabled' });
+    await expect(state.getRemoteControlStatus()).resolves.toStrictEqual({ status: 'disabled' });
+    await expect(state.enableRemoteControl()).resolves.toStrictEqual({ status: 'disabled' });
+    await expect(state.disableRemoteControl()).resolves.toStrictEqual({ status: 'disabled' });
     await expect(state.startDevicePairing()).rejects.toThrow('Device pairing is not available.');
     await expect(state.checkDevicePairing({} as never)).resolves.toBe(false);
     await expect(state.listPairedDevices('environment')).resolves.toStrictEqual([]);
@@ -727,8 +723,8 @@ describe('useAppState', () => {
     await state.loadDaemonStatus();
     await state.setDaemonEnabled(true);
     await state.connectWorkProvider('github');
-    await state.openWorkProviderAuthorization('github');
-    await state.completeWorkProviderConnection('github');
+    await expect(state.openWorkProviderAuthorization('github')).rejects.toThrow('Start authorization');
+    await state.pollWorkProviderAuthorization('github');
     await state.disconnectWorkProvider('github');
     await expect(state.loadWorkRepositories('github')).resolves.toStrictEqual([]);
     await expect(state.loadWorkItems('github', '')).resolves.toStrictEqual([]);
@@ -774,8 +770,8 @@ describe('useAppState', () => {
       seq: 1,
       occurredAt: '2026-09-05T00:00:00.000Z',
       agentId: 'agent-dina',
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'Unable to load conversation history.' },
     });
     expect(state.isActiveAgentHistoryFailed.value).toBe(true);
 
@@ -851,7 +847,7 @@ describe('useAppState', () => {
     const api = {
       listSourceRepositories: vi.fn().mockResolvedValue(repositories),
       previewAgentFile: vi.fn().mockResolvedValue({ path: 'README.md', content: '# Claw' }),
-      openAgentGitDiff: vi.fn().mockResolvedValue(undefined),
+      getAgentGitDiff: vi.fn().mockResolvedValue(undefined),
       disconnectTeam: vi.fn().mockResolvedValue(initialSnapshot),
       getAutomationSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
       updateSettings: vi.fn().mockResolvedValue(updatedSnapshot),
@@ -860,9 +856,9 @@ describe('useAppState', () => {
       checkRemoteConnection: vi.fn().mockResolvedValue(initialSnapshot),
       updateRemoteConnection: vi.fn().mockResolvedValue(initialSnapshot),
       removeRemoteConnection: vi.fn().mockResolvedValue(initialSnapshot),
-      getDevicePairingStatus: vi.fn().mockResolvedValue({ status: 'connected', environmentId: 'environment-1' }),
-      enableDevicePairing: vi.fn().mockResolvedValue({ status: 'connecting' }),
-      disableDevicePairing: vi.fn().mockResolvedValue({ status: 'disabled' }),
+      getRemoteControlStatus: vi.fn().mockResolvedValue({ status: 'connected', environmentId: 'environment-1' }),
+      enableRemoteControl: vi.fn().mockResolvedValue({ status: 'connecting' }),
+      disableRemoteControl: vi.fn().mockResolvedValue({ status: 'disabled' }),
       startDevicePairing: vi.fn().mockResolvedValue(pairingSession),
       checkDevicePairing: vi.fn().mockResolvedValue(true),
       listPairedDevices: vi.fn().mockResolvedValue([{ clientId: 'client-1', displayName: 'Phone' }]),
@@ -878,7 +874,7 @@ describe('useAppState', () => {
 
     await expect(state.listSourceRepositories('ssh-1')).resolves.toStrictEqual(repositories);
     await expect(state.previewAgentFile('agent-dina', 'README.md')).resolves.toStrictEqual({ path: 'README.md', content: '# Claw' });
-    await state.openAgentGitDiff('agent-dina');
+    await state.getAgentGitDiff('agent-dina');
     await state.disconnectTeam('team-other');
     await expect(state.getAutomationSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
     await state.updateSettings({ sourceFolder: { path: '/Users/nbonamy/projects' } });
@@ -887,9 +883,9 @@ describe('useAppState', () => {
     await state.checkRemoteConnection('ssh-1');
     await state.updateRemoteConnection('ssh-1', { sourceFolderPath: '/srv/src' });
     await state.removeRemoteConnection('ssh-1');
-    await expect(state.getDevicePairingStatus()).resolves.toMatchObject({ status: 'connected' });
-    await expect(state.enableDevicePairing()).resolves.toMatchObject({ status: 'connecting' });
-    await expect(state.disableDevicePairing()).resolves.toMatchObject({ status: 'disabled' });
+    await expect(state.getRemoteControlStatus()).resolves.toMatchObject({ status: 'connected' });
+    await expect(state.enableRemoteControl()).resolves.toMatchObject({ status: 'connecting' });
+    await expect(state.disableRemoteControl()).resolves.toMatchObject({ status: 'disabled' });
     await expect(state.startDevicePairing()).resolves.toBe(pairingSession);
     await expect(state.checkDevicePairing(pairingSession)).resolves.toBe(true);
     await expect(state.listPairedDevices('environment-1')).resolves.toMatchObject([{ clientId: 'client-1' }]);
@@ -907,18 +903,19 @@ describe('useAppState', () => {
   });
 
   it('normalizes reactive Git diff targets before crossing the preload boundary', async () => {
-    const openAgentGitDiff = vi.fn(async (_agentId: string, target?: object) => {
+    const getAgentGitDiff = vi.fn(async (_agentId: string, target?: object) => {
       structuredClone(target);
+      return { target: { type: 'branch' as const, baseRef: 'origin/main' }, diff: '', sections: [], summary: { addedLines: 0, removedLines: 0, changedFiles: 0 } };
     });
-    stubElectronTestWindow({ codexClaw: { openAgentGitDiff } satisfies Partial<CodexClawApi> });
+    stubElectronTestWindow({ codexClaw: { getAgentGitDiff } satisfies Partial<CodexClawApi> });
     const state = useAppState();
 
-    await expect(state.openAgentGitDiff(
+    await expect(state.getAgentGitDiff(
       'agent-dina',
       reactive({ type: 'branch' as const, baseRef: 'origin/main' }),
-    )).resolves.toBeUndefined();
+    )).resolves.toMatchObject({ target: { type: 'branch', baseRef: 'origin/main' }, diff: '' });
 
-    expect(openAgentGitDiff).toHaveBeenCalledWith('agent-dina', {
+    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina', {
       type: 'branch',
       baseRef: 'origin/main',
     });
@@ -937,7 +934,6 @@ describe('useAppState', () => {
       setCodexResourceSharing,
       getDaemonStatus,
       setDaemonEnabled: vi.fn().mockRejectedValue(new Error('cannot stop daemon')),
-      openWorkProviderAuthorization: vi.fn().mockRejectedValue('authorization unavailable'),
       listBackendSkills: vi.fn().mockRejectedValue('skills unavailable'),
       listAgentFiles: vi.fn().mockRejectedValue(new Error('files unavailable')),
       loadOlderAgentHistory: vi.fn().mockReturnValue(history.promise),
@@ -957,9 +953,9 @@ describe('useAppState', () => {
     await state.setDaemonEnabled(false);
     expect(state.daemonStatusError.value).toBe('cannot stop daemon');
 
-    await expect(state.openWorkProviderAuthorization('github')).rejects.toBe('authorization unavailable');
+    await expect(state.openWorkProviderAuthorization('github')).rejects.toThrow('Start authorization');
     expect(state.workBacklogStatus.value).toBe('error');
-    expect(state.workBacklogError.value).toBe('authorization unavailable');
+    expect(state.workBacklogError.value).toBe('Start authorization before opening the provider login page.');
 
     await state.loadBackendSkills();
     expect(state.skillCatalogStatus.value).toBe('error');

@@ -1,7 +1,7 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { app, shell } from 'electron';
 import type { SystemPermissionsStatus } from '@codex-claw/core/contracts';
-import { spokenAnnouncementVoices, type AnnouncementPhase, type SpokenAnnouncementRequest, type SpokenAnnouncementVoice } from '@codex-claw/core/contracts';
+import { type AnnouncementPhase, type SpokenAnnouncementRequest, type SpokenAnnouncementVoice } from '@codex-claw/core/contracts';
 import { executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, requestComputerUseAccessibility, requestComputerUseScreenCapture, stopComputerUseHelper, type ComputerUseOptions } from './computer-use-tools';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import { createRuntimeSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
@@ -16,9 +16,10 @@ export type ClientRequestHandlersOptions = {
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
   spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
+  spokenAnnouncementVoice?: () => SpokenAnnouncementVoice;
 };
 
-export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute' | 'browserOpen' | 'spokenAnnouncements'> = {}): Record<string, ClientRequestHandler> {
+export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute' | 'browserOpen' | 'spokenAnnouncements' | 'spokenAnnouncementVoice'> = {}): Record<string, ClientRequestHandler> {
   const spokenAnnouncements = overrides.spokenAnnouncements ?? createRuntimeSpokenAnnouncementQueue({
     appPath: app?.getAppPath?.() ?? process.cwd(),
     isPackaged: app?.isPackaged ?? false,
@@ -67,7 +68,7 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
         agentId: requireString(input.agentId, 'agentId'),
         phase,
         text,
-        voice: requireSpokenAnnouncementVoice(input.voice),
+        voice: options.spokenAnnouncementVoice?.() ?? 'af_heart',
       };
       return options.spokenAnnouncements?.queue(request) ?? { queued: false, reason: 'unsupported' };
     },
@@ -101,14 +102,6 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
       });
     },
   };
-}
-
-function requireSpokenAnnouncementVoice(value: unknown): SpokenAnnouncementVoice {
-  if (value === undefined) return 'af_heart';
-  if (typeof value !== 'string' || !spokenAnnouncementVoices.includes(value as SpokenAnnouncementVoice)) {
-    throw new Error('Invalid voice.');
-  }
-  return value as SpokenAnnouncementVoice;
 }
 
 function mergeComputerUsePermissions(

@@ -1,6 +1,13 @@
 import type { AgentBackend, BackendCapabilities } from './contracts';
 
 export const codexBackendCapabilities: BackendCapabilities = {
+  planReview: true,
+  questions: true,
+  plugins: true,
+  conversationArchive: true,
+  conversationResume: true,
+  conversationReplaceWithSummary: true,
+  remoteControl: true,
   attachments: true,
   models: true,
   skills: true,
@@ -21,6 +28,13 @@ export const codexBackendCapabilities: BackendCapabilities = {
 };
 
 export const claudeBackendCapabilities: BackendCapabilities = {
+  planReview: true,
+  questions: true,
+  plugins: false,
+  conversationArchive: false,
+  conversationResume: true,
+  conversationReplaceWithSummary: false,
+  remoteControl: false,
   attachments: true,
   models: true,
   skills: true,

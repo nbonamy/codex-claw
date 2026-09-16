@@ -96,6 +96,18 @@ preference, workspace identity, provider conversation references, and Claw
 metadata. `AppSnapshot` contains no provider transcript. Persisted Git remote
 identities are canonical and credential-free.
 
+Backend domain events, provider conversation frames, explicit client effects,
+and client transport events have separate contracts. A headless consumer can
+handle `plan.readyForReview` through `agent/planReview/respond` without a pane.
+Pending review decisions persist; live provider input handles do not. Both
+adapters publish normalized `agentRequest.created`/`agentRequest.resolved` facts
+in addition to their unchanged native conversation frames.
+
+Selection, order and presentation settings live in per-client preference
+profiles. Selecting a remote team never changes the remote desktop's navigation.
+Clients load conversations explicitly; reading a snapshot does not run startup
+maintenance. See [the protocol](protocol.md) for the current commands and shapes.
+
 On a fresh install, create a default team when no teams exist. Do not create a
 default agent automatically; an empty team offers the same local folder,
 GitHub repository, and explicit repository URL sources as **Add project**.
@@ -371,8 +383,8 @@ type AgentBackendDriver = {
   clearGoal?(agent: Agent): Promise<BackendGoalResult>
   setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>
   interrupt(agent: Agent): Promise<BackendSendResult>
-  respondToRequest(response: ClientRequestResponse): Promise<void>
-  hydrateAgent?(agent: Agent): Promise<BackendSession | null>
+  respondToAgentRequest(response: ClientRequestResponse): Promise<void>
+  loadConversation?(agent: Agent): Promise<BackendSession | null>
   archiveAgentConversation?(agent: Agent): Promise<void>
   reconcileConversations?(agents: Agent[]): Promise<void>
   listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>

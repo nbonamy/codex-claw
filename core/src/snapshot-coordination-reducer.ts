@@ -1,6 +1,7 @@
 import type { AppSnapshot, TurnGitDiff } from './contracts';
 import { setAgentStatusInSnapshot } from './agent-manager';
 import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
+import { agentConversationId, planReviewFromEvent } from './plan-review';
 
 /** Applies Claw-owned prompt, approval, and diff projections. */
 export function applyCoordinationEventToSnapshot(
@@ -8,6 +9,21 @@ export function applyCoordinationEventToSnapshot(
   event: SnapshotEventOwnedBy<'coordination'>,
 ): void {
   if (!event.agentId) return;
+
+  if (event.type === 'plan.readyForReview') {
+    const agent = snapshot.agents.find((candidate) => candidate.id === event.agentId);
+    if (agent && (!event.conversationId || event.conversationId === agentConversationId(agent))) {
+      const review = planReviewFromEvent(agent, event);
+      // Replayed provider completion must not reopen an already resolved review.
+      if (agent.planReview?.id !== review.id) agent.planReview = review;
+    }
+    return;
+  }
+  if (event.type === 'plan.reviewResolved') {
+    const review = snapshot.agents.find((candidate) => candidate.id === event.agentId)?.planReview;
+    if (review?.id === event.payload.reviewId) review.status = event.payload.resolution;
+    return;
+  }
 
   if (event.type === 'agent.promptQueued') {
     const queuedPrompts = snapshot.queuedPrompts ?? [];
@@ -45,26 +61,33 @@ export function applyCoordinationEventToSnapshot(
     return;
   }
 
-  if (event.type === 'backendApproval.requested') {
+  if (event.type === 'agentRequest.created') {
+    const requests = snapshot.agentRequests ??= {};
+    const request = event.payload.request;
+    requests[event.agentId] = [...(requests[event.agentId] ?? []).filter((item) => item.id !== request.id), request];
+    if (request.kind !== 'approval') return;
     const approvals = snapshot.backendApprovals[event.agentId] ?? [];
     snapshot.backendApprovals[event.agentId] = [
-      ...approvals.filter((candidate) => candidate.id !== event.payload.approval.id),
-      event.payload.approval,
+      ...approvals.filter((candidate) => candidate.id !== request.id),
+      request.approval,
     ];
     setAgentStatusInSnapshot(snapshot, event.agentId, {
       type: 'awaitingInput',
-      detail: event.payload.approval.title,
+      detail: request.approval.title,
     }, event.occurredAt);
     return;
   }
 
-  if (event.type === 'backendApproval.resolved') {
+  if (event.type === 'agentRequest.resolved') {
+    const pending = snapshot.agentRequests?.[event.agentId]?.find((request) => request.id === event.payload.id);
+    if (pending && event.conversationId && pending.conversationId !== event.conversationId) return;
+    if (snapshot.agentRequests) snapshot.agentRequests[event.agentId] = (snapshot.agentRequests[event.agentId] ?? []).filter((request) => request.id !== event.payload.id);
     snapshot.backendApprovals[event.agentId] = (snapshot.backendApprovals[event.agentId] ?? [])
-      .filter((candidate) => candidate.id !== event.payload.approval.id);
+      .filter((candidate) => candidate.id !== event.payload.id);
     return;
   }
 
-  if (event.type === 'diff.updated') {
+  if (event.type === 'conversation.turnDiffUpdated') {
     const { addedLines, removedLines } = event.payload;
     if (!addedLines && !removedLines) return;
     const diff: TurnGitDiff = {

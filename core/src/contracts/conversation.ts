@@ -423,6 +423,8 @@ export type ClientRequest =
 
 export type ClientRequestResponse = {
   id: string;
+  /** App routing identity; never forwarded as provider request data. */
+  agentId?: string;
   payload?: {
     answers?: AskUserAnswers;
     cancelled?: boolean;

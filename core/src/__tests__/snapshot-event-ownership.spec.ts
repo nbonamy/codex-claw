@@ -17,24 +17,26 @@ const runtimeEventTypes = [
   'backend.statusChanged',
   'snapshot.updated',
   'account.rateLimitsUpdated',
-  'workBacklog.assignmentUpdated',
+  'workItem.assignmentUpdated',
   'agent.updated',
   'agent.statusChanged',
-  'thread.started',
-  'thread.settingsUpdated',
-  'thread.goalUpdated',
-  'thread.goalCleared',
-  'thread.tokenUsageUpdated',
+  'agent.conversationAttached',
+  'conversation.settingsUpdated',
+  'conversation.goalUpdated',
+  'conversation.goalCleared',
+  'conversation.contextUsageUpdated',
   'git.statusUpdated',
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'runtime'>[];
 
 const coordinationEventTypes = [
+  'plan.readyForReview',
+  'plan.reviewResolved',
   'agent.promptQueued',
   'agent.promptRetryScheduled',
   'agent.promptDequeued',
-  'diff.updated',
-  'backendApproval.requested',
-  'backendApproval.resolved',
+  'conversation.turnDiffUpdated',
+  'agentRequest.created',
+  'agentRequest.resolved',
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'coordination'>[];
 
 const subagentEventTypes = [
@@ -46,23 +48,21 @@ const subagentEventTypes = [
 
 const rendererEventTypes = [
   'client.connectionChanged',
-  'devicePairing.statusChanged',
+  'remoteControl.statusChanged',
   'models.changed',
   'skills.changed',
   'codex.conversationSnapshotChanged',
   'codex.conversationEventReceived',
   'claude.conversationSnapshotChanged',
   'claude.conversationEventReceived',
-  'sidePanel.markdownRequested',
-  'sidePanel.gitDiffRequested',
-  'celebration.requested',
+  'client.markdownDisplayRequested',
+  'client.celebrationRequested',
   'agentCreation.progress',
   'git.operationProgress',
   'browser.annotationCreated',
-  'clientRequest.resolved',
-  'thread.modeUpdated',
-  'thread.historyHydrationFailed',
-  'file.activity',
+  'conversation.modeUpdated',
+  'conversation.historyLoadFailed',
+  'workspace.fileActivityDetected',
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'renderer'>[];
 
 const codexConversationSnapshot = {
@@ -118,7 +118,7 @@ const rendererOnlyEvents = [
   },
   {
     ...base,
-    type: 'devicePairing.statusChanged',
+    type: 'remoteControl.statusChanged',
     payload: { status: 'connected' },
   },
   {
@@ -202,17 +202,12 @@ const rendererOnlyEvents = [
   },
   {
     ...agent,
-    type: 'sidePanel.markdownRequested',
+    type: 'client.markdownDisplayRequested',
     payload: { kind: 'markdown', content: '# Plan' },
   },
   {
     ...agent,
-    type: 'sidePanel.gitDiffRequested',
-    payload: { kind: 'gitDiff', diff: '' },
-  },
-  {
-    ...agent,
-    type: 'celebration.requested',
+    type: 'client.celebrationRequested',
     payload: { kind: 'stars' },
   },
   {
@@ -247,27 +242,21 @@ const rendererOnlyEvents = [
   {
     ...agent,
     backend: 'codex',
-    type: 'clientRequest.resolved',
-    payload: { id: 'request-1' },
-  },
-  {
-    ...agent,
-    backend: 'codex',
     threadId: 'thread-1',
-    type: 'thread.modeUpdated',
+    type: 'conversation.modeUpdated',
     payload: { mode: 'plan' },
   },
   {
     ...agent,
-    type: 'thread.historyHydrationFailed',
-    payload: {},
+    type: 'conversation.historyLoadFailed',
+    payload: { error: 'History unavailable' },
   },
   {
     ...agent,
     backend: 'codex',
     threadId: 'thread-1',
     turnId: 'turn-1',
-    type: 'file.activity',
+    type: 'workspace.fileActivityDetected',
     payload: {
       messageId: 'message-1',
       itemId: 'item-1',
@@ -292,8 +281,7 @@ describe('snapshot event ownership', () => {
     } as const;
     const assignedTypes = Object.values(expectedByOwner).flat();
 
-    expect(assignedTypes).toHaveLength(40);
-    expect(new Set(assignedTypes).size).toBe(40);
+    expect(new Set(assignedTypes).size).toBe(assignedTypes.length);
     for (const [owner, types] of Object.entries(expectedByOwner)) {
       expect(
         Object.entries(snapshotEventOwnership)

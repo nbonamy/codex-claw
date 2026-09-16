@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import type { BackendConversationRef } from '@codex-claw/core/contracts';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
@@ -66,7 +66,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'set-open-in-application',
-        method: 'agent/externalApplication/update',
+        method: 'client/agentExternalApplication/update',
         params: { agentId, application: 'xcode' },
       })).resolves.toMatchObject({
         result: {
@@ -99,7 +99,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'reorder-agent',
-        method: 'agent/reorder',
+        method: 'client/agentOrder/update',
         params: { input: { teamId: 'team-test', agentId, beforeAgentId: null } },
       })).resolves.toMatchObject({ result: { activeAgentId: expect.any(String) } });
       expect(snapshot.teams.find((team) => team.id === 'team-test')?.agentIds).toStrictEqual([agentId]);
@@ -181,7 +181,7 @@ describe('ClawBackendServer', () => {
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'reorder-repository',
-        method: 'repository/reorder',
+        method: 'client/repositoryOrder/update',
         params: {
           input: {
             teamId: 'team-test',
@@ -191,7 +191,7 @@ describe('ClawBackendServer', () => {
         },
       })).resolves.toMatchObject({ result: { activeTeamId: 'team-test' } });
 
-      expect(snapshot.teams[0]!.agentIds).toStrictEqual([
+      expect(snapshot.clientPreferences?.desktop?.agentOrderByTeam?.['team-test']).toStrictEqual([
         'agent-id8',
         'agent-claw-main',
         'agent-claw-worktree',
@@ -218,7 +218,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0]!.agentIds = [agent.id];
     snapshot.agents = [agent];
     snapshot.activeAgentId = agent.id;
-    const forgetAgentSession = vi.fn();
+    const releaseConversation = vi.fn();
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
@@ -227,8 +227,8 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
-      forgetAgentSession,
+      respondToAgentRequest: async () => undefined,
+      releaseConversation,
       archiveAgentConversation,
       onEvent: () => () => undefined,
       close: async () => undefined,
@@ -250,7 +250,7 @@ describe('ClawBackendServer', () => {
     expect(archiveAgentConversation).toHaveBeenCalledWith(expect.objectContaining({
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
     }));
-    expect(forgetAgentSession).toHaveBeenCalledWith(agent.id);
+    expect(releaseConversation).toHaveBeenCalledWith(agent.id);
     expect(snapshot.agents).toStrictEqual([]);
     expect(saveSnapshot).toHaveBeenCalledOnce();
     await server.close();
@@ -599,7 +599,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       listConversations,
       listModels,
       listPlugins,
@@ -616,6 +616,7 @@ describe('ClawBackendServer', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
 
+    await server.initialize();
     await server.handleMessage({ jsonrpc: '2.0', id: 'snapshot', method: 'snapshot/get' });
     await vi.waitFor(() => {
       expect(snapshot.subagentTrees['agent-dina']?.nodes['thread-child']?.agentNickname)

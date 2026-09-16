@@ -174,24 +174,24 @@ describe('BackendDriverRpc', () => {
     const resumeConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
     });
-    const compressSession = vi.fn().mockResolvedValue({
+    const replaceConversationWithSummary = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-compressed' },
     });
     const forkConversation = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });
-    const forgetAgentSession = vi.fn();
+    const releaseConversation = vi.fn();
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
     const reconcileConversations = vi.fn().mockResolvedValue(undefined);
-    const respondToRequest = vi.fn().mockResolvedValue(undefined);
+    const respondToAgentRequest = vi.fn().mockResolvedValue(undefined);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
       clearGoal,
       archiveAgentConversation,
-      compressSession,
-      forgetAgentSession,
+      replaceConversationWithSummary,
+      releaseConversation,
       forkConversation,
       interrupt,
-      respondToRequest,
+      respondToAgentRequest,
       deleteTurn,
       editTurn,
       retryTurn,
@@ -239,7 +239,7 @@ describe('BackendDriverRpc', () => {
     await expect(rpc.handle('driver/conversation/resume', { agent, target })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-resumed' },
     });
-    await expect(rpc.handle('driver/session/compress', { agent })).resolves.toStrictEqual({
+    await expect(rpc.handle('driver/conversation/replaceWithSummary', { agent })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-compressed' },
     });
     await expect(rpc.handle('driver/conversation/fork', { agent, targetAgent })).resolves.toStrictEqual({
@@ -248,12 +248,12 @@ describe('BackendDriverRpc', () => {
     await expect(rpc.handle('driver/conversation/fork', { agent, targetAgent, turnId: 'turn-5' })).resolves.toStrictEqual({
       backendSession: { kind: 'codex', threadId: 'thread-forked' },
     });
-    await expect(rpc.handle('driver/session/forget', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
-    await expect(rpc.handle('driver/conversation/archive', { agent })).resolves.toBeNull();
+    await expect(rpc.handle('driver/conversation/release', { backend: 'codex', agentId: 'agent-dina' })).resolves.toBeNull();
+    await expect(rpc.handle('driver/conversation/archive', { agent })).resolves.toEqual({ supported: true });
     await expect(rpc.handle('driver/conversations/reconcile', { backend: 'codex', agents: [agent] })).resolves.toBeNull();
-    await expect(rpc.handle('driver/clientRequest/respond', {
+    await expect(rpc.handle('driver/agentRequest/respond', {
       backend: 'codex',
-      response: { id: 'approval-1', payload: { decision: 'allow' } },
+      response: { id: 'approval-1', outcome: { kind: 'decision', decision: 'allow' } },
     })).resolves.toBeNull();
 
     expect(setGoal).toHaveBeenCalledWith(agent, 'Ship the goal shelf');
@@ -265,13 +265,13 @@ describe('BackendDriverRpc', () => {
     expect(editTurn).toHaveBeenCalledWith(agent, 'turn-1', 'edited');
     expect(retryTurn).toHaveBeenCalledWith(agent, 'turn-1');
     expect(resumeConversation).toHaveBeenCalledWith(agent, target);
-    expect(compressSession).toHaveBeenCalledWith(agent);
+    expect(replaceConversationWithSummary).toHaveBeenCalledWith(agent);
     expect(forkConversation).toHaveBeenNthCalledWith(1, agent, targetAgent);
     expect(forkConversation).toHaveBeenNthCalledWith(2, agent, targetAgent, 'turn-5');
-    expect(forgetAgentSession).toHaveBeenCalledWith('agent-dina');
+    expect(releaseConversation).toHaveBeenCalledWith('agent-dina');
     expect(archiveAgentConversation).toHaveBeenCalledWith(agent);
     expect(reconcileConversations).toHaveBeenCalledWith([agent]);
-    expect(respondToRequest).toHaveBeenCalledWith({ id: 'approval-1', payload: { decision: 'allow' } });
+    expect(respondToAgentRequest).toHaveBeenCalledWith({ id: 'approval-1', outcome: { kind: 'decision', decision: 'allow' } });
   });
 
   it('returns undefined for methods outside the driver RPC surface', async () => {
@@ -321,11 +321,11 @@ describe('BackendDriverRpc', () => {
       await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
       await writeFile(path.join(tempDir, 'src', 'main.ts'), 'main');
 
-      await expect(rpc.handle('driver/files/list', { folder: tempDir })).resolves.toStrictEqual([
+      await expect(rpc.handle('workspace/files/list', { folder: tempDir })).resolves.toStrictEqual([
         { name: 'README.md', path: 'README.md' },
         { name: 'main.ts', path: 'src/main.ts' },
       ]);
-      await expect(rpc.handle('driver/file/preview', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
+      await expect(rpc.handle('workspace/file/preview', { folder: tempDir, filePath: 'README.md' })).resolves.toStrictEqual({
         path: 'README.md',
         size: 10,
         kind: 'text',
@@ -345,8 +345,8 @@ describe('BackendDriverRpc', () => {
       const filePath = path.join(tempDir, 'README.md');
       await writeFile(filePath, '# Read me\n');
 
-      await expect(rpc.handle('agent/folder/validate', { folder: tempDir })).resolves.toBeNull();
-      await expect(rpc.handle('agent/folder/validate', { folder: filePath })).rejects.toThrow('Agent folder must be a directory.');
+      await expect(rpc.handle('workspace/folder/validate', { folder: tempDir })).resolves.toBeNull();
+      await expect(rpc.handle('workspace/folder/validate', { folder: filePath })).rejects.toThrow('Agent folder must be a directory.');
     } finally {
       await rm(tempDir, { recursive: true, force: true });
       await rpc.close();
@@ -417,7 +417,7 @@ function createDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackend
       backendSession: { kind: 'codex', threadId: 'thread-interrupt' },
       turnId: 'turn-interrupt',
     }),
-    respondToRequest: vi.fn().mockResolvedValue(undefined),
+    respondToAgentRequest: vi.fn().mockResolvedValue(undefined),
     onEvent: vi.fn().mockReturnValue(() => undefined),
     close: vi.fn().mockResolvedValue(undefined),
     ...overrides,

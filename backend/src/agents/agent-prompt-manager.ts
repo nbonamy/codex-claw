@@ -23,6 +23,13 @@ export class AgentPromptManager {
     return canStartPrompt(agent);
   }
 
+  sendAndWaitForAcceptance(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<void> {
+    if (!canStartPrompt(agent)) return Promise.reject(new Error('Agent is busy. Try the review decision again when idle.'));
+    return new Promise((resolve, reject) => {
+      this.start(agent, prompt, options, undefined, { resolve, reject });
+    });
+  }
+
   send(agentId: string, prompt: string, promptOptions?: SendPromptOptions): AppSnapshot {
     const snapshot = this.options.getSnapshot();
     const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
@@ -81,7 +88,7 @@ export class AgentPromptManager {
     this.inFlightQueuedPrompts.clear();
   }
 
-  private start(agent: Agent, prompt: string, promptOptions?: SendPromptOptions, queuedPromptId?: string): AppSnapshot {
+  private start(agent: Agent, prompt: string, promptOptions?: SendPromptOptions, queuedPromptId?: string, acceptance?: { resolve: () => void; reject: (error: Error) => void }): AppSnapshot {
     const snapshot = this.options.getSnapshot();
     const inFlightKey = queuedPromptId ? queuedPromptKey(agent.id, queuedPromptId) : undefined;
     if (inFlightKey && this.inFlightQueuedPrompts.has(inFlightKey)) return snapshot;
@@ -108,8 +115,10 @@ export class AgentPromptManager {
           },
           onPromptStarted: () => {
             if (queuedPromptId) this.dequeue(agent.id, queuedPromptId);
+            acceptance?.resolve();
           },
           onPromptFailed: (error) => {
+            acceptance?.reject(error);
             if (queuedPromptId) {
               this.inFlightQueuedPrompts.delete(queuedPromptKey(agent.id, queuedPromptId));
               this.scheduleRetry(agent.id, queuedPromptId, error);

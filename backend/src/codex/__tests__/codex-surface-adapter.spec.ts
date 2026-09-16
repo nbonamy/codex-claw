@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, RendererMessage } from '@codex-claw/core/contracts';
+import type { Agent } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
 import { CodexAppServerClient, type RpcMessage, type RpcTransport } from '@codex-app-sdk/backend/protocol';
 import { CodexSurface } from '@codex-app-sdk/backend';
@@ -395,7 +395,7 @@ describe('CodexSurfaceAgentAdapter', () => {
   it('maps official remote-control pairing data into Claw contracts', async () => {
     const { adapter, transport } = createAdapter();
 
-    await expect(adapter.getDevicePairingStatus()).resolves.toStrictEqual({
+    await expect(adapter.getRemoteControlStatus()).resolves.toStrictEqual({
       status: 'connected',
       serverName: 'Claw',
       installationId: 'installation-1',
@@ -473,8 +473,8 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
 
     await adapter.start();
-    await expect(adapter.enableDevicePairing()).resolves.toMatchObject({ status: 'connected', allowRemoteControl: null });
-    await expect(adapter.disableDevicePairing()).resolves.toMatchObject({ status: 'disabled', allowRemoteControl: null });
+    await expect(adapter.enableRemoteControl()).resolves.toMatchObject({ status: 'connected', allowRemoteControl: null });
+    await expect(adapter.disableRemoteControl()).resolves.toMatchObject({ status: 'disabled', allowRemoteControl: null });
     await expect(adapter.checkDevicePairing({
       pairingCode: '',
       manualPairingCode: 'ABCD-EFGH',
@@ -528,8 +528,8 @@ describe('CodexSurfaceAgentAdapter', () => {
     await expect(adapter.interruptTurn(agentA)).resolves.toStrictEqual({ threadId: 'thread-a', turnId: sent.turnId });
 
     expect(lastRequest(transport, 'thread/name/set')).toBeDefined();
-    adapter.forgetAgentSession('agent-missing');
-    adapter.forgetAgentSession('agent-a');
+    adapter.releaseConversation('agent-missing');
+    adapter.releaseConversation('agent-a');
   });
 
   it('restores an archived conversation before archiving the displaced active conversation', async () => {
@@ -641,21 +641,21 @@ describe('CodexSurfaceAgentAdapter', () => {
     };
     adapter.onEvent((event) => {
       events.push(event);
-      if (event.type !== 'thread.settingsUpdated') return;
+      if (event.type !== 'conversation.settingsUpdated') return;
       compressionAgent.backendDefaults = {
         ...(compressionAgent.backendDefaults?.kind === 'codex'
           ? compressionAgent.backendDefaults
           : { kind: 'codex' as const }),
-        ...event.payload.threadSettings,
+        ...event.payload.settings,
       };
     });
     transport.completeTurnsImmediately = true;
     transport.completedTurnAgentMessage = '## Handoff\n\nContinue the renderer migration.';
     transport.emitTurnSettingsUpdated = true;
     transport.includeLunaModel = true;
-    await adapter.hydrateAgent(compressionAgent);
+    await adapter.loadConversation(compressionAgent);
 
-    await expect(adapter.compressSession(compressionAgent)).resolves.toStrictEqual({ threadId: 'thread-new' });
+    await expect(adapter.replaceConversationWithSummary(compressionAgent)).resolves.toStrictEqual({ threadId: 'thread-new' });
 
     const turnStarts = transport.sent.filter((message) => (
       'method' in message && message.method === 'turn/start'
@@ -728,10 +728,10 @@ describe('CodexSurfaceAgentAdapter', () => {
     ));
     expect(methods.lastIndexOf('turn/start')).toBeLessThan(methods.lastIndexOf('thread/archive'));
     expect(events).not.toContainEqual(expect.objectContaining({
-      type: 'thread.settingsUpdated',
+      type: 'conversation.settingsUpdated',
       threadId: 'thread-a',
       payload: {
-        threadSettings: expect.objectContaining({
+        settings: expect.objectContaining({
           model: 'gpt-5.6-luna',
           reasoningEffort: 'low',
         }),
@@ -792,9 +792,9 @@ describe('CodexSurfaceAgentAdapter', () => {
       payload: expect.objectContaining({ conversationTitle: 'Plan a summer trip' }),
     }));
 
-    adapter.forgetAgentSession(quickChat.id);
+    adapter.releaseConversation(quickChat.id);
     quickChat.backendSession = { kind: 'codex', threadId: 'thread-new' };
-    await adapter.hydrateAgent(quickChat);
+    await adapter.loadConversation(quickChat);
 
     expect(lastRequest(transport, 'thread/resume')).not.toMatchObject({
       params: { cwd: expect.anything() },
@@ -844,7 +844,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await Promise.all([adapter.hydrateAgent(agentA), adapter.hydrateAgent(agentB)]);
+    await Promise.all([adapter.loadConversation(agentA), adapter.loadConversation(agentB)]);
     await Promise.all([adapter.sendPrompt(agentA, 'Run A'), adapter.sendPrompt(agentB, 'Run B')]);
     events.length = 0;
 
@@ -914,7 +914,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     await adapter.sendPrompt(agentA, 'Run exactly once');
@@ -943,7 +943,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await Promise.all([adapter.hydrateAgent(agentA), adapter.hydrateAgent(agentB)]);
+    await Promise.all([adapter.loadConversation(agentA), adapter.loadConversation(agentB)]);
     const resetFrames = events.filter((event) => event.type === 'codex.conversationSnapshotChanged');
     for (const agent of [agentA, agentB]) {
       const frame = resetFrames.find((event) => event.agentId === agent.id);
@@ -1004,9 +1004,9 @@ describe('CodexSurfaceAgentAdapter', () => {
     const priorRevision = frames
       .filter((event) => event.type === 'codex.conversationEventReceived' && event.agentId === agentA.id)
       .at(-1)?.payload.revision ?? 0;
-    adapter.forgetAgentSession(agentA.id);
+    adapter.releaseConversation(agentA.id);
     events.length = 0;
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     const reboundFrame = events
       .filter((event) => event.type === 'codex.conversationSnapshotChanged')
       .at(-1);
@@ -1031,7 +1031,7 @@ describe('CodexSurfaceAgentAdapter', () => {
         agentMessage('assistant-original', 'Original response'),
       ]),
     ]);
-    await driver.hydrateAgent(agentA);
+    await driver.loadConversation(agentA);
 
     const result = await driver.editTurn(agentA, 'turn-original', 'Edited prompt');
 
@@ -1057,7 +1057,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
     transport.threadMetadataByThreadId.set('thread-child', {
       parentThreadId: 'thread-a',
@@ -1174,7 +1174,7 @@ describe('CodexSurfaceAgentAdapter', () => {
 
   it('reads every live child message without reloading inherited history', async () => {
     const { adapter, transport } = createAdapter();
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     transport.fullHistoryTurnsByThreadId.set('thread-child', [
       turn('turn-parent', 'completed', [agentMessage('parent-answer', 'Inherited parent answer')]),
     ]);
@@ -1249,7 +1249,7 @@ describe('CodexSurfaceAgentAdapter', () => {
       turn('turn-parent', 'completed', [agentMessage('parent-answer', 'Inherited parent answer')]),
       turn('turn-child', 'completed', [agentMessage('child-answer', 'Finished the probe')]),
     ]);
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     await expect(adapter.readConversationMessages('thread-child', agentA.id)).resolves.toEqual([
@@ -1272,7 +1272,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     await adapter.sendPrompt(agentA, 'Plan and run');
     events.length = 0;
 
@@ -1332,7 +1332,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     await adapter.sendPrompt(agentA, 'Inspect and update files');
     events.length = 0;
 
@@ -1362,14 +1362,14 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        type: 'file.activity', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
+        type: 'workspace.fileActivityDetected', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
         payload: {
           messageId: 'assistant-turn-thread-a', itemId: 'read-file',
           path: '/workspace/a/README.md', action: 'read', status: 'running',
         },
       }),
       expect.objectContaining({
-        type: 'file.activity', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
+        type: 'workspace.fileActivityDetected', agentId: 'agent-a', threadId: 'thread-a', turnId: 'turn-thread-a',
         payload: {
           messageId: 'assistant-turn-thread-a', itemId: 'create-file',
           path: '/workspace/a/src/new-file.ts', action: 'create', status: 'completed',
@@ -1382,7 +1382,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await Promise.all([adapter.hydrateAgent(agentA), adapter.hydrateAgent(agentB)]);
+    await Promise.all([adapter.loadConversation(agentA), adapter.loadConversation(agentB)]);
     events.length = 0;
 
     transport.emit({
@@ -1453,11 +1453,40 @@ describe('CodexSurfaceAgentAdapter', () => {
     }]);
   });
 
+  it.each(['approval', 'question'] as const)('preserves agent targeting through the driver for colliding %s IDs', async (kind) => {
+    const { adapter, surface } = createAdapter();
+    const handles = [surface.conversation('thread-a'), surface.conversation('thread-b')];
+    const calls = handles.map((handle) => {
+      const getSnapshot = handle.getSnapshot.bind(handle);
+      vi.spyOn(handle, 'getSnapshot').mockImplementation(() => ({
+        ...getSnapshot(),
+        approvals: kind === 'approval' ? [{ id: '0', conversationId: handle.id, itemId: 'item', kind: 'command', title: 'Run', canDeny: true, allowedScopes: ['once'] }] : [],
+        clientRequests: kind === 'question' ? [{ id: '0', conversationId: handle.id, turnId: 'turn', itemId: 'item', kind: 'ask_user', payload: { request: { itemId: 'item', delivery: 'async', blocking: false, questions: [] } } }] : [],
+      }));
+      return kind === 'approval'
+        ? vi.spyOn(handle, 'resolveApproval').mockImplementation(async () => handle.getSnapshot())
+        : vi.spyOn(handle, 'respondToClientRequest').mockImplementation(async () => handle.getSnapshot());
+    });
+    const driver = new CodexBackendDriver(adapter);
+    try {
+      await Promise.all([adapter.loadConversation(agentA), adapter.loadConversation(agentB)]);
+      const outcome = kind === 'approval' ? { kind: 'decision' as const, decision: 'allow' as const } : { kind: 'answered' as const, answers: {} };
+      await expect(driver.respondToAgentRequest({ id: '0', outcome })).rejects.toThrow('Agent identity');
+      await expect(driver.respondToAgentRequest({ agentId: 'missing', id: '0', outcome })).rejects.toThrow('no longer pending');
+      await driver.respondToAgentRequest({ agentId: agentA.id, id: '0', outcome });
+      expect(calls[0]).toHaveBeenCalledOnce();
+      expect(calls[1]).not.toHaveBeenCalled();
+      if (kind === 'question') expect(calls[0]).toHaveBeenCalledWith({ id: '0', payload: { answers: {} } });
+      await driver.respondToAgentRequest({ agentId: agentB.id, id: '0', outcome });
+      expect(calls[1]).toHaveBeenCalledOnce();
+    } finally { await adapter.close(); }
+  });
+
   it('emits a decodable skill update when the provider returns a null brand color', async () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     transport.skillBrandColor = null;
@@ -1486,7 +1515,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     transport.skillDefaultPrompt = null;
@@ -1575,7 +1604,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     transport.resumedServiceTier = 'default';
     adapter.onEvent((event) => {
       events.push(event);
-      if (event.type !== 'thread.settingsUpdated') return;
+      if (event.type !== 'conversation.settingsUpdated') return;
       const threadSettings = (event.payload as { threadSettings?: { serviceTier?: string | null } }).threadSettings;
       if (!threadSettings || threadSettings.serviceTier === undefined) return;
       persistedAgent.backendDefaults = {
@@ -1585,17 +1614,17 @@ describe('CodexSurfaceAgentAdapter', () => {
       };
     });
 
-    await adapter.hydrateAgent(persistedAgent);
+    await adapter.loadConversation(persistedAgent);
 
     expect(lastRequest(transport, 'thread/settings/update')).toMatchObject({
       params: { threadId: 'thread-a', serviceTier: 'fast' },
     });
-    const settingsEvents = events.filter((event) => event.type === 'thread.settingsUpdated');
+    const settingsEvents = events.filter((event) => event.type === 'conversation.settingsUpdated');
     expect(settingsEvents.at(-1)).toMatchObject({
       agentId: 'agent-a',
       threadId: 'thread-a',
       payload: {
-        threadSettings: expect.objectContaining({ serviceTier: 'fast' }),
+        settings: expect.objectContaining({ serviceTier: 'fast' }),
       },
     });
   });
@@ -1603,7 +1632,7 @@ describe('CodexSurfaceAgentAdapter', () => {
   it('refreshes models and uses handle-scoped approval capabilities', async () => {
     const { adapter, transport } = createAdapter();
     const driver = new CodexBackendDriver(adapter);
-    await Promise.all([adapter.hydrateAgent(agentA), adapter.hydrateAgent(agentB)]);
+    await Promise.all([adapter.loadConversation(agentA), adapter.loadConversation(agentB)]);
 
     expect(driver.getCapabilities(agentA).approvalPresets).not.toContain('full-access');
     expect(driver.getCapabilities(agentB).approvalPresets).toContain('full-access');
@@ -1648,7 +1677,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     transport.staleActiveThreadIds.add('thread-a');
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
     expect(events).toContainEqual(expect.objectContaining({
@@ -1673,7 +1702,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
     expect(events).toContainEqual(expect.objectContaining({
@@ -1683,7 +1712,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
-      type: 'thread.goalUpdated',
+      type: 'conversation.goalUpdated',
       payload: { goal: expect.objectContaining({ status: 'active' }) },
     }));
   });
@@ -1697,7 +1726,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     });
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     expect(lastRequest(transport, 'turn/interrupt')).toBeUndefined();
     expect(events).toContainEqual(expect.objectContaining({
@@ -1711,7 +1740,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     await adapter.sendPrompt(agentA, 'Start work');
     events.length = 0;
     transport.emit({ method: 'item/completed', params: {
@@ -1736,7 +1765,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     transport.emit({
@@ -1752,7 +1781,7 @@ describe('CodexSurfaceAgentAdapter', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
-      type: 'thread.goalUpdated',
+      type: 'conversation.goalUpdated',
       payload: { goal: expect.objectContaining({ status: 'complete' }) },
     }));
   });
@@ -1762,7 +1791,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     await adapter.sendPrompt(agentA, 'Start work');
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-a',
@@ -1771,7 +1800,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     }));
 
     events.length = 0;
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/resume'
@@ -1817,7 +1846,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     const providerSnapshot = events.slice().reverse().find((event) => event.type === 'codex.conversationSnapshotChanged');
     expect(providerSnapshot).toMatchObject({
@@ -1841,7 +1870,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     const emitSurfaceEvent = (surface as unknown as {
@@ -1880,7 +1909,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     )));
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     const initialHistory = events.slice().reverse().find((event) => event.type === 'codex.conversationSnapshotChanged');
     expect(initialHistory).toMatchObject({
@@ -1919,28 +1948,28 @@ describe('CodexSurfaceAgentAdapter', () => {
       storageState: 'active',
     });
     const cachedHandle = surface.conversation('thread-a');
-    adapter.forgetAgentSession(agentA.id);
+    adapter.releaseConversation(agentA.id);
     expect(surface.conversation('thread-a')).not.toBe(cachedHandle);
     events.length = 0;
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toHaveLength(1);
     expect(events).toContainEqual(expect.objectContaining({
-      type: 'thread.settingsUpdated',
+      type: 'conversation.settingsUpdated',
       payload: expect.objectContaining({
-        threadSettings: expect.objectContaining({ model: 'gpt-1', reasoningEffort: 'medium', serviceTier: 'fast' }),
+        settings: expect.objectContaining({ model: 'gpt-1', reasoningEffort: 'medium', serviceTier: 'fast' }),
       }),
     }));
     events.length = 0;
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toHaveLength(1);
     expect(events.filter(isLegacyClawConversationEvent)).toStrictEqual([]);
     events.length = 0;
 
     await adapter.setThreadGoal(agentA, 'Ship it');
     await adapter.clearThreadGoal(agentA);
-    expect(events.some((event) => event.type === 'thread.goalUpdated' || event.type === 'thread.goalCleared')).toBe(false);
+    expect(events.some((event) => event.type === 'conversation.goalUpdated' || event.type === 'conversation.goalCleared')).toBe(false);
 
     await adapter.sendPrompt(agentA, 'Run once');
     await adapter.steerPrompt(agentA, 'Try smaller');
@@ -1988,7 +2017,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     transport.fullHistoryTurnsByThreadId.set('thread-forked', [
       turn('turn-source', 'completed', [agentMessage('message-source', 'Source answer')]),
     ]);
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     await expect(adapter.forkConversation(agentA, targetAgent, 'turn-source')).resolves.toMatchObject({
       threadId: 'thread-forked',
@@ -2002,7 +2031,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     await adapter.sendPrompt(agentA, '/review');
@@ -2030,7 +2059,7 @@ describe('CodexSurfaceAgentAdapter', () => {
     const { adapter, transport } = createAdapter();
     const events: BackendEvent[] = [];
     adapter.onEvent((event) => events.push(event));
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
     transport.emit({
@@ -2072,11 +2101,11 @@ describe('CodexSurfaceAgentAdapter', () => {
       const events: BackendEvent[] = [];
       adapter.onEvent((event) => events.push(event));
 
-      await adapter.hydrateAgent(agentA);
+      await adapter.loadConversation(agentA);
       events.length = 0;
       vi.setSystemTime(new Date('2026-08-01T00:05:00.001Z'));
 
-      await adapter.hydrateAgent(agentA);
+      await adapter.loadConversation(agentA);
 
       expect(transport.sent.filter((message) => (
         'method' in message && message.method === 'thread/resume'
@@ -2084,7 +2113,7 @@ describe('CodexSurfaceAgentAdapter', () => {
 
       vi.setSystemTime(new Date('2026-08-01T00:15:00.001Z'));
 
-      await adapter.hydrateAgent(agentA);
+      await adapter.loadConversation(agentA);
 
       expect(transport.sent.filter((message) => (
         'method' in message && message.method === 'thread/resume'
@@ -2104,10 +2133,10 @@ describe('CodexSurfaceAgentAdapter', () => {
     ]);
     adapter.onEvent((event) => events.push(event));
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
     events.length = 0;
 
-    await adapter.hydrateAgent(agentA);
+    await adapter.loadConversation(agentA);
 
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/resume'

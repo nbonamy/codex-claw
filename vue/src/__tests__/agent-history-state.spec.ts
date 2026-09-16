@@ -11,11 +11,11 @@ describe('createAgentHistoryState', () => {
     snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
     const first = deferred<AppSnapshot>();
     const second = deferred<AppSnapshot>();
-    const hydrateAgentHistory = vi.fn()
+    const loadConversationHistory = vi.fn()
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
     stubElectronTestWindow({
-      codexClaw: { hydrateAgentHistory } satisfies Partial<CodexClawApi>,
+      codexClaw: { loadConversationHistory } satisfies Partial<CodexClawApi>,
     });
     const state = createAgentHistoryState({
       adoptSnapshot: vi.fn(),
@@ -30,8 +30,8 @@ describe('createAgentHistoryState', () => {
       seq: 1,
       occurredAt: '2026-09-05T00:00:00.000Z',
       agentId: 'agent-dina',
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'Unable to load conversation history.' },
     });
     first.resolve(snapshot);
     await initialHydration;
@@ -47,15 +47,15 @@ describe('createAgentHistoryState', () => {
       seq: 2,
       occurredAt: '2026-09-05T00:00:00.500Z',
       agentId: 'agent-dina',
-      type: 'thread.historyHydrationFailed',
-      payload: {},
+      type: 'conversation.historyLoadFailed',
+      payload: { error: 'Unable to load conversation history.' },
     });
 
     const retry = state.retryActive();
     void state.retryActive();
     expect(state.isActiveAgentHistoryFailed.value).toBe(false);
     expect(state.isHydratingActiveAgentHistory.value).toBe(true);
-    expect(hydrateAgentHistory).toHaveBeenCalledTimes(2);
+    expect(loadConversationHistory).toHaveBeenCalledTimes(2);
 
     second.resolve(snapshot);
     await retry;

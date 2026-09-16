@@ -188,8 +188,8 @@ describe('ClawBackendProcessClient', () => {
       },
       {
         seq: secret,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: '2026-06-13T00:00:00.000Z',
       },
       {
@@ -210,8 +210,8 @@ describe('ClawBackendProcessClient', () => {
       method: backendMethods.backendEventNotify,
       params: {
         seq: 3,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: '2026-06-13T00:00:00.000Z',
       },
     })}\n`);

@@ -103,21 +103,22 @@ export class AgentConversationService {
       });
       this.options.applyEvent({
         agentId,
-        type: 'thread.historyHydrationFailed',
-        payload: {},
+        type: 'conversation.historyLoadFailed',
+        conversationId: agent.backendSession.kind === 'codex' ? agent.backendSession.threadId : agent.backendSession.sessionId,
+        payload: { error: 'Unable to load conversation history.' },
       });
     }
   }
 
   private async hydrateSessionWithTransientRetry(agentId: string, agent: Agent): Promise<unknown> {
     try {
-      return await this.options.driverRequest(agent, backendMethods.driverHistoryHydrate, { agent });
+      return await this.options.driverRequest(agent, backendMethods.driverConversationLoad, { agent });
     } catch (error) {
       if (!isTransientHistoryHydrationError(error)) throw error;
       await delay(HISTORY_HYDRATION_RETRY_DELAY_MS);
       const retryAgent = this.agent(agentId);
       if (!retryAgent?.backendSession) return undefined;
-      return this.options.driverRequest(retryAgent, backendMethods.driverHistoryHydrate, { agent: retryAgent });
+      return this.options.driverRequest(retryAgent, backendMethods.driverConversationLoad, { agent: retryAgent });
     }
   }
 

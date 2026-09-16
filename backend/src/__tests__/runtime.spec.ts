@@ -143,6 +143,7 @@ vi.mock('../scheduling/runtime-scheduler', () => ({
 
 vi.mock('../server', () => ({
   ClawBackendServer: class {
+    initialize = vi.fn().mockResolvedValue(undefined);
     constructor(options: unknown) { mocks.serverOptions.push(options); }
     emitEvent = mocks.serverEmitEvent;
     close = mocks.serverClose;
@@ -344,11 +345,8 @@ describe('clawd runtime', () => {
     expect(workIntegrations.getSnapshot()).toBe(mocks.snapshot);
     expect(workIntegrations.drivers[0]?.getClientId()).toBe('github-client');
     expect(mocks.runtimeGitHubOAuthClientId).toHaveBeenCalledWith({ oauthClientId: 'github-client' });
-    await workIntegrations.openExternal('https://github.com/login');
     await workIntegrations.saveSnapshot();
-    expect(requestClient).toHaveBeenCalledWith(backendMethods.clientExternalOpen, {
-      url: 'https://github.com/login',
-    });
+    expect(workIntegrations).not.toHaveProperty('openExternal');
     expect(mocks.saveBackendSnapshot).toHaveBeenCalledWith(mocks.snapshot);
 
     const remote = mocks.remoteOptions[0] as RemoteOptions;

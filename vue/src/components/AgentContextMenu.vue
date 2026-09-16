@@ -117,7 +117,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
   ...(props.compressVisible === true ? [{
     id: 'compress-session',
     type: 'action',
-    label: t('agents.compressSession'),
+    label: t('agents.replaceConversationWithSummary'),
     icon: ArrowsMinimizeIcon,
     disabled: props.compressDisabled === true,
   } satisfies AppMenuItem] : []),

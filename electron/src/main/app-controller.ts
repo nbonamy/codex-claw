@@ -1,4 +1,6 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
+import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { encodedAppError } from '@codex-claw/core/app-error';
 import { mainT } from './i18n';
@@ -118,6 +120,7 @@ export class AppController {
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
       spokenAnnouncements: this.policyAwareSpokenAnnouncements,
+      spokenAnnouncementVoice: () => this.snapshot?.general.spokenAnnouncementVoice ?? 'af_heart',
     });
   }
 
@@ -192,9 +195,9 @@ export class AppController {
       return this.removeRemoteConnection(connectionId);
     });
 
-    ipc.handle(ipcChannels.getDevicePairingStatus, () => this.getDevicePairingStatus());
-    ipc.handle(ipcChannels.enableDevicePairing, () => this.enableDevicePairing());
-    ipc.handle(ipcChannels.disableDevicePairing, () => this.disableDevicePairing());
+    ipc.handle(ipcChannels.getRemoteControlStatus, () => this.getRemoteControlStatus());
+    ipc.handle(ipcChannels.enableRemoteControl, () => this.enableRemoteControl());
+    ipc.handle(ipcChannels.disableRemoteControl, () => this.disableRemoteControl());
     ipc.handle(ipcChannels.startDevicePairing, () => this.startDevicePairing());
     ipc.handle(ipcChannels.checkDevicePairing, (_event, session: DevicePairingSession) => this.checkDevicePairing(session));
     ipc.handle(ipcChannels.listPairedDevices, (_event, environmentId: string) => this.listPairedDevices(environmentId));
@@ -204,12 +207,9 @@ export class AppController {
       return this.connectWorkProvider(provider);
     });
 
-    ipc.handle(ipcChannels.openWorkProviderAuthorization, async (_event, provider: WorkProviderKind) => {
-      return this.openWorkProviderAuthorization(provider);
-    });
 
-    ipc.handle(ipcChannels.completeWorkProviderConnection, async (_event, provider: WorkProviderKind) => {
-      return this.completeWorkProviderConnection(provider);
+    ipc.handle(ipcChannels.pollWorkProviderAuthorization, async (_event, provider: WorkProviderKind) => {
+      return this.pollWorkProviderAuthorization(provider);
     });
 
     ipc.handle(ipcChannels.disconnectWorkProvider, async (_event, provider: WorkProviderKind) => {
@@ -433,8 +433,8 @@ export class AppController {
       return this.compressAgentSession(agentId);
     });
 
-    ipc.handle(ipcChannels.hydrateAgentHistory, async (_event, agentId: string) => {
-      return this.hydrateAgentHistory(agentId);
+    ipc.handle(ipcChannels.loadConversationHistory, async (_event, agentId: string) => {
+      return this.loadConversationHistory(agentId);
     });
 
     ipc.handle(ipcChannels.loadOlderAgentHistory, async (_event, agentId: string) => {
@@ -510,6 +510,9 @@ export class AppController {
       return this.setAgentPermissionMode(agentId, mode);
     });
 
+    ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
+      return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
+    });
     ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
@@ -689,7 +692,7 @@ export class AppController {
   }
 
   private async checkRemoteConnection(connectionId: string, inspectOnly?: boolean): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsSync, { connectionId, ...(inspectOnly ? { inspectOnly: true } : {}) }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(inspectOnly ? backendMethods.connectionsRuntimeInspect : backendMethods.connectionsRuntimeSync, { connectionId }));
   }
 
   private async updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<AppSnapshot> {
@@ -700,40 +703,37 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.connectionsDelete, { connectionId }));
   }
 
-  private getDevicePairingStatus(): Promise<DevicePairingStatus> {
-    return this.requireBackendClient().request(backendMethods.devicePairingStatusGet);
+  private getRemoteControlStatus(): Promise<DevicePairingStatus> {
+    return this.requireBackendClient().request(backendMethods.remoteControlStatusGet);
   }
 
-  private enableDevicePairing(): Promise<DevicePairingStatus> {
-    return this.requireBackendClient().request(backendMethods.devicePairingEnable);
+  private enableRemoteControl(): Promise<DevicePairingStatus> {
+    return this.requireBackendClient().request(backendMethods.remoteControlEnable);
   }
 
-  private disableDevicePairing(): Promise<DevicePairingStatus> {
-    return this.requireBackendClient().request(backendMethods.devicePairingDisable);
+  private disableRemoteControl(): Promise<DevicePairingStatus> {
+    return this.requireBackendClient().request(backendMethods.remoteControlDisable);
   }
 
   private startDevicePairing(): Promise<DevicePairingSession> {
-    return this.requireBackendClient().request(backendMethods.devicePairingStart);
+    return this.requireBackendClient().request(backendMethods.remoteControlPairingStart);
   }
 
   private checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
-    return this.requireBackendClient().request(backendMethods.devicePairingStatus, { session });
+    return this.requireBackendClient().request(backendMethods.remoteControlPairingCheck, { session });
   }
 
   private listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
-    return this.requireBackendClient().request(backendMethods.devicePairingClientsList, { environmentId });
+    return this.requireBackendClient().request(backendMethods.remoteControlClientsList, { environmentId });
   }
 
   private async revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
-    await this.requireBackendClient().request(backendMethods.devicePairingClientRevoke, { environmentId, clientId });
+    await this.requireBackendClient().request(backendMethods.remoteControlClientRevoke, { environmentId, clientId });
   }
 
-  private async openWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderAuthorizationOpen, { provider }));
-  }
 
-  private async completeWorkProviderConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderConnectionComplete, { provider }));
+  private async pollWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderAuthorizationPoll, { provider }));
   }
 
   private async disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot> {
@@ -812,7 +812,7 @@ export class AppController {
     const targetPath = await resolveProjectPath(requireAgentFolder(agent), filePath);
     await this.openInProvider.open(application, targetPath);
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(
-      backendMethods.agentOpenInApplicationUpdate,
+      backendMethods.clientAgentExternalApplicationUpdate,
       { agentId, application },
     ));
   }
@@ -836,11 +836,11 @@ export class AppController {
   }
 
   private async reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentReorder, { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientAgentOrderUpdate, { input }));
   }
 
   private async reorderRepositories(input: ReorderRepositoriesInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.repositoryReorder, { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientRepositoryOrderUpdate, { input }));
   }
 
   private async closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<AppSnapshot> {
@@ -851,7 +851,7 @@ export class AppController {
   }
 
   private async selectAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentSelect, { agentId }));
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientNavigationSelectAgent, { agentId }));
   }
 
   private async assignWorkItemToAgent(agentId: string, item: unknown): Promise<AppSnapshot> {
@@ -863,7 +863,7 @@ export class AppController {
   }
 
   private async createTeam(input: CreateTeamInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamCreate, { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(input.remoteTeamId ? backendMethods.teamConnect : backendMethods.teamCreate, { input }));
   }
 
   private async updateTeam(input: UpdateTeamInput): Promise<AppSnapshot> {
@@ -871,7 +871,7 @@ export class AppController {
   }
 
   private async reorderTeams(input: ReorderTeamsInput): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamReorder, { input }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientTeamOrderUpdate, { input }));
   }
 
   private async closeTeam(teamId: string): Promise<AppSnapshot> {
@@ -883,12 +883,16 @@ export class AppController {
   }
 
   private async selectTeam(teamId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.teamSelect, { teamId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientNavigationSelectTeam, { teamId }));
   }
 
   private async updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot> {
     const previousCodexBinaryPath = this.snapshot?.general.codexBinaryPath ?? '';
-    const snapshot = await this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input }));
+    const { policy, preferences } = splitSettingsInput(input);
+    let result: AppSnapshot | undefined;
+    if (Object.keys(policy).length) result = await this.requireBackendClient().request<AppSnapshot>(backendMethods.settingsUpdate, { input: policy });
+    if (Object.keys(preferences).length) result = await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientPreferencesUpdate, { input: preferences });
+    const snapshot = await this.adoptBackendSnapshot(result ?? this.snapshot!);
     if (input.general?.appshots) this.syncAppshotsKeyMonitor();
     if (previousCodexBinaryPath !== snapshot.general.codexBinaryPath) {
       await this.restartApp();
@@ -926,7 +930,7 @@ export class AppController {
   }
 
   private cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication> {
-    return this.requireBackendClient().request(backendMethods.codexChatGptLoginCancel,
+    return this.requireBackendClient().request(backendMethods.codexLoginCancel,
       remoteConnectionId || loginId ? { ...(remoteConnectionId ? { remoteConnectionId } : {}), ...(loginId ? { loginId } : {}) } : undefined);
   }
 
@@ -1184,22 +1188,22 @@ export class AppController {
   }
 
   private async restartAgent(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRestart, { agentId }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentConversationReset, { agentId }));
   }
 
   private async compressAgentSession(agentId: string): Promise<AppSnapshot> {
     return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(
-      backendMethods.agentSessionCompress,
+      backendMethods.agentConversationReplaceWithSummary,
       { agentId },
     ));
   }
 
-  private async hydrateAgentHistory(agentId: string): Promise<AppSnapshot> {
-    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHistoryHydrate, { agentId }));
+  private async loadConversationHistory(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendMutationSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentConversationLoad, { agentId }));
   }
 
   private async loadOlderAgentHistory(agentId: string): Promise<{ hasOlder: boolean }> {
-    return this.requireBackendClient().request<{ hasOlder: boolean }>(backendMethods.agentHistoryLoadOlder, { agentId });
+    return this.requireBackendClient().request<{ hasOlder: boolean }>(backendMethods.agentConversationHistoryLoadOlder, { agentId });
   }
 
   private async listAgentConversations(agentId: string, input?: ConversationListInput): Promise<ConversationSummary[]> {
@@ -1475,7 +1479,7 @@ export class AppController {
   }
 
   private async respondToClientRequest(response: ClientRequestResponse): Promise<AppSnapshot> {
-    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientRequestRespond, { response }));
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentRequestRespond, { response: agentResponseFromClientResponse(response) }));
   }
 
   private installUpdate(): void {
@@ -1560,7 +1564,7 @@ export class AppController {
       return;
     }
 
-    void this.backendClient.request<AppSnapshot>(backendMethods.debugPlanReviewInject, { agentId })
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugPlanReadyForReviewInject, { agentId })
       .then((snapshot) => this.adoptBackendSnapshot(snapshot))
       .catch((error) => warnMain('debug', 'failed to inject plan review fixture', {
         agentId,
@@ -1569,6 +1573,8 @@ export class AppController {
   }
 
   private emitBackendEvent(event: ClawBackendEvent): void {
+    if (event.type === 'snapshot.updated') event = { ...event, payload: projectClientSnapshot(event.payload, 'desktop') };
+    if (event.snapshot) event = { ...event, snapshot: projectClientSnapshot(event.snapshot, 'desktop') };
     if (this.backendEventBuffer) {
       this.backendEventBuffer.push(event);
       return;

@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
@@ -100,13 +101,13 @@ export class BackendDriverRpc {
 
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
-      case backendMethods.driverFilesList: {
+      case backendMethods.workspaceFilesList: {
         const record = requireRecord(params);
         return listAgentFolderFiles(requireString(record.folder, 'folder'));
       }
       case backendMethods.driverCodexAuthenticationGet:
         return this.requireCodexDriver().getAuthentication();
-      case backendMethods.driverCodexChatGptLoginCancel:
+      case backendMethods.driverCodexLoginCancel:
         return this.requireCodexDriver().cancelChatGptLogin(params ? requireString(requireRecord(params).loginId, 'loginId') : undefined);
       case backendMethods.driverCodexChatGptDeviceCodeLoginStart:
         return this.requireCodexDriver().startChatGptDeviceCodeLogin();
@@ -114,38 +115,38 @@ export class BackendDriverRpc {
         return this.requireCodexDriver().startChatGptLogin();
       case backendMethods.driverCodexLogout:
         return this.requireCodexDriver().logout();
-      case backendMethods.devicePairingStatusGet:
-        return this.requireCodexDriver().getDevicePairingStatus();
-      case backendMethods.devicePairingEnable:
-        return this.requireCodexDriver().enableDevicePairing();
-      case backendMethods.devicePairingDisable:
-        return this.requireCodexDriver().disableDevicePairing();
-      case backendMethods.devicePairingStart:
-        return this.requireCodexDriver().startDevicePairing();
-      case backendMethods.devicePairingStatus: {
+      case backendMethods.remoteControlStatusGet:
+        return this.remoteControlOperation(params, 'getRemoteControlStatus')();
+      case backendMethods.remoteControlEnable:
+        return this.remoteControlOperation(params, 'enableRemoteControl')();
+      case backendMethods.remoteControlDisable:
+        return this.remoteControlOperation(params, 'disableRemoteControl')();
+      case backendMethods.remoteControlPairingStart:
+        return this.remoteControlOperation(params, 'startDevicePairing')();
+      case backendMethods.remoteControlPairingCheck: {
         const record = requireRecord(params);
-        return this.requireCodexDriver().checkDevicePairing(record.session as DevicePairingSession);
+        return this.remoteControlOperation(params, 'checkDevicePairing')(record.session as DevicePairingSession);
       }
-      case backendMethods.devicePairingClientsList: {
+      case backendMethods.remoteControlClientsList: {
         const record = requireRecord(params);
-        return this.requireCodexDriver().listPairedDevices(requireString(record.environmentId, 'environmentId'));
+        return this.remoteControlOperation(params, 'listPairedDevices')(requireString(record.environmentId, 'environmentId'));
       }
-      case backendMethods.devicePairingClientRevoke: {
+      case backendMethods.remoteControlClientRevoke: {
         const record = requireRecord(params);
-        await this.requireCodexDriver().revokePairedDevice(
+        await this.remoteControlOperation(params, 'revokePairedDevice')(
           requireString(record.environmentId, 'environmentId'),
           requireString(record.clientId, 'clientId'),
         );
         return null;
       }
-      case backendMethods.driverFilePreview: {
+      case backendMethods.workspaceFilePreview: {
         const record = requireRecord(params);
         return previewAgentFolderFile(
           requireString(record.folder, 'folder'),
           requireString(record.filePath, 'filePath'),
         );
       }
-      case backendMethods.agentFolderValidate: {
+      case backendMethods.workspaceFolderValidate: {
         const record = requireRecord(params);
         const folderStat = await stat(requireString(record.folder, 'folder').trim());
         if (!folderStat.isDirectory()) {
@@ -177,13 +178,13 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
-      case backendMethods.driverSessionCompress: {
+      case backendMethods.driverConversationReplaceWithSummary: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
-        if (!driver.compressSession) {
+        if (!driver.replaceConversationWithSummary) {
           throw unsupportedBackendFeature(agent, 'session compression');
         }
-        return driver.compressSession(agent);
+        return driver.replaceConversationWithSummary(agent);
       }
       case backendMethods.driverConversationTitleUpdate: {
         const { agent } = requireAgentParams(params);
@@ -235,16 +236,17 @@ export class BackendDriverRpc {
         }
         return driver.setPermissionMode(agent, mode);
       }
-      case backendMethods.driverSessionForget: {
+      case backendMethods.driverConversationRelease: {
         const { backend, agentId } = requireBackendAgentIdParams(params);
-        this.requireDriver(backend).forgetAgentSession?.(agentId);
+        this.requireDriver(backend).releaseConversation?.(agentId);
         return null;
       }
       case backendMethods.driverConversationArchive: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
-        await driver.archiveAgentConversation?.(agent);
-        return null;
+        if (!driver.archiveAgentConversation) return { supported: false };
+        await driver.archiveAgentConversation(agent);
+        return { supported: true };
       }
       case backendMethods.driverConversationsReconcile: {
         const record = requireRecord(params);
@@ -257,18 +259,20 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         return this.requireDriver(agent.backend).interrupt(agent);
       }
-      case backendMethods.driverClientRequestRespond: {
+      case backendMethods.driverAgentRequestRespond: {
         const record = requireRecord(params);
         const backend = requireBackend(record.backend);
-        await this.requireDriver(backend).respondToRequest(record.response as never);
+        if (!isAgentRequestResponse(record.response)) throw new Error('Invalid agent request response.');
+        await this.requireDriver(backend).respondToAgentRequest(record.response);
         return null;
       }
-      case backendMethods.driverHistoryHydrate: {
+      case backendMethods.driverConversationLoad: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
-        return driver.hydrateAgent ? driver.hydrateAgent(agent) : null;
+        if (!driver.loadConversation) throw unsupportedBackendFeature(agent, 'conversation loading');
+        return driver.loadConversation(agent);
       }
-      case backendMethods.driverHistoryLoadOlder: {
+      case backendMethods.driverConversationHistoryLoadOlder: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.loadOlderHistory) {
@@ -280,7 +284,8 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
-        return driver.listConversations ? driver.listConversations(agent, record.input as ConversationListInput | undefined) : [];
+        if (!driver.listConversations) throw unsupportedBackendFeature(agent, 'conversation listing');
+        return driver.listConversations(agent, record.input as ConversationListInput | undefined);
       }
       case backendMethods.driverConversationResume: {
         const { agent } = requireAgentParams(params);
@@ -318,7 +323,7 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
-        if (!driver.readConversationSummary) return null;
+        if (!driver.readConversationSummary) throw unsupportedBackendFeature(agent, 'conversation summaries');
         return driver.readConversationSummary(agent, record.ref as never);
       }
       case backendMethods.driverPromptSteer: {
@@ -373,7 +378,8 @@ export class BackendDriverRpc {
       case backendMethods.driverPluginsList: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);
-        return driver.listPlugins ? driver.listPlugins(agent) : [];
+        if (!driver.listPlugins) throw unsupportedBackendFeature(agent, 'plugins');
+        return driver.listPlugins(agent);
       }
       case backendMethods.driverSkillsList: {
         const { agent } = requireAgentParams(params);
@@ -425,6 +431,16 @@ export class BackendDriverRpc {
       default:
         return undefined;
     }
+  }
+
+  private remoteControlOperation<Key extends 'getRemoteControlStatus' | 'enableRemoteControl' | 'disableRemoteControl' | 'startDevicePairing' | 'checkDevicePairing' | 'listPairedDevices' | 'revokePairedDevice'>(
+    params: unknown, key: Key,
+  ): NonNullable<AgentBackendDriver[Key]> {
+    const backend = params === undefined ? 'codex' : requireBackend(requireRecord(params).backend ?? 'codex');
+    const driver = this.requireDriver(backend);
+    const operation = driver[key];
+    if (!operation) throw new Error(`${backend} does not support remote control (${key}).`);
+    return operation.bind(driver) as NonNullable<AgentBackendDriver[Key]>;
   }
 
   private requireCodexDriver(): CodexBackendDriver {

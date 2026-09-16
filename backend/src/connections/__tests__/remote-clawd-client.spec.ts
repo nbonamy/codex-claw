@@ -161,8 +161,8 @@ describe('RemoteClawdClientManager', () => {
       },
       {
         seq: secret,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: '2026-06-14T10:00:01.000Z',
       },
       {
@@ -180,8 +180,8 @@ describe('RemoteClawdClientManager', () => {
     }
     const validEvent = {
       seq: 3,
-      type: 'client.connectionChanged',
-      payload: { status: 'connected' },
+      backend: 'codex' as const, type: 'backend.statusChanged',
+      payload: { backend: 'codex' as const, status: 'running' },
       occurredAt: '2026-06-14T10:00:03.000Z',
     };
     child.stdout.write(`${JSON.stringify({

@@ -30,8 +30,8 @@ describe('Claw browser client', () => {
       event: {
         seq: 3,
         source: 'backend',
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: '2026-08-07T00:00:00.000Z',
       },
     });
@@ -70,8 +70,8 @@ describe('Claw browser client', () => {
       event: {
         seq: 4,
         source: 'backend',
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: 'now',
       },
     });
@@ -97,8 +97,8 @@ describe('Claw browser client', () => {
       {
         seq: secret,
         source: 'backend',
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: 'now',
       },
       { seq: 2, source: 'backend', type: secret, payload: {}, occurredAt: 'now' },
@@ -115,8 +115,8 @@ describe('Claw browser client', () => {
     const validEvent = {
       seq: 3,
       source: 'backend' as const,
-      type: 'client.connectionChanged' as const,
-      payload: { status: 'connected' as const },
+      backend: 'codex' as const, type: 'backend.statusChanged' as const,
+      payload: { backend: 'codex' as const, status: 'running' as const },
       occurredAt: 'now',
     };
     socket.receive({ version: 1, type: 'event', event: validEvent });

@@ -392,7 +392,7 @@ describe('ClawMcpService', () => {
     });
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
-      type: 'sidePanel.markdownRequested',
+      type: 'client.markdownDisplayRequested',
       payload: { kind: 'markdown', title: 'Coverage', content: '# Coverage report' },
     }));
 
@@ -402,13 +402,13 @@ describe('ClawMcpService', () => {
     });
     expect(celebrationResponse.result.structuredContent).toStrictEqual({
       success: true,
-      displayed: true,
+      requested: true,
       kind: 'shapes',
-      message: 'Celebration started.',
+      message: 'Celebration requested; each client decides whether to display it.',
     });
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind: 'shapes' },
     }));
 
@@ -535,7 +535,7 @@ describe('ClawMcpService', () => {
     );
   });
 
-  it('does not emit celebration events when the user disabled them', async () => {
+  it('leaves celebration display policy to the receiving client', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.celebrationsEnabled = false;
     const events: Array<{ type?: string }> = [];
@@ -546,14 +546,14 @@ describe('ClawMcpService', () => {
 
     expect(response.result.structuredContent).toStrictEqual({
       success: true,
-      displayed: false,
+      requested: true,
       kind: 'schoolPride',
-      message: 'Celebrations are disabled in General settings.',
+      message: 'Celebration requested; each client decides whether to display it.',
     });
-    expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested' }));
   });
 
-  it('does not emit celebration events for an agent that is not selected', async () => {
+  it('emits celebration requests independently of legacy shared selection', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.activeAgentId = 'agent-dina';
     const events: Array<{ type?: string }> = [];
@@ -564,14 +564,14 @@ describe('ClawMcpService', () => {
 
     expect(response.result.structuredContent).toStrictEqual({
       success: true,
-      displayed: false,
+      requested: true,
       kind: 'stars',
-      message: 'Celebrations only play for the selected agent.',
+      message: 'Celebration requested; each client decides whether to display it.',
     });
-    expect(events).not.toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested', agentId: 'agent-jesse' }));
   });
 
-  it('queues spoken announcements only when enabled and selected', async () => {
+  it('retains global speech enablement but delegates selection, mute and voice to the client', async () => {
     const snapshot = createInitialSnapshot();
     const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
     service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
@@ -598,17 +598,16 @@ describe('ClawMcpService', () => {
       agentId: 'agent-dina',
       phase: 'start',
       text: 'On it.',
-      voice: 'af_heart',
     });
 
     const background = await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'skipped' });
-    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
+    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'queued' });
+    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
 
     snapshot.general.spokenAnnouncementsMuted = true;
     const muted = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'skipped' });
-    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
+    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'queued' });
+    expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(3);
 
     snapshot.general.spokenAnnouncementsMuted = false;
     snapshot.general.spokenAnnouncementScope = 'all';
@@ -617,7 +616,6 @@ describe('ClawMcpService', () => {
       agentId: 'agent-jesse',
       phase: 'finish',
       text: 'Done.',
-      voice: 'af_heart',
     });
   });
 
@@ -689,8 +687,8 @@ describe('ClawMcpService', () => {
 
     const response = await callTool(url, 'agent-dina', 'celebrate', { kind: 'confetti' });
 
-    expect(response.result.structuredContent).toMatchObject({ displayed: true, kind: 'confetti' });
-    expect(events).toContainEqual(expect.objectContaining({ type: 'celebration.requested' }));
+    expect(response.result.structuredContent).toMatchObject({ requested: true, kind: 'confetti' });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested' }));
   });
 
   it('updates only the caller-owned assignment and requires blocked context', async () => {
@@ -731,7 +729,7 @@ describe('ClawMcpService', () => {
       note: 'Need access to the private fixture',
       updatedAt: '2026-06-15T01:30:48.802Z',
     });
-    expect(events).toContainEqual(expect.objectContaining({ type: 'workBacklog.assignmentUpdated' }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'workItem.assignmentUpdated' }));
   });
 
   it('completes automation executions only after every created assignment is done and keeps the created agents', async () => {
@@ -796,7 +794,7 @@ function createDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackend
       backendSession: { kind: 'codex', threadId: 'thread-test' },
       turnId: 'turn-test',
     }),
-    respondToRequest: vi.fn().mockResolvedValue(undefined),
+    respondToAgentRequest: vi.fn().mockResolvedValue(undefined),
     onEvent: vi.fn().mockReturnValue(() => undefined),
     close: vi.fn().mockResolvedValue(undefined),
     ...overrides,

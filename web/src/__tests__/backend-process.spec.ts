@@ -44,8 +44,8 @@ describe('Claw web backend process', () => {
       method: backendMethods.backendEventNotify,
       params: {
         seq: 4,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: 'now',
       },
     });
@@ -84,8 +84,8 @@ describe('Claw web backend process', () => {
       },
       {
         seq: secret,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: 'now',
       },
       { seq: 2, type: secret, payload: {}, occurredAt: 'now' },
@@ -101,8 +101,8 @@ describe('Claw web backend process', () => {
       method: backendMethods.backendEventNotify,
       params: {
         seq: 3,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: 'now',
       },
     });

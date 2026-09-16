@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
-import type { Agent, AgentGitStatus, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
+import type { SourceWorktree } from '@codex-claw/core/contracts';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
@@ -163,7 +162,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'source/repositories/list',
-      undefined,
+      { _clientId: 'remote-controller' },
       expect.any(Function),
     );
   });
@@ -197,7 +196,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       backendMethods.sourceRepositoryCreate,
-      { input: { name: 'fresh-project' } },
+      { ...{ input: { name: 'fresh-project' } }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual([]);
@@ -237,7 +236,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       backendMethods.sourceRepositoryClone,
-      { input: { url: 'https://github.com/nbonamy/new-project' } },
+      { ...{ input: { url: 'https://github.com/nbonamy/new-project' } }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual([]);
@@ -277,7 +276,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'source/folders/list',
-      { path: '/home/nicolas' },
+      { ...{ path: '/home/nicolas' }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
   });
@@ -475,13 +474,13 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'source/worktree/create',
-      {
+      { ...{
         input: {
           repoPath: '/home/nicolas/src/codex-claw',
           branchName: 'remote-agent',
           reuseExisting: true,
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual([]);
@@ -541,14 +540,14 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'agent/create',
-      {
+      { ...{
         input: {
           name: 'Remote Dina',
           folder: '/home/nicolas/src/codex-claw',
           backend: 'codex',
           teamId: 'team-remote',
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(snapshot.agents).toStrictEqual([]);
@@ -609,14 +608,14 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.request).toHaveBeenCalledWith(
       snapshot.remoteConnections.connections[0],
       'agent/create',
-      {
+      { ...{
         input: {
           name: 'Remote Dina',
           folder: '/home/nicolas/src/codex-claw',
           backend: 'codex',
           teamId: 'team-remote',
         },
-      },
+      }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
   });

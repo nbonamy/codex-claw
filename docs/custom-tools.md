@@ -121,7 +121,7 @@ UI at predictable keys:
 return {
   success: true,
   kind: 'schoolPride',
-  message: 'Celebration started.',
+  message: 'Celebration requested.',
 };
 ```
 
@@ -189,8 +189,11 @@ app event, not from the result text.
 
 - the MCP schema limits the effect names;
 - the coordinator validates the caller and delegates the effect;
-- the service checks the user setting and emits `celebration.requested`;
-- Vue handles the transient event without persisting it in app state;
+- the service emits `client.celebrationRequested` without consulting shared navigation;
+- Vue applies the receiving client's selection/settings and handles the transient
+  event without persisting it in app state;
+- the tool result confirms `requested`, not `displayed`: emitting an effect does
+  not prove any receiving client chose to show it;
 - the presenter reads the bounded `kind` value and renders a phase-aware row;
 - the Debug menu exposes the same effect variants for deterministic visual QA.
 
@@ -205,10 +208,11 @@ app event, not from the result text.
   characters;
 - the coordinator validates the caller and delegates without touching
   `agent.statusText`;
-- the service applies persisted enablement, dictated-input, mute, and
-  selected-agent policy, then sends the provider-neutral
-  `client/spokenAnnouncement/queue` request;
-- Electron rechecks selected-agent and foreground eligibility when accepting
+- the service applies backend-owned global enablement and dictated-input policy,
+  then sends the provider-neutral `client/spokenAnnouncement/queue` request
+  without a voice or client-selection assumption;
+- Electron chooses the current client's voice and checks mute, selected-agent
+  and foreground eligibility when accepting
   playback and cancels active or pending speech when it becomes ineligible;
 - Electron returns as soon as its bounded global queue accepts the request,
   coalesces pending phrases, rate-limits repeated phases, and owns native helper

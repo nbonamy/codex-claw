@@ -105,10 +105,14 @@ Cover:
   team/agent, and window state.
 - Filesystem and git operations at the app boundary.
 
-Use fake backend drivers, fake transports, and captured Codex app-server
-fixtures for normal tests. A real Codex app-server smoke test is useful, but it
-must be gated behind an environment variable and never required for the normal
-unit-test gate.
+Use these ownership boundaries for integration coverage: a Codex app SDK fake
+drives the real Claw Codex backend; a Claude Agent SDK fake drives the real Claw
+Claude backend; a unified backend fake drives application state and mounted UI.
+Claw tests its adapter translations and product behavior, not either SDK's
+implementation. Process/socket transport tests still validate Claw's own wire
+framing, decoding and lifecycle. Real provider smoke tests remain opt-in and are
+never required for the normal test gate. The complete gap/value inventory is
+tracked separately in the backend semantics and testing plan.
 
 ## Preload And IPC Tests
 
@@ -274,6 +278,13 @@ it owns:
 - app snapshot persistence and synchronization remain transcript-free;
 - Claw projections such as plans, diffs, unread state, and sidebar activity are
   read-only and cannot resurrect or mutate provider turns.
+
+Plan review decisions are explicit backend commands, not projection mutations.
+Test pending-review persistence, identity, idempotence and failed acceptance;
+test the application opening/dismissing review in response to domain state.
+Likewise, normalized pending input and typed outcomes must not require clients
+to decode provider frames. Navigation/preferences tests assert client isolation
+and no implicit runtime loading; snapshot queries must not perform maintenance.
 
 Use captured long-conversation fixtures for deterministic performance or memory
 regressions. Do not reintroduce a Claw transcript reducer solely to benchmark

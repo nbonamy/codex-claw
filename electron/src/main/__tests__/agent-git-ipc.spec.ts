@@ -14,21 +14,22 @@ describe('agent Git IPC', () => {
       }),
     } as unknown as Parameters<typeof registerAgentGitIpcHandlers>[0];
     const backend = {
-      request: vi.fn().mockResolvedValue(true),
+      request: vi.fn().mockResolvedValue({ target: { type: 'staged' }, diff: 'staged diff', sections: [], summary: { addedLines: 1, removedLines: 0, changedFiles: 1 } }),
     } as unknown as ClawBackendClientPort;
     registerAgentGitIpcHandlers(ipc, () => backend);
 
-    const handler = handlers.get(ipcChannels.openAgentGitDiff);
+    const handler = handlers.get(ipcChannels.getAgentGitDiff);
     expect(handler).toBeDefined();
-    await expect(handler?.({}, 'agent-1', { type: 'staged' })).resolves.toBeUndefined();
-    expect(backend.request).toHaveBeenCalledWith(backendMethods.agentGitDiffOpen, {
+    await expect(handler?.({}, 'agent-1', { type: 'staged' })).resolves.toStrictEqual({
+      target: { type: 'staged' }, diff: 'staged diff', sections: [], summary: { addedLines: 1, removedLines: 0, changedFiles: 1 },
+    });
+    expect(backend.request).toHaveBeenCalledWith(backendMethods.agentGitDiffGet, {
       agentId: 'agent-1',
       target: { type: 'staged' },
     });
   });
 
   it.each([
-    [ipcChannels.openAgentGitDiff, backendMethods.agentGitDiffOpen, [], undefined],
     [ipcChannels.getAgentGitWorkflow, backendMethods.agentGitWorkflowGet, [], { repository: 'repo' }],
     [ipcChannels.generateAgentGitMessage, backendMethods.agentGitMessageGenerate, [{ kind: 'commit' }], { kind: 'commit', message: 'Subject' }],
     [ipcChannels.stageAgentGitFiles, backendMethods.agentGitStage, [{ paths: ['file.ts'], confirmed: true }], { repository: 'repo' }],

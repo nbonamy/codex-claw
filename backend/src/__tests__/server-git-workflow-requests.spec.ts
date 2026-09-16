@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -29,6 +28,8 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     const getGitDiff = vi.fn().mockResolvedValue({
+      target: { type: 'uncommitted' },
+      summary: { addedLines: 3, removedLines: 0, changedFiles: 3 },
       diff: 'diff --git a/a.ts b/a.ts\n',
       sections: [
         { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
@@ -55,7 +56,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => claudeBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
       interrupt: async () => ({ backendSession: { kind: 'claude', sessionId: 'session-test', transport: 'stdio' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -69,32 +70,17 @@ describe('ClawBackendServer', () => {
       agentGitService: { diff: getGitDiff, status: getGitStatus } as unknown as AgentGitService,
     });
 
-    await expect(server.handleMessage({
+    const result = await server.handleMessage({
       jsonrpc: '2.0',
       id: 'open-diff',
-      method: 'agent/git/diff/open',
+      method: 'agent/git/diff/get',
       params: { agentId: 'agent-dina' },
-    })).resolves.toMatchObject({ result: true });
+    });
+    expect(result).toStrictEqual({ jsonrpc: '2.0', id: 'open-diff', result: await getGitDiff.mock.results[0]?.value });
 
     expect(getGitDiff).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', { type: 'uncommitted' });
     expect(getGitStatus).not.toHaveBeenCalled();
-    expect(events).toContainEqual(expect.objectContaining({
-      agentId: 'agent-dina',
-      type: 'sidePanel.gitDiffRequested',
-      payload: {
-        kind: 'gitDiff',
-        scope: 'workingTree',
-        target: { type: 'uncommitted' },
-        title: 'Uncommitted changes',
-        subtitle: '/Users/nbonamy/src/codex-claw',
-        diff: 'diff --git a/a.ts b/a.ts\n',
-        sections: [
-          { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
-          { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
-          { scope: 'untracked', diff: 'diff --git a/new.ts b/new.ts\n' },
-        ],
-      },
-    }));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'sidePanel.gitDiffRequested' }));
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'git.statusUpdated' }));
     await server.close();
   });
@@ -150,7 +136,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -209,7 +195,7 @@ describe('ClawBackendServer', () => {
       generateText,
       sendPrompt,
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -368,7 +354,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('emits git diff preview errors from clawd', async () => {
+  it('rejects failed diff queries without emitting presentation events', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -387,7 +373,7 @@ describe('ClawBackendServer', () => {
       getCapabilities: () => codexBackendCapabilities,
       sendPrompt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
       interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-test' } }),
-      respondToRequest: async () => undefined,
+      respondToAgentRequest: async () => undefined,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -402,20 +388,13 @@ describe('ClawBackendServer', () => {
       agentGitService: { diff } as unknown as AgentGitService,
     });
 
-    await server.handleMessage({
+    await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'open-diff',
-      method: 'agent/git/diff/open',
+      method: 'agent/git/diff/get',
       params: { agentId: 'agent-dina' },
-    });
-
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'sidePanel.gitDiffRequested',
-      payload: expect.objectContaining({
-        state: 'error',
-        error: 'Git diff failed.',
-      }),
-    }));
+    })).rejects.toThrow('Git diff failed.');
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'sidePanel.gitDiffRequested' }));
     await server.close();
   });
 

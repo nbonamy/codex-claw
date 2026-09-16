@@ -1,14 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { CodexClawApi, MainToRendererEvent } from '@codex-claw/core/contracts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
-import { configureClawClient } from '../platform-api';
-import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
+import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { snapshotEventOwnership } from '@codex-claw/core/snapshot-event-ownership';
 describe('useAppState', () => {
   afterEach(() => {
@@ -44,7 +40,7 @@ describe('useAppState', () => {
       backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse',
-      type: 'file.activity',
+      type: 'workspace.fileActivityDetected',
       payload: {
         messageId: 'message-files', itemId: 'item-files',
         path: '  /Users/nbonamy/src/other/src/main.ts  ', action: 'edit', status: 'running',
@@ -69,7 +65,7 @@ describe('useAppState', () => {
       backend: 'codex',
       threadId: 'thread-jesse',
       turnId: 'turn-jesse',
-      type: 'file.activity',
+      type: 'workspace.fileActivityDetected',
       payload: { messageId: '', itemId: 'item-files', path: '/tmp/bad.ts', action: 'edit', status: 'running' },
       occurredAt: '2026-06-05T00:00:02.000Z',
     } as unknown as MainToRendererEvent);
@@ -80,7 +76,7 @@ describe('useAppState', () => {
       agentId: 'agent-jesse',
       backend: 'codex',
       threadId: 'thread-jesse',
-      type: 'file.activity',
+      type: 'workspace.fileActivityDetected',
       payload: {
         messageId: 'message-without-turn', itemId: 'item-without-turn',
         path: '/tmp/no-turn.ts', action: 'read', status: 'completed',
@@ -111,7 +107,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
-      type: 'sidePanel.markdownRequested',
+      type: 'client.markdownDisplayRequested',
       payload: {
         kind: 'markdown',
         purpose: 'plan',
@@ -133,7 +129,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-jesse',
-      type: 'sidePanel.markdownRequested',
+      type: 'client.markdownDisplayRequested',
       payload: {
         kind: 'markdown',
         content: '# Other',
@@ -147,33 +143,19 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 3,
       agentId: 'agent-dina',
-      type: 'sidePanel.gitDiffRequested',
+      type: 'plan.readyForReview',
+      turnId: 'turn-plan',
       payload: {
-        kind: 'gitDiff',
-        scope: 'workingTree',
-        title: 'Current diff',
-        subtitle: 'Working tree',
-        diff: 'diff --git a/a.ts b/a.ts\n',
-        sections: [
-          { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
-          { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
-          { scope: 'untracked', diff: '' },
-        ],
+        markdown: '# Proposed plan\n\n- Build it',
       },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
     expect(state.sidePanelRequest.value).toStrictEqual({
-      kind: 'gitDiff',
-      scope: 'workingTree',
-      title: 'Current diff',
-      subtitle: 'Working tree',
-      diff: 'diff --git a/a.ts b/a.ts\n',
-      sections: [
-        { scope: 'staged', diff: 'diff --git a/staged.ts b/staged.ts\n' },
-        { scope: 'unstaged', diff: 'diff --git a/a.ts b/a.ts\n' },
-        { scope: 'untracked', diff: '' },
-      ],
+      kind: 'markdown',
+      purpose: 'plan',
+      title: 'Proposed plan',
+      content: '- Build it',
     });
   });
 
@@ -194,7 +176,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-jesse',
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind: 'confetti' },
       occurredAt: '2026-06-05T00:00:00.500Z',
     });
@@ -204,7 +186,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 2,
       agentId: 'agent-dina',
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind: 'stars' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
@@ -288,7 +270,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind: 'confetti' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
@@ -315,7 +297,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       agentId: 'agent-dina',
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind: 'shapes' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
@@ -353,27 +335,25 @@ describe('useAppState', () => {
       .sort()).toStrictEqual([
       'agentCreation.progress',
       'browser.annotationCreated',
-      'celebration.requested',
+      'client.celebrationRequested',
       'claude.conversationEventReceived',
       'claude.conversationSnapshotChanged',
       'client.connectionChanged',
-      'clientRequest.resolved',
       'codex.conversationEventReceived',
       'codex.conversationSnapshotChanged',
-      'devicePairing.statusChanged',
-      'file.activity',
+      'remoteControl.statusChanged',
+      'workspace.fileActivityDetected',
       'git.operationProgress',
       'models.changed',
-      'sidePanel.gitDiffRequested',
-      'sidePanel.markdownRequested',
+      'client.markdownDisplayRequested',
       'skills.changed',
-      'thread.historyHydrationFailed',
-      'thread.modeUpdated',
-    ]);
+      'conversation.historyLoadFailed',
+      'conversation.modeUpdated',
+    ].sort());
 
     listeners[0]?.({
       seq: 1,
-      type: 'devicePairing.statusChanged',
+      type: 'remoteControl.statusChanged',
       payload: { status: 'connected', serverName: 'Claw test' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });

@@ -43,7 +43,7 @@ export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentI
   return insertAgentInSnapshot(snapshot, agent, options.select);
 }
 
-export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQuickChatInput, createdAt = new Date().toISOString(), id = createEntityId('agent')): AppSnapshot {
+export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQuickChatInput, createdAt = new Date().toISOString(), id = createEntityId('agent'), options: { select?: boolean } = {}): AppSnapshot {
   const agent = createAgentFromInput({
     name: null,
     folder: '',
@@ -52,7 +52,7 @@ export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQu
   }, createdAt, targetTeamId(snapshot, input.teamId), id);
   agent.folder = null;
   agent.sessionKind = 'quickChat';
-  return insertAgentInSnapshot(snapshot, agent);
+  return insertAgentInSnapshot(snapshot, agent, options.select);
 }
 
 export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentInput, updatedAt = new Date().toISOString()): Agent | null {
@@ -142,32 +142,18 @@ function insertAgentInSnapshot(snapshot: AppSnapshot, agent: Agent, select = tru
   return snapshot;
 }
 
-function activeTeamId(snapshot: AppSnapshot): string {
-  if (snapshot.activeTeamId && snapshot.teams.some((team) => team.id === snapshot.activeTeamId)) {
-    return snapshot.activeTeamId;
-  }
-
-  const activeAgent = snapshot.activeAgentId ? findAgent(snapshot, snapshot.activeAgentId) : undefined;
-  if (activeAgent?.teamId) {
-    return activeAgent.teamId;
-  }
-
-  const activeTeam = snapshot.teams.find((team) => activeAgent && team.agentIds.includes(activeAgent.id));
-  return activeTeam?.id ?? snapshot.teams[0]?.id ?? seedTeamId;
-}
-
 function targetTeamId(snapshot: AppSnapshot, teamId: string | undefined): string {
-  if (teamId && snapshot.teams.some((team) => team.id === teamId)) {
-    return teamId;
-  }
-
-  return activeTeamId(snapshot);
+  if (teamId && !snapshot.teams.some((team) => team.id === teamId)) throw new Error(`Team not found: ${teamId}`);
+  // Legacy callers without a client context get only the stable default team.
+  // Backend dispatch resolves the initiating client's explicit target first.
+  return teamId ?? snapshot.teams[0]?.id ?? seedTeamId;
 }
 
 function clearAgentRuntimeState(agent: Agent): void {
   delete agent.backendSession;
   delete agent.contextUsage;
   delete agent.plan;
+  delete agent.planReview;
   delete agent.goal;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
@@ -276,6 +262,7 @@ export function attachForkedAgentInSnapshot(
   sourceAgentId: string,
   forked: Agent,
   backendSession: BackendSession,
+  options: { select?: boolean } = {},
 ): Agent | null {
   const source = snapshot.agents.find((agent) => agent.id === sourceAgentId);
   if (!source) {
@@ -290,8 +277,10 @@ export function attachForkedAgentInSnapshot(
 
   forked.backendSession = { ...backendSession };
   insertAgentAfterSource(snapshot, source, forked);
-  snapshot.activeTeamId = forked.teamId ?? snapshot.activeTeamId;
-  snapshot.activeAgentId = forked.id;
+  if (options.select !== false) {
+    snapshot.activeTeamId = forked.teamId ?? snapshot.activeTeamId;
+    snapshot.activeAgentId = forked.id;
+  }
   return forked;
 }
 
@@ -489,6 +478,8 @@ export function restartAgentConversation(snapshot: AppSnapshot, agentId: string,
   }
 
   ensureAgentCanChange(agent, 'Agent must be idle before restarting.');
+  delete snapshot.agentRequests?.[agentId];
+  delete snapshot.backendApprovals[agentId];
   clearRuntimeState(agent);
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
@@ -513,6 +504,8 @@ export function resumeAgentConversationInSnapshot(
 
   clearRuntimeState(agent);
   agent.backendSession = { ...backendSession };
+  delete snapshot.agentRequests?.[agentId];
+  delete snapshot.backendApprovals[agentId];
   agent.status = { type: 'idle' };
   agent.updatedAt = updatedAt;
   return agent;
@@ -525,6 +518,8 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
   }
 
   snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== agentId);
+  delete snapshot.agentRequests?.[agentId];
+  delete snapshot.backendApprovals[agentId];
   snapshot.workBacklog.assignments = Object.fromEntries(
     Object.entries(snapshot.workBacklog.assignments)
       .filter(([, assignment]) => assignment.agentId !== agentId),
@@ -561,6 +556,7 @@ function clearRuntimeState(agent: Agent): void {
   delete agent.conversationTitle;
   delete agent.contextUsage;
   delete agent.plan;
+  delete agent.planReview;
   delete agent.goal;
   delete agent.isRegistered;
   delete agent.mcpSessionId;

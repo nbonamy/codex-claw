@@ -11,25 +11,24 @@ import type {
   BackendPromptOptions,
   BackendRuntimeStatus,
   BackendSession,
-  BackendSkillSummary,
-  ClientRequestResponse,
-  ConversationSummary,
+  BackendSkillSummary, ConversationSummary,
   ConversationListInput,
   ConversationResumeTarget,
   DevicePairingSession,
   DevicePairingStatus,
-  MainToRendererEvent,
   PairedDevice,
   RendererMessage,
   SendPromptOptions,
-  ThreadGoal,
+  ThreadGoal
 } from './contracts';
+import type { BackendPublishedEvent } from './contracts/events';
+import type { AgentRequestResponse } from './agent-request';
 
-type BackendEventFrom<Event extends MainToRendererEvent> = Event extends MainToRendererEvent
+type BackendEventFrom<Event extends BackendPublishedEvent> = Event extends BackendPublishedEvent
   ? Omit<Event, 'seq' | 'occurredAt'> & Partial<Pick<Event, 'seq' | 'occurredAt'>>
   : never;
 
-export type BackendEvent = BackendEventFrom<MainToRendererEvent>;
+export type BackendEvent = BackendEventFrom<BackendPublishedEvent>;
 
 export type BackendSendResult = {
   backendSession: BackendSession;
@@ -45,7 +44,7 @@ export type BackendConversationResumeResult = {
   backendSession: BackendSession;
 };
 
-export type BackendSessionCompressionResult = {
+export type BackendConversationReplacementResult = {
   backendSession: BackendSession;
 };
 
@@ -98,16 +97,16 @@ export type AgentBackendDriver = {
   clearGoal?(agent: Agent): Promise<BackendGoalResult>;
   setApprovalPreset?(agent: Agent, preset: ApprovalPreset): Promise<BackendApprovalPresetResult>;
   setPermissionMode?(agent: Agent, mode: string): Promise<BackendPermissionModeResult>;
-  forgetAgentSession?(agentId: string): void;
+  releaseConversation?(agentId: string): void;
   archiveAgentConversation?(agent: Agent): Promise<void>;
   reconcileConversations?(agents: Agent[]): Promise<void>;
   interrupt(agent: Agent): Promise<BackendSendResult>;
-  respondToRequest(response: ClientRequestResponse): Promise<void>;
-  hydrateAgent?(agent: Agent): Promise<BackendSession | null>;
+  respondToAgentRequest(response: AgentRequestResponse): Promise<void>;
+  loadConversation?(agent: Agent): Promise<BackendSession | null>;
   loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;
   listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult>;
-  compressSession?(agent: Agent): Promise<BackendSessionCompressionResult>;
+  replaceConversationWithSummary?(agent: Agent): Promise<BackendConversationReplacementResult>;
   forkConversation?(agent: Agent, targetAgent: Agent, turnId?: string): Promise<BackendConversationForkResult>;
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
   readConversationSummary?(agent: Agent, ref: BackendConversationRef): Promise<ConversationSummary | null>;
@@ -118,9 +117,9 @@ export type AgentBackendDriver = {
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
   listPlugins?(agent: Agent): Promise<BackendPluginSummary[]>;
   listSkills?(agent: Agent): Promise<BackendSkillSummary[]>;
-  getDevicePairingStatus?(): Promise<DevicePairingStatus>;
-  enableDevicePairing?(): Promise<DevicePairingStatus>;
-  disableDevicePairing?(): Promise<DevicePairingStatus>;
+  getRemoteControlStatus?(): Promise<DevicePairingStatus>;
+  enableRemoteControl?(): Promise<DevicePairingStatus>;
+  disableRemoteControl?(): Promise<DevicePairingStatus>;
   startDevicePairing?(): Promise<DevicePairingSession>;
   checkDevicePairing?(session: DevicePairingSession): Promise<boolean>;
   listPairedDevices?(environmentId: string): Promise<PairedDevice[]>;

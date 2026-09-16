@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import type {
   Agent,
   AppPluginSettings,
@@ -7,15 +8,13 @@ import type {
   BackendRuntimeStatus,
   BackendSession,
   BackendSkillSummary,
-  ClientRequest,
-  ClientRequestResponse,
-  ClaudeConversationEvent,
+  ClientRequest, ClaudeConversationEvent,
   ClaudeConversationSnapshot,
   ConversationResumeTarget,
   ConversationSummary,
   RendererMessage,
   RendererToolPart,
-  SendPromptOptions,
+  SendPromptOptions
 } from '@codex-claw/core/contracts';
 import {
   createClaudeConversationReplica,
@@ -276,16 +275,20 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     };
   }
 
-  async respondToRequest(response: ClientRequestResponse): Promise<void> {
+  async respondToAgentRequest(response: AgentRequestResponse): Promise<void> {
     if (!this.transport.respondToPermissionRequest) {
       throw new Error('Claude permission responses are not supported by the active transport.');
     }
-    const owner = this.pendingRequestOwners.get(response.id);
+    const matches = [...this.pendingRequestOwners].filter(([key, turn]) => (
+      key === JSON.stringify([turn.agentId, response.id]) && (!response.agentId || response.agentId === turn.agentId)
+    ));
+    if (matches.length > 1) throw new Error('Agent identity is required for this request.');
+    const [key, owner] = matches[0] ?? [];
     if (!owner) {
       throw new Error(`Claude permission request '${response.id}' is no longer pending.`);
     }
-    await this.transport.respondToPermissionRequest(response.id, response.payload ?? {});
-    this.pendingRequestOwners.delete(response.id);
+    await this.transport.respondToPermissionRequest(response.id, clientResponseFromAgentResponse(response).payload ?? {}, owner.agentId);
+    if (this.pendingRequestOwners.get(key!) === owner) this.pendingRequestOwners.delete(key!);
     this.emitConversation({
       agentId: owner.agentId,
       backend: this.backend,
@@ -293,10 +296,10 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       turnId: owner.turnId,
       type: 'clientRequest.resolved',
       payload: { id: response.id },
-    });
+    }, response.outcome);
   }
 
-  forgetAgentSession(agentId: string): void {
+  releaseConversation(agentId: string): void {
     this.conversationReplicasByAgentId.delete(agentId);
     this.conversationRevisionsByAgentId.delete(agentId);
     const sessionId = this.liveSessionIdsByAgentId.get(agentId);
@@ -306,7 +309,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     void this.transport.closeSession?.(sessionId);
   }
 
-  async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
+  async loadConversation(agent: Agent): Promise<BackendSession | null> {
     const history = await this.loadHistory(agent);
     if (!history) {
       return null;
@@ -585,7 +588,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       backendSessionId: sessionId,
       threadId: sessionId,
       ...(turnId ? { turnId } : {}),
-      type: 'thread.tokenUsageUpdated',
+      type: 'conversation.contextUsageUpdated',
       payload: { contextUsage },
     });
     const current = this.conversationReplicasByAgentId.get(agentId)?.getSnapshot();
@@ -784,7 +787,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       backendSessionId: activeTurn.sessionId ?? undefined,
       threadId: claudeThreadId(activeTurn),
       turnId: activeTurn.turnId,
-      type: 'file.activity',
+      type: 'workspace.fileActivityDetected',
       payload: {
         messageId: `assistant-${activeTurn.turnId}`,
         itemId,
@@ -809,10 +812,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       backendSessionId: activeTurn.sessionId ?? undefined,
       threadId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
-      type: 'thread.modeUpdated',
+      type: 'conversation.modeUpdated',
       payload: {
         mode: permissionMode === 'plan' ? 'plan' : 'default',
-        provider: 'claude',
         permissionMode,
       },
     });
@@ -830,7 +832,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
           },
         },
       };
-      this.pendingRequestOwners.set(request.id, activeTurn);
+      this.pendingRequestOwners.set(JSON.stringify([activeTurn.agentId, request.id]), activeTurn);
       this.emitConversation({
         agentId: activeTurn.agentId,
         backend: this.backend,
@@ -864,7 +866,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         },
       },
     };
-    this.pendingRequestOwners.set(request.id, activeTurn);
+    this.pendingRequestOwners.set(JSON.stringify([activeTurn.agentId, request.id]), activeTurn);
     this.emitConversation({
       agentId: activeTurn.agentId,
       backend: this.backend,
@@ -1017,15 +1019,19 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       agentId: activeTurn.agentId,
       backend: this.backend,
       backendSessionId: sessionId,
-      type: 'thread.started',
-      payload: {
-        sessionId,
-        transport: 'stdio',
-        ...(activeTurn.model ? { model: activeTurn.model } : {}),
-        ...(activeTurn.reasoningEffort ? { reasoningEffort: activeTurn.reasoningEffort } : {}),
-      },
+      type: 'agent.conversationAttached',
+      conversationId: sessionId,
+      payload: {},
     });
 
+    this.emit({
+      agentId: activeTurn.agentId, backend: this.backend, backendSessionId: sessionId,
+      type: 'conversation.settingsUpdated',
+      payload: { settings: {
+        ...(activeTurn.model ? { model: activeTurn.model } : {}),
+        ...(activeTurn.reasoningEffort ? { reasoningEffort: activeTurn.reasoningEffort } : {}),
+      } },
+    });
     if (!activeTurn.startResolved) {
       activeTurn.startResolved = true;
       activeTurn.resolveStart({
@@ -1117,18 +1123,20 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         backendSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'clientRequest.resolved',
-        payload: { id: requestId },
+        payload: { id: (JSON.parse(requestId) as [string, string])[1] },
       });
     }
   }
 
   private emit(event: BackendEvent): void {
+    const conversationId = event.conversationId ?? event.backendSessionId ?? event.threadId
+      ?? (event.agentId ? this.liveSessionIdsByAgentId.get(event.agentId) : undefined);
     for (const listener of this.listeners) {
-      listener(event);
+      listener(conversationId ? { ...event, conversationId } : event);
     }
   }
 
-  private emitConversation(input: UnsequencedClaudeConversationEvent): void {
+  private emitConversation(input: UnsequencedClaudeConversationEvent, resolution?: import('@codex-claw/core/agent-request').AgentRequestOutcome): void {
     const revision = this.nextConversationRevision(input.agentId);
     const event = {
       ...input,
@@ -1146,6 +1154,17 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       type: 'claude.conversationEventReceived',
       payload: { revision, event },
     });
+    if (input.type === 'toolInput.requested' || input.type === 'approval.requested') {
+      this.emit({
+        agentId: input.agentId, backend: 'claude', type: 'agentRequest.created',
+        payload: { request: requestFromClientRequest(input.payload, {
+          conversationId: input.backendSessionId ?? replica.getSnapshot().sessionId ?? input.agentId,
+          turnId: input.turnId,
+        }) },
+      });
+    } else if (input.type === 'clientRequest.resolved') {
+      this.emit({ agentId: input.agentId, backend: 'claude', type: 'agentRequest.resolved', payload: { id: input.payload.id, outcome: resolution ?? { kind: 'cancelled', reason: 'conversation_released' } } });
+    }
   }
 
   private ensureConversationReplica(agent: Agent): void {

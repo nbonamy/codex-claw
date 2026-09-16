@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, MainToRendererEvent, RendererMessage } from '@codex-claw/core/contracts';
+import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
 import { DelegatedWorkReportService } from '../delegated-work-report-service';
 
 describe('DelegatedWorkReportService', () => {
@@ -168,7 +168,7 @@ function assistantMessage(agentId: string, turnId: string, text: string): Render
   };
 }
 
-function event(agentId: string, turnId: string, type: 'turn.completed'): MainToRendererEvent {
+function event(agentId: string, turnId: string, type: 'turn.completed'): BackendPublishedEvent {
   return {
     seq: 1,
     occurredAt: '2026-09-03T00:01:00.000Z',

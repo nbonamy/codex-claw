@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import type { AppSnapshot, CodexAuthentication, CodexChatGptLogin, SetCodexResourceSharingInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
 import type { OpenInProvider } from '../open-in';
 import { callPrivate, currentSnapshot, fakeAppLifecycle, createBackendClient, updateSettings } from './app-controller-test-harness';
 
@@ -256,7 +254,7 @@ describe('AppController', () => {
 
     expect(request).toHaveBeenCalledWith(backendMethods.codexAuthenticationGet, undefined);
     expect(request).toHaveBeenCalledWith(backendMethods.codexChatGptLoginStart, undefined);
-    expect(request).toHaveBeenCalledWith(backendMethods.codexChatGptLoginCancel, undefined);
+    expect(request).toHaveBeenCalledWith(backendMethods.codexLoginCancel, undefined);
     expect(request).toHaveBeenCalledWith(backendMethods.codexLogout, undefined);
     expect(openExternal).toHaveBeenCalledWith(login.authUrl);
   });
@@ -276,7 +274,7 @@ describe('AppController', () => {
     expect(request.mock.calls).toEqual([
       [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
       [backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId: 'wall-e' }],
-      [backendMethods.codexChatGptLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'device-login' }],
+      [backendMethods.codexLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'device-login' }],
     ]);
     expect(openExternal).not.toHaveBeenCalled();
     expect(() => auth.startCodexChatGptDeviceCodeLogin('')).toThrow('remote connection');
@@ -325,7 +323,7 @@ describe('AppController', () => {
     await expect(openAgentPath(controller, 'agent-dina', 'vscode', 'README.md')).resolves.toBe(updatedSnapshot);
 
     expect(open).toHaveBeenCalledWith('vscode', '/Users/nbonamy/src/codex-claw/README.md');
-    expect(request).toHaveBeenCalledWith(backendMethods.agentOpenInApplicationUpdate, {
+    expect(request).toHaveBeenCalledWith(backendMethods.clientAgentExternalApplicationUpdate, {
       agentId: 'agent-dina',
       application: 'vscode',
     });

@@ -7,7 +7,6 @@ import AgentCloseDialog from '../components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from '../components/PullRequestCleanupDialog.vue';
 import SessionCompressionDialog from '../components/SessionCompressionDialog.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { setElectronTestClient } from '../test/client';
 
 afterEach(() => {
@@ -15,6 +14,29 @@ afterEach(() => {
 });
 
 describe('App', () => {
+  it('opens a plan review from a backend domain event without a panel request', async () => {
+    const snapshot = createInitialSnapshot();
+    let emitEvent!: (event: import('@codex-claw/core/contracts').MainToRendererEvent) => void;
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      onEvent: (listener) => { emitEvent = listener; return () => undefined; },
+    });
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    emitEvent({
+      seq: 1, occurredAt: '2026-09-16T00:00:00.000Z',
+      agentId: snapshot.activeAgentId!, turnId: 'turn-plan',
+      type: 'plan.readyForReview',
+      payload: { itemId: 'proposal-1', markdown: '# Domain review\n\nBuild the unified backend.' },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Domain review');
+    expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Build the unified backend.');
+    expect(wrapper.find('.plan-review-footer__button--primary').exists()).toBe(true);
+  });
+
   it('loads the main-process snapshot on mount', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.backendRuntimes = [{

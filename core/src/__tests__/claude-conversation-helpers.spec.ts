@@ -114,10 +114,10 @@ describe('provider conversation boundaries', () => {
       backend: 'claude',
       threadId: 'session-1',
       turnId: 'turn-1',
-      type: 'sidePanel.markdownRequested',
+      type: 'client.markdownDisplayRequested',
       payload: { kind: 'markdown', content: '# Plan' },
     })).toStrictEqual({
-      type: 'sidePanel.markdownRequested', agentId: 'agent-1', turnId: 'turn-1', payload: { kind: 'markdown', content: '# Plan' },
+      type: 'client.markdownDisplayRequested', agentId: 'agent-1', turnId: 'turn-1', payload: { kind: 'markdown', content: '# Plan' },
     });
   });
 

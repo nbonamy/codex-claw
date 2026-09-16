@@ -15,6 +15,7 @@ import {
 } from '../agent-sdk-transport';
 import type { ClaudePermissionRequest } from '../transport';
 import type { ClaudeSdkMessage } from '../protocol';
+import { ClaudeBackendDriver } from '../claude-driver';
 
 vi.mock('@codex-claw/core/runtime-discovery', () => ({
   // Runtime discovery owns its shell integration tests; this suite tests the transport boundary.
@@ -25,6 +26,33 @@ vi.mock('@codex-claw/core/runtime-discovery', () => ({
 }));
 
 describe('ClaudeAgentSdkTransport', () => {
+  it('routes identical SDK request IDs through the driver without resolving another agent session', async () => {
+    const harnesses = [createQueryHarness(), createQueryHarness()];
+    let index = 0;
+    const transport = new ClaudeAgentSdkTransport({ createQuery: (input) => harnesses[index++]!.createQuery(input) });
+    const driver = new ClaudeBackendDriver(transport);
+    try {
+      const sends = ['A', 'B'].map((id) => driver.sendPrompt({ id, name: id, folder: '/tmp/project', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' }, 'edit'));
+      await vi.waitFor(() => expect(harnesses.every((harness) => harness.inputs.length === 1)).toBe(true));
+      harnesses.forEach((harness, i) => harness.emit({ type: 'system', subtype: 'init', session_id: `session-${i}` } as ClaudeSdkMessage));
+      await Promise.all(sends);
+      const resolved = [vi.fn(), vi.fn()];
+      const permissions = harnesses.map((harness, i) => Promise.resolve(harness.options[0]!.canUseTool!('Edit', { file_path: `${i}.ts` }, {
+        signal: new AbortController().signal, toolUseID: 'item', requestId: 'same',
+      })).then(resolved[i]));
+      await expect(transport.respondToPermissionRequest('same', { decision: 'allow' })).rejects.toThrow('Agent identity');
+      await expect(transport.respondToPermissionRequest('same', { decision: 'allow' }, 'unknown')).rejects.toThrow('no longer pending');
+      await expect(driver.respondToAgentRequest({ id: 'same', outcome: { kind: 'decision', decision: 'allow' } })).rejects.toThrow('Agent identity');
+      await expect(driver.respondToAgentRequest({ agentId: 'unknown', id: 'same', outcome: { kind: 'decision', decision: 'allow' } })).rejects.toThrow('no longer pending');
+      await driver.respondToAgentRequest({ agentId: 'A', id: 'same', outcome: { kind: 'decision', decision: 'allow' } });
+      await permissions[0];
+      expect(resolved[0]).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'allow', updatedInput: { file_path: '0.ts' } }));
+      expect(resolved[1]).not.toHaveBeenCalled();
+      await driver.respondToAgentRequest({ agentId: 'B', id: 'same', outcome: { kind: 'decision', decision: 'deny' } });
+      await permissions[1];
+      expect(resolved[1]).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'deny' }));
+    } finally { await driver.close(); }
+  });
   it('opts into the SDK safety gate for bypass-permissions sessions', async () => {
     const harness = createQueryHarness();
     const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });

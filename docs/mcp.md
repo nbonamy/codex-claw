@@ -407,7 +407,7 @@ and other meaningful wins. Disabled celebrations are not advertised to the
 model.
 Agents choose the effect deliberately and vary it from the most recent visible
 celebration; `schoolPride` is reserved for major product or team milestones.
-The request emits `celebration.requested`; it is not stored in conversation
+The request emits `client.celebrationRequested`; it is not stored in conversation
 history or app state. Users can disable agent celebrations in General settings.
 The setting is enabled by default, and `clawd` suppresses the event when it is
 off.
@@ -506,7 +506,7 @@ limit. Inline Markdown is emitted directly as app-owned renderer content.
 
 Effects:
 
-- emits `sidePanel.markdownRequested`;
+- emits `client.markdownDisplayRequested`;
 - renderer opens the Markdown side panel for the active agent;
 - returns a structured success result with the displayed title and path when
   available.
@@ -530,7 +530,7 @@ Effects:
   timestamp, and optional note;
 - completes the owning automation execution after all of its assignments finish,
   while preserving the created agents and worktrees for review;
-- emits `workBacklog.assignmentUpdated` so the cockpit backlog reflects the
+- emits `workItem.assignmentUpdated` so the cockpit backlog reflects the
   lifecycle state;
 - persists the updated assignment.
 

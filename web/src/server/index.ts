@@ -39,6 +39,7 @@ httpServer.on('upgrade', (request, socket, head) => {
       backend,
       socket: createCodexNodeWebSocketPort(webSocket),
       userId: siteUser.id,
+      clientId: new URL(request.url ?? '/', 'http://localhost').searchParams.get('clientId') ?? undefined,
     });
   });
 });

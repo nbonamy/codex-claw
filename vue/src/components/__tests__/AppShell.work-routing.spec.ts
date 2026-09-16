@@ -714,10 +714,10 @@ describe('AppShell work routing', () => {
       initialSourceRepositoryName: 'codex-claw',
     });
 
-    const teamSelect = agentDialog.findAllComponents({ name: 'ElSelect' }).find((select) => (
+    const clientNavigationSelectTeam = agentDialog.findAllComponents({ name: 'ElSelect' }).find((select) => (
       select.find('#agent-dialog-team').exists()
     ));
-    await teamSelect?.vm.$emit('update:modelValue', '__new_team__');
+    await clientNavigationSelectTeam?.vm.$emit('update:modelValue', '__new_team__');
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
     expect(agentDialog.getComponent({ name: 'NewSourceWorktreeDialog' }).props('visible')).toBe(false);

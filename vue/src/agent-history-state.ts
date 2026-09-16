@@ -38,12 +38,12 @@ export function createAgentHistoryState(options: {
   async function hydrateActive(): Promise<void> {
     const snapshot = options.getSnapshot();
     const activeAgent = snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId);
-    if (!activeAgent?.backendSession || !codexClawApi?.hydrateAgentHistory || hydratingAgentIds.value.has(activeAgent.id)) {
+    if (!activeAgent?.backendSession || !codexClawApi?.loadConversationHistory || hydratingAgentIds.value.has(activeAgent.id)) {
       return;
     }
     markHydrating(activeAgent.id, true);
     try {
-      options.adoptSnapshot(await codexClawApi.hydrateAgentHistory(activeAgent.id));
+      options.adoptSnapshot(await codexClawApi.loadConversationHistory(activeAgent.id));
       options.synchronizeComposerSelection(activeAgent.id);
     } finally {
       markHydrating(activeAgent.id, false);
@@ -95,7 +95,7 @@ export function createAgentHistoryState(options: {
     hasOlderByAgentId.value = hasOlder;
   }
 
-  function handleMainEvent(event: Extract<MainToRendererEvent, { type: 'thread.historyHydrationFailed' }>): void {
+  function handleMainEvent(event: Extract<MainToRendererEvent, { type: 'conversation.historyLoadFailed' }>): void {
     const failed = new Set(failedAgentIds.value);
     failed.add(event.agentId);
     failedAgentIds.value = failed;

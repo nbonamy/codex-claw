@@ -105,12 +105,13 @@ describe('ClaudeBackendDriver', () => {
       agentId: 'agent-claude',
       backend: 'claude',
       backendSessionId: 'claude-session-1',
-      type: 'thread.started',
-      payload: {
-        sessionId: 'claude-session-1',
-        transport: 'stdio',
-        model: 'claude-sonnet-4-5',
-      },
+      type: 'agent.conversationAttached',
+      conversationId: 'claude-session-1',
+      payload: {},
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.settingsUpdated',
+      payload: { settings: { model: 'claude-sonnet-4-5' } },
     }));
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-claude',
@@ -248,7 +249,7 @@ describe('ClaudeBackendDriver', () => {
 
     await vi.waitFor(() => expect(transport.getContextUsage).toHaveBeenCalled());
     await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
-      type: 'thread.tokenUsageUpdated',
+      type: 'conversation.contextUsageUpdated',
       payload: {
         contextUsage: {
           totalTokens: 44_000,
@@ -437,7 +438,7 @@ describe('ClaudeBackendDriver', () => {
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-second' });
     await second;
     transport.emit({ type: 'result', subtype: 'success', session_id: 'claude-session-second', is_error: false });
-    driver.forgetAgentSession(agent.id);
+    driver.releaseConversation(agent.id);
     expect(transport.closeSession).toHaveBeenLastCalledWith('claude-session-second');
   });
 
@@ -460,8 +461,8 @@ describe('ClaudeBackendDriver', () => {
     });
     expect(driver.getCapabilities(agent)).toMatchObject({ attachments: true, approvals: true });
     await expect(driver.interrupt(agent)).rejects.toThrow('No active Claude turn');
-    await expect(driver.respondToRequest({ id: 'request-1', payload: {} })).rejects.toThrow('no longer pending');
-    await expect(driver.hydrateAgent(agent)).resolves.toBeNull();
+    await expect(driver.respondToAgentRequest({ id: 'request-1', outcome: { kind: 'cancelled' } })).rejects.toThrow('no longer pending');
+    await expect(driver.loadConversation(agent)).resolves.toBeNull();
     await expect(driver.resumeConversation(agent, { ref: { backend: 'codex', threadId: 'thread-1' }, storageState: 'active' })).rejects.toThrow('non-Claude');
     await expect(driver.readConversationMessages({ backend: 'codex', threadId: 'thread-1' }, agent.id)).rejects.toThrow('non-Claude');
 
@@ -579,11 +580,11 @@ describe('ClaudeBackendDriver', () => {
     }));
 
     transport.respondToPermissionRequest.mockResolvedValueOnce(undefined);
-    await driver.respondToRequest({
+    await driver.respondToAgentRequest({
       id: 'tool-edit-1',
-      payload: { decision: 'allow_conversation' },
+      outcome: { kind: 'decision', decision: 'allow_conversation' },
     });
-    expect(transport.respondToPermissionRequest).toHaveBeenCalledWith('tool-edit-1', { decision: 'allow_conversation' });
+    expect(transport.respondToPermissionRequest).toHaveBeenCalledWith('tool-edit-1', { decision: 'allow_conversation' }, agent.id);
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-claude',
       backendSessionId: 'claude-session-approval',
@@ -643,8 +644,8 @@ describe('ClaudeBackendDriver', () => {
 
     transport.respondToPermissionRequest.mockResolvedValueOnce(undefined);
     const answers = { 'Which approach?': { answers: ['Simple'] } };
-    await driver.respondToRequest({ id: 'request-question-1', payload: { answers } });
-    expect(transport.respondToPermissionRequest).toHaveBeenCalledWith('request-question-1', { answers });
+    await driver.respondToAgentRequest({ id: 'request-question-1', outcome: { kind: 'answered', answers } });
+    expect(transport.respondToPermissionRequest).toHaveBeenCalledWith('request-question-1', { answers }, agent.id);
   });
 
   it('hydrates persisted Claude transcript history through the driver', async () => {
@@ -675,7 +676,7 @@ describe('ClaudeBackendDriver', () => {
       backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
     };
 
-    await expect(driver.hydrateAgent(persistedAgent)).resolves.toStrictEqual({
+    await expect(driver.loadConversation(persistedAgent)).resolves.toStrictEqual({
       kind: 'claude',
       sessionId: 'claude-session-existing',
       transcriptSessionId: 'claude-session-existing',
@@ -710,7 +711,7 @@ describe('ClaudeBackendDriver', () => {
         backend: 'claude',
         backendSessionId: 'claude-session-existing',
         threadId: 'claude-session-existing',
-        type: 'thread.tokenUsageUpdated',
+        type: 'conversation.contextUsageUpdated',
         payload: {
           contextUsage: {
             totalTokens: 33_120,
@@ -825,7 +826,7 @@ describe('ClaudeBackendDriver', () => {
       sessionId: 'claude-session-existing',
     })));
     await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
-      type: 'thread.tokenUsageUpdated',
+      type: 'conversation.contextUsageUpdated',
       threadId: 'claude-session-existing',
       payload: { contextUsage: expect.objectContaining({ totalTokens: 12_000, usedPercent: 6 }) },
     })));
@@ -956,12 +957,11 @@ describe('ClaudeBackendDriver', () => {
     });
 
     expect(events).toContainEqual(expect.objectContaining({
-      type: 'thread.modeUpdated',
+      type: 'conversation.modeUpdated',
       turnId,
       threadId: 'claude-session-plan',
       payload: {
         mode: 'plan',
-        provider: 'claude',
         permissionMode: 'plan',
       },
     }));
@@ -1184,7 +1184,7 @@ describe('ClaudeBackendDriver', () => {
         }),
       }),
     }));
-    expect(events.filter((event) => event.type === 'file.activity')).toStrictEqual([
+    expect(events.filter((event) => event.type === 'workspace.fileActivityDetected')).toStrictEqual([
       expect.objectContaining({
         turnId,
         payload: {

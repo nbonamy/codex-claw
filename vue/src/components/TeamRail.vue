@@ -37,20 +37,20 @@
         :class="[
           { 'team-rail__team--active': isTeamActive(team.id) },
           { 'team-rail__team--unread': isTeamUnread(team.id) },
-          teamReorder.dropTargetClass(team.id),
+          clientTeamOrderUpdate.dropTargetClass(team.id),
         ]"
         type="button"
-        v-bind="teamReorder.dragItemAttributes(team.id)"
+        v-bind="clientTeamOrderUpdate.dragItemAttributes(team.id)"
         :style="{ backgroundColor: team.color ?? defaultTeamColor }"
         :aria-label="teamAriaLabel(team)"
         :aria-pressed="isTeamActive(team.id)"
         @click="emit('select-team', team.id)"
         @contextmenu.prevent="openTeamMenu(team.id, $event)"
-        @dragstart="teamReorder.onDragStart(team.id, $event)"
-        @dragover="teamReorder.onDragOver(team.id, $event)"
-        @dragleave="teamReorder.onDragLeave(team.id, $event)"
-        @drop="teamReorder.onDrop(team.id, $event)"
-        @dragend="teamReorder.onDragEnd"
+        @dragstart="clientTeamOrderUpdate.onDragStart(team.id, $event)"
+        @dragover="clientTeamOrderUpdate.onDragOver(team.id, $event)"
+        @dragleave="clientTeamOrderUpdate.onDragLeave(team.id, $event)"
+        @drop="clientTeamOrderUpdate.onDrop(team.id, $event)"
+        @dragend="clientTeamOrderUpdate.onDragEnd"
       >
         {{ team.avatar ?? teamInitials(team.name) }}
         <span
@@ -186,7 +186,7 @@ const contextMenuTeam = computed(() => (
 const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
 const unreadTeamIdSet = computed(() => new Set(props.unreadTeamIds ?? []));
 const workingTeamIdSet = computed(() => new Set(props.workingTeamIds ?? []));
-const teamReorder = useListReorderDrag<string>({
+const clientTeamOrderUpdate = useListReorderDrag<string>({
   itemIds: () => props.teams.map((team) => team.id),
   onDrop: ({ draggedId, beforeId }) => {
     emit('reorder-teams', {

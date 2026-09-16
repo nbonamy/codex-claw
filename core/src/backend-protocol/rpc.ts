@@ -68,6 +68,18 @@ export type ClawSnapshotGetResult = {
 };
 
 export type ClawBackendRequestMap = {
+  [backendMethods.agentPlanReviewRespond]: {
+    params: { agentId: string; response: import('../plan-review').PlanReviewResponse };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentRequestRespond]: {
+    params: { response: import('../agent-request').AgentRequestResponse };
+    result: AppSnapshot;
+  };
+  [backendMethods.driverConversationArchive]: {
+    params: { agent: import('../contracts').Agent };
+    result: { supported: boolean };
+  };
   [backendMethods.backendHealthGet]: {
     params: undefined;
     result: ClawBackendHealth;
@@ -80,9 +92,9 @@ export type ClawBackendRequestMap = {
     params: undefined;
     result: ClientState;
   };
-  [backendMethods.agentGitDiffOpen]: {
+  [backendMethods.agentGitDiffGet]: {
     params: { agentId: string; target?: AgentGitDiffTarget };
-    result: true;
+    result: import('../contracts').AgentGitDiff;
   };
   [backendMethods.agentGitWorkflowGet]: {
     params: { agentId: string };

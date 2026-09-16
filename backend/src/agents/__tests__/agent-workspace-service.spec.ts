@@ -47,17 +47,17 @@ describe('scheduled Git refresh', () => {
     service.close();
   });
 
-  it('skips a scheduled refresh after selection changes or the agent is removed', async () => {
+  it('refreshes independently of client selection but skips a removed agent', async () => {
     const { service, snapshot, getGitStatus } = setup();
     service.scheduleGitStatusRefresh('agent');
     snapshot.activeAgentId = null;
     await vi.advanceTimersByTimeAsync(500);
-    expect(getGitStatus).not.toHaveBeenCalled();
+    expect(getGitStatus).toHaveBeenCalledOnce();
     snapshot.activeAgentId = 'agent';
     service.scheduleGitStatusRefresh('agent');
     snapshot.agents = [];
     await vi.advanceTimersByTimeAsync(500);
-    expect(getGitStatus).not.toHaveBeenCalled();
+    expect(getGitStatus).toHaveBeenCalledOnce();
     service.close();
   });
 

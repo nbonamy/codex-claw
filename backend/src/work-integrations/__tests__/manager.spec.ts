@@ -68,11 +68,7 @@ describe('WorkIntegrationManager', () => {
       status: 'connecting',
     });
 
-    await manager.openAuthorization('github');
-
-    expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device?user_code=ABCD-1234');
-
-    await manager.completeConnection('github');
+    await manager.pollAuthorization('github');
 
     expect(snapshot.workBacklog.connections).toStrictEqual([{
       provider: 'github',
@@ -269,7 +265,7 @@ describe('WorkIntegrationManager', () => {
     expect(saveSnapshot).toHaveBeenCalledOnce();
   });
 
-  it('marks pending GitHub authorization expired before opening the browser', async () => {
+  it('marks pending GitHub authorization expired when polling', async () => {
     const snapshot = createInitialSnapshot();
     const openExternal = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
@@ -290,7 +286,7 @@ describe('WorkIntegrationManager', () => {
     });
 
     await manager.connect('github');
-    await manager.openAuthorization('github');
+    await manager.pollAuthorization('github');
 
     expect(openExternal).not.toHaveBeenCalled();
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
@@ -313,7 +309,7 @@ describe('WorkIntegrationManager', () => {
     });
 
     await manager.connect('github');
-    await manager.completeConnection('github');
+    await manager.pollAuthorization('github');
 
     expect(snapshot.workBacklog.connections[0]).toMatchObject({
       provider: 'github',
@@ -450,7 +446,6 @@ function createManager(input: {
   return new WorkIntegrationManager({
     drivers: [input.driver ?? fakeDriver()],
     getSnapshot: () => input.snapshot,
-    openExternal: input.openExternal ?? vi.fn().mockResolvedValue(undefined),
     saveSnapshot: input.saveSnapshot ?? vi.fn().mockResolvedValue(undefined),
     tokenStore: input.tokenStore ?? new MemoryWorkIntegrationTokenStore(),
   });

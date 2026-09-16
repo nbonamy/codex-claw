@@ -80,7 +80,7 @@ export class AgentWorkspaceService {
         // A change arriving during a read must trigger a fresh read afterwards.
         await this.gitStatusRefreshes.get(agentId);
         this.scheduledGitRefreshes.delete(agentId);
-        if (!this.closed && this.options.getSnapshot().activeAgentId === agentId) {
+        if (!this.closed) {
           await this.refreshGitStatus(agentId);
         }
       })().catch(() => { this.scheduledGitRefreshes.delete(agentId); });

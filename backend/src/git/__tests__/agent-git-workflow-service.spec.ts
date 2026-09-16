@@ -15,7 +15,7 @@ describe('AgentGitWorkflowService', () => {
       agentId: 'agent-1',
       params,
     });
-    expect(parseAgentGitRequest(backendMethods.agentSelect, params)).toBeNull();
+    expect(parseAgentGitRequest(backendMethods.clientNavigationSelectAgent, params)).toBeNull();
     expect(() => parseAgentGitRequest(backendMethods.agentGitStage, {})).toThrow('Invalid agentId.');
   });
 
@@ -25,10 +25,10 @@ describe('AgentGitWorkflowService', () => {
     const stage = vi.fn();
     const service = new AgentGitWorkflowService({
       applyEvent: vi.fn(),
-      archiveSession: vi.fn(),
+      archiveConversation: vi.fn(),
       delegatedWorkReports: {} as DelegatedWorkReportPort,
       driverRequest: vi.fn(),
-      forgetSession: vi.fn(),
+      releaseConversation: vi.fn(),
       getSnapshot: () => snapshot,
       getWorkIntegrations: vi.fn(),
       git: { stage } as unknown as AgentGitService,
@@ -45,7 +45,7 @@ describe('AgentGitWorkflowService', () => {
     expect(stage).not.toHaveBeenCalled();
   });
 
-  it('opens provider turn diffs without asking the provider to rebuild repository state', async () => {
+  it('returns provider turn diffs without emitting presentation events or rebuilding repository state', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0] as Agent;
     snapshot.turnGitDiffs['turn-1'] = {
@@ -60,10 +60,10 @@ describe('AgentGitWorkflowService', () => {
     const diff = vi.fn();
     const service = new AgentGitWorkflowService({
       applyEvent,
-      archiveSession: vi.fn(),
+      archiveConversation: vi.fn(),
       delegatedWorkReports: {} as DelegatedWorkReportPort,
       driverRequest: vi.fn(),
-      forgetSession: vi.fn(),
+      releaseConversation: vi.fn(),
       getSnapshot: () => snapshot,
       getWorkIntegrations: vi.fn(),
       git: { diff } as unknown as AgentGitService,
@@ -72,17 +72,18 @@ describe('AgentGitWorkflowService', () => {
       refreshWorkspaceIdentity: vi.fn(),
     });
 
-    await service.execute({
-      method: backendMethods.agentGitDiffOpen,
+    const result = await service.execute({
+      method: backendMethods.agentGitDiffGet,
       agentId: agent.id,
       params: { target: { type: 'turn', turnId: 'turn-1' } },
     }, agent);
 
     expect(diff).not.toHaveBeenCalled();
-    expect(applyEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'sidePanel.gitDiffRequested',
-      payload: expect.objectContaining({ target: { type: 'turn', turnId: 'turn-1' }, diff: 'turn diff' }),
-    }));
+    expect(result).toStrictEqual({
+      target: { type: 'turn', turnId: 'turn-1' }, diff: 'turn diff',
+      summary: { addedLines: 2, removedLines: 1, changedFiles: 0 }, sections: [],
+    });
+    expect(applyEvent).not.toHaveBeenCalled();
   });
 
   it('archives the provider session before closing an agent after a merged-branch push', async () => {
@@ -94,7 +95,7 @@ describe('AgentGitWorkflowService', () => {
     };
     snapshot.agents = [agent];
     snapshot.teams[0]!.agentIds = [agent.id];
-    const archiveSession = vi.fn().mockResolvedValue(undefined);
+    const archiveConversation = vi.fn().mockResolvedValue(undefined);
     const persistAndEmitSnapshot = vi.fn().mockResolvedValue(snapshot);
     const push = vi.fn().mockResolvedValue(undefined);
     const workflow = vi.fn().mockResolvedValue({
@@ -103,10 +104,10 @@ describe('AgentGitWorkflowService', () => {
     });
     const service = new AgentGitWorkflowService({
       applyEvent: vi.fn(),
-      archiveSession,
+      archiveConversation,
       delegatedWorkReports: {} as DelegatedWorkReportPort,
       driverRequest: vi.fn(),
-      forgetSession: vi.fn(),
+      releaseConversation: vi.fn(),
       getSnapshot: () => snapshot,
       getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
       git: { push, workflow } as unknown as AgentGitService,
@@ -121,7 +122,7 @@ describe('AgentGitWorkflowService', () => {
       params: { input: { confirmed: true, target: 'mergeTarget', closeAgentAfterPush: true } },
     }, agent);
 
-    expect(archiveSession).toHaveBeenCalledWith(agent);
+    expect(archiveConversation).toHaveBeenCalledWith(agent);
     expect(snapshot.agents).toStrictEqual([]);
     expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
   });

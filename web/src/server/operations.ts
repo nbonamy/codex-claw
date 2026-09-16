@@ -1,4 +1,8 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
+import type { ClientRequestResponse } from '@codex-claw/core/contracts';
+import type { UpdateSettingsInput } from '@codex-claw/core/contracts';
+import { splitSettingsInput } from '@codex-claw/core/client-preferences';
 import type { ClawSnapshotGetResult } from '@codex-claw/core/backend-protocol/rpc';
 
 export type ClawBackendPort = {
@@ -8,21 +12,20 @@ export type ClawBackendPort = {
 type ParamsFactory = (args: unknown[]) => unknown;
 
 const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?]>> = {
+  respondToPlanReview: [backendMethods.agentPlanReviewRespond, named('agentId', 'response')],
   listSshHosts: [backendMethods.connectionsSshHostsList],
   addSshConnection: [backendMethods.connectionsSshCreate, named('input')],
-  checkRemoteConnection: [backendMethods.connectionsSync, named('connectionId', 'inspectOnly')],
   updateRemoteConnection: [backendMethods.connectionsUpdate, named('connectionId', 'input')],
   removeRemoteConnection: [backendMethods.connectionsDelete, named('connectionId')],
-  getDevicePairingStatus: [backendMethods.devicePairingStatusGet],
-  enableDevicePairing: [backendMethods.devicePairingEnable],
-  disableDevicePairing: [backendMethods.devicePairingDisable],
-  startDevicePairing: [backendMethods.devicePairingStart],
-  checkDevicePairing: [backendMethods.devicePairingStatus, named('session')],
-  listPairedDevices: [backendMethods.devicePairingClientsList, named('environmentId')],
-  revokePairedDevice: [backendMethods.devicePairingClientRevoke, named('environmentId', 'clientId')],
+  getRemoteControlStatus: [backendMethods.remoteControlStatusGet],
+  enableRemoteControl: [backendMethods.remoteControlEnable],
+  disableRemoteControl: [backendMethods.remoteControlDisable],
+  startDevicePairing: [backendMethods.remoteControlPairingStart],
+  checkDevicePairing: [backendMethods.remoteControlPairingCheck, named('session')],
+  listPairedDevices: [backendMethods.remoteControlClientsList, named('environmentId')],
+  revokePairedDevice: [backendMethods.remoteControlClientRevoke, named('environmentId', 'clientId')],
   connectWorkProvider: [backendMethods.workProviderConnect, named('provider')],
-  openWorkProviderAuthorization: [backendMethods.workProviderAuthorizationOpen, named('provider')],
-  completeWorkProviderConnection: [backendMethods.workProviderConnectionComplete, named('provider')],
+  pollWorkProviderAuthorization: [backendMethods.workProviderAuthorizationPoll, named('provider')],
   disconnectWorkProvider: [backendMethods.workProviderDisconnect, named('provider')],
   listWorkRepositories: [backendMethods.workProviderRepositoriesList, namedOptional('provider', 'location')],
   configureWorkBacklog: [backendMethods.workProviderBacklogConfigure, namedOptional('input', 'location')],
@@ -33,7 +36,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   listBackendSkills: [backendMethods.agentSkillsList, named('agentId')],
   listAgentFiles: [backendMethods.agentFilesList, named('agentId')],
   previewAgentFile: [backendMethods.agentFilePreview, named('agentId', 'filePath')],
-  openAgentGitDiff: [backendMethods.agentGitDiffOpen, named('agentId')],
+  getAgentGitDiff: [backendMethods.agentGitDiffGet, namedOptional('agentId', 'target')],
   getAgentGitWorkflow: [backendMethods.agentGitWorkflowGet, named('agentId')],
   generateAgentGitMessage: [backendMethods.agentGitMessageGenerate, named('agentId', 'input')],
   stageAgentGitFiles: [backendMethods.agentGitStage, named('agentId', 'input')],
@@ -49,12 +52,11 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   listSourceWorktrees: [backendMethods.sourceWorktreesList, namedOptional('repoPath', 'remoteConnectionId')],
   suggestSourceWorktreePath: [backendMethods.sourceWorktreePathSuggest, named('input')],
   createSourceWorktree: [backendMethods.sourceWorktreeCreate, named('input')],
-  createTeam: [backendMethods.teamCreate, named('input')],
   updateTeam: [backendMethods.teamUpdate, named('input')],
-  reorderTeams: [backendMethods.teamReorder, named('input')],
+  reorderTeams: [backendMethods.clientTeamOrderUpdate, named('input')],
   closeTeam: [backendMethods.teamDelete, named('teamId')],
   disconnectTeam: [backendMethods.teamDisconnect, named('teamId')],
-  selectTeam: [backendMethods.teamSelect, named('teamId')],
+  selectTeam: [backendMethods.clientNavigationSelectTeam, named('teamId')],
   createAutomation: [backendMethods.automationCreate, namedOptional('input', 'location')],
   updateAutomation: [backendMethods.automationUpdate, namedOptional('input', 'location')],
   runAutomation: [backendMethods.automationRun, namedOptional('automationId', 'location')],
@@ -72,21 +74,20 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   duplicateAgent: [backendMethods.agentDuplicate, namedOptional('agentId', 'options')],
   forkAgent: [backendMethods.agentFork, namedOptional('agentId', 'turnId')],
   moveAgentToTeam: [backendMethods.agentTeamMove, named('input')],
-  reorderAgents: [backendMethods.agentReorder, named('input')],
-  reorderRepositories: [backendMethods.repositoryReorder, named('input')],
-  restartAgent: [backendMethods.agentRestart, named('agentId')],
-  hydrateAgentHistory: [backendMethods.agentHistoryHydrate, named('agentId')],
-  loadOlderAgentHistory: [backendMethods.agentHistoryLoadOlder, named('agentId')],
+  reorderAgents: [backendMethods.clientAgentOrderUpdate, named('input')],
+  reorderRepositories: [backendMethods.clientRepositoryOrderUpdate, named('input')],
+  restartAgent: [backendMethods.agentConversationReset, named('agentId')],
+  loadConversationHistory: [backendMethods.agentConversationLoad, named('agentId')],
+  loadOlderAgentHistory: [backendMethods.agentConversationHistoryLoadOlder, named('agentId')],
   closeAgent: [backendMethods.agentDelete, namedOptional('agentId', 'input')],
-  selectAgent: [backendMethods.agentSelect, named('agentId')],
-  updateSettings: [backendMethods.settingsUpdate, named('input')],
+  selectAgent: [backendMethods.clientNavigationSelectAgent, named('agentId')],
   readEngineInstructions: [backendMethods.engineInstructionsRead, named('engine')],
   saveEngineInstructions: [backendMethods.engineInstructionsSave, named('input')],
   getCodexResourceSharingStatus: [backendMethods.settingsCodexResourceSharingGet],
   setCodexResourceSharing: [backendMethods.settingsCodexResourceSharingSet, named('input')],
   getPluginStatus: [backendMethods.settingsPluginStatusGet],
   getCodexAuthentication: [backendMethods.codexAuthenticationGet, namedOptional('remoteConnectionId')],
-  cancelCodexChatGptLogin: [backendMethods.codexChatGptLoginCancel, namedOptional('remoteConnectionId', 'loginId')],
+  cancelCodexChatGptLogin: [backendMethods.codexLoginCancel, namedOptional('remoteConnectionId', 'loginId')],
   startCodexChatGptDeviceCodeLogin: [backendMethods.codexChatGptDeviceCodeLoginStart, named('remoteConnectionId')],
   startCodexChatGptLogin: [backendMethods.codexChatGptLoginStart],
   logoutCodex: [backendMethods.codexLogout],
@@ -103,7 +104,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   deleteTurn: [backendMethods.agentTurnDelete, named('agentId', 'turnId')],
   editTurn: [backendMethods.agentTurnEdit, named('agentId', 'turnId', 'content')],
   retryTurn: [backendMethods.agentTurnRetry, named('agentId', 'turnId')],
-  respondToClientRequest: [backendMethods.clientRequestRespond, named('response')],
+  respondToClientRequest: [backendMethods.agentRequestRespond, (args) => ({ response: agentResponseFromClientResponse(args[0] as ClientRequestResponse) })],
 };
 
 const desktopOnlyOperations = new Set([
@@ -120,6 +121,20 @@ export async function invokeClawWebOperation(
   operation: string,
   args: unknown[],
 ): Promise<unknown> {
+  if (operation === 'updateSettings') {
+    const { policy, preferences } = splitSettingsInput(args[0] as UpdateSettingsInput);
+    let result: unknown;
+    if (Object.keys(policy).length) result = await backend.request(backendMethods.settingsUpdate, { input: policy });
+    if (Object.keys(preferences).length) result = await backend.request(backendMethods.clientPreferencesUpdate, { input: preferences });
+    return result ?? (await backend.request<ClawSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
+  }
+  if (operation === 'checkRemoteConnection') {
+    return backend.request(args[1] === true ? backendMethods.connectionsRuntimeInspect : backendMethods.connectionsRuntimeSync, { connectionId: args[0] });
+  }
+  if (operation === 'createTeam') {
+    const input = args[0] as { remoteTeamId?: string };
+    return backend.request(input.remoteTeamId ? backendMethods.teamConnect : backendMethods.teamCreate, { input });
+  }
   if (operation === 'getSnapshot') {
     return (await backend.request<ClawSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
   }

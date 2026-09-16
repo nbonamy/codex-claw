@@ -36,6 +36,7 @@ function expectBackendCapabilities(value: unknown, path: string): void {
     'interrupt',
     'history',
     'conversationFork',
+    'planReview', 'questions', 'plugins', 'conversationArchive', 'conversationResume', 'conversationReplaceWithSummary', 'remoteControl',
     'deleteTurn',
     'editTurn',
     'retryTurn',
@@ -101,7 +102,6 @@ function expectAppSnapshot(value: unknown, path: string): void {
 }
 
 function expectRateLimits(value: unknown, path: string): void {
-  if (isAccountRateLimits(value)) return;
   expectRecord(value, path);
   expectKnownShape(
     value.rateLimits,
@@ -198,15 +198,6 @@ function expectSkill(value: unknown, path: string): void {
   expectOptional(value, 'providerMetadata', path, expectRecord);
 }
 
-function expectGitDiffSection(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectLiteral(
-    value.scope,
-    ['staged', 'unstaged', 'untracked'],
-    `${path}.scope`,
-  );
-  expectString(value.diff, `${path}.diff`);
-}
 
 function expectSidePanelMarkdown(value: unknown, path: string): void {
   expectRecord(value, path);
@@ -219,42 +210,6 @@ function expectSidePanelMarkdown(value: unknown, path: string): void {
   expectString(value.content, `${path}.content`);
 }
 
-function expectSidePanelGitDiff(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectLiteral(value.kind, ['gitDiff'], `${path}.kind`);
-  expectOptional(value, 'target', path, expectGitDiffTarget);
-  expectOptional(value, 'summary', path, (candidate, candidatePath) => {
-    expectRecord(candidate, candidatePath);
-    expectNumber(candidate.addedLines, `${candidatePath}.addedLines`);
-    expectNumber(candidate.removedLines, `${candidatePath}.removedLines`);
-    expectNumber(candidate.changedFiles, `${candidatePath}.changedFiles`);
-  });
-  expectOptional(value, 'scope', path, (candidate, candidatePath) =>
-    expectLiteral(candidate, ['workingTree', 'turn'], candidatePath),
-  );
-  expectOptional(value, 'title', path, expectAppText);
-  expectOptional(value, 'subtitle', path, (candidate, candidatePath) =>
-    expectNullable(candidate, candidatePath, expectAppText),
-  );
-  expectString(value.diff, `${path}.diff`);
-  expectOptional(value, 'sections', path, (candidate, candidatePath) =>
-    expectArray(candidate, candidatePath, expectGitDiffSection),
-  );
-  expectOptional(value, 'state', path, (candidate, candidatePath) =>
-    expectLiteral(candidate, ['idle', 'error'], candidatePath),
-  );
-  expectOptional(value, 'error', path, (candidate, candidatePath) =>
-    expectNullable(candidate, candidatePath, expectString),
-  );
-}
-
-function expectGitDiffTarget(value: unknown, path: string): void {
-  expectRecord(value, path);
-  expectLiteral(value.type, ['branch', 'uncommitted', 'unstaged', 'staged', 'commit', 'turn'], `${path}.type`);
-  if (value.type === 'branch') expectOptional(value, 'baseRef', path, expectString);
-  if (value.type === 'commit') expectString(value.sha, `${path}.sha`);
-  if (value.type === 'turn') expectString(value.turnId, `${path}.turnId`);
-}
 
 function expectAgentCreationProgress(value: unknown, path: string): void {
   expectRecord(value, path);
@@ -415,10 +370,9 @@ function expectClaudeConversationEvent(value: unknown, path: string): void {
 
 export const runtimePayloadValidators = {
   'backend.statusChanged': expectBackendRuntimeStatus,
-  'client.connectionChanged': expectConnectionState,
   'snapshot.updated': expectAppSnapshot,
   'account.rateLimitsUpdated': expectRateLimits,
-  'devicePairing.statusChanged': expectDevicePairingStatus,
+  'remoteControl.statusChanged': expectDevicePairingStatus,
   'models.changed': (value, path) => {
     expectRecord(value, path);
     expectArray(value.models, `${path}.models`, expectModel);
@@ -449,9 +403,18 @@ export const runtimePayloadValidators = {
     expectNumber(value.revision, `${path}.revision`);
     expectClaudeConversationEvent(value.event, `${path}.event`);
   },
-  'sidePanel.markdownRequested': expectSidePanelMarkdown,
-  'sidePanel.gitDiffRequested': expectSidePanelGitDiff,
-  'celebration.requested': (value, path) => {
+  'client.markdownDisplayRequested': expectSidePanelMarkdown,
+  'plan.reviewResolved': (value, path) => {
+    expectRecord(value, path);
+    expectString(value.reviewId, `${path}.reviewId`);
+    expectLiteral(value.resolution, ['accept', 'revise', 'cancel'], `${path}.resolution`);
+  },
+  'plan.readyForReview': (value, path) => {
+    expectRecord(value, path);
+    expectString(value.markdown, `${path}.markdown`);
+    expectOptional(value, 'itemId', path, expectString);
+  },
+  'client.celebrationRequested': (value, path) => {
     expectRecord(value, path);
     expectLiteral(
       value.kind,
@@ -470,6 +433,5 @@ export const runtimePayloadValidators = {
     expectLiteral(value.phase, ['handoff', 'delivery'], `${path}.phase`);
   },
   'browser.annotationCreated': expectBrowserAnnotation,
-  'workBacklog.assignmentUpdated': expectWorkBacklogAssignment,
-  'clientRequest.resolved': expectId,
+  'workItem.assignmentUpdated': expectWorkBacklogAssignment,
 } satisfies Record<string, EventValueValidator>;

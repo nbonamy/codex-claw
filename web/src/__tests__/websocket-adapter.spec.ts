@@ -1,8 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexWebSocketClose, CodexWebSocketPort } from '@codex-app-sdk/web';
 import { bindClawWebSocket } from '../server/websocket-adapter';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 
 describe('Claw web WebSocket adapter', () => {
+  it('scopes requests and snapshot events to the authenticated browser profile', async () => {
+    const socket = new FakeSocket();
+    let emit!: (event: ClawBackendEvent) => void;
+    const backend = { request: vi.fn().mockResolvedValue({}), onEvent: (listener: typeof emit) => { emit = listener; return () => undefined; } };
+    bindClawWebSocket({ backend, socket, userId: 'user', clientId: 'phone' });
+    socket.receive(JSON.stringify({ version: 1, type: 'request', id: 'navigation', operation: 'selectAgent', args: ['agent-dina'] }));
+    await vi.waitFor(() => expect(backend.request).toHaveBeenCalledWith('client/navigation/selectAgent', { agentId: 'agent-dina', _clientId: 'web:user:phone' }));
+    const snapshot = createInitialSnapshot();
+    snapshot.clientPreferences = { 'web:user:phone': { activeAgentId: snapshot.agents[1]!.id }, desktop: { activeAgentId: snapshot.agents[0]!.id } };
+    emit({ type: 'snapshot.updated', seq: 1, occurredAt: 'now', payload: snapshot });
+    emit({ type: 'agent.statusChanged', agentId: snapshot.agents[1]!.id, seq: 2, occurredAt: 'now', payload: { type: 'idle' }, snapshot });
+    const events = socket.messages.map(JSON.parse).filter((message) => message.type === 'event');
+    expect(events[0].event.payload.activeAgentId).toBe(snapshot.agents[1]!.id);
+    expect(events[1].event.snapshot.activeAgentId).toBe(snapshot.agents[1]!.id);
+    expect(snapshot.activeAgentId).toBe(snapshot.agents[0]!.id);
+  });
   it('sends tenant context, correlates requests, and forwards backend events', async () => {
     const socket = new FakeSocket();
     let eventListener: ((event: never) => void) | undefined;

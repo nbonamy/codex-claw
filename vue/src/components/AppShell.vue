@@ -36,6 +36,7 @@
       :cockpit-visible="cockpitVisible"
       :current-agent="currentAgent"
       :forkable-agent-ids="forkableAgentIds"
+      :summary-replacement-agent-ids="summaryReplacementAgentIds"
       :list-repository-session-branches="listRepositorySessionBranches"
       :open-in-applications="openInApplications"
       :quick-agent-shortcuts-visible="quickAgentShortcutsVisible"
@@ -103,9 +104,9 @@
         :check-remote-connection="checkRemoteConnection"
         :update-remote-connection="updateRemoteConnection"
         :remove-remote-connection="removeRemoteConnection"
-        :get-device-pairing-status="getDevicePairingStatus"
-        :enable-device-pairing="enableDevicePairing"
-        :disable-device-pairing="disableDevicePairing"
+        :get-device-pairing-status="getRemoteControlStatus"
+        :enable-device-pairing="enableRemoteControl"
+        :disable-device-pairing="disableRemoteControl"
         :start-device-pairing="startDevicePairing"
         :check-device-pairing="checkDevicePairing"
         :list-paired-devices="listPairedDevices"
@@ -116,7 +117,7 @@
         :choose-source-folder="chooseSourceFolder"
         :connect-work-provider="connectWorkProvider"
         :open-work-provider-authorization="openWorkProviderAuthorization"
-        :complete-work-provider-connection="completeWorkProviderConnection"
+        :complete-work-provider-connection="pollWorkProviderAuthorization"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
         :set-codex-resource-sharing="setCodexResourceSharing"
@@ -193,6 +194,7 @@
         :close-right-workspace-tab="closeRightWorkspaceTab"
         :commit-agent-git-changes="props.commitAgentGitChanges"
         :confirm-plan="confirmPlan"
+        :respond-to-plan-review="respondToPlanReview"
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
@@ -531,7 +533,7 @@ const props = withDefaults(defineProps<{
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
-  openAgentGitDiff?: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<void>;
+  getAgentGitDiff?: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
   getAgentGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   generateAgentGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
   stageAgentGitFiles?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitStageInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
@@ -555,9 +557,9 @@ const props = withDefaults(defineProps<{
   checkRemoteConnection?: (connectionId: string, inspectOnly?: boolean) => Promise<void>;
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
-  getDevicePairingStatus?: () => Promise<DevicePairingStatus>;
-  enableDevicePairing?: () => Promise<DevicePairingStatus>;
-  disableDevicePairing?: () => Promise<DevicePairingStatus>;
+  getRemoteControlStatus?: () => Promise<DevicePairingStatus>;
+  enableRemoteControl?: () => Promise<DevicePairingStatus>;
+  disableRemoteControl?: () => Promise<DevicePairingStatus>;
   startDevicePairing?: () => Promise<DevicePairingSession>;
   checkDevicePairing?: (session: DevicePairingSession) => Promise<boolean>;
   listPairedDevices?: (environmentId: string) => Promise<PairedDevice[]>;
@@ -576,7 +578,7 @@ const props = withDefaults(defineProps<{
   readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
-  completeWorkProviderConnection?: (provider: WorkProviderKind) => Promise<void>;
+  pollWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
@@ -588,6 +590,7 @@ const props = withDefaults(defineProps<{
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   retryAgentHistory?: () => Promise<void>;
   sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
+  respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
@@ -642,7 +645,7 @@ const props = withDefaults(defineProps<{
   previewAgentFile: async () => {
     throw new Error(translate('surface.appShell.filePreviewIsNotAvailable'));
   },
-  openAgentGitDiff: async () => {
+  getAgentGitDiff: async () => {
     throw new Error(translate('surface.appShell.gitDiffPreviewIsNotAvailable'));
   },
   getAgentGitWorkflow: async () => { throw new Error(translate('surface.appShell.gitWorkflowIsNotAvailable')); },
@@ -670,9 +673,9 @@ const props = withDefaults(defineProps<{
   checkRemoteConnection: async () => undefined,
   updateRemoteConnection: async () => undefined,
   removeRemoteConnection: async () => undefined,
-  getDevicePairingStatus: async () => ({ status: 'disabled' as const }),
-  enableDevicePairing: async () => ({ status: 'disabled' as const }),
-  disableDevicePairing: async () => ({ status: 'disabled' as const }),
+  getRemoteControlStatus: async () => ({ status: 'disabled' as const }),
+  enableRemoteControl: async () => ({ status: 'disabled' as const }),
+  disableRemoteControl: async () => ({ status: 'disabled' as const }),
   startDevicePairing: async () => ({ pairingCode: '', environmentId: '', expiresAt: '' }),
   checkDevicePairing: async () => false,
   listPairedDevices: async () => [],
@@ -691,7 +694,7 @@ const props = withDefaults(defineProps<{
   readConversationMessages: async () => [],
   connectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,
-  completeWorkProviderConnection: async () => undefined,
+  pollWorkProviderAuthorization: async () => undefined,
   disconnectWorkProvider: async () => undefined,
   configureWorkBacklog: async () => undefined,
   loadWorkRepositories: async () => undefined,
@@ -1047,6 +1050,11 @@ const forkableAgentIds = computed(() => props.snapshot.agents
     return (runtime?.capabilities?.conversationFork ?? defaults.conversationFork) === true;
   })
   .map((agent) => agent.id));
+const summaryReplacementAgentIds = computed(() => props.snapshot.agents
+  .filter((agent) => {
+    const runtime = props.snapshot.backendRuntimes.find((candidate) => candidate.backend === agent.backend);
+    return (runtime?.capabilities?.conversationReplaceWithSummary ?? defaultBackendCapabilities(agent.backend).conversationReplaceWithSummary) === true;
+  }).map((agent) => agent.id));
 const currentAgent = computed(() => {
   const team = activeTeam.value;
   if (!team) {
@@ -1079,9 +1087,9 @@ const workspacePreviews = useWorkspacePreviews({
   closeTab: closeRightWorkspaceTab,
   currentAgent: () => currentAgent.value,
   getSnapshot: () => props.snapshot,
-  openAgentGitDiff: (agentId, target) => target
-    ? props.openAgentGitDiff(agentId, target)
-    : props.openAgentGitDiff(agentId),
+  getAgentGitDiff: (agentId, target) => target
+    ? props.getAgentGitDiff(agentId, target)
+    : props.getAgentGitDiff(agentId),
   openTab: openRightWorkspaceTab,
   previewAgentFile: (agentId, filePath) => props.previewAgentFile(agentId, filePath),
   workspaceFor: rightWorkspaceFor,
@@ -1578,6 +1586,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     attachmentsEnabled: () => props.backendCapabilities.attachments,
     composerAttachments: () => props.composerAttachments,
     currentAgent: () => currentAgent.value,
+    canReplaceConversation: () => Boolean(currentAgent.value && summaryReplacementAgentIds.value.includes(currentAgent.value.id)),
     isAgentWorkspaceVisible: () => isAgentWorkspaceVisible.value,
     isModalDialogVisible: () => isModalDialogVisible.value,
     showOnboardingGate: () => showOnboardingGate.value,
@@ -1585,7 +1594,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
   },
   actions: {
     closeAgent: (agentId) => emit('close-agent', agentId),
-    compressSession: (agentId) => emit('compress-session', agentId),
+    replaceConversationWithSummary: (agentId) => emit('compress-session', agentId),
     closeTeam: (teamId) => emit('close-team', teamId),
     debugMarkUnread: () => emit('debug-mark-unread'),
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
@@ -1931,11 +1940,21 @@ function openResumeSession(agentId: string): void {
   resumeSessionAgentId.value = agentId;
 }
 
-function confirmPlan(): void {
-  emit('update:planMode', false);
+async function respondToPlanReview(resolution: 'accept' | 'revise' | 'cancel', feedback?: string): Promise<void> {
   const agentId = currentAgent.value?.id;
+  if (!agentId || !props.respondToPlanReview) return;
+  try {
+    await props.respondToPlanReview(resolution, feedback);
+  } catch (error) {
+    ElMessage.error(localizedErrorMessage(error, t));
+    return;
+  }
+  if (currentAgent.value?.id === agentId) emit('update:planMode', resolution === 'revise');
   if (agentId) closeRightWorkspaceTab(agentId, 'plan');
-  emit('sendPrompt', 'implement the plan');
+}
+
+function confirmPlan(): void {
+  void respondToPlanReview('accept');
 }
 
 function forwardApprovalResolution(
@@ -2071,8 +2090,8 @@ async function connectWorkProvider(provider: WorkProviderKind): Promise<void> {
   await props.connectWorkProvider(provider);
 }
 
-async function completeWorkProviderConnection(provider: WorkProviderKind): Promise<void> {
-  await props.completeWorkProviderConnection(provider);
+async function pollWorkProviderAuthorization(provider: WorkProviderKind): Promise<void> {
+  await props.pollWorkProviderAuthorization(provider);
 }
 
 async function disconnectWorkProvider(provider: WorkProviderKind): Promise<void> {
@@ -2093,6 +2112,12 @@ watch(() => props.sidePanelRequest, (request) => {
   }
 
   openSidePanelRequest(request);
+}, { immediate: true });
+
+watch(() => props.snapshot.agents.map((agent) => [agent.id, agent.planReview?.status] as const), (reviews) => {
+  for (const [agentId, status] of reviews) {
+    if (status && status !== 'pending') closeRightWorkspaceTab(agentId, 'plan');
+  }
 }, { immediate: true });
 
 watch(() => props.fileActivity, (activity) => {

@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
+import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
-import type { OpenInProvider } from '../open-in';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, ConversationSummary, AutomationLocation, RendererMessage, RendererSendPromptOptions } from '@codex-claw/core/contracts';
 import { currentSnapshot, createBackendClient } from './app-controller-test-harness';
 
 describe('AppController', () => {
@@ -24,7 +20,7 @@ describe('AppController', () => {
 
     await expect(restartAgent(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
-    expect(request).toHaveBeenCalledWith('agent/restart', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/conversation/reset', { agentId: 'agent-dina' });
   });
 
   it('routes lazy provider history hydration through clawd', async () => {
@@ -34,10 +30,10 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
-    await expect(hydrateAgentHistory(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
+    await expect(loadConversationHistory(controller, 'agent-dina')).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenCalledOnce();
-    expect(request).toHaveBeenCalledWith('agent/history/hydrate', { agentId: 'agent-dina' });
+    expect(request).toHaveBeenCalledWith('agent/conversation/load', { agentId: 'agent-dina' });
     expect(currentSnapshot(controller)).toStrictEqual(backendSnapshot);
   });
 
@@ -427,10 +423,10 @@ async function restartAgent(controller: AppController, agentId: string): Promise
   }).restartAgent(agentId);
 }
 
-async function hydrateAgentHistory(controller: AppController, agentId: string): Promise<AppSnapshot> {
+async function loadConversationHistory(controller: AppController, agentId: string): Promise<AppSnapshot> {
   return (controller as unknown as {
-    hydrateAgentHistory(agentId: string): Promise<AppSnapshot>;
-  }).hydrateAgentHistory(agentId);
+    loadConversationHistory(agentId: string): Promise<AppSnapshot>;
+  }).loadConversationHistory(agentId);
 }
 
 async function readConversationMessages(

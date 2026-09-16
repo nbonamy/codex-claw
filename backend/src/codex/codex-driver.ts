@@ -1,3 +1,4 @@
+import { clientResponseFromAgentResponse } from '@codex-claw/core/agent-request';
 import type {
   Agent,
   ApprovalPreset,
@@ -7,9 +8,7 @@ import type {
   BackendPluginSummary,
   BackendRuntimeStatus,
   BackendSession,
-  BackendSkillSummary,
-  ClientRequestResponse,
-  ConversationListInput,
+  BackendSkillSummary, ConversationListInput,
   ConversationResumeTarget,
   ConversationSummary,
   RendererMessage,
@@ -18,10 +17,10 @@ import type {
   CodexChatGptLogin,
   DevicePairingSession,
   DevicePairingStatus,
-  PairedDevice,
+  PairedDevice
 } from '@codex-claw/core/contracts';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendSessionCompressionResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendConversationReplacementResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
 type CodexPromptCommand = { type: 'review'; prompt: string };
@@ -65,8 +64,8 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.generateText(agent, input);
   }
 
-  async compressSession(agent: Agent): Promise<BackendSessionCompressionResult> {
-    const result = await this.sessionManager.compressSession(agent);
+  async replaceConversationWithSummary(agent: Agent): Promise<BackendConversationReplacementResult> {
+    const result = await this.sessionManager.replaceConversationWithSummary(agent);
     return { backendSession: codexBackendSession(result.threadId) };
   }
 
@@ -82,16 +81,16 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.listPlugins();
   }
 
-  getDevicePairingStatus(): Promise<DevicePairingStatus> {
-    return this.sessionManager.getDevicePairingStatus();
+  getRemoteControlStatus(): Promise<DevicePairingStatus> {
+    return this.sessionManager.getRemoteControlStatus();
   }
 
-  enableDevicePairing(): Promise<DevicePairingStatus> {
-    return this.sessionManager.enableDevicePairing();
+  enableRemoteControl(): Promise<DevicePairingStatus> {
+    return this.sessionManager.enableRemoteControl();
   }
 
-  disableDevicePairing(): Promise<DevicePairingStatus> {
-    return this.sessionManager.disableDevicePairing();
+  disableRemoteControl(): Promise<DevicePairingStatus> {
+    return this.sessionManager.disableRemoteControl();
   }
 
   startDevicePairing(): Promise<DevicePairingSession> {
@@ -204,8 +203,8 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  forgetAgentSession(agentId: string): void {
-    this.sessionManager.forgetAgentSession(agentId);
+  releaseConversation(agentId: string): void {
+    this.sessionManager.releaseConversation(agentId);
   }
 
   async deleteTurn(agent: Agent, turnId: string): Promise<BackendTurnActionResult> {
@@ -232,8 +231,8 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async hydrateAgent(agent: Agent): Promise<BackendSession | null> {
-    const threadId = await this.sessionManager.hydrateAgent(agent);
+  async loadConversation(agent: Agent): Promise<BackendSession | null> {
+    const threadId = await this.sessionManager.loadConversation(agent);
     return threadId ? codexBackendSession(threadId) : null;
   }
 
@@ -286,8 +285,11 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async respondToRequest(response: ClientRequestResponse): Promise<void> {
-    await this.sessionManager.respondToClientRequest(response);
+  async respondToAgentRequest(response: import('@codex-claw/core/agent-request').AgentRequestResponse): Promise<void> {
+    await this.sessionManager.respondToClientRequest({
+      ...clientResponseFromAgentResponse(response),
+      ...(response.agentId ? { agentId: response.agentId } : {}),
+    });
   }
 
   onEvent(listener: (event: BackendEvent) => void): () => void {

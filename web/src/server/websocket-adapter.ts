@@ -1,6 +1,7 @@
 import type { CodexWebSocketPort } from '@codex-app-sdk/web/server';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
+import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
 import {
   clawWebProtocolVersion,
   encodeClawWebMessage,
@@ -16,7 +17,12 @@ export function bindClawWebSocket(options: {
   backend: ClawBackendPort & { onEvent(listener: (event: ClawBackendEvent) => void): () => void };
   socket: CodexWebSocketPort;
   userId: string;
+  clientId?: string;
 }): ClawWebSocketSession {
+  const clientId = `web:${options.userId}:${options.clientId ?? 'default'}`;
+  const backend: ClawBackendPort = {
+    request: (method, params) => options.backend.request(method, { ...(params as Record<string, unknown> ?? {}), _clientId: clientId }),
+  };
   let closed = false;
   let queue = Promise.resolve();
   const unsubscribers = [
@@ -24,7 +30,7 @@ export function bindClawWebSocket(options: {
       queue = queue.then(async () => {
         try {
           const request = parseClawWebClientMessage(JSON.parse(webSocketText(data)));
-          const result = await invokeClawWebOperation(options.backend, request.operation, request.args);
+          const result = await invokeClawWebOperation(backend, request.operation, request.args);
           send({
             version: clawWebProtocolVersion,
             type: 'response',
@@ -49,7 +55,11 @@ export function bindClawWebSocket(options: {
     options.backend.onEvent((event) => send({
       version: clawWebProtocolVersion,
       type: 'event',
-      event: { ...event, source: 'backend' } as MainToRendererEvent,
+      event: {
+        ...event, source: 'backend',
+        ...(event.type === 'snapshot.updated' ? { payload: projectClientSnapshot(event.payload, clientId) } : {}),
+        ...(event.snapshot ? { snapshot: projectClientSnapshot(event.snapshot, clientId) } : {}),
+      } as MainToRendererEvent,
     })),
   ];
   if (options.socket.onError) unsubscribers.push(options.socket.onError(() => close()));

@@ -55,8 +55,8 @@ type AgentBackendDriver = {
   clearGoal?(agent: Agent): Promise<BackendGoalResult>
   setCodexApprovalPreset?(agent: Agent, preset: CodexApprovalPreset): Promise<BackendCodexApprovalPresetResult>
   interrupt(agent: Agent): Promise<BackendSendResult>
-  respondToRequest(response: ClientRequestResponse): Promise<void>
-  hydrateAgent?(agent: Agent): Promise<BackendSession | null>
+  respondToAgentRequest(response: ClientRequestResponse): Promise<void>
+  loadConversation?(agent: Agent): Promise<BackendSession | null>
   listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>
   resumeConversation?(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult>
   readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>
@@ -177,7 +177,7 @@ a provider-specific plan flow:
 
 - `EnterPlanMode` marks the Claude session as planning.
 - `system/status.permissionMode: "plan"` is normalized to
-  `thread.modeUpdated`.
+  `conversation.modeUpdated`.
 - Claude may write a private plan file under `~/.claude/plans/...`; Claw treats
   that `Write` tool's streamed `content` as `turn.proposedPlanDelta` and does
   not render the private write as a generic chat tool.

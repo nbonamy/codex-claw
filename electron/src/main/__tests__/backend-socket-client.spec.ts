@@ -51,16 +51,16 @@ describe('ClawBackendSocketClient', () => {
       method: 'backend/event/notify',
       params: {
         seq: 1,
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: '2026-06-14T00:00:00.000Z',
       },
     })}\n`);
 
     expect(listener).toHaveBeenCalledWith({
       seq: 1,
-      type: 'client.connectionChanged',
-      payload: { status: 'connected' },
+      backend: 'codex' as const, type: 'backend.statusChanged',
+      payload: { backend: 'codex' as const, status: 'running' },
       occurredAt: '2026-06-14T00:00:00.000Z',
     });
   });

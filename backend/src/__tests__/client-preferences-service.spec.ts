@@ -1,0 +1,48 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
+import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { ClientPreferencesService } from '../client-preferences-service';
+import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
+
+describe('client presentation preferences', () => {
+  it('isolates selection and appearance across clients without mutating runtime state', async () => {
+    const snapshot = createInitialSnapshot();
+    const original = structuredClone(snapshot);
+    const save = vi.fn(async (id, preferences) => { snapshot.clientPreferences = { ...snapshot.clientPreferences, [id]: preferences }; });
+    const service = new ClientPreferencesService({ snapshot: async () => snapshot, save });
+    const secondAgent = snapshot.agents[1]!;
+    await service.update('phone', backendMethods.clientNavigationSelectAgent, { agentId: secondAgent.id });
+    await service.update('phone', backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: true } } });
+    await service.update('desktop', backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: false } } });
+    expect(snapshot.activeAgentId).toBe(original.activeAgentId);
+    expect(snapshot.general).toStrictEqual(original.general);
+    expect(projectClientSnapshot(snapshot, 'phone').activeAgentId).toBe(secondAgent.id);
+    expect(projectClientSnapshot(snapshot, 'phone').general.agentListCompact).toBe(true);
+    expect(projectClientSnapshot(snapshot, 'desktop').activeAgentId).toBe(original.activeAgentId);
+    expect(projectClientSnapshot(snapshot, 'desktop').general.agentListCompact).toBe(false);
+    expect(save).toHaveBeenCalledTimes(3);
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+    expect(projectClientSnapshot(restored, 'phone').activeAgentId).toBe(secondAgent.id);
+    expect(projectClientSnapshot(restored, 'phone').general.agentListCompact).toBe(true);
+    await expect(service.update('phone', backendMethods.clientPreferencesUpdate, { input: { sourceFolder: { path: '/repo' } } })).rejects.toThrow('Backend policies');
+  });
+
+  it('serializes simultaneous updates for one client without losing unrelated preferences', async () => {
+    const snapshot = createInitialSnapshot();
+    const service = new ClientPreferencesService({ snapshot: async () => snapshot, save: async (id, preferences) => {
+      await Promise.resolve();
+      snapshot.clientPreferences = { ...snapshot.clientPreferences, [id]: preferences };
+    } });
+    await Promise.all([
+      service.update('phone', backendMethods.clientNavigationSelectAgent, { agentId: snapshot.agents[1]!.id }),
+      service.update('phone', backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: true } } }),
+    ]);
+    const projected = projectClientSnapshot(snapshot, 'phone');
+    expect(projected.activeAgentId).toBe(snapshot.agents[1]!.id);
+    expect(projected.general.agentListCompact).toBe(true);
+    snapshot.agents[1]!.teamId = 'moved';
+    snapshot.teams.push({ id: 'moved', name: 'Moved', agentIds: [snapshot.agents[1]!.id] });
+    expect(projectClientSnapshot(snapshot, 'phone').activeTeamId).toBe('moved');
+  });
+});

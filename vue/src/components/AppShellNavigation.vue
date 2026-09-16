@@ -34,6 +34,7 @@
       v-if="showAgentSidebar"
       :agents="activeTeamAgents"
       :forkable-agent-ids="forkableAgentIds"
+      :summary-replacement-agent-ids="summaryReplacementAgentIds"
       :active-agent-id="currentAgent?.id ?? null"
       :unread-agent-ids="unreadAgentIds"
       :teams="snapshot.teams"
@@ -110,6 +111,7 @@ const props = defineProps<{
   cockpitVisible: boolean;
   currentAgent: Agent | null;
   forkableAgentIds: string[];
+  summaryReplacementAgentIds?: string[];
   listRepositorySessionBranches: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
   openInApplications: OpenInApplicationCatalog;
   quickAgentShortcutsVisible: boolean;
@@ -180,6 +182,7 @@ const {
   cockpitVisible,
   currentAgent,
   forkableAgentIds,
+  summaryReplacementAgentIds,
   listRepositorySessionBranches,
   openInApplications,
   quickAgentShortcutsVisible,

@@ -68,7 +68,6 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const workIntegrations = new WorkIntegrationManager({
     drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],
     getSnapshot: () => snapshot,
-    openExternal: (url) => options.requestClient(backendMethods.clientExternalOpen, { url }),
     saveSnapshot: () => saveBackendSnapshot(snapshot),
     tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
   });
@@ -231,6 +230,9 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   mcpService.setDriverRpc(driverRpc);
   mcpService.setEventSink((event) => server.emitEvent(event));
   scheduler.start();
+  void server.initialize().catch((error) => warnMain('startup', 'backend initialization failed', {
+    message: error instanceof Error ? error.message : String(error),
+  }));
 
   return {
     server,

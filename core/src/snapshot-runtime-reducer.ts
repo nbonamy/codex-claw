@@ -11,7 +11,7 @@ import {
   setAgentStatusInSnapshot as setAgentStatus,
 } from './agent-manager';
 import { appText } from './app-text';
-import { codexApprovalPresetFromThreadSettings, codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
+import { codexBackendDefaultsWithApprovalPreset } from './codex-approval-presets';
 import { replaceAppSnapshot } from './snapshot-construction';
 import { decodeAppSnapshot } from './snapshot-guards';
 import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
@@ -45,7 +45,7 @@ export function applyRuntimeEventToSnapshot(
     return;
   }
 
-  if (event.type === 'workBacklog.assignmentUpdated') {
+  if (event.type === 'workItem.assignmentUpdated') {
     const assignment = workBacklogAssignment(event.payload);
     snapshot.workBacklog.assignments = {
       ...snapshot.workBacklog.assignments,
@@ -75,75 +75,56 @@ export function applyRuntimeEventToSnapshot(
     return;
   }
 
-  if (event.type === 'thread.started') {
+  if (event.type === 'agent.conversationAttached') {
     const agent = findAgent(snapshot, event.agentId);
     if (agent && event.backend === 'claude') {
-      const payload = event.payload;
-      const model = payload.model?.trim() ? payload.model : undefined;
-      const reasoningEffort = payload.reasoningEffort?.trim()
-        ? payload.reasoningEffort
-        : undefined;
       agent.backend = 'claude';
       agent.backendSession = {
         kind: 'claude',
-        sessionId: event.backendSessionId,
+        sessionId: event.conversationId,
         transport: 'stdio',
-        ...(model ? { model } : {}),
-        ...(reasoningEffort ? { reasoningEffort } : {}),
       };
-      const defaults = agent.backendDefaults?.kind === 'claude'
-        ? agent.backendDefaults
-        : { kind: 'claude' as const };
-      agent.backendDefaults = {
-        ...defaults,
-        ...(model ? { model } : {}),
-        ...(reasoningEffort ? { reasoningEffort } : {}),
-      };
-      if (model && !reasoningEffort) {
-        delete agent.backendDefaults.reasoningEffort;
-      }
       return;
     }
 
-    if (agent && event.threadId) {
+    if (agent) {
       agent.backend = 'codex';
-      agent.backendSession = { kind: 'codex', threadId: event.threadId };
+      agent.backendSession = { kind: 'codex', threadId: event.conversationId };
     }
     return;
   }
 
-  if (event.type === 'thread.settingsUpdated') {
-    if (event.threadId) {
+  if (event.type === 'conversation.settingsUpdated') {
+    if (event.conversationId) {
       const agent = findAgent(snapshot, event.agentId);
       if (agent) {
-        agent.backend = 'codex';
-        agent.backendSession = { kind: 'codex', threadId: event.threadId };
         const payload = event.payload;
-        const approvalPreset = codexApprovalPresetFromThreadSettings(payload.threadSettings);
-        if (approvalPreset) {
+        const approvalPreset = payload.settings.approvalPreset;
+        if (approvalPreset && event.backend === 'codex') {
           agent.backendDefaults = codexBackendDefaultsWithApprovalPreset(agent.backendDefaults, approvalPreset);
         }
-        const defaults = agent.backendDefaults?.kind === 'codex'
+        const defaults = agent.backendDefaults?.kind === event.backend
           ? agent.backendDefaults
-          : { kind: 'codex' as const };
+          : { kind: event.backend };
         agent.backendDefaults = {
           ...defaults,
-          ...(payload.threadSettings.model !== undefined
-            ? { model: payload.threadSettings.model }
+          ...(payload.settings.model !== undefined
+            ? { model: payload.settings.model }
             : {}),
-          ...(payload.threadSettings.reasoningEffort !== undefined
-            ? { reasoningEffort: payload.threadSettings.reasoningEffort }
+          ...(payload.settings.reasoningEffort !== undefined
+            ? { reasoningEffort: payload.settings.reasoningEffort }
             : {}),
-          ...(payload.threadSettings.serviceTier !== undefined
-            ? { serviceTier: payload.threadSettings.serviceTier }
+          ...(payload.settings.serviceTier !== undefined
+            ? { serviceTier: payload.settings.serviceTier }
             : {}),
+          ...(payload.settings.permissionMode !== undefined ? { permissionMode: payload.settings.permissionMode } : {}),
         };
       }
     }
     return;
   }
 
-  if (event.type === 'thread.tokenUsageUpdated') {
+  if (event.type === 'conversation.contextUsageUpdated') {
     const agent = findAgent(snapshot, event.agentId);
     const contextUsage = agentContextUsage(event.payload);
     if (agent) {
@@ -152,7 +133,7 @@ export function applyRuntimeEventToSnapshot(
     return;
   }
 
-  if (event.type === 'thread.goalUpdated') {
+  if (event.type === 'conversation.goalUpdated') {
     const agent = findAgent(snapshot, event.agentId);
     const goal = threadGoal(event.payload);
     if (agent) {
@@ -161,7 +142,7 @@ export function applyRuntimeEventToSnapshot(
     return;
   }
 
-  if (event.type === 'thread.goalCleared') {
+  if (event.type === 'conversation.goalCleared') {
     const agent = findAgent(snapshot, event.agentId);
     if (agent) {
       delete agent.goal;
@@ -182,9 +163,9 @@ export function applyRuntimeEventToSnapshot(
 }
 
 function agentContextUsage(
-  value: RuntimeEventPayload<'thread.tokenUsageUpdated'>,
+  value: RuntimeEventPayload<'conversation.contextUsageUpdated'>,
 ): AgentContextUsage {
-  const usage = 'contextUsage' in value ? value.contextUsage : value;
+  const usage = value.contextUsage;
 
   return {
     totalTokens: usage.totalTokens,
@@ -201,9 +182,7 @@ function agentContextUsage(
 function accountRateLimits(
   value: RuntimeEventPayload<'account.rateLimitsUpdated'>,
 ): AccountRateLimits {
-  const rateLimits = 'rateLimits' in value && isRecord(value.rateLimits)
-    ? value.rateLimits
-    : value as AccountRateLimits;
+  const rateLimits = value.rateLimits;
   return {
     limitId: rateLimits.limitId,
     limitName: rateLimits.limitName,
@@ -226,7 +205,7 @@ function accountRateLimitWindow(value: AccountRateLimits['primary']): AccountRat
 }
 
 function workBacklogAssignment(
-  value: RuntimeEventPayload<'workBacklog.assignmentUpdated'>,
+  value: RuntimeEventPayload<'workItem.assignmentUpdated'>,
 ): WorkBacklogAssignment {
   const status = value.status === 'working' ? 'inProgress' : value.status;
 
@@ -247,8 +226,8 @@ function workBacklogAssignment(
   };
 }
 
-function threadGoal(value: RuntimeEventPayload<'thread.goalUpdated'>): ThreadGoal {
-  const goal = 'goal' in value ? value.goal : value;
+function threadGoal(value: RuntimeEventPayload<'conversation.goalUpdated'>): ThreadGoal {
+  const goal = value.goal;
 
   return {
     threadId: goal.threadId,
@@ -276,6 +255,8 @@ type BackendRuntimeCapabilities = NonNullable<AppSnapshot['backendRuntimes'][num
 
 function backendCapabilities(value: Record<string, unknown>): Partial<BackendRuntimeCapabilities> {
   return {
+    ...Object.fromEntries(['planReview', 'questions', 'plugins', 'conversationArchive', 'conversationResume', 'conversationReplaceWithSummary', 'remoteControl']
+      .filter((key) => typeof value[key] === 'boolean').map((key) => [key, value[key]])),
     ...(typeof value.attachments === 'boolean' ? { attachments: value.attachments } : {}),
     ...(typeof value.models === 'boolean' ? { models: value.models } : {}),
     ...(typeof value.skills === 'boolean' ? { skills: value.skills } : {}),

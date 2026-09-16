@@ -6,6 +6,7 @@ import type {
   Team,
 } from '@codex-claw/core/contracts';
 import { getCodexNativeRendererApi, type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
+import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ElMessage } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { translate } from '../i18n';
@@ -28,6 +29,7 @@ type AppShellCommandOptions = {
     attachmentsEnabled: () => boolean;
     composerAttachments: () => readonly CodexNativeAttachment[];
     currentAgent: () => Agent | null;
+    canReplaceConversation?: () => boolean;
     isAgentWorkspaceVisible: () => boolean;
     isModalDialogVisible: () => boolean;
     showOnboardingGate: () => boolean;
@@ -35,7 +37,7 @@ type AppShellCommandOptions = {
   };
   actions: {
     closeAgent: (agentId: string) => void;
-    compressSession: (agentId: string) => void;
+    replaceConversationWithSummary: (agentId: string) => void;
     closeTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
     duplicateAgent: (agentId: string) => void;
@@ -415,10 +417,8 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'compress-active-session') {
       if (!isAgentWorkspaceVisible.value || !currentAgent.value) return;
-      if (currentAgent.value.backend === 'codex') {
-        options.actions.compressSession(currentAgent.value.id);
-      } else {
-        options.actions.sendAgentPrompt(currentAgent.value.id, '/compact');
+      if (options.state.canReplaceConversation?.() ?? defaultBackendCapabilities(currentAgent.value.backend).conversationReplaceWithSummary) {
+        options.actions.replaceConversationWithSummary(currentAgent.value.id);
       }
       return;
     }

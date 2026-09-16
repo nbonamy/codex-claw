@@ -5,7 +5,6 @@ import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './type
 type WorkIntegrationManagerOptions = {
   drivers: WorkProviderDriver[];
   getSnapshot: () => AppSnapshot;
-  openExternal: (url: string) => Promise<unknown>;
   saveSnapshot: () => Promise<void>;
   tokenStore: WorkIntegrationTokenStore;
 };
@@ -171,17 +170,7 @@ export class WorkIntegrationManager {
     };
   }
 
-  async openAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
-    const pending = await this.activePendingAuthorization(provider);
-    if (!pending) {
-      return this.snapshot();
-    }
-
-    await this.options.openExternal(authorizationUrl(pending));
-    return this.snapshot();
-  }
-
-  async completeConnection(provider: WorkProviderKind): Promise<AppSnapshot> {
+  async pollAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
     const pending = await this.activePendingAuthorization(provider);
     if (!pending) {
       return this.snapshot();
@@ -434,16 +423,6 @@ function publicAuthorization(authorization: WorkProviderDeviceAuthorization): Wo
     verificationUri: authorization.verificationUri,
     expiresAt: authorization.expiresAt,
   };
-}
-
-function authorizationUrl(authorization: WorkProviderDeviceAuthorization): string {
-  try {
-    const url = new URL(authorization.verificationUri);
-    url.searchParams.set('user_code', authorization.userCode);
-    return url.toString();
-  } catch {
-    return authorization.verificationUri;
-  }
 }
 
 function providerLabel(provider: WorkProviderKind): string {

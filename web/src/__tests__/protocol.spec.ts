@@ -6,8 +6,8 @@ describe('Claw web protocol', () => {
     const event = {
       seq: 1,
       source: 'backend' as const,
-      type: 'client.connectionChanged' as const,
-      payload: { status: 'connected' as const },
+      backend: 'codex' as const, type: 'backend.statusChanged' as const,
+      payload: { backend: 'codex' as const, status: 'running' as const },
       occurredAt: '2026-09-04T00:00:00.000Z',
     };
     expect(parseClawWebClientMessage({ version: 1, type: 'request', id: '1', operation: 'getSnapshot', args: [] }))
@@ -59,8 +59,8 @@ describe('Claw web protocol', () => {
       {
         seq: secret,
         source: 'backend',
-        type: 'client.connectionChanged',
-        payload: { status: 'connected' },
+        backend: 'codex' as const, type: 'backend.statusChanged',
+        payload: { backend: 'codex' as const, status: 'running' },
         occurredAt: '2026-09-04T00:00:00.000Z',
       },
       {

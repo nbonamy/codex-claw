@@ -400,7 +400,7 @@ function createFakeBackendDriver(
     interrupt: vi.fn().mockResolvedValue(backend === 'codex'
       ? { backendSession: { kind: 'codex', threadId: 'thread-1' } }
       : { backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' } }),
-    respondToRequest: vi.fn().mockResolvedValue(undefined),
+    respondToAgentRequest: vi.fn().mockResolvedValue(undefined),
     onEvent: vi.fn(() => () => undefined),
     close: vi.fn().mockResolvedValue(undefined),
   };

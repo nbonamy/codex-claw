@@ -51,8 +51,10 @@ export class RemoteTeamService {
 
   targetTeamForAgentInput(input: Pick<CreateAgentInput, 'teamId'>): Team | null {
     const snapshot = this.options.getSnapshot();
-    if (input.teamId) return snapshot.teams.find((team) => team.id === input.teamId) ?? null;
-    return snapshot.teams.find((team) => team.id === snapshot.activeTeamId) ?? snapshot.teams[0] ?? null;
+    if (!input.teamId) throw new Error('A target team is required before resolving its location.');
+    const team = snapshot.teams.find((team) => team.id === input.teamId);
+    if (!team) throw new Error(`Team not found: ${input.teamId}`);
+    return team;
   }
 
   knownSnapshot(connectionId: string): AppSnapshot | undefined {
@@ -65,17 +67,10 @@ export class RemoteTeamService {
 
   adoptCreatedAgentSnapshot(pointer: RemoteTeamPointer, remoteSnapshot: AppSnapshot): void {
     this.rememberSnapshot(pointer.connectionId, remoteSnapshot);
-    const snapshot = this.options.getSnapshot();
-    const remoteTeam = remoteSnapshot.teams.find((team) => team.id === pointer.remoteTeamId);
-    snapshot.activeTeamId = pointer.localTeamId;
-    snapshot.activeAgentId = remoteSnapshot.activeAgentId
-      ?? remoteTeam?.activeAgentId
-      ?? remoteTeam?.agentIds[0]
-      ?? null;
   }
 
   async request<Result = unknown>(connectionId: string, method: string, params?: unknown): Promise<Result> {
-    return this.options.clients.request<Result>(this.connection(connectionId), method, params, (event) => {
+    return this.options.clients.request<Result>(this.connection(connectionId), method, { ...(params && typeof params === 'object' ? params : {}), _clientId: 'remote-controller' }, (event) => {
       this.applyEvent(connectionId, event);
     });
   }
@@ -272,6 +267,14 @@ function projectRemoteTeam(target: AppSnapshot, localTeam: Team, remoteSnapshot:
   target.agentGitStatuses = {
     ...target.agentGitStatuses,
     ...Object.fromEntries(Object.entries(remoteSnapshot.agentGitStatuses).filter(([agentId]) => projectedAgentIds.has(agentId))),
+  };
+  target.agentRequests = {
+    ...Object.fromEntries(Object.entries(target.agentRequests ?? {}).filter(([agentId]) => !projectedAgentIds.has(agentId))),
+    ...Object.fromEntries(Object.entries(remoteSnapshot.agentRequests ?? {}).filter(([agentId]) => projectedAgentIds.has(agentId))),
+  };
+  target.backendApprovals = {
+    ...Object.fromEntries(Object.entries(target.backendApprovals).filter(([agentId]) => !projectedAgentIds.has(agentId))),
+    ...Object.fromEntries(Object.entries(remoteSnapshot.backendApprovals).filter(([agentId]) => projectedAgentIds.has(agentId))),
   };
   target.turnGitDiffs = {
     ...Object.fromEntries(Object.entries(target.turnGitDiffs).filter(([, diff]) => !projectedAgentIds.has(diff.agentId))),

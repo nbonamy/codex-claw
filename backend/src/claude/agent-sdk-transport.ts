@@ -57,6 +57,7 @@ type ActiveTransportTurn = {
 
 type ClaudeSdkSession = {
   sessionId: string;
+  requestOwnerId: string;
   cwd: string;
   configurationKey: string;
   input: AsyncPushQueue<SDKUserMessage>;
@@ -69,6 +70,7 @@ type ClaudeSdkSession = {
 };
 
 type PendingPermission = {
+  requestId: string;
   session: ClaudeSdkSession;
   toolName: string;
   input: Record<string, unknown>;
@@ -150,13 +152,16 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     };
   }
 
-  async respondToPermissionRequest(requestId: string, response: ClaudePermissionResponse): Promise<void> {
-    const pending = this.pendingPermissions.get(requestId);
+  async respondToPermissionRequest(requestId: string, response: ClaudePermissionResponse, ownerId?: string): Promise<void> {
+    const matches = [...this.pendingPermissions].filter(([, pending]) => pending.requestId === requestId
+      && (!ownerId || pending.session.requestOwnerId === ownerId));
+    if (matches.length > 1) throw new Error('Agent identity is required for this request.');
+    const [key, pending] = matches[0] ?? [];
     if (!pending) {
       throw new Error(`Claude permission request '${requestId}' is no longer pending.`);
     }
 
-    this.pendingPermissions.delete(requestId);
+    this.pendingPermissions.delete(key!);
     pending.signal.removeEventListener('abort', pending.abortListener);
     pending.resolve(permissionResult(pending, response));
   }
@@ -262,6 +267,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     });
     session = {
       sessionId,
+      requestOwnerId: params.ownerId ?? sessionId,
       cwd: expandHome(params.cwd),
       configurationKey,
       input,
@@ -367,14 +373,16 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     }
 
     const requestId = options.requestId;
+    const key = JSON.stringify([session.requestOwnerId, requestId]);
     return new Promise<PermissionResult>((resolve) => {
       const abortListener = () => {
-        const pending = this.pendingPermissions.get(requestId);
+        const pending = this.pendingPermissions.get(key);
         if (!pending) return;
-        this.pendingPermissions.delete(requestId);
+        this.pendingPermissions.delete(key);
         resolve({ behavior: 'deny', message: 'Claude permission request was cancelled.' });
       };
       const pending: PendingPermission = {
+        requestId,
         session,
         toolName,
         input,
@@ -383,12 +391,12 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         abortListener,
         resolve,
       };
-      const existing = this.pendingPermissions.get(requestId);
+      const existing = this.pendingPermissions.get(key);
       if (existing) {
         existing.signal.removeEventListener('abort', existing.abortListener);
         existing.resolve({ behavior: 'deny', message: 'Claude replaced this permission request.' });
       }
-      this.pendingPermissions.set(requestId, pending);
+      this.pendingPermissions.set(key, pending);
       options.signal.addEventListener('abort', abortListener, { once: true });
       onPermissionRequest({
         kind: toolName === 'AskUserQuestion' ? 'ask_user' : 'confirm_tool',

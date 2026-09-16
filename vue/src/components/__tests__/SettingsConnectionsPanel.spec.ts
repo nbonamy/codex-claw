@@ -27,7 +27,7 @@ describe('SettingsConnectionsPanel', () => {
       props: {
         settings: { preventSleepWhenRemoteAccessEnabled: true },
         updateSettings,
-        getDevicePairingStatus: async () => ({ status: 'connected' }),
+        getRemoteControlStatus: async () => ({ status: 'connected' }),
       },
       global: {
         plugins: [ElementPlus],
@@ -48,7 +48,7 @@ describe('SettingsConnectionsPanel', () => {
   it('hides the remote-access keep-awake setting while device connections are disabled', async () => {
     const wrapper = mount(SettingsConnectionsPanel, {
       props: {
-        getDevicePairingStatus: async () => ({ status: 'disabled' }),
+        getRemoteControlStatus: async () => ({ status: 'disabled' }),
       },
       global: {
         plugins: [ElementPlus],
@@ -251,7 +251,7 @@ describe('SettingsConnectionsPanel', () => {
       environmentId: 'environment-1',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     };
-    const getDevicePairingStatus = vi.fn().mockResolvedValue({
+    const getRemoteControlStatus = vi.fn().mockResolvedValue({
       status: 'connected',
       serverName: 'Claw',
       installationId: 'installation-1',
@@ -273,7 +273,7 @@ describe('SettingsConnectionsPanel', () => {
 
     const wrapper = mount(SettingsConnectionsPanel, {
       props: {
-        getDevicePairingStatus,
+        getRemoteControlStatus,
         startDevicePairing,
         checkDevicePairing,
         listPairedDevices,
@@ -306,13 +306,13 @@ describe('SettingsConnectionsPanel', () => {
   });
 
   it('toggles mobile connections through the device-pairing controls', async () => {
-    const enableDevicePairing = vi.fn().mockResolvedValue({ status: 'connecting' });
-    const disableDevicePairing = vi.fn().mockResolvedValue({ status: 'disabled' });
+    const enableRemoteControl = vi.fn().mockResolvedValue({ status: 'connecting' });
+    const disableRemoteControl = vi.fn().mockResolvedValue({ status: 'disabled' });
     const wrapper = mount(SettingsConnectionsPanel, {
       props: {
-        getDevicePairingStatus: async () => ({ status: 'disabled' }),
-        enableDevicePairing,
-        disableDevicePairing,
+        getRemoteControlStatus: async () => ({ status: 'disabled' }),
+        enableRemoteControl,
+        disableRemoteControl,
       },
       global: { plugins: [ElementPlus] },
     });
@@ -320,7 +320,7 @@ describe('SettingsConnectionsPanel', () => {
 
     await switchWithLabel(wrapper, 'Allow connections').vm.$emit('update:modelValue', true);
     await flushPromises();
-    expect(enableDevicePairing).toHaveBeenCalledOnce();
+    expect(enableRemoteControl).toHaveBeenCalledOnce();
     const refreshingButton = wrapper.findAllComponents({ name: 'ElButton' })
       .find((candidate) => candidate.text() === 'Refreshing');
     expect(refreshingButton?.props('loading')).toBe(true);
@@ -330,7 +330,7 @@ describe('SettingsConnectionsPanel', () => {
 
     await switchWithLabel(wrapper, 'Allow connections').vm.$emit('update:modelValue', false);
     await flushPromises();
-    expect(disableDevicePairing).toHaveBeenCalledOnce();
+    expect(disableRemoteControl).toHaveBeenCalledOnce();
   });
 });
 

@@ -167,9 +167,9 @@ describe('CockpitWorkInbox', () => {
     expect(startButton.props('disabled')).toBe(false);
     await startButton.trigger('click');
     expect(wrapper.get('.cockpit-inbox__start-body').text()).toContain('Launch 1 agent?');
-    const teamSelect = wrapper.findAllComponents({ name: 'ElSelect' }).at(-1)!;
-    expect(teamSelect.props('modelValue')).toBe('team-one');
-    await teamSelect.vm.$emit('update:modelValue', 'team-two');
+    const clientNavigationSelectTeam = wrapper.findAllComponents({ name: 'ElSelect' }).at(-1)!;
+    expect(clientNavigationSelectTeam.props('modelValue')).toBe('team-one');
+    await clientNavigationSelectTeam.vm.$emit('update:modelValue', 'team-two');
 
     await wrapper.findAll('.claw-dialog__footer button').find((button) => button.text() === 'Investigate')?.trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith({ action: 'investigate', items: [second], teamId: 'team-two' });

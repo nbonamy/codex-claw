@@ -1,3 +1,4 @@
+import { approvalOutcome } from '@codex-claw/core/agent-request';
 import { describe, expect, it } from 'vitest';
 import { decodeClawBackendEvent } from '../backend-protocol/events';
 import { updateAgentFolder } from '../agent-manager';
@@ -49,8 +50,8 @@ describe('snapshot reducer', () => {
     snapshot.backendApprovals['agent-dina'] = [approval];
     applyMainEventToSnapshot(snapshot, {
       seq: 4,
-      type: 'backendApproval.resolved',
-      payload: { approval, decision: null, scope: null, reason: 'server' },
+      type: 'agentRequest.resolved',
+      payload: { id: (approval).id, outcome: approvalOutcome(null, null, 'server') },
       occurredAt: '2026-06-05T00:00:04.000Z',
     } as unknown as MainToRendererEvent);
     applyMainEventToSnapshot(snapshot, {
@@ -74,12 +75,12 @@ describe('snapshot reducer', () => {
       activities: {},
     };
 
-    applyMainEventToSnapshot(snapshot, {
+    applyMainEventToSnapshot(snapshot, { conversationId: 'thread-1',
       seq: 1,
       agentId,
       backend: 'codex',
       threadId: 'thread-new',
-      type: 'thread.started',
+      type: 'agent.conversationAttached',
       payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
     });

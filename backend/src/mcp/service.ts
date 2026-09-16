@@ -13,20 +13,18 @@ import type {
   AnnouncementPhase,
   AgentCreationProgress,
   AgentWorkspaceIdentity,
-  AppSnapshot,
-  BackendConversationRef,
-  CelebrationKind,
+  AppSnapshot, CelebrationKind,
   CreateAgentInput,
   CreateSourceWorktreeInput,
   AutomationExecutionLogEntry,
-  MainToRendererEvent,
+  BackendPublishedEvent,
   SpokenAnnouncementRequest,
   SpokenAnnouncementQueueResult,
   SendPromptOptions,
   SourceRepository,
   SourceWorktree,
   WorkBacklogAssignment,
-  WorkBacklogAssignmentStatus,
+  WorkBacklogAssignmentStatus
 } from '@codex-claw/core/contracts';
 import { createAgentInSnapshot, updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
@@ -40,6 +38,7 @@ import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway } from './hosted-mcp-gateway';
+import path from 'node:path';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -51,7 +50,7 @@ export type ClawMcpServiceOptions = {
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
   hostedMcpGateway?: HostedMcpGateway;
-  queueSpokenAnnouncement?: (input: SpokenAnnouncementRequest) => Promise<SpokenAnnouncementQueueResult>;
+  queueSpokenAnnouncement?: (input: Omit<SpokenAnnouncementRequest, 'voice'>) => Promise<SpokenAnnouncementQueueResult>;
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
 };
@@ -117,7 +116,7 @@ export class ClawMcpService {
     this.eventSink = listener;
   }
 
-  handleBackendEvent(event: MainToRendererEvent): void {
+  handleBackendEvent(event: BackendPublishedEvent): void {
     if (event.type === 'agent.promptDequeued') {
       const ids = event.payload.ids;
       for (const id of ids) this.queuedMessageIds.delete(id);
@@ -234,8 +233,8 @@ export class ClawMcpService {
         }) as Promise<BackendSendResult>
       ),
       interrupt: (currentAgent) => this.requireDriverRpc().handle(backendMethods.driverInterrupt, { agent: currentAgent }) as Promise<BackendSendResult>,
-      respondToRequest: async (response) => {
-        await this.requireDriverRpc().handle(backendMethods.driverClientRequestRespond, {
+      respondToAgentRequest: async (response) => {
+        await this.requireDriverRpc().handle(backendMethods.driverAgentRequestRespond, {
           backend: agent.backend,
           response,
         });
@@ -267,7 +266,7 @@ export class ClawMcpService {
 
     this.emit({
       agentId: agent.id,
-      type: 'sidePanel.markdownRequested',
+      type: 'client.markdownDisplayRequested',
       payload: {
         kind: 'markdown',
         title,
@@ -285,36 +284,18 @@ export class ClawMcpService {
   }
 
   private celebrateForAgent(agent: Agent, kind: CelebrationKind): CelebrationResponse {
-    if (this.snapshot.general.celebrationsEnabled === false) {
-      return {
-        success: true,
-        displayed: false,
-        kind,
-        message: 'Celebrations are disabled in General settings.',
-      };
-    }
-    if (this.snapshot.activeAgentId !== agent.id) {
-      return {
-        success: true,
-        displayed: false,
-        kind,
-        message: 'Celebrations only play for the selected agent.',
-      };
-    }
     this.emit({
       agentId: agent.id,
-      type: 'celebration.requested',
+      type: 'client.celebrationRequested',
       payload: { kind },
     });
-    return { success: true, displayed: true, kind, message: 'Celebration started.' };
+    return { success: true, requested: true, kind, message: 'Celebration requested; each client decides whether to display it.' };
   }
 
   private async announceForAgent(agent: Agent, phase: AnnouncementPhase, text: string): Promise<AnnouncementResponse> {
     const canRequestPlayback = this.snapshot.general.spokenAnnouncementsEnabled
-      && !this.snapshot.general.spokenAnnouncementsMuted
       && (!this.snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts
-        || this.promptInputMethodsByAgentId.get(agent.id) === 'dictated')
-      && (this.snapshot.general.spokenAnnouncementScope === 'all' || this.snapshot.activeAgentId === agent.id);
+        || this.promptInputMethodsByAgentId.get(agent.id) === 'dictated');
     if (!canRequestPlayback || !this.queueSpokenAnnouncement) {
       return { success: true, phase, outcome: 'skipped' };
     }
@@ -323,7 +304,6 @@ export class ClawMcpService {
         agentId: agent.id,
         phase,
         text,
-        voice: this.snapshot.general.spokenAnnouncementVoice,
       });
       return { success: true, phase, outcome: result.queued ? 'queued' : 'skipped' };
     } catch {
@@ -580,7 +560,7 @@ export class ClawMcpService {
   private emitWorkAssignmentUpdated(agentId: string, assignment: WorkBacklogAssignment): void {
     this.emit({
       agentId,
-      type: 'workBacklog.assignmentUpdated',
+      type: 'workItem.assignmentUpdated',
       payload: assignment,
     });
   }
@@ -628,4 +608,3 @@ function resolveUserPath(value: string): string {
 function fileBasename(filePath: string): string {
   return filePath.split('/').filter(Boolean).at(-1) ?? filePath;
 }
-import path from 'node:path';

@@ -8,15 +8,16 @@ import { applyRuntimeEventToSnapshot as applyMainEventToSnapshot } from '../snap
 
 describe('snapshot runtime reducer', () => {
 
-  it('records legacy backend-less Codex thread starts and payload-owned backend runtime status updates', () => {
+  it('records opaque conversation attachments and payload-owned backend runtime status updates', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
 
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
-      threadId: 'thread-1',
-      type: 'thread.started',
+      conversationId: 'thread-1',
+      backend: 'codex',
+      type: 'agent.conversationAttached',
       payload: { cwd: '/Users/nbonamy/src/codex-claw' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     } as unknown as SnapshotEventOwnedBy<'runtime'>);
@@ -65,14 +66,9 @@ describe('snapshot runtime reducer', () => {
       seq: 1,
       agentId: 'agent-dina',
       backend: 'claude',
-      backendSessionId: 'claude-session-1',
-      type: 'thread.started',
-      payload: {
-        sessionId: 'claude-session-1',
-        transport: 'stdio',
-        model: 'haiku',
-        reasoningEffort: 'low',
-      },
+      conversationId: 'claude-session-1',
+      type: 'agent.conversationAttached',
+      payload: {},
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
@@ -80,36 +76,27 @@ describe('snapshot runtime reducer', () => {
       kind: 'claude',
       sessionId: 'claude-session-1',
       transport: 'stdio',
-      model: 'haiku',
-      reasoningEffort: 'low',
     });
     expect(snapshot.agents[0].backendDefaults).toStrictEqual({
       kind: 'claude',
-      model: 'haiku',
-      reasoningEffort: 'low',
     });
 
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
       agentId: 'agent-dina',
       backend: 'claude',
-      backendSessionId: 'claude-session-2',
-      type: 'thread.started',
-      payload: {
-        sessionId: 'claude-session-2',
-        transport: 'stdio',
-        model: 'sonnet',
-      },
+      conversationId: 'claude-session-2',
+      type: 'agent.conversationAttached',
+      payload: {},
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
     expect(snapshot.agents[0].backendDefaults).toStrictEqual({
       kind: 'claude',
-      model: 'sonnet',
     });
   });
 
-  it('records thread settings updates as durable agent thread mappings', () => {
+  it('records common conversation settings without changing the conversation binding', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
 
@@ -117,25 +104,20 @@ describe('snapshot runtime reducer', () => {
       seq: 1,
       agentId: 'agent-dina',
       backend: 'codex',
-      threadId: 'thread-1',
-      type: 'thread.settingsUpdated',
+      conversationId: 'thread-old',
+      type: 'conversation.settingsUpdated',
       payload: {
-        threadSettings: {
-          cwd: '/Users/nbonamy/src/codex-claw',
+        settings: {
           model: 'gpt-5.5',
           reasoningEffort: 'high',
           serviceTier: 'fast',
-          approvalPolicy: 'on-request',
-          approvalsReviewer: 'auto_review',
-          sandboxPolicy: {
-            type: 'workspaceWrite',
-          },
+          approvalPreset: 'approve-for-me',
         },
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
 
-    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-1' });
+    expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-old' });
     expect(snapshot.agents[0].backendDefaults).toStrictEqual({
       kind: 'codex',
       model: 'gpt-5.5',
@@ -151,14 +133,12 @@ describe('snapshot runtime reducer', () => {
       seq: 2,
       agentId: 'agent-dina',
       backend: 'codex',
-      threadId: 'thread-1',
-      type: 'thread.settingsUpdated',
+      conversationId: 'thread-old',
+      type: 'conversation.settingsUpdated',
       payload: {
-        threadSettings: {
+        settings: {
           serviceTier: null,
-          approvalPolicy: 'never',
-          approvalsReviewer: 'user',
-          sandboxPolicy: { type: 'dangerFullAccess' },
+          approvalPreset: 'full-access',
         },
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
@@ -178,7 +158,7 @@ describe('snapshot runtime reducer', () => {
       seq: 1,
       agentId: 'agent-dina',
       threadId: 'thread-1',
-      type: 'thread.goalUpdated',
+      type: 'conversation.goalUpdated',
       payload: {
         goal: {
           threadId: 'thread-1',
@@ -209,7 +189,7 @@ describe('snapshot runtime reducer', () => {
       seq: 2,
       agentId: 'agent-dina',
       threadId: 'thread-1',
-      type: 'thread.goalCleared',
+      type: 'conversation.goalCleared',
       payload: {},
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
@@ -230,8 +210,8 @@ describe('snapshot runtime reducer', () => {
       seq: 3,
       agentId: 'agent-dina',
       threadId: 'thread-2',
-      type: 'thread.goalUpdated',
-      payload: flatGoal,
+      type: 'conversation.goalUpdated',
+      payload: { goal: flatGoal },
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
     expect(snapshot.agents[0].goal).toStrictEqual(flatGoal);
@@ -246,7 +226,7 @@ describe('snapshot runtime reducer', () => {
       backend: 'codex',
       threadId: 'thread-1',
       turnId: 'turn-1',
-      type: 'thread.tokenUsageUpdated',
+      type: 'conversation.contextUsageUpdated',
       payload: {
         contextUsage: {
           totalTokens: 50_000,
@@ -288,8 +268,8 @@ describe('snapshot runtime reducer', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'thread.tokenUsageUpdated',
-      payload: flatContextUsage,
+      type: 'conversation.contextUsageUpdated',
+      payload: { contextUsage: flatContextUsage },
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
     expect(snapshot.agents[0].contextUsage).toStrictEqual(flatContextUsage);
@@ -345,10 +325,8 @@ describe('snapshot runtime reducer', () => {
     });
   });
 
-  it('also accepts the legacy flat account rate-limit payload', () => {
-    const snapshot = createInitialSnapshot();
-
-    const event = decodeClawBackendEvent({
+  it('rejects legacy flat account rate-limit payloads', () => {
+    const decode = () => decodeClawBackendEvent({
       seq: 1,
       type: 'account.rateLimitsUpdated',
       backend: 'codex',
@@ -373,27 +351,7 @@ describe('snapshot runtime reducer', () => {
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
-    if (event.type !== 'account.rateLimitsUpdated') throw new Error('Expected rate-limit event.');
-    applyMainEventToSnapshot(snapshot, event);
-
-    expect(snapshot.accountRateLimits).toStrictEqual({
-      limitId: 'codex',
-      limitName: 'Codex',
-      primary: {
-        usedPercent: 25,
-        windowDurationMins: 15,
-        resetsAt: 1_780_000_000,
-      },
-      secondary: null,
-      credits: {
-        hasCredits: true,
-        unlimited: false,
-        balance: '10.00',
-      },
-      individualLimit: null,
-      planType: 'pro',
-      rateLimitReachedType: null,
-    });
+    expect(decode).toThrow('$.payload.rateLimits');
   });
 
   it('applies complete snapshots from snapshot update events', () => {
@@ -519,7 +477,7 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
       agentId: 'agent-dina',
-      type: 'workBacklog.assignmentUpdated',
+      type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
         itemId: 'nbonamy/codex-claw#12',
@@ -667,7 +625,7 @@ describe('snapshot runtime reducer', () => {
     const snapshot = createInitialSnapshot();
     applyMainEventToSnapshot(snapshot, {
       seq: 2,
-      type: 'workBacklog.assignmentUpdated',
+      type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
         itemId: 'nbonamy/codex-claw#global',
@@ -681,7 +639,7 @@ describe('snapshot runtime reducer', () => {
     });
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
-      type: 'workBacklog.assignmentUpdated',
+      type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
         itemId: 'nbonamy/codex-claw#review',
@@ -730,8 +688,8 @@ describe('snapshot runtime reducer', () => {
     applyMainEventToSnapshot(snapshot, {
       seq: 3,
       agentId: 'agent-dina',
-      type: 'thread.settingsUpdated',
-      payload: { threadSettings: { model: 'ignored-without-thread' } },
+      type: 'conversation.settingsUpdated',
+      payload: { settings: { model: 'ignored-without-thread' } },
       occurredAt: '2026-06-05T00:00:03.000Z',
     } as unknown as SnapshotEventOwnedBy<'runtime'>);
     expect(snapshot.agents[0].backendSession).toBeUndefined();
@@ -742,7 +700,7 @@ describe('snapshot runtime reducer', () => {
       seq: 4,
       agentId: 'agent-dina',
       threadId: 'thread-1',
-      type: 'thread.goalUpdated',
+      type: 'conversation.goalUpdated',
       payload: { goal: { objective: 'missing fields' } },
       occurredAt: '2026-06-05T00:00:04.000Z',
     })).toThrow();
@@ -751,7 +709,7 @@ describe('snapshot runtime reducer', () => {
       agentId: 'agent-dina',
       backend: 'codex',
       threadId: 'thread-1',
-      type: 'thread.tokenUsageUpdated',
+      type: 'conversation.contextUsageUpdated',
       payload: { contextUsage: { totalTokens: 10 } },
       occurredAt: '2026-06-05T00:00:05.000Z',
     })).toThrow();
@@ -765,7 +723,7 @@ describe('snapshot runtime reducer', () => {
 
     expect(() => decodeClawBackendEvent({
       seq: 3,
-      type: 'workBacklog.assignmentUpdated',
+      type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
         itemId: 'nbonamy/codex-claw#malformed',

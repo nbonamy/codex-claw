@@ -35,17 +35,17 @@
         v-for="group in workspaceGroups"
         :key="group.id"
         class="agent-sidebar__workspace-group"
-        :class="repositoryReorder.dropTargetClass(group.id)"
+        :class="clientRepositoryOrderUpdate.dropTargetClass(group.id)"
         :data-group-kind="group.kind"
-        @dragover="group.kind === 'repository' && repositoryReorder.onDragOver(group.id, $event)"
-        @dragleave="group.kind === 'repository' && repositoryReorder.onDragLeave(group.id, $event)"
-        @drop="group.kind === 'repository' && repositoryReorder.onDrop(group.id, $event)"
+        @dragover="group.kind === 'repository' && clientRepositoryOrderUpdate.onDragOver(group.id, $event)"
+        @dragleave="group.kind === 'repository' && clientRepositoryOrderUpdate.onDragLeave(group.id, $event)"
+        @drop="group.kind === 'repository' && clientRepositoryOrderUpdate.onDrop(group.id, $event)"
       >
         <header
           class="agent-sidebar__workspace-header"
-          v-bind="group.kind === 'repository' ? repositoryReorder.dragItemAttributes(group.id) : {}"
-          @dragstart="group.kind === 'repository' && repositoryReorder.onDragStart(group.id, $event)"
-          @dragend="repositoryReorder.onDragEnd"
+          v-bind="group.kind === 'repository' ? clientRepositoryOrderUpdate.dragItemAttributes(group.id) : {}"
+          @dragstart="group.kind === 'repository' && clientRepositoryOrderUpdate.onDragStart(group.id, $event)"
+          @dragend="clientRepositoryOrderUpdate.onDragEnd"
         >
           <MessageIcon
             v-if="group.kind === 'quickChats'"
@@ -132,19 +132,19 @@
             class="agent-sidebar__agent"
             :class="[
               { 'agent-sidebar__agent--active': session.isActive },
-              agentReorder.dropTargetClass(session.agentId),
+              clientAgentOrderUpdate.dropTargetClass(session.agentId),
             ]"
             type="button"
-            v-bind="agentReorder.dragItemAttributes(session.agentId)"
+            v-bind="clientAgentOrderUpdate.dragItemAttributes(session.agentId)"
             :data-session-kind="session.kind"
             :aria-pressed="session.isActive"
             @click="selectAgent(session.agentId)"
             @contextmenu.prevent="openAgentMenu(session.agentId, $event)"
-            @dragstart="agentReorder.onDragStart(session.agentId, $event)"
-            @dragover="agentReorder.onDragOver(session.agentId, $event)"
-            @dragleave="agentReorder.onDragLeave(session.agentId, $event)"
-            @drop="agentReorder.onDrop(session.agentId, $event)"
-            @dragend="agentReorder.onDragEnd"
+            @dragstart="clientAgentOrderUpdate.onDragStart(session.agentId, $event)"
+            @dragover="clientAgentOrderUpdate.onDragOver(session.agentId, $event)"
+            @dragleave="clientAgentOrderUpdate.onDragLeave(session.agentId, $event)"
+            @drop="clientAgentOrderUpdate.onDrop(session.agentId, $event)"
+            @dragend="clientAgentOrderUpdate.onDragEnd"
           >
             <GitForkIcon
               v-if="group.kind !== 'quickChats' && session.kind === 'worktree'"
@@ -198,7 +198,7 @@
     <AgentContextMenu
       v-if="contextMenuAgentId"
       :fork-disabled="!canForkContextMenuAgent"
-      :compress-visible="contextMenuAgent?.backend === 'codex'"
+      :compress-visible="canReplaceContextMenuConversation"
       :compress-disabled="!canCompressContextMenuAgent"
       :open-in-catalog="resolvedOpenInCatalog"
       :open-in-disabled="!contextMenuAgentIsLocal"
@@ -244,6 +244,7 @@ import {
   PlusIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
+import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
 import StartWorkMenu from './StartWorkMenu.vue';
@@ -257,6 +258,7 @@ const props = defineProps<{
   activeAgentId: string | null;
   unreadAgentIds?: string[];
   forkableAgentIds?: string[];
+  summaryReplacementAgentIds?: string[];
   compact?: boolean;
   collapsedRepositoryKeys?: string[];
   teams?: Team[];
@@ -327,10 +329,16 @@ const canForkContextMenuAgent = computed(() => (
   (props.forkableAgentIds ?? []).includes(contextMenuAgent.value.id)
 ));
 const canCompressContextMenuAgent = computed(() => (
-  contextMenuAgent.value?.backend === 'codex' &&
-  contextMenuAgent.value.status.type === 'idle' &&
-  contextMenuAgent.value.backendSession?.kind === 'codex'
+  canReplaceContextMenuConversation.value &&
+  contextMenuAgent.value?.status.type === 'idle' &&
+  Boolean(contextMenuAgent.value.backendSession)
 ));
+const canReplaceContextMenuConversation = computed(() => {
+  const agent = contextMenuAgent.value;
+  return Boolean(agent && (props.summaryReplacementAgentIds
+    ? props.summaryReplacementAgentIds.includes(agent.id)
+    : defaultBackendCapabilities(agent.backend).conversationReplaceWithSummary));
+});
 const contextMenuAgentIsLocal = computed(() => {
   const agent = contextMenuAgent.value;
   if (!agent) return false;
@@ -349,7 +357,7 @@ const contextMenuMoveTargets = computed(() => {
 
   return (props.teams ?? []).filter((team) => team.id !== agent.teamId && !team.remoteConnectionId);
 });
-const agentReorder = useListReorderDrag<string>({
+const clientAgentOrderUpdate = useListReorderDrag<string>({
   itemIds: () => props.agents.map((agent) => agent.id),
   scopeForId: (agentId) => agentWorkspaceGroupIds.value.get(agentId) ?? agentId,
   onDrop: ({ draggedId, beforeId }) => {
@@ -367,7 +375,7 @@ const agentReorder = useListReorderDrag<string>({
 const agentWorkspaceGroupIds = computed(() => new Map(
   workspaceGroups.value.flatMap((group) => group.sessions.map((session) => [session.agentId, group.id] as const)),
 ));
-const repositoryReorder = useListReorderDrag<string>({
+const clientRepositoryOrderUpdate = useListReorderDrag<string>({
   itemIds: () => workspaceGroups.value
     .filter((group) => group.kind === 'repository')
     .map((group) => group.id),

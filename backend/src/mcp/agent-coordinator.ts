@@ -61,7 +61,7 @@ export type DisplayMarkdownResponse = {
 
 export type CelebrationResponse = {
   success: true;
-  displayed: boolean;
+  requested: boolean;
   kind: CelebrationKind;
   message: string;
 };

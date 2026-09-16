@@ -203,7 +203,7 @@ describe('agent-manager lifecycle', () => {
     });
   });
 
-  it('falls back from a stale active team to the active agent team when creating', () => {
+  it('uses the stable default instead of shared active navigation for legacy creation', () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
       id: 'team-skwad',
@@ -223,9 +223,9 @@ describe('agent-manager lifecycle', () => {
     }, '2026-06-05T10:11:12.000Z', 'agent-new-abby');
 
     expect(result).toBe(snapshot);
-    expect(snapshot.agents.at(-1)?.teamId).toBe('team-skwad');
-    expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-jesse', 'agent-new-abby']);
-    expect(snapshot.activeTeamId).toBe('team-skwad');
+    expect(snapshot.agents.at(-1)?.teamId).toBe('team-codex-claw');
+    expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-jesse']);
+    expect(snapshot.activeTeamId).toBe('team-codex-claw');
     expect(snapshot.activeAgentId).toBe('agent-new-abby');
   });
 

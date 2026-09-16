@@ -101,7 +101,7 @@ export function createAgentUnreadState(options: { getSnapshot: () => AppSnapshot
 function isUnreadWorthyEvent(type: string): boolean {
   return type === 'turn.completed' ||
     type === 'approval.requested' ||
-    type === 'backendApproval.requested' ||
+    type === 'agentRequest.created' ||
     type === 'toolInput.requested' ||
     type === 'error';
 }

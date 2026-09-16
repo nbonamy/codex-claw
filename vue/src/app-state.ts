@@ -1,6 +1,7 @@
 
 import { translate } from './i18n';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
@@ -80,7 +81,7 @@ const workProviders = createWorkProviderState({
 const {
   assignedItemsByProvider: assignedWorkItemsByProvider,
   authorization: workProviderAuthorization,
-  completeConnection: completeWorkProviderConnection,
+  completeConnection: pollWorkProviderAuthorization,
   configure: configureWorkBacklog,
   connect: connectWorkProvider,
   disconnect: disconnectWorkProvider,
@@ -171,6 +172,21 @@ const {
 } = sourceRepositoryState;
 
 export function useAppState() {
+  watch(() => {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
+    return agent?.planReview?.status === 'pending' ? agent.planReview.id : null;
+  }, () => {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
+    if (agent?.planReview?.status === 'pending') showPlanReview(agent.planReview.markdown);
+  }, { immediate: true, flush: 'sync' });
+
+  async function respondToPlanReview(resolution: PlanReviewResolution, feedback?: string): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
+    if (!agent?.planReview || !codexClawApi) throw new Error('No pending plan review.');
+    adoptBackgroundSnapshot(await codexClawApi.respondToPlanReview(agent.id, {
+      reviewId: agent.planReview.id, resolution, ...(feedback ? { feedback } : {}),
+    }));
+  }
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
@@ -602,12 +618,12 @@ export function useAppState() {
     return codexClawApi.previewAgentFile(agentId, filePath);
   }
 
-  async function openAgentGitDiff(agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
-    if (!codexClawApi?.openAgentGitDiff) {
+  async function getAgentGitDiff(agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<import('@codex-claw/core/contracts').AgentGitDiff> {
+    if (!codexClawApi?.getAgentGitDiff) {
       throw new Error(translate('surface.app-state.gitDiffPreviewIsNotAvailable'));
     }
 
-    await codexClawApi.openAgentGitDiff(agentId, target ? { ...target } : undefined);
+    return codexClawApi.getAgentGitDiff(agentId, target ? { ...target } : undefined);
   }
 
   async function getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow> {
@@ -1002,19 +1018,19 @@ export function useAppState() {
     adoptBackgroundSnapshot(await codexClawApi.removeRemoteConnection(connectionId));
   }
 
-  async function getDevicePairingStatus(): Promise<DevicePairingStatus> {
-    if (!codexClawApi?.getDevicePairingStatus) return { status: 'disabled' };
-    return codexClawApi.getDevicePairingStatus();
+  async function getRemoteControlStatus(): Promise<DevicePairingStatus> {
+    if (!codexClawApi?.getRemoteControlStatus) return { status: 'disabled' };
+    return codexClawApi.getRemoteControlStatus();
   }
 
-  async function enableDevicePairing(): Promise<DevicePairingStatus> {
-    if (!codexClawApi?.enableDevicePairing) return { status: 'disabled' };
-    return codexClawApi.enableDevicePairing();
+  async function enableRemoteControl(): Promise<DevicePairingStatus> {
+    if (!codexClawApi?.enableRemoteControl) return { status: 'disabled' };
+    return codexClawApi.enableRemoteControl();
   }
 
-  async function disableDevicePairing(): Promise<DevicePairingStatus> {
-    if (!codexClawApi?.disableDevicePairing) return { status: 'disabled' };
-    return codexClawApi.disableDevicePairing();
+  async function disableRemoteControl(): Promise<DevicePairingStatus> {
+    if (!codexClawApi?.disableRemoteControl) return { status: 'disabled' };
+    return codexClawApi.disableRemoteControl();
   }
 
   async function startDevicePairing(): Promise<DevicePairingSession> {
@@ -1199,7 +1215,8 @@ export function useAppState() {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.respondToClientRequest(response));
+    const agentId = response.agentId ?? snapshot.value.activeAgentId;
+    adoptBackgroundSnapshot(await codexClawApi.respondToClientRequest({ ...response, ...(agentId ? { agentId } : {}) }));
     markClientRequestAnswered(response.id);
   }
 
@@ -1343,7 +1360,8 @@ export function useAppState() {
     chooseSourceWorktreeDestination,
     createSourceWorktree,
     previewAgentFile,
-    openAgentGitDiff,
+    getAgentGitDiff,
+    respondToPlanReview,
     getAgentGitWorkflow,
     generateAgentGitMessage,
     stageAgentGitFiles,
@@ -1370,16 +1388,16 @@ export function useAppState() {
     checkRemoteConnection,
     updateRemoteConnection,
     removeRemoteConnection,
-    getDevicePairingStatus,
-    enableDevicePairing,
-    disableDevicePairing,
+    getRemoteControlStatus,
+    enableRemoteControl,
+    disableRemoteControl,
     startDevicePairing,
     checkDevicePairing,
     listPairedDevices,
     revokePairedDevice,
     setDaemonEnabled,
     connectWorkProvider,
-    completeWorkProviderConnection,
+    pollWorkProviderAuthorization,
     disconnectWorkProvider,
     openWorkProviderAuthorization,
     configureWorkBacklog,
@@ -1613,13 +1631,13 @@ function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void
 function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
   switch (event.type) {
     case 'client.connectionChanged':
-    case 'devicePairing.statusChanged':
+    case 'remoteControl.statusChanged':
     case 'git.operationProgress':
     case 'browser.annotationCreated':
       return;
     case 'models.changed':
     case 'skills.changed':
-    case 'thread.modeUpdated':
+    case 'conversation.modeUpdated':
       syncComposerStateFromMainEvent(event);
       return;
     case 'codex.conversationSnapshotChanged': {
@@ -1705,23 +1723,19 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       };
       return;
     }
-    case 'thread.historyHydrationFailed':
+    case 'conversation.historyLoadFailed':
       syncHistoryPageStateFromMainEvent(event);
       return;
-    case 'sidePanel.markdownRequested':
-    case 'sidePanel.gitDiffRequested':
+    case 'client.markdownDisplayRequested':
       syncSidePanelFromMainEvent(event);
       return;
-    case 'celebration.requested':
+    case 'client.celebrationRequested':
       syncCelebrationFromMainEvent(event);
       return;
     case 'agentCreation.progress':
       syncAgentCreationProgressFromMainEvent(event);
       return;
-    case 'clientRequest.resolved':
-      syncAnsweredClientRequestsFromMainEvent(event);
-      return;
-    case 'file.activity':
+    case 'workspace.fileActivityDetected':
       syncFileActivityFromMainEvent(event);
       return;
     default: {
@@ -1735,9 +1749,9 @@ function invalidateAndRecoverCodexConversation(agentId: string): void {
   const frames = { ...codexConversationFramesByAgentId.value };
   delete frames[agentId];
   codexConversationFramesByAgentId.value = frames;
-  if (recoveringCodexConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
+  if (recoveringCodexConversationAgentIds.has(agentId) || !codexClawApi?.loadConversationHistory) return;
   recoveringCodexConversationAgentIds.add(agentId);
-  void codexClawApi.hydrateAgentHistory(agentId)
+  void codexClawApi.loadConversationHistory(agentId)
     .then(adoptBackgroundSnapshot)
     .catch(() => undefined)
     .finally(() => recoveringCodexConversationAgentIds.delete(agentId));
@@ -1747,20 +1761,30 @@ function invalidateAndRecoverClaudeConversation(agentId: string): void {
   const frames = { ...claudeConversationFramesByAgentId.value };
   delete frames[agentId];
   claudeConversationFramesByAgentId.value = frames;
-  if (recoveringClaudeConversationAgentIds.has(agentId) || !codexClawApi?.hydrateAgentHistory) return;
+  if (recoveringClaudeConversationAgentIds.has(agentId) || !codexClawApi?.loadConversationHistory) return;
   recoveringClaudeConversationAgentIds.add(agentId);
-  void codexClawApi.hydrateAgentHistory(agentId)
+  void codexClawApi.loadConversationHistory(agentId)
     .then(adoptBackgroundSnapshot)
     .catch(() => undefined)
     .finally(() => recoveringClaudeConversationAgentIds.delete(agentId));
 }
 
+function showPlanReview(markdown: string): void {
+  const lines = markdown.trim().split('\n');
+  const headingIndex = lines.findIndex((line) => /^#\s+\S/u.test(line.trim()));
+  sidePanelRequest.value = {
+    kind: 'markdown', purpose: 'plan',
+    title: headingIndex < 0 ? translate('panels.plan') : lines[headingIndex]!.trim().replace(/^#\s+/u, '').trim(),
+    content: headingIndex < 0 ? markdown : [...lines.slice(0, headingIndex), ...lines.slice(headingIndex + 1)].join('\n').trim(),
+  };
+}
+
 function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, RendererOnlySnapshotEvent>): void {
   switch (event.type) {
-    case 'backendApproval.resolved':
+    case 'agentRequest.resolved':
       syncAnsweredClientRequestsFromMainEvent(event);
       return;
-    case 'thread.settingsUpdated':
+    case 'conversation.settingsUpdated':
       syncComposerStateFromMainEvent(event);
       return;
     default:
@@ -1768,7 +1792,7 @@ function handleSnapshotOwnedRendererEffect(event: Exclude<MainToRendererEvent, R
   }
 }
 
-function syncCelebrationFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'celebration.requested' }>): void {
+function syncCelebrationFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'client.celebrationRequested' }>): void {
   if (snapshot.value.general.celebrationsEnabled === false) return;
   if (event.agentId !== snapshot.value.activeAgentId) return;
   useConfetti().celebrate({ kind: event.payload.kind });
@@ -1813,10 +1837,8 @@ function isBackendMainEvent(event: MainToRendererEvent): boolean {
   );
 }
 
-function syncAnsweredClientRequestsFromMainEvent(event: Extract<MainToRendererEvent, { type: 'clientRequest.resolved' | 'backendApproval.resolved' }>): void {
-  const id = event.type === 'backendApproval.resolved'
-    ? event.payload.approval.id
-    : event.payload.id;
+function syncAnsweredClientRequestsFromMainEvent(event: Extract<MainToRendererEvent, { type: 'agentRequest.resolved' }>): void {
+  const id = event.payload.id;
   if (typeof id === 'string' && id) markClientRequestAnswered(id);
 }
 
@@ -1834,7 +1856,7 @@ function adoptSnapshotFromMainEvent(event: MainToRendererEvent): void {
     return;
   }
   applyMainEventToSnapshot(snapshot.value, event);
-  if (event.type === 'thread.started' && event.backend === 'claude') {
+  if (event.type === 'agent.conversationAttached' && event.backend === 'claude') {
     synchronizeComposerSelectionForAgent(event.agentId);
   }
 }
@@ -1883,39 +1905,21 @@ function pruneConversationFrames(): void {
   );
 }
 
-function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'sidePanel.markdownRequested' | 'sidePanel.gitDiffRequested' }>): void {
+function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'client.markdownDisplayRequested' }>): void {
   if (event.agentId !== snapshot.value.activeAgentId) {
     return;
   }
 
-  if (event.type === 'sidePanel.markdownRequested') {
-    sidePanelRequest.value = {
-      kind: 'markdown',
-      content: event.payload.content,
-      ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
-      ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
-      ...(event.payload.path !== undefined ? { path: event.payload.path } : {}),
-    };
-    return;
-  }
-
-  const sections = event.payload.sections?.map((section) => ({ scope: section.scope, diff: section.diff })) ?? null;
-
   sidePanelRequest.value = {
-    kind: 'gitDiff',
-    diff: event.payload.diff,
-    ...(event.payload.target ? { target: event.payload.target } : {}),
-    ...(event.payload.summary ? { summary: event.payload.summary } : {}),
-    ...(sections ? { sections } : {}),
-    ...(event.payload.scope === 'workingTree' || event.payload.scope === 'turn' ? { scope: event.payload.scope } : {}),
+    kind: 'markdown',
+    content: event.payload.content,
+    ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
     ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
-    ...(appText(event.payload.subtitle) ? { subtitle: appText(event.payload.subtitle)! } : {}),
-    ...(event.payload.state === 'error' ? { state: 'error' } : {}),
-    ...(event.payload.error !== undefined && event.payload.error !== null ? { error: event.payload.error } : {}),
+    ...(event.payload.path !== undefined ? { path: event.payload.path } : {}),
   };
 }
 
-function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'file.activity' }>): void {
+function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'workspace.fileActivityDetected' }>): void {
   if (!event.agentId || !event.turnId) return;
   const { action, itemId, messageId, path, status } = event.payload;
   if (
@@ -1951,7 +1955,11 @@ async function refreshTeamSelection(
   needsHistory: boolean,
 ): Promise<void> {
   try {
-    const nextSnapshot = await codexClawApi!.selectTeam(teamId);
+    let nextSnapshot = await codexClawApi!.selectTeam(teamId);
+    if (selectedAgentId && codexClawApi?.loadConversationHistory) {
+      nextSnapshot = await codexClawApi.loadConversationHistory(selectedAgentId);
+      selectTeamInSnapshot(nextSnapshot, teamId);
+    }
     if (requestId === agentSelectionRequestId) {
       adoptNavigationSnapshot(nextSnapshot);
       const activeAgentId = snapshot.value.activeAgentId;
@@ -1969,7 +1977,10 @@ async function refreshTeamSelection(
 
 async function refreshAgentSelection(agentId: string, requestId: number, needsHistory = false): Promise<void> {
   try {
-    const nextSnapshot = await codexClawApi!.selectAgent(agentId);
+    let nextSnapshot = await codexClawApi!.selectAgent(agentId);
+    if (codexClawApi?.loadConversationHistory) {
+      nextSnapshot = await codexClawApi.loadConversationHistory(agentId);
+    }
     if (requestId === agentSelectionRequestId) {
       adoptBackgroundSnapshot(nextSnapshot);
       synchronizeComposerSelectionForAgent(agentId);
