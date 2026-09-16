@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.19.2",
+  "currentVersion": "0.19.3",
   "releases": [
+    {
+      "version": "0.19.3",
+      "releasedAt": "2026-09-15",
+      "sourceSha256": "eddb9dc2013eb6973ab590ebbe98f0bc64aaebeaf15a4f4f78435e53289f3ad4",
+      "markdown": "### Improvements and fixes\n\n- Plan Review now opens reliably for plans returned through Codex Plan mode.\n  Implement Plan closes the review before submitting exactly one implementation\n  prompt, and the footer actions use the standard priority and ordering.\n- Live Codex execution plans once again appear in the conversation mini panel.\n  The right-workspace add menu no longer includes the redundant Backlog entry."
+    },
     {
       "version": "0.19.2",
       "releasedAt": "2026-09-15",

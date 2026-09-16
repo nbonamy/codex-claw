@@ -4,6 +4,16 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.19.3] - 2026-09-15
+
+### Improvements and fixes
+
+- Plan Review now opens reliably for plans returned through Codex Plan mode.
+  Implement Plan closes the review before submitting exactly one implementation
+  prompt, and the footer actions use the standard priority and ordering.
+- Live Codex execution plans once again appear in the conversation mini panel.
+  The right-workspace add menu no longer includes the redundant Backlog entry.
+
 ## [0.19.2] - 2026-09-15
 
 ### New features
