@@ -469,6 +469,8 @@ export type ModelFavorite = {
 export type CockpitAgentViewMode = 'teams' | 'recent';
 
 export type AppGeneralSettings = {
+  commitMessageInstructions: string;
+  pullRequestInstructions: string;
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
   celebrationsEnabled: boolean;
@@ -1158,6 +1160,8 @@ export type CodexClawApi = {
   closeAgent(agentId: string, input?: AgentCloseInput): Promise<AppSnapshot>;
   selectAgent(agentId: string): Promise<AppSnapshot>;
   updateSettings(input: UpdateSettingsInput): Promise<AppSnapshot>;
+  readEngineInstructions(engine: AgentBackend): Promise<{ text: string; path: string }>;
+  saveEngineInstructions(input: { engine: AgentBackend; text: string; all?: boolean; confirmed?: boolean }): Promise<void>;
   previewSpokenAnnouncementVoice(voice: SpokenAnnouncementVoice): Promise<SpokenAnnouncementQueueResult>;
   getCodexResourceSharingStatus(): Promise<CodexResourceSharingStatus>;
   setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;

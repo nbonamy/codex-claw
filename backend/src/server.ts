@@ -12,6 +12,7 @@ import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, reorderAgentInTeam, reorderRepositoryInTeam, restartAgentConversation, resumeAgentConversationInSnapshot, selectAgent, updateAgentFromInput, updateAgentOpenInApplication } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
+import { readEngineInstructions, saveEngineInstructions } from './engine-instructions';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, updateTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { teamColors } from '@codex-claw/core/team-colors';
@@ -1299,6 +1300,18 @@ export class ClawBackendServer {
       case backendMethods.settingsUpdate:
         updateSettingsInSnapshot(this.snapshot, requireSettingsUpdateInput(message.params));
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      case backendMethods.engineInstructionsRead: {
+        const { engine } = requireRecord(message.params);
+        if (engine !== 'codex' && engine !== 'claude') throw new Error('Unknown instruction engine.');
+        return createClawRpcResult(message.id, await readEngineInstructions(engine));
+      }
+      case backendMethods.engineInstructionsSave: {
+        const input = requireRecord(requireRecord(message.params).input);
+        if (input.engine !== 'codex' && input.engine !== 'claude') throw new Error('Unknown instruction engine.');
+        if (typeof input.text !== 'string') throw new Error('Invalid instruction text.');
+        await saveEngineInstructions({ engine: input.engine, text: input.text, all: input.all as boolean | undefined, confirmed: input.confirmed === true });
+        return createClawRpcResult(message.id, null);
+      }
       case backendMethods.settingsCodexResourceSharingGet:
         return createClawRpcResult(
           message.id,

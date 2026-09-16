@@ -23,7 +23,7 @@ export function buildCodexClawThreadConfig(
   hostedMcpServerUrls: Readonly<Record<string, string>> = {},
 ): CodexThreadStartExtension {
   if (!mcpServerUrl) {
-    return {};
+    return effects.developerInstructions?.trim() ? { developerInstructions: effects.developerInstructions.trim() } : {};
   }
 
   return {

@@ -71,6 +71,10 @@ updates remain one policy instead of being repeated in renderer state. Keep
 reusable dialog workflows such as repository acquisition in composables so the
 shell only supplies product context and navigation callbacks.
 
+Use `shared/use-debounced-save` for editable settings that autosave: callers
+schedule immutable edit snapshots, writes are serialized, and pending edits
+flush on disposal. Flush successfully before switching the edited resource.
+
 The renderer-state facade delegates provider catalogs and authorization,
 composer catalogs and selections, unread policy, history paging, and
 source-repository discovery to focused `*-state.ts` modules.

@@ -980,6 +980,8 @@ describe('AppStatePersistence', () => {
   it('persists and restores normalized general settings', () => {
     const snapshot = createInitialSnapshot();
     snapshot.general = {
+      commitMessageInstructions: 'Use conventional commits.',
+      pullRequestInstructions: 'Include a testing section.',
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: false,

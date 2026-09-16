@@ -3,6 +3,16 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { invokeClawWebOperation } from '../server/operations';
 
 describe('Claw web operations', () => {
+  it('forwards fixed engine selection and explicit overwrite confirmation', async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    await invokeClawWebOperation({ request }, 'readEngineInstructions', ['codex']);
+    const input = { engine: 'claude', text: 'Rules', all: true, confirmed: true };
+    await invokeClawWebOperation({ request }, 'saveEngineInstructions', [input]);
+    expect(request.mock.calls).toEqual([
+      [backendMethods.engineInstructionsRead, { engine: 'codex' }],
+      [backendMethods.engineInstructionsSave, { input }],
+    ]);
+  });
   it('preserves the host and login identity for remote authentication', async () => {
     const request = vi.fn().mockResolvedValue({});
     await invokeClawWebOperation({ request }, 'getCodexAuthentication', ['wall-e']);

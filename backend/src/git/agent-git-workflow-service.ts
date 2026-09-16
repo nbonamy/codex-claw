@@ -219,7 +219,7 @@ export class AgentGitWorkflowService {
         agent,
         cwd: folder,
         prompt: `Write a commit message for these selected changes.\n\n${source.context}`,
-        developerInstructions: 'Return one concise, imperative git commit subject. Follow the repository convention when it is evident. Do not add Markdown or explanations.',
+        developerInstructions: ['Return a git commit message. By default use one concise, imperative subject and follow the repository convention when evident. Do not add Markdown fences or explanations.', this.options.getSnapshot().general.commitMessageInstructions].filter(Boolean).join('\n\n'),
         outputSchema: commitMessageOutputSchema,
       });
       return parseGeneratedGitMessage(generated, 'commit');
@@ -230,7 +230,7 @@ export class AgentGitWorkflowService {
         agent,
         cwd: folder,
         prompt: `Draft a pull request title and body for the changes from ${source.baseRef ?? 'the base branch'} to the current branch.\n\n${source.context}`,
-        developerInstructions: 'Return a concise pull request title and a useful Markdown body describing the outcome, important implementation details, and testing when supported by the supplied context. Do not invent facts.',
+        developerInstructions: ['Return a concise pull request title and a useful Markdown body describing the outcome, important implementation details, and testing when supported by the supplied context. Do not invent facts.', this.options.getSnapshot().general.pullRequestInstructions].filter(Boolean).join('\n\n'),
         outputSchema: pullRequestMessageOutputSchema,
       });
       return parseGeneratedGitMessage(generated, 'pullRequest');

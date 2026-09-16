@@ -1,5 +1,21 @@
 // Component-scoped renderer copy. Keep keys stable when editing messages.
 export const surfaceMessages = {
+  "instructionSettings": {
+    "personalization": "Personalization",
+    "git": "Git",
+    "developerInstructions": "Developer instructions",
+    "commitMessageInstructions": "Commit instructions",
+    "pullRequestInstructions": "Pull request instructions",
+    "commitMessageInstructionsDescription": "Added to commit message generation prompts",
+    "pullRequestInstructionsDescription": "Added to PR title/description generation prompts",
+    "commitMessageInstructionsPlaceholder": "Add commit message guidance…",
+    "pullRequestInstructionsPlaceholder": "Add pull request guidance…",
+    "personalizationHint": "Edits the global instruction file on this host, also used outside Claw. Changes apply when sessions start or resume; project instructions remain in place.",
+    "engine": "Engine",
+    "saveAll": "Save to all",
+    "overwrite": "Replace",
+    "overwriteBoth": "This will replace developer instructions for all agents. Do you want to continue?"
+  },
   "remoteCodexAuth": {
     "connected": "Codex connected",
     "connect": "Connect ChatGPT",

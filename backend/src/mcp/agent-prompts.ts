@@ -16,6 +16,7 @@ export type MessageInfo = {
 
 export type AgentEffectInstructionSettings = {
   celebrationsEnabled?: boolean;
+  developerInstructions?: string;
 };
 
 export const CHECK_INBOX_PROMPT = 'Manual recovery: check your unread Codex Claw agent messages.';
@@ -96,5 +97,5 @@ export function codexClawDeveloperInstructions(
   } else {
     instructions.push('Chrome integration is disabled for this Codex Claw session. Do not attempt to use the Chrome plugin.');
   }
-  return instructions.join(' ');
+  return [instructions.join(' '), effects.developerInstructions?.trim()].filter(Boolean).join('\n\n');
 }

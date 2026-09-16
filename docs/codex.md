@@ -160,6 +160,21 @@ continue to require a Codex installation on the remote host.
 
 ## Thread And Agent Mapping
 
+Personalization edits the owning host's global `~/.codex/AGENTS.md` or
+`~/.claude/CLAUDE.md` directly; it is not another instruction string in app
+state. Saving to all requires explicit confirmation before overwriting both
+files. Codex's conversation-configuration extension reads the global Codex
+file and appends it to Claw's developer instructions, because the isolated
+Claw Codex home does not otherwise load that file. Claude loads its global
+file through its existing user/project/local settings sources. Project-level
+instructions remain provider-owned. Changes apply when sessions start/resume,
+not by injecting a user message into an active turn. Remote hosts keep their
+own instruction files; the editor does not overwrite files on other hosts.
+
+Git draft preferences are app-owned settings: commit-message instructions and
+PR-description instructions are sent only to their matching generation calls.
+They are separate from global agent instructions and do not trigger Git writes.
+
 Codex app-server owns conversation history and thread storage. Codex Claw owns
 the product mapping:
 

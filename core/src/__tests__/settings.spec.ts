@@ -20,6 +20,8 @@ describe('settings contracts', () => {
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
+      commitMessageInstructions: '',
+      pullRequestInstructions: '',
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       celebrationsEnabled: false,
@@ -112,6 +114,8 @@ describe('settings contracts', () => {
     });
 
     expect(snapshot.general).toStrictEqual({
+      commitMessageInstructions: '',
+      pullRequestInstructions: '',
       codexBinaryPath: '',
       claudeCodeEnabled: false,
       celebrationsEnabled: true,

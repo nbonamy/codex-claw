@@ -13,6 +13,8 @@ export const defaultAppshotSettings: AppshotSettings = {
 };
 
 export const defaultGeneralSettings: AppGeneralSettings = {
+  commitMessageInstructions: '',
+  pullRequestInstructions: '',
   preventSleepWhenAgentsRun: true,
   preventSleepWhenRemoteAccessEnabled: true,
   celebrationsEnabled: true,
@@ -104,6 +106,8 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
 
   return {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
+    commitMessageInstructions: normalizeString(value.commitMessageInstructions) ?? '',
+    pullRequestInstructions: normalizeString(value.pullRequestInstructions) ?? '',
     preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,
     celebrationsEnabled: value.celebrationsEnabled !== false,
     spokenAnnouncementsEnabled: value.spokenAnnouncementsEnabled === true,

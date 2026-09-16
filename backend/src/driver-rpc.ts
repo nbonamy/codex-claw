@@ -17,6 +17,7 @@ import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { cloneSourceRepository } from './clone-source-repository';
 import { createSourceRepository } from './create-source-repository';
+import { readEngineInstructions } from './engine-instructions';
 
 export type BackendDriverRegistryOptions = {
   clawMcpServerUrl?: string | null;
@@ -62,7 +63,7 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
       ),
     },
     extensions: [{
-        configureConversation: ({ extensionContext }) => (
+        configureConversation: async ({ extensionContext }) => (
           isAgent(extensionContext)
           ? buildCodexClawThreadConfig(
             extensionContext,
@@ -70,6 +71,7 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
             options.pluginSettings?.() ?? options.generalSettings?.plugins,
             {
               celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
+              developerInstructions: (await readEngineInstructions('codex')).text,
             },
             options.hostedMcpServerUrls?.() ?? {},
           )

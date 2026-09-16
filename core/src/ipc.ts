@@ -1,6 +1,8 @@
 import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  readEngineInstructions: 'settings:instructions:read',
+  saveEngineInstructions: 'settings:instructions:save',
   getSnapshot: 'app:get-snapshot',
   getSnapshotState: 'app:get-snapshot-state',
   listSshHosts: 'connections:ssh-hosts:list',

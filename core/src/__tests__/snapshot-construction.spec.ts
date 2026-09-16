@@ -158,6 +158,8 @@ function expectedEmptySnapshot(): AppSnapshot {
       connections: [],
     },
     general: {
+      commitMessageInstructions: '',
+      pullRequestInstructions: '',
       preventSleepWhenAgentsRun: true,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: true,

@@ -5,8 +5,18 @@ import path from 'node:path';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { Agent } from '@codex-claw/core/contracts';
 import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
+import { readEngineInstructions } from '../engine-instructions';
+vi.mock('../engine-instructions', () => ({ readEngineInstructions: vi.fn().mockResolvedValue({ text: '', path: '/fake/AGENTS.md' }) }));
 
 describe('BackendDriverRpc', () => {
+  it('appends the global Codex instructions via the SDK without replacing Claw instructions', async () => {
+    vi.mocked(readEngineInstructions).mockResolvedValueOnce({ text: 'Use concise answers.', path: '/fake/AGENTS.md' });
+    const options = codexClawSurfaceOptions({ clawMcpServerUrl: 'http://localhost:4321/mcp' });
+    const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: createAgent() } as never);
+    expect(extension?.developerInstructions).toContain('Use concise answers.');
+    expect(extension?.developerInstructions).toContain('Your Codex Claw agent ID');
+    expect(readEngineInstructions).toHaveBeenCalledWith('codex');
+  });
   it('puts Codex app-server state below the Claw home instead of ~/.codex', () => {
     vi.stubEnv('CODEX_CLAW_HOME', '/tmp/codex-claw-isolated-home');
     vi.stubEnv('CODEX_CLAW_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');

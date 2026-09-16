@@ -185,6 +185,8 @@ describe('ClawBackendServer', () => {
 
   it('generates editable Git drafts through the active backend without sending a conversation prompt', async () => {
     const snapshot = createTestSnapshot();
+    snapshot.general.commitMessageInstructions = 'Use lowercase conventional commits.';
+    snapshot.general.pullRequestInstructions = 'Include a deployment checklist.';
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
       id: 'agent-dina',
@@ -236,6 +238,10 @@ describe('ClawBackendServer', () => {
     expect(commitMessageContext).toHaveBeenCalledWith('/repo', { includeUnstaged: false, includeUntracked: true });
     expect(pullRequestMessageContext).toHaveBeenCalledWith('/repo');
     expect(generateText).toHaveBeenCalledTimes(2);
+    expect(generateText.mock.calls[0]?.[1].developerInstructions).toContain('Use lowercase conventional commits.');
+    expect(generateText.mock.calls[0]?.[1].developerInstructions).not.toContain('deployment checklist');
+    expect(generateText.mock.calls[1]?.[1].developerInstructions).toContain('Include a deployment checklist.');
+    expect(generateText.mock.calls[1]?.[1].developerInstructions).not.toContain('lowercase conventional commits');
     expect(generateText.mock.calls[0]?.[1]).toMatchObject({ cwd: '/repo', outputSchema: { type: 'object' } });
     expect(sendPrompt).not.toHaveBeenCalled();
     await server.close();

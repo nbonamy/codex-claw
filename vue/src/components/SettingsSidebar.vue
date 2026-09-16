@@ -31,6 +31,14 @@
         <PuzzleIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.plugins') }}</span>
       </el-menu-item>
+      <el-menu-item index="personalization">
+        <SettingsIcon aria-hidden="true" />
+        <span>{{ $t('surface.instructionSettings.personalization') }}</span>
+      </el-menu-item>
+      <el-menu-item index="git">
+        <GitBranchIcon aria-hidden="true" />
+        <span>{{ $t('surface.instructionSettings.git') }}</span>
+      </el-menu-item>
       <el-menu-item index="integrations">
         <AffiliateIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.integrations') }}</span>
@@ -45,7 +53,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, BrandOpenaiIcon, PaletteIcon, PhotoIcon, PuzzleIcon, RobotFaceIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, BrandOpenaiIcon, GitBranchIcon, PaletteIcon, PhotoIcon, PuzzleIcon, RobotFaceIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 import { clawHostCapabilities } from '../platform-api';
 
 defineProps<{
@@ -57,7 +65,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
+  if (tab === 'personalization' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

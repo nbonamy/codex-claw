@@ -52,6 +52,8 @@ import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from 
 describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
+      readEngineInstructions: 'settings:instructions:read',
+      saveEngineInstructions: 'settings:instructions:save',
       getSnapshot: 'app:get-snapshot',
       getSnapshotState: 'app:get-snapshot-state',
       listSshHosts: 'connections:ssh-hosts:list',

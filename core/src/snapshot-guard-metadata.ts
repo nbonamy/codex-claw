@@ -480,6 +480,8 @@ function isRemoteConnectionTransport(value: unknown): boolean {
 
 function isGeneralSettings(value: unknown): boolean {
   return isRecord(value) &&
+    typeof value.commitMessageInstructions === 'string' &&
+    typeof value.pullRequestInstructions === 'string' &&
     typeof value.preventSleepWhenAgentsRun === 'boolean' &&
     typeof value.preventSleepWhenRemoteAccessEnabled === 'boolean' &&
     typeof value.celebrationsEnabled === 'boolean' &&

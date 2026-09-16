@@ -1,4 +1,6 @@
 export const backendMethods = {
+  engineInstructionsRead: 'settings/instructions/read',
+  engineInstructionsSave: 'settings/instructions/save',
   agentApprovalPresetUpdate: 'agent/approvalPreset/update',
   agentConversationMessagesGet: 'agent/conversation/messages/get',
   agentConversationResume: 'agent/conversation/resume',

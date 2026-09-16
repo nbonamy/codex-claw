@@ -24,6 +24,12 @@
           :restart-app="restartApp"
           :update-settings="updateSettings"
         />
+        <SettingsInstructionsPanel
+          v-else-if="activeTab === 'git'"
+          :settings="generalSettings"
+          :update-settings="updateSettings"
+        />
+        <SettingsPersonalizationPanel v-else-if="activeTab === 'personalization'" />
         <SettingsCodexPanel
           v-else-if="activeTab === 'codex'"
           :choose-codex-binary="chooseCodexBinary"
@@ -102,6 +108,8 @@ import SettingsClaudeCodePanel from './SettingsClaudeCodePanel.vue';
 import SettingsCodexPanel from './SettingsCodexPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
+import SettingsInstructionsPanel from './SettingsInstructionsPanel.vue';
+import SettingsPersonalizationPanel from './SettingsPersonalizationPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
 import SettingsPluginsPanel from './SettingsPluginsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';

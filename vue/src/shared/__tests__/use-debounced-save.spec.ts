@@ -1,0 +1,30 @@
+import { effectScope } from 'vue';
+import { afterEach, expect, it, vi } from 'vitest';
+import { useDebouncedSave } from '../use-debounced-save';
+afterEach(() => vi.useRealTimers());
+it('serializes writes and keeps the latest pending edit', async () => {
+  vi.useFakeTimers();
+  let resolve!: () => void;
+  const persist = vi.fn().mockImplementationOnce(() => new Promise<void>(r => { resolve = r; })).mockResolvedValue(undefined);
+  const scope = effectScope();
+  const saver = scope.run(() => useDebouncedSave<string>(persist))!;
+  saver.schedule('one'); await vi.advanceTimersByTimeAsync(600);
+  saver.schedule('two'); saver.schedule('three');
+  const flushed = saver.flush();
+  expect(persist).toHaveBeenCalledTimes(1);
+  resolve(); await flushed;
+  expect(persist.mock.calls).toEqual([['one'], ['three']]);
+  expect(saver.saved.value).toBe(true);
+  scope.stop();
+});
+it('reports failure, retries edited content, and flushes on disposal', async () => {
+  vi.useFakeTimers();
+  const persist = vi.fn().mockRejectedValueOnce('Offline').mockResolvedValue(undefined);
+  const scope = effectScope();
+  const saver = scope.run(() => useDebouncedSave<string>(persist))!;
+  saver.schedule('one'); expect(await saver.flush()).toBe(false);
+  expect(saver.error.value).toBe('Offline');
+  saver.schedule('two'); scope.stop(); await saver.flush();
+  expect(persist.mock.calls).toEqual([['one'], ['two']]);
+  expect(saver.error.value).toBe('');
+});

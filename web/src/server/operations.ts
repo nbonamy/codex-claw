@@ -80,6 +80,8 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   closeAgent: [backendMethods.agentDelete, namedOptional('agentId', 'input')],
   selectAgent: [backendMethods.agentSelect, named('agentId')],
   updateSettings: [backendMethods.settingsUpdate, named('input')],
+  readEngineInstructions: [backendMethods.engineInstructionsRead, named('engine')],
+  saveEngineInstructions: [backendMethods.engineInstructionsSave, named('input')],
   getCodexResourceSharingStatus: [backendMethods.settingsCodexResourceSharingGet],
   setCodexResourceSharing: [backendMethods.settingsCodexResourceSharingSet, named('input')],
   getPluginStatus: [backendMethods.settingsPluginStatusGet],
