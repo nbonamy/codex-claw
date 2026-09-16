@@ -147,7 +147,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.emitted('openTab')).toStrictEqual([['review']]);
   });
 
-  it('offers and renders a repository backlog only for linked GitHub repositories', async () => {
+  it('renders an existing repository backlog without offering it in the add-tab menu', async () => {
     const prefillRepositoryWork = vi.fn();
     const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
     const launcher = mountPanel([], null);
@@ -173,9 +173,7 @@ describe('RightWorkspacePanel', () => {
     });
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
-    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())[0]).toBe('Backlog');
-    await wrapper.findAll('.app-menu__item')[0]?.trigger('click');
-    expect(wrapper.emitted('openTab')).toStrictEqual([['backlog']]);
+    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).not.toContain('Backlog');
   });
 
   it('omits the embedded Browser when the host does not provide it', async () => {

@@ -2153,6 +2153,7 @@ export class ClawBackendServer {
     const payload = conversationEvent.payload;
     if (
       conversationEvent.type !== 'turn.proposedPlanCompleted'
+      && conversationEvent.type !== 'plan.completed'
       || !conversationEvent.agentId
       || !conversationEvent.turnId
       || typeof payload !== 'object'

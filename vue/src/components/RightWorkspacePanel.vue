@@ -383,7 +383,6 @@ const activeProjectFilePath = computed(() => {
   return filePath;
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
-  ...(props.githubRepository ? [{ id: 'backlog', type: 'action', label: translate('surface.rightWorkspacePanel.backlog'), icon: BacklogIcon } satisfies AppMenuItem] : []),
   { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.gitHubReview'), icon: GitHubIcon },
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },

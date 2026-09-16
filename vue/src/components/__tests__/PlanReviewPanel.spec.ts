@@ -28,7 +28,7 @@ describe('PlanReviewPanel', () => {
     const wrapper = mountPanel();
 
     expect(wrapper.text()).toContain('Ship this carefully.');
-    expect(wrapper.findAll('.plan-review-footer__button').map((button) => button.text())).toStrictEqual(['Confirm', 'Cancel']);
+    expect(wrapper.findAll('.plan-review-footer__button').map((button) => button.text())).toStrictEqual(['Cancel', 'Confirm']);
 
     await wrapper.findAll('.plan-review-footer__button')[0]?.trigger('click');
     await wrapper.findAll('.plan-review-footer__button')[1]?.trigger('click');

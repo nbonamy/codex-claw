@@ -321,7 +321,7 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.text()).toContain('newValue');
   });
 
-  it('opens the linked repository backlog and starts isolated work for the current agent', async () => {
+  it('keeps the linked repository backlog available without listing it in the add-tab menu', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agentGitStatuses['agent-dina'] = {
       folder: '/Users/nbonamy/src/codex-claw',
@@ -348,8 +348,9 @@ describe('AppShell workspace and plans', () => {
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
     const backlogMenuItem = wrapper.findAll('.right-workspace-panel__add-menu .app-menu__item')
       .find((candidate) => candidate.text().includes('Backlog'));
-    expect(backlogMenuItem).toBeDefined();
-    await backlogMenuItem!.trigger('click');
+    expect(backlogMenuItem).toBeUndefined();
+
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'backlog');
     await flushPromises();
 
     expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, { kind: 'all', state: 'all' });
@@ -1108,6 +1109,8 @@ describe('AppShell workspace and plans', () => {
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
     expect(wrapper.emitted('sendPrompt')).toStrictEqual([['implement the plan']]);
+    expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).not.toContain('Plan');
   });
 
   it('cancels a plan by exiting plan mode and closing the preview', async () => {

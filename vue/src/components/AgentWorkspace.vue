@@ -308,7 +308,7 @@ const currentTurnPlan = computed<ThreadPlan | null>(() => {
     return null;
   }
   const latestTurnId = props.latestConversationTurnId;
-  return !latestTurnId || latestTurnId === plan.turnId ? plan : null;
+  return plan.turnId.startsWith('debug-plan-') || !latestTurnId || latestTurnId === plan.turnId ? plan : null;
 });
 const executionPlanVisible = computed(() => {
   const agentId = currentAgent.value?.id;

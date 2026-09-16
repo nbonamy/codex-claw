@@ -473,6 +473,82 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(plan);
   });
 
+  it('shows the provider-owned Codex execution plan', () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgent = snapshot.agents[0]!;
+    activeAgent.backendSession = { kind: 'codex', threadId: 'thread-plan' };
+    const providerSnapshot = codexConversationSnapshot([
+      codexTextMessage('assistant-plan', 'assistant', 'Working on it.', 'turn-plan'),
+    ], {
+      activeConversationId: 'thread-plan',
+      activeTurnId: 'turn-plan',
+      turnIds: ['turn-plan'],
+      executionPlan: {
+        turnId: 'turn-plan',
+        explanation: 'Current execution plan',
+        steps: [{ step: 'Render the mini panel', status: 'inProgress' }],
+        markdown: 'Current execution plan\n- [ ] Render the mini panel',
+        updatedAt: '2026-09-15T00:00:00.000Z',
+      },
+    });
+
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        codexConversationSnapshot: providerSnapshot,
+        isLoading: false,
+        isSending: true,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual({
+      threadId: 'thread-plan',
+      turnId: 'turn-plan',
+      kind: 'execution',
+      status: 'inProgress',
+      explanation: 'Current execution plan',
+      steps: [{ step: 'Render the mini panel', status: 'inProgress' }],
+      markdown: 'Current execution plan\n- [ ] Render the mini panel',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    });
+  });
+
+  it('shows an active debug execution plan beside newer conversation history', () => {
+    const snapshot = createInitialSnapshot();
+    const activeAgent = snapshot.agents[0]!;
+    activeAgent.backendSession = { kind: 'codex', threadId: 'thread-debug-plan' };
+    activeAgent.plan = {
+      threadId: 'thread-debug-plan',
+      turnId: 'debug-plan-1',
+      kind: 'execution',
+      status: 'inProgress',
+      explanation: 'Debug execution plan',
+      steps: [{ step: 'Exercise the execution-plan overlay', status: 'inProgress' }],
+      markdown: '- [ ] Exercise the execution-plan overlay',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    };
+
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent,
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('assistant-real-turn', 'assistant', 'Existing history.', 'turn-real'),
+        ], {
+          activeConversationId: 'thread-debug-plan',
+          turnIds: ['turn-real'],
+        }),
+        isLoading: false,
+        isSending: false,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(activeAgent.plan);
+  });
+
   it('does not flash a persisted plan while conversation history hydrates', async () => {
     const snapshot = createInitialSnapshot();
     const activeAgent = snapshot.agents[0];

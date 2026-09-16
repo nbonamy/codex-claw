@@ -49,25 +49,17 @@
     </div>
 
     <div class="plan-review-footer__actions">
-      <AnnotationSendButton
-        v-if="comments.length"
-        :count="comments.length"
-        :disabled="disabled"
-        :label="t('chat.planReview.sendComments', comments.length)"
-        @click="emit('send')"
-      />
       <button
-        v-else
-        class="plan-review-footer__button plan-review-footer__button--primary"
+        class="claw-button claw-button--tertiary plan-review-footer__button plan-review-footer__button--cancel"
         type="button"
         :disabled="disabled"
-        @click="emit('confirm')"
+        @click="emit('cancel')"
       >
-        {{ t('chat.planReview.confirm') }}
+        {{ t('chat.planReview.cancel') }}
       </button>
       <button
         v-if="comments.length"
-        class="plan-review-footer__button"
+        class="claw-button claw-button--secondary plan-review-footer__button"
         type="button"
         :disabled="disabled"
         @click="emit('clear')"
@@ -75,13 +67,21 @@
         {{ t('chat.planReview.clear') }}
       </button>
       <button
-        class="plan-review-footer__button"
+        v-else
+        class="claw-button claw-button--primary plan-review-footer__button plan-review-footer__button--primary"
         type="button"
         :disabled="disabled"
-        @click="emit('cancel')"
+        @click="emit('confirm')"
       >
-        {{ t('chat.planReview.cancel') }}
+        {{ t('chat.planReview.confirm') }}
       </button>
+      <AnnotationSendButton
+        v-if="comments.length"
+        :count="comments.length"
+        :disabled="disabled"
+        :label="t('chat.planReview.sendComments', comments.length)"
+        @click="emit('send')"
+      />
     </div>
   </footer>
 </template>
@@ -255,40 +255,5 @@ function commentTitle(comment: PlanReviewComment): string {
 
 .plan-review-footer__button {
   height: var(--space-16);
-  padding: 0 var(--space-8);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface-lowest);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.plan-review-footer__button:hover {
-  background: var(--color-surface-low);
-}
-
-.plan-review-footer__button:disabled {
-  opacity: 0.38;
-  cursor: default;
-}
-
-.plan-review-footer__button:disabled:hover {
-  background: var(--color-surface-lowest);
-}
-
-.plan-review-footer__button--primary {
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-}
-
-.plan-review-footer__button--primary:hover {
-  background: var(--color-on-primary-container);
-}
-
-.plan-review-footer__button--primary:disabled:hover {
-  background: var(--color-primary);
 }
 </style>

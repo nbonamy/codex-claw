@@ -463,7 +463,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledTimes(3);
   });
 
-  it('previews proposed plans from provider-owned conversation events', () => {
+  it('previews proposed plans from SDK-owned plan document events', () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -485,7 +485,7 @@ describe('ClawBackendServer', () => {
     });
 
     server.emitEvent(codexConversationEvent(
-      'agent-dina', 'thread-dina', 'turn-proposed-plan', 'turn.proposedPlanCompleted',
+      'agent-dina', 'thread-dina', 'turn-proposed-plan', 'plan.completed',
       { itemId: 'turn-proposed-plan-plan', markdown: '# Proposed plan\n\n- Build it' },
     ));
 
