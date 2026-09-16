@@ -11,6 +11,14 @@
         <SettingsIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.general') }}</span>
       </el-menu-item>
+      <el-menu-item index="appearance">
+        <PaletteIcon aria-hidden="true" />
+        <span>{{ $t('surface.settingsSidebar.appearance') }}</span>
+      </el-menu-item>
+      <el-menu-item index="personalization">
+        <SettingsIcon aria-hidden="true" />
+        <span>{{ $t('surface.instructionSettings.personalization') }}</span>
+      </el-menu-item>
       <el-menu-item index="codex">
         <BrandOpenaiIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.codex') }}</span>
@@ -19,33 +27,25 @@
         <RobotFaceIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.claudeCode') }}</span>
       </el-menu-item>
-      <el-menu-item index="appearance">
-        <PaletteIcon aria-hidden="true" />
-        <span>{{ $t('surface.settingsSidebar.appearance') }}</span>
-      </el-menu-item>
-      <el-menu-item v-if="clawHostCapabilities.appshots" index="appshots">
-        <PhotoIcon aria-hidden="true" />
-        <span>{{ $t('surface.settingsSidebar.appshots') }}</span>
-      </el-menu-item>
       <el-menu-item index="plugins">
         <PuzzleIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.plugins') }}</span>
-      </el-menu-item>
-      <el-menu-item index="personalization">
-        <SettingsIcon aria-hidden="true" />
-        <span>{{ $t('surface.instructionSettings.personalization') }}</span>
-      </el-menu-item>
-      <el-menu-item index="git">
-        <GitBranchIcon aria-hidden="true" />
-        <span>{{ $t('surface.instructionSettings.git') }}</span>
       </el-menu-item>
       <el-menu-item index="integrations">
         <AffiliateIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.integrations') }}</span>
       </el-menu-item>
+      <el-menu-item v-if="clawHostCapabilities.appshots" index="appshots">
+        <PhotoIcon aria-hidden="true" />
+        <span>{{ $t('surface.settingsSidebar.appshots') }}</span>
+      </el-menu-item>
       <el-menu-item index="connections">
         <TerminalIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.connections') }}</span>
+      </el-menu-item>
+      <el-menu-item index="git">
+        <GitBranchIcon aria-hidden="true" />
+        <span>{{ $t('surface.instructionSettings.git') }}</span>
       </el-menu-item>
     </el-menu>
   </aside>

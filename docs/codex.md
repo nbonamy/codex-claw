@@ -431,6 +431,9 @@ For Codex, do not rely on a global `codex mcp add` entry for the product path.
 Codex Claw starts the app-server process with process-wide feature overrides,
 then passes the local Claw MCP server through each agent's thread config:
 
+The process-wide overrides enable Codex memories and streamed patch events for
+every Claw-managed Codex session.
+
 ```json
 {
   "mcp_servers.codex_claw.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",

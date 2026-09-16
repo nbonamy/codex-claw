@@ -15,9 +15,10 @@ const agent: Agent = {
 };
 
 describe('codex-config', () => {
-  it('enables the required event feature without creating a partial MCP server config', () => {
+  it('enables required process-wide Codex features without creating a partial MCP server config', () => {
     expect(buildCodexClawMcpConfigOverrides()).toStrictEqual([
       'features.apply_patch_streaming_events=true',
+      'features.memories=true',
       'plugins."github@openai-curated-remote".enabled=false',
     ]);
   });

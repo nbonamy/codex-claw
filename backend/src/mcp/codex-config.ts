@@ -8,6 +8,7 @@ const chatGptGitHubConnectorId = 'connector_76869538009648d5b282a4bb21c3d157';
 export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettings = defaultPluginSettings): string[] {
   return [
     configOverride('features.apply_patch_streaming_events', true),
+    configOverride('features.memories', true),
     configOverride('plugins."github@openai-curated-remote".enabled', false),
     ...(pluginSettings.chromeEnabled
       ? [configOverride('mcp_servers.node_repl.enabled', true)]

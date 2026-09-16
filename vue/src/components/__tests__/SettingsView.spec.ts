@@ -12,7 +12,7 @@ describe('SettingsView', () => {
     document.body.innerHTML = '';
   });
 
-  it('opens on General by default, orders provider settings first, and emits tab selections', async () => {
+  it('opens on General by default, preserves the settings order, and emits tab selections', async () => {
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -24,12 +24,17 @@ describe('SettingsView', () => {
     });
 
     expect(wrapper.text()).toContain('Accessibility');
-    expect(wrapper.findAll('.el-menu-item').map((item) => item.text()).slice(0, 5)).toStrictEqual([
+    expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).toStrictEqual([
       'General',
+      'Appearance',
+      'Personalization',
       'Codex',
       'Claude Code',
-      'Appearance',
+      'Plugins',
+      'Integrations',
       'Appshots',
+      'Connections',
+      'Git',
     ]);
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
