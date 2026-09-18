@@ -513,6 +513,15 @@ export const messages = {
         annotate: 'Annotate {name}',
         editAnnotations: 'Edit annotations for {name} ({count})',
       },
+      textAnnotations: {
+        addToChat: 'Add to chat',
+        annotation: 'Annotation',
+        commentLabel: 'Chat annotation comment',
+        commentPlaceholder: 'What should change?',
+        contextLabel: 'Chat annotations',
+        remove: 'Remove chat annotation',
+        save: 'Add annotation',
+      },
       collaboration: {
         messageFrom: 'Message from {name}',
         messagesFrom: 'Messages from {names}',

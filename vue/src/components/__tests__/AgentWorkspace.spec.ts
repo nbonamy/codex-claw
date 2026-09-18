@@ -45,8 +45,10 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
   const wrapper = shallowMount(AgentWorkspace, {
     props: {
       activeAttachmentAnnotationCounts: {},
+      addChatTextAnnotation: vi.fn(),
       agentFiles: [],
       agentSidebarCollapsed: false,
+      chatTextAnnotations: [],
       closeRightWorkspaceTab: vi.fn(),
       commitAgentGitChanges: vi.fn(),
       confirmPlan: vi.fn(),
@@ -74,6 +76,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       openAgentGitDiffPreview: vi.fn(),
       openAgentIn: vi.fn(),
       openAttachmentImageAnnotation: vi.fn(),
+      removeChatTextAnnotation: vi.fn(),
       openFilePreview: vi.fn(),
       openFilePreviewForAgent: vi.fn(),
       openInApplications: { defaultApplication: 'finder', applications: [] },

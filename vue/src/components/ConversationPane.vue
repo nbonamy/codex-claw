@@ -10,7 +10,10 @@
       ref="surface"
       class="conversation-pane__surface"
       :controller="controller"
+      :has-composer-context="textAnnotations.length > 0"
+      :message-text-selection="true"
       :transform-message="transformConversationMessage"
+      @message-text-selection-change="messageTextSelection = $event"
     >
       <template #empty>
         <div class="conversation-pane__empty">
@@ -57,7 +60,21 @@
           </button>
         </el-tooltip>
       </template>
+      <template #composer-context="{ disabled }">
+        <ChatTextAnnotationCards
+          v-if="textAnnotations.length > 0"
+          :annotations="textAnnotations"
+          :disabled="disabled"
+          @remove="emit('remove-text-annotation', $event)"
+        />
+      </template>
     </CodexConversationPane>
+    <ChatTextSelectionAnnotation
+      :conversation-key="conversationKey"
+      :selection="messageTextSelection"
+      @dismiss="messageTextSelection = null"
+      @save="emit('add-text-annotation', $event)"
+    />
     <ConversationPlanPanel
       v-if="plan && planVisible"
       :plan="plan"
@@ -76,6 +93,7 @@ import {
   provideCodexChatTranslate,
   type CodexChatMessage,
   type CodexConversationPaneController,
+  type CodexMessageTextSelection,
   type CodexNativeAttachment,
   type SurfaceMessage,
 } from '@codex-app-sdk/vue';
@@ -89,6 +107,9 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import ConversationLoadError from './ConversationLoadError.vue';
 import AgentMention from './AgentMention.vue';
+import ChatTextAnnotationCards from './ChatTextAnnotationCards.vue';
+import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
+import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import {
   presentCollaborationMessage,
   presentRendererCollaborationMessage,
@@ -108,6 +129,7 @@ const props = withDefaults(defineProps<{
   agent: Agent | null;
   agents?: readonly Agent[];
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
+  textAnnotations?: readonly ChatTextAnnotation[];
   plan?: ThreadPlan | null;
   planVisible?: boolean;
   historyLoadFailed?: boolean;
@@ -116,6 +138,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   agents: () => [],
   attachmentAnnotationCounts: () => ({}),
+  textAnnotations: () => [],
   planVisible: true,
   historyLoadFailed: false,
   historyLoading: false,
@@ -130,15 +153,19 @@ provideClawToolPresentation(
 );
 
 const emit = defineEmits<{
+  'add-text-annotation': [payload: { selection: CodexMessageTextSelection; comment: string }];
   'annotate-attachment': [attachment: CodexNativeAttachment];
   'close-plan': [];
+  'remove-text-annotation': [annotationId: string];
   'retry-history': [];
 }>();
 
 const conversationKey = computed(() => props.agent?.id ?? 'no-agent');
+const messageTextSelection = ref<CodexMessageTextSelection | null>(null);
 const collaborationMessagePresentations = new Map<string, CollaborationMessagePresentation>();
 let transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 watch(conversationKey, () => {
+  messageTextSelection.value = null;
   collaborationMessagePresentations.clear();
   transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 });

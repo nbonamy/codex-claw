@@ -5,12 +5,14 @@ import ElementPlus from 'element-plus';
 import {
   createCodexConversationPaneController,
   type CodexConversationPaneController,
+  type CodexMessageTextSelection,
   type CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
 import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPane from '../ConversationPane.vue';
+import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import { i18n } from '../../i18n';
 
 const conversationPaneSource = readFileSync(resolve(process.cwd(), 'src/components/ConversationPane.vue'), 'utf8');
@@ -107,6 +109,52 @@ describe('ConversationPane', () => {
 
     expect(wrapper.text()).toContain('Find the failing test.');
     expect(wrapper.text()).toContain('Looking now.');
+  });
+
+  it('turns SDK text selections into removable composer annotations', async () => {
+    const wrapper = mountPane({ controller: controllerFor(messages), agent });
+    const sdkPane = wrapper.getComponent({ name: 'CodexConversationPane' });
+    const selection: CodexMessageTextSelection = {
+      text: 'Looking now.',
+      messageId: 'message-assistant',
+      turnId: 'turn-1',
+      messageIndex: 1,
+      role: 'assistant',
+      anchor: { x: 40, y: 80, width: 100, height: 20 },
+    };
+
+    expect(sdkPane.props('messageTextSelection')).toBe(true);
+    expect(sdkPane.props('hasComposerContext')).toBe(false);
+    sdkPane.vm.$emit('messageTextSelectionChange', selection);
+    await nextTick();
+    await wrapper.get('.chat-text-selection-annotation__add').trigger('click');
+    const input = document.querySelector<HTMLInputElement>('.annotation-popup__input');
+    const form = document.querySelector<HTMLFormElement>('form.annotation-popup');
+    if (!input || !form) throw new Error('Annotation popup was not rendered.');
+    input.value = 'Explain what you found.';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await nextTick();
+
+    expect(wrapper.emitted('add-text-annotation')).toStrictEqual([[
+      { selection, comment: 'Explain what you found.' },
+    ]]);
+
+    const annotation: ChatTextAnnotation = {
+      id: 'annotation-1',
+      text: selection.text,
+      comment: 'Explain what you found.',
+      messageId: selection.messageId,
+      turnId: selection.turnId,
+      messageIndex: selection.messageIndex,
+      role: selection.role,
+    };
+    await wrapper.setProps({ textAnnotations: [annotation] });
+    expect(sdkPane.props('hasComposerContext')).toBe(true);
+    expect(wrapper.get('.chat-text-annotation-cards__card').text()).toBe('Annotation');
+    expect(wrapper.text()).not.toContain('Explain what you found.');
+    await wrapper.get('[aria-label="Remove chat annotation"]').trigger('click');
+    expect(wrapper.emitted('remove-text-annotation')).toStrictEqual([['annotation-1']]);
   });
 
   it('replaces only an empty transcript with the history load recovery state', async () => {
@@ -419,6 +467,7 @@ function mountPane(props: {
   controller: CodexConversationPaneController;
   agent: Agent | null;
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
+  textAnnotations?: readonly ChatTextAnnotation[];
   plan?: ThreadPlan | null;
   planVisible?: boolean;
   historyLoadFailed?: boolean;

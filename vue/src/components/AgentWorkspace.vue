@@ -41,14 +41,17 @@
       :agent="currentAgent"
       :agents="snapshot.agents"
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
+      :text-annotations="chatTextAnnotations"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
       :history-load-failed="historyLoadFailed"
       :history-loading="isConversationLoading"
       :has-visible-messages="hasVisibleMessages"
       @annotate-attachment="openAttachmentImageAnnotation"
+      @add-text-annotation="addChatTextAnnotation($event.selection, $event.comment)"
       @close-plan="closeExecutionPlan"
       @retry-history="retryConversationHistory"
+      @remove-text-annotation="removeChatTextAnnotation"
     />
     <RightWorkspacePanel
       v-for="agent in snapshot.agents"
@@ -154,6 +157,7 @@ import type {
   CodexMessageImage,
   CodexMessageImageContext,
   CodexNativeAttachment,
+  CodexMessageTextSelection,
 } from '@codex-app-sdk/vue';
 import { computed, reactive, ref, toRefs, watch } from 'vue';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
@@ -166,6 +170,7 @@ import ConversationPane from './ConversationPane.vue';
 import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
+import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import { fileBasename } from './use-workspace-previews';
 import {
   isRightWorkspaceSubagentTab,
@@ -178,6 +183,7 @@ import {
 
 const props = defineProps<{
   activeAttachmentAnnotationCounts: Readonly<Record<string, number>>;
+  addChatTextAnnotation: (selection: CodexMessageTextSelection, comment: string) => void;
   agentFiles: AgentFileSearchItem[];
   agentSidebarCollapsed: boolean;
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
@@ -185,6 +191,7 @@ const props = defineProps<{
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
+  chatTextAnnotations: readonly ChatTextAnnotation[];
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
@@ -214,6 +221,7 @@ const props = defineProps<{
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;
+  removeChatTextAnnotation: (annotationId: string) => void;
   openFilePreview: (link: ConversationFileLink) => Promise<void>;
   openFilePreviewForAgent: (agentId: string, filePath: string) => Promise<void>;
   openInApplications: OpenInApplicationCatalog;

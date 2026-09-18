@@ -189,6 +189,7 @@
         v-else
         ref="agentWorkspace"
         :active-attachment-annotation-counts="activeAttachmentAnnotationCounts"
+        :add-chat-text-annotation="addChatTextAnnotation"
         :agent-files="agentFiles"
         :agent-sidebar-collapsed="agentSidebarCollapsed"
         :close-right-workspace-tab="closeRightWorkspaceTab"
@@ -197,6 +198,7 @@
         :respond-to-plan-review="respondToPlanReview"
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
+        :chat-text-annotations="activeChatTextAnnotations"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
         :current-agent-git-status="currentAgentGitStatus"
@@ -219,6 +221,7 @@
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
         :open-attachment-image-annotation="openAttachmentImageAnnotation"
+        :remove-chat-text-annotation="removeChatTextAnnotation"
         :open-file-preview="openFilePreview"
         :open-file-preview-for-agent="openFilePreviewForAgent"
         :open-in-applications="openInApplications"
@@ -469,6 +472,7 @@ import { useRepositoryAcquisition } from './use-repository-acquisition';
 import { useRepositorySession } from './use-repository-session';
 import { useRightWorkspaceState } from './use-right-workspace-state';
 import { useImageAnnotation } from './use-image-annotation';
+import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
 import { useWorkspacePreviews } from './use-workspace-previews';
 import { useWorkItemRouting } from './use-work-item-routing';
@@ -1134,6 +1138,15 @@ const {
   target: attachmentAnnotationTarget,
   visible: imageAnnotationVisible,
 } = imageAnnotation;
+const chatTextAnnotation = useChatTextAnnotations({
+  currentAgentId: () => currentAgent.value?.id,
+});
+const {
+  activeAnnotations: activeChatTextAnnotations,
+  add: addChatTextAnnotation,
+  forward: forwardCodexPromptWithChatTextAnnotations,
+  remove: removeChatTextAnnotation,
+} = chatTextAnnotation;
 const cockpitBacklogState = useCockpitBacklog({
   configure: (input) => props.configureWorkBacklog(input),
   confirmLoadAll: async () => {
@@ -1987,11 +2000,27 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
 }
 
 async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
-  await forwardCodexPromptWithImageAnnotations(prompt, options, forwardPrompt);
+  await forwardCodexPromptWithChatTextAnnotations(
+    prompt,
+    options,
+    (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
+      nextPrompt,
+      nextOptions,
+      forwardPrompt,
+    ),
+  );
 }
 
 async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
-  await forwardCodexPromptWithImageAnnotations(prompt, options, forwardSteerPrompt);
+  await forwardCodexPromptWithChatTextAnnotations(
+    prompt,
+    options,
+    (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
+      nextPrompt,
+      nextOptions,
+      forwardSteerPrompt,
+    ),
+  );
 }
 
 function updateConversationComposerState(state: CodexComposerState): void {
