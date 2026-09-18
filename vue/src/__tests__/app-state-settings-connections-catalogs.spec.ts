@@ -187,6 +187,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(base),
+        listBackendModels: vi.fn().mockResolvedValue([{ id: 'gpt-5.4', model: 'gpt-5.4', displayName: 'GPT', supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'High' }] }]),
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });
@@ -262,6 +263,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(base),
+        listBackendModels: vi.fn().mockResolvedValue([{ id: 'haiku', model: 'haiku', displayName: 'Haiku', supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Low' }] }]),
         onEvent: vi.fn(),
       } satisfies Partial<CodexClawApi>,
     });

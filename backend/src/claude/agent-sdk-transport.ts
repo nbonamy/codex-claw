@@ -53,6 +53,7 @@ type ActiveTransportTurn = {
   settled: boolean;
   onMessage: (message: ClaudeSdkMessage) => void;
   onPermissionRequest?: (request: ClaudePermissionRequest) => void;
+  onPermissionCancelled?: (requestId: string) => void;
 };
 
 type ClaudeSdkSession = {
@@ -106,6 +107,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     params: ClaudeTurnParams,
     onMessage: (message: ClaudeSdkMessage) => void,
     onPermissionRequest?: (request: ClaudePermissionRequest) => void,
+    onPermissionCancelled?: (requestId: string) => void,
   ): ClaudeTurnHandle {
     if (this.closing) {
       throw new Error('Claude Agent SDK transport is closing.');
@@ -126,7 +128,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         existingSession = undefined;
       }
     }
-    const activeTurn = createActiveTurn(onMessage, onPermissionRequest);
+    const activeTurn = createActiveTurn(onMessage, onPermissionRequest, onPermissionCancelled);
     const session = existingSession ?? this.createSession(params, requestedSessionId, activeTurn, configurationKey);
     if (existingSession) {
       if (existingSession.activeTurn) {
@@ -379,7 +381,9 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         const pending = this.pendingPermissions.get(key);
         if (!pending) return;
         this.pendingPermissions.delete(key);
+        pending.signal.removeEventListener('abort', pending.abortListener);
         resolve({ behavior: 'deny', message: 'Claude permission request was cancelled.' });
+        activeTurn?.onPermissionCancelled?.(requestId);
       };
       const pending: PendingPermission = {
         requestId,
@@ -412,6 +416,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         allowAlways: pending.suggestions.some((suggestion) => suggestion.destination !== 'session'),
         ...(toolName === 'AskUserQuestion' ? { questions: askUserQuestions(input) } : {}),
       });
+      if (options.signal.aborted) abortListener();
     });
   }
 
@@ -459,6 +464,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
 function createActiveTurn(
   onMessage: (message: ClaudeSdkMessage) => void,
   onPermissionRequest?: (request: ClaudePermissionRequest) => void,
+  onPermissionCancelled?: (requestId: string) => void,
 ): ActiveTransportTurn {
   let resolve: () => void = () => undefined;
   let reject: (error: Error) => void = () => undefined;
@@ -473,6 +479,7 @@ function createActiveTurn(
     settled: false,
     onMessage,
     ...(onPermissionRequest ? { onPermissionRequest } : {}),
+    ...(onPermissionCancelled ? { onPermissionCancelled } : {}),
   };
 }
 

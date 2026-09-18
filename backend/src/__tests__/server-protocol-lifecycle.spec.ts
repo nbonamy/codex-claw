@@ -280,7 +280,7 @@ describe('ClawBackendServer', () => {
     expect((result as { result: AppSnapshot }).result.agents[0]?.plan).toBeUndefined();
   });
 
-  it('injects a proposed plan and emits the normal plan-review side-panel request', async () => {
+  it('injects a proposed plan and emits the normal review-ready domain event', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{
       id: 'agent-dina',

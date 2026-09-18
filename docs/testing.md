@@ -7,8 +7,10 @@ Codex Claw has an Electron desktop host and an initial localhost-only Express
 web host. Do not copy id8's generic API harness here. When this repo says
 "contract" or "workflow" test, it means Electron IPC, the Claw WebSocket
 adapter, client state, renderer behavior, or a fake backend transport.
-As the backend seam grows, prefer fake backend drivers for app-controller
-routing tests and fake Codex transports for Codex-driver/session tests.
+Use a fake unified backend for app-controller/state routing tests, a fake Codex
+SDK surface for the real Codex driver, and a fake Claude SDK query for the real
+Claude driver. Do not run the real Codex SDK against a fake app-server in Claw's
+normal tests: that boundary belongs to the SDK repository.
 
 ## Quality Bar
 
@@ -88,14 +90,14 @@ real backend process by default.
 
 Cover:
 
-- Codex RPC parsing, request/response matching, notifications, malformed
-  responses, and server-initiated requests.
+- Claw RPC parsing, request/response matching, notifications, malformed
+  responses, and client callbacks (not Codex SDK wire parsing).
 - App-server lifecycle decisions: spawn/connect, readiness, restart, shutdown,
   and process cleanup.
 - Backend-driver routing for prompt send, interrupt, request responses, history
   hydration, model/skill catalogs, and unsupported capabilities.
-- `CodexAgentSessionManager` behavior: start/resume thread, start turn, steer,
-  interrupt, status updates, and event routing by agent/thread.
+- Driver/adapter policy: create/resume/archive, submit/steer/interrupt,
+  status projection and routing by agent/conversation.
 - Codex routing-envelope behavior and SDK replica revision handling, without a
   second Claw transcript reducer.
 - Host-boundary regressions proving Claw forwards SDK snapshots, events, and
@@ -193,8 +195,36 @@ reimplemented or exhaustively retested in Codex Claw.
 
 ## Contract Fixtures
 
-Codex app-server protocol fixtures are important. Keep them small, explicit,
-and representative.
+The reusable boundary fixtures are deliberately scripted, not simulators:
+
+- `backend/src/codex/__tests__/sdk-surface-fixture.ts`: typed SDK methods,
+  per-conversation snapshots and explicit SDK events. Tests supply the provider's
+  resulting state; the fixture must not grow a transcript reducer.
+- `backend/src/claude/__tests__/sdk-query-fixture.ts`: real transport consumes
+  independently controlled SDK query iterators; inputs, permissions and failures
+  are observable at the SDK boundary.
+- `vue/src/test/client-api-mock.ts`: exhaustive, typed `CodexClawApi` fake with
+  production snapshot/connection/sequence initialization and independent,
+  disposable backend-event, app-command and update-status subscriptions. Explicit
+  read defaults perform no I/O; consequential operations throw unless scripted.
+  `backend-fixture.ts` adds sequenced event delivery for app state and mounted
+  `App` tests. Neither fixture implements backend policy or a reducer.
+- Shared desktop test setup merges per-test API overrides into this complete
+  fake. Use `stubLegacyElectronTestWindow` only to explicitly test missing-method
+  compatibility, never as the normal application boundary. Await asynchronous
+  initialization before exercising controls; script consistent navigation and
+  history responses instead of relying on missing APIs to skip those paths.
+
+Assert event retention before supplying a later navigation snapshot that could
+repair lost state. Capability tests should exercise a visible control and its
+interaction result, not merely inspect forwarded component props.
+
+`sdk-boundary-*.spec.ts`, Claude's `sdk-boundary.spec.ts`, and the app's
+`*backend-boundary.spec.ts` exercise these seams. They run in the normal workspace
+test glob and CI; `npm run test:integration` is a fast focused entry point.
+Keep lower-level tests for Claw-owned algorithms, provider translation, wire
+security, persistence, filesystem and Git safety. A provider-independent service
+does not need artificial Codex and Claude variants.
 
 Rules:
 
@@ -202,8 +232,19 @@ Rules:
   folder becomes clearly useful.
 - Include malformed and partial-stream cases, not only happy paths.
 - Preserve enough original payload shape to catch protocol drift.
-- Normalize through the adapter before renderer assertions.
+- Drive the real adapter from SDK-shaped fixtures; drive renderer composition
+  from the resulting app-owned contract, not an SDK fake inside the UI test.
 - Do not make renderer tests import generated Codex protocol types.
+
+When replacing tests, record the Claw behavior retained and the new owning suite.
+Delete SDK-owned optimistic-message, raw protocol reduction and slash-prompt-copy
+assertions instead of transplanting them. Do not replace useful failure, identity
+or ordering tests with call-through smoke tests.
+
+For a regression family, demonstrate sensitivity with a temporary deliberate
+fault (for example dropping a review event or removing a queue lock), observe the
+expected failure, restore the implementation, and rerun green. These probes are
+local validation, not committed fault switches or a second test runner.
 
 ## Desktop Smoke And Visual Checks
 

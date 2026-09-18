@@ -13,7 +13,7 @@ import {
 
 describe('ClawBackendServer', () => {
 
-  it('owns git diff preview side-panel events', async () => {
+  it('returns git diff data without emitting presentation events', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{

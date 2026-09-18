@@ -4,9 +4,8 @@ import { useAppState } from '../app-state';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { BackendConversationRef, CodexClawApi, RendererMessage, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
-import { stubElectronTestWindow } from '../test/client';
+import { stubElectronTestWindow, stubLegacyElectronTestWindow } from '../test/client';
 import { configureClawClient } from '../platform-api';
 import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 import { workItem } from './app-state-test-harness';
@@ -248,30 +247,8 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toStrictEqual(unassignedSnapshot);
   });
 
-  it('formats deterministic work item assignment prompts', () => {
-    expect(workItemAssignmentPrompt(workItem())).toBe([
-      'Please take this GitHub issue and drive it to completion.',
-      '',
-      'Work item ID: github:nbonamy/codex-claw#12',
-      'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
-      'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
-      '',
-      'Repository: nbonamy/codex-claw',
-      'Issue: #12 Fix cockpit drag target',
-      'URL: https://github.com/nbonamy/codex-claw/issues/12',
-      'Labels: bug',
-      'Author: nbonamy',
-      'Body:',
-      'Make issue assignment feel obvious.',
-    ].join('\n'));
-
-    expect(workItemAssignmentPrompt(workItem(), {
-      assignment: 'Start by reproducing the issue.',
-    })).toContain('Assignment instructions:\nStart by reproducing the issue.');
-  });
-
   it('handles missing work provider bridge methods as no-ops', async () => {
-    stubElectronTestWindow({ codexClaw: {} satisfies Partial<CodexClawApi> });
+    stubLegacyElectronTestWindow({ codexClaw: {} });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
 
@@ -508,30 +485,6 @@ describe('useAppState', () => {
     delete state.snapshot.value.workBacklog.providerConfigurations.github;
     await state.loadWorkRepositories('github');
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
-  });
-
-  it('omits optional work item prompt fields and truncates long bodies', () => {
-    expect(workItemAssignmentPrompt({
-      ...workItem(),
-      authorName: undefined,
-      body: '',
-      labels: [],
-    })).toBe([
-      'Please take this GitHub issue and drive it to completion.',
-      '',
-      'Work item ID: github:nbonamy/codex-claw#12',
-      'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
-      'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
-      '',
-      'Repository: nbonamy/codex-claw',
-      'Issue: #12 Fix cockpit drag target',
-      'URL: https://github.com/nbonamy/codex-claw/issues/12',
-    ].join('\n'));
-
-    expect(workItemAssignmentPrompt({
-      ...workItem(),
-      body: 'x'.repeat(4100),
-    })).toContain('[Body truncated]');
   });
 
   it('creates, updates, and deletes automations through the preload bridge', async () => {

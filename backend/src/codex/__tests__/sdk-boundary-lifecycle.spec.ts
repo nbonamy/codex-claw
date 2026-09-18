@@ -1,0 +1,99 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
+
+describe('Codex SDK → Claw backend lifecycle', () => {
+  const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
+  const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
+  afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); vi.useRealTimers(); });
+
+  it('creates a user conversation in the assigned folder and sends prepared options to that handle', async () => {
+    const { driver, surface, conversation } = setup();
+    const agent = { ...sdkAgent(), backendSession: undefined };
+    surface.createConversation.mockResolvedValue(sdkSnapshot());
+    conversation('conversation-a').handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', { turnIds: ['accepted'], activeTurnId: 'accepted' }));
+    const options = driver.preparePromptOptions(agent, { model: 'model', reasoningEffort: 'high', serviceTier: 'fast', planMode: true });
+    await expect(driver.sendPrompt(agent, 'Implement', options)).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'accepted' });
+    expect(surface.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, { extensionContext: agent });
+    expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledWith('Implement', { model: 'model', reasoningEffort: 'high', serviceTier: 'fast', planMode: true });
+    expect(conversation('conversation-a').handle.rename).toHaveBeenCalledWith('agent-a');
+  });
+
+  it('propagates SDK rejection without fabricating a successful turn and permits retry', async () => {
+    const { driver, conversation } = setup();
+    const handle = conversation('conversation-a').handle;
+    handle.sendMessage.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(sdkSnapshot('conversation-a', { turnIds: ['retry'] }));
+    await expect(driver.sendPrompt(sdkAgent(), 'hello')).rejects.toThrow('offline');
+    await expect(driver.sendPrompt(sdkAgent(), 'hello')).resolves.toMatchObject({ turnId: 'retry' });
+    expect(handle.load).toHaveBeenCalledOnce();
+  });
+
+  it('restores an archived target before displacing the attached conversation', async () => {
+    const { driver, surface, conversation } = setup();
+    const order: string[] = [];
+    surface.unarchiveConversation.mockImplementation(async (id) => { order.push(`restore:${id}`); return sdkSnapshot(id); });
+    conversation('archived').handle.load.mockImplementation(async () => { order.push('load:archived'); return sdkSnapshot('archived'); });
+    surface.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
+    await expect(driver.resumeConversation(sdkAgent(), { ref: { backend: 'codex', threadId: 'archived' }, storageState: 'archived' })).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'archived' } });
+    expect(order).toStrictEqual(['restore:archived', 'load:archived', 'archive:conversation-a']);
+  });
+
+  it('rolls back failed restoration and keeps subsequent prompts on the previous conversation', async () => {
+    const { driver, surface, conversation } = setup();
+    conversation('broken').handle.load.mockRejectedValueOnce(new Error('cannot load'));
+    await expect(driver.resumeConversation(sdkAgent(), { ref: { backend: 'codex', threadId: 'broken' }, storageState: 'archived' })).rejects.toThrow('cannot load');
+    expect(surface.archiveConversation).toHaveBeenCalledExactlyOnceWith('broken');
+    await driver.sendPrompt(sdkAgent(), 'continue');
+    expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledOnce();
+    expect(conversation('broken').handle.sendMessage).not.toHaveBeenCalled();
+    expect(conversation('broken').listenerCount()).toBe(0);
+  });
+
+  it('does not detach an attached conversation when archive fails', async () => {
+    const { driver, surface, conversation } = setup();
+    await driver.loadConversation(sdkAgent());
+    surface.archiveConversation.mockRejectedValueOnce(new Error('archive failed'));
+    await expect(driver.archiveAgentConversation(sdkAgent())).rejects.toThrow('archive failed');
+    await driver.sendPrompt(sdkAgent(), 'still attached');
+    expect(conversation('conversation-a').handle.load).toHaveBeenCalledOnce();
+    expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledWith('still attached', {});
+  });
+
+  it.each([false, true])('cold hydration interrupts orphaned work except an active goal (goal=%s)', async (activeGoal) => {
+    const { driver, conversation } = setup();
+    const session = conversation('conversation-a');
+    session.setSnapshot({ activeTurnId: 'old-turn', busy: true, ...(activeGoal ? { goal: { threadId: 'conversation-a', objective: 'finish', status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0 } } : {}) });
+    await driver.loadConversation(sdkAgent());
+    expect(session.handle.interrupt).toHaveBeenCalledTimes(activeGoal ? 0 : 1);
+  });
+
+  it('reuses fresh snapshots, refreshes expired idle history, and retains live history', async () => {
+    vi.useFakeTimers();
+    const { driver, conversation, events } = setup();
+    const session = conversation('conversation-a');
+    session.setSnapshot({ messages: [{ id: 'cached', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Cached answer' }], createdAt: '2026-09-16T00:00:00Z' }] });
+    await driver.loadConversation(sdkAgent());
+    events.length = 0;
+    await driver.loadConversation(sdkAgent());
+    expect(session.handle.load).toHaveBeenCalledOnce();
+    expect(events.filter((event) => event.type === 'codex.conversationSnapshotChanged')).toMatchObject([{ payload: { snapshot: { messages: session.handle.getSnapshot().messages } } }]);
+    vi.advanceTimersByTime(16 * 60_000);
+    await driver.loadConversation(sdkAgent());
+    expect(session.handle.load).toHaveBeenCalledTimes(2);
+    session.setSnapshot({ activeTurnId: 'live', busy: true });
+    vi.advanceTimersByTime(16 * 60_000);
+    await driver.loadConversation(sdkAgent());
+    expect(session.handle.load).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops old subscriptions when the agent changes conversation and on close', async () => {
+    const { driver, conversation, events } = setup();
+    await driver.loadConversation(sdkAgent());
+    await driver.loadConversation(sdkAgent('agent-a', 'replacement'));
+    expect(conversation('conversation-a').listenerCount()).toBe(0);
+    events.length = 0;
+    conversation('conversation-a').emit({ type: 'conversation.activityChanged', seq: 1, origin: 'notification', occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', payload: { busy: true, error: null, threadStatus: null } });
+    expect(events).toStrictEqual([]);
+    await driver.close();
+    expect(conversation('replacement').listenerCount()).toBe(0);
+  });
+});

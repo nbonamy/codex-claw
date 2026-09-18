@@ -17,7 +17,11 @@ Read `docs/testing.md` before changing tests or testable behavior.
 - Test observable behavior and app contracts, not implementation details.
 - Match test scope to risk.
 - Use focused tests while iterating, then run the full relevant gate.
-- Mock external systems at the boundary: Codex app-server transports, Electron
+- For provider integration, fake the public Codex app SDK or Claude Agent SDK
+  and exercise the real Claw adapter/backend. For application integration, fake
+  the unified backend and exercise real app state and representative mounted UI.
+  Use the fixtures and ownership rules in `docs/testing.md`.
+- For provider-independent services, test their own external boundary: Electron
   shell, filesystem, git, clocks, and OS dialogs.
 - Prefer realistic component interaction over mutating internals directly.
 - New shared components, public helpers, reducers, adapters, and persistence

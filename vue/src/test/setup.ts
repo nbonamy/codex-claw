@@ -2,7 +2,7 @@ import { config, enableAutoUnmount } from '@vue/test-utils';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { i18n } from '../i18n';
 import { configureClawClient } from '../platform-api';
-import { installElectronTestClientAccessor } from './client';
+import { installElectronTestClientAccessor, setElectronTestClient } from './client';
 
 beforeEach(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -17,6 +17,7 @@ config.global.plugins = [i18n];
 enableAutoUnmount(afterEach);
 
 afterEach(() => {
+  setElectronTestClient();
   delete window.codexClaw;
   configureClawClient(undefined);
   vi.unstubAllGlobals();

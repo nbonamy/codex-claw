@@ -1,0 +1,127 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Agent } from '@codex-claw/core/contracts';
+import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
+import { ClaudeBackendDriver } from '../claude-driver';
+import { ClaudeAgentSdkTransport } from '../agent-sdk-transport';
+import { createQueryHarness } from './sdk-query-fixture';
+import { ClawBackendServer } from '../../server';
+import { BackendDriverRpc } from '../../driver-rpc';
+import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
+
+vi.mock('@codex-claw/core/runtime-discovery', () => ({
+  withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
+}));
+
+function agent(id = 'claude-a'): Agent {
+  return { id, name: id, folder: '/tmp/project', teamId: 'team-test', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' };
+}
+
+describe('Claude Agent SDK → Claw backend', () => {
+  const servers: ClawBackendServer[] = [];
+  function setup() {
+    const sdk = createQueryHarness();
+    const driver = new ClaudeBackendDriver(new ClaudeAgentSdkTransport({ createQuery: sdk.createQuery }));
+    const snapshot = createTestSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
+    snapshot.agents = [agent(), agent('claude-b')];
+    snapshot.teams[0]!.agentIds = snapshot.agents.map((item) => item.id);
+    const events: ClawBackendEvent[] = [];
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['claude', driver]])), onEvent: (event) => events.push(event),
+    });
+    servers.push(server);
+    return { sdk, driver, server, snapshot, events, send: (agentId: string, prompt: string) => server.handleMessage({ jsonrpc: '2.0', id: `${agentId}-${prompt}`, method: 'agent/prompt/send', params: { agentId, prompt } }) };
+  }
+  afterEach(async () => { await Promise.all(servers.splice(0).map((server) => server.close())); });
+
+  it('turns an SDK ExitPlanMode item into a durable review without UI semantics', async () => {
+    const { sdk, driver, server, snapshot, events } = setup();
+    const pending = driver.sendPrompt(agent(), 'plan it', { planMode: true });
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    expect(sdk.options[0]!.permissionMode).toBe('plan');
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await pending;
+    sdk.emit({ type: 'assistant', session_id: 'session-a', message: { content: [
+      { type: 'tool_use', id: 'proposal', name: 'ExitPlanMode', input: { plan: '# Claude plan\n\nShip it.' } },
+    ] } });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.planReview).toMatchObject({ status: 'pending', markdown: '# Claude plan\n\nShip it.' }));
+    expect(events.filter((event) => event.type === 'plan.readyForReview')).toMatchObject([{ agentId: 'claude-a', payload: { markdown: '# Claude plan\n\nShip it.' } }]);
+    expect(events.map((event) => event.type)).not.toContain('sidePanel.markdownRequested');
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: false });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+    const accepted = server.handleMessage({ jsonrpc: '2.0', id: 'accept', method: 'agent/planReview/respond', params: { agentId: 'claude-a', response: { reviewId: snapshot.agents[0]!.planReview!.id, resolution: 'accept' } } });
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(2));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await expect(accepted).resolves.not.toHaveProperty('error');
+    expect(sdk.inputs[1]!.message.content).toEqual([{ type: 'text', text: 'implement the plan' }]);
+    expect(snapshot.agents[0]!.planReview!.status).toBe('accept');
+  });
+
+  it('isolates SDK query streams and completion status across two concurrent agents', async () => {
+    const { sdk, send, snapshot } = setup();
+    const a = send('claude-a', 'first');
+    const b = send('claude-b', 'second');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(2));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' }, 0);
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-b' }, 1);
+    await Promise.all([a, b]);
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-b', is_error: false }, 1);
+    await vi.waitFor(() => expect(snapshot.agents[1]!.status.type).toBe('idle'));
+    expect(snapshot.agents[0]!.status.type).toBe('working');
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: false }, 0);
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+  });
+
+  it('exposes an SDK permission as a normalized pending request and returns the targeted decision', async () => {
+    const { sdk, driver, snapshot, events } = setup();
+    const pending = driver.sendPrompt(agent(), 'edit');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await pending;
+    const permission = sdk.options[0]!.canUseTool!('Edit', { file_path: '/tmp/project/file.ts' }, {
+      signal: new AbortController().signal, toolUseID: 'edit-item', requestId: 'permission',
+    });
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.created')).toBe(true));
+    expect(snapshot.agentRequests?.['claude-a']).toMatchObject([{ id: 'permission', kind: 'toolConfirmation', conversationId: 'session-a' }]);
+    await driver.respondToAgentRequest({ agentId: 'claude-a', id: 'permission', outcome: { kind: 'decision', decision: 'deny' } });
+    await expect(permission).resolves.toMatchObject({ behavior: 'deny' });
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.resolved')).toBe(true));
+  });
+
+  it.each([false, true])('removes an SDK-cancelled permission before turn completion (already aborted: %s)', async (alreadyAborted) => {
+    const { sdk, send, snapshot, events, driver } = setup();
+    const started = send('claude-a', 'edit');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await started;
+    const cancellation = new AbortController();
+    if (alreadyAborted) cancellation.abort();
+    const permission = sdk.options[0]!.canUseTool!('Edit', { file_path: '/tmp/project/file.ts' }, {
+      signal: cancellation.signal, toolUseID: 'edit-item', requestId: 'cancelled',
+    });
+    if (!alreadyAborted) expect(snapshot.agentRequests?.['claude-a']).toHaveLength(1);
+    cancellation.abort();
+    await expect(permission).resolves.toMatchObject({ behavior: 'deny' });
+    expect(snapshot.agentRequests?.['claude-a'] ?? []).toHaveLength(0);
+    expect(snapshot.agents[0]!.status.type).toBe('working');
+    expect(events.filter((event) => event.type === 'agentRequest.resolved')).toMatchObject([
+      { agentId: 'claude-a', payload: { id: 'cancelled', outcome: { kind: 'cancelled' } } },
+    ]);
+    await expect(driver.respondToAgentRequest({ agentId: 'claude-a', id: 'cancelled', outcome: { kind: 'decision', decision: 'allow' } })).rejects.toThrow('no longer pending');
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: false });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+    expect(events.filter((event) => event.type === 'agentRequest.resolved')).toHaveLength(1);
+  });
+
+  it('reports SDK startup failure as an error and allows another attempt', async () => {
+    const { sdk, send, snapshot } = setup();
+    sdk.createQuery.mockImplementationOnce(() => { throw new Error('sdk unavailable'); });
+    await send('claude-a', 'hello');
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('error'));
+    const retry = send('claude-a', 'retry');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'retry-session' });
+    await retry;
+    await vi.waitFor(() => expect(snapshot.agents[0]!.backendSession).toMatchObject({ sessionId: 'retry-session' }));
+  });
+});

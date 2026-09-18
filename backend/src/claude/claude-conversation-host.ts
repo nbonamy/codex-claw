@@ -188,6 +188,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
             this.emitPermissionRequest(activeTurn, request);
           }
         },
+        (requestId) => {
+          if (activeTurn) this.cancelPermissionRequest(activeTurn, requestId);
+        },
       );
       activeTurn = {
         agentId: agent.id,
@@ -1111,6 +1114,23 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     });
+  }
+
+  private cancelPermissionRequest(activeTurn: ActiveClaudeTurn, requestId: string): void {
+    const key = JSON.stringify([activeTurn.agentId, requestId]);
+    if (this.pendingRequestOwners.get(key) !== activeTurn) return;
+    this.pendingRequestOwners.delete(key);
+    this.emitConversation({
+      agentId: activeTurn.agentId,
+      backend: this.backend,
+      backendSessionId: activeTurn.sessionId ?? undefined,
+      turnId: activeTurn.turnId,
+      type: 'clientRequest.resolved',
+      payload: { id: requestId },
+    }, { kind: 'cancelled', reason: 'provider_cancelled' });
+    if (!activeTurn.completed && ![...this.pendingRequestOwners.values()].includes(activeTurn)) {
+      this.emit({ agentId: activeTurn.agentId, type: 'agent.statusChanged', payload: { type: 'working' } });
+    }
   }
 
   private resolvePendingRequests(activeTurn: ActiveClaudeTurn): void {

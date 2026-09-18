@@ -5,7 +5,7 @@ import { useAppState } from '../app-state';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, CodexClawApi, DevicePairingSession, MainToRendererEvent, SourceRepository } from '@codex-claw/core/contracts';
 import { clearConfetti } from '../shared/confetti/use-confetti';
-import { stubElectronTestWindow } from '../test/client';
+import { stubElectronTestWindow, stubLegacyElectronTestWindow } from '../test/client';
 import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { workItem, deferred } from './app-state-test-harness';
 
@@ -135,7 +135,7 @@ describe('useAppState', () => {
   });
 
   it('uses source repository fallbacks when preload helpers are unavailable', async () => {
-    stubElectronTestWindow({ codexClaw: {} satisfies Partial<CodexClawApi> });
+    stubLegacyElectronTestWindow({ codexClaw: {} });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
     state.snapshot.value.sourceFolder = {
@@ -466,10 +466,12 @@ describe('useAppState', () => {
     const selectedTeamSnapshot = structuredClone(remoteSnapshot);
     selectedTeamSnapshot.activeTeamId = 'team-other';
     selectedTeamSnapshot.activeAgentId = 'agent-joel';
+    selectedTeamSnapshot.teams.find((team) => team.id === 'team-other')!.activeAgentId = 'agent-joel';
     stubElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectTeam: vi.fn().mockResolvedValue(selectedTeamSnapshot),
+        loadConversationHistory: vi.fn().mockResolvedValue(selectedTeamSnapshot),
         setDockBadgeCount,
         onEvent: vi.fn(() => () => undefined),
       } satisfies Partial<CodexClawApi>,
@@ -654,7 +656,7 @@ describe('useAppState', () => {
 
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
     const remoteSnapshot = createInitialSnapshot();
-    stubElectronTestWindow({
+    stubLegacyElectronTestWindow({
       codexClaw: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
@@ -932,6 +934,7 @@ describe('useAppState', () => {
       .mockRejectedValueOnce(new Error('migration failed'));
     const api = {
       setCodexResourceSharing,
+      reloadRenderer: vi.fn().mockResolvedValue(undefined),
       getDaemonStatus,
       setDaemonEnabled: vi.fn().mockRejectedValue(new Error('cannot stop daemon')),
       listBackendSkills: vi.fn().mockRejectedValue('skills unavailable'),
@@ -944,7 +947,8 @@ describe('useAppState', () => {
     state.snapshot.value = initialSnapshot;
 
     await state.setCodexResourceSharing({ enabled: true });
-    expect(state.backendRestartInProgress.value).toBe(false);
+    expect(api.reloadRenderer).toHaveBeenCalledOnce();
+    expect(state.backendRestartInProgress.value).toBe(true);
     await expect(state.setCodexResourceSharing({ enabled: true })).rejects.toThrow('migration failed');
     expect(state.backendRestartInProgress.value).toBe(false);
 

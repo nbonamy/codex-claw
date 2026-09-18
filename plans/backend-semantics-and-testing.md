@@ -1,8 +1,10 @@
 # Backend semantics and testing
 
-Status: full semantic remediation implemented; 2,306 workspace tests plus 6
-script tests and all lint/typecheck gates pass. Existing coverage deficits remain.
-The broader testing inventory has not started.
+Status: full semantic remediation and the three-boundary test redesign are
+implemented. All 2,326 workspace tests plus 6 script tests pass, as do lint,
+typechecks and affected workspace builds. Existing repository-wide coverage
+deficits remain; this is not a fully green release gate. Debt is itemized below,
+not waived or hidden.
 
 The independent Codex review found five gaps after the initial handoff. Their
 fixes and targeted regressions are recorded in the audit's **Independent review
@@ -39,6 +41,129 @@ Test Claw's translations and behavior, not either SDK's implementation.
 Preserve provider-owned conversation rendering and state; this work must not
 introduce a replacement Claw transcript reducer.
 
+## Testing work ledger (2026-09-16)
+
+The inventory below groups the exhaustive method/event inventory in
+`backend-semantics-audit.md` by its actual owner. “Keep” does not claim exhaustive
+coverage. The recorded assertions are the evidence for the named scenario only.
+SDK columns are not applicable to provider-independent Git, filesystem, host,
+persistence and integration services: their own external boundary is the owner.
+
+| Domain | Owning tests and observable evidence | Disposition |
+| --- | --- | --- |
+| Provider prompts, settings and lifecycle | Codex `sdk-boundary-lifecycle`, `-controls`, `-sessions`: accepted/rejected sends, settings, attachments, archival order and rollback. Claude `sdk-boundary` joins the real transport, driver and server; `agent-sdk-transport` covers repeated turns, configuration changes, interruption and workspace isolation. | Rewritten Codex boundary; joined Claude boundary. Keep Claude translation unit tests because Claw owns that translation. |
+| Plans and execution progress | Both SDK suites reach durable server review state and send acceptance back through the SDK. Codex duplicate/stale proposals cannot re-emit readiness. `agent-plan-review-service` covers cancellation, revision, retry, replacement during acceptance and persisted review round-trip. Mounted `App.backend-boundary` proves execution panel updates/clearing, review visibility, footer dismissal, cancel, failed acceptance and external resolution. App-state boundary covers background arrival, navigation and revision. | Added composition tests; retained focused lifecycle tests. Generic SDK plan reduction is not retested. |
+| Approvals/questions | `agent-request-registry`: scope, collision, retry, stale replacement and lifecycle validation. Codex SDK tests use colliding approval/question ID `0`. Claude SDK tests route decisions and cancelled/pre-aborted permissions into backend state. App-state boundary tests identical IDs across navigation and failed response; mounted app observes approval cancellation. | Added joined lifecycle tests. Found/fixed missing Claude cancellation propagation. SDK-owned question widget permutations remain SDK tests. |
+| Prompt queue/admission | `server-conversation-requests`: competing completion/idle events must send exactly once; acceptance/rejection/retry. App-state queue tests retain submission/agent ownership; mounted app proves queued row appearance/removal. Removing the in-flight lock makes the retained test fail. | Keep race coverage; add real composed visibility test. |
+| Capabilities/catalogs | `driver-capability-boundary` enumerates 18 unsupported operations, empty catalogs, archive support and unadvertised permission modes. Codex SDK controls check fresh catalogs, nested cloning and failures. Existing app-state catalogs check invalidation/selection/errors; mounted app receives changing advertised capabilities without changing provider. | New boundary coverage, no artificial parity. Claude goals, fast tier and archive are unsupported. |
+| Goals/usage/limits | Codex SDK projections check active/completed/cleared goals, action/event ownership, supplied context usage and account limits. Common optional-operation tests reject unsupported goals. Claude SDK transport measures live/persisted context without sending a prompt. Core policy/reducer tests own arithmetic and validation. | Rewritten provider mapping; retain pure algorithms. SDK token calculation is out of scope. |
+| Provider conversation frames/history | Codex SDK suites check independent opaque revisions, paging/cache/error, TTL, cold settings, turn operations and late events. App-state replica recovery tests subscribe-before-load, gaps and stale selection. Claude history/stream translation tests belong to Claw. | Remove Codex SDK reducer/optimistic-row assertions; keep transport integrity and recovery. |
+| Subagents/delegation | Codex `sdk-boundary-subagents`: owner routing, activity, live-vs-cold history, release and delayed identity after replacement. Existing delegated-report lifecycle/core tree tests own cross-agent coordination. | Migrated SDK inputs; retained Claw algorithms. Claude provider subagent stream projection is not an advertised equivalent. |
+| Agents/teams/client navigation | `server-client-isolation-regressions`: concurrent clients cannot overwrite each other's selected agent or replay remote pending requests. App-state lifecycle tests retain stale-navigation cases. | Keep; included in focused integration command and normal glob-based CI. |
+| Persistence/recovery | `state-persistence`: coalesced writes, no credentials/transcripts, invalid metadata and remote-pointer repair. Server session tests roll back failed persistence; review service persists/restores pending workflow. | Keep real serialization and failure assertions, not SDK storage tests. |
+| Git/worktrees | Temporary Git repositories exercise actual commands and worktree safety. `server-git-workflow-requests` checks query/no presentation side effect, draft generation without conversation prompt, existing PR/push ordering and diff failure. `use-workspace-previews` rejects stale success/failure updates. | Keep; corrected obsolete test titles. SDK columns N/A. |
+| Files/repository acquisition | Filesystem path/sandbox tests; `server-source-workspace-requests` proves clone/create/list/worktree operations use the selected remote host. Preview tests prevent obsolete failure from replacing a newer selection. | Keep external filesystem/host seam. SDK columns N/A. |
+| Integrations/credentials/MCP | Provider HTTP/token-store tests and hosted MCP gateway verify fresh credentials, forced refresh after 401 and stripping incoming client credentials. App-state provider failure tests do not mark failed authorizations connected. | Keep security boundary tests. SDK columns N/A except adapter configuration injection. |
+| Authentication/remote control | Codex SDK controls cover browser/device login, cancellation identity, logout/error and policy/pairing timestamps/client revocation. Remote auth RPC tests reject unknown host rather than authenticating locally; settings tests retain URL/code/copy behavior. | Migrate SDK facade calls; keep remote routing/host UI tests. Claude SDK does not expose these Codex operations. |
+| SSH/remote routing | Remote client wire validation, malformed snapshots, owning-host prompts/actions and two-server pending-request recovery. Source-workspace tests reject local adoption of remote metadata. | Keep real protocol and location-isolation tests; do not duplicate these in provider fakes. |
+| Automations/scheduling | Runner tests select/deduplicate work, handle no work and worktree failure; scheduler tests prevent concurrent runs and release execution state after failures. Remote routing and app-state CRUD remain covered separately. | Keep scheduler/runner external dependencies as fakes; provider SDK columns N/A. |
+| Work assignments/PR monitoring | Assignment state transitions, PR head verification and app-state dispatch/removal tests remain. Core `work-item-prompts` owns optional fields, deterministic IDs/instructions and truncation. | Delete two duplicate Vue pure-format tests; retain actual assignment-to-backend calls. |
+| Host effects/native adapters | Security/preload/wire/lifecycle, browser/computer-use validation and speech policy tests remain at native-process boundary. Host coverage is deficient; see explicit debt below. | Keep; do not claim host coverage is complete because backend tests pass. SDK columns N/A. |
+| Debug/diagnostic support | `server-protocol-lifecycle` injects the normal domain pipeline. Mounted execution/review tests and existing debug panel tests prove separate presentation. | Keep behavior assertions, update misleading legacy title. |
+
+### Implementation checkpoints
+
+- [x] Add scripted typed SDK-surface fixture; no SDK reducer or fake app-server.
+- [x] Extract existing Claude SDK query fixture mechanically, verify byte equality,
+  then give each query its own output queue and indexed event delivery.
+- [x] Add typed unified backend fixture reusing the existing app test client.
+- [x] Join both provider SDK boundaries to the real backend plan-review state.
+- [x] Join backend review events to mounted app, decision command, failure/retry,
+  duplicate delivery and resolution from another client.
+- [x] Complete migrations and replacement/deletion ledger.
+- [x] Complete identified boundary scenarios and fault checks.
+- [x] Update durable test guidance and normal gate entry points.
+- [x] Run full tests, lint/typecheck, coverage and affected workspace builds; record outstanding debt
+  without weakening thresholds or hiding sources.
+
+### Replacement/deletion ledger
+
+The old Codex adapter suite (47 cases, 2,287 lines) used a fake app-server
+underneath a real SDK. Its useful Claw assertions moved to the public SDK seam;
+the old driver suite (15 cases) mocked Claw's own adapter. Both files are removed.
+This is not a claim that all 62 cases were useless.
+
+| Removed scenario group | Replacement / reason |
+| --- | --- |
+| Generation and isolated runtime ownership | SDK controls assert folder/defaults and no conversation creation; projections assert injected host closure exactly once. |
+| Login, device login/cancel and remote-control mapping | SDK controls: exact facade operations, targeted cancellation, errors, pairing/client/policy metadata. |
+| Public create/resume/archive/close lifecycle and archived rollback | SDK lifecycle and sessions: ordering, load/archive failures, original session retention, orphan reconciliation and attached restoration. |
+| User thread source, workspace-free chat and generated titles | SDK lifecycle/settings creation assertions; sessions test absent cwd, cold restore and title notifications. |
+| Session compression/replacement | SDK sessions: handoff isolation/defaults, acceptance-before-archive and failed replacement rollback. Command routing remains in `codex-command`. |
+| Simultaneous semantic events, full snapshots, history pages, retry metadata and remote messages | SDK events forward opaque frames with independent revisions; lifecycle/sessions preserve cache, TTL, paging and errors. Removed detailed SDK-native item reduction, exact optimistic user row generation and app-server pagination permutations: SDK-owned. |
+| Tool/plan mutations and completed plan distinction | SDK events assert opaque forwarding and real server readiness; mounted application proves separate execution/review surfaces. No Claw Codex transcript reducer. |
+| Subagent tree events, live history and cold completion | SDK subagents: routing, last-message cold reads, provider summaries, identity refresh and release/stale isolation. |
+| Approval routing, cwd skills and null skill fields | SDK events collide approval/question IDs across two owners; projections retain defensive wire decoding and nullable-field normalization. |
+| Prompt settings, attachments, model catalog/Astra, approval presets/capabilities, fast tier | SDK controls/lifecycle/sessions/projections preserve exact handle selection and settings; no hardcoded catalog filtering. |
+| Immediate turn ID, orphan history, active goals and async questions | SDK lifecycle/projections retain returned turn ID, orphan interrupt policy and status distinctions. SDK reconciliation internals are deliberately not recreated. |
+| Editing/retry/delete/fork/stable fork turn ID | SDK controls target real adapter operations at scripted handle; opaque snapshots/events remain provider-owned. |
+| Slash review materialization and compact routing | SDK controls and existing command parser tests retain Claw routing. Deleted exact SDK-generated review prompt text/optimistic row assertions. |
+| Driver pass-through title failure/history/catalog/lifecycle/goals | Real driver now participates in all six SDK suites; title error/retry, capabilities, history paging, goal set/clear and generation are tested against the SDK rather than a mocked Claw adapter. |
+| Two Vue work-item prompt formatting cases | Removed duplicated pure-function tests; `core/src/__tests__/work-item-prompts.spec.ts` owns optional fields, truncation and assignment instructions. Vue still verifies assignment dispatch, removal and failed operations. |
+
+Other suites are retained for their distinct purpose, not presumed redundant
+because they share fixtures or exercise the same method. In particular the
+Claude transcript translator, protocol decoder, persistence, filesystem/Git,
+credential security and race tests belong to Claw.
+
+### Fault sensitivity and defects found
+
+Four temporary mutations were applied one at a time, tested, then restored:
+
+| Deliberate fault | Test that failed |
+| --- | --- |
+| Drop server plan-ready translation | Codex SDK completed-plan → durable review test |
+| Remove advertised permission-mode validation | Unified driver capability test |
+| Remove queued-prompt in-flight guard | Existing server queue-drain race test; observed two sends rather than one |
+| Drop agent identity when responding to SDK input | Colliding approval/question identity tests |
+
+No fault flags or mutation machinery remain in production. Joined tests also
+exposed two genuine defects and were observed red before fixing them:
+
+- Replayed Codex proposals emitted duplicate `plan.readyForReview` events even
+  though snapshot reduction was idempotent. The server now suppresses duplicate
+  and obsolete-conversation proposals before publication.
+- SDK-cancelled Claude permissions stayed pending in Claw until turn completion.
+  The internal transport now notifies the conversation host; it resolves the
+  app-owned request, clears waiting status when no other input is pending, and
+  handles already-aborted signals. Completion cannot resolve the same request
+  a second time.
+
+### Remaining coverage debt (not a waived gate)
+
+The previous committed baseline already failed coverage in core, backend, Vue
+and Electron. Removing the blanket Claude exclusion makes the backend report
+honest for both providers. No threshold was reduced and no source was excluded
+to make this work pass. The three-boundary redesign is not a claim of exhaustive
+branch coverage across all desktop/native services.
+
+Concrete follow-up work, separate from SDK-owned behavior:
+
+1. **Core:** reach the configured 90% statement gate; prioritize snapshot
+   validation/recovery and malformed contract inputs, not duplicate happy paths.
+2. **Backend:** close branch deficits in driver RPC, Git workflows, integration
+   refresh/error handling, daemon lifecycle and SSH operations using their real
+   owning seams. Include both providers in every future report.
+3. **Application:** close app-state failure/recovery and capability branches;
+   exercise user-visible outcomes through backend inputs, not private helpers.
+4. **Electron:** prioritize `app-controller`, `backend-client`, `main-window`
+   and logging failure/lifecycle branches. Fake the OS/process boundary and test
+   actual controller behavior; provider SDK fakes cannot prove this surface.
+
+These items remain open until the coverage command passes unchanged thresholds.
+Do not advertise a fully green release gate or commit this work while a required
+gate is unresolved without an explicit scope decision.
+
 ## Phase A — complete the audit before implementation
 
 ### A1. Inventory every backend subdomain and contract
@@ -68,20 +193,20 @@ Proceed to fix these before undertaking the broad integration-test inventory.
 
 Begin this phase after the semantic fixes, using the corrected backend contract.
 
-- [ ] Map each behavior to Codex SDK fake → real backend, Claude Agent SDK fake → real backend, and unified backend fake → real application state/UI.
-- [ ] Record applicable capabilities and justified not-applicable cells; provider-independent backend services retain their own appropriate tests.
-- [ ] Cite actual tests and assertions; distinguish proven behavior, partial coverage, wrong-boundary coverage and missing coverage.
-- [ ] Classify existing tests as keep / rewrite / merge / delete, with a reason and replacement where needed.
-- [ ] List concrete missing scenarios per subdomain, including failures and asynchronous lifecycle behavior.
+- [x] Map behavior groups to Codex SDK fake → real backend, Claude Agent SDK fake → real backend, and unified backend fake → real application state/UI.
+- [x] Record applicable capabilities and justified not-applicable cells; provider-independent backend services retain their own appropriate tests.
+- [x] Cite actual tests and assertions; distinguish proven behavior, partial coverage, wrong-boundary coverage and missing coverage.
+- [x] Classify existing tests as keep / rewrite / merge / delete, with a reason and replacement where needed.
+- [x] List concrete missing scenarios per subdomain, including failures and asynchronous lifecycle behavior; broader numerical coverage debt remains explicit above.
 
 Done when the inventory identifies test changes across the entire backend—not
 just plan review and Git.
 
 ### Subsequent testing phase: produce the test improvement backlog
 
-- [ ] Turn coverage findings into scoped work items with source references, acceptance criteria, dependencies and test replacements/deletions.
-- [ ] Revise, expand or remove the provisional items below based on the complete audit.
-- [ ] Present the resulting test backlog for review before the broad test migration begins.
+- [x] Turn coverage findings into scoped work items with source references, acceptance criteria, dependencies and test replacements/deletions.
+- [x] Revise, expand or remove the provisional items below based on the complete audit.
+- [x] Execute under Nicolas's explicit "Do it all" authorization rather than stopping for another backlog approval.
 
 Gate: identify the semantic defects first, then fix them with focused regression
 coverage. Do not block semantic fixes on a full test inventory. Broad test
@@ -133,12 +258,12 @@ success, empty and error results.
 
 ## 5. Build the three test fixtures at the correct boundaries
 
-- [ ] Typed Codex SDK fake driving the real Claw Codex adapter/backend.
-- [ ] Typed Claude Agent SDK fake driving the real transport/driver/backend.
-- [ ] Unified backend fake driving real application state and representative mounted UI.
-- [ ] Controllable event delivery, deferred operations, errors and capability sets.
-- [ ] Reuse current fixtures where possible; avoid a generic simulation framework.
-- [ ] Share provider-independent backend expectations where useful, with provider-specific input scripts.
+- [x] Typed Codex SDK fake driving the real Claw Codex adapter/backend.
+- [x] Typed Claude Agent SDK fake driving the real transport/driver/backend.
+- [x] Unified backend fake driving real application state and representative mounted UI.
+- [x] Controllable event delivery, deferred operations, errors and capability sets.
+- [x] Reuse current fixtures where possible; avoid a generic simulation framework.
+- [x] Share provider-independent backend expectations where useful, with provider-specific input scripts.
 
 Done when both adapter suites can prove the same advertised backend behavior;
 application scenarios run without selecting a provider name.
@@ -147,50 +272,50 @@ application scenarios run without selecting a provider name.
 
 At both SDK adapter boundaries:
 
-- [ ] Proposed plan becomes exactly one review-ready workflow.
-- [ ] Execution progress does not create a review.
-- [ ] Review decision reaches the correct SDK operation.
-- [ ] Cover duplicate events, stale sessions, failure and restored pending review.
+- [x] Proposed plan becomes exactly one review-ready workflow.
+- [x] Execution progress does not create a review.
+- [x] Review decision reaches the correct SDK operation.
+- [x] Cover duplicate events, stale sessions, failure and restored pending review.
 
 At the application boundary:
 
-- [ ] Backend event/snapshot produces a visible review with correct content.
-- [ ] Implement/revise/cancel performs the agreed command and state transition.
-- [ ] Verify footer dismissal and failure behavior.
-- [ ] Cover inactive-agent arrival, switching, reconnect and no reopening resolved reviews.
-- [ ] Execution progress appears, updates and clears separately.
+- [x] Backend event/snapshot produces a visible review with correct content.
+- [x] Implement/revise/cancel performs the agreed command and state transition.
+- [x] Verify footer dismissal and failure behavior.
+- [x] Cover inactive-agent arrival, switching, snapshot restoration and no reopening resolved reviews; retain general reconnect/sequence recovery tests.
+- [x] Execution progress appears, updates and clears separately.
 
 Done when deliberately breaking event translation, app-state handling or review
 presentation makes an appropriate integration test fail.
 
 ## 7. Cover approvals and questions through each boundary
 
-- [ ] SDK request → unified pending request → backend decision → correct SDK response.
-- [ ] Test identity, blocking/nonblocking behavior, cancellation, failure and duplicate resolution.
-- [ ] Application shows requests based on capabilities and backend state.
-- [ ] Verify response routing and visible resolution with representative mounted tests.
+- [x] SDK request → unified pending request → backend decision → correct SDK response.
+- [x] Test identity, blocking/nonblocking behavior, cancellation, failure and duplicate resolution.
+- [x] Application consumes backend capabilities and pending state; generic Codex widget behavior stays SDK-owned.
+- [x] Verify response routing and visible resolution with representative mounted tests.
 
 Done when neither backend nor UI can silently lose a request or answer the wrong
 agent/session.
 
 ## 8. Cover prompt lifecycle, queues and races
 
-- [ ] Submission acceptance/rejection, streaming/completion/error/interruption.
-- [ ] Completion and idle events in competing orders.
-- [ ] Exactly-once queue draining, retry after failure and stale-session isolation.
-- [ ] Application queued-row visibility/removal and agent switching.
+- [x] Submission acceptance/rejection, streaming/completion/error/interruption.
+- [x] Completion and idle events in competing orders.
+- [x] Exactly-once queue draining, retry after failure and stale-session isolation.
+- [x] Application queued-row visibility/removal and agent switching.
 
 Done when SDK-boundary sequences cannot trigger duplicate sends, stuck working
 state or disappearing queued prompts. Retain useful existing race tests.
 
 ## 9. Cover capabilities, settings and session lifecycle
 
-- [ ] Supported/unsupported operations are capability-driven.
-- [ ] Model, effort, speed, permission and plan settings reach the adapter correctly.
-- [ ] Create/restart/resume/archive/close preserve the correct references.
-- [ ] Recovery, history hydration, late results and concurrent-agent isolation.
-- [ ] Application reacts correctly to capability changes and failed operations.
-- [ ] No artificial feature parity where a provider does not advertise support.
+- [x] Supported/unsupported operations are capability-driven.
+- [x] Model, effort, speed, permission and plan settings reach the adapter correctly.
+- [x] Create/restart/resume/archive/close preserve the correct references.
+- [x] Recovery, history hydration, late results and concurrent-agent isolation.
+- [x] Application reacts correctly to capability changes and failed operations.
+- [x] No artificial feature parity where a provider does not advertise support.
 
 Done when the shared contract holds for every advertised capability, and
 unsupported behavior is explicit.
@@ -201,11 +326,11 @@ This is a seed list, not a residual bucket or an exhaustive list. The semantic
 review must discover any additional subdomains; the subsequent testing phase
 must assess their coverage against the corrected contract.
 
-- [ ] Map Git mutations/status, file activity, goals/usage, subagent coordination, authentication, remote routing, automations and assignments to their owning boundary and tests.
-- [ ] Reuse existing coverage where it proves the behavior.
-- [ ] Add concrete missing scenarios, especially async failure and routing.
-- [ ] Do not force provider-independent backend services into SDK adapter tests.
-- [ ] Explicitly mark unsupported/not-applicable cells.
+- [x] Map Git mutations/status, file activity, goals/usage, subagent coordination, authentication, remote routing, automations and assignments to their owning boundary and tests.
+- [x] Reuse existing coverage where it proves the behavior.
+- [x] Add identified boundary gaps, especially async failure and routing; record remaining coverage debt separately.
+- [x] Do not force provider-independent backend services into SDK adapter tests.
+- [x] Explicitly mark unsupported/not-applicable cells.
 
 Done when every inventoried behavior has a test reference, a justified lower-level
 test, or a concrete remaining work item. No blanket coverage claims based on
@@ -213,8 +338,8 @@ file names or test counts.
 
 ## 11. Replace and prune low-value tests alongside each migration
 
-- [ ] Classify existing tests as keep / rewrite at correct seam / merge / delete.
-- [ ] Record each removed test's replacement scenario, or why it tests behavior Claw does not own.
+- [x] Classify existing tests as keep / rewrite at correct seam / merge / delete.
+- [x] Record removed scenario groups and replacement suites, or why Claw does not own the assertion.
 
 Primary candidates:
 
@@ -240,10 +365,10 @@ assertions. Preserve those assertions, not their unnecessary plumbing.
 
 ## 12. Make the strategy durable
 
-- [ ] Update existing architecture/protocol/testing docs with ownership rules.
-- [ ] Put the three boundary suites in normal CI gates.
-- [ ] Check representative intentional faults fail tests: dropped plan event, missing capability guard, duplicate queue send, incorrect request identity.
-- [ ] Run affected suites and full project gates at the end.
+- [x] Update existing testing/Codex ownership docs; the prior semantic migration already updated architecture/protocol docs.
+- [x] Put the three boundary suites in normal CI gates.
+- [x] Check representative intentional faults fail tests: dropped plan event, missing capability guard, duplicate queue send, incorrect request identity.
+- [x] Run affected suites and full project gates at the end; coverage results and unresolved deficits are recorded below.
 
 Done when the strategy is executable and enforced, not just prose.
 
@@ -292,3 +417,70 @@ working and design patterns after execution is complete.
 
 The goal is a suite that fails when Claw's responsibilities break, and does not
 require maintenance when an SDK changes internally.
+
+## Verification results — 2026-09-16
+
+- `npm run test:ai`: core 285, backend 724, Vue 984, Electron 303, web 30;
+  all pass, plus all 6 script tests. Final small fixture/type corrections were
+  rerun with focused suites.
+- `npm run test:integration`: both SDK boundaries, optional capabilities,
+  server queue/client isolation and backend-to-application suites pass.
+- `npm run lint`: all workspace typechecks, CSS checks and Knip pass.
+- Core/backend/Vue workspace builds pass. No signed desktop packaging was
+  attempted for this test redesign and its two backend lifecycle fixes.
+- `git diff --check`: pass. No generated artifacts or changelog edits.
+- `npm run test:coverage`: all tests pass; existing threshold failures remain:
+
+| Workspace | Statements | Branches | Functions | Lines | Gate |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Core | 88.96% | 85.30% | 88.40% | 90.85% | Statement threshold is 90% |
+| Backend, now including Claude | 84.46% | 73.87% | 89.19% | 86.36% | Statements/branches below 85% |
+| Vue | 88.45% | 79.85% | 89.85% | 90.92% | Statements below 90%, branches below 85% |
+| Electron | 68.26% | 67.45% | 62.46% | 70.72% | All metrics below 85% |
+| Web | 96.18% | 88.88% | 94.02% | 97.39% | Pass |
+
+### Independent review follow-up — complete UI boundary
+
+The review accepted the SDK boundaries but found three gaps in the application
+tests. All three are corrected:
+
+- The shared desktop client now supplies every `CodexClawApi` method, checked
+  against the required interface without casting a partial object. Normal tests
+  use production `getSnapshotState`, connection state, sequence watermarks and
+  disposable subscriptions. Per-test overrides merge into that complete fake;
+  missing-method compatibility scenarios use an explicitly named legacy helper.
+  Consequential operations require scripting. No backend reducer was added.
+- The background-plan test asserts the exact owner-scoped review immediately
+  after the event, before any navigation response can repair missing state.
+- The mounted capability test opens the real composer menu, verifies disabled
+  and enabled controls, selects plan mode and checks the submitted IPC options.
+  It no longer treats forwarded component props as proof of UI enforcement.
+
+Validation: all 2,329 workspace tests and 6 script tests pass (Vue: 987).
+Full lint, workspace typechecks, CSS checks, Knip and `git diff --check` pass.
+Temporary faults that discarded background reviews and hardcoded attachments
+enabled each failed their intended assertion; both mutations were restored.
+The fixture tests also cover startup sequencing, stale-event rejection,
+connection state, daemon initialization, instance isolation and disposal.
+Older tests now await authentication initialization and script consistent
+catalog/navigation responses instead of silently skipping missing methods.
+
+Refreshed Vue coverage: statements 88.39%, branches 79.76%, functions 89.88%,
+lines 90.86%. The existing statement/branch coverage gate remains red; thresholds
+and exclusions were not relaxed. This closes the three review findings, not the
+separately recorded repository-wide coverage debt.
+
+### Learnings
+
+- A green reducer test does not prove the producer emits a semantic event once.
+  Join the SDK boundary to the real server and assert event count as well as state.
+- Testing SDK permission cancellation only at the transport hid a stale request
+  in Claw. Test the observable backend state before the turn ends.
+- Scripted fakes supply events/results; they must not reproduce provider reducers.
+  Each concurrent SDK query needs its own stream, or the test harness itself
+  destroys the isolation it is supposed to test.
+- Keep focused algorithms/security/race tests when they protect distinct behavior.
+  Replace the wrong boundary, not every small test. Fault probes validate that
+  retained tests are actually sensitive to the regression.
+- Coverage must include every supported provider. Reporting numerical debt
+  separately is more useful than hiding a provider or transplanting SDK tests.

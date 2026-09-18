@@ -1,0 +1,212 @@
+import { vi, type Mock } from 'vitest';
+import type { AppSnapshot, CodexClawApi, RendererSnapshotState } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+
+type Api = Required<CodexClawApi>;
+type ApiMocks = { [K in keyof Api]: Mock<Api[K]> };
+
+function unscripted<K extends keyof Api>(method: K): Mock<Api[K]> {
+  return vi.fn<Api[K]>(() => { throw new Error(`Script the UI client method '${method}' before invoking it.`); });
+}
+function channel<T>() {
+  const listeners = new Set<(value: T) => void>();
+  return {
+    subscribe(listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    emit(value: T) { for (const listener of listeners) listener(value); },
+    clear() { listeners.clear(); },
+  };
+}
+
+/** Full external client seam. Responses are scripted; no backend policy or reducer. */
+export function createClientApiMock(
+  snapshot: AppSnapshot = createInitialSnapshot(),
+  state: Pick<RendererSnapshotState, 'lastBackendEventSeq' | 'connection'> = { lastBackendEventSeq: 0, connection: { status: 'connected' } },
+) {
+  const events = channel<Parameters<Parameters<Api['onEvent']>[0]>[0]>();
+  const commands = channel<Parameters<Parameters<Api['onAppCommand']>[0]>[0]>();
+  const updates = channel<Parameters<Parameters<Api['onUpdateStatusChanged']>[0]>[0]>();
+  // Enumerating the public interface makes new required AND optional methods a type error here.
+  const api = {
+    respondToPlanReview: unscripted('respondToPlanReview'),
+    getSnapshot: unscripted('getSnapshot'),
+    getSnapshotState: unscripted('getSnapshotState'),
+    listSshHosts: unscripted('listSshHosts'),
+    addSshConnection: unscripted('addSshConnection'),
+    checkRemoteConnection: unscripted('checkRemoteConnection'),
+    updateRemoteConnection: unscripted('updateRemoteConnection'),
+    removeRemoteConnection: unscripted('removeRemoteConnection'),
+    getRemoteControlStatus: unscripted('getRemoteControlStatus'),
+    enableRemoteControl: unscripted('enableRemoteControl'),
+    disableRemoteControl: unscripted('disableRemoteControl'),
+    startDevicePairing: unscripted('startDevicePairing'),
+    checkDevicePairing: unscripted('checkDevicePairing'),
+    listPairedDevices: unscripted('listPairedDevices'),
+    revokePairedDevice: unscripted('revokePairedDevice'),
+    connectWorkProvider: unscripted('connectWorkProvider'),
+    pollWorkProviderAuthorization: unscripted('pollWorkProviderAuthorization'),
+    disconnectWorkProvider: unscripted('disconnectWorkProvider'),
+    listWorkRepositories: unscripted('listWorkRepositories'),
+    configureWorkBacklog: unscripted('configureWorkBacklog'),
+    listGlobalWorkItems: unscripted('listGlobalWorkItems'),
+    listAssignedWorkItems: unscripted('listAssignedWorkItems'),
+    listWorkItems: unscripted('listWorkItems'),
+    listBackendModels: unscripted('listBackendModels'),
+    listBackendPlugins: unscripted('listBackendPlugins'),
+    listBackendSkills: unscripted('listBackendSkills'),
+    listAgentFiles: unscripted('listAgentFiles'),
+    previewAgentFile: unscripted('previewAgentFile'),
+    getAgentGitDiff: unscripted('getAgentGitDiff'),
+    getAgentGitWorkflow: unscripted('getAgentGitWorkflow'),
+    generateAgentGitMessage: unscripted('generateAgentGitMessage'),
+    stageAgentGitFiles: unscripted('stageAgentGitFiles'),
+    commitAgentGitChanges: unscripted('commitAgentGitChanges'),
+    pushAgentGitBranch: unscripted('pushAgentGitBranch'),
+    createAgentGitBranch: unscripted('createAgentGitBranch'),
+    createAgentGitPullRequest: unscripted('createAgentGitPullRequest'),
+    mergeAgentGitBranch: unscripted('mergeAgentGitBranch'),
+    getOpenInApplications: unscripted('getOpenInApplications'),
+    openAgentPath: unscripted('openAgentPath'),
+    chooseAgentFolder: unscripted('chooseAgentFolder'),
+    chooseCodexBinary: unscripted('chooseCodexBinary'),
+    chooseSourceFolder: unscripted('chooseSourceFolder'),
+    listSourceFolders: unscripted('listSourceFolders'),
+    listSourceRepositories: unscripted('listSourceRepositories'),
+    cloneSourceRepository: unscripted('cloneSourceRepository'),
+    createSourceRepository: unscripted('createSourceRepository'),
+    listSourceBranches: unscripted('listSourceBranches'),
+    listSourceWorktrees: unscripted('listSourceWorktrees'),
+    suggestSourceWorktreePath: unscripted('suggestSourceWorktreePath'),
+    chooseSourceWorktreeDestination: unscripted('chooseSourceWorktreeDestination'),
+    createSourceWorktree: unscripted('createSourceWorktree'),
+    createTeam: unscripted('createTeam'),
+    updateTeam: unscripted('updateTeam'),
+    reorderTeams: unscripted('reorderTeams'),
+    closeTeam: unscripted('closeTeam'),
+    disconnectTeam: unscripted('disconnectTeam'),
+    selectTeam: unscripted('selectTeam'),
+    getAutomationSnapshot: unscripted('getAutomationSnapshot'),
+    createAutomation: unscripted('createAutomation'),
+    updateAutomation: unscripted('updateAutomation'),
+    runAutomation: unscripted('runAutomation'),
+    clearAutomationHistory: unscripted('clearAutomationHistory'),
+    deleteAutomationExecution: unscripted('deleteAutomationExecution'),
+    deleteAutomation: unscripted('deleteAutomation'),
+    listAgentConversations: unscripted('listAgentConversations'),
+    resumeAgentConversation: unscripted('resumeAgentConversation'),
+    readConversationMessages: unscripted('readConversationMessages'),
+    createAgent: unscripted('createAgent'),
+    createQuickChat: unscripted('createQuickChat'),
+    updateAgent: unscripted('updateAgent'),
+    assignWorkItemToAgent: unscripted('assignWorkItemToAgent'),
+    removeWorkItemAssignment: unscripted('removeWorkItemAssignment'),
+    duplicateAgent: unscripted('duplicateAgent'),
+    forkAgent: unscripted('forkAgent'),
+    moveAgentToTeam: unscripted('moveAgentToTeam'),
+    reorderAgents: unscripted('reorderAgents'),
+    reorderRepositories: unscripted('reorderRepositories'),
+    restartAgent: unscripted('restartAgent'),
+    compressAgentSession: unscripted('compressAgentSession'),
+    loadConversationHistory: unscripted('loadConversationHistory'),
+    loadOlderAgentHistory: unscripted('loadOlderAgentHistory'),
+    closeAgent: unscripted('closeAgent'),
+    selectAgent: unscripted('selectAgent'),
+    updateSettings: unscripted('updateSettings'),
+    readEngineInstructions: unscripted('readEngineInstructions'),
+    saveEngineInstructions: unscripted('saveEngineInstructions'),
+    previewSpokenAnnouncementVoice: unscripted('previewSpokenAnnouncementVoice'),
+    getCodexResourceSharingStatus: unscripted('getCodexResourceSharingStatus'),
+    setCodexResourceSharing: unscripted('setCodexResourceSharing'),
+    getPluginStatus: unscripted('getPluginStatus'),
+    getCodexAuthentication: unscripted('getCodexAuthentication'),
+    cancelCodexChatGptLogin: unscripted('cancelCodexChatGptLogin'),
+    startCodexChatGptDeviceCodeLogin: unscripted('startCodexChatGptDeviceCodeLogin'),
+    startCodexChatGptLogin: unscripted('startCodexChatGptLogin'),
+    logoutCodex: unscripted('logoutCodex'),
+    getUpdateStatus: unscripted('getUpdateStatus'),
+    installUpdate: unscripted('installUpdate'),
+    setDockBadgeCount: unscripted('setDockBadgeCount'),
+    getDaemonStatus: unscripted('getDaemonStatus'),
+    setDaemonEnabled: unscripted('setDaemonEnabled'),
+    getSystemPermissions: unscripted('getSystemPermissions'),
+    openAccessibilitySettings: unscripted('openAccessibilitySettings'),
+    openScreenRecordingSettings: unscripted('openScreenRecordingSettings'),
+    launchChatGptApp: unscripted('launchChatGptApp'),
+    quit: unscripted('quit'),
+    restartApp: unscripted('restartApp'),
+    reloadRenderer: unscripted('reloadRenderer'),
+    setAgentGoal: unscripted('setAgentGoal'),
+    clearAgentGoal: unscripted('clearAgentGoal'),
+    setAgentApprovalPreset: unscripted('setAgentApprovalPreset'),
+    setAgentPermissionMode: unscripted('setAgentPermissionMode'),
+    sendPrompt: unscripted('sendPrompt'),
+    steerPrompt: unscripted('steerPrompt'),
+    deleteQueuedPrompt: unscripted('deleteQueuedPrompt'),
+    steerQueuedPrompt: unscripted('steerQueuedPrompt'),
+    updateQueuedPrompt: unscripted('updateQueuedPrompt'),
+    interruptAgent: unscripted('interruptAgent'),
+    deleteTurn: unscripted('deleteTurn'),
+    editTurn: unscripted('editTurn'),
+    retryTurn: unscripted('retryTurn'),
+    browserOpen: unscripted('browserOpen'),
+    browserOpenVisualization: unscripted('browserOpenVisualization'),
+    browserNavigate: unscripted('browserNavigate'),
+    browserGoBack: unscripted('browserGoBack'),
+    browserGoForward: unscripted('browserGoForward'),
+    browserReload: unscripted('browserReload'),
+    browserSetBounds: unscripted('browserSetBounds'),
+    browserSetVisible: unscripted('browserSetVisible'),
+    browserSetAnnotationMode: unscripted('browserSetAnnotationMode'),
+    browserResolveAnnotation: unscripted('browserResolveAnnotation'),
+    browserClearAnnotations: unscripted('browserClearAnnotations'),
+    browserClose: unscripted('browserClose'),
+    respondToClientRequest: unscripted('respondToClientRequest'),
+    onEvent: unscripted('onEvent'),
+    onAppCommand: unscripted('onAppCommand'),
+    onUpdateStatusChanged: unscripted('onUpdateStatusChanged'),
+  } satisfies ApiMocks;
+
+  api.getSnapshot.mockImplementation(async () => structuredClone(snapshot));
+  api.getSnapshotState.mockImplementation(async () => ({ ...structuredClone(state), snapshot: await api.getSnapshot() }));
+  api.loadConversationHistory.mockImplementation(async () => api.getSnapshot());
+  api.getAutomationSnapshot.mockImplementation(async () => api.getSnapshot());
+  api.onEvent.mockImplementation(events.subscribe);
+  api.onAppCommand.mockImplementation(commands.subscribe);
+  api.onUpdateStatusChanged.mockImplementation(updates.subscribe);
+
+  // Harmless reads have explicit values; writes and consequential operations must be scripted.
+  api.listSshHosts.mockResolvedValue([]);
+  api.listPairedDevices.mockResolvedValue([]);
+  api.listWorkRepositories.mockResolvedValue([]);
+  api.listWorkItems.mockResolvedValue([]);
+  api.listAssignedWorkItems.mockResolvedValue([]);
+  api.listGlobalWorkItems.mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 });
+  api.listBackendModels.mockResolvedValue([]);
+  api.listBackendPlugins.mockResolvedValue([]);
+  api.listBackendSkills.mockResolvedValue([]);
+  api.listAgentFiles.mockResolvedValue([]);
+  api.listSourceRepositories.mockResolvedValue([]);
+  api.listSourceBranches.mockResolvedValue([]);
+  api.listSourceWorktrees.mockResolvedValue([]);
+  api.listAgentConversations.mockResolvedValue([]);
+  api.readConversationMessages.mockResolvedValue([]);
+  api.getRemoteControlStatus.mockResolvedValue({ status: 'disabled' });
+  api.getDaemonStatus.mockResolvedValue({ supported: true, installed: false, running: false, socketPath: '/test/clawd.sock' });
+  api.getPluginStatus.mockResolvedValue({ chromeEnabled: false });
+  api.getCodexResourceSharingStatus.mockResolvedValue({ enabled: false, migrationRequired: false });
+  api.getCodexAuthentication.mockResolvedValue({ account: null, requiresOpenaiAuth: false, login: { status: 'idle', error: null } });
+  api.getSystemPermissions.mockResolvedValue({ platform: 'darwin', accessibility: { required: true, trusted: true }, screenRecording: { required: true, trusted: true } });
+  api.getUpdateStatus.mockResolvedValue({ state: 'idle' });
+  api.getOpenInApplications.mockResolvedValue({ defaultApplication: 'vscode', applications: [] });
+  // Routine host presentation notifications are observable no-ops, not backend mutations.
+  api.setDockBadgeCount.mockResolvedValue(undefined);
+  api.browserSetVisible.mockResolvedValue(undefined);
+  api.browserSetBounds.mockResolvedValue(undefined);
+
+  return {
+    api,
+    emit: events.emit,
+    emitAppCommand: commands.emit,
+    emitUpdateStatus: updates.emit,
+    dispose() { events.clear(); commands.clear(); updates.clear(); },
+  };
+}

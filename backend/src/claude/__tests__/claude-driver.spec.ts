@@ -66,7 +66,7 @@ describe('ClaudeBackendDriver', () => {
       model: 'claude-sonnet-4-5',
       permissionMode: 'acceptEdits',
       appendSystemPrompt: expect.stringContaining('Your Codex Claw agent ID is agent-claude.'),
-    }), expect.any(Function), expect.any(Function));
+    }), expect.any(Function), expect.any(Function), expect.any(Function));
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-1' });
     await expect(sendResult).resolves.toStrictEqual({
@@ -221,7 +221,7 @@ describe('ClaudeBackendDriver', () => {
     expect(compactResult).not.toBeNull();
     expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
       prompt: '/compact keep the decisions',
-    }), expect.any(Function), expect.any(Function));
+    }), expect.any(Function), expect.any(Function), expect.any(Function));
     expect(driver.tryHandlePromptCommand(agent, '/review')).toBeNull();
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-context-session' });
@@ -325,7 +325,7 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
       model: 'haiku',
       effort: 'low',
-    }), expect.any(Function), expect.any(Function));
+    }), expect.any(Function), expect.any(Function), expect.any(Function));
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-defaults' });
     await expect(sendResult).resolves.toStrictEqual({
@@ -403,7 +403,7 @@ describe('ClaudeBackendDriver', () => {
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const started = driver.sendPrompt(agent, 'hello', { reasoningEffort: 'high' });
-    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({ effort: 'high' }), expect.any(Function), expect.any(Function));
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({ effort: 'high' }), expect.any(Function), expect.any(Function), expect.any(Function));
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-catalog' });
     await started;
     await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
@@ -873,6 +873,7 @@ describe('ClaudeBackendDriver', () => {
 
     expect(transport.startTurn).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'review this', attachments }),
+      expect.any(Function),
       expect.any(Function),
       expect.any(Function),
     );

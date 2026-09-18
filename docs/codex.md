@@ -794,17 +794,18 @@ change when the SDK is removed.
 
 ## Testing
 
-Normal tests use fake app-server transports and captured protocol fixtures.
+Normal Claw integration tests use a typed fake Codex SDK surface and real Claw
+driver/adapter/server code. The SDK repository owns app-server transport and
+conversation-reducer tests; Claw must not recreate them here.
 
 Cover:
 
 - initialization and shutdown;
-- JSON-RPC request/response matching;
-- notifications before, during, and after turns;
-- malformed messages;
-- server-initiated requests;
+- SDK events before, during, and after turns;
+- SDK failures, nullable catalog fields and stale session identities;
+- normalized approval/question routing and SDK-targeted responses;
 - interrupt and steer;
-- event adaptation into app-owned state;
+- event adaptation into app-owned state, including durable review readiness;
 - renderer reload snapshots for in-flight streams.
 
 A real app-server smoke test is useful once the first agent works, but it must

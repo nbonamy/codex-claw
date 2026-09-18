@@ -37,7 +37,7 @@ import { AgentGitWorkflowService, parseAgentGitRequest } from './git/agent-git-w
 import { AgentPromptManager } from './agents/agent-prompt-manager';
 import { AgentPlanReviewService } from './agents/agent-plan-review-service';
 import type { PlanReviewResponse } from '@codex-claw/core/plan-review';
-import { agentConversationId } from '@codex-claw/core/plan-review';
+import { agentConversationId, planReviewFromEvent } from '@codex-claw/core/plan-review';
 import { isAgentRequestResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import { AgentWorkspaceService } from './agents/agent-workspace-service';
 import { AgentConversationService } from './agents/agent-conversation-service';
@@ -2151,9 +2151,16 @@ export class ClawBackendServer {
       return;
     }
 
-    this.applyAndEmitBackendEvent({
+    const agent = this.snapshot.agents.find((candidate) => candidate.id === conversationEvent.agentId);
+    if (!agent) return;
+    const currentConversationId = agentConversationId(agent);
+    if (currentConversationId && event.conversationId && currentConversationId !== event.conversationId) return;
+    const ready: Extract<BackendPublishedEvent, { type: 'plan.readyForReview' }> = {
+      seq: event.seq,
+      occurredAt: event.occurredAt,
       agentId: conversationEvent.agentId,
       backend: event.backend,
+      ...(event.conversationId ? { conversationId: event.conversationId } : {}),
       ...(event.threadId ? { threadId: event.threadId } : {}),
       turnId: conversationEvent.turnId,
       type: 'plan.readyForReview',
@@ -2161,7 +2168,10 @@ export class ClawBackendServer {
         markdown: payload.markdown,
         ...('itemId' in payload && typeof payload.itemId === 'string' ? { itemId: payload.itemId } : {}),
       },
-    });
+    };
+    const review = planReviewFromEvent(agent, ready);
+    if (agent.planReview?.id === review.id) return;
+    this.applyAndEmitBackendEvent(ready);
   }
 
 }

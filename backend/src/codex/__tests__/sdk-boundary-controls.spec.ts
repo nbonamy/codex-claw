@@ -1,0 +1,131 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
+
+describe('Codex SDK → Claw backend controls', () => {
+  const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
+  const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
+  afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
+
+  it('refreshes the SDK model catalog without filtering new models or exposing mutable SDK arrays', async () => {
+    const { driver, surface } = setup();
+    const models = [{ id: 'new-model', model: 'new-model', displayName: 'New', description: '', defaultReasoningEffort: 'high', isDefault: true,
+      supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'Deep' }], serviceTiers: [{ id: 'fast', name: 'Fast', description: '' }], defaultServiceTier: 'fast' }];
+    surface.listModels.mockResolvedValue(models);
+    const result = await driver.listModels(sdkAgent());
+    expect(result).toStrictEqual(models);
+    expect(result[0]).not.toBe(models[0]);
+    expect(result[0]!.supportedReasoningEfforts).not.toBe(models[0]!.supportedReasoningEfforts);
+    expect(surface.listModels).toHaveBeenCalledWith({ includeHidden: false, forceReload: true });
+    surface.listModels.mockRejectedValueOnce(new Error('catalog offline'));
+    await expect(driver.listModels(sdkAgent())).rejects.toThrow('catalog offline');
+  });
+
+  it('uses conversation-specific permissions without leaking them between agents', async () => {
+    const { driver, conversation } = setup();
+    conversation('conversation-a').setSnapshot({ approvalPresets: ['ask-for-approval'] });
+    conversation('conversation-b').setSnapshot({ approvalPresets: ['full-access'] });
+    await driver.loadConversation(sdkAgent());
+    await driver.loadConversation(sdkAgent('agent-b', 'conversation-b'));
+    conversation('conversation-b').handle.updateSettings.mockClear();
+    expect(driver.getCapabilities(sdkAgent()).approvalPresets).toStrictEqual(['ask-for-approval']);
+    expect(driver.getCapabilities(sdkAgent('agent-b', 'conversation-b')).approvalPresets).toStrictEqual(['full-access']);
+    await expect(driver.setApprovalPreset(sdkAgent(), 'full-access')).resolves.toMatchObject({ approvalPreset: 'ask-for-approval' });
+    expect(conversation('conversation-a').handle.updateSettings).toHaveBeenCalledWith({ approvalPreset: 'ask-for-approval' });
+    expect(conversation('conversation-b').handle.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it('generates ephemeral drafts with defaults without creating an agent conversation', async () => {
+    const { driver, surface } = setup();
+    surface.generateText.mockResolvedValue({ text: 'feat: ship' });
+    const agent = { ...sdkAgent(), backendDefaults: { kind: 'codex' as const, model: 'model', reasoningEffort: 'high', serviceTier: 'fast' } };
+    await expect(driver.generateText(agent, { prompt: 'draft', cwd: '/repo', developerInstructions: 'Keep short', outputSchema: { type: 'object' } })).resolves.toStrictEqual({ text: 'feat: ship' });
+    expect(surface.generateText).toHaveBeenCalledWith('draft', { cwd: '/repo', developerInstructions: 'Keep short', model: 'model', reasoningEffort: 'high', serviceTier: 'fast', outputSchema: { type: 'object' } });
+    expect(surface.createConversation).not.toHaveBeenCalled();
+    expect(surface.conversation).not.toHaveBeenCalled();
+  });
+
+  it('delegates account lifecycle and device-login identity without handling credentials', async () => {
+    const { driver, surface } = setup();
+    surface.refreshAccount.mockResolvedValue(sdkSnapshot());
+    surface.cancelLogin.mockResolvedValue(sdkSnapshot());
+    surface.logout.mockResolvedValue(sdkSnapshot());
+    surface.startChatGptLogin.mockResolvedValue({ loginId: 'browser', authUrl: 'https://example.test/auth' });
+    surface.startChatGptDeviceCodeLogin.mockResolvedValue({ loginId: 'device', verificationUrl: 'https://example.test/device', userCode: 'ABCD' });
+    await expect(driver.getAuthentication()).resolves.toStrictEqual({ account: null, requiresOpenaiAuth: false, login: { status: 'idle', error: null } });
+    await expect(driver.startChatGptLogin()).resolves.toStrictEqual({ loginId: 'browser', authUrl: 'https://example.test/auth' });
+    await expect(driver.startChatGptDeviceCodeLogin()).resolves.toStrictEqual({ loginId: 'device', verificationUrl: 'https://example.test/device', userCode: 'ABCD' });
+    await driver.cancelChatGptLogin('device');
+    expect(surface.cancelLogin).toHaveBeenCalledWith('device');
+    await driver.logout();
+    expect(surface.logout).toHaveBeenCalledOnce();
+    surface.startChatGptDeviceCodeLogin.mockRejectedValueOnce(new Error('login unavailable'));
+    await expect(driver.startChatGptDeviceCodeLogin()).rejects.toThrow('login unavailable');
+  });
+
+  it('maps remote pairing timestamps and enforces provider remote-control requirements in its result', async () => {
+    const { driver, surface } = setup();
+    const status = { status: 'connected' as const, serverName: 'Claw', installationId: 'install', environmentId: 'environment' };
+    surface.readRemoteControlStatus.mockResolvedValue(status);
+    surface.readConfigRequirements.mockResolvedValue({ allowRemoteControl: false } as NonNullable<Awaited<ReturnType<typeof surface.readConfigRequirements>>>);
+    await expect(driver.getRemoteControlStatus()).resolves.toStrictEqual({ ...status, allowRemoteControl: false });
+    surface.startRemoteControlPairing.mockResolvedValue({ pairingCode: 'opaque', manualPairingCode: 'CODE', environmentId: 'environment', expiresAt: 1_900_000_000n });
+    const pairing = await driver.startDevicePairing();
+    expect(pairing).toStrictEqual({ pairingCode: 'opaque', manualPairingCode: 'CODE', environmentId: 'environment', expiresAt: '2030-03-17T17:46:40.000Z' });
+    expect(surface.startRemoteControlPairing).toHaveBeenCalledWith({ manualCode: true });
+    surface.readRemoteControlPairingStatus.mockResolvedValue({ claimed: true });
+    await expect(driver.checkDevicePairing(pairing)).resolves.toBe(true);
+    expect(surface.readRemoteControlPairingStatus).toHaveBeenCalledWith({ pairingCode: 'opaque' });
+    await driver.revokePairedDevice('environment', 'client');
+    expect(surface.revokeRemoteControlClient).toHaveBeenCalledWith({ environmentId: 'environment', clientId: 'client' });
+    surface.enableRemoteControl.mockResolvedValue(status);
+    surface.disableRemoteControl.mockResolvedValue({ ...status, status: 'disabled' });
+    await expect(driver.enableRemoteControl()).resolves.toMatchObject({ status: 'connected', allowRemoteControl: false });
+    await expect(driver.disableRemoteControl()).resolves.toMatchObject({ status: 'disabled' });
+    await driver.checkDevicePairing({ ...pairing, pairingCode: '' });
+    expect(surface.readRemoteControlPairingStatus).toHaveBeenLastCalledWith({ manualPairingCode: 'CODE' });
+    surface.listRemoteControlClients.mockResolvedValue({ data: [{ clientId: 'client', displayName: 'Phone', deviceType: 'phone', platform: 'iOS', osVersion: '26', deviceModel: 'iPhone', appVersion: '1', lastSeenAt: 1_800_000_000n }], nextCursor: null });
+    await expect(driver.listPairedDevices('environment')).resolves.toMatchObject([{ clientId: 'client', lastSeenAt: '2027-01-15T08:00:00.000Z' }]);
+  });
+
+  it('preserves attachments and turn identity through steer, edit, retry, delete and fork', async () => {
+    const { driver, conversation, surface } = setup();
+    const handle = conversation('conversation-a').handle;
+    const attachments = [{ type: 'image' as const, path: '/image.png', detail: 'high' as const }, { type: 'file' as const, path: '/file.md', name: 'file' }];
+    await driver.sendPrompt(sdkAgent(), 'inspect', driver.preparePromptOptions(sdkAgent(), { attachments }));
+    expect(handle.sendMessage).toHaveBeenCalledWith('inspect', { attachments });
+    await driver.steerPrompt(sdkAgent(), 'adjust', driver.preparePromptOptions(sdkAgent(), { attachments }));
+    expect(handle.steerMessage).toHaveBeenCalledWith('adjust', { attachments });
+    await driver.editTurn(sdkAgent(), 'turn', 'corrected');
+    expect(handle.editTurn).toHaveBeenCalledWith('turn', 'corrected');
+    await driver.retryTurn(sdkAgent(), 'turn');
+    expect(handle.retryTurn).toHaveBeenCalledWith('turn');
+    await driver.deleteTurn(sdkAgent(), 'turn');
+    expect(handle.deleteTurn).toHaveBeenCalledWith('turn');
+    handle.forkTurn.mockResolvedValue({ conversationId: 'fork', conversation: surface.conversation('fork'), snapshot: sdkSnapshot('fork') });
+    const target = sdkAgent('fork-agent', 'fork');
+    await expect(driver.forkConversation(sdkAgent(), target, 'turn')).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'fork' } });
+    expect(handle.forkTurn).toHaveBeenCalledWith('turn', { cwd: '/repo' }, { extensionContext: target });
+    expect(conversation('fork').listenerCount()).toBe(1);
+    handle.fork.mockResolvedValue({ conversationId: 'whole-fork', conversation: surface.conversation('whole-fork'), snapshot: sdkSnapshot('whole-fork') });
+    await driver.forkConversation(sdkAgent(), { ...target, id: 'whole-fork-agent' });
+    expect(handle.fork).toHaveBeenCalledWith({ cwd: '/repo' }, { extensionContext: expect.objectContaining({ id: 'whole-fork-agent' }) });
+  });
+
+  it('leaves compact to the app and delegates review slash handling to the SDK', async () => {
+    const { driver, conversation } = setup();
+    expect(driver.tryHandlePromptCommand(sdkAgent(), '/compact')).toBeNull();
+    expect(driver.tryHandlePromptCommand(sdkAgent(), '/compact extra')).toBeNull();
+    conversation('conversation-a').handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', { turnIds: ['review'] }));
+    await expect(driver.tryHandlePromptCommand(sdkAgent(), '/review check regressions')).resolves.toMatchObject({ turnId: 'review' });
+    expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledWith('/review check regressions', {});
+  });
+
+  it('propagates explicit rename failure without hiding it behind best-effort initial naming', async () => {
+    const { driver, conversation } = setup();
+    await driver.loadConversation(sdkAgent());
+    conversation('conversation-a').handle.rename.mockRejectedValueOnce(new Error('rename failed'));
+    await expect(driver.setConversationTitle(sdkAgent(), 'New title')).rejects.toThrow('rename failed');
+    await driver.setConversationTitle(sdkAgent(), 'New title');
+    expect(conversation('conversation-a').handle.rename).toHaveBeenLastCalledWith('New title');
+  });
+});

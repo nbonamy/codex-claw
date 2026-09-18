@@ -113,6 +113,7 @@ describe('AppShell dialogs and commands', () => {
     });
     const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountShell({ snapshot, getAgentGitDiff });
+    await flushPromises();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', metaKey: true, cancelable: true }));
@@ -143,6 +144,7 @@ describe('AppShell dialogs and commands', () => {
       agentFiles: [{ name: 'main.ts', path: 'src/main.ts' }],
       previewAgentFile,
     });
+    await flushPromises();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', metaKey: true, cancelable: true }));
     await flushPromises();
@@ -172,6 +174,7 @@ describe('AppShell dialogs and commands', () => {
       updatedAt: '2026-09-15T00:00:00.000Z',
     });
     const wrapper = mountShell({ snapshot, unreadAgentIds: ['agent-other'] });
+    await flushPromises();
 
     const shortcut = new KeyboardEvent('keydown', {
       key: 'k',
