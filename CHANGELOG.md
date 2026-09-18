@@ -4,6 +4,26 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.19.4] - 2026-09-18
+
+### New features
+
+- Select text in a conversation, add a comment, and carry it into the next
+  prompt as a compact, removable annotation. Annotation drafts stay with their
+  agent across navigation, survive failed submissions, and keep their detailed
+  context out of the visible user message.
+
+### Improvements and fixes
+
+- Agent creation, navigation, announcements, and celebrations now respect the
+  initiating or receiving client instead of leaking shared selection state
+  across desktop, web, or remote clients.
+- Plan reviews, queued prompts, approvals, and questions remain scoped to the
+  correct agent and conversation. Replayed plans no longer create duplicate
+  reviews, and cancelled Claude permission requests clear promptly.
+- Interrupted and failed Codex work groups are labeled as stopped or failed
+  instead of appearing completed.
+
 ## [0.19.3] - 2026-09-15
 
 ### Improvements and fixes

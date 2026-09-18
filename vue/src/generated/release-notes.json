@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.19.3",
+  "currentVersion": "0.19.4",
   "releases": [
+    {
+      "version": "0.19.4",
+      "releasedAt": "2026-09-18",
+      "sourceSha256": "f828326ea6a4b60d58fed038cfcf18d677055e48e7d229c5b50d73f252cf47bd",
+      "markdown": "### New features\n\n- Select text in a conversation, add a comment, and carry it into the next\n  prompt as a compact, removable annotation. Annotation drafts stay with their\n  agent across navigation, survive failed submissions, and keep their detailed\n  context out of the visible user message.\n\n### Improvements and fixes\n\n- Agent creation, navigation, announcements, and celebrations now respect the\n  initiating or receiving client instead of leaking shared selection state\n  across desktop, web, or remote clients.\n- Plan reviews, queued prompts, approvals, and questions remain scoped to the\n  correct agent and conversation. Replayed plans no longer create duplicate\n  reviews, and cancelled Claude permission requests clear promptly.\n- Interrupted and failed Codex work groups are labeled as stopped or failed\n  instead of appearing completed."
+    },
     {
       "version": "0.19.3",
       "releasedAt": "2026-09-15",
