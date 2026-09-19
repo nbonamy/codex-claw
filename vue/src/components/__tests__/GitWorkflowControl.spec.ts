@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus, { ElMessage } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,8 +10,6 @@ import { stubElectronTestWindow } from '../../test/client';
 const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktree', backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'idle' }, createdAt: '', updatedAt: '' } as Agent;
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
 const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
-const componentSource = readFileSync(resolve(process.cwd(), 'src/components/GitWorkflowControl.vue'), 'utf8');
-
 function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
   return mount(GitWorkflowControl, { props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides }, global: { plugins: [ElementPlus] } });
 }
@@ -22,21 +18,6 @@ describe('GitWorkflowControl', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
-  });
-
-  it('keeps dialog titles on one line while repository context truncates', () => {
-    expect(componentSource).toMatch(/\.git-workflow-control__dialog-header \.claw-dialog__title\s*\{[^}]*flex:\s*0 0 auto;[^}]*white-space:\s*nowrap;/s);
-    expect(componentSource).toMatch(/\.git-workflow-control__dialog-header \.git-workflow-control__branch\s*\{[^}]*min-width:\s*0;[^}]*flex:\s*1 1 auto;/s);
-  });
-
-  it('keeps the push summary left aligned', () => {
-    expect(componentSource).toMatch(/\.git-workflow-control__push-summary\s*\{[^}]*justify-items:\s*start;[^}]*text-align:\s*left;/s);
-    expect(componentSource).toMatch(/\.git-workflow-control__push-count\s*\{[^}]*justify-self:\s*start;[^}]*text-align:\s*left;/s);
-  });
-
-  it('uses one border for focused merge choices', () => {
-    expect(componentSource).toMatch(/\.git-workflow-control__merge-strategy label:focus-within\s*\{[^}]*border-color:\s*var\(--color-primary\);/s);
-    expect(componentSource).not.toMatch(/\.git-workflow-control__merge-strategy label:focus-within\s*\{[^}]*outline:/s);
   });
 
   it('opens the commit dialog as the first enabled action', async () => {

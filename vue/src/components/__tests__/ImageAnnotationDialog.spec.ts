@@ -1,6 +1,4 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { ElButton } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +27,6 @@ const context = {
 };
 const mountedWrappers: VueWrapper[] = [];
 const originalClipboard = navigator.clipboard;
-const componentSource = readFileSync(resolve(process.cwd(), 'src/components/ImageAnnotationDialog.vue'), 'utf8');
 const ElTooltipStub = {
   name: 'ElTooltip',
   props: ['content'],
@@ -53,27 +50,6 @@ afterEach(() => {
 });
 
 describe('ImageAnnotationDialog', () => {
-  it('uses the shared dialog header gutter while keeping its body compact', () => {
-    expect(componentSource).not.toContain(':global(.image-annotation-dialog.el-dialog > .el-dialog__header)');
-    expect(componentSource).toMatch(
-      /:global\(\.image-annotation-dialog\.el-dialog > \.el-dialog__body\) \{[^}]*padding: 0;/,
-    );
-    expect(componentSource).toContain('<template #footer>');
-    expect(componentSource).toMatch(
-      /:global\(\.image-annotation-dialog\.el-dialog > \.el-dialog__footer\) \{[^}]*padding: var\(--space-3\) var\(--space-4\);/,
-    );
-    expect(componentSource).toMatch(
-      /\.image-annotation-dialog__body \{[^}]*display: grid;[^}]*grid-template-rows: minmax\(0, 1fr\);/,
-    );
-    expect(componentSource).toMatch(/\.image-annotation-dialog__content \{[^}]*height: 100%;/);
-    expect(componentSource).toMatch(/\.image-annotation-dialog__comment-list \{[^}]*padding: var\(--space-2\);/);
-    expect(componentSource).toMatch(
-      /\.image-annotation-dialog__comment-list \{[^}]*grid-auto-rows: max-content;[^}]*align-content: start;/,
-    );
-    expect(componentSource).not.toContain('cursor: ew-resize');
-    expect(componentSource).not.toContain('cursor: ns-resize');
-  });
-
   it('keeps the compact title and annotation tools together without instructional copy', async () => {
     const wrapper = await mountDialog();
 

@@ -28,8 +28,8 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "file:../../codex-app-sdk/packages/core",
-    "@codex-app-sdk/vue": "file:../../codex-app-sdk/packages/vue",
+    "@codex-app-sdk/core": "latest",
+    "@codex-app-sdk/vue": "latest",
     "@codex-claw/core": "0.19.4",
     "@tabler/icons-vue": "^3.44.0",
     "canvas-confetti": "^1.9.4",

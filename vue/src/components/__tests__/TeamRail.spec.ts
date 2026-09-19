@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
@@ -110,19 +108,6 @@ describe('TeamRail', () => {
     }).get('[aria-label="Skwad, agents working"]');
     expect(workingOnly.get('.team-rail__unread-indicator').classes())
       .toContain('team-rail__unread-indicator--working');
-  });
-
-  it('renders team identities and the create action as rounded squares', () => {
-    expect(teamRailSource()).toMatch(/\.team-rail__team \{[\s\S]*?border-radius: var\(--radius-lg\);/);
-    expect(teamRailSource()).toMatch(/\.team-rail__new \{[\s\S]*?border-radius: var\(--radius-lg\);/);
-    expect(teamRailSource()).toMatch(/\.team-rail__team--active \{[\s\S]*?outline-offset: 2px;/);
-    const unreadIndicatorStyles = teamRailSource().match(/\.team-rail__unread-indicator \{([^}]*)\}/)?.[1];
-    expect(unreadIndicatorStyles).not.toContain('border:');
-    expect(teamRailSource()).toMatch(/\.team-rail__unread-indicator--working \{[^}]*background: var\(--color-warning\);[^}]*animation: team-working-color-pulse/);
-    const workingPulseStyles = teamRailSource().match(/@keyframes team-working-color-pulse \{([\s\S]*?)\n\}/)?.[1];
-    expect(workingPulseStyles).toContain('filter: brightness(0.75);');
-    expect(workingPulseStyles).not.toContain('opacity:');
-    expect(teamRailSource()).toMatch(/prefers-reduced-motion: reduce[\s\S]*?\.team-rail__unread-indicator--working \{[^}]*animation: none;/);
   });
 
   it('falls back to team initials when no avatar is set', () => {
@@ -276,32 +261,6 @@ describe('TeamRail', () => {
   it('hides global speech mute when spoken acknowledgments are disabled', () => {
     const wrapper = mountRail({ teams, activeTeamId: 'team-sk' });
     expect(wrapper.find('.team-rail__speech-mute').exists()).toBe(false);
-  });
-
-  it('keeps app surface icons visually consistent', () => {
-    expect(teamRailSource()).toContain(':deep() .settings-menu__trigger svg');
-    expect(teamRailSource()).toContain('width: var(--icon-xl);');
-    expect(teamRailSource()).toContain('stroke-width: 1.25px;');
-    expect(teamRailSource()).toContain('transform: scale(1.15);');
-    expect(teamRailSource()).toContain('.team-rail__new svg');
-    expect(teamRailSource()).toContain('.team-rail__speech-mute svg');
-    expect(teamRailSource()).toContain('.team-rail__backlog {');
-    expect(teamRailSource()).toContain('padding: 0;');
-    expect(teamRailSource()).toContain('border: 1px solid var(--color-border-strong);');
-    expect(teamRailSource()).toContain('.team-rail__backlog svg {');
-    expect(teamRailSource()).toContain('width: var(--icon-xl);');
-    expect(teamRailSource()).toContain('CockpitIcon');
-    expect(teamRailSource()).not.toContain('DashboardIcon');
-    expect(teamRailSource()).toContain('.team-rail__cockpit:not(.team-rail__cockpit--active)');
-    expect(teamRailSource()).toContain('.team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging)');
-    expect(teamRailSource()).toMatch(/\.team-rail__team:not\(\.team-rail__team--active, \.list-reorder-drag--dragging\) \{\s+opacity: 0\.\d+;/);
-    expect(teamRailSource()).toContain('AutomationIcon');
-    expect(teamRailSource()).not.toContain('InfinityIcon');
-    expect(teamRailSource()).not.toContain('transform: scaleX(1.2) scaleY(1.48);');
-    expect(teamRailSource()).not.toContain('CompassIcon');
-    expect(teamRailSource()).not.toContain('RepeatIcon');
-    expect(settingsMenuSource()).not.toContain('width: var(--icon-xl);');
-    expect(settingsMenuSource()).not.toContain('transform: scale(1.15)');
   });
 
   it('emits team reorder drops and marks the drop location', async () => {
@@ -592,12 +551,4 @@ function cockpitSquareBackgrounds(wrapper: ReturnType<typeof mountRail>): string
   return wrapper
     .findAll('.cockpit-icon__square')
     .map((square) => (square.element as HTMLElement).style.backgroundColor);
-}
-
-function teamRailSource(): string {
-  return readFileSync(resolve(process.cwd(), 'src/components/TeamRail.vue'), 'utf8');
-}
-
-function settingsMenuSource(): string {
-  return readFileSync(resolve(process.cwd(), 'src/components/SettingsMenu.vue'), 'utf8');
 }

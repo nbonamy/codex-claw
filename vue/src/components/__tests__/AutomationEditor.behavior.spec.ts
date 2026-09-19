@@ -18,7 +18,6 @@ describe('AutomationEditor behavior', () => {
     await wrapper.find('form').trigger('submit');
 
     expect(wrapper.emitted('submit')).toBeUndefined();
-    expect(wrapper.findComponent({ name: 'ElButton' }).findAll).toBeDefined();
   });
 
   it('disables repository selection when GitHub is disconnected', () => {

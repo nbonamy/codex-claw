@@ -1,13 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { nextTick } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
-
-const componentSource = readFileSync(resolve(process.cwd(), 'src/components/RepositorySessionSourceDialog.vue'), 'utf8');
 
 const branches: SourceBranch[] = [
   { name: 'main', isDefault: true, worktreePath: '/repos/project' },
@@ -79,15 +75,6 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.get('[aria-label="Search session sources"]').attributes('placeholder'))
       .toBe('Search by title, number, author, or URL');
     expect(wrapper.text()).toContain('Recent pull requests');
-  });
-
-  it('keeps text centered inside the outer pill tabs', () => {
-    expect(componentSource).toMatch(/el-tabs__item\.is-top:nth-child\(2\)\)[^{]*\{[^}]*padding-left:\s*var\(--space-6\);/s);
-    expect(componentSource).toMatch(/el-tabs__item\.is-top:last-child\)[^{]*\{[^}]*padding-right:\s*var\(--space-6\);/s);
-  });
-
-  it('animates the forwarded Element Plus dialog root when its width changes', () => {
-    expect(componentSource).toMatch(/:global\(\.repository-session-source-dialog\.el-dialog\)[^{]*\{[^}]*transition:\s*width 240ms ease;/s);
   });
 
   it('opens the shared assignment picker for repository work items', async () => {

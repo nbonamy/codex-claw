@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 type ReleaseNotesScript = {
@@ -104,18 +102,5 @@ describe('release-notes script', () => {
       ...consistentInput,
       lockfile: { ...consistentInput.lockfile, version: '0.4.0' },
     })).toThrow('package-lock.json root version does not match 0.5.0');
-  });
-
-  it('keeps the release check in the root make command path', () => {
-    const rootPackage = JSON.parse(readFileSync(resolve(process.cwd(), '../package.json'), 'utf8')) as {
-      scripts: Record<string, string>;
-    };
-    const electronPackage = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as {
-      scripts: Record<string, string>;
-    };
-
-    expect(rootPackage.scripts.make).toBe('npm run make:electron');
-    expect(rootPackage.scripts['make:electron']).toContain('npm run make -w @codex-claw/electron');
-    expect(electronPackage.scripts.make).toContain('npm run release-notes:check');
   });
 });

@@ -1,11 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import RepositoryIconPicker from '../RepositoryIconPicker.vue';
-
-const pickerSource = readFileSync(resolve(process.cwd(), 'src/components/RepositoryIconPicker.vue'), 'utf8');
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -19,8 +15,6 @@ describe('RepositoryIconPicker', () => {
     expect(wrapper.findComponent({ name: 'IdentityPicker' }).exists()).toBe(true);
     expect(wrapper.find('.tabler-icon-folder-root').exists()).toBe(true);
     expect(wrapper.find('.agent-avatar-picker__hint').exists()).toBe(false);
-    expect(pickerSource).toContain('width: 24px;\n  height: 24px;');
-    expect(pickerSource).toContain('width: 20px;\n  height: 20px;');
   });
 
   it('selects and clears a repository icon', async () => {

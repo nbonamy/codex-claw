@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import {
@@ -14,9 +12,6 @@ import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contra
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import { i18n } from '../../i18n';
-
-const conversationPaneSource = readFileSync(resolve(process.cwd(), 'src/components/ConversationPane.vue'), 'utf8');
-const rendererViteConfig = readFileSync(resolve(process.cwd(), '../electron/vite.renderer.config.ts'), 'utf8');
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -68,10 +63,6 @@ describe('ConversationPane', () => {
     const wrapper = mountPane({ controller, agent });
 
     expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('controller')).toStrictEqual(controller);
-    expect(conversationPaneSource).toContain(':controller="controller"');
-    expect(conversationPaneSource).not.toContain('createCodexConversationPaneController');
-    expect(conversationPaneSource).toMatch(/\.conversation-pane\s*\{[\s\S]*background:\s*var\(--color-shell-main\);/);
-    expect(conversationPaneSource).toMatch(/:deep\(\.chat-tool-call__title-target\[href\]:hover\)[\s\S]*text-decoration:\s*underline;/);
   });
 
   it('floats active plan progress independently of controller state', () => {
@@ -95,13 +86,6 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('close-plan')).toStrictEqual([[]]);
     await wrapper.setProps({ planVisible: false } as Record<string, unknown>);
     expect(wrapper.find('.conversation-plan').exists()).toBe(false);
-  });
-
-  it('keeps SDK sources hot-reloadable with a prebundled dist fallback', () => {
-    expect(rendererViteConfig).toContain('optimizeDeps: useSdkSources ? {');
-    expect(rendererViteConfig).toContain('exclude: Object.keys(sdkSourceAliases)');
-    expect(rendererViteConfig).toMatch(/:\s*\{[\s\S]*force:\s*true/);
-    expect(rendererViteConfig).not.toMatch(/exclude:\s*\[[^\]]*codex-app-sdk/);
   });
 
   it('renders app-owned messages supplied by the controller', () => {

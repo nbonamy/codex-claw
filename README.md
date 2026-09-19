@@ -81,12 +81,18 @@ Requirements:
 
 - macOS arm64, or experimental Linux x64, with a current Node.js toolchain;
 - network access to download the pinned Codex app-server on the first build;
-- a sibling `codex-app-sdk` checkout while the SDK dependency remains local.
+- a sibling `codex-app-sdk` checkout.
 
 ```bash
 npm install
 npm run dev
 ```
+
+The root `package.json` overrides all Codex App SDK packages to the sibling
+checkout. Workspace manifests retain their published `latest` declarations, so
+removing the single `overrides` block restores published-package installation.
+Development additionally aliases SDK imports directly to sibling sources for
+hot reloads; build and package entrypoints rebuild the sibling SDK first.
 
 Focused project gates:
 
@@ -99,8 +105,7 @@ npm run typecheck
 
 Builds consume the pinned Computer Use artifact and verify its checksum. Set
 `COMPUTER_USE_LOCAL=1` in `.env` to build the helper from a sibling
-`computer-use` checkout instead. While `codex-app-sdk` is linked through a local
-`file:` dependency, build and package entrypoints rebuild its `dist` first.
+`computer-use` checkout instead.
 Linux support is experimental. Computer Use and Appshots are currently
 macOS-only; Linux builds skip the Computer Use helper and do not package its
 native automation dependency.

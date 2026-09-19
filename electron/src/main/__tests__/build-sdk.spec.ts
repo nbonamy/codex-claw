@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe('local SDK build', () => {
-  it('refreshes installed file dependencies after a successful SDK build', () => {
+  it('builds root-overridden SDK packages and refreshes their installed artifacts', () => {
     const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'codex-claw-build-sdk-'));
     temporaryDirectories.push(fixtureRoot);
     const clawRoot = path.join(fixtureRoot, 'codex-claw');
@@ -31,7 +31,6 @@ describe('local SDK build', () => {
     mkdirSync(scriptDirectory, { recursive: true });
     mkdirSync(fakeBinDirectory, { recursive: true });
     mkdirSync(sdkRoot, { recursive: true });
-    writeFileSync(path.join(clawRoot, 'package.json'), '{}');
     writeFileSync(path.join(sdkRoot, 'package.json'), '{}', { flag: 'wx' });
 
     const packages = [
@@ -41,6 +40,12 @@ describe('local SDK build', () => {
       ['vue', '@codex-app-sdk/vue'],
       ['web', '@codex-app-sdk/web'],
     ] as const;
+    writeFileSync(path.join(clawRoot, 'package.json'), JSON.stringify({
+      overrides: Object.fromEntries(packages.map(([, packageName]) => {
+        const packageSlug = packageName.split('/').at(-1)!;
+        return [packageName, `file:../codex-app-sdk/packages/${packageSlug}`];
+      })),
+    }));
     for (const [workspace, packageName] of packages) {
       const packageSlug = packageName.split('/').at(-1)!;
       const workspacePackagePath = path.join(clawRoot, workspace, 'package.json');
@@ -49,7 +54,7 @@ describe('local SDK build', () => {
         ? JSON.parse(readFileSync(workspacePackagePath, 'utf8')) as { dependencies?: Record<string, string> }
         : {};
       workspacePackage.dependencies ??= {};
-      workspacePackage.dependencies[packageName] = `file:../../codex-app-sdk/packages/${packageSlug}`;
+      workspacePackage.dependencies[packageName] = 'latest';
       writeFileSync(workspacePackagePath, JSON.stringify(workspacePackage));
 
       const sourcePackage = path.join(sdkRoot, 'packages', packageSlug);

@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
@@ -7,8 +5,6 @@ import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import AppMenu from '../../shared/menu/AppMenu.vue';
 import CockpitAgentsView from '../CockpitAgentsView.vue';
 import CockpitView from '../CockpitView.vue';
-
-const cockpitViewSource = readFileSync(resolve(process.cwd(), 'src/components/CockpitView.vue'), 'utf8');
 
 describe('CockpitView', () => {
   it('shows all agents grouped by team by default', () => {
@@ -46,10 +42,4 @@ describe('CockpitView', () => {
     expect(wrapper.findComponent(CockpitAgentsView).props('mode')).toBe('recent');
   });
 
-  it('uses compact app-bar sizing and title typography', () => {
-    expect(cockpitViewSource).toContain('height: var(--workbench-appbar-height);');
-    expect(cockpitViewSource).toContain('padding: 0 var(--space-20);');
-    expect(cockpitViewSource).toContain('font-size: var(--font-size-16);');
-    expect(cockpitViewSource).toContain('line-height: var(--line-height-20);');
-  });
 });

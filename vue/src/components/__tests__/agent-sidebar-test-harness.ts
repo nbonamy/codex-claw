@@ -1,10 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, expect, vi } from 'vitest';
 import type { Agent, Team } from '@codex-claw/core/contracts';
-
-export const agentSidebarSource = readFileSync(resolve(process.cwd(), 'src/components/AgentSidebar.vue'), 'utf8');
 
 export function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {

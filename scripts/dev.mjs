@@ -8,8 +8,8 @@ const backendBundle = path.join(rootDir, 'backend/dist/clawd.mjs');
 const children = new Set();
 let shuttingDown = false;
 
-// Development resolves the linked sibling SDK directly from source so Vite
-// can hot-reload changes. Package and release builds keep using SDK dist.
+// Development resolves the sibling SDK directly from source so Vite can
+// hot-reload changes. Package and release builds use its locally built dist.
 process.env.CODEX_APP_SDK_SOURCE = '1';
 
 if (process.argv.includes('--help')) {

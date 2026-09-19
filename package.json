@@ -2,6 +2,13 @@
   "name": "codex-claw",
   "version": "0.19.4",
   "private": true,
+  "overrides": {
+    "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",
+    "@codex-app-sdk/core": "file:../codex-app-sdk/packages/core",
+    "@codex-app-sdk/electron": "file:../codex-app-sdk/packages/electron",
+    "@codex-app-sdk/vue": "file:../codex-app-sdk/packages/vue",
+    "@codex-app-sdk/web": "file:../codex-app-sdk/packages/web"
+  },
   "devDependencies": {
     "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",

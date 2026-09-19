@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const rootPackageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const sdkDependencies = [
   ['backend', '@codex-app-sdk/backend'],
   ['backend', '@codex-app-sdk/core'],
@@ -14,9 +15,12 @@ const sdkDependencies = [
 ].map(([directory, packageName]) => {
   const packagePath = path.join(rootDir, directory, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-  const specifier = packageJson.dependencies?.[packageName];
+  const declaredSpecifier = packageJson.dependencies?.[packageName];
+  const overrideSpecifier = rootPackageJson.overrides?.[packageName];
+  const specifier = overrideSpecifier ?? declaredSpecifier;
+  const specifierBaseDirectory = overrideSpecifier ? rootDir : path.join(rootDir, directory);
   const packageDirectory = typeof specifier === 'string' && specifier.startsWith('file:')
-    ? path.resolve(rootDir, directory, specifier.slice('file:'.length))
+    ? path.resolve(specifierBaseDirectory, specifier.slice('file:'.length))
     : undefined;
   return { directory, packageDirectory, packageName, specifier };
 });

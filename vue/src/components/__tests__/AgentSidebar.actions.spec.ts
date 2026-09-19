@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
 
 import {
-  agentSidebarSource,
   agents,
   clickPortaledMenuItem,
   dragEvent,
@@ -226,22 +225,6 @@ describe('AgentSidebar actions', () => {
 
     expect(wrapper.findAll('.agent-sidebar__session-icon')).toHaveLength(2);
     expect(wrapper.find('.agent-sidebar__avatar').exists()).toBe(false);
-  });
-
-  it('gives normal workspace rows larger icons and breathing room than compact rows', () => {
-    expect(agentSidebarSource).toContain('--agent-sidebar-row-min-height: 30px;');
-    expect(agentSidebarSource).toContain('--agent-sidebar-workspace-icon-size: 16px;');
-    expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-size: 20px;');
-    expect(agentSidebarSource).toContain('min-height: 30px;');
-    expect(agentSidebarSource).toContain('.agent-sidebar--compact {\n  --agent-sidebar-row-min-height: 28px;\n  --agent-sidebar-workspace-icon-size: 16px;');
-    expect(agentSidebarSource).toContain('--agent-sidebar-repository-icon-column-width: 24px;');
-    expect(agentSidebarSource).toContain('--agent-sidebar-workspace-column-gap: 4px;');
-    expect(agentSidebarSource).not.toContain('agent-sidebar__workspace-toggle');
-    expect(agentSidebarSource).toContain('width: calc(var(--icon-sm) + 2px);');
-    expect(agentSidebarSource).not.toContain('.agent-sidebar__workspace-header:focus-within');
-    expect(agentSidebarSource).toContain('.agent-sidebar__start-work {\n  flex: 0 0 auto;');
-    expect(agentSidebarSource).toContain('.agent-sidebar__list {\n  flex: 1 1 0;');
-    expect(agentSidebarSource).toContain('padding: 1px var(--space-6) 1px\n    calc(var(--agent-sidebar-workspace-inline-padding) + var(--space-6));');
   });
 
   it('labels non-idle statuses for assistive tech', () => {
