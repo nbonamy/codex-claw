@@ -1,5 +1,6 @@
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { createMission, updateMission, type Mission } from '@codex-claw/core/missions';
+import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import type { Agent, AppSnapshot } from '@codex-claw/core/contracts';
+import { createMission, deleteMission, updateMission, type DeleteMissionInput, type Mission } from '@codex-claw/core/missions';
 
 /** Serializes mission revisions and publishes them only after durable storage succeeds. */
 export class MissionService {
@@ -23,12 +24,28 @@ export class MissionService {
     });
   }
 
-  private transaction(mutate: (candidate: AppSnapshot) => void): Promise<void> {
+  remove(input: DeleteMissionInput, cleanup: (agents: Agent[]) => Promise<void>): Promise<void> {
+    return this.transaction(async candidate => {
+      const mission = deleteMission(candidate, input);
+      const workerIds = new Set(mission.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? []);
+      const retainedWorkerIds = new Set((candidate.missions ?? []).flatMap(other => (
+        other.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? []
+      )));
+      const workers = candidate.agents.filter(agent => workerIds.has(agent.id) && !retainedWorkerIds.has(agent.id));
+      await cleanup(workers);
+      for (const worker of workers) closeAgentInSnapshot(candidate, worker.id);
+    }, true);
+  }
+
+  private transaction(mutate: (candidate: AppSnapshot) => void | Promise<void>, cloneSnapshot = false): Promise<void> {
     const operation = this.pending.then(async () => {
-      const candidate = { ...this.snapshot, missions: structuredClone(this.snapshot.missions ?? []) };
-      mutate(candidate);
+      const candidate = cloneSnapshot
+        ? structuredClone(this.snapshot)
+        : { ...this.snapshot, missions: structuredClone(this.snapshot.missions ?? []) };
+      await mutate(candidate);
       await this.persist(candidate);
-      this.snapshot.missions = candidate.missions;
+      if (cloneSnapshot) Object.assign(this.snapshot, candidate);
+      else this.snapshot.missions = candidate.missions;
     });
     this.pending = operation.catch(() => undefined);
     return operation;

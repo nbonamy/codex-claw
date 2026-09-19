@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MissionService } from '../mission-service';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
+import { createMission } from '@codex-claw/core/missions';
 
 describe('MissionService', () => {
   it('keeps failed writes out of live state and serializes competing revision updates', async () => {
@@ -16,5 +17,33 @@ describe('MissionService', () => {
     const results = await Promise.allSettled([service.mutate('update', change), service.mutate('update', change)]);
     expect(results.map(r => r.status)).toStrictEqual(['fulfilled', 'rejected']);
     expect(snapshot.missions![0]!.revision).toBe(1);
+  });
+
+  it('removes a mission and its workers only after their conversations are cleaned up', async () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.teams = [{ id: 'team-1', name: 'Team', agentIds: ['worker-1'], color: '#000000' }];
+    snapshot.agents = [{
+      id: 'worker-1', teamId: 'team-1', name: 'Mission worker', folder: '/repo', backend: 'codex',
+      status: { type: 'idle' }, createdAt: '2026-09-19T00:00:00.000Z', updatedAt: '2026-09-19T00:00:00.000Z',
+    }];
+    const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+    mission.execution = {
+      teamId: 'team-1', repoPath: '/repo', memberIds: [],
+      runs: [{
+        id: 'run-1', stage: 'requirements', memberId: 'member-1', workerId: 'worker-1',
+        status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+      }],
+    };
+    const persist = vi.fn().mockResolvedValue(undefined);
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    const service = new MissionService(snapshot, persist);
+
+    await service.remove({ id: mission.id, revision: mission.revision }, cleanup);
+
+    expect(cleanup).toHaveBeenCalledWith([expect.objectContaining({ id: 'worker-1' })]);
+    expect(snapshot.missions).toStrictEqual([]);
+    expect(snapshot.agents).toStrictEqual([]);
+    expect(snapshot.teams[0]!.agentIds).toStrictEqual([]);
+    expect(persist).toHaveBeenCalledOnce();
   });
 });

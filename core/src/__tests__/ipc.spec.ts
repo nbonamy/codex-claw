@@ -112,6 +112,7 @@ describe('ipc channels', () => {
       createAgent: 'agent:create',
       executeMission: 'mission:execute',
       createMission: 'mission:create',
+      deleteMission: 'mission:delete',
       updateMission: 'mission:update',
       createQuickChat: 'agent:quick-chat:create',
       updateAgent: 'agent:update',

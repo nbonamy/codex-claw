@@ -77,6 +77,7 @@
               type="button"
               :aria-pressed="activeMissionId === mission.id"
               @click="emit('select-mission', mission.id)"
+              @contextmenu.prevent="openMissionMenu(mission.id, $event)"
             >
               <span class="agent-sidebar__meta">
                 <strong
@@ -273,6 +274,14 @@
       @close="closeContextMenu"
     />
 
+    <MissionContextMenu
+      v-if="contextMenuMissionId"
+      :x="contextMenuPosition.x"
+      :y="contextMenuPosition.y"
+      @delete="deleteContextMission"
+      @close="closeMissionContextMenu"
+    />
+
     <div
       class="agent-sidebar__resize-handle"
       role="separator"
@@ -308,6 +317,7 @@ import {
   TargetArrowIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
+import MissionContextMenu from './MissionContextMenu.vue';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
@@ -366,6 +376,7 @@ const emit = defineEmits<{
   'start-work': [action: 'new' | 'github' | 'local' | 'url'];
   'create-quick-chat': [];
   'create-mission': [];
+  'delete-mission': [id: string];
   'select-mission': [id: string];
   'update-repository-icon': [payload: { repositoryKey: string; repositoryRoot: string; icon: string | undefined }];
 }>();
@@ -387,6 +398,7 @@ const workspaceGroups = computed(() => projectWorkspaceSidebar({
 }).sort((left, right) => Number(right.kind === 'quickChats') - Number(left.kind === 'quickChats')));
 const quickChatGroup = computed(() => workspaceGroups.value.find((group) => group.kind === 'quickChats') ?? null);
 const contextMenuAgentId = ref<string | null>(null);
+const contextMenuMissionId = ref<string | null>(null);
 const repositorySessionMenu = useRepositorySessionMenu(() => props.listRepositoryBranches, t);
 const repositorySessionMenuId = repositorySessionMenu.visibleGroupId;
 const collapsedRepositoryKeys = computed(() => new Set(props.collapsedRepositoryKeys ?? []));
@@ -579,11 +591,32 @@ function selectRepositorySessionMenuItem(
 }
 
 function openAgentMenu(agentId: string, event: MouseEvent): void {
+  contextMenuMissionId.value = null;
   contextMenuAgentId.value = agentId;
   contextMenuPosition.value = {
     x: event.clientX,
     y: event.clientY,
   };
+}
+
+function openMissionMenu(missionId: string, event: MouseEvent): void {
+  contextMenuAgentId.value = null;
+  contextMenuMissionId.value = missionId;
+  contextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+}
+
+function deleteContextMission(): void {
+  const missionId = contextMenuMissionId.value;
+  if (!missionId) return;
+  emit('delete-mission', missionId);
+  closeMissionContextMenu();
+}
+
+function closeMissionContextMenu(): void {
+  contextMenuMissionId.value = null;
 }
 
 function emitContextAgentAction(action: AgentContextMenuAction): void {

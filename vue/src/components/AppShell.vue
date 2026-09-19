@@ -29,6 +29,7 @@
       :mission-creation-error="missionCreationError"
       :mission-creation-pending="missionCreationPending"
       @create-mission="createNewMission"
+      @delete-mission="deleteMissionFromSidebar"
       @select-mission="selectMission"
       :active-team="activeTeam"
       :active-team-agents="activeTeamAgents"
@@ -452,7 +453,7 @@ import AgentWorkspace from './AgentWorkspace.vue';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
 import ConversationPane from './ConversationPane.vue';
-import type { Mission, CreateMissionInput, UpdateMissionInput } from '@codex-claw/core/missions';
+import type { Mission, CreateMissionInput, DeleteMissionInput, UpdateMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -567,6 +568,7 @@ const props = withDefaults(defineProps<{
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission?: (input: CreateMissionInput) => Promise<Mission>;
+  deleteMission?: (input: DeleteMissionInput) => Promise<void>;
   executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
   updateMission?: (input: UpdateMissionInput) => Promise<void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
@@ -686,6 +688,7 @@ const props = withDefaults(defineProps<{
   },
   createAgent: async () => undefined,
   createMission: async () => { throw new Error('Missions unavailable.'); },
+  deleteMission: async () => { throw new Error('Missions unavailable.'); },
   updateMission: async () => { throw new Error('Missions unavailable.'); },
   createQuickChat: async () => undefined,
   createTeam: async () => undefined,
@@ -853,6 +856,35 @@ async function createNewMission() {
     missionCreationError.value = error instanceof Error ? error.message : String(error);
   } finally {
     missionCreationPending.value = false;
+  }
+}
+
+async function deleteMissionFromSidebar(id: string): Promise<void> {
+  const mission = props.snapshot.missions?.find(candidate => candidate.id === id);
+  if (!mission) return;
+
+  try {
+    await ElMessageBox.confirm(
+      translate('missions.deleteDescription'),
+      translate('missions.deleteTitle', { mission: mission.outcome }),
+      {
+        cancelButtonText: translate('common.cancel'),
+        confirmButtonText: translate('missions.deleteAction'),
+        type: 'warning',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  try {
+    await props.deleteMission({ id: mission.id, revision: mission.revision });
+    if (selectedMissionId.value === mission.id) {
+      selectedMissionId.value = null;
+      activeSurface.value = 'agent';
+    }
+  } catch (error) {
+    ElMessage.error(localizedErrorMessage(error, t));
   }
 }
 const fileQuickOpenVisible = ref(false);

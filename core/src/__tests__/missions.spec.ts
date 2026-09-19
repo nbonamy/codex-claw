@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot } from '../snapshot-construction';
-import { createMission, updateMission, isMission, type UpdateMissionInput } from '../missions';
+import { createMission, deleteMission, updateMission, isMission, type UpdateMissionInput } from '../missions';
 import { decodeAppSnapshot } from '../snapshot-guards';
 
 describe('missions', () => {
@@ -45,5 +45,16 @@ describe('missions', () => {
     updateMission(snapshot, { ...input, action: 'advance' });
     input.artifacts.requirements.problem = '';
     expect(() => updateMission(snapshot, { ...input, revision: 1 })).toThrow('required stage');
+  });
+
+  it('deletes only the current mission revision', () => {
+    const snapshot = createEmptySnapshot();
+    const first = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+    const second = createMission(snapshot, { outcome: 'Invitations', workflowType: 'shapeAndShipFeature' });
+
+    expect(() => deleteMission(snapshot, { id: first.id, revision: 1 })).toThrow('changed');
+    expect(() => deleteMission(snapshot, { id: 'missing', revision: 0 })).toThrow('not found');
+    expect(deleteMission(snapshot, { id: first.id, revision: 0 })).toBe(first);
+    expect(snapshot.missions).toStrictEqual([second]);
   });
 });

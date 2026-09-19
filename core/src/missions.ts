@@ -25,6 +25,7 @@ export type Mission = {
   updatedAt: string;
 };
 export type CreateMissionInput = { outcome: string; workflowType: Mission['workflow']['type'] };
+export type DeleteMissionInput = { id: string; revision: number };
 export type UpdateMissionInput = {
   id: string;
   revision: number;
@@ -87,6 +88,14 @@ export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
     stageAgentIds: {},
   };
   (snapshot.missions ??= []).push(mission);
+  return mission;
+}
+export function deleteMission(snapshot: AppSnapshot, input: unknown): Mission {
+  if (!record(input) || typeof input.id !== 'string' || !Number.isInteger(input.revision)) throw new Error('Invalid mission deletion.');
+  const mission = snapshot.missions?.find(mission => mission.id === input.id);
+  if (!mission) throw new Error('Mission not found.');
+  if (mission.revision !== input.revision) throw new Error('This mission changed. Reload before deleting it.');
+  snapshot.missions = snapshot.missions!.filter(candidate => candidate.id !== mission.id);
   return mission;
 }
 export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {

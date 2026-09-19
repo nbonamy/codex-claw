@@ -59,6 +59,9 @@ placeholder `New mission`, selects it, and immediately starts the requirements
 station from the active local project. During that conversation, the assigned
 worker replaces the placeholder with a concise outcome through the
 mission-scoped title tool.
+Mission rows use the sidebar context-menu pattern for deletion. Deletion removes
+the persisted Mission and its hidden worker agents after interrupting active work
+and archiving their provider conversations; the mission worktree remains on disk.
 The selected mission is a workshop: persistent stations on the left, the
 current or previously accepted artifact in the central workbench, and the
 station's orchestrator conversation on the right. The conversation drives

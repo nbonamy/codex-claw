@@ -41,6 +41,7 @@
       :mission-creation-error="missionCreationError"
       :mission-creation-pending="missionCreationPending"
       @create-mission="$emit('create-mission')"
+      @delete-mission="$emit('delete-mission', $event)"
       @select-mission="$emit('select-mission', $event)"
       :unread-agent-ids="unreadAgentIds"
       :teams="snapshot.teams"
@@ -143,6 +144,7 @@ const emit = defineEmits<{
   'create-agent-worktree-in-repository': [payload: RepositorySessionPayload];
   'create-quick-chat': [];
   'create-mission': [];
+  'delete-mission': [id: string];
   'select-mission': [id: string];
   'disconnect-team': [teamId: string];
   'duplicate-agent': [agentId: string];

@@ -11,6 +11,8 @@ export const messages = {
       runStatus: { preparing: 'Preparing workspace', running: 'Stage in progress', awaitingReview: 'Awaiting your review', accepted: 'Accepted', cancelled: 'Stopped', failed: 'Failed' },
       showNavigation: 'Show mission navigation',
       new: 'New mission', title: 'Missions',
+      actions: 'Mission actions', deleteMission: 'Delete {mission}', deleteTitle: 'Delete {mission}?', deleteAction: 'Delete mission',
+      deleteDescription: 'The mission and its agent conversations will be removed from Codex Claw. Its worktree and files will remain.',
       workflow: 'Shape and ship a feature', workspace: 'Mission execution', progress: 'Workflow progress',
       workshop: 'Mission workshop', stageCount: '{current} of {total} stations', station: 'Station {number}',
       requirements: 'Requirements', tickets: 'Tickets', implementation: 'Implementation', review: 'Review',

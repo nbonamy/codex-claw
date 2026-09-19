@@ -80,6 +80,7 @@
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
     :create-mission="createMission"
+    :delete-mission="deleteMission"
     :update-mission="updateMission"
     :execute-mission="executeMission"
     :create-quick-chat="createQuickChat"
@@ -309,6 +310,7 @@ const {
   createAgent,
   clearAgentCreationProgress,
   createMission,
+  deleteMission,
   updateMission,
   executeMission,
   createQuickChat,

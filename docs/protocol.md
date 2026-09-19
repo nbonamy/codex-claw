@@ -130,10 +130,11 @@ This keeps the synchronization barrier bounded even for very long threads.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `mission/create` | `{ input: CreateMissionInput }` | `AppSnapshot` | Creates a backend-wide outcome with a versioned workflow, independently of agents and client navigation. |
+| `mission/delete` | `{ input: DeleteMissionInput }` | `AppSnapshot` | Deletes the current persisted revision, interrupts active mission workers, archives and releases their provider conversations, and removes those hidden workers. The managed worktree and its files remain on disk. |
 | `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Configures a local team/repository, starts a stage attempt, accepts a proposal, stops a run, or reopens a reached stage. An assigned worker may revise and resubmit while the proposal awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
 | `mission/update` | `{ input: UpdateMissionInput }` | `AppSnapshot` | Saves structured artifacts and per-stage agent references, optionally approving the current stage. Requires the current revision; rejects stale writes, missing agents, invalid earlier gates, and edits to completed missions. |
 
-Both operations persist before publishing `snapshot.updated`. Existing snapshots
+Mission writes persist before publishing `snapshot.updated`. Existing snapshots
 without `missions` represent an empty mission collection. Unknown or malformed
 persisted mission records are ignored by the current reader. Workflow selection
 currently accepts only `shapeAndShipFeature`; additional types need their own

@@ -4,7 +4,7 @@ import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission } from '@codex-claw/core/missions';
 
 describe('mission IPC', () => {
-  it('forwards outcome creation and artifact updates to clawd and adopts the returned snapshots', async () => {
+  it('forwards mission writes to clawd and adopts the returned snapshots', async () => {
     const snapshot = createEmptySnapshot();
     const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
@@ -21,9 +21,12 @@ describe('mission IPC', () => {
     const execution = { id: mission.id, revision: 0, action: 'run' };
     await expect(handlers.get('mission:execute')!({}, execution)).resolves.toBe(snapshot);
     expect(request).toHaveBeenLastCalledWith('mission/execution/update', { input: execution });
-    expect(adopt).toHaveBeenCalledTimes(3);
+    const deletion = { id: mission.id, revision: 0 };
+    await expect(handlers.get('mission:delete')!({}, deletion)).resolves.toBe(snapshot);
+    expect(request).toHaveBeenLastCalledWith('mission/delete', { input: deletion });
+    expect(adopt).toHaveBeenCalledTimes(4);
     request.mockRejectedValueOnce(new Error('Stale revision'));
     await expect(handlers.get('mission:update')!({}, update)).rejects.toThrow('Stale revision');
-    expect(adopt).toHaveBeenCalledTimes(3);
+    expect(adopt).toHaveBeenCalledTimes(4);
   });
 });

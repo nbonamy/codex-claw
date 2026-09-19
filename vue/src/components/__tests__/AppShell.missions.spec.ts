@@ -1,4 +1,5 @@
 import { flushPromises } from '@vue/test-utils';
+import { ElMessageBox } from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createMission } from '@codex-claw/core/missions';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
@@ -74,6 +75,28 @@ describe('AppShell missions', () => {
     expect(wrapper.find('.mission-workspace').exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(false);
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-agent', snapshot.agents[0]!.id);
+    expect(wrapper.find('.mission-workspace').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
+  });
+
+  it('confirms mission deletion, removes its persisted revision, and leaves the mission surface', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
+    const deleteMission = vi.fn().mockResolvedValue(undefined);
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const wrapper = mountShell({ snapshot, deleteMission });
+    const navigation = wrapper.findComponent({ name: 'AppShellNavigation' });
+
+    await navigation.vm.$emit('select-mission', mission.id);
+    await navigation.vm.$emit('delete-mission', mission.id);
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledWith(
+      'The mission and its agent conversations will be removed from Codex Claw. Its worktree and files will remain.',
+      'Delete Add billing?',
+      { cancelButtonText: 'Cancel', confirmButtonText: 'Delete mission', type: 'warning' },
+    );
+    expect(deleteMission).toHaveBeenCalledWith({ id: mission.id, revision: mission.revision });
     expect(wrapper.find('.mission-workspace').exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
   });

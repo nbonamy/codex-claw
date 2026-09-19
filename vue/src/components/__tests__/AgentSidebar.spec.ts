@@ -320,6 +320,13 @@ describe('mission navigation', () => {
     expect(row.attributes('aria-pressed')).toBe('true');
     await row.trigger('click');
     expect(wrapper.emitted('select-mission')).toStrictEqual([[mission.id]]);
+    await row.trigger('contextmenu', { clientX: 80, clientY: 120 });
+    const deleteAction = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+      .find(button => button.textContent?.trim() === 'Delete mission');
+    expect(deleteAction).toBeDefined();
+    deleteAction!.click();
+    await flushPromises();
+    expect(wrapper.emitted('delete-mission')).toStrictEqual([[mission.id]]);
     await group.get('.agent-sidebar__workspace-label').trigger('click');
     expect(group.find('.agent-sidebar__agent').exists()).toBe(false);
   });

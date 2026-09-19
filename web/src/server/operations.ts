@@ -69,6 +69,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   createAgent: [backendMethods.agentCreate, named('input')],
   executeMission: [backendMethods.missionExecute, named('input')],
   createMission: [backendMethods.missionCreate, named('input')],
+  deleteMission: [backendMethods.missionDelete, named('input')],
   updateMission: [backendMethods.missionUpdate, named('input')],
   createQuickChat: [backendMethods.agentQuickChatCreate, named('input')],
   updateAgent: [backendMethods.agentUpdate, named('input')],

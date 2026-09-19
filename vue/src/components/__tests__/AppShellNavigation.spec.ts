@@ -55,6 +55,7 @@ describe('AppShellNavigation', () => {
     const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
 
     sidebar.vm.$emit('select-agent', 'agent-dina');
+    sidebar.vm.$emit('delete-mission', 'mission-1');
     sidebar.vm.$emit('cleanup-pull-request', 'agent-dina');
     sidebar.vm.$emit('open-in', {
       agentId: 'agent-dina',
@@ -62,6 +63,7 @@ describe('AppShellNavigation', () => {
     });
 
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('delete-mission')).toStrictEqual([['mission-1']]);
     expect(wrapper.emitted('cleanup-pull-request')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('open-in')).toStrictEqual([
       [

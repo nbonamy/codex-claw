@@ -86,6 +86,9 @@ describe('Claw web operations', () => {
     const update = { id: 'mission-1', revision: 0, action: 'save' };
     await invokeClawWebOperation({ request }, 'updateMission', [update]);
     expect(request).toHaveBeenLastCalledWith('mission/update', { input: update });
+    const deletion = { id: 'mission-1', revision: 1 };
+    await invokeClawWebOperation({ request }, 'deleteMission', [deletion]);
+    expect(request).toHaveBeenLastCalledWith('mission/delete', { input: deletion });
   });
 
   it('adapts the backend snapshot envelope for the Vue client', async () => {

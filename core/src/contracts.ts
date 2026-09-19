@@ -796,6 +796,7 @@ export type CodexClawApi = {
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
   executeMission(input: import('./mission-execution').MissionExecutionInput): Promise<AppSnapshot>;
   createMission(input: import('./missions').CreateMissionInput): Promise<AppSnapshot>;
+  deleteMission(input: import('./missions').DeleteMissionInput): Promise<AppSnapshot>;
   updateMission(input: import('./missions').UpdateMissionInput): Promise<AppSnapshot>;
   createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;

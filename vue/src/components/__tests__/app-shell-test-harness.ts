@@ -12,7 +12,7 @@ import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
-import type { CreateMissionInput, Mission } from '@codex-claw/core/missions';
+import type { CreateMissionInput, DeleteMissionInput, Mission } from '@codex-claw/core/missions';
 import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 
 const ConversationPaneStub = defineComponent({
@@ -57,6 +57,7 @@ const AgentSidebarStub = defineComponent({
     'create-agent-worktree-in-repository',
     'create-quick-chat',
     'create-mission',
+    'delete-mission',
     'duplicate-agent',
     'edit-agent',
     'fork-agent',
@@ -112,6 +113,7 @@ export function mountShell(overrides: Partial<{
   createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission: (input: CreateMissionInput) => Promise<Mission>;
+  deleteMission: (input: DeleteMissionInput) => Promise<void>;
   executeMission: (input: MissionExecutionInput) => Promise<void>;
   createQuickChat: (input: import('@codex-claw/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
@@ -189,6 +191,7 @@ export function mountShell(overrides: Partial<{
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createMission: overrides.createMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
+      deleteMission: overrides.deleteMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
       executeMission: overrides.executeMission ?? vi.fn().mockResolvedValue(undefined),
       createQuickChat: overrides.createQuickChat ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),

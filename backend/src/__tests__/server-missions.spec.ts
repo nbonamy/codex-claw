@@ -24,6 +24,8 @@ describe('mission backend boundary', () => {
       expect(onEvent.mock.calls.at(-1)?.[0]).toMatchObject({ type: 'snapshot.updated', payload: { missions: restored.missions } });
       await expect(call('mission/update', { id: mission.id, revision: 0, artifacts, stageAgentIds: {}, action: 'save' })).rejects.toThrow('changed');
       expect(snapshotFromPersistedState(disk).missions).toStrictEqual(restored.missions);
+      await call('mission/delete', { id: mission.id, revision: 1 });
+      expect(snapshotFromPersistedState(disk).missions).toStrictEqual([]);
       expect(snapshotFromPersistedState({ ...disk as object, missions: [{}] }).missions).toStrictEqual([]);
       expect(snapshotFromPersistedState({ teams: [] }).missions).toBeUndefined();
     } finally { await server.close(); }
@@ -55,9 +57,13 @@ it('routes mission execution through the backend driver and worktree manager, th
     await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
     const snapshot = createInitialSnapshot();
     const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
+    const interrupt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
+    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
+    const releaseConversation = vi.fn();
     const driver: AgentBackendDriver = {
       backend: 'codex', getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }), getCapabilities: () => codexBackendCapabilities,
-      sendPrompt, interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'mission-thread' } }), respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
+      sendPrompt, interrupt, archiveAgentConversation, releaseConversation,
+      respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
       listSkills: async () => [{ name: 'grill-with-docs', path: '/skills/grill-with-docs/SKILL.md', enabled: true }],
     };
     let disk: unknown;
@@ -80,7 +86,17 @@ it('routes mission execution through the backend driver and worktree manager, th
     await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'accept', runId: run.id });
     expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);
     expect(current().stage).toBe('requirements');
-    expect(snapshot.agents.find(agent => agent.id === run.workerId)?.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' });
+    const worker = snapshot.agents.find(agent => agent.id === run.workerId)!;
+    expect(worker.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' });
+    worker.status = { type: 'working' };
+    const missionId = current().id;
+    await call('mission/delete', { id: missionId, revision: current().revision });
+    expect(snapshot.missions).toStrictEqual([]);
+    expect(snapshot.agents.some(agent => agent.id === worker.id)).toBe(false);
+    expect(snapshot.teams[0]!.agentIds).not.toContain(worker.id);
+    expect(interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: worker.id }));
+    expect(archiveAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ id: worker.id }));
+    expect(releaseConversation).toHaveBeenCalledWith(worker.id);
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
 });
 

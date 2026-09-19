@@ -9,6 +9,7 @@ export const backendMethods = {
   agentCreate: 'agent/create',
   missionExecute: 'mission/execution/update',
   missionCreate: 'mission/create',
+  missionDelete: 'mission/delete',
   missionUpdate: 'mission/update',
   agentQuickChatCreate: 'agent/quickChat/create',
   agentDelete: 'agent/delete',

@@ -620,6 +620,23 @@ export class ClawBackendServer {
         this.emitSnapshotUpdated(snapshot);
         return createClawRpcResult(message.id, snapshot);
       }
+      case backendMethods.missionDelete: {
+        const input = requireRecord(message.params).input as import('@codex-claw/core/missions').DeleteMissionInput;
+        await this.missions.remove(input, async workers => {
+          for (const worker of workers) {
+            if (worker.status.type === 'working' || worker.status.type === 'awaitingInput') {
+              await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
+            }
+            if (worker.backendSession) {
+              await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent: worker });
+              await this.driverRpc?.handle(backendMethods.driverConversationRelease, { backend: worker.backend, agentId: worker.id });
+            }
+          }
+        });
+        const snapshot = await this.remoteTeams.clientSnapshot();
+        this.emitSnapshotUpdated(snapshot);
+        return createClawRpcResult(message.id, snapshot);
+      }
       case backendMethods.agentQuickChatCreate: {
         const input = requireQuickChatCreateInput(message.params);
         const remoteTeamPointer = this.remoteTeams.pointerForAgentInput(input);
