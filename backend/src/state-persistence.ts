@@ -1,3 +1,4 @@
+import { isThreadFlags } from '@codex-claw/core/thread-flags';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isPlanReview } from '@codex-claw/core/plan-review';
@@ -42,6 +43,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('@codex-claw/core/plan-review').PlanReview;
+  threadFlags?: import('@codex-claw/core/thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   statusText?: string;
   lastActivityAt?: string;
@@ -166,6 +168,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.openInApplication ? { openInApplication: agent.openInApplication } : {}),
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
+    ...(agent.threadFlags ? { threadFlags: structuredClone(agent.threadFlags) } : {}),
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
     statusText: agent.statusText,
@@ -389,6 +392,7 @@ function sanitizeAgent(value: unknown): Agent | null {
     ...(openInApplication ? { openInApplication } : {}),
     ...(contextUsage ? { contextUsage } : {}),
     ...(plan ? { plan } : {}),
+    ...(isThreadFlags(value.threadFlags) ? { threadFlags: structuredClone(value.threadFlags) } : {}),
     ...(isPlanReview(value.planReview) ? { planReview: { ...value.planReview } } : {}),
     ...(goal ? { goal } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),

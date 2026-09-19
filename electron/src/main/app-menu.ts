@@ -16,12 +16,14 @@ export type AppMenuCallbacks = {
   sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
+  isDebugThreadFlagSet?: () => boolean;
+  setDebugThreadFlag?: (value: boolean) => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -34,6 +36,8 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
+    isDebugThreadFlagSet: options.isDebugThreadFlagSet,
+    setDebugThreadFlag: options.setDebugThreadFlag,
   };
   const menu = Menu.buildFromTemplate(buildAppMenuTemplate(callbacks, menuOptions));
   appendAgentActionsToEditMenu(menu, callbacks);
@@ -75,6 +79,18 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
       {
         label: 'Agent Fixtures',
         submenu: buildDebugAgentFixtures(callbacks),
+      },
+      {
+        label: 'Thread Flags',
+        submenu: [
+          {
+            label: 'Delegate to Worktree',
+            type: 'checkbox',
+            checked: callbacks.isDebugThreadFlagSet?.() ?? false,
+            enabled: Boolean(callbacks.setDebugThreadFlag),
+            click: (item) => callbacks.setDebugThreadFlag?.(item.checked),
+          },
+        ],
       },
       {
         label: 'UI Previews',

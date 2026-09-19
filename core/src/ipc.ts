@@ -1,6 +1,7 @@
 import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  respondToThreadFlag: 'agent:thread-flag:respond',
   respondToPlanReview: 'agent:plan-review:respond',
   readEngineInstructions: 'settings:instructions:read',
   saveEngineInstructions: 'settings:instructions:save',

@@ -352,6 +352,7 @@ export type Agent = {
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('./plan-review').PlanReview;
+  threadFlags?: import('./thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   isRegistered?: boolean;
   mcpSessionId?: string;
@@ -729,6 +730,7 @@ export type DesktopUpdateStatus = {
 };
 
 export type CodexClawApi = {
+  respondToThreadFlag(agentId: string, response: import('./thread-flags').ThreadFlagResponse): Promise<AppSnapshot>;
   respondToPlanReview(agentId: string, response: import('./plan-review').PlanReviewResponse): Promise<AppSnapshot>;
   getSnapshot(): Promise<AppSnapshot>;
   getSnapshotState(): Promise<RendererSnapshotState>;

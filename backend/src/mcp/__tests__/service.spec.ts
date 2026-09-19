@@ -36,6 +36,40 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('sets and clears the payload-free delegate_to_worktree flag over MCP', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: any[] = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    const set = await callTool(url, 'agent-dina', 'toggle_thread_flag', {
+      id: 'delegate_to_worktree', value: true,
+    });
+    expect(set.result.structuredContent).toStrictEqual({
+      success: true, id: 'delegate_to_worktree', value: true,
+    });
+    expect(snapshot.agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
+    expect(events.at(-1)).toEqual(expect.objectContaining({
+      type: 'agent.updated',
+      payload: expect.objectContaining({ threadFlags: { delegate_to_worktree: true } }),
+    }));
+
+    const invalid = await callTool(url, 'agent-dina', 'toggle_thread_flag', {
+      id: 'delegate_to_worktree', value: true, payload: { button: true },
+    });
+    expect(invalid.result.isError).toBe(true);
+    expect(invalid.result.content[0].text).toContain('does not accept a payload');
+
+    await callTool(url, 'agent-dina', 'toggle_thread_flag', {
+      id: 'delegate_to_worktree', value: false,
+    });
+    expect(snapshot.agents[0]!.threadFlags).toBeUndefined();
+    expect(events.at(-1)).toEqual(expect.objectContaining({
+      type: 'agent.updated',
+      payload: expect.objectContaining({ threadFlags: null }),
+    }));
+  });
+
   it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
     service = new ClawMcpService({ snapshot: createInitialSnapshot() });
     const mcpUrl = await service.start();

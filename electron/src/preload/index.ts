@@ -6,6 +6,7 @@ import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/e
 const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
 
 const api: CodexClawApi = {
+  respondToThreadFlag: (agentId, response) => ipc.invoke(ipcChannels.respondToThreadFlag, agentId, response),
   getSnapshot: () => ipc.invoke(ipcChannels.getSnapshot),
   getSnapshotState: () => ipc.invoke(ipcChannels.getSnapshotState),
   listSshHosts: () => ipc.invoke(ipcChannels.listSshHosts),

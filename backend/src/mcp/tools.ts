@@ -67,6 +67,20 @@ export function createCodexClawMcpServer(
     statusLength: status.length,
   }, () => coordinator.setStatus(callerAgentId, status)));
 
+  server.registerTool('toggle_thread_flag', {
+    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent; clear it when that is no longer appropriate. This flag takes no payload.',
+    inputSchema: {
+      id: z.enum(['delegate_to_worktree']).describe('Predefined semantic thread flag.'),
+      value: z.boolean().describe('True sets the flag; false clears it.'),
+      payload: z.unknown().optional().describe('Optional kind-specific payload. delegate_to_worktree does not accept one.'),
+    },
+  }, ({ id, value, payload }) => toolResult('toggle_thread_flag', {
+    agentId: callerAgentId,
+    id,
+    value,
+    hasPayload: payload !== undefined,
+  }, () => coordinator.toggleThreadFlag(callerAgentId, { id, value, payload })));
+
   server.registerTool('celebrate', {
     description: 'Request a transient visual celebration in Codex Claw when celebrations are enabled by the user. Confetti, stars, and shapes fit ordinary wins, while schoolPride marks a major team achievement.',
     inputSchema: {

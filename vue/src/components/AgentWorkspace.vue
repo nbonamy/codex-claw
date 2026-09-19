@@ -48,10 +48,12 @@
       :history-load-failed="historyLoadFailed"
       :history-loading="isConversationLoading"
       :has-visible-messages="hasVisibleMessages"
+      :thread-flag-busy="threadFlagBusy"
       @annotate-attachment="openAttachmentImageAnnotation"
       @add-text-annotation="addChatTextAnnotation($event.selection, $event.comment)"
       @close-plan="closeExecutionPlan"
       @retry-history="retryConversationHistory"
+      @thread-flag="respondToThreadFlag($event)"
       @remove-text-annotation="removeChatTextAnnotation"
     />
     <RightWorkspacePanel
@@ -190,6 +192,8 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
+  respondToThreadFlag: (action: 'execute' | 'dismiss') => Promise<void>;
+  threadFlagBusy: boolean;
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];

@@ -196,6 +196,8 @@
         :commit-agent-git-changes="props.commitAgentGitChanges"
         :confirm-plan="confirmPlan"
         :respond-to-plan-review="respondToPlanReview"
+        :respond-to-thread-flag="respondToThreadFlag"
+        :thread-flag-busy="threadFlagBusy"
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
         :chat-text-annotations="activeChatTextAnnotations"
@@ -597,6 +599,7 @@ const props = withDefaults(defineProps<{
   retryAgentHistory?: () => Promise<void>;
   sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
+  respondToThreadFlagAction?: (action: 'execute' | 'dismiss') => Promise<void>;
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
@@ -1967,6 +1970,19 @@ async function respondToPlanReview(resolution: 'accept' | 'revise' | 'cancel', f
   }
   if (currentAgent.value?.id === agentId) emit('update:planMode', resolution === 'revise');
   if (agentId) closeRightWorkspaceTab(agentId, 'plan');
+}
+
+const threadFlagBusy = ref(false);
+async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+  if (!props.respondToThreadFlagAction || threadFlagBusy.value) return;
+  threadFlagBusy.value = true;
+  try {
+    await props.respondToThreadFlagAction(action);
+  } catch (error) {
+    ElMessage.error(localizedErrorMessage(error, t));
+  } finally {
+    threadFlagBusy.value = false;
+  }
 }
 
 function confirmPlan(): void {

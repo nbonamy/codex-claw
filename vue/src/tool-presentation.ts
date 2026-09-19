@@ -70,7 +70,7 @@ const COMPUTER_USE_TOOLS = new Set([
   'computer-use-type-text',
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
-const AGENT_TOOLS = new Set(['create-agent', 'list-agents', 'register-agent', 'set-status']);
+const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
 const WORKSPACE_TOOLS = new Set(['create-worktree', 'list-repos', 'list-worktrees']);
 
 export function presentClawTool(

@@ -319,6 +319,30 @@ describe('ClawBackendServer', () => {
     ]));
   });
 
+  it('sets and clears delegate_to_worktree through the debug protocol', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
+      status: { type: 'idle' }, createdAt: '2026-09-19T00:00:00.000Z', updatedAt: '2026-09-19T00:00:00.000Z',
+    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.activeAgentId = 'agent-dina';
+    const server = new ClawBackendServer({ version: 'test-version', snapshot });
+
+    const set = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-thread-flag-set', method: backendMethods.debugThreadFlagSet,
+      params: { agentId: 'agent-dina', value: true },
+    });
+    expect((set as { result: AppSnapshot }).result.agents[0]?.threadFlags)
+      .toStrictEqual({ delegate_to_worktree: true });
+
+    const cleared = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-thread-flag-clear', method: backendMethods.debugThreadFlagSet,
+      params: { agentId: 'agent-dina', value: false },
+    });
+    expect((cleared as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
+  });
+
   it('routes system permission requests through the backend system port', async () => {
     const status: SystemPermissionsStatus = {
       platform: 'darwin',

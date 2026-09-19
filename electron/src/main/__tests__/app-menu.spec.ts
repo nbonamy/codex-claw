@@ -59,6 +59,8 @@ const callbacks = (): AppMenuCallbacks => ({
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
   injectDebugPlanReview: vi.fn(),
+  isDebugThreadFlagSet: vi.fn(() => false),
+  setDebugThreadFlag: vi.fn(),
 });
 
 describe('app menu', () => {
@@ -257,6 +259,7 @@ describe('app menu', () => {
     const debugItems = submenu(debugMenu, 'Debug');
     expect(debugItems.map((item) => item.type === 'separator' ? 'separator' : item.label)).toStrictEqual([
       'Agent Fixtures',
+      'Thread Flags',
       'UI Previews',
       'Effects',
       'separator',
@@ -269,6 +272,10 @@ describe('app menu', () => {
       'Execution Plan',
       'Plan Review',
     ]);
+    expect(nestedMenuItem(debugMenu, 'Debug', 'Thread Flags', 'Delegate to Worktree')).toMatchObject({
+      type: 'checkbox',
+      checked: false,
+    });
     expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
       'Markdown',
       'Image Annotation',
@@ -311,6 +318,8 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Mark as Unread');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Execution Plan');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Plan Review');
+    clickThreadFlagItem(debugMenu, true);
+    clickThreadFlagItem(debugMenu, false);
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Markdown');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Image Annotation');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Worktree Initialization');
@@ -373,7 +382,21 @@ describe('app menu', () => {
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(1, true);
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(2, false);
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);
+  });
+
+  it('reflects an active worktree delegation flag in the native checkbox', () => {
+    const nextCallbacks = callbacks();
+    nextCallbacks.isDebugThreadFlagSet = vi.fn(() => true);
+
+    const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: true }, 'darwin');
+
+    expect(nestedMenuItem(menu, 'Debug', 'Thread Flags', 'Delegate to Worktree')).toMatchObject({
+      type: 'checkbox',
+      checked: true,
+    });
   });
 
   it('omits image data when the native clipboard has no image', () => {
@@ -489,6 +512,12 @@ function clickNestedItem(
   const item = nestedMenuItem(template, menuLabel, parentLabel, itemLabel);
   if (!item?.click) throw new Error(`${itemLabel} menu item not found`);
   item.click({ checked: true } as never, undefined as never, undefined as never);
+}
+
+function clickThreadFlagItem(template: MenuItemConstructorOptions[], checked: boolean): void {
+  const item = nestedMenuItem(template, 'Debug', 'Thread Flags', 'Delegate to Worktree');
+  if (!item?.click) throw new Error('Delegate to Worktree menu item not found');
+  item.click({ checked } as never, undefined as never, undefined as never);
 }
 
 function installedEditItems(): MenuItemConstructorOptions[] {

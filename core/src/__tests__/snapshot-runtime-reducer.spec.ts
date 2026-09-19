@@ -452,9 +452,10 @@ describe('snapshot runtime reducer', () => {
     });
   });
 
-  it('removes an agent status text when collaboration explicitly clears it', () => {
+  it('removes nullable agent collaboration state when explicitly cleared', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.statusText = 'Reviewing MCP shape';
+    snapshot.agents[0]!.threadFlags = { delegate_to_worktree: true };
 
     applyMainEventToSnapshot(snapshot, {
       seq: 1,
@@ -462,6 +463,7 @@ describe('snapshot runtime reducer', () => {
       type: 'agent.updated',
       payload: {
         id: 'agent-dina',
+        threadFlags: null,
         statusText: null,
         updatedAt: '2026-06-05T00:00:02.000Z',
       },
@@ -469,6 +471,7 @@ describe('snapshot runtime reducer', () => {
     });
 
     expect(snapshot.agents[0]!.statusText).toBeUndefined();
+    expect(snapshot.agents[0]!.threadFlags).toBeUndefined();
   });
 
   it('applies work backlog assignment updates from MCP tools', () => {

@@ -483,6 +483,11 @@ export const messages = {
     },
     chat: {
       quickChatHeadline: 'What can I help with?',
+      threadFlags: {
+        prompt: 'Start implementation in a worktree?',
+        accept: 'Start implementation in a worktree',
+        dismiss: 'Dismiss worktree delegation',
+      },
       subagents: {
         label: 'Subagents',
         triggerActive: 'Subagents ({count} active)',
@@ -867,6 +872,11 @@ export const messages = {
               completed: 'Updated status',
               failed: 'Failed updating status',
               running: 'Updating status',
+            },
+            toggleThreadFlag: {
+              completed: 'Updated thread flag',
+              failed: 'Failed updating thread flag',
+              running: 'Updating thread flag',
             },
           },
         },

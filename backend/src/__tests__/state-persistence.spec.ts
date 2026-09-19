@@ -96,6 +96,19 @@ describe('AppStatePersistence', () => {
     expect(restored.agents[0].delegatedByAgentId).toBe('agent-main');
   });
 
+  it('round-trips valid thread flags and drops invalid persisted values', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].threadFlags = { delegate_to_worktree: true };
+    const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
+      agents: Array<Record<string, unknown>>;
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0].threadFlags)
+      .toStrictEqual({ delegate_to_worktree: true });
+    persisted.agents[0].threadFlags = { delegate_to_worktree: false };
+    expect(snapshotFromPersistedState(persisted).agents[0].threadFlags).toBeUndefined();
+  });
+
   it('round-trips tracked pull request state and rejects incomplete tracking records', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].pullRequest = {

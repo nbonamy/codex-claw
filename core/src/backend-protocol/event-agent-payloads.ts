@@ -1,3 +1,4 @@
+import { isThreadFlags } from '../thread-flags';
 import { isAppTextDescriptor } from '../app-text';
 import {
   isSubagentActivityKind,
@@ -256,6 +257,7 @@ function expectAgentUpdate(value: unknown, path: string): void {
   expectOptional(value, 'contextUsage', path, expectContextUsage);
   expectOptional(value, 'plan', path, expectPlan);
   expectOptional(value, 'goal', path, expectGoal);
+  expectOptional(value, 'threadFlags', path, (candidate, candidatePath) => expectNullable(candidate, candidatePath, (flagValue, flagPath) => expectKnownShape(flagValue, flagPath, isThreadFlags, 'thread flags')));
   expectOptional(value, 'isRegistered', path, expectBoolean);
   expectOptional(value, 'status', path, expectAgentStatus);
 }

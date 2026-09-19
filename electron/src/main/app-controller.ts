@@ -513,6 +513,9 @@ export class AppController {
     ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
     });
+    ipc.handle(ipcChannels.respondToThreadFlag, async (_event, agentId: string, response: import('@codex-claw/core/thread-flags').ThreadFlagResponse) => {
+      return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentThreadFlagRespond, { agentId, response }));
+    });
     ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
@@ -1048,6 +1051,7 @@ export class AppController {
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
+    const wasDebugThreadFlagSet = this.isDebugThreadFlagSet();
     this.snapshot = snapshot;
     this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
@@ -1056,14 +1060,17 @@ export class AppController {
       return withRendererMediaUrls(snapshot, this.localMediaRegistry);
     } finally {
       this.transientSnapshots.delete(snapshot);
+      this.refreshDebugThreadFlagMenuIfChanged(wasDebugThreadFlagSet);
     }
   }
 
   private async adoptBackendMutationSnapshot(nextSnapshot: AppSnapshot): Promise<AppSnapshot> {
     if (!this.snapshot) throw new Error('clawd snapshot is not available.');
+    const wasDebugThreadFlagSet = this.isDebugThreadFlagSet();
     replaceAppSnapshot(this.snapshot, nextSnapshot);
     this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
+    this.refreshDebugThreadFlagMenuIfChanged(wasDebugThreadFlagSet);
     return nextSnapshot;
   }
 
@@ -1523,12 +1530,23 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      isDebugThreadFlagSet: () => this.isDebugThreadFlagSet(),
+      setDebugThreadFlag: (value) => this.setDebugThreadFlag(value),
     };
+  }
+
+  private isDebugThreadFlagSet(snapshot = this.snapshot): boolean {
+    const activeAgent = snapshot?.agents.find((agent) => agent.id === snapshot.activeAgentId);
+    return activeAgent?.threadFlags?.delegate_to_worktree === true;
+  }
+
+  private refreshDebugThreadFlagMenuIfChanged(previousValue: boolean): void {
+    if (!app?.isPackaged && previousValue !== this.isDebugThreadFlagSet()) this.refreshAppMenu();
   }
 
   private toggleDebugExecutionPlan(): void {
@@ -1572,6 +1590,21 @@ export class AppController {
       }));
   }
 
+  private setDebugThreadFlag(value: boolean): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app?.isPackaged) return;
+
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugThreadFlagSet, { agentId, value })
+      .then((snapshot) => this.adoptBackendSnapshot(snapshot))
+      .catch((error) => {
+        warnMain('debug', 'failed to set thread flag fixture', {
+          agentId,
+          detail: error instanceof Error ? error.message : String(error),
+        });
+        this.refreshAppMenu();
+      });
+  }
+
   private emitBackendEvent(event: ClawBackendEvent): void {
     if (event.type === 'snapshot.updated') event = { ...event, payload: projectClientSnapshot(event.payload, 'desktop') };
     if (event.snapshot) event = { ...event, snapshot: projectClientSnapshot(event.snapshot, 'desktop') };
@@ -1595,6 +1628,7 @@ export class AppController {
   }
 
   private applyBackendEvent(event: ClawBackendEvent, notifyRenderer: boolean): void {
+    const wasDebugThreadFlagSet = this.isDebugThreadFlagSet();
     const rendererEvent = eventForRenderer(event);
     const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
     for (const snapshot of this.transientSnapshots) {
@@ -1613,6 +1647,7 @@ export class AppController {
 
     this.lastBackendEventSeq = event.seq;
     this.syncPowerSaveBlocker();
+    this.refreshDebugThreadFlagMenuIfChanged(wasDebugThreadFlagSet);
     if (notifyRenderer && this.mainWindow && !this.mainWindow.isDestroyed()) {
       sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls(rendererEvent, this.localMediaRegistry));
     }

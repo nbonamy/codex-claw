@@ -37,6 +37,7 @@ import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from 
 describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
+      respondToThreadFlag: 'agent:thread-flag:respond',
       respondToPlanReview: 'agent:plan-review:respond',
       readEngineInstructions: 'settings:instructions:read',
       saveEngineInstructions: 'settings:instructions:save',
@@ -363,7 +364,8 @@ describe('ipc channels', () => {
     type AgentUpdatedEvent = Extract<MainToRendererEvent, { type: 'agent.updated' }>;
     expectTypeOf<AgentUpdatedEvent['payload']>()
       .toEqualTypeOf<
-        Omit<Partial<Agent>, 'id' | 'statusText'> & {
+        Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText'> & {
+          threadFlags?: Agent['threadFlags'] | null;
           id: string;
           statusText?: string | null;
         }
