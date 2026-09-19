@@ -44,4 +44,7 @@ export function registerAgentGitIpcHandlers(
   ipc.handle(ipcChannels.mergeAgentGitBranch, (_event, agentId, input) => (
     requestClawBackend(getBackendClient(), backendMethods.agentGitMerge, { agentId, input })
   ));
+  ipc.handle(ipcChannels.updateAgentGitBranchFromBase, (_event, agentId, input) => (
+    requestClawBackend(getBackendClient(), backendMethods.agentGitUpdateFromBase, { agentId, input })
+  ));
 }

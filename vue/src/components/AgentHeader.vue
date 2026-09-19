@@ -72,6 +72,7 @@
         :push-branch="pushGitBranch"
         :create-pull-request="createGitPullRequest"
         :merge-branch="mergeGitBranch"
+        :update-from-base="updateGitBranchFromBase"
         :report-back-agent-name="reportBackAgentName"
       />
       <OpenInControl
@@ -155,6 +156,7 @@ const props = defineProps<{
   pushGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   createGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   mergeGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  updateGitBranchFromBase?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
 }>();
 
 const emit = defineEmits<{

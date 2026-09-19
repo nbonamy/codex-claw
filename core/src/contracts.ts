@@ -17,6 +17,8 @@ import type {
   AgentGitPushInput,
   AgentGitStageInput,
   AgentGitStatus,
+  AgentGitUpdateFromBaseInput,
+  AgentGitUpdateFromBaseResult,
   AgentGitWorkflow,
   AgentPullRequestTracking,
   TurnGitDiff
@@ -111,6 +113,8 @@ export type {
   AgentGitPushInput,
   AgentGitStageInput,
   AgentGitStatus,
+  AgentGitUpdateFromBaseInput,
+  AgentGitUpdateFromBaseResult,
   AgentGitWorkflow,
   AgentPullRequestTracking,
   TurnGitDiff,
@@ -764,6 +768,7 @@ export type CodexClawApi = {
   createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow>;
   createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
   mergeAgentGitBranch(agentId: string, input: AgentGitMergeInput): Promise<AgentGitWorkflow>;
+  updateAgentGitBranchFromBase(agentId: string, input: AgentGitUpdateFromBaseInput): Promise<AgentGitUpdateFromBaseResult>;
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;
   openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;

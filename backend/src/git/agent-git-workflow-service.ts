@@ -9,6 +9,7 @@ import type {
   AgentGitMessageGenerationResult,
   AgentGitOperationProgress,
   AgentGitPullRequest,
+  AgentGitUpdateFromBaseResult,
   AgentGitWorkflow,
   AppSnapshot,
 } from '@codex-claw/core/contracts';
@@ -39,13 +40,14 @@ export type AgentGitWorkflowServiceOptions = {
   persistAndEmitSnapshot: () => Promise<AppSnapshot>;
   refreshGitStatus: (agentId: string) => Promise<void>;
   refreshWorkspaceIdentity: (agentId: string) => Promise<boolean>;
+  sendPrompt: (agentId: string, prompt: string) => void;
 };
 
 /** Owns the complete local workflow for app-level agent Git requests. */
 export class AgentGitWorkflowService {
   constructor(private readonly options: AgentGitWorkflowServiceOptions) {}
 
-  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow> {
+  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult> {
     const { method, agentId, params } = request;
     switch (method) {
       case backendMethods.agentGitDiffGet:
@@ -119,6 +121,8 @@ export class AgentGitWorkflowService {
         return this.createPullRequest(agent, agentId, params);
       case backendMethods.agentGitMerge:
         return this.merge(agent, agentId, params);
+      case backendMethods.agentGitUpdateFromBase:
+        return this.updateFromBase(agent, agentId, params);
     }
   }
 
@@ -289,6 +293,18 @@ export class AgentGitWorkflowService {
     return result;
   }
 
+  private async updateFromBase(agent: Agent, agentId: string, params: Record<string, unknown>): Promise<AgentGitUpdateFromBaseResult> {
+    const input = requireConfirmed(params.input, 'Updating a branch from its base branch');
+    const result = await this.options.git.updateFromBase(requireAgentFolder(agent), input.allowDirty === true);
+    if (result.conflicts.length > 0) {
+      this.options.sendPrompt(agentId, conflictResolutionPrompt(result));
+    }
+    return {
+      ...result,
+      workflow: await this.workflow(agent, { refreshStatus: true }),
+    };
+  }
+
   private emitOperationProgress(
     agentId: string,
     operation: AgentGitOperationProgress['operation'],
@@ -300,6 +316,17 @@ export class AgentGitWorkflowService {
       payload: { operation, phase } satisfies AgentGitOperationProgress,
     });
   }
+}
+
+function conflictResolutionPrompt(result: { baseBranch: string; branch: string; conflicts: string[] }): string {
+  return [
+    `Git merged \`${result.baseBranch}\` into \`${result.branch}\`, but conflicts need to be resolved.`,
+    '',
+    'Conflicted files:',
+    ...result.conflicts.map((path) => `- ${path}`),
+    '',
+    'Resolve the merge conflicts, preserve the intended changes from both branches, run the relevant tests, and commit the merge when ready.',
+  ].join('\n');
 }
 
 function parseGitDiffTarget(value: unknown): AgentGitDiffTarget {

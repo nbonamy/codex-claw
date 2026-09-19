@@ -35,6 +35,7 @@ describe('AgentGitWorkflowService', () => {
       persistAndEmitSnapshot: vi.fn(),
       refreshGitStatus: vi.fn(),
       refreshWorkspaceIdentity: vi.fn(),
+      sendPrompt: vi.fn(),
     });
 
     await expect(service.execute({
@@ -70,6 +71,7 @@ describe('AgentGitWorkflowService', () => {
       persistAndEmitSnapshot: vi.fn(),
       refreshGitStatus: vi.fn(),
       refreshWorkspaceIdentity: vi.fn(),
+      sendPrompt: vi.fn(),
     });
 
     const result = await service.execute({
@@ -114,6 +116,7 @@ describe('AgentGitWorkflowService', () => {
       persistAndEmitSnapshot,
       refreshGitStatus: vi.fn(),
       refreshWorkspaceIdentity: vi.fn(),
+      sendPrompt: vi.fn(),
     });
 
     await service.execute({
@@ -125,5 +128,79 @@ describe('AgentGitWorkflowService', () => {
     expect(archiveConversation).toHaveBeenCalledWith(agent);
     expect(snapshot.agents).toStrictEqual([]);
     expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
+  });
+
+  it('hands merge conflicts to the affected agent with branch context', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0] as Agent;
+    agent.folder = '/repo-feature';
+    const updateFromBase = vi.fn().mockResolvedValue({
+      baseBranch: 'main',
+      branch: 'feature/demo',
+      conflicts: ['src/app.ts', 'src/state.ts'],
+    });
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    });
+    const sendPrompt = vi.fn();
+    const service = new AgentGitWorkflowService({
+      applyEvent: vi.fn(),
+      archiveConversation: vi.fn(),
+      delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(),
+      releaseConversation: vi.fn(),
+      getSnapshot: () => snapshot,
+      getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
+      git: { updateFromBase, workflow } as unknown as AgentGitService,
+      persistAndEmitSnapshot: vi.fn(),
+      refreshGitStatus: vi.fn(),
+      refreshWorkspaceIdentity: vi.fn(),
+      sendPrompt,
+    });
+
+    await expect(service.execute({
+      method: backendMethods.agentGitUpdateFromBase,
+      agentId: agent.id,
+      params: { input: { confirmed: true, allowDirty: true } },
+    }, agent)).resolves.toMatchObject({
+      baseBranch: 'main',
+      branch: 'feature/demo',
+      conflicts: ['src/app.ts', 'src/state.ts'],
+      workflow: { branch: 'feature/demo' },
+    });
+
+    expect(updateFromBase).toHaveBeenCalledWith('/repo-feature', true);
+    expect(sendPrompt).toHaveBeenCalledWith(agent.id, expect.stringMatching(
+      /merged `main` into `feature\/demo`[\s\S]*src\/app\.ts[\s\S]*resolve the merge conflicts/i,
+    ));
+  });
+
+  it('does not prompt the agent after a clean base-branch update', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0] as Agent;
+    const updateFromBase = vi.fn().mockResolvedValue({ baseBranch: 'main', branch: 'feature/demo', conflicts: [] });
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    });
+    const sendPrompt = vi.fn();
+    const service = new AgentGitWorkflowService({
+      applyEvent: vi.fn(), archiveConversation: vi.fn(), delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(), releaseConversation: vi.fn(), getSnapshot: () => snapshot,
+      getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
+      git: { updateFromBase, workflow } as unknown as AgentGitService,
+      persistAndEmitSnapshot: vi.fn(), refreshGitStatus: vi.fn(), refreshWorkspaceIdentity: vi.fn(), sendPrompt,
+    });
+
+    await service.execute({
+      method: backendMethods.agentGitUpdateFromBase,
+      agentId: agent.id,
+      params: { input: { confirmed: true } },
+    }, agent);
+
+    expect(sendPrompt).not.toHaveBeenCalled();
   });
 });

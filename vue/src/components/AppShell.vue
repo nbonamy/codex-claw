@@ -220,6 +220,7 @@
         :latest-conversation-turn-id="conversationLatestTurnId"
         :load-work-items="props.loadWorkItems"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
+        :update-agent-git-branch-from-base="props.updateAgentGitBranchFromBase"
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
         :open-attachment-image-annotation="openAttachmentImageAnnotation"
@@ -548,6 +549,7 @@ const props = withDefaults(defineProps<{
   createAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   createAgentGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   mergeAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  updateAgentGitBranchFromBase?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -663,6 +665,7 @@ const props = withDefaults(defineProps<{
   createAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitBranchCreationIsNotAvailable')); },
   createAgentGitPullRequest: async () => { throw new Error(translate('surface.appShell.pullRequestCreationIsNotAvailable')); },
   mergeAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitMergeIsNotAvailable')); },
+  updateAgentGitBranchFromBase: async () => { throw new Error(translate('surface.appShell.gitUpdateFromBaseIsNotAvailable')); },
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
   openAgentPath: async () => {
     throw new Error(translate('surface.appShell.openInIsNotAvailable'));
