@@ -188,7 +188,7 @@ app event, not from the result text.
 `toggle_thread_flag` exposes a generic `{ id, value, payload? }` shape while Claw keeps a
 strict allowlist and validates each flag's payload contract. Flags describe
 typed thread state rather than presentation. The payload-free
-`delegate_to_worktree` flag is rendered by Claw near the composer; selecting it
+`delegate_to_worktree` flag is rendered by Claw in the composer shelf; selecting it
 submits a fixed delegation prompt through the normal app-owned prompt path.
 Claw clears the flag after that prompt is accepted, on manual dismissal, or
 when the agent calls `toggle_thread_flag` with `value: false`. Failed prompt submission keeps

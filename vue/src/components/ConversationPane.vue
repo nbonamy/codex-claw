@@ -10,7 +10,7 @@
       ref="surface"
       class="conversation-pane__surface"
       :controller="controller"
-      :has-composer-context="textAnnotations.length > 0 || delegateToWorktree"
+      :has-composer-context="textAnnotations.length > 0"
       :message-text-selection="true"
       :transform-message="transformConversationMessage"
       @message-text-selection-change="messageTextSelection = $event"
@@ -60,13 +60,14 @@
           </button>
         </el-tooltip>
       </template>
-      <template #composer-context="{ disabled }">
+      <template v-if="delegateToWorktree" #composer-shelf-actions="{ disabled }">
         <ThreadFlagAffordance
-          v-if="delegateToWorktree"
           :busy="threadFlagBusy || disabled"
           @execute="emit('thread-flag', 'execute')"
           @dismiss="emit('thread-flag', 'dismiss')"
         />
+      </template>
+      <template #composer-context="{ disabled }">
         <ChatTextAnnotationCards
           v-if="textAnnotations.length > 0"
           :annotations="textAnnotations"

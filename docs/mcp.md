@@ -406,7 +406,7 @@ Input:
   contract defines a payload.
 
 The first supported flag is `delegate_to_worktree`. It takes no payload. Claw
-renders it as a compact **Delegate to worktree** affordance near the composer.
+renders it as a compact **Delegate to worktree** action in the composer shelf.
 Activating that affordance submits an app-owned prompt to the current agent to
 delegate the implementation through the existing worktree/co-agent workflow.
 The flag clears only after the prompt is accepted; a failed submission leaves
