@@ -18,18 +18,37 @@ describe('SourcePreviewPanel', () => {
     expect(wrapper.text()).toContain('value');
   });
 
-  it('can hide line numbers and enable line wrap', () => {
+  it('can hide line numbers', () => {
     const wrapper = mount(SourcePreviewPanel, {
       props: {
         content: 'const veryLongValueName = "this is intentionally long";\n',
         language: 'typescript',
         showLineNumbers: false,
-        wordWrap: true,
       },
     });
 
     expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--hide-line-numbers');
-    expect(wrapper.get('.source-preview-panel').classes()).toContain('source-preview-panel--wrap');
+  });
+
+  it('applies wrapping styles to rendered source lines', () => {
+    const unwrapped = mount(SourcePreviewPanel, {
+      props: {
+        content: 'const veryLongValueName = "this is intentionally long";\n',
+        language: 'typescript',
+        wordWrap: false,
+      },
+    });
+    const wrapped = mount(SourcePreviewPanel, {
+      props: {
+        content: 'const veryLongValueName = "this is intentionally long";\n',
+        language: 'typescript',
+        wordWrap: true,
+      },
+    });
+
+    expect(getComputedStyle(unwrapped.get('.line').element).whiteSpace).toBe('pre');
+    expect(getComputedStyle(wrapped.get('.line').element).whiteSpace).toBe('pre-wrap');
+    expect(getComputedStyle(wrapped.get('.line').element).overflowWrap).toBe('anywhere');
   });
 
   it('renders loading, empty, and error states', () => {

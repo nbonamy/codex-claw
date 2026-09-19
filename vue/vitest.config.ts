@@ -11,6 +11,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    css: {
+      // Opt in only components with valuable runtime CSS assertions.
+      include: [/SourcePreviewPanel\.vue/],
+    },
     pool: 'vmThreads',
     vmMemoryLimit: '512MB',
     setupFiles: [path.resolve(__dirname, 'src/test/setup.ts')],

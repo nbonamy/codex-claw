@@ -81,6 +81,10 @@ Reject tests that freeze incidental implementation details:
 - Vue components must be tested by mounting them and asserting rendered DOM,
   accessibility state, user interactions, emitted events, or resulting app
   behavior. This is production behavior and is explicitly encouraged.
+- When meaningful behavior depends on CSS, mount the component with its
+  production styles and assert the resolved behavior on the rendered element.
+  This must prove the selector matches and the cascade applies; use a real
+  browser only when the invariant depends on layout geometry.
 - Do not assert every sentence or phrase in tool descriptions, model prompts,
   help text, or developer instructions. Test dynamic interpolation, conditional
   sections, schemas, and the behavior those instructions enable. If exact copy
