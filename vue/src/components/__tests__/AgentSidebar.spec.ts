@@ -296,8 +296,9 @@ describe('AgentSidebar sessions', () => {
 describe('mission navigation', () => {
   it('uses the native workspace-group and session-row layout for missions', async () => {
     const { createMission } = await import('@codex-claw/core/missions');
-    const { createEmptySnapshot } = await import('@codex-claw/core/snapshot-construction');
-    const mission = createMission(createEmptySnapshot(), { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature' });
+    const { createInitialSnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const missionSnapshot = createInitialSnapshot();
+    const mission = createMission(missionSnapshot, { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature', teamId: missionSnapshot.teams[0]!.id, orchestratorMemberId: missionSnapshot.agents[0]!.id });
     const wrapper = mount(AgentSidebar, {
       props: { agents: [], activeAgentId: null, teamName: 'Team' },
       global: { components: { ElPopover } },

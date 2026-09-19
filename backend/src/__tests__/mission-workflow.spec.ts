@@ -26,18 +26,19 @@ it('executes all mission stages across isolated provider sessions, respects tick
     await git(repo, ['commit', '-m', 'initial']);
     const baseline = await readWorktreeHead(repo);
     const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature' });
+    snapshot.agents[0]!.folder = repo;
+    const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
     const started: string[] = [];
-    const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
+    const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder, validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       listSkills: async () => ['grill-with-docs', 'to-spec', 'to-tickets', 'implement', 'tdd', 'code-review'].map(name => ({ name, path: `/skills/${name}/SKILL.md`, enabled: true })),
       send: async agent => { started.push(agent.id); }, interrupt: async () => {},
     });
     const current = () => snapshot.missions![0]!;
     const command = (input: Omit<MissionExecutionInput, 'id' | 'revision'> | Record<string, unknown>) => service.execute({ ...input, id: mission.id, revision: current().revision } as MissionExecutionInput);
-    await command({ action: 'configure', teamId: snapshot.teams[0]!.id, repoPath: repo, memberIds: snapshot.agents.map(agent => agent.id) });
+    await command({ action: 'attachRepository', repoPath: repo });
     const submit = async (artifacts: MissionArtifacts) => {
       const run = current().execution!.runs.at(-1)!;
       await service.submit(run.workerId!, { missionId: mission.id, runId: run.id, summary: `${run.stage} ready`, artifacts });

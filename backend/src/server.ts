@@ -5,6 +5,8 @@ import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core
 import { MissionService } from './mission-service';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
+import os from 'node:os';
+import { mkdir } from 'node:fs/promises';
 import { createEntityId } from '@codex-claw/core/ids';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
@@ -72,6 +74,7 @@ export type ClawBackendServerOptions = {
   agentGitService?: AgentGitService;
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
+  ensureMissionHome?: (missionId: string) => Promise<string>;
 };
 
 export type SystemPermissionsPort = {
@@ -188,6 +191,11 @@ export class ClawBackendServer {
       snapshot: this.snapshot,
       missions: this.missions,
       publish: () => this.emitProjectedSnapshot(),
+      ensureMissionHome: options.ensureMissionHome ?? (async missionId => {
+        const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
+        await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
+        return home;
+      }),
       validateRepository: async folder => {
         const identity = await this.agentGitService.identity(folder);
         if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
@@ -612,10 +620,25 @@ export class ClawBackendServer {
         await this.missionExecution.execute(input);
         return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
       }
-      case backendMethods.missionCreate:
+      case backendMethods.missionCreate: {
+        const input = requireRecord(message.params).input as import('@codex-claw/core/missions').CreateMissionInput;
+        const previousIds = new Set(this.snapshot.missions?.map(mission => mission.id));
+        await this.missions.mutate('create', input);
+        const mission = this.snapshot.missions?.find(candidate => !previousIds.has(candidate.id));
+        if (!mission) throw new Error('Mission creation did not produce a mission.');
+        await this.missionExecution.execute({
+          id: mission.id,
+          revision: mission.revision,
+          action: 'run',
+          memberId: input.orchestratorMemberId,
+        });
+        const snapshot = await this.remoteTeams.clientSnapshot();
+        this.emitSnapshotUpdated(snapshot);
+        return createClawRpcResult(message.id, snapshot);
+      }
       case backendMethods.missionUpdate: {
         const input = isRecord(message.params) ? message.params.input : undefined;
-        await this.missions.mutate(message.method === backendMethods.missionCreate ? 'create' : 'update', input);
+        await this.missions.mutate('update', input);
         const snapshot = await this.remoteTeams.clientSnapshot();
         this.emitSnapshotUpdated(snapshot);
         return createClawRpcResult(message.id, snapshot);

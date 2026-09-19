@@ -9,6 +9,7 @@ export type MissionExecutionPorts = {
   snapshot: AppSnapshot;
   missions: MissionService;
   publish(): Promise<unknown>;
+  ensureMissionHome(missionId: string): Promise<string>;
   validateRepository(path: string): Promise<void>;
   createWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   getHead(path: string): Promise<string>;
@@ -31,11 +32,20 @@ export class MissionExecutionService {
       const team = this.ports.snapshot.teams.find(team => team.id === input.teamId && !team.remoteConnectionId);
       if (!team || !Array.isArray(input.memberIds) || !input.memberIds.length || input.memberIds.length > 20
         || input.memberIds.some(id => !this.ports.snapshot.agents.some(agent => agent.id === id && agent.teamId === team.id))) throw new Error('Choose a local team and at least one of its agents.');
-      if (typeof input.repoPath !== 'string' || !input.repoPath.trim()) throw new Error('Choose a repository.');
-      await this.ports.validateRepository(input.repoPath);
       await this.change(input, current => {
         if (current.execution?.workspace || current.execution?.runs.length) throw new Error('Mission workspace configuration is locked after the first run.');
-        current.execution = { teamId: team.id, repoPath: input.repoPath.trim(), memberIds: [...new Set(input.memberIds)], runs: [] };
+        current.execution = { teamId: team.id, memberIds: [...new Set(input.memberIds)], runs: [] };
+      });
+      return;
+    }
+    if (input.action === 'attachRepository') {
+      if (typeof input.repoPath !== 'string' || !input.repoPath.trim()) throw new Error('Choose a repository.');
+      const repoPath = input.repoPath.trim();
+      if (!this.teamRepositories(mission).includes(repoPath)) throw new Error('Choose a repository represented in this mission team.');
+      await this.ports.validateRepository(repoPath);
+      await this.change(input, current => {
+        if (current.execution?.workspace) throw new Error('The mission repository is locked after its worktree is created.');
+        current.execution!.repoPath = repoPath;
       });
       return;
     }
@@ -80,6 +90,9 @@ export class MissionExecutionService {
       this.requireNoActiveRun(current);
       const execution = current.execution;
       if (!execution) throw new Error('Configure the mission repository and team first.');
+      if ((current.stage === 'implementation' || current.stage === 'review') && !execution.repoPath) {
+        throw new Error('Attach a team repository before starting code work.');
+      }
       const ticketIndex = current.stage === 'implementation'
         ? input.ticketIndex ?? current.artifacts.tickets.findIndex((_, index) => missionTicketReady(current.artifacts.tickets, index)) : undefined;
       if (current.stage === 'implementation' && (ticketIndex === undefined || !Number.isInteger(ticketIndex) || ticketIndex < 0 || !missionTicketReady(current.artifacts.tickets, ticketIndex))) throw new Error('Choose an implementation ticket.');
@@ -189,9 +202,10 @@ export class MissionExecutionService {
   private async launch(id: string, runId: string): Promise<void> {
     let mission = this.requireMission(id);
     const execution = mission.execution!;
-    if (!execution.workspace) {
+    const runBeforeWorkspace = execution.runs.find(run => run.id === runId)!;
+    if (!execution.workspace && (runBeforeWorkspace.stage === 'implementation' || runBeforeWorkspace.stage === 'review')) {
       const branch = `mission/${mission.id.replace(/^mission-/, '')}`;
-      const worktree = await this.ports.createWorktree({ repoPath: execution.repoPath, branchName: branch, reuseExisting: true });
+      const worktree = await this.ports.createWorktree({ repoPath: execution.repoPath!, branchName: branch, reuseExisting: true });
       const baseSha = await this.ports.getHead(worktree.path);
       await this.ports.missions.change(id, current => { current.execution!.workspace = { path: worktree.path, branch, baseSha }; });
       await this.ports.publish();
@@ -201,12 +215,14 @@ export class MissionExecutionService {
     if (run.status === 'cancelled') return;
     const member = this.agent(run.memberId);
     if (!member) throw new Error('Assigned team member was removed.');
+    const missionHome = await this.ports.ensureMissionHome(mission.id);
+    const workingFolder = mission.execution!.workspace?.path ?? missionHome;
     let worker = this.agent(run.workerId);
     if (!worker) {
       const workerId = createEntityId('agent');
       createAgentInSnapshot(this.ports.snapshot, {
         name: `${member.name || 'Agent'} · ${mission.outcome} · ${run.stage}`,
-        teamId: mission.execution!.teamId, folder: mission.execution!.workspace!.path,
+        teamId: mission.execution!.teamId, folder: workingFolder,
         backend: member.backend, backendDefaults: structuredClone(member.backendDefaults), avatar: member.avatar,
       }, undefined, workerId, { select: false });
       worker = this.agent(workerId)!;
@@ -226,7 +242,7 @@ export class MissionExecutionService {
     mission = this.requireMission(id);
     const active = mission.execution!.runs.find(run => run.id === runId)!;
     if (active.status === 'cancelled') return;
-    if (!worker.backendSession) await this.ports.send(worker, missionRunPrompt(mission, active));
+    if (!worker.backendSession) await this.ports.send(worker, missionRunPrompt(mission, active, this.teamRepositories(mission)));
   }
 
   private requireMission(id: string): Mission {
@@ -235,6 +251,14 @@ export class MissionExecutionService {
     return mission;
   }
   private agent(id: string | undefined): Agent | undefined { return this.ports.snapshot.agents.find(agent => agent.id === id); }
+  private teamRepositories(mission: Mission): string[] {
+    return [...new Set((mission.execution?.memberIds ?? []).flatMap(id => {
+      const agent = this.agent(id);
+      if (!agent) return [];
+      if (agent.workspace?.kind === 'git') return [agent.workspace.primaryWorktreeRoot];
+      return agent.folder ? [agent.folder] : [];
+    }))];
+  }
   private requireNoActiveRun(mission: Mission): void {
     if (pendingMissionRun(mission)) throw new Error('Review or stop the existing run first.');
     if (mission.execution?.runs.some(run => { const worker = this.agent(run.workerId); return worker && ['working', 'awaitingInput'].includes(worker.status.type); })) throw new Error('A mission worker is still active. Stop it before starting another run.');

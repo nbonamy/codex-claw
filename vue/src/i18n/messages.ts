@@ -29,7 +29,7 @@ export const messages = {
       acceptedAtStation: 'Accepted at this station', accepted: 'Accepted', noArtifactYet: 'No artifact yet',
       keepWorkingInConversation: 'Continue with the orchestrator to create this station’s artifact.', continueWorkshop: 'Continue workshop',
       orchestrator: 'Orchestrator', orchestratorHint: 'Your guide through this station and the mission as a whole.', orchestratorStarting: 'Starting the mission orchestrator…', conversations: 'Mission conversations',
-      projectContextRequired: 'Open a project agent before starting a mission.', canonicalReference: 'Open canonical ticket',
+      teamContextRequired: 'Add an agent to this team before starting a mission.', canonicalReference: 'Open canonical ticket',
       active: 'In progress', completed: 'Completed', problem: 'Problem and scope', acceptance: 'Acceptance criteria',
       changes: 'Code changes and diff references', tests: 'Test results and verification evidence',
       reviewSummary: 'Review findings and delivery decision', pullRequest: 'Pull request', complete: 'Complete mission', support: 'Stage conversation',

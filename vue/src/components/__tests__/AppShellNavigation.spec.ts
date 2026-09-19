@@ -77,7 +77,7 @@ describe('AppShellNavigation', () => {
 
   it('keeps mission-owned agents out of the global sidebar', () => {
     const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     mission.execution = {
       teamId: snapshot.teams[0]!.id,
       repoPath: snapshot.agents[0]!.folder!,

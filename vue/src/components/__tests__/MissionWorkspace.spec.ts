@@ -9,7 +9,7 @@ import MissionWorkspace from '../MissionWorkspace.vue';
 
 function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
   const snapshot = createInitialSnapshot();
-  const mission = createMission(snapshot, { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature' });
+  const mission = createMission(snapshot, { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   const artifacts = structuredClone(mission.artifacts);
   artifacts.requirements = { problem: 'Teams need one bill', acceptance: 'An owner can pay for the team' };
   mission.execution = {

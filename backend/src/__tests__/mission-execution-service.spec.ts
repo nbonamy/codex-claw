@@ -7,10 +7,11 @@ import { MissionExecutionService } from '../mission-execution-service';
 function setup() {
   const snapshot = createInitialSnapshot();
   const originalAgents = structuredClone(snapshot.agents);
-  const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature' });
+  const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   const persisted = vi.fn().mockResolvedValue(undefined);
   const store = new MissionService(snapshot, persisted);
   const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), validateRepository: vi.fn().mockResolvedValue(undefined),
+    ensureMissionHome: vi.fn().mockResolvedValue('/claw/missions/mission'),
     createWorktree: vi.fn().mockResolvedValue({ name: 'mission', path: '/repo-mission' }),
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -19,7 +20,7 @@ function setup() {
   const service = new MissionExecutionService(ports);
   const current = () => snapshot.missions![0]!;
   const command = (input: Record<string, unknown>) => service.execute({ id: mission.id, revision: current().revision, ...input } as Parameters<typeof service.execute>[0]);
-  const configure = () => command({ action: 'configure', teamId: snapshot.teams[0]!.id, repoPath: '/repo', memberIds: originalAgents.map(agent => agent.id) });
+  const configure = () => command({ action: 'attachRepository', repoPath: originalAgents[0]!.folder });
   return { snapshot, originalAgents, persisted, ports, service, current, command, configure, store };
 }
 
@@ -29,9 +30,11 @@ describe('mission execution', () => {
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     const mission = h.current(); const run = mission.execution!.runs[0]!;
     expect(run.status).toBe('running');
-    expect(h.ports.createWorktree).toHaveBeenCalledWith({ repoPath: '/repo', branchName: expect.stringMatching(/^mission\//), reuseExisting: true });
+    expect(h.ports.createWorktree).not.toHaveBeenCalled();
     expect(h.snapshot.agents.slice(0, 2)).toStrictEqual(h.originalAgents);
-    expect(h.ports.send.mock.calls[0]?.[0]).toMatchObject({ id: run.workerId, folder: '/repo-mission', backend: h.originalAgents[0]!.backend });
+    expect(h.ports.send.mock.calls[0]?.[0]).toMatchObject({ id: run.workerId, folder: '/claw/missions/mission', backend: h.originalAgents[0]!.backend });
+    expect(h.ports.send.mock.calls[0]?.[1]).toContain(h.originalAgents[0]!.folder);
+    expect(h.ports.send.mock.calls[0]?.[1]).toContain('Begin by asking the user what they want to build');
     expect(run.skills).toStrictEqual([{ name: 'grilling', path: '/skills/grilling/SKILL.md' }]);
     expect(h.ports.send.mock.calls[0]?.[1]).toContain(run.id);
     expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: run.id, stage: 'requirements' });
@@ -89,15 +92,15 @@ describe('mission execution', () => {
 
   it('retains failures, rejects overlapping work, and never starts a cancelled preparation', async () => {
     const h = setup(); await h.configure();
-    let release!: (result: { name: string; path: string }) => void;
-    h.ports.createWorktree.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+    let release!: (path: string) => void;
+    h.ports.ensureMissionHome.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
     await h.command({ action: 'run' });
     await expect(h.command({ action: 'run' })).rejects.toThrow('existing run');
     const id = h.current().execution!.runs[0]!.id;
     await h.command({ action: 'cancel', runId: id });
-    release({ name: 'mission', path: '/repo-mission' }); await h.service.waitForLaunches();
+    release('/claw/missions/mission'); await h.service.waitForLaunches();
     expect(h.ports.send).not.toHaveBeenCalled();
-    expect(h.current().execution!.workspace?.path).toBe('/repo-mission');
+    expect(h.current().execution!.workspace).toBeUndefined();
     h.ports.send.mockRejectedValueOnce(new Error('Provider offline'));
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     expect(h.current().execution!.runs[1]).toMatchObject({ status: 'failed', error: 'Provider offline' });
@@ -114,9 +117,9 @@ describe('mission execution', () => {
 
 it('rejects invalid configuration, stale commands and inactive worker results without accepting artifacts', async () => {
   const h = setup();
-  await expect(h.command({ action: 'configure', teamId: 'missing', repoPath: '/repo', memberIds: [] })).rejects.toThrow('local team');
-  await expect(h.command({ action: 'configure', teamId: h.snapshot.teams[0]!.id, repoPath: '', memberIds: [h.originalAgents[0]!.id] })).rejects.toThrow('repository');
-  await expect(h.command({ action: 'run' })).rejects.toThrow('Configure');
+  await expect(h.command({ action: 'configure', teamId: 'missing', memberIds: [] })).rejects.toThrow('local team');
+  await expect(h.command({ action: 'attachRepository', repoPath: '' })).rejects.toThrow('repository');
+  await expect(h.command({ action: 'attachRepository', repoPath: '/outside-team' })).rejects.toThrow('represented');
   await h.configure();
   await expect(h.command({ action: 'run', memberId: 'missing' })).rejects.toThrow('unavailable');
   await expect(h.command({ action: 'run', feedback: 99 })).rejects.toThrow('feedback');
@@ -126,7 +129,6 @@ it('rejects invalid configuration, stale commands and inactive worker results wi
   await expect(h.service.execute({ id: h.current().id, revision: -1, action: 'run' })).rejects.toThrow('changed');
   await expect(h.service.execute({ id: 'missing', revision: 0, action: 'run' })).rejects.toThrow('not found');
   await h.command({ action: 'run' }); await h.service.waitForLaunches();
-  await expect(h.configure()).rejects.toThrow('locked');
   const run = h.current().execution!.runs[0]!;
   await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'Empty', artifacts: h.current().artifacts })).rejects.toThrow('incomplete');
   const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;

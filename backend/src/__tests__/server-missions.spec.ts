@@ -1,30 +1,35 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClawBackendServer } from '../server';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
 
 describe('mission backend boundary', () => {
-  it('creates, broadcasts, updates and reloads a mission independently of agents and navigation', async () => {
-    const snapshot = createEmptySnapshot();
+  it('creates, broadcasts, updates and reloads a team-scoped mission without a repository', async () => {
+    const snapshot = createInitialSnapshot();
     let disk: unknown;
     const onEvent = vi.fn();
     const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); }, onEvent });
     const call = (method: string, input: unknown) => server.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { input } });
     try {
-      const created = await call('mission/create', { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
+      const created = await call('mission/create', {
+        outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
+        teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+      });
       expect(created).toHaveProperty('result');
       const mission = (created as { result: AppSnapshot }).result.missions![0]!;
+      expect(mission.teamId).toBe(snapshot.teams[0]!.id);
+      expect(mission.execution!.repoPath).toBeUndefined();
+      await vi.waitFor(() => expect(snapshot.missions![0]!.execution!.runs[0]!.status).toBe('failed'));
       const artifacts = { ...mission.artifacts, requirements: { problem: 'Billing', acceptance: 'Owner checkout' } };
-      await call('mission/update', { id: mission.id, revision: 0, artifacts, stageAgentIds: {}, action: 'advance' });
+      await call('mission/update', { id: mission.id, revision: snapshot.missions![0]!.revision, artifacts, stageAgentIds: {}, action: 'advance' });
       const restored = snapshotFromPersistedState(disk);
-      expect(restored.missions?.[0]).toMatchObject({ id: mission.id, stage: 'tickets', revision: 1, artifacts });
-      expect(restored.agents).toStrictEqual([]);
-      expect(restored.activeAgentId).toBeNull();
+      expect(restored.missions?.[0]).toMatchObject({ id: mission.id, stage: 'tickets', artifacts });
+      expect(restored.activeAgentId).toBe(snapshot.activeAgentId);
       expect(onEvent.mock.calls.at(-1)?.[0]).toMatchObject({ type: 'snapshot.updated', payload: { missions: restored.missions } });
       await expect(call('mission/update', { id: mission.id, revision: 0, artifacts, stageAgentIds: {}, action: 'save' })).rejects.toThrow('changed');
       expect(snapshotFromPersistedState(disk).missions).toStrictEqual(restored.missions);
-      await call('mission/delete', { id: mission.id, revision: 1 });
+      await call('mission/delete', { id: mission.id, revision: snapshot.missions![0]!.revision });
       expect(snapshotFromPersistedState(disk).missions).toStrictEqual([]);
       expect(snapshotFromPersistedState({ ...disk as object, missions: [{}] }).missions).toStrictEqual([]);
       expect(snapshotFromPersistedState({ teams: [] }).missions).toBeUndefined();
@@ -33,13 +38,12 @@ describe('mission backend boundary', () => {
 });
 
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission } from '@codex-claw/core/missions';
 import { BackendDriverRpc } from '../driver-rpc';
 
@@ -56,6 +60,7 @@ it('routes mission execution through the backend driver and worktree manager, th
     await exec('git', ['add', '.'], { cwd: repo });
     await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.folder = repo;
     const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
     const interrupt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
@@ -67,15 +72,18 @@ it('routes mission execution through the backend driver and worktree manager, th
       listSkills: async () => [{ name: 'grill-with-docs', path: '/skills/grill-with-docs/SKILL.md', enabled: true }],
     };
     let disk: unknown;
-    server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])), saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); } });
+    const missionHome = join(root, 'mission-home');
+    await mkdir(missionHome);
+    server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])), ensureMissionHome: async () => missionHome, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); } });
     const call = (method: string, input: unknown) => server!.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { input } });
-    await call('mission/create', { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+    await call('mission/create', { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     const current = () => snapshot.missions![0]!;
-    await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'configure', teamId: snapshot.teams[0]!.id, repoPath: repo, memberIds: ['agent-dina'] });
-    await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'run' });
     await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
     const run = current().execution!.runs[0]!;
-    expect(sendPrompt.mock.calls[0]![0]).toMatchObject({ id: run.workerId, folder: current().execution!.workspace!.path });
+    expect(sendPrompt.mock.calls[0]![0]).toMatchObject({ id: run.workerId, folder: missionHome });
+    expect(current().execution!.workspace).toBeUndefined();
+    expect(sendPrompt.mock.calls[0]![1]).toContain('Begin by asking the user what they want to build');
+    expect(sendPrompt.mock.calls[0]![1]).toContain(repo);
     expect(sendPrompt.mock.calls[0]![1]).toContain('/skills/grill-with-docs/SKILL.md');
     expect(server.missionContext(run.workerId!)).toEqual({ missionId: current().id, runId: run.id, stage: 'requirements' });
     await expect(server.setMissionTitle(run.workerId!, 'Add team billing')).resolves.toEqual({ success: true, title: 'Add team billing' });
@@ -113,7 +121,7 @@ it('recovers a persisted preparing mission by starting its orchestrator conversa
     await exec('git', ['add', '.'], { cwd: repo });
     await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
     const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     mission.execution = {
       teamId: snapshot.teams[0]!.id,
       repoPath: repo,
@@ -147,7 +155,7 @@ it('recovers a persisted preparing mission by starting its orchestrator conversa
     expect(worker).toMatchObject({
       folder: expect.stringMatching(/mission-/),
       backendSession: { kind: 'codex', threadId: 'recovered-mission-thread' },
-      workspace: { kind: 'git', primaryWorktreeRoot: expect.stringMatching(/\/repo$/), isLinkedWorktree: true },
+      workspace: { kind: 'folder' },
     });
     expect(snapshot.teams[0]!.agentIds).toContain(worker!.id);
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }

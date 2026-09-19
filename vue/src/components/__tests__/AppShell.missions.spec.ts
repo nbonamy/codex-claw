@@ -6,13 +6,12 @@ import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { mountShell } from './app-shell-test-harness';
 
 describe('AppShell missions', () => {
-  it('creates, selects, and starts a placeholder mission from the active project without asking for a title', async () => {
+  it('creates and selects a team-scoped placeholder mission without asking for a title or repository', async () => {
     const snapshot = createInitialSnapshot();
     const createdSnapshot = createInitialSnapshot();
-    const mission = createMission(createdSnapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(createdSnapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: createdSnapshot.teams[0]!.id, orchestratorMemberId: createdSnapshot.agents[0]!.id });
     const createMissionAction = vi.fn().mockResolvedValue(mission);
-    const executeMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, createMission: createMissionAction, executeMission });
+    const wrapper = mountShell({ snapshot, createMission: createMissionAction });
 
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('create-mission');
     await flushPromises();
@@ -20,20 +19,8 @@ describe('AppShell missions', () => {
     expect(createMissionAction).toHaveBeenCalledWith({
       outcome: 'New mission',
       workflowType: 'shapeAndShipFeature',
-    });
-    expect(executeMission).toHaveBeenNthCalledWith(1, {
-      id: mission.id,
-      revision: 0,
-      action: 'configure',
       teamId: snapshot.teams[0]!.id,
-      repoPath: snapshot.agents[0]!.folder,
-      memberIds: snapshot.agents.map(agent => agent.id),
-    });
-    expect(executeMission).toHaveBeenNthCalledWith(2, {
-      id: mission.id,
-      revision: 1,
-      action: 'run',
-      memberId: snapshot.agents[0]!.id,
+      orchestratorMemberId: snapshot.agents[0]!.id,
     });
     expect(wrapper.find('.agent-dialog-test-shell').exists()).toBe(false);
     await wrapper.setProps({ snapshot: { ...snapshot, missions: [mission] } });
@@ -53,23 +40,30 @@ describe('AppShell missions', () => {
     expect(navigation.props('missionCreationError')).toBe('Could not create mission');
   });
 
-  it('requires project context before persisting a mission', async () => {
+  it('creates a mission even when the team has no repository folder', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents.forEach(agent => { agent.folder = null; });
-    const createMissionAction = vi.fn();
+    const created = createMission(snapshot, {
+      outcome: 'New mission', workflowType: 'shapeAndShipFeature',
+      teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+    });
+    const createMissionAction = vi.fn().mockResolvedValue(created);
     const wrapper = mountShell({ snapshot, createMission: createMissionAction });
     const navigation = wrapper.findComponent({ name: 'AppShellNavigation' });
 
     await navigation.vm.$emit('create-mission');
     await flushPromises();
 
-    expect(createMissionAction).not.toHaveBeenCalled();
-    expect(navigation.props('missionCreationError')).toBe('Open a project agent before starting a mission.');
+    expect(createMissionAction).toHaveBeenCalledWith(expect.objectContaining({
+      teamId: snapshot.teams[0]!.id,
+      orchestratorMemberId: snapshot.agents[0]!.id,
+    }));
+    expect(navigation.props('missionCreationError')).toBe('');
   });
 
   it('replaces the agent workspace with a mission and returns to normal agent navigation', async () => {
     const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     const wrapper = mountShell({ snapshot });
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
     expect(wrapper.find('.mission-workspace').exists()).toBe(true);
@@ -81,7 +75,7 @@ describe('AppShell missions', () => {
 
   it('confirms mission deletion, removes its persisted revision, and leaves the mission surface', async () => {
     const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     const deleteMission = vi.fn().mockResolvedValue(undefined);
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountShell({ snapshot, deleteMission });
@@ -101,27 +95,9 @@ describe('AppShell missions', () => {
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
   });
 
-  it('starts a persisted unconfigured mission when it is selected', async () => {
-    const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
-    const executeMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, executeMission });
-
-    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
-    await flushPromises();
-
-    expect(executeMission).toHaveBeenNthCalledWith(1, {
-      id: mission.id, revision: mission.revision, action: 'configure', teamId: snapshot.teams[0]!.id,
-      repoPath: snapshot.agents[0]!.folder, memberIds: snapshot.agents.map(agent => agent.id),
-    });
-    expect(executeMission).toHaveBeenNthCalledWith(2, {
-      id: mission.id, revision: mission.revision + 1, action: 'run', memberId: snapshot.agents[0]!.id,
-    });
-  });
-
   it('mounts the mission worker conversation when the orchestrator becomes available', async () => {
     const snapshot = createInitialSnapshot();
-    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     mission.execution = {
       teamId: snapshot.teams[0]!.id,
       repoPath: snapshot.agents[0]!.folder!,

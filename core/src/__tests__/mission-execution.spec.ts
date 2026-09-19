@@ -16,12 +16,13 @@ describe('mission stage skills', () => {
   });
 });
 
-import { createEmptySnapshot } from '../snapshot-construction';
+import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, isMission, isMissionArtifacts, missionTicketReady, updateMission } from '../missions';
 import { missionRunPrompt, pendingMissionRun, type MissionRun } from '../mission-execution';
 
 it('carries the assigned stage, accepted artifacts, workspace, skills and revision feedback into the provider handoff', () => {
-  const mission = createMission(createEmptySnapshot(), { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+  const snapshot = createInitialSnapshot();
+  const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   mission.execution = { teamId: 'team', repoPath: '/repo', memberIds: ['member'], workspace: { path: '/isolated', branch: 'mission/billing', baseSha: 'a'.repeat(40) }, runs: [] };
   mission.artifacts.requirements = { problem: 'Owners pay', acceptance: 'Only owners' };
   for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
@@ -43,8 +44,8 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
 });
 
 it('validates persisted execution records and dependency graphs before admitting them into app state', () => {
-  const snapshot = createEmptySnapshot();
-  const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+  const snapshot = createInitialSnapshot();
+  const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   const run: MissionRun = { id: 'run', stage: 'requirements', memberId: 'member', workerId: 'worker', status: 'running', skills: [{ name: 'grilling', path: '/skill' }], feedback: '', startedAt: 'now', finishedAt: 'later', summary: 'Ready', error: 'old error', proposal: structuredClone(mission.artifacts), ticketIndex: 0 };
   mission.execution = { teamId: 'team', repoPath: '/repo', memberIds: ['member'], workspace: { path: '/isolated', branch: 'mission/billing', baseSha: 'a'.repeat(40) }, runs: [run] };
   expect(isMission(mission)).toBe(true);

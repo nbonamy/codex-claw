@@ -797,61 +797,32 @@ const missionCreationError = ref('');
 const missionCreationPending = ref(false);
 const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
-const missionStartRequests = new Set<string>();
 function selectMissionSurface(id: string): void { selectedMissionId.value = id; activeSurface.value = 'mission'; }
-function missionProjectContext(): { team: Team; orchestrator: Agent; repoPath: string } {
+function missionTeamContext(): { team: Team; orchestrator: Agent } {
   const team = activeTeam.value;
   const activeAgent = currentAgent.value;
-  let orchestrator = activeTeamAgents.value.find(agent => agent.folder);
-  if (activeAgent && activeAgent.teamId === team?.id && activeAgent.folder) orchestrator = activeAgent;
-  if (!team || !orchestrator?.folder) throw new Error(translate('missions.projectContextRequired'));
-  return { team, orchestrator, repoPath: orchestrator.folder };
-}
-async function startMission(mission: Mission): Promise<void> {
-  const executeMission = props.executeMission;
-  if (mission.execution || missionStartRequests.has(mission.id)) return;
-  if (!executeMission) throw new Error('Missions are unavailable.');
-  const { team, orchestrator, repoPath } = missionProjectContext();
-  missionStartRequests.add(mission.id);
-  try {
-    await executeMission({
-      id: mission.id,
-      revision: mission.revision,
-      action: 'configure',
-      teamId: team.id,
-      repoPath,
-      memberIds: activeTeamAgents.value.map(agent => agent.id),
-    });
-    await executeMission({
-      id: mission.id,
-      revision: mission.revision + 1,
-      action: 'run',
-      memberId: orchestrator.id,
-    });
-  } catch (error) {
-    missionStartRequests.delete(mission.id);
-    throw error;
-  }
+  const orchestrator = activeAgent && activeAgent.teamId === team?.id
+    ? activeAgent
+    : activeTeamAgents.value[0];
+  if (!team || !orchestrator) throw new Error(translate('missions.teamContextRequired'));
+  return { team, orchestrator };
 }
 async function selectMission(id: string): Promise<void> {
   selectMissionSurface(id);
-  const mission = props.snapshot.missions?.find(candidate => candidate.id === id);
-  if (mission && !mission.execution) {
-    missionCreationError.value = '';
-    try { await startMission(mission); }
-    catch (error) { missionCreationError.value = error instanceof Error ? error.message : String(error); }
-  }
 }
 async function createNewMission() {
   if (missionCreationPending.value) return;
   missionCreationPending.value = true;
   missionCreationError.value = '';
   try {
-    if (!props.executeMission) throw new Error('Missions are unavailable.');
-    missionProjectContext();
-    const mission = await props.createMission({ outcome: translate('missions.new'), workflowType: 'shapeAndShipFeature' });
+    const { team, orchestrator } = missionTeamContext();
+    const mission = await props.createMission({
+      outcome: translate('missions.new'),
+      workflowType: 'shapeAndShipFeature',
+      teamId: team.id,
+      orchestratorMemberId: orchestrator.id,
+    });
     selectMissionSurface(mission.id);
-    await startMission(mission);
   } catch (error) {
     missionCreationError.value = error instanceof Error ? error.message : String(error);
   } finally {

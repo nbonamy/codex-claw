@@ -21,6 +21,17 @@ export function backendProviderTokensFilePath(): string {
   return path.join(backendHomeDir(), 'provider-tokens.json');
 }
 
+export function backendMissionHomeDir(missionId: string): string {
+  if (!/^mission-[a-zA-Z0-9-]+$/.test(missionId)) throw new Error('Invalid mission ID.');
+  return path.join(backendHomeDir(), 'missions', missionId);
+}
+
+export async function ensureBackendMissionHome(missionId: string): Promise<string> {
+  const home = backendMissionHomeDir(missionId);
+  await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
+  return home;
+}
+
 /** Isolated Codex app-server state; never share the user's ~/.codex threads. */
 export function backendCodexHomeDir(): string {
   return path.join(backendHomeDir(), 'codex-home');

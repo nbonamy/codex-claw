@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MissionService } from '../mission-service';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission } from '@codex-claw/core/missions';
 
 describe('MissionService', () => {
   it('keeps failed writes out of live state and serializes competing revision updates', async () => {
-    const snapshot = createEmptySnapshot();
+    const snapshot = createInitialSnapshot();
     const persist = vi.fn().mockRejectedValueOnce(new Error('Disk full')).mockResolvedValue(undefined);
     const service = new MissionService(snapshot, persist);
-    const input = { outcome: 'Billing', workflowType: 'shapeAndShipFeature' };
+    const input = { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id };
     await expect(service.mutate('create', input)).rejects.toThrow('Disk full');
     expect(snapshot.missions).toBeUndefined();
     await service.mutate('create', input);
@@ -26,7 +26,7 @@ describe('MissionService', () => {
       id: 'worker-1', teamId: 'team-1', name: 'Mission worker', folder: '/repo', backend: 'codex',
       status: { type: 'idle' }, createdAt: '2026-09-19T00:00:00.000Z', updatedAt: '2026-09-19T00:00:00.000Z',
     }];
-    const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: 'team-1', orchestratorMemberId: 'worker-1' });
     mission.execution = {
       teamId: 'team-1', repoPath: '/repo', memberIds: [],
       runs: [{

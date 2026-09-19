@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptySnapshot } from '../snapshot-construction';
+import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, deleteMission, updateMission, isMission, type UpdateMissionInput } from '../missions';
 import { decodeAppSnapshot } from '../snapshot-guards';
 
 describe('missions', () => {
-  it('persists a separate outcome through four explicit artifact gates without creating agents', () => {
-    const snapshot = createEmptySnapshot();
-    const mission = createMission(snapshot, { outcome: ' Add team billing ', workflowType: 'shapeAndShipFeature' });
+  const createInput = (snapshot: ReturnType<typeof createInitialSnapshot>, outcome: string) => ({
+    outcome, workflowType: 'shapeAndShipFeature' as const,
+    teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+  });
+
+  it('persists a team-scoped outcome through four explicit artifact gates without creating another agent', () => {
+    const snapshot = createInitialSnapshot();
+    const originalAgentIds = snapshot.agents.map(agent => agent.id);
+    const mission = createMission(snapshot, createInput(snapshot, ' Add team billing '));
     expect(mission.outcome).toBe('Add team billing');
-    expect(snapshot.agents).toStrictEqual([]);
+    expect(mission.teamId).toBe(snapshot.teams[0]!.id);
+    expect(snapshot.agents.map(agent => agent.id)).toStrictEqual(originalAgentIds);
     const update = (action: UpdateMissionInput['action']) => updateMission(snapshot, { id: mission.id, revision: mission.revision, artifacts, stageAgentIds: {}, action });
     const artifacts = structuredClone(mission.artifacts);
     expect(() => update('advance')).toThrow('required stage');
@@ -29,9 +36,9 @@ describe('missions', () => {
     expect(decodeAppSnapshot(snapshot)?.value.missions).toStrictEqual([mission]);
   });
   it('rejects malformed input, stale writers, dangling agents, and invalidated earlier gates without mutation', () => {
-    const snapshot = createEmptySnapshot();
+    const snapshot = createInitialSnapshot();
     for (const input of [null, { outcome: ' ', workflowType: 'shapeAndShipFeature' }, { outcome: 'x', workflowType: 'unknown' }]) expect(() => createMission(snapshot, input)).toThrow();
-    const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+    const mission = createMission(snapshot, createInput(snapshot, 'Billing'));
     const input: UpdateMissionInput = { id: mission.id, revision: 0, artifacts: structuredClone(mission.artifacts), stageAgentIds: {}, action: 'save' };
     const before = structuredClone(mission);
     expect(() => updateMission(snapshot, { ...input, revision: 9 })).toThrow('changed');
@@ -48,9 +55,9 @@ describe('missions', () => {
   });
 
   it('deletes only the current mission revision', () => {
-    const snapshot = createEmptySnapshot();
-    const first = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
-    const second = createMission(snapshot, { outcome: 'Invitations', workflowType: 'shapeAndShipFeature' });
+    const snapshot = createInitialSnapshot();
+    const first = createMission(snapshot, createInput(snapshot, 'Billing'));
+    const second = createMission(snapshot, createInput(snapshot, 'Invitations'));
 
     expect(() => deleteMission(snapshot, { id: first.id, revision: 1 })).toThrow('changed');
     expect(() => deleteMission(snapshot, { id: 'missing', revision: 0 })).toThrow('not found');

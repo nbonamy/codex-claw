@@ -13,6 +13,7 @@ export type MissionArtifacts = {
 };
 export type Mission = {
   id: string;
+  teamId: string;
   outcome: string;
   workflow: { type: 'shapeAndShipFeature'; version: 1 };
   stage: MissionStage;
@@ -24,7 +25,12 @@ export type Mission = {
   createdAt: string;
   updatedAt: string;
 };
-export type CreateMissionInput = { outcome: string; workflowType: Mission['workflow']['type'] };
+export type CreateMissionInput = {
+  outcome: string;
+  workflowType: Mission['workflow']['type'];
+  teamId: string;
+  orchestratorMemberId: string;
+};
 export type DeleteMissionInput = { id: string; revision: number };
 export type UpdateMissionInput = {
   id: string;
@@ -63,7 +69,7 @@ function isStageAgents(v: unknown): v is Mission['stageAgentIds'] {
   return record(v) && Object.entries(v).every(([k, id]) => featureStages.includes(k as MissionStage) && typeof id === 'string');
 }
 export function isMission(v: unknown): v is Mission {
-  return record(v) && text(v.id) && text(v.outcome) && !!v.outcome.trim() && v.outcome.length <= 200
+  return record(v) && text(v.id) && text(v.teamId) && text(v.outcome) && !!v.outcome.trim() && v.outcome.length <= 200
     && record(v.workflow) && v.workflow.type === 'shapeAndShipFeature' && v.workflow.version === 1
     && featureStages.includes(v.stage as MissionStage) && ['active', 'completed'].includes(v.status as string)
     && (v.status !== 'completed' || v.stage === 'review') && isMissionArtifacts(v.artifacts) && isStageAgents(v.stageAgentIds)
@@ -79,13 +85,18 @@ export function missionStageReady(stage: MissionStage, a: MissionArtifacts): boo
   }
 }
 export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
-  if (!record(input) || typeof input.outcome !== 'string' || !input.outcome.trim() || input.outcome.trim().length > 200 || input.workflowType !== 'shapeAndShipFeature') throw new Error('Invalid mission outcome or workflow.');
+  if (!record(input) || typeof input.outcome !== 'string' || !input.outcome.trim() || input.outcome.trim().length > 200 || input.workflowType !== 'shapeAndShipFeature'
+    || typeof input.teamId !== 'string' || typeof input.orchestratorMemberId !== 'string') throw new Error('Invalid mission outcome or workflow.');
+  const team = snapshot.teams.find(team => team.id === input.teamId && !team.remoteConnectionId);
+  const orchestrator = snapshot.agents.find(agent => agent.id === input.orchestratorMemberId && agent.teamId === team?.id);
+  if (!team || !orchestrator) throw new Error('Choose a local team and one of its agents to orchestrate the mission.');
   const now = new Date().toISOString();
   const mission: Mission = {
-    id: createEntityId('mission'), outcome: input.outcome.trim(), workflow: { type: 'shapeAndShipFeature', version: 1 },
+    id: createEntityId('mission'), teamId: team.id, outcome: input.outcome.trim(), workflow: { type: 'shapeAndShipFeature', version: 1 },
     stage: 'requirements', status: 'active', revision: 0, createdAt: now, updatedAt: now,
     artifacts: { requirements: { problem: '', acceptance: '' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } },
     stageAgentIds: {},
+    execution: { teamId: team.id, memberIds: [...team.agentIds], runs: [] },
   };
   (snapshot.missions ??= []).push(mission);
   return mission;
@@ -120,7 +131,7 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
 }
 
 function isMissionExecution(v: unknown): v is MissionExecution {
-  return record(v) && text(v.teamId) && text(v.repoPath) && Array.isArray(v.memberIds) && v.memberIds.every(text)
+  return record(v) && text(v.teamId) && (v.repoPath === undefined || text(v.repoPath)) && Array.isArray(v.memberIds) && v.memberIds.every(text)
     && (v.workspace === undefined || (record(v.workspace) && text(v.workspace.path) && text(v.workspace.branch) && (v.workspace.baseSha === undefined || (typeof v.workspace.baseSha === 'string' && /^[a-f0-9]{40,64}$/.test(v.workspace.baseSha)))))
     && Array.isArray(v.runs) && v.runs.every(run => record(run) && text(run.id) && text(run.memberId)
       && featureStages.includes(run.stage as MissionStage)

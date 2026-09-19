@@ -105,7 +105,7 @@
         <section v-else class="mission-workspace__empty-artifact">
           <span class="mission-workspace__callout-icon"><FileTextIcon aria-hidden="true" /></span>
           <h3>{{ t('missions.noArtifactYet') }}</h3>
-          <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.projectContextRequired') }}</p>
+          <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.orchestratorStarting') }}</p>
           <button
             v-if="mission.execution && !activeRun && mission.status !== 'completed'"
             class="claw-button claw-button--primary"
