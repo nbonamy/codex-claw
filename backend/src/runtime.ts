@@ -99,15 +99,16 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     worktreeManager,
   });
   const mcpServerUrl = await mcpService.start();
+  let server: ClawBackendServer;
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
     hostedMcpServerUrls: () => mcpService.hostedMcpServerUrls(),
     generalSettings: snapshot.general,
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
+    additionalDeveloperInstructions: (agent) => server?.missionDeveloperInstructions(agent.id),
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
-  let server: ClawBackendServer;
   const automationRunner = new AutomationRunner({
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,

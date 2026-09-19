@@ -47,7 +47,7 @@ import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities'
 import { createMission } from '@codex-claw/core/missions';
 import { BackendDriverRpc } from '../driver-rpc';
 
-it('routes mission execution through the backend driver and worktree manager, then accepts an authenticated stage proposal', async () => {
+it('prepares a mission without a provider turn, then starts it from the first user message', async () => {
   const exec = promisify(execFile);
   const root = await mkdtemp(join(tmpdir(), 'claw-mission-protocol-'));
   const repo = join(root, 'repo');
@@ -78,14 +78,23 @@ it('routes mission execution through the backend driver and worktree manager, th
     const call = (method: string, input: unknown) => server!.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { input } });
     await call('mission/create', { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     const current = () => snapshot.missions![0]!;
-    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(current().execution!.runs[0]!.status).toBe('running'));
     const run = current().execution!.runs[0]!;
-    expect(sendPrompt.mock.calls[0]![0]).toMatchObject({ id: run.workerId, folder: missionHome });
+    const worker = snapshot.agents.find(agent => agent.id === run.workerId)!;
+    expect(worker).toMatchObject({ id: run.workerId, folder: missionHome, status: { type: 'idle' } });
+    expect(worker).not.toHaveProperty('backendSession');
+    expect(sendPrompt).not.toHaveBeenCalled();
     expect(current().execution!.workspace).toBeUndefined();
-    expect(sendPrompt.mock.calls[0]![1]).toContain('Begin by asking the user what they want to build');
-    expect(sendPrompt.mock.calls[0]![1]).toContain(repo);
-    expect(sendPrompt.mock.calls[0]![1]).toContain('/skills/grill-with-docs/SKILL.md');
+    const instructions = server.missionDeveloperInstructions(run.workerId!);
+    expect(instructions).toMatch(/^<context>\n/);
+    expect(instructions).toContain("Treat the user's first message as the beginning of requirements shaping");
+    expect(instructions).toContain(repo);
+    expect(instructions).toContain('/skills/grill-with-docs/SKILL.md');
     expect(server.missionContext(run.workerId!)).toEqual({ missionId: current().id, runId: run.id, stage: 'requirements' });
+    await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'agent/prompt/send', params: { agentId: run.workerId, prompt: 'Build team billing' } });
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: run.workerId }), 'Build team billing', undefined);
+    await vi.waitFor(() => expect(worker.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' }));
     await expect(server.setMissionTitle(run.workerId!, 'Add team billing')).resolves.toEqual({ success: true, title: 'Add team billing' });
     expect(snapshotFromPersistedState(disk).missions![0]!.outcome).toBe('Add team billing');
     await expect(server.attachMissionRepository(run.workerId!, repo)).resolves.toEqual({ success: true, repoPath: repo });
@@ -102,7 +111,6 @@ it('routes mission execution through the backend driver and worktree manager, th
     await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'accept', runId: run.id });
     expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);
     expect(current().stage).toBe('requirements');
-    const worker = snapshot.agents.find(agent => agent.id === run.workerId)!;
     expect(worker.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' });
     worker.status = { type: 'working' };
     const missionId = current().id;
@@ -116,7 +124,7 @@ it('routes mission execution through the backend driver and worktree manager, th
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
 });
 
-it('recovers a persisted preparing mission by starting its orchestrator conversation during backend initialization', async () => {
+it('recovers a persisted preparing mission without starting its provider conversation', async () => {
   const exec = promisify(execFile);
   const root = await mkdtemp(join(tmpdir(), 'claw-mission-recovery-'));
   const repo = join(root, 'repo');
@@ -155,16 +163,14 @@ it('recovers a persisted preparing mission by starting its orchestrator conversa
     await server.initialize();
     await server.initialize();
 
-    expect(sendPrompt).toHaveBeenCalledOnce();
+    expect(sendPrompt).not.toHaveBeenCalled();
     const recoveredMission = snapshot.missions![0]!;
     const run = recoveredMission.execution!.runs[0]!;
     const worker = snapshot.agents.find(agent => agent.id === run.workerId);
     expect(run.status).toBe('running');
-    expect(worker).toMatchObject({
-      folder: expect.stringMatching(/mission-/),
-      backendSession: { kind: 'codex', threadId: 'recovered-mission-thread' },
-      workspace: { kind: 'folder' },
-    });
+    expect(worker).toMatchObject({ folder: expect.stringMatching(/mission-/), workspace: { kind: 'folder' } });
+    expect(worker).not.toHaveProperty('backendSession');
+    expect(server.missionDeveloperInstructions(worker!.id)).toContain('<context>');
     expect(snapshot.teams[0]!.agentIds).toContain(worker!.id);
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
 });

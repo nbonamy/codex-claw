@@ -18,7 +18,7 @@ describe('mission stage skills', () => {
 
 import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, isMission, isMissionArtifacts, missionTicketReady, updateMission } from '../missions';
-import { missionRunPrompt, pendingMissionRun, type MissionRun } from '../mission-execution';
+import { missionDeveloperInstructions, pendingMissionRun, type MissionRun } from '../mission-execution';
 
 it('carries the assigned stage, accepted artifacts, workspace, skills and revision feedback into the provider handoff', () => {
   const snapshot = createInitialSnapshot();
@@ -27,7 +27,9 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
   mission.artifacts.requirements = { problem: 'Owners pay', acceptance: 'Only owners' };
   for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
     const run: MissionRun = { id: 'run', stage, memberId: 'member', ticketIndex: 1, status: 'running', skills: [{ name: 'tdd', path: '/skills/tdd' }], feedback: 'Check permissions', startedAt: 'now' };
-    const prompt = missionRunPrompt(mission, run);
+    const prompt = missionDeveloperInstructions(mission, run);
+    expect(prompt).toMatch(/^<context>\n/);
+    expect(prompt).toMatch(/\n<\/context>$/);
     expect(prompt).toContain('Mission: Billing');
     expect(prompt).toContain(`Stage: ${stage}.`);
     expect(prompt).toContain('/isolated');
@@ -42,7 +44,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt.includes('codex_claw.set-mission-title')).toBe(stage === 'requirements');
     expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Do not automatically invoke setup-matt-pocock-skills');
-    expect(missionRunPrompt(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('do not claim you used an unavailable skill');
+    expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('do not claim you used an unavailable skill');
   }
 });
 

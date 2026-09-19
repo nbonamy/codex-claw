@@ -57,9 +57,13 @@ Mission navigation uses the same compact workspace-group and session-row
 patterns as project and quick-chat navigation. Sidebar creation persists a
 team-scoped placeholder `New mission`, selects it, and immediately starts the
 requirements station from a Claw-owned mission home without requiring a repository.
-During that conversation, the assigned
-worker replaces the placeholder with a concise outcome through the
-mission-scoped title tool.
+Creation prepares an idle hidden worker but does not submit a provider turn. The
+conversation initially asks “What do you want to build?” and the user's first
+message starts the provider session. The Mission execution contract is appended
+after Claw's normal developer instructions inside a hidden `<context>` block; it
+never appears as a user message or transcript item. During that conversation,
+the assigned worker replaces the placeholder with a concise outcome through
+the mission-scoped title tool.
 Mission rows use the sidebar context-menu pattern for deletion. Deletion removes
 the persisted Mission and its hidden worker agents after interrupting active work
 and archiving their provider conversations; the mission worktree remains on disk.

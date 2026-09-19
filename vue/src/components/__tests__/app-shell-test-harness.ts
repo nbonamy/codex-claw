@@ -17,7 +17,7 @@ import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
-  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'historyLoadFailed', 'historyLoading', 'hasVisibleMessages', 'plan', 'planVisible'],
+  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'historyLoadFailed', 'historyLoading', 'hasVisibleMessages', 'plan', 'planVisible', 'emptyHeadline', 'emptySubhead'],
   emits: ['annotate-attachment', 'close-plan', 'retry-history'],
   setup(_props, { expose }) {
     expose({ focusComposer: vi.fn() });

@@ -19,7 +19,7 @@ function setup() {
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
     listSkills: vi.fn().mockResolvedValue([{ name: 'grilling', path: '/skills/grilling/SKILL.md', enabled: true }]),
-    send: vi.fn().mockResolvedValue(undefined), interrupt: vi.fn().mockResolvedValue(undefined) };
+    interrupt: vi.fn().mockResolvedValue(undefined) };
   const service = new MissionExecutionService(ports);
   const current = () => snapshot.missions![0]!;
   const command = (input: Record<string, unknown>) => service.execute({ id: mission.id, revision: current().revision, ...input } as Parameters<typeof service.execute>[0]);
@@ -28,18 +28,22 @@ function setup() {
 }
 
 describe('mission execution', () => {
-  it('creates an isolated session from a team member, invokes available stage skills, and requires proposal acceptance', async () => {
+  it('prepares an isolated mission worker without starting its provider conversation', async () => {
     const h = setup(); await h.configure();
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     const mission = h.current(); const run = mission.execution!.runs[0]!;
     expect(run.status).toBe('running');
     expect(h.ports.createWorktree).not.toHaveBeenCalled();
     expect(h.snapshot.agents.slice(0, 2)).toStrictEqual(h.originalAgents);
-    expect(h.ports.send.mock.calls[0]?.[0]).toMatchObject({ id: run.workerId, folder: '/claw/missions/mission', backend: h.originalAgents[0]!.backend });
-    expect(h.ports.send.mock.calls[0]?.[1]).toContain(h.originalAgents[0]!.folder);
-    expect(h.ports.send.mock.calls[0]?.[1]).toContain('Begin by asking the user what they want to build');
+    const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;
+    expect(worker).toMatchObject({ folder: '/claw/missions/mission', backend: h.originalAgents[0]!.backend, status: { type: 'idle' } });
+    expect(worker).not.toHaveProperty('backendSession');
     expect(run.skills).toStrictEqual([{ name: 'grilling', path: '/skills/grilling/SKILL.md' }]);
-    expect(h.ports.send.mock.calls[0]?.[1]).toContain(run.id);
+    const instructions = h.service.developerInstructionsForAgent(run.workerId!);
+    expect(instructions).toMatch(/^<context>\n/);
+    expect(instructions).toContain(h.originalAgents[0]!.folder);
+    expect(instructions).toContain("Treat the user's first message as the beginning of requirements shaping");
+    expect(instructions).toContain(run.id);
     expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: run.id, stage: 'requirements' });
     await expect(h.service.setTitle(h.originalAgents[0]!.id, 'Add team billing')).rejects.toThrow('not working');
     await expect(h.service.setTitle(run.workerId!, '   ')).rejects.toThrow('between 1 and 200');
@@ -147,11 +151,10 @@ describe('mission execution', () => {
     const id = h.current().execution!.runs[0]!.id;
     await h.command({ action: 'cancel', runId: id });
     release('/claw/missions/mission'); await h.service.waitForLaunches();
-    expect(h.ports.send).not.toHaveBeenCalled();
     expect(h.current().execution!.workspace).toBeUndefined();
-    h.ports.send.mockRejectedValueOnce(new Error('Provider offline'));
+    h.ports.ensureMissionHome.mockRejectedValueOnce(new Error('Mission home unavailable'));
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
-    expect(h.current().execution!.runs[1]).toMatchObject({ status: 'failed', error: 'Provider offline' });
+    expect(h.current().execution!.runs[1]).toMatchObject({ status: 'failed', error: 'Mission home unavailable' });
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     const run = h.current().execution!.runs[2]!;
     await h.service.agentFinished(run.workerId!);

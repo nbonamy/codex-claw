@@ -210,7 +210,6 @@ export class ClawBackendServer {
       createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
       refreshWorkspace: async agentId => { await this.agentWorkspaces.refreshIdentity(agentId); },
       listSkills: agent => this.requireDriverRpc().handle(backendMethods.driverSkillsList, { agent }) as Promise<BackendSkillSummary[]>,
-      send: (agent, prompt) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt),
       interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
     });
     this.planReviews = new AgentPlanReviewService({
@@ -303,6 +302,10 @@ export class ClawBackendServer {
 
   missionContext(agentId: string) {
     return this.missionExecution.contextForAgent(agentId);
+  }
+
+  missionDeveloperInstructions(agentId: string) {
+    return this.missionExecution.developerInstructionsForAgent(agentId);
   }
 
   async setMissionTitle(agentId: string, title: string) {

@@ -3,7 +3,7 @@ import { ElMessageBox } from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createMission } from '@codex-claw/core/missions';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { mountShell } from './app-shell-test-harness';
+import { conversationControllerState, mountShell } from './app-shell-test-harness';
 
 describe('AppShell missions', () => {
   it('creates and selects a team-scoped placeholder mission without asking for a title or repository', async () => {
@@ -71,6 +71,23 @@ describe('AppShell missions', () => {
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-agent', snapshot.agents[0]!.id);
     expect(wrapper.find('.mission-workspace').exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
+  });
+
+  it('asks for the outcome in the empty mission conversation', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    mission.execution!.runs.push({
+      id: 'mission-run-requirements', stage: 'requirements', memberId: snapshot.agents[0]!.id,
+      workerId: snapshot.agents[0]!.id, status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+    });
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+
+    const conversation = wrapper.getComponent({ name: 'ConversationPane' });
+    expect(conversation.props('emptyHeadline')).toBe('What do you want to build?');
+    expect(conversation.props('emptySubhead')).toBe('');
+    expect(conversationControllerState(wrapper).composer?.placeholder).toBe('Describe what you want to build…');
   });
 
   it('confirms mission deletion, removes its persisted revision, and leaves the mission surface', async () => {

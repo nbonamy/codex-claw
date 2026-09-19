@@ -26,6 +26,7 @@ export type BackendDriverRegistryOptions = {
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
+  additionalDeveloperInstructions?: (agent: Agent) => string | undefined;
 };
 
 type CodexClawLoadingStrategy = 'eager' | 'lazy';
@@ -45,6 +46,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
       hostedMcpServerUrls: options.hostedMcpServerUrls,
       pluginSettings: options.pluginSettings,
       celebrationsEnabled: options.celebrationsEnabled,
+      additionalDeveloperInstructions: options.additionalDeveloperInstructions,
     })],
   ]);
 }
@@ -72,7 +74,10 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
             options.pluginSettings?.() ?? options.generalSettings?.plugins,
             {
               celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
-              developerInstructions: (await readEngineInstructions('codex')).text,
+              developerInstructions: [
+                (await readEngineInstructions('codex')).text,
+                options.additionalDeveloperInstructions?.(extensionContext),
+              ].map(value => value?.trim()).filter(Boolean).join('\n\n'),
             },
             options.hostedMcpServerUrls?.() ?? {},
           )

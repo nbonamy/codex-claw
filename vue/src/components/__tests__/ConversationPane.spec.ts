@@ -224,6 +224,19 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).not.toContain('Chat with Untitled conversation');
   });
 
+  it('renders an app-owned empty state without exposing the worker folder', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([]),
+      agent,
+      emptyHeadline: 'What do you want to build?',
+      emptySubhead: '',
+    });
+
+    expect(wrapper.get('.conversation-pane__empty h1').text()).toBe('What do you want to build?');
+    expect(wrapper.find('.conversation-pane__empty p').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain(agent.folder);
+  });
+
   it('renders persisted agent mentions with the app-owned bot treatment', () => {
     const mentionGroup = {
       id: 'agents',
@@ -457,6 +470,8 @@ function mountPane(props: {
   historyLoadFailed?: boolean;
   historyLoading?: boolean;
   hasVisibleMessages?: boolean;
+  emptyHeadline?: string;
+  emptySubhead?: string;
 }) {
   return mount(ConversationPane, {
     props,

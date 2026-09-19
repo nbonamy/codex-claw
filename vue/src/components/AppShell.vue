@@ -196,7 +196,7 @@
           <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :get-workflow="props.getAgentGitWorkflow" :generate-message="props.generateAgentGitMessage" :commit-changes="props.commitAgentGitChanges" :push-branch="props.pushAgentGitBranch" :create-pull-request="props.createAgentGitPullRequest" />
         </template>
         <template #conversation="{ agentId }">
-          <ConversationPane v-if="currentAgent?.id === agentId" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" @retry-history="props.retryAgentHistory" />
+          <ConversationPane v-if="currentAgent?.id === agentId" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory" />
         </template>
       </MissionWorkspace>
       <AgentWorkspace
@@ -1512,7 +1512,11 @@ const conversationPaneState: CodexConversationPaneState = {
     get placeholder() {
       if (!currentAgent.value) return translate('surface.appShell.selectAnAgent');
       const backend = currentAgent.value.backend === 'claude' ? translate('surface.appShell.claude') : translate('surface.appShell.codex');
-      return props.isSending ? `${backend} is working...` : translate('surface.appShell.askForFollowUpChanges');
+      if (props.isSending) return `${backend} is working...`;
+      if (activeSurface.value === 'mission' && selectedMission.value?.stage === 'requirements' && conversationMessages.value.length === 0) {
+        return t('missions.describeWhatYouWantToBuild');
+      }
+      return translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
     get leadingMenuItems() { return permissionModeMenuItems.value; },

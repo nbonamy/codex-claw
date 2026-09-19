@@ -30,7 +30,6 @@ it('executes all mission stages across isolated provider sessions, respects tick
     const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
-    const started: string[] = [];
     const artifactContents = new Map<string, string>();
     const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
       readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
@@ -38,7 +37,7 @@ it('executes all mission stages across isolated provider sessions, respects tick
       validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       listSkills: async () => ['grill-with-docs', 'to-spec', 'to-tickets', 'implement', 'tdd', 'code-review'].map(name => ({ name, path: `/skills/${name}/SKILL.md`, enabled: true })),
-      send: async agent => { started.push(agent.id); }, interrupt: async () => {},
+      interrupt: async () => {},
     });
     const current = () => snapshot.missions![0]!;
     const command = (input: Omit<MissionExecutionInput, 'id' | 'revision'> | Record<string, unknown>) => service.execute({ ...input, id: mission.id, revision: current().revision } as MissionExecutionInput);
@@ -80,7 +79,7 @@ it('executes all mission stages across isolated provider sessions, respects tick
     }
     expect(current().status).toBe('completed');
     expect(current().execution!.workspace!.baseSha).toBe(baseline);
-    expect(new Set(started).size).toBe(5);
+    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(5);
     expect(await readWorktreeHead(repo)).toBe(baseline);
     expect(await readFile(join(repo, 'billing.txt'), 'utf8')).toBe('original\n');
     expect((await git(repo, ['status', '--porcelain'])).stdout).toBe('');

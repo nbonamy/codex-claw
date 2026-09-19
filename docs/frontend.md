@@ -70,6 +70,8 @@ supporting conversation. The artifact is rendered for review and comments flow
 through the conversation; do not add setup or artifact-editing forms to this
 surface. Mission-owned execution agents stay out of the global agent sidebar;
 the mission conversation pane owns switching among their provider conversations.
+Before the requirements conversation has messages, its empty state asks “What
+do you want to build?” and the composer invites the user to describe the outcome.
 Accepted artifacts remain navigable after the workflow advances.
 
 Shells coordinate focused modules; they do not implement multi-step workflows.

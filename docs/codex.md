@@ -171,6 +171,13 @@ instructions remain provider-owned. Changes apply when sessions start/resume,
 not by injecting a user message into an active turn. Remote hosts keep their
 own instruction files; the editor does not overwrite files on other hosts.
 
+Mission workers use the same conversation configuration boundary. Claw appends
+the active Mission contract after its normal developer instructions inside a
+`<context>` block. Creating a Mission does not inject that contract as a user
+message or start a turn; the user's first visible message starts the provider
+session with the Mission context already configured. Claude receives the same
+app-owned Mission context through its appended system prompt.
+
 Git draft preferences are app-owned settings: commit-message instructions and
 PR-description instructions are sent only to their matching generation calls.
 They are separate from global agent instructions and do not trigger Git writes.

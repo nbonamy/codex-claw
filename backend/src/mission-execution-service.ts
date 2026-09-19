@@ -2,7 +2,7 @@ import type { Agent, AppSnapshot, BackendSkillSummary, CreateSourceWorktreeInput
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
 import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
-import { missionRunPrompt, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { missionDeveloperInstructions, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 
 export type MissionExecutionPorts = {
@@ -17,7 +17,6 @@ export type MissionExecutionPorts = {
   getHead(path: string): Promise<string>;
   refreshWorkspace(agentId: string): Promise<void>;
   listSkills(agent: Agent): Promise<BackendSkillSummary[]>;
-  send(agent: Agent, prompt: string): Promise<void>;
   interrupt(agent: Agent): Promise<unknown>;
 };
 
@@ -173,6 +172,14 @@ export class MissionExecutionService {
     return undefined;
   }
 
+  developerInstructionsForAgent(agentId: string): string | undefined {
+    const context = this.contextForAgent(agentId);
+    if (!context) return undefined;
+    const mission = this.requireMission(context.missionId);
+    const run = mission.execution!.runs.find(candidate => candidate.id === context.runId)!;
+    return missionDeveloperInstructions(mission, run, this.teamRepositories(mission));
+  }
+
   listArtifacts(agentId: string) {
     const context = this.requireContext(agentId);
     const mission = this.requireMission(context.missionId);
@@ -292,18 +299,19 @@ export class MissionExecutionService {
       });
     }
     await this.ports.refreshWorkspace(worker.id);
-    const skills = missionSkills(run.stage, await this.ports.listSkills(worker));
     await this.ports.missions.change(id, current => {
       const currentRun = current.execution!.runs.find(run => run.id === runId)!;
-      currentRun.workerId = worker.id; currentRun.skills = skills;
+      currentRun.workerId = worker.id;
       if (currentRun.status !== 'cancelled') currentRun.status = 'running';
       current.stageAgentIds[currentRun.stage] = worker.id;
     });
     await this.ports.publish();
-    mission = this.requireMission(id);
-    const active = mission.execution!.runs.find(run => run.id === runId)!;
-    if (active.status === 'cancelled') return;
-    if (!worker.backendSession) await this.ports.send(worker, missionRunPrompt(mission, active, this.teamRepositories(mission)));
+    const skills = missionSkills(run.stage, await this.ports.listSkills(worker).catch(() => []));
+    await this.ports.missions.change(id, current => {
+      const currentRun = current.execution!.runs.find(candidate => candidate.id === runId)!;
+      if (currentRun.status !== 'cancelled') currentRun.skills = skills;
+    });
+    await this.ports.publish();
   }
 
   private requireMission(id: string): Mission {
