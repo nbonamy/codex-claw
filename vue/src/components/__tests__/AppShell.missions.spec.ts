@@ -77,4 +77,45 @@ describe('AppShell missions', () => {
     expect(wrapper.find('.mission-workspace').exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
   });
+
+  it('starts a persisted unconfigured mission when it is selected', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, executeMission });
+
+    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
+
+    expect(executeMission).toHaveBeenNthCalledWith(1, {
+      id: mission.id, revision: mission.revision, action: 'configure', teamId: snapshot.teams[0]!.id,
+      repoPath: snapshot.agents[0]!.folder, memberIds: snapshot.agents.map(agent => agent.id),
+    });
+    expect(executeMission).toHaveBeenNthCalledWith(2, {
+      id: mission.id, revision: mission.revision + 1, action: 'run', memberId: snapshot.agents[0]!.id,
+    });
+  });
+
+  it('mounts the mission worker conversation when the orchestrator becomes available', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
+    mission.execution = {
+      teamId: snapshot.teams[0]!.id,
+      repoPath: snapshot.agents[0]!.folder!,
+      memberIds: snapshot.agents.map(agent => agent.id),
+      runs: [{
+        id: 'run-requirements', stage: 'requirements', memberId: snapshot.agents[0]!.id,
+        workerId: snapshot.agents[1]!.id, status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+      }],
+    };
+    const wrapper = mountShell({ snapshot });
+
+    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
+
+    expect(wrapper.emitted('select-agent')).toStrictEqual([[snapshot.agents[1]!.id]]);
+    await wrapper.setProps({ activeAgent: snapshot.agents[1]! });
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'ConversationPane' }).props('agent').id).toBe(snapshot.agents[1]!.id);
+  });
 });
