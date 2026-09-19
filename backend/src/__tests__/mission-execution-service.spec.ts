@@ -15,7 +15,7 @@ function setup() {
     ensureMissionHome: vi.fn().mockResolvedValue('/claw/missions/mission'),
     readArtifact: vi.fn(async (_missionId: string, stage: string) => artifactContents.get(stage) ?? ''),
     writeArtifact: vi.fn(async (_missionId: string, stage: string, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
-    createWorktree: vi.fn().mockResolvedValue({ name: 'mission', path: '/repo-mission' }),
+    createWorktree: vi.fn(async ({ repoPath, branchName }: { repoPath: string; branchName: string }) => ({ name: branchName, path: `${repoPath}-${branchName.replace('/', '-')}` })),
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
     refreshConversationContext: vi.fn().mockResolvedValue(undefined),
@@ -100,14 +100,16 @@ describe('mission execution', () => {
     });
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     const run = h.current().execution!.runs[0]!;
-    await expect(h.service.upsertTicket(h.originalAgents[0]!.id, { title: 'Wrong owner', body: 'Nope' })).rejects.toThrow('not working');
+    await expect(h.service.upsertTicket(h.originalAgents[0]!.id, { title: 'Wrong owner', body: 'Nope', repositoryPath: h.originalAgents[0]!.folder! })).rejects.toThrow('not working');
     const foundation = await h.service.upsertTicket(run.workerId!, {
       title: 'Create the billing account',
       body: 'Deliver an owner-visible billing account with integration coverage.',
+      repositoryPath: h.originalAgents[0]!.folder!,
     });
     const checkout = await h.service.upsertTicket(run.workerId!, {
       title: 'Add owner checkout',
       body: 'Let an owner buy seats and verify the completed payment.',
+      repositoryPath: h.originalAgents[0]!.folder!,
       blockedByTicketIds: [foundation.ticketId],
       reference: 'https://example.com/issues/42',
     });
@@ -123,10 +125,11 @@ describe('mission execution', () => {
       ticketId: foundation.ticketId,
       title: 'Create the billing account',
       body: 'Deliver the account, permissions, and integration coverage.',
+      repositoryPath: h.originalAgents[0]!.folder!,
     })).resolves.toMatchObject({ ticketId: foundation.ticketId, index: 0, artifactRevision: 3 });
     expect(h.current().execution!.runs[0]!.draftTickets?.[0]?.body).toContain('permissions');
     await expect(h.service.upsertTicket(run.workerId!, {
-      title: 'Broken dependency', body: 'Cannot be saved.', blockedByTicketIds: ['mission-ticket-missing'],
+      title: 'Broken dependency', body: 'Cannot be saved.', repositoryPath: h.originalAgents[0]!.folder!, blockedByTicketIds: ['mission-ticket-missing'],
     })).rejects.toThrow('was not found');
     const submitted = structuredClone(h.current().artifacts);
     await h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, artifacts: submitted, summary: 'Backlog ready' });
@@ -134,26 +137,64 @@ describe('mission execution', () => {
     expect(h.current().artifacts.tickets).toStrictEqual([]);
   });
 
-  it('routes different implementation tickets to team members and preserves other accepted artifacts', async () => {
-    const h = setup(); await h.configure();
+  it('provisions one shared Mission branch and runs independent repositories in parallel', async () => {
+    const h = setup();
+    const repositoryPaths = ['/repo/billing-service', '/repo/invoice-service'];
+    for (const [index, repositoryPath] of repositoryPaths.entries()) {
+      const agent = h.snapshot.agents.find(candidate => candidate.id === h.originalAgents[index]!.id)!;
+      agent.folder = repositoryPath;
+      if (agent.workspace?.kind === 'git') {
+        agent.workspace.folder = repositoryPath;
+        agent.workspace.repositoryRoot = repositoryPath;
+        agent.workspace.primaryWorktreeRoot = repositoryPath;
+      }
+    }
     await h.store.change(h.current().id, mission => {
-      mission.stage = 'implementation';
+      mission.stage = 'tickets';
       mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Pay' };
-      mission.artifacts.tickets = [{ title: 'Checkout', done: false }, { title: 'Invoice', done: false }];
+      mission.execution!.runs = [];
     });
-    for (let index = 0; index < 2; index++) {
-      if (index === 0) await h.command({ action: 'run' });
-      await h.service.waitForLaunches();
-      const mission = h.current(); const run = mission.execution!.runs[index]!;
-      expect(run.memberId).toBe(h.originalAgents[index]!.id);
-      const artifacts: MissionArtifacts = structuredClone(mission.artifacts);
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const ticketsRun = h.current().execution!.runs[0]!;
+    await h.service.upsertTicket(ticketsRun.workerId!, {
+      title: 'Checkout', body: 'Implement checkout.', repositoryPath: repositoryPaths[0]!,
+    });
+    await h.service.upsertTicket(ticketsRun.workerId!, {
+      title: 'Invoice', body: 'Implement invoices.', repositoryPath: repositoryPaths[1]!,
+    });
+    await h.service.setExecutionPolicy(ticketsRun.workerId!, 'reviewEachTicket');
+    await h.service.submit(ticketsRun.workerId!, {
+      missionId: h.current().id, runId: ticketsRun.id, artifacts: structuredClone(h.current().artifacts), summary: 'Backlog ready',
+    });
+    await h.command({ action: 'accept', runId: ticketsRun.id });
+
+    const workspaces = h.current().execution!.workspaces!;
+    expect(workspaces).toHaveLength(2);
+    expect(workspaces[0]!.branch).toMatch(/^mission\/team-billing-/);
+    expect(new Set(workspaces.map(workspace => workspace.branch)).size).toBe(1);
+    expect(h.ports.createWorktree).toHaveBeenCalledTimes(2);
+    expect(h.ports.createWorktree.mock.calls.map(([input]) => input.repoPath)).toStrictEqual(repositoryPaths);
+    expect(h.ports.createWorktree.mock.calls[0]![0].branchName).toBe(h.ports.createWorktree.mock.calls[1]![0].branchName);
+
+    await h.service.waitForLaunches();
+    const implementationRuns = h.current().execution!.runs.filter(run => run.stage === 'implementation');
+    expect(implementationRuns).toHaveLength(2);
+    expect(implementationRuns.map(run => run.status)).toStrictEqual(['running', 'running']);
+    expect(implementationRuns.map(run => run.repositoryPath)).toStrictEqual(repositoryPaths);
+
+    for (const [index, run] of implementationRuns.entries()) {
+      const artifacts: MissionArtifacts = structuredClone(h.current().artifacts);
       artifacts.requirements.problem = 'Unapproved upstream edit';
       artifacts.tickets[index]!.done = true;
       artifacts.implementation = { changes: `Changed ticket ${index}`, tests: `Tests for ${index} passed` };
-      await h.service.writeArtifact(run.workerId!, { stage: 'implementation', content: `# Implementation\nTicket ${index}` });
-      await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Implemented' });
-      await h.command({ action: 'accept', runId: run.id });
+      await expect(h.service.submit(run.workerId!, {
+        missionId: h.current().id, runId: run.id, artifacts, summary: 'Implemented',
+      })).resolves.toEqual({ success: true, status: 'awaitingReview' });
     }
+
+    await h.command({ action: 'accept', runId: implementationRuns[0]!.id });
+    expect(h.current().stage).toBe('implementation');
+    await h.command({ action: 'accept', runId: implementationRuns[1]!.id });
     await h.service.waitForLaunches();
     expect(h.current().artifacts.tickets.every(ticket => ticket.done)).toBe(true);
     expect(h.current().artifacts.requirements.problem).toBe('Billing');
@@ -161,7 +202,54 @@ describe('mission execution', () => {
     expect(h.current().artifacts.implementation.tests).toContain('Tests for 1 passed');
     expect(h.current().stage).toBe('review');
     expect(h.current().execution!.runs.at(-1)).toMatchObject({ stage: 'review', status: 'running' });
-    expect(h.ports.createWorktree).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a repository queue moving automatically while preserving the final Mission review', async () => {
+    const h = setup();
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'tickets';
+      mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
+    });
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const ticketsRun = h.current().execution!.runs[0]!;
+    const foundation = await h.service.upsertTicket(ticketsRun.workerId!, {
+      title: 'Billing foundation', body: 'Build the billing foundation.', repositoryPath: h.originalAgents[0]!.folder!,
+    });
+    await h.service.upsertTicket(ticketsRun.workerId!, {
+      title: 'Owner checkout', body: 'Build owner checkout.', repositoryPath: h.originalAgents[0]!.folder!, blockedByTicketIds: [foundation.ticketId],
+    });
+    await h.service.setExecutionPolicy(ticketsRun.workerId!, 'reviewAfterImplementation');
+    await h.service.submit(ticketsRun.workerId!, {
+      missionId: h.current().id, runId: ticketsRun.id, artifacts: structuredClone(h.current().artifacts), summary: 'Backlog ready',
+    });
+    await h.command({ action: 'accept', runId: ticketsRun.id });
+    await h.service.waitForLaunches();
+
+    const firstRun = h.current().execution!.runs.find(run => run.stage === 'implementation')!;
+    const firstResult = structuredClone(h.current().artifacts);
+    firstResult.tickets[0]!.done = true;
+    firstResult.implementation = { changes: 'Built the foundation.', tests: 'Foundation tests passed.' };
+    await expect(h.service.submit(firstRun.workerId!, {
+      missionId: h.current().id, runId: firstRun.id, artifacts: firstResult, summary: 'Foundation complete',
+    })).resolves.toEqual({ success: true, status: 'accepted' });
+    await h.service.waitForLaunches();
+
+    const implementationRuns = h.current().execution!.runs.filter(run => run.stage === 'implementation');
+    expect(implementationRuns).toHaveLength(2);
+    expect(implementationRuns[0]).toMatchObject({ status: 'accepted', ticketIndex: 0 });
+    expect(implementationRuns[1]).toMatchObject({ status: 'running', ticketIndex: 1 });
+
+    const secondResult = structuredClone(h.current().artifacts);
+    secondResult.tickets[1]!.done = true;
+    secondResult.implementation = { changes: 'Built checkout.', tests: 'Checkout tests passed.' };
+    await expect(h.service.submit(implementationRuns[1]!.workerId!, {
+      missionId: h.current().id, runId: implementationRuns[1]!.id, artifacts: secondResult, summary: 'Checkout complete',
+    })).resolves.toEqual({ success: true, status: 'accepted' });
+    await h.service.waitForLaunches();
+
+    expect(h.current().stage).toBe('review');
+    expect(h.current().execution!.runs.at(-1)).toMatchObject({ stage: 'review', status: 'running' });
+    expect(h.current().artifactFiles?.implementation?.revision).toBe(2);
   });
 
   it('lets the active orchestrator attach a repository represented in its team', async () => {
@@ -177,7 +265,7 @@ describe('mission execution', () => {
     expect(h.ports.validateRepository).toHaveBeenCalledWith(h.originalAgents[0]!.folder);
   });
 
-  it('rolls back approval when the next stage cannot be started', async () => {
+  it('keeps the backlog reviewable when an affected repository worktree cannot be created', async () => {
     const h = setup();
     await h.store.change(h.current().id, mission => {
       mission.stage = 'tickets';
@@ -186,16 +274,15 @@ describe('mission execution', () => {
     await h.command({ action: 'run' });
     await h.service.waitForLaunches();
     const run = h.current().execution!.runs[0]!;
-    const artifacts = structuredClone(h.current().artifacts);
-    artifacts.tickets = [{ title: 'Implement billing', done: false }];
-    await h.service.upsertTicket(run.workerId!, { title: 'Implement billing', body: 'Deliver billing end to end.' });
-    await h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, artifacts, summary: 'Tickets ready' });
+    await h.service.upsertTicket(run.workerId!, { title: 'Implement billing', body: 'Deliver billing end to end.', repositoryPath: h.originalAgents[0]!.folder! });
+    await h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, artifacts: structuredClone(h.current().artifacts), summary: 'Tickets ready' });
     const revision = h.current().revision;
+    h.ports.createWorktree.mockRejectedValueOnce(new Error('Worktree path is unavailable'));
 
-    await expect(h.command({ action: 'accept', runId: run.id })).rejects.toThrow('Attach a team repository');
+    await expect(h.command({ action: 'accept', runId: run.id })).rejects.toThrow('Worktree path is unavailable');
 
     expect(h.current()).toMatchObject({ revision, stage: 'tickets', artifacts: { tickets: [] } });
-    expect(h.current().execution!.runs[0]).toMatchObject({ status: 'awaitingReview', proposal: artifacts });
+    expect(h.current().execution!.runs[0]).toMatchObject({ status: 'awaitingReview' });
   });
 
   it('serializes competing artifact revisions before writing the canonical file', async () => {
@@ -279,7 +366,7 @@ it('reopens reached stages while invalidating dependent acceptance and retains i
   const h = setup(); await h.configure();
   await h.store.change(h.current().id, mission => {
     mission.stage = 'review'; mission.status = 'completed';
-    mission.artifacts = { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [{ title: 'Pay', done: true }], implementation: { changes: 'Payment', tests: 'Pass' }, review: { summary: 'Approved', pullRequestUrl: '' } };
+    mission.artifacts = { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [{ title: 'Pay', repositoryPath: h.originalAgents[0]!.folder!, done: true }], implementation: { changes: 'Payment', tests: 'Pass' }, review: { summary: 'Approved', pullRequestUrl: '' } };
   });
   await expect(h.command({ action: 'run' })).rejects.toThrow('Reopen');
   await h.command({ action: 'reopen', stage: 'requirements' });
@@ -289,7 +376,6 @@ it('reopens reached stages while invalidating dependent acceptance and retains i
   await h.command({ action: 'run' }); await h.service.waitForLaunches();
   const run = h.current().execution!.runs.at(-1)!;
   const artifacts = structuredClone(h.current().artifacts);
-  await h.service.writeArtifact(run.workerId!, { stage: 'implementation', content: '# Implementation' });
   await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'Not done', artifacts })).rejects.toThrow('assigned ticket');
   artifacts.tickets[0]!.done = true;
   await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'No evidence', artifacts })).rejects.toThrow('test evidence');

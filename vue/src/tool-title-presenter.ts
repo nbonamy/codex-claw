@@ -46,6 +46,7 @@ const TOOL_KEYS: Record<string, string> = {
   'list-repos': 'listRepos',
   'list-worktrees': 'listWorktrees',
   'set-mission-title': 'setMissionTitle',
+  'set-mission-execution-policy': 'setMissionExecutionPolicy',
   'attach-mission-repository': 'attachMissionRepository',
   'list-mission-artifacts': 'listMissionArtifacts',
   'read-mission-artifact': 'readMissionArtifact',

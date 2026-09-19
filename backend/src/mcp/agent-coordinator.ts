@@ -1,4 +1,4 @@
-import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionExecutionPolicyResult, MissionResultInput, MissionReviewPolicy, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/missions';
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
@@ -116,9 +116,10 @@ export type McpCreateAgentResponse = {
 
 export type ClawMcpAgentCoordinatorOptions = {
   getMissionContext?: (agentId: string) => MissionToolContext | undefined;
-  onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' }>;
+  onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' | 'accepted' }>;
   onUpsertMissionTicket?: (agentId: string, input: MissionTicketDraftInput) => Promise<MissionTicketDraftResult>;
   onSetMissionTitle?: (agentId: string, title: string) => Promise<{ success: true; title: string }>;
+  onSetMissionExecutionPolicy?: (agentId: string, reviewPolicy: MissionReviewPolicy) => Promise<MissionExecutionPolicyResult>;
   onAttachMissionRepository?: (agentId: string, repoPath: string) => Promise<{ success: true; repoPath: string }>;
   onListMissionArtifacts?: (agentId: string) => Array<{ stage: MissionStage } & MissionArtifactFile>;
   onReadMissionArtifact?: (agentId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
@@ -150,6 +151,7 @@ export class ClawMcpAgentCoordinator {
   private readonly onMissionResult?: ClawMcpAgentCoordinatorOptions['onMissionResult'];
   private readonly onUpsertMissionTicket?: ClawMcpAgentCoordinatorOptions['onUpsertMissionTicket'];
   private readonly onSetMissionTitle?: ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
+  private readonly onSetMissionExecutionPolicy?: ClawMcpAgentCoordinatorOptions['onSetMissionExecutionPolicy'];
   private readonly onAttachMissionRepository?: ClawMcpAgentCoordinatorOptions['onAttachMissionRepository'];
   private readonly onListMissionArtifacts?: ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
   private readonly onReadMissionArtifact?: ClawMcpAgentCoordinatorOptions['onReadMissionArtifact'];
@@ -174,6 +176,7 @@ export class ClawMcpAgentCoordinator {
     this.onMissionResult = options.onMissionResult;
     this.onUpsertMissionTicket = options.onUpsertMissionTicket;
     this.onSetMissionTitle = options.onSetMissionTitle;
+    this.onSetMissionExecutionPolicy = options.onSetMissionExecutionPolicy;
     this.onAttachMissionRepository = options.onAttachMissionRepository;
     this.onListMissionArtifacts = options.onListMissionArtifacts;
     this.onReadMissionArtifact = options.onReadMissionArtifact;
@@ -349,6 +352,12 @@ export class ClawMcpAgentCoordinator {
     this.requireAgent(agentId);
     if (!this.onSetMissionTitle) throw new McpToolError('Mission title updates are unavailable.');
     return this.onSetMissionTitle(agentId, title);
+  }
+
+  async setMissionExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy) {
+    this.requireAgent(agentId);
+    if (!this.onSetMissionExecutionPolicy) throw new McpToolError('Mission execution policy updates are unavailable.');
+    return this.onSetMissionExecutionPolicy(agentId, reviewPolicy);
   }
 
   async attachMissionRepository(agentId: string, repoPath: string) {

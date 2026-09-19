@@ -2,7 +2,7 @@ import type { Agent, AppSnapshot, BackendSkillSummary, CreateSourceWorktreeInput
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
 import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
-import { missionDeveloperInstructions, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { missionDeveloperInstructions, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionResultInput, type MissionReviewPolicy, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 
 export type MissionExecutionPorts = {
@@ -37,7 +37,7 @@ export class MissionExecutionService {
         || input.memberIds.some(id => !this.ports.snapshot.agents.some(agent => agent.id === id && agent.teamId === team.id))) throw new Error('Choose a local team and at least one of its agents.');
       await this.change(input, current => {
         if (current.execution?.workspace || current.execution?.runs.length) throw new Error('Mission workspace configuration is locked after the first run.');
-        current.execution = { teamId: team.id, memberIds: [...new Set(input.memberIds)], runs: [] };
+        current.execution = { teamId: team.id, memberIds: [...new Set(input.memberIds)], reviewPolicy: 'reviewEachTicket', workspaces: [], runs: [] };
       });
       return;
     }
@@ -64,22 +64,31 @@ export class MissionExecutionService {
       return;
     }
     if (input.action === 'accept') {
-      let nextRunId = '';
-      await this.change(input, current => {
+      let nextRunIds: string[] = [];
+      await this.changeAsync(input, async current => {
         const run = current.execution?.runs.find(run => run.id === input.runId);
         if (!run || run.status !== 'awaitingReview' || !run.proposal || run.stage !== current.stage) throw new Error('No current proposal to accept.');
-        current.artifacts = structuredClone(run.proposal);
-        run.status = 'accepted';
+        if (run.stage === 'implementation') {
+          this.acceptImplementationResult(current, run);
+          await this.persistImplementationArtifact(current);
+        } else {
+          if (run.stage === 'tickets' && !missionStageReady('tickets', run.proposal)) {
+            throw new Error('Assign one represented repository to every ticket before starting implementation.');
+          }
+          current.artifacts = structuredClone(run.proposal);
+          run.status = 'accepted';
+        }
         if (missionStageReady(current.stage, current.artifacts)) {
           if (current.stage === 'review') {
             current.status = 'completed';
             return;
           }
           current.stage = featureStages[featureStages.indexOf(current.stage) + 1]!;
+          if (current.stage === 'implementation') await this.provisionImplementationWorkspaces(current);
         }
-        nextRunId = this.enqueueRun(current, {});
+        nextRunIds = this.enqueueRuns(current, {});
       });
-      if (nextRunId) void this.startLaunch(input.id, nextRunId);
+      for (const runId of nextRunIds) void this.startLaunch(input.id, runId);
       return;
     }
     if (input.action === 'reopen') {
@@ -98,12 +107,13 @@ export class MissionExecutionService {
       return;
     }
     if (input.action !== 'run') throw new Error('Unknown mission command.');
-    let runId = '';
+    let runIds: string[] = [];
     await this.change(input, current => {
-      this.requireNoActiveRun(current);
-      runId = this.enqueueRun(current, input);
+      if (current.stage !== 'implementation') this.requireNoActiveRun(current);
+      runIds = this.enqueueRuns(current, input);
+      if (!runIds.length) throw new Error('No implementation ticket is ready to start.');
     });
-    void this.startLaunch(input.id, runId);
+    for (const runId of runIds) void this.startLaunch(input.id, runId);
   }
 
   async recoverInterruptedRuns(): Promise<void> {
@@ -132,12 +142,14 @@ export class MissionExecutionService {
     return launch;
   }
 
-  async submit(agentId: string, input: MissionResultInput): Promise<{ success: true; status: 'awaitingReview' }> {
+  async submit(agentId: string, input: MissionResultInput): Promise<{ success: true; status: 'awaitingReview' | 'accepted' }> {
     if (!input || typeof input.missionId !== 'string' || !isMissionArtifacts(input.artifacts) || typeof input.summary !== 'string' || !input.summary.trim() || input.summary.length > 20_000) throw new Error('Invalid mission result.');
-    await this.ports.missions.change(input.missionId, mission => {
+    let status: 'awaitingReview' | 'accepted' = 'awaitingReview';
+    let nextRunIds: string[] = [];
+    await this.ports.missions.changeAsync(input.missionId, async mission => {
       const run = mission.execution?.runs.find(run => run.id === input.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
-      if (!mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
+      if (run.stage !== 'implementation' && !mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
       const proposal = structuredClone(mission.artifacts);
       if (run.stage === 'implementation') {
         const index = run.ticketIndex!;
@@ -148,6 +160,7 @@ export class MissionExecutionService {
           tests: [proposal.implementation.tests, input.artifacts.implementation.tests].filter(Boolean).join('\n\n'),
         };
         if (!input.artifacts.implementation.changes.trim() || !input.artifacts.implementation.tests.trim()) throw new Error('Report code changes and actual test evidence.');
+        run.implementationResult = structuredClone(input.artifacts.implementation);
       } else {
         if (run.stage === 'requirements') proposal.requirements = structuredClone(input.artifacts.requirements);
         if (run.stage === 'tickets') {
@@ -159,9 +172,17 @@ export class MissionExecutionService {
       }
       if (!isMissionArtifacts(proposal)) throw new Error('Mission evidence is too large. Submit a concise report with references.');
       run.proposal = proposal; run.summary = input.summary.trim(); run.status = 'awaitingReview'; run.finishedAt = new Date().toISOString();
+      if (run.stage === 'implementation' && mission.execution?.reviewPolicy === 'reviewAfterImplementation') {
+        this.acceptImplementationResult(mission, run);
+        await this.persistImplementationArtifact(mission);
+        status = 'accepted';
+        if (missionStageReady('implementation', mission.artifacts)) mission.stage = 'review';
+        nextRunIds = this.enqueueRuns(mission, {});
+      }
     });
     await this.ports.publish();
-    return { success: true, status: 'awaitingReview' };
+    for (const runId of nextRunIds) void this.startLaunch(input.missionId, runId);
+    return { success: true, status };
   }
 
   contextForAgent(agentId: string): MissionToolContext | undefined {
@@ -208,6 +229,7 @@ export class MissionExecutionService {
     const context = this.requireContext(agentId);
     if (!input || !featureStages.includes(input.stage) || typeof input.content !== 'string') throw new Error('Invalid mission artifact.');
     if (input.stage !== context.stage) throw new Error('This agent can write only its assigned stage artifact.');
+    if (input.stage === 'implementation') throw new Error('Submit implementation evidence with the assigned ticket result.');
     const result = await this.ports.missions.changeAsync(context.missionId, async current => {
       const run = current.execution?.runs.find(run => run.id === context.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== input.stage) {
@@ -229,6 +251,7 @@ export class MissionExecutionService {
   async upsertTicket(agentId: string, input: MissionTicketDraftInput): Promise<MissionTicketDraftResult> {
     const context = this.requireContext(agentId);
     if (context.stage !== 'tickets' || !input || typeof input.title !== 'string' || typeof input.body !== 'string'
+      || typeof input.repositoryPath !== 'string'
       || (input.ticketId !== undefined && typeof input.ticketId !== 'string')
       || (input.reference !== undefined && typeof input.reference !== 'string')
       || (input.blockedByTicketIds !== undefined && (!Array.isArray(input.blockedByTicketIds) || input.blockedByTicketIds.some(id => typeof id !== 'string')))) {
@@ -236,10 +259,14 @@ export class MissionExecutionService {
     }
     const title = input.title.trim();
     const body = input.body.trim();
+    const repositoryPath = input.repositoryPath.trim();
     const reference = input.reference?.trim();
-    if (!title || title.length > 500 || /[\r\n]/.test(title) || !body || body.length > 100_000 || (reference !== undefined && (!reference || reference.length > 100_000))) {
-      throw new Error('Mission ticket title, body, or reference is invalid.');
+    const mission = this.requireMission(context.missionId);
+    if (!title || title.length > 500 || /[\r\n]/.test(title) || !body || body.length > 100_000 || !repositoryPath || (reference !== undefined && (!reference || reference.length > 100_000))) {
+      throw new Error('Mission ticket title, body, repository, or reference is invalid.');
     }
+    if (!this.teamRepositories(mission).includes(repositoryPath)) throw new Error('Choose a repository represented in this Mission team.');
+    await this.ports.validateRepository(repositoryPath);
     const result = await this.ports.missions.changeAsync(context.missionId, async mission => {
       const run = mission.execution?.runs.find(candidate => candidate.id === context.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== 'tickets' || mission.stage !== 'tickets') {
@@ -260,6 +287,7 @@ export class MissionExecutionService {
         id: ticketId,
         title,
         body,
+        repositoryPath,
         done: false,
         ...(reference ? { reference } : {}),
         ...(dependsOn.length ? { dependsOn } : {}),
@@ -277,6 +305,20 @@ export class MissionExecutionService {
     });
     await this.ports.publish();
     return result;
+  }
+
+  async setExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy): Promise<MissionExecutionPolicyResult> {
+    const context = this.requireContext(agentId);
+    if (!['reviewEachTicket', 'reviewAfterImplementation'].includes(reviewPolicy)) throw new Error('Invalid Mission execution policy.');
+    await this.ports.missions.change(context.missionId, mission => {
+      const run = mission.execution?.runs.find(candidate => candidate.id === context.runId);
+      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || mission.stage !== 'tickets') {
+        throw new Error('Execution policy can be changed only by the active Tickets orchestrator.');
+      }
+      mission.execution!.reviewPolicy = reviewPolicy;
+    });
+    await this.ports.publish();
+    return { success: true, reviewPolicy };
   }
 
   async setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> {
@@ -323,23 +365,17 @@ export class MissionExecutionService {
   async waitForLaunches(): Promise<void> { await Promise.all(this.launches.values()); }
 
   private async launch(id: string, runId: string): Promise<void> {
-    let mission = this.requireMission(id);
-    const execution = mission.execution!;
-    const runBeforeWorkspace = execution.runs.find(run => run.id === runId)!;
-    if (!execution.workspace && (runBeforeWorkspace.stage === 'implementation' || runBeforeWorkspace.stage === 'review')) {
-      const branch = `mission/${mission.id.replace(/^mission-/, '')}`;
-      const worktree = await this.ports.createWorktree({ repoPath: execution.repoPath!, branchName: branch, reuseExisting: true });
-      const baseSha = await this.ports.getHead(worktree.path);
-      await this.ports.missions.change(id, current => { current.execution!.workspace = { path: worktree.path, branch, baseSha }; });
-      await this.ports.publish();
-    }
-    mission = this.requireMission(id);
+    const mission = this.requireMission(id);
     const run = mission.execution!.runs.find(run => run.id === runId)!;
     if (run.status === 'cancelled') return;
     const member = this.agent(run.memberId);
     if (!member) throw new Error('Assigned team member was removed.');
     const missionHome = await this.ports.ensureMissionHome(mission.id);
-    const workingFolder = mission.execution!.workspace?.path ?? missionHome;
+    const repositoryPath = run.repositoryPath ?? mission.artifacts.tickets[run.ticketIndex ?? -1]?.repositoryPath;
+    const workspace = repositoryPath
+      ? mission.execution!.workspaces?.find(candidate => candidate.repositoryPath === repositoryPath)
+      : mission.execution!.workspaces?.[0] ?? mission.execution!.workspace;
+    const workingFolder = workspace?.path ?? missionHome;
     let worker = this.agent(run.workerId);
     const reusedWorker = !!worker;
     if (!worker) {
@@ -377,26 +413,127 @@ export class MissionExecutionService {
     if (!mission) throw new Error('Mission not found.');
     return mission;
   }
+  private enqueueRuns(mission: Mission, input: { memberId?: string; ticketIndex?: number; feedback?: string }): string[] {
+    if (mission.stage !== 'implementation') return [this.enqueueRun(mission, input)];
+    const execution = mission.execution;
+    if (!execution) throw new Error('Configure the Mission team first.');
+    const activeStatuses: MissionRun['status'][] = ['preparing', 'running', 'awaitingReview'];
+    const busyRepositories = new Set(execution.runs
+      .filter(run => run.stage === 'implementation' && activeStatuses.includes(run.status) && run.repositoryPath)
+      .map(run => run.repositoryPath!));
+    const activeTickets = new Set(execution.runs
+      .filter(run => run.stage === 'implementation' && activeStatuses.includes(run.status) && run.ticketIndex !== undefined)
+      .map(run => run.ticketIndex!));
+    const candidates = input.ticketIndex === undefined
+      ? mission.artifacts.tickets.map((_, index) => index)
+      : [input.ticketIndex];
+    const runIds: string[] = [];
+    for (const ticketIndex of candidates) {
+      const ticket = mission.artifacts.tickets[ticketIndex];
+      const repositoryPath = ticket?.repositoryPath;
+      if (!ticket || !repositoryPath || !missionTicketReady(mission.artifacts.tickets, ticketIndex)
+        || activeTickets.has(ticketIndex) || busyRepositories.has(repositoryPath)) continue;
+      const runId = this.enqueueImplementationRun(mission, ticketIndex, repositoryPath, input);
+      runIds.push(runId);
+      busyRepositories.add(repositoryPath);
+    }
+    return runIds;
+  }
+
   private enqueueRun(mission: Mission, input: { memberId?: string; ticketIndex?: number; feedback?: string }): string {
     const execution = mission.execution;
-    if (!execution) throw new Error('Configure the mission repository and team first.');
-    if ((mission.stage === 'implementation' || mission.stage === 'review') && !execution.repoPath) {
-      throw new Error('Attach a team repository before starting code work.');
-    }
-    const ticketIndex = mission.stage === 'implementation'
-      ? input.ticketIndex ?? mission.artifacts.tickets.findIndex((_, index) => missionTicketReady(mission.artifacts.tickets, index)) : undefined;
-    if (mission.stage === 'implementation' && (ticketIndex === undefined || !Number.isInteger(ticketIndex) || ticketIndex < 0 || !missionTicketReady(mission.artifacts.tickets, ticketIndex))) throw new Error('Choose an implementation ticket.');
+    if (!execution) throw new Error('Configure the Mission team first.');
     const previousOrchestratorRun = mission.stage === 'tickets'
       ? execution.runs.slice().reverse().find(run => (run.stage === 'requirements' || run.stage === 'tickets') && run.workerId)
       : undefined;
-    const memberId = input.memberId ?? previousOrchestratorRun?.memberId ?? execution.memberIds[(ticketIndex ?? 0) % execution.memberIds.length]!;
+    const memberId = input.memberId ?? previousOrchestratorRun?.memberId ?? execution.memberIds[0]!;
     const member = this.agent(memberId);
     if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
     if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
     const runId = createEntityId('mission-run');
-    execution.runs.push({ id: runId, stage: mission.stage, memberId, ...(previousOrchestratorRun?.workerId ? { workerId: previousOrchestratorRun.workerId } : {}), ...(ticketIndex === undefined ? {} : { ticketIndex }), status: 'preparing', skills: [], feedback: input.feedback?.trim() ?? '', startedAt: new Date().toISOString() });
+    execution.runs.push({ id: runId, stage: mission.stage, memberId, ...(previousOrchestratorRun?.workerId ? { workerId: previousOrchestratorRun.workerId } : {}), status: 'preparing', skills: [], feedback: input.feedback?.trim() ?? '', startedAt: new Date().toISOString() });
     return runId;
   }
+
+  private enqueueImplementationRun(
+    mission: Mission,
+    ticketIndex: number,
+    repositoryPath: string,
+    input: { memberId?: string; feedback?: string },
+  ): string {
+    const execution = mission.execution!;
+    const memberId = input.memberId ?? execution.memberIds[ticketIndex % execution.memberIds.length]!;
+    const member = this.agent(memberId);
+    if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
+    if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
+    const runId = createEntityId('mission-run');
+    execution.runs.push({
+      id: runId,
+      stage: 'implementation',
+      memberId,
+      ticketIndex,
+      repositoryPath,
+      status: 'preparing',
+      skills: [],
+      feedback: input.feedback?.trim() ?? '',
+      startedAt: new Date().toISOString(),
+    });
+    return runId;
+  }
+
+  private async provisionImplementationWorkspaces(mission: Mission): Promise<void> {
+    const execution = mission.execution!;
+    execution.reviewPolicy ??= 'reviewEachTicket';
+    execution.workspaceName ??= missionWorkspaceName(mission);
+    execution.workspaces ??= [];
+    const branch = `mission/${execution.workspaceName}`;
+    const repositoryPaths = [...new Set(mission.artifacts.tickets.map(ticket => ticket.repositoryPath))];
+    const representedRepositories = this.teamRepositories(mission);
+    for (const repositoryPath of repositoryPaths) {
+      if (!repositoryPath || !representedRepositories.includes(repositoryPath)) {
+        throw new Error('Every ticket must target a repository represented in this Mission team.');
+      }
+      if (execution.workspaces.some(workspace => workspace.repositoryPath === repositoryPath)) continue;
+      await this.ports.validateRepository(repositoryPath);
+      const worktree = await this.ports.createWorktree({ repoPath: repositoryPath, branchName: branch, reuseExisting: true });
+      const baseSha = await this.ports.getHead(worktree.path);
+      execution.workspaces.push({ repositoryPath, path: worktree.path, branch, baseSha });
+    }
+  }
+
+  private acceptImplementationResult(mission: Mission, run: MissionRun): void {
+    const index = run.ticketIndex;
+    const result = run.implementationResult;
+    if (index === undefined || !mission.artifacts.tickets[index] || !result) throw new Error('Implementation evidence is incomplete.');
+    mission.artifacts.tickets[index]!.done = true;
+    mission.artifacts.implementation = {
+      changes: [mission.artifacts.implementation.changes, result.changes].filter(Boolean).join('\n\n'),
+      tests: [mission.artifacts.implementation.tests, result.tests].filter(Boolean).join('\n\n'),
+    };
+    run.status = 'accepted';
+  }
+
+  private async persistImplementationArtifact(mission: Mission): Promise<void> {
+    const content = [
+      '# Implementation evidence',
+      '',
+      '## Changes',
+      '',
+      mission.artifacts.implementation.changes,
+      '',
+      '## Verification',
+      '',
+      mission.artifacts.implementation.tests,
+    ].join('\n');
+    const stored = await this.ports.writeArtifact(mission.id, 'implementation', content);
+    const currentRevision = mission.artifactFiles?.implementation?.revision ?? 0;
+    (mission.artifactFiles ??= {}).implementation = {
+      revision: currentRevision + 1,
+      size: stored.size,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   private agent(id: string | undefined): Agent | undefined { return this.ports.snapshot.agents.find(agent => agent.id === id); }
   private teamRepositories(mission: Mission): string[] {
     return [...new Set((mission.execution?.memberIds ?? []).flatMap(id => {
@@ -418,12 +555,34 @@ export class MissionExecutionService {
     });
     await this.ports.publish();
   }
+
+  private async changeAsync(input: { id: string; revision: number }, mutate: (mission: Mission) => Promise<void>, allowCompleted = false): Promise<void> {
+    await this.ports.missions.changeAsync(input.id, async mission => {
+      if (mission.revision !== input.revision) throw new Error('This mission changed. Reload before continuing.');
+      if (!allowCompleted && mission.status === 'completed') throw new Error('Reopen the completed mission before starting work.');
+      await mutate(mission);
+    });
+    await this.ports.publish();
+  }
+}
+
+function missionWorkspaceName(mission: Mission): string {
+  const outcome = mission.outcome
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'mission';
+  const suffix = mission.id.replace(/^mission-/, '').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toLowerCase();
+  return `${outcome}-${suffix || 'work'}`;
 }
 
 function missionTicketsMarkdown(tickets: MissionTicket[]): string {
   return tickets.map((ticket, index) => [
     `# ${String(index + 1).padStart(2, '0')}: ${ticket.title}`,
     ticket.body,
+    `**Repository:** ${ticket.repositoryPath ?? 'Not assigned'}`,
     `**Blocked by:** ${ticket.dependsOn?.length ? ticket.dependsOn.map(blocker => `${String(blocker + 1).padStart(2, '0')}: ${tickets[blocker]?.title ?? 'Unknown ticket'}`).join(', ') : 'None (can start immediately)'}`,
     '**Status:** ready-for-agent',
     ticket.reference ? `**External reference:** ${ticket.reference}` : '',

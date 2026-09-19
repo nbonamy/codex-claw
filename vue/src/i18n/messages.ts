@@ -888,6 +888,7 @@ export const messages = {
               running: 'Listing worktrees for {target}',
             },
             setMissionTitle: { running: 'Naming mission', completed: 'Named mission', failed: 'Could not name mission' },
+            setMissionExecutionPolicy: { running: 'Setting implementation review', completed: 'Set implementation review', failed: 'Could not set implementation review' },
             attachMissionRepository: { running: 'Attaching mission repository', completed: 'Attached mission repository', failed: 'Could not attach mission repository' },
             listMissionArtifacts: { running: 'Checking mission artifacts', completed: 'Checked mission artifacts', failed: 'Could not check mission artifacts' },
             readMissionArtifact: { running: 'Reading mission artifact', completed: 'Read mission artifact', failed: 'Could not read mission artifact' },

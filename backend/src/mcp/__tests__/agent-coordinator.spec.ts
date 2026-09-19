@@ -13,7 +13,7 @@ describe('ClawMcpAgentCoordinator', () => {
     const input = { missionId: 'mission', runId: 'run', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
     expect(coordinator.missionContext('agent-dina')).toBeUndefined();
     await expect(coordinator.submitMissionResult('agent-dina', input)).rejects.toThrow('unavailable');
-    await expect(coordinator.upsertMissionTicket('agent-dina', { title: 'Ticket', body: 'Body' })).rejects.toThrow('unavailable');
+    await expect(coordinator.upsertMissionTicket('agent-dina', { title: 'Ticket', body: 'Body', repositoryPath: '/repo' })).rejects.toThrow('unavailable');
     await expect(coordinator.setMissionTitle('agent-dina', 'Add team billing')).rejects.toThrow('unavailable');
     await expect(coordinator.attachMissionRepository('agent-dina', '/repo')).rejects.toThrow('unavailable');
     expect(() => coordinator.listMissionArtifacts('agent-dina')).toThrow('unavailable');
@@ -21,11 +21,12 @@ describe('ClawMcpAgentCoordinator', () => {
     const onMissionResult = vi.fn().mockResolvedValue({ success: true, status: 'awaitingReview' });
     const onUpsertMissionTicket = vi.fn().mockResolvedValue({ success: true, ticketId: 'mission-ticket-1', index: 0, artifactRevision: 1 });
     const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
+    const onSetMissionExecutionPolicy = vi.fn().mockResolvedValue({ success: true, reviewPolicy: 'reviewAfterImplementation' });
     const onAttachMissionRepository = vi.fn().mockResolvedValue({ success: true, repoPath: '/repo' });
     const onListMissionArtifacts = vi.fn().mockReturnValue([{ stage: 'requirements', revision: 1, size: 10, updatedAt: 'now' }]);
     const onReadMissionArtifact = vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 1, updatedAt: 'now' });
     const onWriteMissionArtifact = vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 2, updatedAt: 'later' });
-    const enabled = fixture({ getMissionContext: missionContext, onMissionResult, onUpsertMissionTicket, onSetMissionTitle, onAttachMissionRepository, onListMissionArtifacts, onReadMissionArtifact, onWriteMissionArtifact }).coordinator;
+    const enabled = fixture({ getMissionContext: missionContext, onMissionResult, onUpsertMissionTicket, onSetMissionTitle, onSetMissionExecutionPolicy, onAttachMissionRepository, onListMissionArtifacts, onReadMissionArtifact, onWriteMissionArtifact }).coordinator;
     expect(() => enabled.missionContext('missing')).toThrow();
     await expect(enabled.submitMissionResult('missing', input)).rejects.toThrow();
     expect(onMissionResult).not.toHaveBeenCalled();
@@ -33,6 +34,8 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(missionContext).toHaveBeenCalledWith('agent-dina');
     await expect(enabled.setMissionTitle('agent-dina', 'Add team billing')).resolves.toEqual({ success: true, title: 'Add team billing' });
     expect(onSetMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
+    await expect(enabled.setMissionExecutionPolicy('agent-dina', 'reviewAfterImplementation')).resolves.toEqual({ success: true, reviewPolicy: 'reviewAfterImplementation' });
+    expect(onSetMissionExecutionPolicy).toHaveBeenCalledWith('agent-dina', 'reviewAfterImplementation');
     await expect(enabled.attachMissionRepository('agent-dina', '/repo')).resolves.toEqual({ success: true, repoPath: '/repo' });
     expect(onAttachMissionRepository).toHaveBeenCalledWith('agent-dina', '/repo');
     expect(enabled.listMissionArtifacts('agent-dina')).toHaveLength(1);
@@ -40,8 +43,8 @@ describe('ClawMcpAgentCoordinator', () => {
     await expect(enabled.writeMissionArtifact('agent-dina', { stage: 'requirements', content: '# Brief' })).resolves.toMatchObject({ revision: 2 });
     await expect(enabled.submitMissionResult('agent-dina', input)).resolves.toEqual({ success: true, status: 'awaitingReview' });
     expect(onMissionResult).toHaveBeenCalledWith('agent-dina', input);
-    await expect(enabled.upsertMissionTicket('agent-dina', { title: 'Ticket', body: 'Body' })).resolves.toMatchObject({ ticketId: 'mission-ticket-1' });
-    expect(onUpsertMissionTicket).toHaveBeenCalledWith('agent-dina', { title: 'Ticket', body: 'Body' });
+    await expect(enabled.upsertMissionTicket('agent-dina', { title: 'Ticket', body: 'Body', repositoryPath: '/repo' })).resolves.toMatchObject({ ticketId: 'mission-ticket-1' });
+    expect(onUpsertMissionTicket).toHaveBeenCalledWith('agent-dina', { title: 'Ticket', body: 'Body', repositoryPath: '/repo' });
   });
 
   it('connects agents, reports statuses, and updates trimmed status text', () => {

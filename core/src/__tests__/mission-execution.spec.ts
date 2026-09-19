@@ -23,7 +23,7 @@ import { missionDeveloperInstructions, pendingMissionRun, type MissionRun } from
 it('carries the assigned stage, accepted artifacts, workspace, skills and revision feedback into the provider handoff', () => {
   const snapshot = createInitialSnapshot();
   const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
-  mission.execution = { teamId: 'team', repoPath: '/repo', memberIds: ['member'], workspace: { path: '/isolated', branch: 'mission/billing', baseSha: 'a'.repeat(40) }, runs: [] };
+  mission.execution = { teamId: 'team', memberIds: ['member'], workspaceName: 'billing-work', reviewPolicy: 'reviewAfterImplementation', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [] };
   mission.artifacts.requirements = { problem: 'Owners pay', acceptance: 'Only owners' };
   for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
     const run: MissionRun = { id: 'run', stage, memberId: 'member', ticketIndex: 1, status: 'running', skills: [{ name: 'tdd', path: '/skills/tdd' }], feedback: 'Check permissions', startedAt: 'now' };
@@ -45,6 +45,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     if (stage === 'tickets') {
       expect(prompt).toContain('Continue as the same Mission orchestrator');
       expect(prompt).toContain('Use codex_claw.upsert-mission-ticket for every draft');
+      expect(prompt).toContain('set-mission-execution-policy');
     }
     expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Do not automatically invoke setup-matt-pocock-skills');
@@ -56,7 +57,7 @@ it('validates persisted execution records and dependency graphs before admitting
   const snapshot = createInitialSnapshot();
   const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   const run: MissionRun = { id: 'run', stage: 'requirements', memberId: 'member', workerId: 'worker', status: 'running', skills: [{ name: 'grilling', path: '/skill' }], feedback: '', startedAt: 'now', finishedAt: 'later', summary: 'Ready', error: 'old error', proposal: structuredClone(mission.artifacts), ticketIndex: 0 };
-  mission.execution = { teamId: 'team', repoPath: '/repo', memberIds: ['member'], workspace: { path: '/isolated', branch: 'mission/billing', baseSha: 'a'.repeat(40) }, runs: [run] };
+  mission.execution = { teamId: 'team', memberIds: ['member'], reviewPolicy: 'reviewEachTicket', workspaceName: 'billing-work', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [run] };
   expect(isMission(mission)).toBe(true);
   expect(pendingMissionRun(mission)).toBe(run);
   expect(() => updateMission(snapshot, { id: mission.id, revision: 0, artifacts: mission.artifacts, stageAgentIds: {}, action: 'save' })).toThrow('current mission run');
@@ -64,6 +65,8 @@ it('validates persisted execution records and dependency graphs before admitting
     expect(isMission({ ...mission, execution: { ...mission.execution, runs: [{ ...run, ...change }] } })).toBe(false);
   }
   expect(isMission({ ...mission, execution: { ...mission.execution, workspace: { path: '/repo', branch: 'x', baseSha: 'bad' } } })).toBe(false);
+  expect(isMission({ ...mission, execution: { ...mission.execution, reviewPolicy: 'unknown' } })).toBe(false);
+  expect(isMission({ ...mission, execution: { ...mission.execution, workspaces: [{ repositoryPath: '', path: '/repo', branch: 'x' }] } })).toBe(false);
   const tickets = [{ title: 'Checkout', done: false, reference: 'https://example.com/1', dependsOn: [1] }, { title: 'Account', done: false }];
   expect(isMissionArtifacts({ ...mission.artifacts, tickets })).toBe(true);
   expect(missionTicketReady(tickets, 0)).toBe(false);

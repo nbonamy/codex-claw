@@ -23,7 +23,7 @@ describe('missions', () => {
     update('save'); expect(mission.stage).toBe('requirements');
     update('advance'); expect(mission.stage).toBe('tickets');
     expect(() => update('advance')).toThrow('required stage');
-    artifacts.tickets = [{ title: 'Add owner checkout', done: false }];
+    artifacts.tickets = [{ title: 'Add owner checkout', repositoryPath: snapshot.agents[0]!.folder!, done: false }];
     update('advance'); expect(mission.stage).toBe('implementation');
     artifacts.implementation = { changes: 'commit abc', tests: 'Checkout tests pass' };
     expect(() => update('advance')).toThrow('required stage');

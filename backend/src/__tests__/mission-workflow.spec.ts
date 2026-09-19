@@ -44,7 +44,7 @@ it('keeps one orchestrator through shaping, isolates code sessions, respects tic
     await command({ action: 'attachRepository', repoPath: repo });
     const submit = async (artifacts: MissionArtifacts) => {
       const run = current().execution!.runs.at(-1)!;
-      if (run.stage !== 'tickets') await service.writeArtifact(run.workerId!, { stage: run.stage, content: `# ${run.stage}\nMission artifact.` });
+      if (run.stage !== 'tickets' && run.stage !== 'implementation') await service.writeArtifact(run.workerId!, { stage: run.stage, content: `# ${run.stage}\nMission artifact.` });
       await service.submit(run.workerId!, { missionId: mission.id, runId: run.id, summary: `${run.stage} ready`, artifacts });
       expect(current().execution!.runs.at(-1)!.status).toBe('awaitingReview');
       await command({ action: 'accept', runId: run.id });
@@ -62,11 +62,11 @@ it('keeps one orchestrator through shaping, isolates code sessions, respects tic
           await service.agentFinished(run.workerId!); // Question/answer rounds remain part of the same stage.
           artifacts.requirements = { problem: 'Team billing', acceptance: 'An owner can buy seats' };
         } else if (stage === 'tickets') {
-          const account = await service.upsertTicket(run.workerId!, { title: 'Billing account', body: 'Create the billing account.', reference: 'https://example.com/issues/1' });
-          await service.upsertTicket(run.workerId!, { title: 'Owner checkout', body: 'Add owner checkout.', reference: 'https://example.com/issues/2', blockedByTicketIds: [account.ticketId] });
+          const account = await service.upsertTicket(run.workerId!, { title: 'Billing account', body: 'Create the billing account.', repositoryPath: repo, reference: 'https://example.com/issues/1' });
+          await service.upsertTicket(run.workerId!, { title: 'Owner checkout', body: 'Add owner checkout.', repositoryPath: repo, reference: 'https://example.com/issues/2', blockedByTicketIds: [account.ticketId] });
         } else if (stage === 'implementation') {
           expect(run.ticketIndex).toBe(attempt);
-          const workspace = current().execution!.workspace!.path;
+          const workspace = current().execution!.workspaces![0]!.path;
           await writeFile(join(workspace, `ticket-${run.ticketIndex}.txt`), 'implemented\n');
           await git(workspace, ['add', '.']);
           await git(workspace, ['commit', '-m', `feat: implement ticket ${run.ticketIndex}`]);
@@ -77,7 +77,7 @@ it('keeps one orchestrator through shaping, isolates code sessions, respects tic
       }
     }
     expect(current().status).toBe('completed');
-    expect(current().execution!.workspace!.baseSha).toBe(baseline);
+    expect(current().execution!.workspaces![0]!.baseSha).toBe(baseline);
     expect(current().execution!.runs[0]!.workerId).toBe(current().execution!.runs[1]!.workerId);
     expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(4);
     expect(await readWorktreeHead(repo)).toBe(baseline);

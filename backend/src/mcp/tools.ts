@@ -30,10 +30,12 @@ export function createCodexClawMcpServer(
       },
     }, ({ title }) => toolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
 
-    server.registerTool('attach-mission-repository', {
-      description: 'Attach one repository represented in the active Mission team after confirming it with the user. This lets later code stages create an isolated Mission worktree.',
-      inputSchema: { repoPath: z.string().trim().min(1) },
-    }, ({ repoPath }) => toolResult('attach-mission-repository', { callerAgentId, repoPath }, () => coordinator.attachMissionRepository(callerAgentId, repoPath)));
+    server.registerTool('set-mission-execution-policy', {
+      description: 'Choose how implementation results are reviewed after discussing it with the user. reviewEachTicket pauses each repository lane for approval. reviewAfterImplementation automatically continues successful tickets and pauses for one combined implementation review.',
+      inputSchema: {
+        reviewPolicy: z.enum(['reviewEachTicket', 'reviewAfterImplementation']),
+      },
+    }, ({ reviewPolicy }) => toolResult('set-mission-execution-policy', { callerAgentId, reviewPolicy }, () => coordinator.setMissionExecutionPolicy(callerAgentId, reviewPolicy)));
 
     server.registerTool('list-mission-artifacts', {
       description: 'List canonical artifact files already written for the active Mission. The Mission is inferred from your authenticated agent identity.',
@@ -55,11 +57,12 @@ export function createCodexClawMcpServer(
     }, input => toolResult('write-mission-artifact', { callerAgentId, stage: input.stage }, () => coordinator.writeMissionArtifact(callerAgentId, input)));
 
     server.registerTool('upsert-mission-ticket', {
-      description: 'Create or revise one ticket in the active Mission Tickets stage. Call once per ticket and again after each revision so the user sees the backlog emerge live. Omit ticketId to create; pass the returned Mission ticket ID to revise. Use blockedByTicketIds for dependencies. A tracker issue number is optional and belongs in reference only after publication.',
+      description: 'Create or revise one ticket in the active Mission Tickets stage. Assign exactly one represented repository path. Call once per ticket and again after each revision so the user sees the backlog emerge live. Omit ticketId to create; pass the returned Mission ticket ID to revise. Use blockedByTicketIds for dependencies. A tracker issue number is optional and belongs in reference only after publication.',
       inputSchema: {
         ticketId: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(),
         title: z.string().trim().min(1).max(500),
         body: z.string().trim().min(1).max(100000),
+        repositoryPath: z.string().trim().min(1),
         reference: z.string().trim().min(1).max(100000).optional(),
         blockedByTicketIds: z.array(z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/)).max(200).optional(),
       },
@@ -71,7 +74,7 @@ export function createCodexClawMcpServer(
         missionId: z.string(), runId: z.string(), summary: z.string().min(1).max(20000),
         artifacts: z.object({
           requirements: z.object({ problem: z.string().max(100000), acceptance: z.string().max(100000) }),
-          tickets: z.array(z.object({ id: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(), title: z.string().max(100000), body: z.string().max(100000).optional(), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),
+          tickets: z.array(z.object({ id: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(), title: z.string().max(100000), body: z.string().max(100000).optional(), repositoryPath: z.string().trim().min(1).optional(), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),
           implementation: z.object({ changes: z.string().max(100000), tests: z.string().max(100000) }),
           review: z.object({ summary: z.string().max(100000), pullRequestUrl: z.string().max(100000) }),
         }),

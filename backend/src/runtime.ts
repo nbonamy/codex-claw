@@ -78,6 +78,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onMissionResult: (agentId, input) => server.submitMissionResult(agentId, input),
     onUpsertMissionTicket: (agentId, input) => server.upsertMissionTicket(agentId, input),
     onSetMissionTitle: (agentId, title) => server.setMissionTitle(agentId, title),
+    onSetMissionExecutionPolicy: (agentId, reviewPolicy) => server.setMissionExecutionPolicy(agentId, reviewPolicy),
     onAttachMissionRepository: (agentId, repoPath) => server.attachMissionRepository(agentId, repoPath),
     onListMissionArtifacts: (agentId) => server.listMissionArtifacts(agentId),
     onReadMissionArtifact: (agentId, stage) => server.readMissionArtifact(agentId, stage),

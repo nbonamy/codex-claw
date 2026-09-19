@@ -48,6 +48,7 @@ export type ClawMcpServiceOptions = {
   onMissionResult?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onMissionResult'];
   onUpsertMissionTicket?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onUpsertMissionTicket'];
   onSetMissionTitle?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
+  onSetMissionExecutionPolicy?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onSetMissionExecutionPolicy'];
   onAttachMissionRepository?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onAttachMissionRepository'];
   onListMissionArtifacts?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
   onReadMissionArtifact?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onReadMissionArtifact'];
@@ -91,6 +92,7 @@ export class ClawMcpService {
       onMissionResult: options.onMissionResult,
       onUpsertMissionTicket: options.onUpsertMissionTicket,
       onSetMissionTitle: options.onSetMissionTitle,
+      onSetMissionExecutionPolicy: options.onSetMissionExecutionPolicy,
       onAttachMissionRepository: options.onAttachMissionRepository,
       onListMissionArtifacts: options.onListMissionArtifacts,
       onReadMissionArtifact: options.onReadMissionArtifact,

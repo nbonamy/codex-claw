@@ -327,6 +327,10 @@ export class ClawBackendServer {
     return this.missionExecution.setTitle(agentId, title);
   }
 
+  async setMissionExecutionPolicy(agentId: string, reviewPolicy: import('@codex-claw/core/mission-execution').MissionReviewPolicy) {
+    return this.missionExecution.setExecutionPolicy(agentId, reviewPolicy);
+  }
+
   async attachMissionRepository(agentId: string, repoPath: string) {
     return this.missionExecution.attachRepository(agentId, repoPath);
   }

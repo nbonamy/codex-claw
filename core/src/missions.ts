@@ -4,7 +4,15 @@ import { createEntityId } from './ids';
 
 export const featureStages = ['requirements', 'tickets', 'implementation', 'review'] as const;
 export type MissionStage = typeof featureStages[number];
-export type MissionTicket = { id?: string; title: string; body?: string; done: boolean; reference?: string; dependsOn?: number[] };
+export type MissionTicket = {
+  id?: string;
+  title: string;
+  body?: string;
+  repositoryPath?: string;
+  done: boolean;
+  reference?: string;
+  dependsOn?: number[];
+};
 export type MissionArtifacts = {
   requirements: { problem: string; acceptance: string };
   tickets: MissionTicket[];
@@ -50,7 +58,7 @@ const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v ===
 const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 100_000;
 export function isMissionArtifacts(v: unknown): v is MissionArtifacts {
   return record(v) && record(v.requirements) && text(v.requirements.problem) && text(v.requirements.acceptance)
-    && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && (t.id === undefined || (text(t.id) && /^mission-ticket-[a-zA-Z0-9-]+$/.test(t.id))) && text(t.title) && (t.body === undefined || text(t.body)) && typeof t.done === 'boolean' && (t.reference === undefined || (text(t.reference) && !!t.reference.trim())) && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.every(n => Number.isInteger(n) && n >= 0)))) && validTicketDependencies(v.tickets as MissionTicket[])
+    && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && (t.id === undefined || (text(t.id) && /^mission-ticket-[a-zA-Z0-9-]+$/.test(t.id))) && text(t.title) && (t.body === undefined || text(t.body)) && (t.repositoryPath === undefined || (text(t.repositoryPath) && !!t.repositoryPath.trim())) && typeof t.done === 'boolean' && (t.reference === undefined || (text(t.reference) && !!t.reference.trim())) && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.every(n => Number.isInteger(n) && n >= 0)))) && validTicketDependencies(v.tickets as MissionTicket[])
     && record(v.implementation) && text(v.implementation.changes) && text(v.implementation.tests)
     && record(v.review) && text(v.review.summary) && text(v.review.pullRequestUrl)
     && (!v.review.pullRequestUrl || /^https?:\/\//.test(v.review.pullRequestUrl));
@@ -91,7 +99,7 @@ export function isMission(v: unknown): v is Mission {
 export function missionStageReady(stage: MissionStage, a: MissionArtifacts): boolean {
   switch (stage) {
     case 'requirements': return !!a.requirements.problem.trim() && !!a.requirements.acceptance.trim();
-    case 'tickets': return a.tickets.length > 0 && a.tickets.every(t => !!t.title.trim());
+    case 'tickets': return a.tickets.length > 0 && a.tickets.every(t => !!t.title.trim() && !!t.repositoryPath?.trim());
     case 'implementation': return a.tickets.length > 0 && a.tickets.every(t => t.done) && !!a.implementation.changes.trim() && !!a.implementation.tests.trim();
     case 'review': return !!a.review.summary.trim();
   }
@@ -109,7 +117,7 @@ export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
     artifacts: { requirements: { problem: '', acceptance: '' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } },
     artifactFiles: {},
     stageAgentIds: {},
-    execution: { teamId: team.id, memberIds: [...team.agentIds], runs: [] },
+    execution: { teamId: team.id, memberIds: [...team.agentIds], reviewPolicy: 'reviewEachTicket', workspaces: [], runs: [] },
   };
   (snapshot.missions ??= []).push(mission);
   return mission;
@@ -145,12 +153,20 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
 
 function isMissionExecution(v: unknown): v is MissionExecution {
   return record(v) && text(v.teamId) && (v.repoPath === undefined || text(v.repoPath)) && Array.isArray(v.memberIds) && v.memberIds.every(text)
+    && (v.reviewPolicy === undefined || ['reviewEachTicket', 'reviewAfterImplementation'].includes(v.reviewPolicy as string))
+    && (v.workspaceName === undefined || (text(v.workspaceName) && !!v.workspaceName.trim()))
+    && (v.workspaces === undefined || (Array.isArray(v.workspaces) && v.workspaces.every(workspace => record(workspace)
+      && text(workspace.repositoryPath) && !!workspace.repositoryPath.trim()
+      && text(workspace.path) && !!workspace.path.trim() && text(workspace.branch) && !!workspace.branch.trim()
+      && (workspace.baseSha === undefined || (typeof workspace.baseSha === 'string' && /^[a-f0-9]{40,64}$/.test(workspace.baseSha))))))
     && (v.workspace === undefined || (record(v.workspace) && text(v.workspace.path) && text(v.workspace.branch) && (v.workspace.baseSha === undefined || (typeof v.workspace.baseSha === 'string' && /^[a-f0-9]{40,64}$/.test(v.workspace.baseSha)))))
     && Array.isArray(v.runs) && v.runs.every(run => record(run) && text(run.id) && text(run.memberId)
       && featureStages.includes(run.stage as MissionStage)
       && ['preparing', 'running', 'awaitingReview', 'accepted', 'cancelled', 'failed'].includes(run.status as string)
       && (run.workerId === undefined || text(run.workerId))
       && (run.ticketIndex === undefined || (Number.isInteger(run.ticketIndex) && (run.ticketIndex as number) >= 0))
+      && (run.repositoryPath === undefined || (text(run.repositoryPath) && !!run.repositoryPath.trim()))
+      && (run.implementationResult === undefined || (record(run.implementationResult) && text(run.implementationResult.changes) && text(run.implementationResult.tests)))
       && Array.isArray(run.skills) && run.skills.every(skill => record(skill) && text(skill.name) && text(skill.path))
       && text(run.feedback) && text(run.startedAt)
       && (run.finishedAt === undefined || text(run.finishedAt))
