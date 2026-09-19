@@ -243,6 +243,7 @@ export class ClawBackendServer {
       persistAndEmitSnapshot: () => this.persistAndEmitSnapshot(),
       refreshGitStatus: async (agentId) => { await this.agentWorkspaces.refreshGitStatus(agentId); },
       refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
+      sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
     });
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }

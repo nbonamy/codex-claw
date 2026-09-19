@@ -8,6 +8,8 @@ import type {
   AgentGitPullRequestInput,
   AgentGitPushInput,
   AgentGitStageInput,
+  AgentGitUpdateFromBaseInput,
+  AgentGitUpdateFromBaseResult,
   AgentGitDiffTarget,
   AgentGitWorkflow,
   AppSnapshot,
@@ -127,6 +129,10 @@ export type ClawBackendRequestMap = {
   [backendMethods.agentGitMerge]: {
     params: { agentId: string; input: AgentGitMergeInput };
     result: AgentGitWorkflow;
+  };
+  [backendMethods.agentGitUpdateFromBase]: {
+    params: { agentId: string; input: AgentGitUpdateFromBaseInput };
+    result: AgentGitUpdateFromBaseResult;
   };
 };
 

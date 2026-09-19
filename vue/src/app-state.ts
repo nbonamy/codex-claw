@@ -2,7 +2,7 @@
 import { translate } from './i18n';
 import { computed, ref, watch } from 'vue';
 import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
-import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
@@ -664,6 +664,11 @@ export function useAppState() {
   async function mergeAgentGitBranch(agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput): Promise<AgentGitWorkflow> {
     if (!codexClawApi?.mergeAgentGitBranch) throw new Error(translate('surface.app-state.gitMergeIsNotAvailable'));
     return codexClawApi.mergeAgentGitBranch(agentId, input);
+  }
+
+  async function updateAgentGitBranchFromBase(agentId: string, input: AgentGitUpdateFromBaseInput): Promise<AgentGitUpdateFromBaseResult> {
+    if (!codexClawApi?.updateAgentGitBranchFromBase) throw new Error(translate('surface.app-state.gitUpdateFromBaseIsNotAvailable'));
+    return codexClawApi.updateAgentGitBranchFromBase(agentId, input);
   }
 
   async function loadOpenInApplications(): Promise<void> {
@@ -1370,6 +1375,7 @@ export function useAppState() {
     createAgentGitBranch,
     createAgentGitPullRequest,
     mergeAgentGitBranch,
+    updateAgentGitBranchFromBase,
     loadOpenInApplications,
     openAgentPath,
     createAgent,

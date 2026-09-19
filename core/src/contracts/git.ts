@@ -87,6 +87,9 @@ export type AgentGitWorkflow = {
   repository: string;
   folder: string;
   isLinkedWorktree: boolean;
+  baseBranch?: string;
+  baseUpdateRequired?: boolean;
+  baseWorktreeDirty?: boolean;
   branch?: string;
   detached: boolean;
   remote?: string;
@@ -121,6 +124,15 @@ export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: bo
 export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
 
 export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
+
+export type AgentGitUpdateFromBaseInput = { confirmed: boolean; allowDirty?: boolean };
+
+export type AgentGitUpdateFromBaseResult = {
+  workflow: AgentGitWorkflow;
+  baseBranch: string;
+  branch: string;
+  conflicts: string[];
+};
 
 export type AgentGitMessageGenerationInput =
   | { kind: 'commit'; includeUnstaged: boolean; includeUntracked: boolean }

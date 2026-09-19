@@ -50,6 +50,8 @@ const contractModules = {
       'AgentGitPushInput',
       'AgentGitStageInput',
       'AgentGitStatus',
+      'AgentGitUpdateFromBaseInput',
+      'AgentGitUpdateFromBaseResult',
       'AgentGitWorkflow',
       'AgentPullRequestTracking',
       'TurnGitDiff',
@@ -259,7 +261,7 @@ describe('contract domain ownership', () => {
       .flatMap((module) => [...module.exports])
       .sort();
 
-    expect(exportsByPath.get(barrelPath)).toHaveLength(228);
+    expect(exportsByPath.get(barrelPath)).toHaveLength(230);
     expect(exportsByPath.get(barrelPath)).toEqual(expect.arrayContaining(expectedMovedExports));
     for (const module of Object.values(contractModules)) {
       expect(exportsByPath.get(module.path)).toEqual([...module.exports].sort());
@@ -295,6 +297,8 @@ describe('contract domain ownership', () => {
     expectTypeOf<Contracts.AgentCloseInput>().toEqualTypeOf<GitContracts.AgentCloseInput>();
     expectTypeOf<Contracts.AgentGitPullRequestInput>().toEqualTypeOf<GitContracts.AgentGitPullRequestInput>();
     expectTypeOf<Contracts.AgentGitMergeInput>().toEqualTypeOf<GitContracts.AgentGitMergeInput>();
+    expectTypeOf<Contracts.AgentGitUpdateFromBaseInput>().toEqualTypeOf<GitContracts.AgentGitUpdateFromBaseInput>();
+    expectTypeOf<Contracts.AgentGitUpdateFromBaseResult>().toEqualTypeOf<GitContracts.AgentGitUpdateFromBaseResult>();
     expectTypeOf<Contracts.AgentGitMessageGenerationInput>().toEqualTypeOf<GitContracts.AgentGitMessageGenerationInput>();
     expectTypeOf<Contracts.AgentGitMessageGenerationResult>().toEqualTypeOf<GitContracts.AgentGitMessageGenerationResult>();
     expectTypeOf<Contracts.TurnGitDiff>().toEqualTypeOf<GitContracts.TurnGitDiff>();

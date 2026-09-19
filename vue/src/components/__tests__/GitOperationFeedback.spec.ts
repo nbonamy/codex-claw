@@ -27,4 +27,15 @@ describe('GitOperationFeedback', () => {
     expect(wrapper.find('[data-test="action-icon"]').exists()).toBe(false);
     expect(wrapper.find('.git-operation-feedback__mark svg').exists()).toBe(true);
   });
+
+  it('renders an attention outcome without reporting the operation as busy', () => {
+    const wrapper = mount(GitOperationFeedback, {
+      props: { status: 'warning', title: 'Agent resolving conflicts', detail: '1 conflict from main' },
+    });
+
+    expect(wrapper.attributes('aria-busy')).toBe('false');
+    expect(wrapper.classes()).toContain('git-operation-feedback--warning');
+    expect(wrapper.text()).toContain('Agent resolving conflicts');
+    expect(wrapper.find('.git-operation-feedback__mark svg').exists()).toBe(true);
+  });
 });

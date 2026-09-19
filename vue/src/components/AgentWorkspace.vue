@@ -23,6 +23,7 @@
     :push-git-branch="props.pushAgentGitBranch"
     :create-git-pull-request="props.createAgentGitPullRequest"
     :merge-git-branch="props.mergeAgentGitBranch"
+    :update-git-branch-from-base="props.updateAgentGitBranchFromBase"
     :report-back-agent-name="reportBackAgentName"
     @expand-sidebar="emit('expand-sidebar')"
     @toggle-execution-plan="toggleExecutionPlan"
@@ -218,6 +219,7 @@ const props = defineProps<{
   hasRunningPlanTool: boolean;
   latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
+  updateAgentGitBranchFromBase: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;

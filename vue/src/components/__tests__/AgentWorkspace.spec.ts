@@ -73,6 +73,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       latestConversationTurnId: null,
       loadWorkItems: vi.fn(),
       mergeAgentGitBranch: vi.fn(),
+      updateAgentGitBranchFromBase: vi.fn(),
       openAgentGitDiffPreview: vi.fn(),
       openAgentIn: vi.fn(),
       openAttachmentImageAnnotation: vi.fn(),

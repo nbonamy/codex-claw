@@ -38,6 +38,7 @@ describe('agent Git IPC', () => {
     [ipcChannels.createAgentGitBranch, backendMethods.agentGitBranchCreate, [{ name: 'feat/test', confirmed: true }], { repository: 'repo' }],
     [ipcChannels.createAgentGitPullRequest, backendMethods.agentGitPullRequestCreate, [{ title: 'Title', body: 'Body', confirmed: true }], { repository: 'repo' }],
     [ipcChannels.mergeAgentGitBranch, backendMethods.agentGitMerge, [{ strategy: 'merge', deleteBranch: false, deleteWorktree: false, confirmed: true }], { repository: 'repo' }],
+    [ipcChannels.updateAgentGitBranchFromBase, backendMethods.agentGitUpdateFromBase, [{ confirmed: true }], { baseBranch: 'main', branch: 'feature', conflicts: [] }],
   ] as const)('maps %s to %s with the exact backend payload', async (channel, method, inputArguments, result) => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const ipc = {

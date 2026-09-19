@@ -10,6 +10,7 @@
       <span v-if="status === 'running'" class="git-operation-feedback__orbit" />
       <slot v-if="status === 'running'" name="icon" />
       <CheckIcon v-else-if="status === 'success'" />
+      <AlertTriangleIcon v-else-if="status === 'warning'" />
       <CircleXIcon v-else />
     </div>
     <div class="git-operation-feedback__copy">
@@ -20,10 +21,10 @@
 </template>
 
 <script setup lang="ts">
-import { CheckIcon, CircleXIcon } from '../shared/icons/app-icons';
+import { AlertTriangleIcon, CheckIcon, CircleXIcon } from '../shared/icons/app-icons';
 
 defineProps<{
-  status: 'running' | 'success' | 'error';
+  status: 'running' | 'success' | 'warning' | 'error';
   title: string;
   detail?: string;
 }>();
@@ -50,6 +51,10 @@ defineSlots<{
 
 .git-operation-feedback--error {
   color: var(--color-error);
+}
+
+.git-operation-feedback--warning {
+  color: var(--color-warning);
 }
 
 .git-operation-feedback__mark {

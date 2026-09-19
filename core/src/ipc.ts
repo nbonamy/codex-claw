@@ -40,6 +40,7 @@ export const ipcChannels = {
   createAgentGitBranch: 'agent:git-workflow:branch:create',
   createAgentGitPullRequest: 'agent:git-workflow:pull-request:create',
   mergeAgentGitBranch: 'agent:git-workflow:merge',
+  updateAgentGitBranchFromBase: 'agent:git-workflow:update-from-base',
   getOpenInApplications: 'open-in:applications:get',
   openAgentPath: 'agent:path:open-in',
   chooseAgentFolder: 'agent:choose-folder',
