@@ -6,7 +6,9 @@ export const messages = {
     missions: {
       acceptedArtifact: 'Accepted artifact',
       draftTickets: 'Draft tickets', draftTicketsHint: '{count} ticket drafted | {count} tickets drafted', inProgress: 'In progress',
-      blockedBy: 'Blocked by tickets',
+      blockedBy: 'Blocked by tickets', blockedByShort: 'After {tickets}',
+      openTicketDetails: 'View details for {title}', closeTicketDetails: 'Close ticket details', ticketDetails: 'Ticket details',
+      ticketReady: 'Ready to build', ticketComplete: 'Complete', noTicketDescription: 'Description is still being drafted.',
       codeReview: 'Code and delivery', diffScope: 'Diff scope', branchDiff: 'Branch changes', uncommittedDiff: 'Uncommitted changes', refreshDiff: 'Refresh diff',
       proposal: 'Artifact ready for review', stopRun: 'Stop run',
       runStatus: { preparing: 'Preparing workspace', running: 'Stage in progress', awaitingReview: 'Awaiting your review', accepted: 'Accepted', cancelled: 'Stopped', failed: 'Failed' },

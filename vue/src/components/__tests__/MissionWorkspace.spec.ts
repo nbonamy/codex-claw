@@ -177,9 +177,15 @@ describe('MissionWorkspace', () => {
 
     const drafts = wrapper.get('[aria-label="Draft tickets"]');
     expect(drafts.text()).toContain('2 tickets drafted');
-    expect(drafts.text()).toContain('Create billing account');
-    expect(drafts.text()).toContain('Deliver the account with integration coverage.');
-    expect(drafts.text()).toContain('Blocked by tickets: 1');
+    const ticketCards = drafts.findAll('.mission-ticket-board__card');
+    expect(ticketCards).toHaveLength(2);
+    expect(ticketCards[0]!.text()).toContain('Create billing account');
+    expect(ticketCards[0]!.text()).toContain('Deliver the account with integration coverage.');
+    expect(ticketCards[1]!.text()).toContain('After 01');
+
+    await ticketCards[1]!.trigger('click');
+
+    expect(drafts.get('[aria-label="Ticket details"]').text()).toContain('Let an owner buy seats.');
     expect(wrapper.get('[aria-label="Skills in use"]').text()).toContain('to-tickets');
     expect(wrapper.find('[aria-label="Artifact ready for review"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Mission conversations"]').exists()).toBe(false);
@@ -295,8 +301,12 @@ describe('MissionWorkspace', () => {
 
     mission.stage = 'tickets';
     await wrapper.setProps({ mission: structuredClone(mission) });
-    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Open canonical ticket');
-    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Blocked by tickets: 1');
+    const acceptedTickets = wrapper.get('[aria-label="Accepted artifact"]');
+    expect(acceptedTickets.findAll('.mission-ticket-board__card')).toHaveLength(2);
+    await acceptedTickets.findAll('.mission-ticket-board__card')[0]!.trigger('click');
+    expect(acceptedTickets.get('[aria-label="Ticket details"]').text()).toContain('Open canonical ticket');
+    await acceptedTickets.findAll('.mission-ticket-board__card')[1]!.trigger('click');
+    expect(acceptedTickets.get('[aria-label="Ticket details"]').text()).toContain('Blocked by tickets: 01');
 
     mission.stage = 'implementation';
     await wrapper.setProps({ mission: structuredClone(mission) });

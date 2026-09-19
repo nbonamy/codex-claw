@@ -86,7 +86,7 @@
             <div><strong>{{ artifactTitle('tickets') }}</strong><span>{{ t('missions.draftTicketsHint', { count: activeRun.draftTickets.length }) }}</span></div>
             <span class="mission-workspace__review-status">{{ t('missions.inProgress') }}</span>
           </header>
-          <MarkdownPanel :content="draftTicketMarkdown" />
+          <MissionTicketBoard :tickets="visibleTickets" />
         </section>
 
         <section v-else-if="viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
@@ -95,7 +95,8 @@
             <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ activeRun.summary }}</span></div>
             <span class="mission-workspace__review-status">{{ t('missions.readyForReview') }}</span>
           </header>
-          <MarkdownPanel :content="artifactMarkdown" />
+          <MissionTicketBoard v-if="viewedStage === 'tickets' && visibleTickets.length" :tickets="visibleTickets" />
+          <MarkdownPanel v-else :content="artifactMarkdown" />
           <footer class="mission-workspace__review-hint">
             <MessageCircleIcon aria-hidden="true" />
             <span>{{ t('missions.reviewInConversation') }}</span>
@@ -108,7 +109,8 @@
             <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ t('missions.acceptedAtStage') }}</span></div>
             <span class="mission-workspace__accepted-status"><CheckIcon aria-hidden="true" />{{ t('missions.accepted') }}</span>
           </header>
-          <MarkdownPanel :content="artifactMarkdown" />
+          <MissionTicketBoard v-if="viewedStage === 'tickets' && visibleTickets.length" :tickets="visibleTickets" />
+          <MarkdownPanel v-else :content="artifactMarkdown" />
         </section>
 
         <section v-else class="mission-workspace__empty-artifact">
@@ -170,6 +172,7 @@ import { featureStages, type Mission, type MissionArtifacts, type MissionStage }
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
+import MissionTicketBoard from './MissionTicketBoard.vue';
 
 const props = withDefaults(defineProps<{
   agents?: Agent[];
@@ -263,10 +266,12 @@ const artifactMarkdown = computed(() => canonicalArtifact.value || stageMarkdown
     ? activeRun.value.proposal
     : props.mission.artifacts,
 ));
-const draftTicketMarkdown = computed(() => canonicalArtifact.value || stageMarkdown('tickets', {
-  ...props.mission.artifacts,
-  tickets: activeRun.value?.draftTickets ?? [],
-}));
+const visibleTickets = computed(() => {
+  if (viewedStage.value !== 'tickets') return [];
+  if (viewedStage.value === props.mission.stage && activeRun.value?.proposal) return activeRun.value.proposal.tickets;
+  if (viewedStage.value === props.mission.stage && activeRun.value?.draftTickets?.length) return activeRun.value.draftTickets;
+  return props.mission.artifacts.tickets;
+});
 function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string {
   switch (stage) {
     case 'requirements': return artifacts.requirements.problem.trim() ? `## ${t('missions.problem')}\n\n${artifacts.requirements.problem}\n\n## ${t('missions.acceptance')}\n\n${artifacts.requirements.acceptance}` : '';
