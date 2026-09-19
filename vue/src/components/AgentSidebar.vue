@@ -981,7 +981,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__agent--active {
-  background: var(--color-surface-base);
+  background: color-mix(in srgb, var(--color-surface-base) 72%, transparent);
 }
 
 .agent-sidebar__session-icon {
