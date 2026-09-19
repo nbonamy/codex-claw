@@ -40,7 +40,7 @@ import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway } from './hosted-mcp-gateway';
 import path from 'node:path';
-import { ReviewToolRegistry, type CompletedReviewToolContext } from '../review/review-tool-registry';
+import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -144,17 +144,13 @@ export class ClawMcpService {
     return this.server.hostedMcpServerUrls();
   }
 
-  createReviewToolContext(agentId: string): { id: string; url: string } {
-    const context = this.reviewTools.create(agentId);
+  createReviewToolContext(agentId: string, handlers: ReviewToolHandlers): { id: string; url: string } {
+    const context = this.reviewTools.create(agentId, handlers);
     return { id: context.id, url: this.server.reviewMcpServerUrl(agentId, context.id) };
   }
 
-  finishReviewToolContext(contextId: string): CompletedReviewToolContext {
-    return this.reviewTools.finish(contextId);
-  }
-
-  discardReviewToolContext(contextId: string): void {
-    this.reviewTools.discard(contextId);
+  closeReviewToolContext(contextId: string): void {
+    this.reviewTools.close(contextId);
   }
 
   sendMessage(fromAgentId: string, toAgentId: string, content: string): void {

@@ -12,6 +12,13 @@ export type ClawBackendPort = {
 type ParamsFactory = (args: unknown[]) => unknown;
 
 const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?]>> = {
+  startCodeReview: [backendMethods.agentCodeReviewStart, named('agentId')],
+  decideCodeReviewFinding: [backendMethods.agentCodeReviewFindingDecide, named('agentId', 'input')],
+  assignCodeReviewFinding: [backendMethods.agentCodeReviewFindingAssign, named('agentId', 'input')],
+  discussCodeReviewFinding: [backendMethods.agentCodeReviewFindingDiscuss, named('agentId', 'input')],
+  submitCodeReviewRound: [backendMethods.agentCodeReviewRoundSubmit, named('agentId', 'sessionId')],
+  finishCodeReview: [backendMethods.agentCodeReviewFinish, named('agentId', 'sessionId')],
+  reviewCodeAgain: [backendMethods.agentCodeReviewAgain, named('agentId', 'sessionId')],
   respondToThreadFlag: [backendMethods.agentThreadFlagRespond, named('agentId', 'response')],
   respondToPlanReview: [backendMethods.agentPlanReviewRespond, named('agentId', 'response')],
   listSshHosts: [backendMethods.connectionsSshHostsList],

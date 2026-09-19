@@ -1,42 +1,45 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { CodeReviewFinding } from '@codex-claw/core/code-review';
 import { ReviewToolRegistry } from '../review-tool-registry';
 
+const finding = (): CodeReviewFinding => ({
+  id: 'finding-1', roundId: 'round-1', fingerprint: 'src/auth.ts:ownership', priority: 'p1',
+  summary: 'Ownership is not checked', rationale: 'The handler writes before authorizing.',
+  suggestedResolution: 'Authorize before the write.', disposition: { state: 'unresolved' },
+  discussion: [], verification: { state: 'notRequested' },
+  createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
+});
+
 describe('ReviewToolRegistry', () => {
-  it('collects stable findings and verification in an agent-scoped review context', () => {
+  it('routes only the three model-owned finding actions through an agent-scoped context', async () => {
     const registry = new ReviewToolRegistry();
-    const context = registry.create('agent-1');
+    const handlers = {
+      reportFinding: vi.fn(async () => finding()),
+      updateFinding: vi.fn(async () => ({ ...finding(), priority: 'p0' as const })),
+      markFindingComplete: vi.fn(async () => ({
+        ...finding(),
+        disposition: { state: 'accepted' as const, decidedAt: '2026-09-19T10:01:00.000Z' },
+        verification: { state: 'passed' as const, verifiedAt: '2026-09-19T10:02:00.000Z', roundId: 'round-2' },
+      })),
+    };
+    const context = registry.create('agent-1', handlers);
 
-    const first = context.reportFinding({
-      fingerprint: 'src/auth.ts:ownership',
-      priority: 'p1',
-      summary: 'Ownership is not checked',
-      rationale: 'The handler writes before authorizing.',
-      suggestedResolution: 'Authorize before the write.',
+    await context.reportFinding({
+      fingerprint: 'src/auth.ts:ownership', priority: 'p1', summary: 'Ownership is not checked',
+      rationale: 'The handler writes before authorizing.', suggestedResolution: 'Authorize before the write.',
     });
-    const updated = context.reportFinding({
-      fingerprint: 'src/auth.ts:ownership',
-      priority: 'p0',
-      summary: 'Ownership is not checked',
-      rationale: 'The public handler writes before authorizing.',
-      suggestedResolution: 'Authorize before the write.',
-    });
-    context.reportVerification({ findingId: 'prior-1', state: 'passed' });
-    context.complete('One critical finding.');
+    await context.updateFinding({ findingId: 'finding-1', priority: 'p0' });
+    await context.markFindingComplete({ findingId: 'finding-1', evidence: 'Focused test passes.' });
 
-    expect(updated.id).toBe(first.id);
+    expect(handlers.reportFinding).toHaveBeenCalledOnce();
+    expect(handlers.updateFinding).toHaveBeenCalledWith({ findingId: 'finding-1', priority: 'p0' });
+    expect(handlers.markFindingComplete).toHaveBeenCalledWith({ findingId: 'finding-1', evidence: 'Focused test passes.' });
     expect(registry.resolve('agent-2', context.id)).toBeNull();
-    expect(registry.finish(context.id)).toEqual({
-      findings: [expect.objectContaining({ id: first.id, priority: 'p0' })],
-      verifications: [{ findingId: 'prior-1', state: 'passed' }],
-      summary: 'One critical finding.',
-    });
+
+    registry.close(context.id);
     expect(registry.resolve('agent-1', context.id)).toBeNull();
-  });
-
-  it('requires the reviewer to explicitly complete the round', () => {
-    const registry = new ReviewToolRegistry();
-    const context = registry.create('agent-1');
-
-    expect(() => registry.finish(context.id)).toThrow('Reviewer did not complete');
+    expect(() => context.reportFinding({
+      fingerprint: 'later', priority: 'p3', summary: 'Later', rationale: 'Later', suggestedResolution: 'Later',
+    })).toThrow('no longer available');
   });
 });

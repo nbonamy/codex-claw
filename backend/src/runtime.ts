@@ -203,6 +203,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onPromptStarting: (agentId, promptOptions) => {
       mcpService.recordPromptInputMethod(agentId, promptOptions?.inputMethod);
     },
+    codeReviewTools: mcpService,
     workIntegrations,
     automationRunner,
     remoteClients: new RemoteClawdClientManager({

@@ -1,75 +1,38 @@
 import { randomUUID } from 'node:crypto';
-import type { CodeReviewFindingInput } from '@codex-claw/core/code-review';
+import type {
+  CodeReviewFinding,
+  CodeReviewFindingInput,
+  CodeReviewFindingUpdateInput,
+} from '@codex-claw/core/code-review';
 
-export type ReviewFindingReport = CodeReviewFindingInput & {
-  id: string;
-};
-
-export type ReviewVerificationReport = {
+export type ReviewFindingCompletionInput = {
   findingId: string;
-  state: 'passed' | 'failed';
   evidence?: string;
 };
 
-export type ReviewToolContext = {
+export type ReviewToolHandlers = {
+  reportFinding(input: CodeReviewFindingInput): Promise<CodeReviewFinding> | CodeReviewFinding;
+  updateFinding(input: CodeReviewFindingUpdateInput): Promise<CodeReviewFinding> | CodeReviewFinding;
+  markFindingComplete(input: ReviewFindingCompletionInput): Promise<CodeReviewFinding> | CodeReviewFinding;
+};
+
+export type ReviewToolContext = ReviewToolHandlers & {
   id: string;
   agentId: string;
-  reportFinding(input: CodeReviewFindingInput): ReviewFindingReport;
-  reportVerification(input: ReviewVerificationReport): ReviewVerificationReport;
-  complete(summary?: string): void;
-};
-
-export type CompletedReviewToolContext = {
-  findings: ReviewFindingReport[];
-  verifications: ReviewVerificationReport[];
-  summary?: string;
-};
-
-type StoredReviewToolContext = ReviewToolContext & {
-  result: CompletedReviewToolContext;
-  completed: boolean;
 };
 
 export class ReviewToolRegistry {
-  private readonly contexts = new Map<string, StoredReviewToolContext>();
+  private readonly contexts = new Map<string, ReviewToolContext>();
 
-  create(agentId: string): ReviewToolContext {
-    const id = randomUUID();
-    const result: CompletedReviewToolContext = { findings: [], verifications: [] };
-    const context: StoredReviewToolContext = {
-      id,
+  create(agentId: string, handlers: ReviewToolHandlers): ReviewToolContext {
+    const context: ReviewToolContext = {
+      id: randomUUID(),
       agentId,
-      result,
-      completed: false,
-      reportFinding: (input) => {
-        this.requireOpen(context);
-        const prior = input.priorFindingId
-          ? result.findings.find((finding) => finding.id === input.priorFindingId)
-          : result.findings.find((finding) => finding.fingerprint === input.fingerprint);
-        const finding: ReviewFindingReport = {
-          ...input,
-          id: prior?.id ?? input.priorFindingId ?? randomUUID(),
-        };
-        const existingIndex = result.findings.findIndex((candidate) => candidate.id === finding.id);
-        if (existingIndex >= 0) result.findings.splice(existingIndex, 1, finding);
-        else result.findings.push(finding);
-        return structuredClone(finding);
-      },
-      reportVerification: (input) => {
-        this.requireOpen(context);
-        const verification = { ...input };
-        const existingIndex = result.verifications.findIndex((candidate) => candidate.findingId === input.findingId);
-        if (existingIndex >= 0) result.verifications.splice(existingIndex, 1, verification);
-        else result.verifications.push(verification);
-        return structuredClone(verification);
-      },
-      complete: (summary) => {
-        this.requireOpen(context);
-        context.completed = true;
-        if (summary?.trim()) result.summary = summary.trim();
-      },
+      reportFinding: (input) => this.run(context, () => handlers.reportFinding(input)),
+      updateFinding: (input) => this.run(context, () => handlers.updateFinding(input)),
+      markFindingComplete: (input) => this.run(context, () => handlers.markFindingComplete(input)),
     };
-    this.contexts.set(id, context);
+    this.contexts.set(context.id, context);
     return context;
   }
 
@@ -79,20 +42,12 @@ export class ReviewToolRegistry {
     return context?.agentId === agentId ? context : null;
   }
 
-  finish(contextId: string): CompletedReviewToolContext {
-    const context = this.contexts.get(contextId);
-    if (!context) throw new Error('Review context is no longer available.');
-    if (!context.completed) throw new Error('Reviewer did not complete the review round.');
-    this.contexts.delete(contextId);
-    return structuredClone(context.result);
-  }
-
-  discard(contextId: string): void {
+  close(contextId: string): void {
     this.contexts.delete(contextId);
   }
 
-  private requireOpen(context: StoredReviewToolContext): void {
+  private run<T>(context: ReviewToolContext, action: () => Promise<T> | T): Promise<T> | T {
     if (!this.contexts.has(context.id)) throw new Error('Review context is no longer available.');
-    if (context.completed) throw new Error('Review round is already complete.');
+    return action();
   }
 }

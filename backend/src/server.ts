@@ -48,6 +48,8 @@ import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
+import type { CodeReviewAssignmentInput, CodeReviewDecisionInput, CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
+import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -69,6 +71,7 @@ export type ClawBackendServerOptions = {
   agentGitService?: AgentGitService;
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
+  codeReviewTools?: CodeReviewToolPort;
 };
 
 export type SystemPermissionsPort = {
@@ -127,6 +130,7 @@ export class ClawBackendServer {
   private readonly subagentIdentities: SubagentIdentityService;
   private readonly agentGitService: AgentGitService;
   private readonly agentGitWorkflows: AgentGitWorkflowService;
+  private readonly codeReviews?: CodeReviewService;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
   private conversationsReconciliation?: Promise<void>;
@@ -251,6 +255,22 @@ export class ClawBackendServer {
       refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
       sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
     });
+    if (options.codeReviewTools) {
+      this.codeReviews = new CodeReviewService({
+        snapshot: this.snapshot,
+        tools: options.codeReviewTools,
+        runReview: async (agent, prompt, reviewMcpServerUrl) => {
+          return await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewRun, {
+            agent,
+            prompt,
+            cwd: requireAgentFolder(agent),
+            reviewMcpServerUrl,
+          }) as { text: string };
+        },
+        sendFixPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
+        changed: async () => { await this.persistAndEmitSnapshot(); },
+      });
+    }
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
@@ -789,6 +809,61 @@ export class ClawBackendServer {
       case backendMethods.agentSkillsList: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentSkillsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverSkillsList, { agent }));
+      }
+      case backendMethods.agentCodeReviewStart: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId }, async (agent) => {
+          this.requireCodeReviews().start(agent);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFindingDecide: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input') as CodeReviewDecisionInput;
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          this.requireCodeReviews().decide(agent, input);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFindingAssign: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input') as CodeReviewAssignmentInput;
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          this.requireCodeReviews().assign(agent, input);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFindingDiscuss: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input') as CodeReviewDiscussionInput;
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          this.requireCodeReviews().discuss(agent, input);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewRoundSubmit: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          this.requireCodeReviews().submit(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFinish: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          this.requireCodeReviews().finish(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewAgain: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          this.requireCodeReviews().reviewAgain(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
       }
       case backendMethods.agentConversationsList: {
         const params = requireRecord(message.params);
@@ -1767,6 +1842,11 @@ export class ClawBackendServer {
     return this.driverRpc;
   }
 
+  private requireCodeReviews(): CodeReviewService {
+    if (!this.codeReviews) throw new Error('Code review is not configured.');
+    return this.codeReviews;
+  }
+
   private async handleAgentDriverRequest(agent: Agent, method: string, params: unknown): Promise<unknown> {
     const remoteConnectionId = this.remoteTeams.connectionIdForAgent(agent);
     return this.backendHandleForLocation(this.locationFromRemoteConnectionId(remoteConnectionId))
@@ -2062,6 +2142,9 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
+    if (event.type === 'agent.statusChanged' && event.agentId) {
+      this.codeReviews?.handleAgentStatusChanged(event.agentId, event.payload);
+    }
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
@@ -2079,6 +2162,9 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
+    if (event.type === 'agent.statusChanged' && event.agentId) {
+      this.codeReviews?.handleAgentStatusChanged(event.agentId, event.payload);
+    }
     if (
       event.agentId && (
         providerConversationEventView(fullEvent).type === 'turn.completed' ||
@@ -2669,6 +2755,18 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     candidate.folder.trim().length > 0 &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
+}
+
+function requireStringParam(params: unknown, key: string): string {
+  if (!isRecord(params) || typeof params[key] !== 'string' || !params[key].trim()) {
+    throw new Error(`Invalid ${key}.`);
+  }
+  return params[key];
+}
+
+function requireRecordParam(params: unknown, key: string): Record<string, unknown> {
+  if (!isRecord(params) || !isRecord(params[key])) throw new Error(`Invalid ${key}.`);
+  return params[key];
 }
 
 function conversationListInput(value: unknown): ConversationListInput | undefined {

@@ -70,6 +70,51 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('adds only model-owned finding actions to a scoped review context', async () => {
+    const snapshot = createInitialSnapshot();
+    service = new ClawMcpService({ snapshot });
+    const ordinaryUrl = await service.start();
+    const reportFinding = vi.fn().mockResolvedValue({ id: 'finding-1' });
+    const review = service.createReviewToolContext('agent-dina', {
+      reportFinding,
+      updateFinding: vi.fn(),
+      markFindingComplete: vi.fn(),
+    });
+
+    const ordinary = await postJson(agentUrl(ordinaryUrl, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    const scoped = await postJson(review.url, {
+      jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
+    });
+    const ordinaryNames = ordinary.result.tools.map((tool: { name: string }) => tool.name);
+    const scopedNames = scoped.result.tools.map((tool: { name: string }) => tool.name);
+
+    expect(ordinaryNames).not.toEqual(expect.arrayContaining([
+      'report_finding', 'update_finding', 'mark_finding_complete',
+    ]));
+    expect(scopedNames).toEqual(expect.arrayContaining([
+      'report_finding', 'update_finding', 'mark_finding_complete',
+    ]));
+    expect(scopedNames).not.toEqual(expect.arrayContaining([
+      'verify_finding', 'respond_to_finding', 'complete_review',
+    ]));
+
+    const called = await postJson(review.url, {
+      jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
+        name: 'report_finding',
+        arguments: {
+          fingerprint: 'src/auth.ts:ownership', priority: 'p1', summary: 'Ownership is skipped',
+          rationale: 'The mutation writes before authorizing.', suggestedResolution: 'Authorize first.',
+        },
+      },
+    });
+    expect(called.result.isError).toBe(false);
+    expect(reportFinding).toHaveBeenCalledOnce();
+
+    service.closeReviewToolContext(review.id);
+  });
+
   it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
     service = new ClawMcpService({ snapshot: createInitialSnapshot() });
     const mcpUrl = await service.start();

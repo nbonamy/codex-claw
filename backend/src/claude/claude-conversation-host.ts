@@ -21,7 +21,7 @@ import {
   type ClaudeConversationReplica,
 } from '@codex-claw/core/claude-conversation-replica';
 import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
-import { type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
+import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
@@ -140,6 +140,35 @@ export class ClaudeConversationHost implements AgentBackendDriver {
 
   async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
     return this.catalog.listSkills(agent);
+  }
+
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<{ text: string }> {
+    const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
+    const assistantText: string[] = [];
+    const handle = this.transport.startTurn({
+      ownerId: agent.id,
+      cwd: input.cwd,
+      prompt: input.prompt,
+      model: defaults?.model ?? null,
+      effort: claudeEffort(defaults?.reasoningEffort),
+      permissionMode: defaults?.permissionMode ?? null,
+      appendSystemPrompt: codexClawDeveloperInstructions(agent, this.driverOptions.pluginSettings?.(), {
+        celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
+      }),
+      mcpServerUrl: input.reviewMcpServerUrl,
+      allowedTools: [
+        'mcp__codex_claw__report_finding',
+        'mcp__codex_claw__update_finding',
+        'mcp__codex_claw__mark_finding_complete',
+      ],
+    }, (message) => {
+      if (message.type !== 'assistant') return;
+      for (const block of claudeMessageContentBlocks(message)) {
+        if (block.type === 'text' && typeof block.text === 'string') assistantText.push(block.text);
+      }
+    });
+    await handle.done;
+    return { text: assistantText.join('\n').trim() };
   }
 
   async setPermissionMode(agent: Agent, mode: string): Promise<BackendPermissionModeResult> {

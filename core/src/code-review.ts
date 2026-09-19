@@ -23,7 +23,7 @@ export type CodeReviewVerification =
   | { state: 'queued'; assignedAgentId: string; requestedAt: string }
   | { state: 'fixing'; assignedAgentId: string; startedAt: string }
   | { state: 'awaitingVerification'; assignedAgentId: string; completedAt: string }
-  | { state: 'passed'; verifiedAt: string; roundId: string }
+  | { state: 'passed'; verifiedAt: string; roundId: string; evidence?: string }
   | { state: 'failed'; verifiedAt: string; roundId: string; evidence: string };
 
 export type CodeReviewFinding = {
@@ -76,6 +76,16 @@ export type CodeReviewFindingInput = Pick<
   materiallyNewEvidence?: string;
 };
 
+export type CodeReviewFindingUpdateInput = {
+  findingId: string;
+  priority?: CodeReviewPriority;
+  summary?: string;
+  rationale?: string;
+  suggestedResolution?: string;
+  location?: CodeReviewLocation;
+  materiallyNewEvidence?: string;
+};
+
 export type CodeReviewLedger = {
   exclusions: Array<{
     findingId: string;
@@ -106,14 +116,29 @@ export type CodeReviewProgress = {
   verified: number;
 };
 
+export type CodeReviewFindingRef = {
+  sessionId: string;
+  roundId: string;
+  findingId: string;
+};
+
+export type CodeReviewDecisionInput = CodeReviewFindingRef & (
+  | { decision: 'accept' }
+  | { decision: 'decline'; reason: string }
+);
+
+export type CodeReviewAssignmentInput = CodeReviewFindingRef & {
+  assignedAgentId: string;
+};
+
+export type CodeReviewDiscussionInput = CodeReviewFindingRef & {
+  question: string;
+};
+
 export function activeCodeReviewRound(session: CodeReviewSession): CodeReviewRound {
   const round = session.rounds.find((candidate) => candidate.id === session.activeRoundId);
   if (!round) throw new Error('Active review round is missing.');
   return round;
-}
-
-export function latestCodeReviewSession(sessions: readonly CodeReviewSession[] | undefined): CodeReviewSession | null {
-  return sessions?.at(-1) ?? null;
 }
 
 export function codeReviewLedger(session: CodeReviewSession): CodeReviewLedger {
@@ -151,7 +176,11 @@ export function codeReviewLedger(session: CodeReviewSession): CodeReviewLedger {
 }
 
 export function codeReviewProgress(session: CodeReviewSession): CodeReviewProgress {
-  const findings = session.rounds.flatMap((round) => round.findings);
+  const latestByFindingId = new Map<string, CodeReviewFinding>();
+  for (const round of session.rounds) {
+    for (const finding of round.findings) latestByFindingId.set(finding.id, finding);
+  }
+  const findings = [...latestByFindingId.values()];
   return findings.reduce<CodeReviewProgress>((progress, finding) => {
     progress.total += 1;
     if (finding.disposition.state === 'unresolved') progress.unresolved += 1;
@@ -163,8 +192,8 @@ export function codeReviewProgress(session: CodeReviewSession): CodeReviewProgre
   }, { total: 0, unresolved: 0, accepted: 0, declined: 0, awaitingVerification: 0, verified: 0 });
 }
 
-export function cloneCodeReviewSessions(sessions: readonly CodeReviewSession[]): CodeReviewSession[] {
-  return structuredClone(sessions) as CodeReviewSession[];
+export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSession {
+  return structuredClone(session) as CodeReviewSession;
 }
 
 export function isCodeReviewSession(value: unknown): value is CodeReviewSession {
@@ -215,7 +244,11 @@ function isVerification(value: unknown): value is CodeReviewVerification {
   if (value.state === 'queued') return typeof value.assignedAgentId === 'string' && typeof value.requestedAt === 'string';
   if (value.state === 'fixing') return typeof value.assignedAgentId === 'string' && typeof value.startedAt === 'string';
   if (value.state === 'awaitingVerification') return typeof value.assignedAgentId === 'string' && typeof value.completedAt === 'string';
-  if (value.state === 'passed') return typeof value.verifiedAt === 'string' && typeof value.roundId === 'string';
+  if (value.state === 'passed') {
+    return typeof value.verifiedAt === 'string'
+      && typeof value.roundId === 'string'
+      && (value.evidence === undefined || typeof value.evidence === 'string');
+  }
   return value.state === 'failed'
     && typeof value.verifiedAt === 'string'
     && typeof value.roundId === 'string'

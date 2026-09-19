@@ -84,11 +84,23 @@ export type BackendTextGenerationResult = {
   text: string;
 };
 
+export type BackendCodeReviewInput = {
+  prompt: string;
+  cwd: string;
+  reviewMcpServerUrl: string;
+};
+
+export type BackendCodeReviewResult = {
+  /** Normal assistant response from the isolated reviewer turn, used for finding discussion. */
+  text: string;
+};
+
 export type AgentBackendDriver = {
   readonly backend: AgentBackend;
   getRuntimeStatus(): BackendRuntimeStatus;
   getCapabilities(agent: Agent): BackendCapabilities;
   generateText?(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult>;
+  runCodeReview?(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   preparePromptOptions?(agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;

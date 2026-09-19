@@ -352,7 +352,8 @@ export type Agent = {
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('./plan-review').PlanReview;
-  codeReviews?: import('./code-review').CodeReviewSession[];
+  /** Durable only while a review workflow is active; removed when the user finishes it. */
+  codeReview?: import('./code-review').CodeReviewSession;
   threadFlags?: import('./thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   isRegistered?: boolean;
@@ -731,6 +732,13 @@ export type DesktopUpdateStatus = {
 };
 
 export type CodexClawApi = {
+  startCodeReview(agentId: string): Promise<AppSnapshot>;
+  decideCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDecisionInput): Promise<AppSnapshot>;
+  assignCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewAssignmentInput): Promise<AppSnapshot>;
+  discussCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDiscussionInput): Promise<AppSnapshot>;
+  submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot>;
   respondToThreadFlag(agentId: string, response: import('./thread-flags').ThreadFlagResponse): Promise<AppSnapshot>;
   respondToPlanReview(agentId: string, response: import('./plan-review').PlanReviewResponse): Promise<AppSnapshot>;
   getSnapshot(): Promise<AppSnapshot>;

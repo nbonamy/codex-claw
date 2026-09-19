@@ -538,6 +538,31 @@ describe('ClaudeBackendDriver', () => {
     });
   });
 
+  it('runs review in a fresh context with only review-domain MCP tools added', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+
+    const review = driver.runCodeReview(agent, {
+      cwd: '/Users/nbonamy/src/codex-claw',
+      prompt: 'Review the current diff.',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
+    });
+
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Review the current diff.',
+      mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
+      allowedTools: [
+        'mcp__codex_claw__report_finding',
+        'mcp__codex_claw__update_finding',
+        'mcp__codex_claw__mark_finding_complete',
+      ],
+    }), expect.any(Function));
+    expect(transport.startTurn.mock.calls[0]?.[0].sessionId).toBeUndefined();
+    transport.emit({ type: 'assistant', message: { content: [{ type: 'text', text: 'The finding is reachable.' }] } });
+    transport.resolveDone();
+    await expect(review).resolves.toEqual({ text: 'The finding is reachable.' });
+  });
+
   it('maps Agent SDK permission requests through the app-owned approval contract', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

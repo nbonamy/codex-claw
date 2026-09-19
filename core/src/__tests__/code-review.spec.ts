@@ -103,6 +103,19 @@ describe('code review ledger', () => {
     });
   });
 
+  it('counts a stable finding once when a later round re-observes it', () => {
+    const review = session();
+    review.rounds[1]!.findings.push({
+      ...structuredClone(review.rounds[0]!.findings[0]!),
+      roundId: 'round-2',
+      rationale: 'The accepted defect is still reproducible.',
+      verification: { state: 'failed', verifiedAt: '2026-09-19T11:05:00.000Z', roundId: 'round-2', evidence: 'Regression still fails.' },
+      updatedAt: '2026-09-19T11:05:00.000Z',
+    });
+
+    expect(codeReviewProgress(review)).toMatchObject({ total: 3, accepted: 1, awaitingVerification: 0 });
+  });
+
   it('rejects a persisted session with an incomplete decline decision', () => {
     const invalid = structuredClone(session()) as unknown as Record<string, unknown>;
     const rounds = invalid.rounds as Array<Record<string, unknown>>;

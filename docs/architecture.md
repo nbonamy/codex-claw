@@ -784,6 +784,13 @@ change event or explicit refresh may invalidate the relevant cache. Snapshot
 writes are coalesced so bursts of backend metadata events write only the latest
 durable projection.
 
+An in-progress code review is app-owned state, not provider transcript state.
+The owning agent carries one active review ledger containing rounds, structured
+findings, user dispositions, assignments, linked discussion, and verification.
+`clawd` persists that ledger in `state.json` so reloads and agent switches do
+not lose unfinished arbitration. Finishing the review removes the ledger;
+completed findings are not permanent project history.
+
 ## Work Backlog Integrations
 
 Work backlog providers are app-owned integrations, not agent backend features.

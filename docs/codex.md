@@ -454,6 +454,13 @@ passing its own caller ID to each tool.
 
 This keeps normal Codex config and normal Codex data untouched.
 
+Independent product review rounds create a fresh SDK conversation and replace
+the normal Claw MCP URL with a round-scoped URL. That URL adds only the three
+finding actions documented in `docs/mcp.md`; normal repository tools remain
+owned by the Codex harness. After the turn completes, Claw reads the normal
+assistant response for finding discussion, archives the temporary conversation,
+and forgets it. Findings themselves live in Claw's active review ledger.
+
 ## Notifications And Server Requests
 
 Handled notifications:

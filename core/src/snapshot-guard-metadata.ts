@@ -3,6 +3,7 @@ import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
 import { spokenAnnouncementVoices } from './contracts';
 import { isPlanReview } from './plan-review';
+import { isCodeReviewSession } from './code-review';
 import {
   isSubagentActivityKind,
   isSubagentOperationKind,
@@ -109,6 +110,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'contextUsage', isAgentContextUsage) &&
     optional(value, 'plan', isThreadPlan) &&
     optional(value, 'planReview', isPlanReview) &&
+    optional(value, 'codeReview', isCodeReviewSession) &&
     optional(value, 'threadFlags', isThreadFlags) &&
     optional(value, 'goal', isThreadGoal) &&
     optional(value, 'isRegistered', isBoolean) &&
@@ -332,7 +334,7 @@ function isBackendCapabilities(value: unknown): boolean {
     optional(value, 'interrupt', isBoolean) &&
     optional(value, 'history', isBoolean) &&
     optional(value, 'conversationFork', isBoolean) &&
-    ['planReview', 'questions', 'plugins', 'conversationArchive', 'conversationResume', 'conversationReplaceWithSummary', 'remoteControl'].every((key) => optional(value, key, isBoolean)) &&
+    ['codeReview', 'planReview', 'questions', 'plugins', 'conversationArchive', 'conversationResume', 'conversationReplaceWithSummary', 'remoteControl'].every((key) => optional(value, key, isBoolean)) &&
     optional(value, 'deleteTurn', isBoolean) &&
     optional(value, 'editTurn', isBoolean) &&
     optional(value, 'retryTurn', isBoolean) &&

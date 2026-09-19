@@ -84,6 +84,23 @@ describe('BackendDriverRpc', () => {
     expect(listPlugins).toHaveBeenCalledWith(agent);
   });
 
+  it('routes code review only through a driver that advertises the capability', async () => {
+    const agent = createAgent();
+    const runCodeReview = vi.fn().mockResolvedValue({ text: '' });
+    const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
+      getCapabilities: vi.fn().mockReturnValue({ codeReview: true }),
+      runCodeReview,
+    })]]));
+    const input = {
+      prompt: 'Review independently.',
+      cwd: '/repo',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?reviewContextId=one',
+    };
+
+    await expect(rpc.handle('driver/codeReview/run', { agent, ...input })).resolves.toEqual({ text: '' });
+    expect(runCodeReview).toHaveBeenCalledWith(agent, input);
+  });
+
   it('routes only advertised permission modes to the backend driver', async () => {
     const agent: Agent = {
       ...createAgent(),

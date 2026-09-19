@@ -728,6 +728,13 @@ server replacement. That is promising, but the first implementation should
 prefer startup/session-local config because it mirrors our Codex approach and
 avoids mutating global user state.
 
+Code review uses that session-local shape today: Claw starts a fresh Agent SDK
+turn with the round-scoped MCP URL and allows only `report_finding`,
+`update_finding`, and `mark_finding_complete` from that MCP server. Repository
+inspection continues through Claude's ordinary harness tools. Provider output
+is returned through the unified review driver result, while durable findings
+and workflow decisions remain app-owned.
+
 ### Models, Thinking, Skills
 
 The current Claw model and skill contracts are backend-neutral. Codex returns

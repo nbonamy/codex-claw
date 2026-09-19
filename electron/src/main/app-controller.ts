@@ -513,6 +513,27 @@ export class AppController {
     ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
     });
+    ipc.handle(ipcChannels.startCodeReview, async (_event, agentId: string) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewStart, { agentId }))
+    ));
+    ipc.handle(ipcChannels.decideCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingDecide, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.assignCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewAssignmentInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingAssign, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.discussCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingDiscuss, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.submitCodeReviewRound, async (_event, agentId: string, sessionId: string) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewRoundSubmit, { agentId, sessionId }))
+    ));
+    ipc.handle(ipcChannels.finishCodeReview, async (_event, agentId: string, sessionId: string) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFinish, { agentId, sessionId }))
+    ));
+    ipc.handle(ipcChannels.reviewCodeAgain, async (_event, agentId: string, sessionId: string) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewAgain, { agentId, sessionId }))
+    ));
     ipc.handle(ipcChannels.respondToThreadFlag, async (_event, agentId: string, response: import('@codex-claw/core/thread-flags').ThreadFlagResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentThreadFlagRespond, { agentId, response }));
     });

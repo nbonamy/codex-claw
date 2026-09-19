@@ -64,20 +64,21 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
       ),
     },
     extensions: [{
-        configureConversation: async ({ extensionContext }) => (
-          isAgent(extensionContext)
-          ? buildCodexClawThreadConfig(
-            extensionContext,
-            options.clawMcpServerUrl ?? null,
-            options.pluginSettings?.() ?? options.generalSettings?.plugins,
-            {
-              celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
-              developerInstructions: (await readEngineInstructions('codex')).text,
-            },
-            options.hostedMcpServerUrls?.() ?? {},
-          )
-          : {}
-      ),
+      configureConversation: async ({ extensionContext }) => {
+        const agent = reviewExtensionAgent(extensionContext) ?? (isAgent(extensionContext) ? extensionContext : null);
+        if (!agent) return {};
+        const reviewMcpServerUrl = reviewExtensionMcpUrl(extensionContext);
+        return buildCodexClawThreadConfig(
+          agent,
+          reviewMcpServerUrl ?? options.clawMcpServerUrl ?? null,
+          options.pluginSettings?.() ?? options.generalSettings?.plugins,
+          {
+            celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
+            developerInstructions: (await readEngineInstructions('codex')).text,
+          },
+          reviewMcpServerUrl ? {} : options.hostedMcpServerUrls?.() ?? {},
+        );
+      },
     }],
   };
 }
@@ -86,6 +87,18 @@ function isAgent(value: unknown): value is Agent {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return record.backend === 'codex' && typeof record.id === 'string' && typeof record.folder === 'string';
+}
+
+function reviewExtensionAgent(value: unknown): Agent | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const agent = (value as Record<string, unknown>).agent;
+  return isAgent(agent) ? agent : null;
+}
+
+function reviewExtensionMcpUrl(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const url = (value as Record<string, unknown>).reviewMcpServerUrl;
+  return typeof url === 'string' ? url : null;
 }
 
 export class BackendDriverRpc {
@@ -164,6 +177,19 @@ export class BackendDriverRpc {
           cwd: requireString(record.cwd, 'cwd'),
           ...(typeof record.developerInstructions === 'string' ? { developerInstructions: record.developerInstructions } : {}),
           ...(record.outputSchema !== undefined ? { outputSchema: record.outputSchema as never } : {}),
+        });
+      }
+      case backendMethods.driverCodeReviewRun: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.runCodeReview || !driver.getCapabilities(agent).codeReview) {
+          throw unsupportedBackendFeature(agent, 'code review');
+        }
+        return driver.runCodeReview(agent, {
+          prompt: requireString(record.prompt, 'prompt'),
+          cwd: requireString(record.cwd, 'cwd'),
+          reviewMcpServerUrl: requireString(record.reviewMcpServerUrl, 'reviewMcpServerUrl'),
         });
       }
       case backendMethods.driverPromptCommandHandle: {

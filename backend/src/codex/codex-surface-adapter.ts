@@ -26,7 +26,7 @@ import type {
   SubagentOperationChange,
   SubagentStatusChange
 } from '@codex-claw/core/contracts';
-import type { BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
+import type { BackendCodeReviewInput, BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -62,6 +62,7 @@ const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
 const SESSION_HANDOFF_TARGET_CHARACTERS = 4_000;
 const SESSION_HANDOFF_MAX_CHARACTERS = 6_000;
 const SESSION_HANDOFF_TIMEOUT_MS = 8 * 60 * 1_000;
+const REVIEW_TIMEOUT_MS = 30 * 60 * 1_000;
 const SESSION_HANDOFF_MODEL = 'gpt-5.6-luna';
 const SESSION_HANDOFF_REASONING_EFFORT = 'low';
 const SESSION_HANDOFF_PROMPT = `Prepare a handoff for a fresh continuation of this coding session.
@@ -254,6 +255,43 @@ export class CodexSurfaceAgentAdapter {
       ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),
       ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     });
+  }
+
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<{ text: string }> {
+    await this.start();
+    const snapshot = await this.surface.createConversation({
+      cwd: expandHome(input.cwd),
+      threadSource: 'user',
+    }, { extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
+    const conversationId = snapshot.activeConversationId;
+    if (!conversationId) throw new Error('Codex did not create a fresh review conversation.');
+    const conversation = this.surface.conversation(conversationId);
+    let targetTurnId: string | null = null;
+    const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
+    let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
+    const completion = new Promise<CodexSurfaceTurnStatus>((resolve) => { resolveCompletion = resolve; });
+    const unsubscribe = conversation.onEvent((event) => {
+      if (event.type !== 'turn.completed') return;
+      if (event.turnId === targetTurnId) resolveCompletion?.(event.payload.status);
+      else completedBeforeTarget.set(event.turnId, event.payload.status);
+    });
+    try {
+      const beforeTurnIds = conversation.getSnapshot().turnIds;
+      const started = await conversation.startReview({
+        target: { type: 'custom', instructions: input.prompt },
+      });
+      targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
+      if (!targetTurnId) throw new Error('Codex did not start the review round.');
+      const immediate = completedBeforeTarget.get(targetTurnId)
+        ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
+      const status = immediate ?? await reviewCompletion(completion);
+      if (status !== 'completed') throw new Error(`Code review was ${status}.`);
+      return { text: sessionHandoffText(conversation.getSnapshot().messages, targetTurnId) };
+    } finally {
+      unsubscribe();
+      await this.surface.archiveConversation(conversationId).catch(() => undefined);
+      this.surface.forgetConversation(conversationId);
+    }
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}) {
@@ -1397,6 +1435,15 @@ function sessionHandoffCompletion(
       },
     );
   });
+}
+
+function reviewCompletion(completion: Promise<CodexSurfaceTurnStatus>): Promise<CodexSurfaceTurnStatus> {
+  return Promise.race([
+    completion,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Code review timed out.')), REVIEW_TIMEOUT_MS);
+    }),
+  ]);
 }
 
 function subagentStatusFromTurn(

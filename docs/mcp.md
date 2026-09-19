@@ -641,6 +641,20 @@ Persisting MCP inbox history is not part of the first no-team communication
 milestone. If we add durable collaboration history later, it should be app
 state, not Codex transcript duplication.
 
+### Review-scoped finding tools
+
+An independent review turn receives a short-lived MCP URL whose tool surface
+adds only three model actions: `report_finding`, `update_finding`, and
+`mark_finding_complete`. The ordinary provider harness continues to supply
+repository reading, search, Git, and test tools. The review tools mutate the
+active app-owned ledger and persist it before returning; the registry itself
+does not own finding storage.
+
+User decisions and workflow actions are backend methods, not model tools. The
+renderer uses the unified client contract to accept, decline, assign, discuss,
+submit, repeat, or finish a review. A reviewer turn ending makes the round
+ready; there is deliberately no `complete_review` tool.
+
 ## Error Handling
 
 Tool errors return MCP tool results with `isError: true` and plain text
