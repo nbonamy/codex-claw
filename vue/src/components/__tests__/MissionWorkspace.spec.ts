@@ -278,6 +278,33 @@ describe('MissionWorkspace', () => {
     expect(executeMission).toHaveBeenCalledOnce();
   });
 
+  it('keeps failed and running implementation tickets recoverable from their repository lane', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'implementation';
+    mission.artifacts.tickets = [{ title: 'Checkout', repositoryPath: '/src/billing-service', done: false }];
+    mission.execution!.workspaces = [{ repositoryPath: '/src/billing-service', path: '/src/billing-service-checkout', branch: 'mission/checkout' }];
+    mission.execution!.runs = [{
+      id: 'run-checkout', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
+      repositoryPath: '/src/billing-service', status: 'failed', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', error: 'Tests failed',
+    }];
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { executeMission });
+
+    await wrapper.get('.mission-implementation__ticket').trigger('click');
+    await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
+    expect(executeMission).toHaveBeenLastCalledWith({
+      id: mission.id, revision: mission.revision, action: 'run', ticketIndex: 0,
+    });
+
+    mission.revision++;
+    mission.execution!.runs[0]!.status = 'running';
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
+    expect(executeMission).toHaveBeenLastCalledWith({
+      id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-checkout',
+    });
+  });
+
   it('stops active work and can retry a retained failed stage', async () => {
     const mission = missionWithRun('running');
     const executeMission = vi.fn().mockResolvedValue(undefined);
