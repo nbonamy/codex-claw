@@ -324,6 +324,56 @@ describe('mission navigation', () => {
     expect(group.find('.agent-sidebar__agent').exists()).toBe(false);
   });
 
+  it('keeps the mission orchestrator in the normal repository session list', async () => {
+    const { createMission } = await import('@codex-claw/core/missions');
+    const { createEmptySnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const mission = createMission(createEmptySnapshot(), { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
+    const worker: Agent = {
+      ...structuredClone(agents[0]!),
+      id: 'agent-mission-worker',
+      name: 'missions · New mission · requirements',
+      conversationTitle: 'missions · New mission · requirements',
+      folder: '~/src/id8-mission',
+      workspace: {
+        kind: 'git',
+        folder: '~/src/id8-mission',
+        repositoryName: 'id8',
+        repositoryRoot: '~/src/id8-mission',
+        branch: 'mission/new-mission',
+        isLinkedWorktree: true,
+        primaryWorktreeRoot: '~/src/id8',
+        originUrl: 'git@github.com:nbonamy/id8.git',
+        updatedAt: '2026-09-19T00:00:00.000Z',
+      },
+    };
+    mission.execution = {
+      teamId: 'team', repoPath: '~/src/id8', memberIds: ['agent-dina'],
+      workspace: { path: worker.folder!, branch: 'mission/new-mission' },
+      runs: [{
+        id: 'mission-run', stage: 'requirements', memberId: 'agent-dina', workerId: worker.id,
+        status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+      }],
+    };
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [agents[0]!, worker],
+        activeAgentId: null,
+        activeMissionId: mission.id,
+        missions: [mission],
+        teamName: 'Team',
+      },
+      global: { components: { ElPopover } },
+    });
+
+    expect(wrapper.get('[data-group-kind="missions"] .agent-sidebar__session-title').text()).toBe('New mission');
+    const repository = wrapper.findAll('[data-group-kind="repository"]')
+      .find(group => group.get('.agent-sidebar__workspace-label').text() === 'id8')!;
+    expect(repository.findAll('.agent-sidebar__session-title').map(title => title.text()))
+      .toStrictEqual(['Dina', 'missions · New mission · requirements']);
+    await repository.findAll('.agent-sidebar__agent')[1]!.trigger('click');
+    expect(wrapper.emitted('select-agent')).toStrictEqual([[worker.id]]);
+  });
+
   it('disables mission creation while pending and surfaces creation failures', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
