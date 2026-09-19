@@ -44,6 +44,7 @@ const { t } = useI18n();
 .thread-flag-affordance__icon {
   width: var(--icon-sm);
   height: var(--icon-sm);
+  display: block;
   flex: 0 0 auto;
 }
 
@@ -73,17 +74,22 @@ const { t } = useI18n();
 
 .thread-flag-affordance__actions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-2);
 }
 
 .thread-flag-affordance__action,
 .thread-flag-affordance__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: var(--radius-md);
   color: var(--color-text);
   background: transparent;
   font-size: var(--font-size-12);
+  line-height: var(--line-height-18);
   cursor: pointer;
 }
 
