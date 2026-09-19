@@ -30,7 +30,7 @@ it('executes all mission stages across isolated provider sessions, respects tick
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
     const started: string[] = [];
-    const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, validateRepository: async path => { await readWorktreeHead(path); },
+    const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       listSkills: async () => ['grill-with-docs', 'to-spec', 'to-tickets', 'implement', 'tdd', 'code-review'].map(name => ({ name, path: `/skills/${name}/SKILL.md`, enabled: true })),
       send: async agent => { started.push(agent.id); }, interrupt: async () => {},

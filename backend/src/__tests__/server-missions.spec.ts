@@ -38,6 +38,7 @@ import { promisify } from 'node:util';
 import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import { createMission } from '@codex-claw/core/missions';
 import { BackendDriverRpc } from '../driver-rpc';
 
 it('routes mission execution through the backend driver and worktree manager, then accepts an authenticated stage proposal', async () => {
@@ -80,5 +81,58 @@ it('routes mission execution through the backend driver and worktree manager, th
     expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);
     expect(current().stage).toBe('requirements');
     expect(snapshot.agents.find(agent => agent.id === run.workerId)?.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' });
+  } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
+});
+
+it('recovers a persisted preparing mission by starting its orchestrator conversation during backend initialization', async () => {
+  const exec = promisify(execFile);
+  const root = await mkdtemp(join(tmpdir(), 'claw-mission-recovery-'));
+  const repo = join(root, 'repo');
+  let server: ClawBackendServer | undefined;
+  try {
+    await exec('git', ['init', repo]);
+    await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: repo });
+    await exec('git', ['config', 'user.name', 'Mission test'], { cwd: repo });
+    await writeFile(join(repo, 'README.md'), 'Mission recovery fixture');
+    await exec('git', ['add', '.'], { cwd: repo });
+    await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature' });
+    mission.execution = {
+      teamId: snapshot.teams[0]!.id,
+      repoPath: repo,
+      memberIds: ['agent-dina'],
+      runs: [{
+        id: 'mission-run-recovery',
+        stage: 'requirements',
+        memberId: 'agent-dina',
+        status: 'preparing',
+        skills: [],
+        feedback: '',
+        startedAt: '2026-09-19T19:18:51.911Z',
+      }],
+    };
+    const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'recovered-mission-thread' } });
+    const driver: AgentBackendDriver = {
+      backend: 'codex', getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }), getCapabilities: () => codexBackendCapabilities,
+      sendPrompt, interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'recovered-mission-thread' } }), respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
+      listSkills: async () => [{ name: 'grilling', path: '/skills/grilling/SKILL.md', enabled: true }],
+    };
+    server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])) });
+
+    await server.initialize();
+    await server.initialize();
+
+    expect(sendPrompt).toHaveBeenCalledOnce();
+    const recoveredMission = snapshot.missions![0]!;
+    const run = recoveredMission.execution!.runs[0]!;
+    const worker = snapshot.agents.find(agent => agent.id === run.workerId);
+    expect(run.status).toBe('running');
+    expect(worker).toMatchObject({
+      folder: expect.stringMatching(/mission-/),
+      backendSession: { kind: 'codex', threadId: 'recovered-mission-thread' },
+      workspace: { kind: 'git', primaryWorktreeRoot: expect.stringMatching(/\/repo$/), isLinkedWorktree: true },
+    });
+    expect(snapshot.teams[0]!.agentIds).toContain(worker!.id);
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
 });

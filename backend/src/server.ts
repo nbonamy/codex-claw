@@ -193,6 +193,7 @@ export class ClawBackendServer {
         if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
       },
       createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
+      refreshWorkspace: async agentId => { await this.agentWorkspaces.refreshIdentity(agentId); },
       listSkills: agent => this.requireDriverRpc().handle(backendMethods.driverSkillsList, { agent }) as Promise<BackendSkillSummary[]>,
       send: (agent, prompt) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt),
       interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
@@ -287,6 +288,7 @@ export class ClawBackendServer {
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
+    await this.missionExecution.recoverInterruptedRuns();
   }
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {

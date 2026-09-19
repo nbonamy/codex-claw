@@ -12,6 +12,7 @@ export type MissionExecutionPorts = {
   validateRepository(path: string): Promise<void>;
   createWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   getHead(path: string): Promise<string>;
+  refreshWorkspace(agentId: string): Promise<void>;
   listSkills(agent: Agent): Promise<BackendSkillSummary[]>;
   send(agent: Agent, prompt: string): Promise<void>;
   interrupt(agent: Agent): Promise<unknown>;
@@ -89,8 +90,23 @@ export class MissionExecutionService {
       runId = createEntityId('mission-run');
       execution.runs.push({ id: runId, stage: current.stage, memberId, ...(ticketIndex === undefined ? {} : { ticketIndex }), status: 'preparing', skills: [], feedback: input.feedback?.trim() ?? '', startedAt: new Date().toISOString() });
     });
-    const launch = this.launch(input.id, runId).catch(async error => {
-      await this.ports.missions.change(input.id, current => {
+    void this.startLaunch(input.id, runId);
+  }
+
+  async recoverInterruptedRuns(): Promise<void> {
+    const interrupted = (this.ports.snapshot.missions ?? []).flatMap(mission => (
+      mission.execution?.runs
+        .filter(run => run.status === 'preparing' || (run.status === 'running' && !this.agent(run.workerId)?.backendSession))
+        .map(run => ({ missionId: mission.id, runId: run.id })) ?? []
+    ));
+    await Promise.all(interrupted.map(({ missionId, runId }) => this.startLaunch(missionId, runId)));
+  }
+
+  private startLaunch(missionId: string, runId: string): Promise<void> {
+    const existing = this.launches.get(runId);
+    if (existing) return existing;
+    const launch = this.launch(missionId, runId).catch(async error => {
+      await this.ports.missions.change(missionId, current => {
         const run = current.execution!.runs.find(run => run.id === runId)!;
         if (!['preparing', 'running'].includes(run.status)) return;
         run.status = 'failed'; run.error = error instanceof Error ? error.message : String(error); run.finishedAt = new Date().toISOString();
@@ -100,6 +116,7 @@ export class MissionExecutionService {
     this.launches.set(runId, launch);
     // Launch runs independently of request deadlines; snapshot shows its actual phase.
     void launch.catch(() => undefined);
+    return launch;
   }
 
   async submit(agentId: string, input: MissionResultInput): Promise<{ success: true; status: 'awaitingReview' }> {
@@ -184,16 +201,20 @@ export class MissionExecutionService {
     if (run.status === 'cancelled') return;
     const member = this.agent(run.memberId);
     if (!member) throw new Error('Assigned team member was removed.');
-    const workerId = createEntityId('agent');
-    createAgentInSnapshot(this.ports.snapshot, {
-      name: `${member.name || 'Agent'} · ${mission.outcome} · ${run.stage}`,
-      teamId: mission.execution!.teamId, folder: mission.execution!.workspace!.path,
-      backend: member.backend, backendDefaults: structuredClone(member.backendDefaults), avatar: member.avatar,
-    }, undefined, workerId, { select: false });
-    const worker = this.agent(workerId)!;
-    await this.ports.missions.change(id, current => {
-      current.execution!.runs.find(run => run.id === runId)!.workerId = worker.id;
-    });
+    let worker = this.agent(run.workerId);
+    if (!worker) {
+      const workerId = createEntityId('agent');
+      createAgentInSnapshot(this.ports.snapshot, {
+        name: `${member.name || 'Agent'} · ${mission.outcome} · ${run.stage}`,
+        teamId: mission.execution!.teamId, folder: mission.execution!.workspace!.path,
+        backend: member.backend, backendDefaults: structuredClone(member.backendDefaults), avatar: member.avatar,
+      }, undefined, workerId, { select: false });
+      worker = this.agent(workerId)!;
+      await this.ports.missions.change(id, current => {
+        current.execution!.runs.find(run => run.id === runId)!.workerId = worker!.id;
+      });
+    }
+    await this.ports.refreshWorkspace(worker.id);
     const skills = missionSkills(run.stage, await this.ports.listSkills(worker));
     await this.ports.missions.change(id, current => {
       const currentRun = current.execution!.runs.find(run => run.id === runId)!;
@@ -205,7 +226,7 @@ export class MissionExecutionService {
     mission = this.requireMission(id);
     const active = mission.execution!.runs.find(run => run.id === runId)!;
     if (active.status === 'cancelled') return;
-    await this.ports.send(worker, missionRunPrompt(mission, active));
+    if (!worker.backendSession) await this.ports.send(worker, missionRunPrompt(mission, active));
   }
 
   private requireMission(id: string): Mission {

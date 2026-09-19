@@ -13,6 +13,7 @@ function setup() {
   const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), validateRepository: vi.fn().mockResolvedValue(undefined),
     createWorktree: vi.fn().mockResolvedValue({ name: 'mission', path: '/repo-mission' }),
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
+    refreshWorkspace: vi.fn().mockResolvedValue(undefined),
     listSkills: vi.fn().mockResolvedValue([{ name: 'grilling', path: '/skills/grilling/SKILL.md', enabled: true }]),
     send: vi.fn().mockResolvedValue(undefined), interrupt: vi.fn().mockResolvedValue(undefined) };
   const service = new MissionExecutionService(ports);
