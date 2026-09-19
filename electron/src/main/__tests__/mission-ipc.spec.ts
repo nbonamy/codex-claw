@@ -18,9 +18,12 @@ describe('mission IPC', () => {
     const update = { id: mission.id, revision: 0, artifacts: mission.artifacts, stageAgentIds: {}, action: 'save' };
     await expect(handlers.get('mission:update')!({}, update)).resolves.toBe(snapshot);
     expect(request).toHaveBeenLastCalledWith('mission/update', { input: update });
-    expect(adopt).toHaveBeenCalledTimes(2);
+    const execution = { id: mission.id, revision: 0, action: 'run' };
+    await expect(handlers.get('mission:execute')!({}, execution)).resolves.toBe(snapshot);
+    expect(request).toHaveBeenLastCalledWith('mission/execution/update', { input: execution });
+    expect(adopt).toHaveBeenCalledTimes(3);
     request.mockRejectedValueOnce(new Error('Stale revision'));
     await expect(handlers.get('mission:update')!({}, update)).rejects.toThrow('Stale revision');
-    expect(adopt).toHaveBeenCalledTimes(2);
+    expect(adopt).toHaveBeenCalledTimes(3);
   });
 });

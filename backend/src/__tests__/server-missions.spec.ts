@@ -29,3 +29,53 @@ describe('mission backend boundary', () => {
     } finally { await server.close(); }
   });
 });
+
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import { BackendDriverRpc } from '../driver-rpc';
+
+it('routes mission execution through the backend driver and worktree manager, then accepts an authenticated stage proposal', async () => {
+  const exec = promisify(execFile);
+  const root = await mkdtemp(join(tmpdir(), 'claw-mission-protocol-'));
+  const repo = join(root, 'repo');
+  let server: ClawBackendServer | undefined;
+  try {
+    await exec('git', ['init', repo]);
+    await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: repo });
+    await exec('git', ['config', 'user.name', 'Mission test'], { cwd: repo });
+    await writeFile(join(repo, 'README.md'), 'Mission protocol fixture');
+    await exec('git', ['add', '.'], { cwd: repo });
+    await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
+    const snapshot = createInitialSnapshot();
+    const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
+    const driver: AgentBackendDriver = {
+      backend: 'codex', getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }), getCapabilities: () => codexBackendCapabilities,
+      sendPrompt, interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'mission-thread' } }), respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
+      listSkills: async () => [{ name: 'grill-with-docs', path: '/skills/grill-with-docs/SKILL.md', enabled: true }],
+    };
+    let disk: unknown;
+    server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])), saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); } });
+    const call = (method: string, input: unknown) => server!.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { input } });
+    await call('mission/create', { outcome: 'Billing', workflowType: 'shapeAndShipFeature' });
+    const current = () => snapshot.missions![0]!;
+    await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'configure', teamId: snapshot.teams[0]!.id, repoPath: repo, memberIds: ['agent-dina'] });
+    await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'run' });
+    await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+    const run = current().execution!.runs[0]!;
+    expect(sendPrompt.mock.calls[0]![0]).toMatchObject({ id: run.workerId, folder: current().execution!.workspace!.path });
+    expect(sendPrompt.mock.calls[0]![1]).toContain('/skills/grill-with-docs/SKILL.md');
+    const artifacts = structuredClone(current().artifacts);
+    artifacts.requirements = { problem: 'Team billing', acceptance: 'Owners can pay' };
+    await server.submitMissionResult(run.workerId!, { missionId: current().id, runId: run.id, summary: 'Ready', artifacts });
+    await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'accept', runId: run.id });
+    expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);
+    expect(current().stage).toBe('requirements');
+    expect(snapshot.agents.find(agent => agent.id === run.workerId)?.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' });
+  } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
+});

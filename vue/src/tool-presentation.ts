@@ -106,6 +106,6 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (tool === 'celebrate') return icons.celebration;
   if (tool === 'announce') return icons.announcement;
   if (tool === 'display-markdown') return icons.markdown;
-  if (tool === 'update-work-item') return icons.workItem;
+  if (tool === 'update-work-item' || tool === 'submit-mission-result') return icons.workItem;
   return undefined;
 }

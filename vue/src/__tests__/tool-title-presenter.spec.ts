@@ -5,6 +5,9 @@ import { presentClawToolTitle } from '../tool-title-presenter';
 
 describe('Claw tool title presenter', () => {
   it.each([
+    ['codex_claw.submit-mission-result', {}, 'running', 'Submitting mission artifact'],
+    ['codex_claw.submit-mission-result', {}, 'completed', 'Mission artifact ready for review'],
+    ['codex_claw.submit-mission-result', {}, 'error', 'Could not submit mission artifact'],
     ['codex_claw.set-status', { status: 'Reviewing changes' }, 'completed', 'Updated status'],
     ['codex_claw.set-status', { status: '' }, 'completed', 'Cleared status'],
     ['codex_claw.send-message', { to: 'computer-use' }, 'completed', 'Sent message to computer-use'],

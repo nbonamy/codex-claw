@@ -53,8 +53,24 @@ implementation, review). Core owns its pure validation and transition policy;
 Mission navigation is client-local; missions themselves are backend-wide, not
 team members or provider threads. Existing provider conversation panes can be
 opened as secondary stage support, without transferring transcript ownership.
-The initial workflow uses explicit human approval and recorded evidence; it
-does not execute tickets, verify evidence, or create a pull request automatically.
+Mission execution is owned by `clawd`: selected team member profiles supply
+provider settings for dedicated stage sessions in one managed mission worktree.
+Runs persist assignment, installed skill paths, proposal, status, and feedback.
+Implementation is serial, dispatching only tickets whose dependencies have been
+accepted. The worktree records a baseline commit for whole-mission diff review;
+failed or cancelled attempts retain their workspace and conversation for inspection.
+Requirements/ticket discussions may span multiple provider turns. Provider hosts
+continue to own all conversation content and turn mechanics.
+
+The authenticated `submit-mission-result` MCP tool submits stage proposals; only
+the user can accept an artifact and approve advancement. Reports are scoped to
+the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
+for published tickets; mission tickets retain canonical references and record local
+implementation acceptance, not external issue status. Setup is never invoked
+implicitly. Current and older installed skill names are resolved by capability.
+The workflow reuses Claw's diff and explicit commit/push/PR controls; agents do not
+publish or merge automatically. External ticket refresh and parallel branch
+integration are not part of this first execution policy.
 
 Core persisted entities:
 

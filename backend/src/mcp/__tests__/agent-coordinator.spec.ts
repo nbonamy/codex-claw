@@ -8,6 +8,18 @@ import {
 } from '../agent-coordinator';
 
 describe('ClawMcpAgentCoordinator', () => {
+  it('requires a known caller before forwarding a mission proposal and reports unavailable hosts', async () => {
+    const { coordinator } = fixture();
+    const input = { missionId: 'mission', runId: 'run', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
+    await expect(coordinator.submitMissionResult('agent-dina', input)).rejects.toThrow('unavailable');
+    const onMissionResult = vi.fn().mockResolvedValue({ success: true, status: 'awaitingReview' });
+    const enabled = fixture({ onMissionResult }).coordinator;
+    await expect(enabled.submitMissionResult('missing', input)).rejects.toThrow();
+    expect(onMissionResult).not.toHaveBeenCalled();
+    await expect(enabled.submitMissionResult('agent-dina', input)).resolves.toEqual({ success: true, status: 'awaitingReview' });
+    expect(onMissionResult).toHaveBeenCalledWith('agent-dina', input);
+  });
+
   it('connects agents, reports statuses, and updates trimmed status text', () => {
     const { agents, coordinator, onAgentUpdated } = fixture();
     agents[0]!.status = { type: 'working', detail: 'Running tests' };

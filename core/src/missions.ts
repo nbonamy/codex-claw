@@ -1,11 +1,13 @@
+import { pendingMissionRun, type MissionExecution } from './mission-execution';
 import type { AppSnapshot } from './contracts';
 import { createEntityId } from './ids';
 
 export const featureStages = ['requirements', 'tickets', 'implementation', 'review'] as const;
 export type MissionStage = typeof featureStages[number];
+export type MissionTicket = { title: string; done: boolean; reference?: string; dependsOn?: number[] };
 export type MissionArtifacts = {
   requirements: { problem: string; acceptance: string };
-  tickets: { title: string; done: boolean }[];
+  tickets: MissionTicket[];
   implementation: { changes: string; tests: string };
   review: { summary: string; pullRequestUrl: string };
 };
@@ -17,6 +19,7 @@ export type Mission = {
   status: 'active' | 'completed';
   artifacts: MissionArtifacts;
   stageAgentIds: Partial<Record<MissionStage, string>>;
+  execution?: MissionExecution;
   revision: number;
   createdAt: string;
   updatedAt: string;
@@ -34,10 +37,26 @@ const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v ===
 const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 100_000;
 export function isMissionArtifacts(v: unknown): v is MissionArtifacts {
   return record(v) && record(v.requirements) && text(v.requirements.problem) && text(v.requirements.acceptance)
-    && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && text(t.title) && typeof t.done === 'boolean')
+    && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && text(t.title) && typeof t.done === 'boolean' && (t.reference === undefined || (text(t.reference) && !!t.reference.trim())) && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.every(n => Number.isInteger(n) && n >= 0)))) && validTicketDependencies(v.tickets as MissionTicket[])
     && record(v.implementation) && text(v.implementation.changes) && text(v.implementation.tests)
     && record(v.review) && text(v.review.summary) && text(v.review.pullRequestUrl)
     && (!v.review.pullRequestUrl || /^https?:\/\//.test(v.review.pullRequestUrl));
+}
+function validTicketDependencies(tickets: MissionTicket[]): boolean {
+  const visited = new Set<number>();
+  const visiting = new Set<number>();
+  const visit = (index: number): boolean => {
+    if (visiting.has(index) || !tickets[index]) return false;
+    if (visited.has(index)) return true;
+    visiting.add(index);
+    if (!(tickets[index]!.dependsOn ?? []).every(visit)) return false;
+    visiting.delete(index); visited.add(index); return true;
+  };
+  return tickets.every((_, index) => visit(index));
+}
+export function missionTicketReady(tickets: MissionTicket[], index: number): boolean {
+  const ticket = tickets[index];
+  return !!ticket && !ticket.done && (ticket.dependsOn ?? []).every(blocker => tickets[blocker]?.done);
 }
 function isStageAgents(v: unknown): v is Mission['stageAgentIds'] {
   return record(v) && Object.entries(v).every(([k, id]) => featureStages.includes(k as MissionStage) && typeof id === 'string');
@@ -47,6 +66,7 @@ export function isMission(v: unknown): v is Mission {
     && record(v.workflow) && v.workflow.type === 'shapeAndShipFeature' && v.workflow.version === 1
     && featureStages.includes(v.stage as MissionStage) && ['active', 'completed'].includes(v.status as string)
     && (v.status !== 'completed' || v.stage === 'review') && isMissionArtifacts(v.artifacts) && isStageAgents(v.stageAgentIds)
+    && (v.execution === undefined || isMissionExecution(v.execution))
     && Number.isInteger(v.revision) && (v.revision as number) >= 0 && text(v.createdAt) && text(v.updatedAt);
 }
 export function missionStageReady(stage: MissionStage, a: MissionArtifacts): boolean {
@@ -75,6 +95,7 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
   if (!mission) throw new Error('Mission not found.');
   if (mission.revision !== input.revision) throw new Error('This mission changed. Reopen it before saving.');
   if (mission.status === 'completed') throw new Error('This mission is completed.');
+  if (pendingMissionRun(mission)) throw new Error('Review or stop the current mission run before editing artifacts or advancing.');
   if (Object.values(input.stageAgentIds).some(id => !snapshot.agents.some(a => a.id === id))) throw new Error('Supporting agent not found.');
   // Earlier gates remain true even when revising their artifacts in later stages.
   const stageIndex = featureStages.indexOf(mission.stage);
@@ -87,4 +108,19 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
   }
   Object.assign(mission, updated);
   return mission;
+}
+
+function isMissionExecution(v: unknown): v is MissionExecution {
+  return record(v) && text(v.teamId) && text(v.repoPath) && Array.isArray(v.memberIds) && v.memberIds.every(text)
+    && (v.workspace === undefined || (record(v.workspace) && text(v.workspace.path) && text(v.workspace.branch) && (v.workspace.baseSha === undefined || (typeof v.workspace.baseSha === 'string' && /^[a-f0-9]{40,64}$/.test(v.workspace.baseSha)))))
+    && Array.isArray(v.runs) && v.runs.every(run => record(run) && text(run.id) && text(run.memberId)
+      && featureStages.includes(run.stage as MissionStage)
+      && ['preparing', 'running', 'awaitingReview', 'accepted', 'cancelled', 'failed'].includes(run.status as string)
+      && (run.workerId === undefined || text(run.workerId))
+      && (run.ticketIndex === undefined || (Number.isInteger(run.ticketIndex) && (run.ticketIndex as number) >= 0))
+      && Array.isArray(run.skills) && run.skills.every(skill => record(skill) && text(skill.name) && text(skill.path))
+      && text(run.feedback) && text(run.startedAt)
+      && (run.finishedAt === undefined || text(run.finishedAt))
+      && (run.summary === undefined || text(run.summary)) && (run.error === undefined || text(run.error))
+      && (run.proposal === undefined || isMissionArtifacts(run.proposal)));
 }

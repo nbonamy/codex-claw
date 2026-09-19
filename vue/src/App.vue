@@ -81,6 +81,7 @@
     :create-agent="createAgent"
     :create-mission="createMission"
     :update-mission="updateMission"
+    :execute-mission="executeMission"
     :create-quick-chat="createQuickChat"
     :create-team="createTeam"
     :update-team="updateTeam"
@@ -309,6 +310,7 @@ const {
   clearAgentCreationProgress,
   createMission,
   updateMission,
+  executeMission,
   createQuickChat,
   createTeam,
   updateTeam,

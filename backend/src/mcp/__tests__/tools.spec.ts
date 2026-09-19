@@ -1,3 +1,4 @@
+import * as z from 'zod/v4';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClawMcpAgentCoordinator } from '../agent-coordinator';
 import { McpToolError } from '../agent-coordinator';
@@ -45,6 +46,7 @@ describe('Codex Claw MCP tool registration', () => {
     celebrate: vi.fn(),
     announce: vi.fn(),
     updateWorkItem: vi.fn(),
+    submitMissionResult: vi.fn(),
     listSourceRepositories: vi.fn(),
     listSourceWorktrees: vi.fn(),
     createSourceWorktree: vi.fn(),
@@ -76,6 +78,7 @@ describe('Codex Claw MCP tool registration', () => {
     );
 
     expect([...handlers.keys()]).toStrictEqual([
+      'submit-mission-result',
       'list-agents',
       'send-message',
       'check-messages',
@@ -152,6 +155,17 @@ describe('Codex Claw MCP tool registration', () => {
       tool,
       structuredKeys: ['ok'],
     });
+  });
+
+  it('routes mission proposals using authenticated caller identity', async () => {
+    createServer();
+    coordinator.submitMissionResult.mockResolvedValue({ success: true, status: 'awaitingReview' });
+    const input = { missionId: 'mission-1', runId: 'run-1', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
+    input.artifacts.tickets = [{ title: 'Checkout', done: false, reference: 'https://example.com/issue/1', dependsOn: [] }] as never[];
+    const definition = mocks.registerTool.mock.calls.find(([name]) => name === 'submit-mission-result')![1] as { inputSchema: z.ZodRawShape };
+    expect(z.object(definition.inputSchema).parse(input)).toEqual(input);
+    expect(await handlers.get('submit-mission-result')!(input)).toMatchObject({ structuredContent: { success: true, status: 'awaitingReview' } });
+    expect(coordinator.submitMissionResult).toHaveBeenCalledWith('agent-dina', input);
   });
 
   it('preserves every optional creation and display field', async () => {

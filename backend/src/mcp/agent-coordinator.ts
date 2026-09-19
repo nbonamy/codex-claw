@@ -1,3 +1,4 @@
+import type { MissionResultInput } from '@codex-claw/core/mission-execution';
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -110,6 +111,7 @@ export type McpCreateAgentResponse = {
 };
 
 export type ClawMcpAgentCoordinatorOptions = {
+  onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' }>;
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
@@ -133,6 +135,7 @@ export class McpToolError extends Error {
 }
 
 export class ClawMcpAgentCoordinator {
+  private readonly onMissionResult?: ClawMcpAgentCoordinatorOptions['onMissionResult'];
   private readonly messages: McpMessage[] = [];
   private readonly getAgents: () => Agent[];
   private readonly onAgentUpdated?: (agent: Agent) => void;
@@ -149,6 +152,7 @@ export class ClawMcpAgentCoordinator {
   private readonly now: () => Date;
 
   constructor(options: ClawMcpAgentCoordinatorOptions) {
+    this.onMissionResult = options.onMissionResult;
     this.getAgents = options.getAgents;
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
@@ -281,6 +285,12 @@ export class ClawMcpAgentCoordinator {
       throw new McpToolError('Spoken announcements are not available.');
     }
     return this.onAnnounce(agent, phase, normalizedText);
+  }
+
+  async submitMissionResult(agentId: string, input: MissionResultInput) {
+    this.requireAgent(agentId);
+    if (!this.onMissionResult) throw new McpToolError('Mission result submission is unavailable.');
+    return this.onMissionResult(agentId, input);
   }
 
   async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {

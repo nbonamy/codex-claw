@@ -24,15 +24,23 @@
     </ol>
     <div class="mission-workspace__body">
       <form class="mission-workspace__artifacts" @submit.prevent="save('save')">
+        <MissionExecutionPanel v-if="executeMission" :mission="mission" :agents="agents" :teams="teams ?? []" :execute-mission="executeMission" :choose-repository="chooseRepository" :blocked="busy || dirty || conflicted" @open-conversation="openExecutionConversation" />
+        <slot v-if="codeAgentId && ['implementation', 'review'].includes(mission.stage)" name="code-review" :agent-id="codeAgentId" />
         <p v-if="error" role="alert">{{ error }}</p>
         <p v-if="conflicted" role="alert">
           {{ t('missions.conflict') }}
-          <button type="button" class="claw-button" @click="reload">
+          <button type="button" class="claw-button" @click="reload()">
             {{ t('missions.reload') }}
           </button>
         </p>
+        <section v-if="mission.execution && !activeRun?.proposal && acceptedMarkdown.trim()" :aria-label="t('missions.acceptedArtifact')">
+          <h2>{{ t('missions.acceptedArtifact') }}</h2>
+          <MarkdownPanel :content="acceptedMarkdown" />
+        </section>
+        <details :open="!mission.execution">
+          <summary v-if="mission.execution">{{ t('missions.editArtifact') }}</summary>
         <fieldset
-          :disabled="busy || mission.status === 'completed' || conflicted"
+          :disabled="!!activeRun || busy || mission.status === 'completed' || conflicted"
         >
           <template v-if="mission.stage === 'requirements'">
             <h2>{{ t('missions.requirements') }}</h2>
@@ -132,14 +140,17 @@
               ><el-input id="mission-pr" v-model="draft.review.pullRequestUrl"
             /></FormDialogField>
           </template>
+
+        </fieldset>
+        </details>
           <footer v-if="mission.status !== 'completed'">
-            <button class="claw-button claw-button--secondary" type="submit">
+            <button class="claw-button claw-button--secondary" type="submit" :disabled="!!activeRun || busy || conflicted">
               {{ t('missions.save') }}
             </button>
             <button
               class="claw-button claw-button--primary"
               type="button"
-              :disabled="!ready"
+              :disabled="!!activeRun || busy || conflicted || !ready"
               @click="save('advance')"
             >
               {{
@@ -151,7 +162,6 @@
               }}
             </button>
           </footer>
-        </fieldset>
         <p role="status">
           {{
             busy
@@ -171,8 +181,9 @@
         :aria-label="t('missions.support')"
       >
         <h2>{{ t('missions.support') }}</h2>
-        <p>{{ t(agents.length ? 'missions.supportHint' : 'missions.noAgents') }}</p>
+        <p>{{ t(mission.execution ? 'missions.executionSupportHint' : agents.length ? 'missions.supportHint' : 'missions.noAgents') }}</p>
         <el-select
+          v-if="!mission.execution"
           v-model="supportAgent"
           :aria-label="t('missions.support')"
           clearable
@@ -186,7 +197,7 @@
           />
         </el-select>
         <button
-          v-if="supportAgent"
+          v-if="supportAgent && !mission.execution"
           class="claw-button"
           type="button"
           :disabled="busy || conflicted"
@@ -197,7 +208,7 @@
         <slot
           v-if="conversationVisible"
           name="conversation"
-          :agent-id="supportAgent"
+          :agent-id="executionConversationId || supportAgent"
         />
       </aside>
     </div>
@@ -206,16 +217,22 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent, Team } from '@codex-claw/core/contracts';
 import {
   featureStages,
   missionStageReady,
   type Mission,
   type UpdateMissionInput,
 } from '@codex-claw/core/missions';
+import { pendingMissionRun, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import MarkdownPanel from './MarkdownPanel.vue';
+import MissionExecutionPanel from './MissionExecutionPanel.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 const props = defineProps<{
   sidebarCollapsed?: boolean;
+  teams?: Team[];
+  executeMission?: (input: MissionExecutionInput) => Promise<void>;
+  chooseRepository?: () => Promise<string | null>;
   mission: Mission;
   agents: Agent[];
   updateMission: (input: UpdateMissionInput) => Promise<void>;
@@ -229,6 +246,7 @@ const revision = ref(props.mission.revision);
 const busy = ref(false);
 const error = ref('');
 const conversationVisible = ref(false);
+const executionConversationId = ref('');
 const supportAgent = computed({
   get: () => stageAgents.value[props.mission.stage] ?? '',
   set: (id: string) => {
@@ -237,6 +255,8 @@ const supportAgent = computed({
     else delete stageAgents.value[props.mission.stage];
   },
 });
+const codeAgentId = computed(() => props.mission.execution?.runs.slice().reverse().find(run => run.workerId)?.workerId);
+const activeRun = computed(() => pendingMissionRun(props.mission));
 const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
 const ready = computed(() =>
   missionStageReady(props.mission.stage, draft.value),
@@ -248,6 +268,15 @@ const dirty = computed(
       JSON.stringify(props.mission.stageAgentIds),
 );
 const conflicted = computed(() => revision.value !== props.mission.revision);
+const acceptedMarkdown = computed(() => {
+  const a = props.mission.artifacts;
+  switch (props.mission.stage) {
+    case 'requirements': return [a.requirements.problem, a.requirements.acceptance].filter(Boolean).join('\n\n');
+    case 'tickets': return a.tickets.map((ticket, index) => `### ${index + 1}. ${ticket.title}\n\n${ticket.reference ?? ''}`).join('\n\n');
+    case 'implementation': return [a.implementation.changes, a.implementation.tests].filter(Boolean).join('\n\n');
+    case 'review': return [a.review.summary, a.review.pullRequestUrl].filter(Boolean).join('\n\n');
+  }
+});
 const artifactSummary = computed(() =>
   [
     draft.value.requirements.problem,
@@ -261,13 +290,16 @@ const artifactSummary = computed(() =>
     .filter(Boolean)
     .join('\n\n'),
 );
-function reload() {
+function reload(preserveConversation = false) {
   draft.value = clone(props.mission.artifacts);
   stageAgents.value = { ...props.mission.stageAgentIds };
   revision.value = props.mission.revision;
   error.value = '';
-  conversationVisible.value = false;
+  if (!preserveConversation) conversationVisible.value = false;
 }
+watch(() => props.mission, (next, previous) => {
+  if (next.revision !== previous.revision && JSON.stringify(draft.value) === JSON.stringify(previous.artifacts) && JSON.stringify(stageAgents.value) === JSON.stringify(previous.stageAgentIds)) reload(true);
+});
 watch(
   () => props.mission.stage,
   () => {
@@ -298,6 +330,11 @@ async function save(action: UpdateMissionInput['action']): Promise<boolean> {
   } finally {
     busy.value = false;
   }
+}
+function openExecutionConversation(id: string) {
+  executionConversationId.value = id;
+  emit('open-conversation', id);
+  conversationVisible.value = true;
 }
 async function openSupport() {
   const id = supportAgent.value;

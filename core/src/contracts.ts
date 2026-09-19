@@ -794,6 +794,7 @@ export type CodexClawApi = {
   resumeAgentConversation(agentId: string, target: ConversationResumeTarget): Promise<AppSnapshot>;
   readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
+  executeMission(input: import('./mission-execution').MissionExecutionInput): Promise<AppSnapshot>;
   createMission(input: import('./missions').CreateMissionInput): Promise<AppSnapshot>;
   updateMission(input: import('./missions').UpdateMissionInput): Promise<AppSnapshot>;
   createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;

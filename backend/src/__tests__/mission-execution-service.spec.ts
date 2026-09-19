@@ -1,0 +1,146 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import { createMission, updateMission, type MissionArtifacts } from '@codex-claw/core/missions';
+import { MissionService } from '../mission-service';
+import { MissionExecutionService } from '../mission-execution-service';
+
+function setup() {
+  const snapshot = createInitialSnapshot();
+  const originalAgents = structuredClone(snapshot.agents);
+  const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature' });
+  const persisted = vi.fn().mockResolvedValue(undefined);
+  const store = new MissionService(snapshot, persisted);
+  const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), validateRepository: vi.fn().mockResolvedValue(undefined),
+    createWorktree: vi.fn().mockResolvedValue({ name: 'mission', path: '/repo-mission' }),
+    getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
+    listSkills: vi.fn().mockResolvedValue([{ name: 'grilling', path: '/skills/grilling/SKILL.md', enabled: true }]),
+    send: vi.fn().mockResolvedValue(undefined), interrupt: vi.fn().mockResolvedValue(undefined) };
+  const service = new MissionExecutionService(ports);
+  const current = () => snapshot.missions![0]!;
+  const command = (input: Record<string, unknown>) => service.execute({ id: mission.id, revision: current().revision, ...input } as Parameters<typeof service.execute>[0]);
+  const configure = () => command({ action: 'configure', teamId: snapshot.teams[0]!.id, repoPath: '/repo', memberIds: originalAgents.map(agent => agent.id) });
+  return { snapshot, originalAgents, ports, service, current, command, configure, store };
+}
+
+describe('mission execution', () => {
+  it('creates an isolated session from a team member, invokes available stage skills, and requires proposal acceptance', async () => {
+    const h = setup(); await h.configure();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const mission = h.current(); const run = mission.execution!.runs[0]!;
+    expect(run.status).toBe('running');
+    expect(h.ports.createWorktree).toHaveBeenCalledWith({ repoPath: '/repo', branchName: expect.stringMatching(/^mission\//), reuseExisting: true });
+    expect(h.snapshot.agents.slice(0, 2)).toStrictEqual(h.originalAgents);
+    expect(h.ports.send.mock.calls[0]?.[0]).toMatchObject({ id: run.workerId, folder: '/repo-mission', backend: h.originalAgents[0]!.backend });
+    expect(run.skills).toStrictEqual([{ name: 'grilling', path: '/skills/grilling/SKILL.md' }]);
+    expect(h.ports.send.mock.calls[0]?.[1]).toContain(run.id);
+    const artifacts = structuredClone(mission.artifacts); artifacts.requirements = { problem: 'Teams pay together', acceptance: 'Owner can check out' };
+    await expect(h.service.submit(h.originalAgents[0]!.id, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' })).rejects.toThrow('does not own');
+    await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' });
+    expect(h.current().artifacts.requirements.problem).toBe('');
+    expect(h.current().execution!.runs[0]!.status).toBe('awaitingReview');
+    expect(() => updateMission(h.snapshot, { id: mission.id, revision: h.current().revision, artifacts, stageAgentIds: {}, action: 'advance' })).toThrow('current mission run');
+    await h.command({ action: 'accept', runId: run.id });
+    expect(h.current().artifacts.requirements).toStrictEqual(artifacts.requirements);
+    expect(h.current().stage).toBe('requirements');
+    await expect(h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Late result' })).rejects.toThrow('does not own');
+  });
+
+  it('routes different implementation tickets to team members and preserves other accepted artifacts', async () => {
+    const h = setup(); await h.configure();
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'implementation';
+      mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Pay' };
+      mission.artifacts.tickets = [{ title: 'Checkout', done: false }, { title: 'Invoice', done: false }];
+    });
+    for (let index = 0; index < 2; index++) {
+      await h.command({ action: 'run' }); await h.service.waitForLaunches();
+      const mission = h.current(); const run = mission.execution!.runs[index]!;
+      expect(run.memberId).toBe(h.originalAgents[index]!.id);
+      const artifacts: MissionArtifacts = structuredClone(mission.artifacts);
+      artifacts.requirements.problem = 'Unapproved upstream edit';
+      artifacts.tickets[index]!.done = true;
+      artifacts.implementation = { changes: `Changed ticket ${index}`, tests: `Tests for ${index} passed` };
+      await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Implemented' });
+      await h.command({ action: 'accept', runId: run.id });
+    }
+    expect(h.current().artifacts.tickets.every(ticket => ticket.done)).toBe(true);
+    expect(h.current().artifacts.requirements.problem).toBe('Billing');
+    expect(h.current().artifacts.implementation.tests).toContain('Tests for 0 passed');
+    expect(h.current().artifacts.implementation.tests).toContain('Tests for 1 passed');
+    expect(h.ports.createWorktree).toHaveBeenCalledOnce();
+  });
+
+  it('retains failures, rejects overlapping work, and never starts a cancelled preparation', async () => {
+    const h = setup(); await h.configure();
+    let release!: (result: { name: string; path: string }) => void;
+    h.ports.createWorktree.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+    await h.command({ action: 'run' });
+    await expect(h.command({ action: 'run' })).rejects.toThrow('existing run');
+    const id = h.current().execution!.runs[0]!.id;
+    await h.command({ action: 'cancel', runId: id });
+    release({ name: 'mission', path: '/repo-mission' }); await h.service.waitForLaunches();
+    expect(h.ports.send).not.toHaveBeenCalled();
+    expect(h.current().execution!.workspace?.path).toBe('/repo-mission');
+    h.ports.send.mockRejectedValueOnce(new Error('Provider offline'));
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    expect(h.current().execution!.runs[1]).toMatchObject({ status: 'failed', error: 'Provider offline' });
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const run = h.current().execution!.runs[2]!;
+    await h.service.agentFinished(run.workerId!);
+    expect(h.current().execution!.runs[2]!.status).toBe('running'); // Shaping questions can span multiple turns.
+    const artifacts = structuredClone(h.current().artifacts);
+    artifacts.requirements = { problem: 'Clarified after a question', acceptance: 'User answered' };
+    await h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, artifacts, summary: 'Ready after discussion' });
+    expect(h.current().execution!.runs[2]!.status).toBe('awaitingReview');
+  });
+});
+
+it('rejects invalid configuration, stale commands and inactive worker results without accepting artifacts', async () => {
+  const h = setup();
+  await expect(h.command({ action: 'configure', teamId: 'missing', repoPath: '/repo', memberIds: [] })).rejects.toThrow('local team');
+  await expect(h.command({ action: 'configure', teamId: h.snapshot.teams[0]!.id, repoPath: '', memberIds: [h.originalAgents[0]!.id] })).rejects.toThrow('repository');
+  await expect(h.command({ action: 'run' })).rejects.toThrow('Configure');
+  await h.configure();
+  await expect(h.command({ action: 'run', memberId: 'missing' })).rejects.toThrow('unavailable');
+  await expect(h.command({ action: 'run', feedback: 99 })).rejects.toThrow('feedback');
+  await expect(h.command({ action: 'accept', runId: 'missing' })).rejects.toThrow('proposal');
+  await expect(h.command({ action: 'cancel', runId: 'missing' })).rejects.toThrow('cancellable');
+  await expect(h.command({ action: 'unknown' })).rejects.toThrow('Unknown');
+  await expect(h.service.execute({ id: h.current().id, revision: -1, action: 'run' })).rejects.toThrow('changed');
+  await expect(h.service.execute({ id: 'missing', revision: 0, action: 'run' })).rejects.toThrow('not found');
+  await h.command({ action: 'run' }); await h.service.waitForLaunches();
+  await expect(h.configure()).rejects.toThrow('locked');
+  const run = h.current().execution!.runs[0]!;
+  await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'Empty', artifacts: h.current().artifacts })).rejects.toThrow('incomplete');
+  const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;
+  worker.status = { type: 'working' };
+  await h.command({ action: 'cancel', runId: run.id });
+  expect(h.ports.interrupt).toHaveBeenCalledWith(worker);
+  await expect(h.command({ action: 'run' })).rejects.toThrow('still active');
+  worker.status = { type: 'idle' };
+  await h.command({ action: 'run' }); await h.service.waitForLaunches();
+  expect(h.current().execution!.runs.at(-1)!.status).toBe('running');
+});
+
+it('reopens reached stages while invalidating dependent acceptance and retains incomplete implementation failures', async () => {
+  const h = setup(); await h.configure();
+  await h.store.change(h.current().id, mission => {
+    mission.stage = 'review'; mission.status = 'completed';
+    mission.artifacts = { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [{ title: 'Pay', done: true }], implementation: { changes: 'Payment', tests: 'Pass' }, review: { summary: 'Approved', pullRequestUrl: '' } };
+  });
+  await expect(h.command({ action: 'run' })).rejects.toThrow('Reopen');
+  await h.command({ action: 'reopen', stage: 'requirements' });
+  expect(h.current()).toMatchObject({ stage: 'requirements', status: 'active', artifacts: { tickets: [{ title: 'Pay', done: false }], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } });
+  await expect(h.command({ action: 'reopen', stage: 'review' })).rejects.toThrow('reached');
+  await h.store.change(h.current().id, mission => { mission.stage = 'implementation'; });
+  await h.command({ action: 'run' }); await h.service.waitForLaunches();
+  const run = h.current().execution!.runs.at(-1)!;
+  const artifacts = structuredClone(h.current().artifacts);
+  await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'Not done', artifacts })).rejects.toThrow('assigned ticket');
+  artifacts.tickets[0]!.done = true;
+  await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'No evidence', artifacts })).rejects.toThrow('test evidence');
+  await h.service.agentFinished(run.workerId!);
+  expect(h.current().execution!.runs.at(-1)).toMatchObject({ status: 'failed', error: expect.stringContaining('without submitting') });
+  await h.service.agentFinished('unrelated-agent');
+  expect(h.current().execution!.runs).toHaveLength(1);
+});

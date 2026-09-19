@@ -67,3 +67,27 @@ describe('MissionWorkspace', () => {
     expect(wrapper.emitted('open-conversation')).toStrictEqual([['agent-dina']]);
   });
 });
+
+it('refreshes accepted execution artifacts without a false edit conflict and keeps the run conversation local to the workflow', async () => {
+  const { wrapper, mission, click } = await setup();
+  const execute = vi.fn().mockResolvedValue(undefined);
+  mission.execution = { teamId: 'team', repoPath: '/repo', memberIds: ['agent-dina'], runs: [] };
+  mission.revision++;
+  await wrapper.setProps({ mission: structuredClone(mission), executeMission: execute });
+  for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
+    mission.stage = stage;
+    mission.artifacts.requirements = { problem: 'Owners need billing', acceptance: 'Owner can pay' };
+    mission.artifacts.tickets = [{ title: 'Owner checkout', done: true, reference: 'https://example.com/issue/1' }];
+    mission.artifacts.implementation = { changes: 'owner.ts changed', tests: 'Owner test passed' };
+    mission.artifacts.review = { summary: 'All acceptance checked', pullRequestUrl: '' };
+    mission.stageAgentIds[stage] = 'agent-dina';
+    mission.execution.runs = [{ id: `run-${stage}`, stage, memberId: 'agent-dina', workerId: 'agent-dina', status: 'accepted', skills: [], feedback: '', startedAt: 'now' }];
+    mission.revision++;
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain(stage === 'requirements' ? 'Owners need billing' : stage === 'tickets' ? 'Owner checkout' : stage === 'implementation' ? 'Owner test passed' : 'All acceptance checked');
+    await click('Open conversation');
+    expect(wrapper.emitted('open-conversation')!.at(-1)).toEqual(['agent-dina']);
+    expect(wrapper.text()).not.toContain('Unsaved changes');
+  }
+});

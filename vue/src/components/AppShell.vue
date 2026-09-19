@@ -189,7 +189,10 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :agents="missionAgents" :update-mission="updateMission" @open-conversation="emit('select-agent', $event)">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :agents="missionAgents" :update-mission="updateMission" :execute-mission="executeMission" :teams="snapshot.teams" :choose-repository="chooseSourceFolder" @open-conversation="emit('select-agent', $event)">
+        <template #code-review="{ agentId }">
+          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :get-workflow="props.getAgentGitWorkflow" :generate-message="props.generateAgentGitMessage" :commit-changes="props.commitAgentGitChanges" :push-branch="props.pushAgentGitBranch" :create-pull-request="props.createAgentGitPullRequest" />
+        </template>
         <template #conversation="{ agentId }">
           <ConversationPane v-if="currentAgent?.id === agentId" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" @retry-history="props.retryAgentHistory" />
         </template>
@@ -445,6 +448,7 @@ import AppShellNavigation from './AppShellNavigation.vue';
 import BackendConnectionBanner from './BackendConnectionBanner.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
 import AgentWorkspace from './AgentWorkspace.vue';
+import MissionCodeReview from './MissionCodeReview.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
 import NewMissionDialog from './NewMissionDialog.vue';
 import ConversationPane from './ConversationPane.vue';
@@ -563,6 +567,7 @@ const props = withDefaults(defineProps<{
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission?: (input: CreateMissionInput) => Promise<Mission>;
+  executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
   updateMission?: (input: UpdateMissionInput) => Promise<void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;

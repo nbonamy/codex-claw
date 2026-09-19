@@ -7,6 +7,7 @@ export const backendMethods = {
   agentConversationReplaceWithSummary: 'agent/conversation/replaceWithSummary',
   agentConversationsList: 'agent/conversations/list',
   agentCreate: 'agent/create',
+  missionExecute: 'mission/execution/update',
   missionCreate: 'mission/create',
   missionUpdate: 'mission/update',
   agentQuickChatCreate: 'agent/quickChat/create',

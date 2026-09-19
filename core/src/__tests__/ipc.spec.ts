@@ -110,6 +110,7 @@ describe('ipc channels', () => {
       compressAgentSession: 'conversation:compress',
       readConversationMessages: 'conversation:messages:read',
       createAgent: 'agent:create',
+      executeMission: 'mission:execute',
       createMission: 'mission:create',
       updateMission: 'mission:update',
       createQuickChat: 'agent:quick-chat:create',

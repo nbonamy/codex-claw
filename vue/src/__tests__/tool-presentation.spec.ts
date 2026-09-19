@@ -32,6 +32,7 @@ describe('Claw tool presentation', () => {
     ['list-agents', UsersIcon, 'Listed agents'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
+    ['submit-mission-result', SquareCheck, 'Mission artifact ready for review'],
     ['update-work-item', SquareCheck, 'Updated work item'],
     ['celebrate', SparklesIcon, 'Celebrated with stars'],
     ['announce', VolumeIcon, 'Acknowledged start'],

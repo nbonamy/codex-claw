@@ -1,3 +1,7 @@
+import { readWorktreeHead } from './git-worktrees';
+import { MissionExecutionService } from './mission-execution-service';
+import type { BackendSkillSummary } from '@codex-claw/core/contracts';
+import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
@@ -100,6 +104,7 @@ export class ClawBackendServer {
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
   private readonly missions: MissionService;
+  private readonly missionExecution: MissionExecutionService;
   private remoteControlStatus: DevicePairingStatus = { status: 'disabled' };
   private remoteControlStatusLoaded = false;
   private readonly driverRpc?: BackendDriverRpc;
@@ -178,6 +183,20 @@ export class ClawBackendServer {
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
       onPromptStarting: options.onPromptStarting,
     });
+    this.missionExecution = new MissionExecutionService({
+      getHead: readWorktreeHead,
+      snapshot: this.snapshot,
+      missions: this.missions,
+      publish: () => this.emitProjectedSnapshot(),
+      validateRepository: async folder => {
+        const identity = await this.agentGitService.identity(folder);
+        if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
+      },
+      createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
+      listSkills: agent => this.requireDriverRpc().handle(backendMethods.driverSkillsList, { agent }) as Promise<BackendSkillSummary[]>,
+      send: (agent, prompt) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt),
+      interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
+    });
     this.planReviews = new AgentPlanReviewService({
       submit: (agent, prompt, planMode) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt, { planMode }),
       emit: (event) => this.applyAndEmitBackendEvent(event),
@@ -248,6 +267,10 @@ export class ClawBackendServer {
       refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
     });
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
+  }
+
+  async submitMissionResult(agentId: string, input: MissionResultInput) {
+    return this.missionExecution.submit(agentId, input);
   }
 
   async initialize(): Promise<void> {
@@ -573,6 +596,11 @@ export class ClawBackendServer {
           await this.agentWorkspaces.refreshGitStatus(createdAgentId);
         }
         return createClawRpcResult(message.id, snapshot);
+      }
+      case backendMethods.missionExecute: {
+        const input = requireRecord(message.params).input as MissionExecutionInput;
+        await this.missionExecution.execute(input);
+        return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
       }
       case backendMethods.missionCreate:
       case backendMethods.missionUpdate: {
@@ -2049,6 +2077,9 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.delegatedWorkReports.handleEvent(fullEvent);
+    if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
+      void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
+    }
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);

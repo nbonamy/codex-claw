@@ -4,6 +4,16 @@ export const messages = {
   en: {
     surface: surfaceMessages,
     missions: {
+      acceptedArtifact: 'Accepted artifact', editArtifact: 'Edit artifact manually', executionSupportHint: 'Open a run’s conversation to answer questions or inspect its work. Artifact approval stays in the workflow.',
+      blockedBy: 'Blocked by tickets',
+      codeReview: 'Code and delivery', diffScope: 'Diff scope', branchDiff: 'Branch changes', uncommittedDiff: 'Uncommitted changes', refreshDiff: 'Refresh diff',
+      execution: 'Mission execution', team: 'Team', members: 'Available team members', repository: 'Repository', browse: 'Browse',
+      isolationHint: 'Each mission gets an isolated worktree. Runs use dedicated sessions with your selected team members’ provider settings.',
+      configure: 'Configure mission', worktreePending: 'An isolated worktree will be created when the first stage starts.',
+      proposal: 'Artifact ready for review', acceptProposal: 'Accept artifact', discardProposal: 'Discard proposal', stopRun: 'Stop run',
+      assign: 'Assign this run', automaticAssignment: 'Automatic assignment', feedback: 'Direction or revision feedback',
+      runStage: 'Run current stage', saveBeforeRun: 'Save or reload your draft before starting a run.', runHistory: 'Run history', revisit: 'Revisit an earlier stage',
+      runStatus: { preparing: 'Preparing workspace', running: 'Stage in progress', awaitingReview: 'Awaiting your review', accepted: 'Accepted', cancelled: 'Stopped', failed: 'Failed' },
       showNavigation: 'Show mission navigation', noAgents: 'Create a Quick Chat or project agent from the sidebar to get help with this stage.',
       new: 'New mission', create: 'Create mission', title: 'Missions', outcome: 'What outcome do you want?',
       workflow: 'Shape and ship a feature', workspace: 'Mission execution', progress: 'Workflow progress',
@@ -861,6 +871,7 @@ export const messages = {
               failed: 'Failed listing worktrees for {target}',
               running: 'Listing worktrees for {target}',
             },
+            submitMissionResult: { running: 'Submitting mission artifact', completed: 'Mission artifact ready for review', failed: 'Could not submit mission artifact' },
             updateWorkItem: {
               completed: 'Updated work item',
               failed: 'Failed updating work item',
