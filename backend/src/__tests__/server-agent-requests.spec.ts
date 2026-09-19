@@ -387,6 +387,8 @@ describe('ClawBackendServer', () => {
 
   it('owns agent file listing and reads by resolving agent folders internally', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
+    const externalTempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-external-file-'));
+    const externalFile = path.join(externalTempDir, 'outside.md');
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -410,6 +412,7 @@ describe('ClawBackendServer', () => {
       await mkdir(path.join(tempDir, 'docs'), { recursive: true });
       await writeFile(path.join(tempDir, 'README.md'), '# Read me\n');
       await writeFile(path.join(tempDir, 'docs', 'architecture.md'), '# Architecture\n');
+      await writeFile(externalFile, '# Outside\n');
 
       await expect(server.handleMessage({
         jsonrpc: '2.0',
@@ -445,13 +448,21 @@ describe('ClawBackendServer', () => {
       });
       await expect(server.handleMessage({
         jsonrpc: '2.0',
-        id: 'traversal-file',
+        id: 'external-file',
         method: 'agent/file/preview',
-        params: { agentId: 'agent-dina', filePath: '../outside.md' },
-      })).rejects.toThrow('outside the agent folder');
+        params: { agentId: 'agent-dina', filePath: externalFile },
+      })).resolves.toMatchObject({
+        result: {
+          path: externalFile,
+          content: '# Outside\n',
+        },
+      });
     } finally {
       await server.close();
-      await rm(tempDir, { recursive: true, force: true });
+      await Promise.all([
+        rm(tempDir, { recursive: true, force: true }),
+        rm(externalTempDir, { recursive: true, force: true }),
+      ]);
     }
   });
 

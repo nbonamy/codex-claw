@@ -60,22 +60,35 @@ describe('listAgentFolderFiles', () => {
     });
   });
 
-  it('rejects absolute files and symlinks outside the agent folder', async () => {
+  it('reads absolute files, traversal paths, and symlinks outside the agent folder', async () => {
     const folder = await createTempFolder();
     const outsideFolder = await createTempFolder();
     const outsideFile = path.join(outsideFolder, 'notes.md');
-    await writeFile(outsideFile, '# External notes\n', 'utf8');
+    const content = '# External notes\n';
+    await writeFile(outsideFile, content, 'utf8');
 
     await symlink(outsideFile, path.join(folder, 'notes-link.md'));
-    await expect(previewAgentFolderFile(folder, outsideFile)).rejects.toThrow('outside the agent folder');
-    await expect(previewAgentFolderFile(folder, 'notes-link.md')).rejects.toThrow('outside the agent folder');
+    await expect(previewAgentFolderFile(folder, outsideFile)).resolves.toStrictEqual({
+      path: outsideFile,
+      size: Buffer.byteLength(content),
+      kind: 'text',
+      content,
+    });
+    const traversalPath = path.relative(folder, outsideFile);
+    await expect(previewAgentFolderFile(folder, traversalPath)).resolves.toMatchObject({
+      path: traversalPath.split(path.sep).join('/'),
+      content,
+    });
+    await expect(previewAgentFolderFile(folder, 'notes-link.md')).resolves.toMatchObject({
+      path: 'notes-link.md',
+      content,
+    });
   });
 
-  it('rejects traversal, folders, and oversized files before reading content', async () => {
+  it('rejects folders and reports oversized files before reading content', async () => {
     const folder = await createTempFolder();
     await writeFile(path.join(folder, 'large.md'), 'xxxx', 'utf8');
 
-    await expect(previewAgentFolderFile(folder, '../outside.md')).rejects.toThrow('outside the agent folder');
     await expect(previewAgentFolderFile(folder, '.')).rejects.toThrow('Path is not a file');
     await expect(previewAgentFolderFile(folder, 'large.md', { maxBytes: 3 })).resolves.toStrictEqual({
       path: 'large.md', size: 4, kind: 'tooLarge',

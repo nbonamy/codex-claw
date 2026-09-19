@@ -159,7 +159,8 @@ Current implementation checkpoint:
   transcript contains an absolute or `file://` path inside the agent folder,
   the client normalizes it to an agent-relative preview path. An explicitly
   clicked absolute path outside that folder remains absolute and `clawd` reads
-  it on the agent's local or remote host; relative traversal remains refused.
+  it on the agent's local or remote host. Relative traversal is resolved from
+  the agent folder and may also address files elsewhere on that host.
 - `clawd` now owns work item assignment and unassignment mutations. Electron
   forwards the item payload and adopts the backend snapshot instead of changing
   `workBacklog.assignments` locally.
@@ -476,12 +477,12 @@ renderer.
   source discovery, `git worktree list`, worktree creation, agent file
   listing/previewing, GitHub work integrations, system permission API calls, and
   other backend-location-owned operations through `clawd`.
-- Renderer file previews and MCP `display-markdown` path reads use the same
-  rule: clients ask `clawd` for content; Electron does not read agent workspace
-  files on behalf of product features. This keeps the contract valid for a
-  mobile client connected to a remote backend. Renderer-side normalization is
-  only for turning displayed links into backend-relative preview requests, never
-  for granting arbitrary filesystem access.
+- Renderer file previews and MCP `display-markdown` path reads share one
+  ownership rule: clients ask `clawd` for content, and Electron does not read
+  backend-host files on behalf of product features. Renderer previews accept
+  paths outside the agent folder; `display-markdown` remains confined to the
+  caller agent folder. This keeps both contracts valid for a mobile client
+  connected to a remote backend without conflating their path policies.
 - Durable snapshot JSON persistence lives in `backend/src`, not `core/src`,
   because it is a Node filesystem concern. `core` must remain usable by
   desktop, mobile, and web clients without carrying local file-read authority.

@@ -204,9 +204,10 @@ automations, worktree path policy, and agent runtime state belong behind `clawd`
 That includes file previews: desktop and future non-desktop clients may request
 file content from `clawd`, but they do not read backend-owned agent workspace
 paths themselves. If model output includes an absolute or `file://` link, the
-client may normalize it to a path relative to the active agent folder before
-requesting a preview; it must not forward an arbitrary absolute local path as
-read authority.
+client normalizes it to a path relative to the active agent folder when
+possible and otherwise forwards the absolute path to the owning `clawd`. This
+keeps remote previews on the backend host while allowing transcript links to
+files outside the repository.
 
 The Codex SDK defines the composable provider-runtime foundation for `clawd`.
 Its `CodexAppBackend` owns one shared `CodexSurface` and accepts named app

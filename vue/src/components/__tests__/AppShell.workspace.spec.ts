@@ -857,11 +857,12 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
   });
 
-  it('opens absolute file preview paths outside the active agent folder', async () => {
+  it('opens absolute file previews outside the active agent folder', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
     const previewAgentFile = vi.fn().mockResolvedValue({
-      path: '/Users/nbonamy/src/codex-claw/README.md',
-      content: '# Codex Claw\n',
+      path: '/Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md',
+      content: '# Writing for agents\n',
     });
     const wrapper = mount(AppShell, {
       props: {
@@ -871,7 +872,7 @@ describe('AppShell workspace and plans', () => {
           codexTextMessage(
             'message-outside-file-url',
             'assistant',
-            'Open [file](file:///Users/nbonamy/src/codex-claw/README.md).',
+            'Open [skill](file:///Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md).',
           ),
         ]),
         isLoading: false,
@@ -883,12 +884,15 @@ describe('AppShell workspace and plans', () => {
       },
     });
 
-    await wrapper.get('a[href="file:///Users/nbonamy/src/codex-claw/README.md"]').trigger('click');
+    await wrapper.get('a[href="file:///Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md"]').trigger('click');
     await flushPromises();
 
-    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', '/Users/nbonamy/src/codex-claw/README.md');
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('README.md');
-    expect(wrapper.text()).toContain('Codex Claw');
+    expect(previewAgentFile).toHaveBeenCalledWith(
+      'agent-dina',
+      '/Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md',
+    );
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('SKILL.md');
+    expect(wrapper.text()).toContain('Writing for agents');
   });
 
   it('ignores stale markdown reads after the file tab closes', async () => {

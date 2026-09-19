@@ -93,18 +93,18 @@ export async function previewAgentFolderFile(
   const resolvedPath = await resolveAgentFilePath(folder, filePath);
   const fileStat = await stat(resolvedPath.absolutePath);
   if (!fileStat.isFile()) {
-    throw new Error(`Path is not a file: ${resolvedPath.relativePath}`);
+    throw new Error(`Path is not a file: ${resolvedPath.previewPath}`);
   }
 
   if (fileStat.size > (options.maxBytes ?? DEFAULT_AGENT_FILE_READ_BYTES)) {
-    return { path: resolvedPath.relativePath, size: fileStat.size, kind: 'tooLarge' };
+    return { path: resolvedPath.previewPath, size: fileStat.size, kind: 'tooLarge' };
   }
 
   const buffer = await readFile(resolvedPath.absolutePath);
-  const mimeType = imageMimeType(resolvedPath.relativePath);
+  const mimeType = imageMimeType(resolvedPath.previewPath);
   if (mimeType) {
     return {
-      path: resolvedPath.relativePath,
+      path: resolvedPath.previewPath,
       size: fileStat.size,
       kind: 'image',
       mimeType,
@@ -112,35 +112,25 @@ export async function previewAgentFolderFile(
     };
   }
   if (buffer.includes(0)) {
-    return { path: resolvedPath.relativePath, size: fileStat.size, kind: 'binary' };
+    return { path: resolvedPath.previewPath, size: fileStat.size, kind: 'binary' };
   }
   return {
-    path: resolvedPath.relativePath,
+    path: resolvedPath.previewPath,
     size: fileStat.size,
     kind: 'text',
     content: buffer.toString('utf8'),
   };
 }
 
-async function resolveAgentFilePath(folder: string, filePath: string): Promise<{ absolutePath: string; relativePath: string }> {
+async function resolveAgentFilePath(folder: string, filePath: string): Promise<{ absolutePath: string; previewPath: string }> {
   const root = path.resolve(folder);
-  const target = path.resolve(root, filePath);
-  const relativePath = path.relative(root, target);
-  const outsideRoot = relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath);
-
-  if (outsideRoot) {
-    throw new Error(`File is outside the agent folder: ${filePath}`);
-  }
-
-  const [realRoot, realTarget] = await Promise.all([realpath(root), realpath(target)]);
-  const realRelativePath = path.relative(realRoot, realTarget);
-  if (realRelativePath === '..' || realRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(realRelativePath)) {
-    throw new Error(`File is outside the agent folder: ${filePath}`);
-  }
+  const absoluteInput = path.isAbsolute(filePath);
+  const target = absoluteInput ? path.resolve(filePath) : path.resolve(root, filePath);
+  const realTarget = await realpath(target);
 
   return {
     absolutePath: realTarget,
-    relativePath: relativePath.split(path.sep).join('/'),
+    previewPath: (absoluteInput ? target : path.normalize(filePath)).split(path.sep).join('/'),
   };
 }
 
