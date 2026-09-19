@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.19.4",
+  "currentVersion": "0.19.5",
   "releases": [
+    {
+      "version": "0.19.5",
+      "releasedAt": "2026-09-18",
+      "sourceSha256": "4810ad7e16b9beb5ccc4b44fa9ede0b53c2e3e7f7aa46e42f197422f8e1cb5f6",
+      "markdown": "### Improvements and fixes\n\n- File links in conversations can now preview files anywhere on the agent's\n  local or remote host, including shared instructions and other resources\n  outside the repository.\n- `/compact` is passed through to Codex instead of opening Claw's retired\n  session-compression dialog. Slash-command suggestions now appear only when\n  `/` is the first character in the prompt.\n- Delegation instructions now distinguish engine-native subagents from separate\n  Claw co-agents, asking for clarification when a request is ambiguous.\n- The selected agent row preserves the sidebar's translucent background."
+    },
     {
       "version": "0.19.4",
       "releasedAt": "2026-09-18",

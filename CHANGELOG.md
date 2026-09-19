@@ -4,6 +4,20 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.19.5] - 2026-09-18
+
+### Improvements and fixes
+
+- File links in conversations can now preview files anywhere on the agent's
+  local or remote host, including shared instructions and other resources
+  outside the repository.
+- `/compact` is passed through to Codex instead of opening Claw's retired
+  session-compression dialog. Slash-command suggestions now appear only when
+  `/` is the first character in the prompt.
+- Delegation instructions now distinguish engine-native subagents from separate
+  Claw co-agents, asking for clarification when a request is ambiguous.
+- The selected agent row preserves the sidebar's translucent background.
+
 ## [0.19.4] - 2026-09-18
 
 ### New features
