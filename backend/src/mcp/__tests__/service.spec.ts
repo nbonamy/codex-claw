@@ -229,7 +229,7 @@ describe('ClawMcpService', () => {
     const workerTools = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
     });
-    const missionTools = ['set-mission-title', 'attach-mission-repository', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
+    const missionTools = ['set-mission-title', 'set-mission-execution-policy', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
     const workerToolNames = workerTools.result.tools.map((tool: { name: string }) => tool.name);
     expect(workerToolNames.slice(0, 7)).toStrictEqual(missionTools);
     expect(workerToolNames).not.toContain('toggle_thread_flag');
