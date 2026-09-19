@@ -352,6 +352,7 @@ export type Agent = {
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('./plan-review').PlanReview;
+  codeReviews?: import('./code-review').CodeReviewSession[];
   threadFlags?: import('./thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   isRegistered?: boolean;

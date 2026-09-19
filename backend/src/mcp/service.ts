@@ -40,6 +40,7 @@ import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway } from './hosted-mcp-gateway';
 import path from 'node:path';
+import { ReviewToolRegistry, type CompletedReviewToolContext } from '../review/review-tool-registry';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -69,6 +70,7 @@ export class ClawMcpService {
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
   private readonly promptInputMethodsByAgentId = new Map<string, SendPromptOptions['inputMethod']>();
+  private readonly reviewTools = new ReviewToolRegistry();
 
   constructor(options: ClawMcpServiceOptions) {
     this.snapshot = options.snapshot;
@@ -110,6 +112,7 @@ export class ClawMcpService {
       computerUseEnabled: this.computerUseEnabled,
       browser: options.browser,
       hostedMcpGateway: options.hostedMcpGateway,
+      reviewTools: this.reviewTools,
     });
   }
 
@@ -139,6 +142,19 @@ export class ClawMcpService {
 
   hostedMcpServerUrls(): Record<string, string> {
     return this.server.hostedMcpServerUrls();
+  }
+
+  createReviewToolContext(agentId: string): { id: string; url: string } {
+    const context = this.reviewTools.create(agentId);
+    return { id: context.id, url: this.server.reviewMcpServerUrl(agentId, context.id) };
+  }
+
+  finishReviewToolContext(contextId: string): CompletedReviewToolContext {
+    return this.reviewTools.finish(contextId);
+  }
+
+  discardReviewToolContext(contextId: string): void {
+    this.reviewTools.discard(contextId);
   }
 
   sendMessage(fromAgentId: string, toAgentId: string, content: string): void {

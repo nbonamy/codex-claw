@@ -8,12 +8,15 @@ import { CHECK_INBOX_PROMPT } from './agent-prompts';
 import { errorToolResult, structuredToolResult } from './tool-result';
 import { registerComputerUseTools, type ComputerUseClient } from './computer-use-tools';
 import { registerInAppBrowserTools, type InAppBrowserClient } from './browser-tools';
+import { registerReviewTools } from './review-tools';
+import type { ReviewToolContext } from '../review/review-tool-registry';
 
 export function createCodexClawMcpServer(
   coordinator: ClawMcpAgentCoordinator,
   callerAgentId: string,
   computerUse?: ComputerUseClient,
   browser?: InAppBrowserClient,
+  reviewContext?: ReviewToolContext,
 ): McpServer {
   const server = new McpServer({
     name: 'codex-claw-mcp',
@@ -193,6 +196,7 @@ export function createCodexClawMcpServer(
     registerComputerUseTools(server, computerUse);
   }
   if (browser) registerInAppBrowserTools(server, callerAgentId, browser);
+  if (reviewContext) registerReviewTools(server, reviewContext);
 
   return server;
 }
