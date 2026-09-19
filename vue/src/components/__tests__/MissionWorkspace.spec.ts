@@ -107,6 +107,36 @@ describe('MissionWorkspace', () => {
     });
   });
 
+  it('keeps the approval command revisions stable when the accepted snapshot arrives during the request', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    const initialRevision = mission.revision;
+    let wrapper!: ReturnType<typeof mountWorkspace>;
+    const updateMission = vi.fn(async () => {
+      mission.revision = initialRevision + 2;
+      mission.stage = 'tickets';
+      await wrapper.setProps({ mission: structuredClone(mission) });
+    });
+    const executeMission = vi.fn(async (input: MissionExecutionInput) => {
+      if (input.action !== 'accept') return;
+      mission.revision = initialRevision + 1;
+      mission.execution!.runs[0]!.status = 'accepted';
+      await wrapper.setProps({ mission: structuredClone(mission) });
+    });
+    wrapper = mountWorkspace(mission, { executeMission, updateMission });
+
+    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await flushPromises();
+
+    expect(updateMission).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'advance',
+      revision: initialRevision + 1,
+    }));
+    expect(executeMission).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      action: 'run',
+      revision: initialRevision + 2,
+    }));
+  });
+
   it('switches among mission-owned agent conversations inside the mission workspace', async () => {
     const snapshot = createInitialSnapshot();
     const mission = missionWithRun('accepted', true);

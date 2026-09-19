@@ -271,16 +271,20 @@ function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string
 async function approveProposal(): Promise<void> {
   const run = activeRun.value;
   if (!run?.proposal || !props.executeMission) return;
+  const missionId = props.mission.id;
+  const stage = props.mission.stage;
+  const stageAgentIds = { ...props.mission.stageAgentIds };
+  let revision = props.mission.revision;
   busy.value = true; error.value = '';
   try {
-    await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId: run.id });
-    let revision = props.mission.revision + 1;
-    if (missionStageReady(props.mission.stage, run.proposal)) {
-      await props.updateMission({ id: props.mission.id, revision, artifacts: structuredClone(toRaw(run.proposal)), stageAgentIds: { ...props.mission.stageAgentIds }, action: 'advance' });
+    await props.executeMission({ id: missionId, revision, action: 'accept', runId: run.id });
+    revision++;
+    if (missionStageReady(stage, run.proposal)) {
+      await props.updateMission({ id: missionId, revision, artifacts: structuredClone(toRaw(run.proposal)), stageAgentIds, action: 'advance' });
       revision++;
-      if (props.mission.stage !== 'review') await props.executeMission({ id: props.mission.id, revision, action: 'run' });
+      if (stage !== 'review') await props.executeMission({ id: missionId, revision, action: 'run' });
     } else {
-      await props.executeMission({ id: props.mission.id, revision, action: 'run' });
+      await props.executeMission({ id: missionId, revision, action: 'run' });
     }
   } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
   finally { busy.value = false; }
