@@ -698,6 +698,8 @@ main-process implementation.
 Mission tools are registered only when the authenticated backend agent owns the
 current running Mission attempt. Ordinary agents do not receive them in their
 tool catalog, and backend ownership checks still reject cached or late calls.
+Mission workers do not receive generic thread-flag tools because the Mission
+workflow owns delegation and worktree transitions explicitly.
 
 `set-mission-title` lets the requirements worker replace the initial `New mission`
 label once the outcome is clear. The backend infers the Mission and run from the

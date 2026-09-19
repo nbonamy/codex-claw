@@ -230,16 +230,24 @@ describe('ClawMcpService', () => {
       jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
     });
     const missionTools = ['set-mission-title', 'attach-mission-repository', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
-    expect(workerTools.result.tools.map((tool: { name: string }) => tool.name).slice(0, 7))
-      .toStrictEqual(missionTools);
-    const ordinaryTools = await postJson(agentUrl(url, 'agent-jesse'), {
-      jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
+    const workerToolNames = workerTools.result.tools.map((tool: { name: string }) => tool.name);
+    expect(workerToolNames.slice(0, 7)).toStrictEqual(missionTools);
+    expect(workerToolNames).not.toContain('toggle_thread_flag');
+    const blockedToggle = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'toggle_thread_flag', arguments: { id: 'delegate_to_worktree', value: true } },
     });
-    expect(ordinaryTools.result.tools.map((tool: { name: string }) => tool.name))
-      .not.toEqual(expect.arrayContaining(missionTools));
+    expect(blockedToggle.result.isError).toBe(true);
+    expect(snapshot.agents[0]!.threadFlags).toBeUndefined();
+    const ordinaryTools = await postJson(agentUrl(url, 'agent-jesse'), {
+      jsonrpc: '2.0', id: 3, method: 'tools/list', params: {},
+    });
+    const ordinaryToolNames = ordinaryTools.result.tools.map((tool: { name: string }) => tool.name);
+    expect(ordinaryToolNames).not.toEqual(expect.arrayContaining(missionTools));
+    expect(ordinaryToolNames).toContain('toggle_thread_flag');
 
     const renamed = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 3, method: 'tools/call',
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
       params: { name: 'set-mission-title', arguments: { title: 'Add team billing' } },
     });
     expect(renamed.result.structuredContent).toEqual({ success: true, title: 'Add team billing' });
@@ -247,7 +255,7 @@ describe('ClawMcpService', () => {
 
     active = false;
     const inactiveTools = await postJson(agentUrl(url, 'agent-dina'), {
-      jsonrpc: '2.0', id: 4, method: 'tools/list', params: {},
+      jsonrpc: '2.0', id: 5, method: 'tools/list', params: {},
     });
     expect(inactiveTools.result.tools.map((tool: { name: string }) => tool.name))
       .not.toEqual(expect.arrayContaining(missionTools));
