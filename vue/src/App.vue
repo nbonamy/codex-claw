@@ -11,7 +11,7 @@
     :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-conversation-load-failed="isActiveAgentHistoryFailed"
     :retry-agent-history="retryActiveAgentHistory"
-    :send-prompt-action="sendPromptWithCompression"
+    :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
@@ -152,7 +152,7 @@
     @debug-mark-unread="markDebugAgentsUnread"
     @interrupt-agent="interruptActiveAgent"
     @send-agent-prompt="sendAgentPrompt($event.agentId, $event.prompt)"
-    @send-prompt="sendPromptWithCompression"
+    @send-prompt="sendPrompt"
     @steer-prompt="steerPrompt"
     @steer-queued-prompt="steerQueuedPrompt"
     @update-queued-prompt="updateQueuedPrompt"
@@ -213,7 +213,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitWorkflow, DesktopUpdateStatus, RendererSendPromptOptions } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
@@ -518,15 +518,6 @@ async function confirmSessionCompression(dontShowAgain: boolean): Promise<void> 
   } finally {
     sessionCompressionBusy.value = false;
   }
-}
-
-async function sendPromptWithCompression(prompt: string, options?: RendererSendPromptOptions): Promise<void> {
-  const agent = activeAgent.value;
-  if (prompt.trim() === '/compact' && agent?.backend === 'codex') {
-    requestSessionCompression(agent.id);
-    return;
-  }
-  await sendPrompt(prompt, options);
 }
 
 function syncRendererWindowFocus(): void {

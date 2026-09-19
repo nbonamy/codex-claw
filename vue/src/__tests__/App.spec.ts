@@ -90,20 +90,13 @@ describe('App', () => {
     expect(sendPrompt).toHaveBeenCalledWith(snapshot.activeAgentId, 'hello');
   });
 
-  it('routes bare compact through the warned session-compression flow', async () => {
+  it('submits bare compact without opening the session-compression flow', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
-    const compressedSnapshot = structuredClone(snapshot);
-    compressedSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-compressed' };
-    let resolveCompression!: (value: typeof compressedSnapshot) => void;
-    const compressAgentSession = vi.fn().mockReturnValue(new Promise<typeof compressedSnapshot>((resolve) => {
-      resolveCompression = resolve;
-    }));
     const sendPrompt = vi.fn().mockResolvedValue(snapshot);
     setElectronTestClient({
       getSnapshot: vi.fn().mockResolvedValue(snapshot),
       onEvent: vi.fn(),
-      compressAgentSession,
       sendPrompt,
     });
     const wrapper = mount(App, {
@@ -116,17 +109,8 @@ describe('App', () => {
     ) => Promise<void>;
     await action('/compact');
 
-    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(sendPrompt).toHaveBeenCalledWith(snapshot.activeAgentId, '/compact');
     const dialog = wrapper.findComponent(SessionCompressionDialog);
-    expect(dialog.props('visible')).toBe(true);
-    expect(wrapper.get('.app-shell').attributes('inert')).toBe('');
-    dialog.vm.$emit('confirm', false);
-    await wrapper.vm.$nextTick();
-    expect(dialog.props('busy')).toBe(true);
-    expect(compressAgentSession).toHaveBeenCalledWith('agent-dina');
-
-    resolveCompression(compressedSnapshot);
-    await flushPromises();
     expect(dialog.props('visible')).toBe(false);
   });
 
