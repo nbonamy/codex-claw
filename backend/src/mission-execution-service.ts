@@ -1,8 +1,8 @@
 import type { Agent, AppSnapshot, BackendSkillSummary, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
-import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
-import { missionDeveloperInstructions, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
+import { missionDeveloperInstructions, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 
 export type MissionExecutionPorts = {
@@ -16,6 +16,8 @@ export type MissionExecutionPorts = {
   createWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   getHead(path: string): Promise<string>;
   refreshWorkspace(agentId: string): Promise<void>;
+  refreshConversationContext(agent: Agent): Promise<void>;
+  continueStage(agentId: string, prompt: string): Promise<void>;
   listSkills(agent: Agent): Promise<BackendSkillSummary[]>;
   interrupt(agent: Agent): Promise<unknown>;
 };
@@ -62,12 +64,22 @@ export class MissionExecutionService {
       return;
     }
     if (input.action === 'accept') {
+      let nextRunId = '';
       await this.change(input, current => {
         const run = current.execution?.runs.find(run => run.id === input.runId);
         if (!run || run.status !== 'awaitingReview' || !run.proposal || run.stage !== current.stage) throw new Error('No current proposal to accept.');
         current.artifacts = structuredClone(run.proposal);
         run.status = 'accepted';
+        if (missionStageReady(current.stage, current.artifacts)) {
+          if (current.stage === 'review') {
+            current.status = 'completed';
+            return;
+          }
+          current.stage = featureStages[featureStages.indexOf(current.stage) + 1]!;
+        }
+        nextRunId = this.enqueueRun(current, {});
       });
+      if (nextRunId) void this.startLaunch(input.id, nextRunId);
       return;
     }
     if (input.action === 'reopen') {
@@ -89,20 +101,7 @@ export class MissionExecutionService {
     let runId = '';
     await this.change(input, current => {
       this.requireNoActiveRun(current);
-      const execution = current.execution;
-      if (!execution) throw new Error('Configure the mission repository and team first.');
-      if ((current.stage === 'implementation' || current.stage === 'review') && !execution.repoPath) {
-        throw new Error('Attach a team repository before starting code work.');
-      }
-      const ticketIndex = current.stage === 'implementation'
-        ? input.ticketIndex ?? current.artifacts.tickets.findIndex((_, index) => missionTicketReady(current.artifacts.tickets, index)) : undefined;
-      if (current.stage === 'implementation' && (ticketIndex === undefined || !Number.isInteger(ticketIndex) || ticketIndex < 0 || !missionTicketReady(current.artifacts.tickets, ticketIndex))) throw new Error('Choose an implementation ticket.');
-      const memberId = input.memberId ?? execution.memberIds[(ticketIndex ?? 0) % execution.memberIds.length]!;
-      const member = this.agent(memberId);
-      if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
-      if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
-      runId = createEntityId('mission-run');
-      execution.runs.push({ id: runId, stage: current.stage, memberId, ...(ticketIndex === undefined ? {} : { ticketIndex }), status: 'preparing', skills: [], feedback: input.feedback?.trim() ?? '', startedAt: new Date().toISOString() });
+      runId = this.enqueueRun(current, input);
     });
     void this.startLaunch(input.id, runId);
   }
@@ -151,7 +150,10 @@ export class MissionExecutionService {
         if (!input.artifacts.implementation.changes.trim() || !input.artifacts.implementation.tests.trim()) throw new Error('Report code changes and actual test evidence.');
       } else {
         if (run.stage === 'requirements') proposal.requirements = structuredClone(input.artifacts.requirements);
-        if (run.stage === 'tickets') proposal.tickets = input.artifacts.tickets.map(ticket => ({ ...structuredClone(ticket), done: false }));
+        if (run.stage === 'tickets') {
+          if (!run.draftTickets?.length) throw new Error('Create Mission ticket drafts before submitting the Tickets stage.');
+          proposal.tickets = run.draftTickets.map(ticket => ({ ...structuredClone(ticket), done: false }));
+        }
         if (run.stage === 'review') proposal.review = structuredClone(input.artifacts.review);
         if (!missionStageReady(run.stage, proposal)) throw new Error('The stage result is incomplete.');
       }
@@ -224,6 +226,59 @@ export class MissionExecutionService {
     return result;
   }
 
+  async upsertTicket(agentId: string, input: MissionTicketDraftInput): Promise<MissionTicketDraftResult> {
+    const context = this.requireContext(agentId);
+    if (context.stage !== 'tickets' || !input || typeof input.title !== 'string' || typeof input.body !== 'string'
+      || (input.ticketId !== undefined && typeof input.ticketId !== 'string')
+      || (input.reference !== undefined && typeof input.reference !== 'string')
+      || (input.blockedByTicketIds !== undefined && (!Array.isArray(input.blockedByTicketIds) || input.blockedByTicketIds.some(id => typeof id !== 'string')))) {
+      throw new Error('Invalid Mission ticket draft.');
+    }
+    const title = input.title.trim();
+    const body = input.body.trim();
+    const reference = input.reference?.trim();
+    if (!title || title.length > 500 || /[\r\n]/.test(title) || !body || body.length > 100_000 || (reference !== undefined && (!reference || reference.length > 100_000))) {
+      throw new Error('Mission ticket title, body, or reference is invalid.');
+    }
+    const result = await this.ports.missions.changeAsync(context.missionId, async mission => {
+      const run = mission.execution?.runs.find(candidate => candidate.id === context.runId);
+      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== 'tickets' || mission.stage !== 'tickets') {
+        throw new Error('This agent is not working on the active Tickets stage.');
+      }
+      const drafts = structuredClone(run.draftTickets ?? []);
+      const index = input.ticketId === undefined ? drafts.length : drafts.findIndex(ticket => ticket.id === input.ticketId);
+      if (input.ticketId !== undefined && index < 0) throw new Error('Mission ticket draft not found.');
+      const ticketId = input.ticketId ?? createEntityId('mission-ticket');
+      const blockerIds = [...new Set(input.blockedByTicketIds ?? [])];
+      if (blockerIds.includes(ticketId)) throw new Error('A Mission ticket cannot block itself.');
+      const dependsOn = blockerIds.map(blockerId => {
+        const blockerIndex = drafts.findIndex(ticket => ticket.id === blockerId);
+        if (blockerIndex < 0) throw new Error(`Blocking Mission ticket '${blockerId}' was not found.`);
+        return blockerIndex;
+      });
+      const ticket: MissionTicket = {
+        id: ticketId,
+        title,
+        body,
+        done: false,
+        ...(reference ? { reference } : {}),
+        ...(dependsOn.length ? { dependsOn } : {}),
+      };
+      if (index === drafts.length) drafts.push(ticket);
+      else drafts[index] = ticket;
+      if (!isMissionArtifacts({ ...mission.artifacts, tickets: drafts })) throw new Error('Mission ticket dependencies must be acyclic and reference existing tickets.');
+      const content = missionTicketsMarkdown(drafts);
+      const stored = await this.ports.writeArtifact(mission.id, 'tickets', content);
+      const updatedAt = new Date().toISOString();
+      const artifactRevision = (mission.artifactFiles?.tickets?.revision ?? 0) + 1;
+      (mission.artifactFiles ??= {}).tickets = { revision: artifactRevision, size: stored.size, updatedAt };
+      run.draftTickets = drafts;
+      return { success: true as const, ticketId, index, artifactRevision };
+    });
+    await this.ports.publish();
+    return result;
+  }
+
   async setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> {
     const normalized = title.trim();
     if (!normalized || normalized.length > 200) throw new Error('Mission title must be between 1 and 200 characters.');
@@ -286,6 +341,7 @@ export class MissionExecutionService {
     const missionHome = await this.ports.ensureMissionHome(mission.id);
     const workingFolder = mission.execution!.workspace?.path ?? missionHome;
     let worker = this.agent(run.workerId);
+    const reusedWorker = !!worker;
     if (!worker) {
       const workerId = createEntityId('agent');
       createAgentInSnapshot(this.ports.snapshot, {
@@ -312,12 +368,34 @@ export class MissionExecutionService {
       if (currentRun.status !== 'cancelled') currentRun.skills = skills;
     });
     await this.ports.publish();
+    if (reusedWorker && worker.backendSession) await this.ports.refreshConversationContext(worker);
+    if (run.stage !== 'requirements') await this.ports.continueStage(worker.id, stageKickoffPrompt(run));
   }
 
   private requireMission(id: string): Mission {
     const mission = this.ports.snapshot.missions?.find(mission => mission.id === id);
     if (!mission) throw new Error('Mission not found.');
     return mission;
+  }
+  private enqueueRun(mission: Mission, input: { memberId?: string; ticketIndex?: number; feedback?: string }): string {
+    const execution = mission.execution;
+    if (!execution) throw new Error('Configure the mission repository and team first.');
+    if ((mission.stage === 'implementation' || mission.stage === 'review') && !execution.repoPath) {
+      throw new Error('Attach a team repository before starting code work.');
+    }
+    const ticketIndex = mission.stage === 'implementation'
+      ? input.ticketIndex ?? mission.artifacts.tickets.findIndex((_, index) => missionTicketReady(mission.artifacts.tickets, index)) : undefined;
+    if (mission.stage === 'implementation' && (ticketIndex === undefined || !Number.isInteger(ticketIndex) || ticketIndex < 0 || !missionTicketReady(mission.artifacts.tickets, ticketIndex))) throw new Error('Choose an implementation ticket.');
+    const previousOrchestratorRun = mission.stage === 'tickets'
+      ? execution.runs.slice().reverse().find(run => (run.stage === 'requirements' || run.stage === 'tickets') && run.workerId)
+      : undefined;
+    const memberId = input.memberId ?? previousOrchestratorRun?.memberId ?? execution.memberIds[(ticketIndex ?? 0) % execution.memberIds.length]!;
+    const member = this.agent(memberId);
+    if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
+    if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
+    const runId = createEntityId('mission-run');
+    execution.runs.push({ id: runId, stage: mission.stage, memberId, ...(previousOrchestratorRun?.workerId ? { workerId: previousOrchestratorRun.workerId } : {}), ...(ticketIndex === undefined ? {} : { ticketIndex }), status: 'preparing', skills: [], feedback: input.feedback?.trim() ?? '', startedAt: new Date().toISOString() });
+    return runId;
   }
   private agent(id: string | undefined): Agent | undefined { return this.ports.snapshot.agents.find(agent => agent.id === id); }
   private teamRepositories(mission: Mission): string[] {
@@ -340,4 +418,20 @@ export class MissionExecutionService {
     });
     await this.ports.publish();
   }
+}
+
+function missionTicketsMarkdown(tickets: MissionTicket[]): string {
+  return tickets.map((ticket, index) => [
+    `# ${String(index + 1).padStart(2, '0')}: ${ticket.title}`,
+    ticket.body,
+    `**Blocked by:** ${ticket.dependsOn?.length ? ticket.dependsOn.map(blocker => `${String(blocker + 1).padStart(2, '0')}: ${tickets[blocker]?.title ?? 'Unknown ticket'}`).join(', ') : 'None (can start immediately)'}`,
+    '**Status:** ready-for-agent',
+    ticket.reference ? `**External reference:** ${ticket.reference}` : '',
+  ].filter(Boolean).join('\n\n')).join('\n\n---\n\n');
+}
+
+function stageKickoffPrompt(run: MissionRun): string {
+  if (run.stage === 'tickets') return 'The requirements are approved. Continue this Mission in the Tickets stage now: read and use the to-tickets skill, then work with the user to shape and publish the backlog.';
+  if (run.stage === 'implementation') return `The tickets are approved. Begin implementation of assigned ticket ${(run.ticketIndex ?? 0) + 1} now and report progress in this Mission conversation.`;
+  return 'The implementation is approved. Begin the Mission review now and prepare the delivery decision for the user.';
 }

@@ -76,6 +76,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const mcpService = new ClawMcpService({
     getMissionContext: (agentId) => server.missionContext(agentId),
     onMissionResult: (agentId, input) => server.submitMissionResult(agentId, input),
+    onUpsertMissionTicket: (agentId, input) => server.upsertMissionTicket(agentId, input),
     onSetMissionTitle: (agentId, title) => server.setMissionTitle(agentId, title),
     onAttachMissionRepository: (agentId, repoPath) => server.attachMissionRepository(agentId, repoPath),
     onListMissionArtifacts: (agentId) => server.listMissionArtifacts(agentId),

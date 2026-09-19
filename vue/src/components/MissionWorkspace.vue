@@ -15,7 +15,7 @@
       <aside class="mission-workspace__process" :aria-label="t('missions.progress')">
         <div class="mission-workspace__process-heading">
           <TargetArrowIcon aria-hidden="true" />
-          <div><strong>{{ t('missions.workshop') }}</strong><span>{{ t('missions.workflow') }}</span></div>
+          <div><strong>{{ t('missions.process') }}</strong><span>{{ t('missions.workflow') }}</span></div>
         </div>
         <ol class="mission-workspace__stages">
           <li v-for="(stage, index) in featureStages" :key="stage">
@@ -47,9 +47,9 @@
       </aside>
 
       <main class="mission-workspace__workbench">
-        <header class="mission-workspace__station-header">
+        <header class="mission-workspace__stage-header">
           <div>
-            <small>{{ t('missions.station', { number: featureStages.indexOf(viewedStage) + 1 }) }}</small>
+            <small>{{ t('missions.stageNumber', { number: featureStages.indexOf(viewedStage) + 1 }) }}</small>
             <h2>{{ t(`missions.${viewedStage}`) }}</h2>
             <p>{{ t(`missions.stageDescription.${viewedStage}`) }}</p>
           </div>
@@ -71,13 +71,22 @@
           <span class="mission-workspace__callout-icon"><SparklesIcon aria-hidden="true" /></span>
           <div>
             <small>{{ t(`missions.runStatus.${activeRun.status}`) }}</small>
-            <h3>{{ t('missions.stationInProgress', { stage: t(`missions.${mission.stage}`) }) }}</h3>
+            <h3>{{ t('missions.stageInProgress', { stage: t(`missions.${mission.stage}`) }) }}</h3>
             <p>{{ t('missions.conversationDrivesStage') }}</p>
             <div v-if="activeRun.skills.length" class="mission-workspace__skills" :aria-label="t('missions.skillsInUse')">
               <span v-for="skill in activeRun.skills" :key="skill.path">{{ skill.name }}</span>
             </div>
           </div>
           <button class="claw-button" type="button" :disabled="busy" @click="stopRun(activeRun.id)">{{ t('missions.stopRun') }}</button>
+        </section>
+
+        <section v-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
+          <header class="mission-workspace__artifact-meta">
+            <FileTextIcon aria-hidden="true" />
+            <div><strong>{{ artifactTitle('tickets') }}</strong><span>{{ t('missions.draftTicketsHint', { count: activeRun.draftTickets.length }) }}</span></div>
+            <span class="mission-workspace__review-status">{{ t('missions.inProgress') }}</span>
+          </header>
+          <MarkdownPanel :content="draftTicketMarkdown" />
         </section>
 
         <section v-else-if="viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
@@ -96,7 +105,7 @@
         <section v-else-if="artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
           <header class="mission-workspace__artifact-meta">
             <FileTextIcon aria-hidden="true" />
-            <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ t('missions.acceptedAtStation') }}</span></div>
+            <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ t('missions.acceptedAtStage') }}</span></div>
             <span class="mission-workspace__accepted-status"><CheckIcon aria-hidden="true" />{{ t('missions.accepted') }}</span>
           </header>
           <MarkdownPanel :content="artifactMarkdown" />
@@ -111,9 +120,9 @@
             class="claw-button claw-button--primary"
             type="button"
             :disabled="busy || !executeMission"
-            @click="continueWorkshop"
+            @click="continueMission"
           >
-            <PlayerPlayIcon aria-hidden="true" />{{ t('missions.continueWorkshop') }}
+            <PlayerPlayIcon aria-hidden="true" />{{ t('missions.continueMission') }}
           </button>
         </section>
 
@@ -153,11 +162,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRaw, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { Agent } from '@codex-claw/core/contracts';
-import { featureStages, missionStageReady, type Mission, type MissionArtifacts, type MissionStage, type UpdateMissionInput } from '@codex-claw/core/missions';
+import { featureStages, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
@@ -168,7 +177,6 @@ const props = withDefaults(defineProps<{
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   mission: Mission;
   readMissionArtifact?: (missionId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
-  updateMission: (input: UpdateMissionInput) => Promise<void>;
 }>(), { agents: () => [] });
 const emit = defineEmits<{ 'open-conversation': [agentId: string]; 'expand-sidebar': [] }>();
 const { t } = useI18n();
@@ -188,12 +196,11 @@ const preferredConversationAgentId = computed(() => activeRun.value?.workerId
   ?? props.mission.stageAgentIds[props.mission.stage]
   ?? '');
 const missionConversations = computed(() => {
-  const seen = new Set<string>();
-  return (props.mission.execution?.runs ?? []).flatMap(run => {
-    if (!run.workerId || seen.has(run.workerId)) return [];
-    seen.add(run.workerId);
-    return [{ agentId: run.workerId, run }];
-  });
+  const conversations = new Map<string, { agentId: string; run: NonNullable<Mission['execution']>['runs'][number] }>();
+  for (const run of props.mission.execution?.runs ?? []) {
+    if (run.workerId) conversations.set(run.workerId, { agentId: run.workerId, run });
+  }
+  return [...conversations.values()];
 });
 const selectedConversationAgentId = ref('');
 const conversationAgentId = computed(() => (
@@ -243,7 +250,7 @@ function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
 }
 function stageStatus(stage: MissionStage): string {
   const state = stageState(stage);
-  if (state === 'complete') return t('missions.stationComplete');
+  if (state === 'complete') return t('missions.stageComplete');
   if (state === 'upcoming') return t('missions.notStarted');
   if (activeRun.value?.proposal) return t('missions.readyForReview');
   if (activeRun.value) return t(`missions.runStatus.${activeRun.value.status}`);
@@ -256,11 +263,16 @@ const artifactMarkdown = computed(() => canonicalArtifact.value || stageMarkdown
     ? activeRun.value.proposal
     : props.mission.artifacts,
 ));
+const draftTicketMarkdown = computed(() => canonicalArtifact.value || stageMarkdown('tickets', {
+  ...props.mission.artifacts,
+  tickets: activeRun.value?.draftTickets ?? [],
+}));
 function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string {
   switch (stage) {
     case 'requirements': return artifacts.requirements.problem.trim() ? `## ${t('missions.problem')}\n\n${artifacts.requirements.problem}\n\n## ${t('missions.acceptance')}\n\n${artifacts.requirements.acceptance}` : '';
     case 'tickets': return artifacts.tickets.map((ticket, index) => [
       `## ${index + 1}. ${ticket.title}`,
+      ticket.body?.trim() ?? '',
       ticket.reference ? `[${t('missions.canonicalReference')}](${ticket.reference})` : '',
       ticket.dependsOn?.length ? `${t('missions.blockedBy')}: ${ticket.dependsOn.map(blocker => blocker + 1).join(', ')}` : '',
     ].filter(Boolean).join('\n\n')).join('\n\n');
@@ -271,25 +283,13 @@ function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string
 async function approveProposal(): Promise<void> {
   const run = activeRun.value;
   if (!run?.proposal || !props.executeMission) return;
-  const missionId = props.mission.id;
-  const stage = props.mission.stage;
-  const stageAgentIds = { ...props.mission.stageAgentIds };
-  let revision = props.mission.revision;
   busy.value = true; error.value = '';
   try {
-    await props.executeMission({ id: missionId, revision, action: 'accept', runId: run.id });
-    revision++;
-    if (missionStageReady(stage, run.proposal)) {
-      await props.updateMission({ id: missionId, revision, artifacts: structuredClone(toRaw(run.proposal)), stageAgentIds, action: 'advance' });
-      revision++;
-      if (stage !== 'review') await props.executeMission({ id: missionId, revision, action: 'run' });
-    } else {
-      await props.executeMission({ id: missionId, revision, action: 'run' });
-    }
+    await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId: run.id });
   } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
   finally { busy.value = false; }
 }
-async function continueWorkshop(): Promise<void> {
+async function continueMission(): Promise<void> {
   if (!props.executeMission) return;
   busy.value = true; error.value = '';
   try { await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'run' }); }
@@ -310,7 +310,7 @@ async function stopRun(runId: string): Promise<void> {
 .mission-workspace__header { display: flex; min-height: 64px; align-items: center; gap: var(--space-8); padding: 0 var(--space-10); border-bottom: 1px solid var(--color-border); }
 .mission-workspace__navigation-button { border: 0; color: var(--color-primary); background: transparent; cursor: pointer; }
 .mission-workspace__identity { min-width: 0; flex: 1; }
-.mission-workspace__identity > span, .mission-workspace__station-header small, .mission-workspace__working small { color: var(--color-text-muted); font-size: var(--font-size-12); }
+.mission-workspace__identity > span, .mission-workspace__stage-header small, .mission-workspace__working small { color: var(--color-text-muted); font-size: var(--font-size-12); }
 .mission-workspace h1, .mission-workspace h2, .mission-workspace h3, .mission-workspace p { margin: 0; }
 .mission-workspace h1 { overflow: hidden; margin-top: var(--space-1); font-size: var(--font-size-18); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
 .mission-workspace__mission-status, .mission-workspace__review-status, .mission-workspace__accepted-status { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-6); border-radius: var(--radius-full); color: var(--color-on-primary-container); background: var(--color-primary-container); font-size: var(--font-size-12); white-space: nowrap; }
@@ -334,12 +334,12 @@ async function stopRun(runId: string): Promise<void> {
 .mission-workspace__progress-summary [role='progressbar'] { height: 6px; grid-column: 1 / -1; overflow: hidden; border-radius: var(--radius-full); background: var(--color-surface-high); }
 .mission-workspace__progress-summary [role='progressbar'] span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
 .mission-workspace__workbench { min-width: 0; padding: var(--space-12); overflow: auto; }
-.mission-workspace__station-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-10); padding-bottom: var(--space-10); border-bottom: 1px solid var(--color-border); }
-.mission-workspace__station-header > div { display: grid; gap: var(--space-2); }
-.mission-workspace__station-header h2 { font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); }
-.mission-workspace__station-header p, .mission-workspace__working p, .mission-workspace__empty-artifact p { color: var(--color-text-muted); line-height: var(--line-height-20); }
-.mission-workspace__station-header button, .mission-workspace__empty-artifact button { display: inline-flex; align-items: center; gap: var(--space-3); white-space: nowrap; }
-.mission-workspace__station-header button svg, .mission-workspace__empty-artifact button svg { width: var(--icon-sm); height: var(--icon-sm); }
+.mission-workspace__stage-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-10); padding-bottom: var(--space-10); border-bottom: 1px solid var(--color-border); }
+.mission-workspace__stage-header > div { display: grid; gap: var(--space-2); }
+.mission-workspace__stage-header h2 { font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); }
+.mission-workspace__stage-header p, .mission-workspace__working p, .mission-workspace__empty-artifact p { color: var(--color-text-muted); line-height: var(--line-height-20); }
+.mission-workspace__stage-header button, .mission-workspace__empty-artifact button { display: inline-flex; align-items: center; gap: var(--space-3); white-space: nowrap; }
+.mission-workspace__stage-header button svg, .mission-workspace__empty-artifact button svg { width: var(--icon-sm); height: var(--icon-sm); }
 .mission-workspace__error { margin-top: var(--space-8) !important; padding: var(--space-6); border-radius: var(--radius-md); color: var(--color-on-error-container); background: var(--color-error-container); }
 .mission-workspace__working, .mission-workspace__empty-artifact { display: flex; max-width: 700px; align-items: flex-start; gap: var(--space-8); margin: var(--space-16) auto; padding: var(--space-10); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-low); }
 .mission-workspace__working > div { display: grid; flex: 1; gap: var(--space-3); }

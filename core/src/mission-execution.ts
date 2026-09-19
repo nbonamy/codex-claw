@@ -1,5 +1,5 @@
 import type { BackendSkillSummary } from './contracts';
-import type { Mission, MissionArtifacts, MissionStage } from './missions';
+import type { Mission, MissionArtifacts, MissionStage, MissionTicket } from './missions';
 
 export type MissionRun = {
   id: string;
@@ -15,6 +15,7 @@ export type MissionRun = {
   summary?: string;
   error?: string;
   proposal?: MissionArtifacts;
+  draftTickets?: MissionTicket[];
 };
 export type MissionExecution = {
   teamId: string;
@@ -35,6 +36,8 @@ export type MissionResultInput = { missionId: string; runId: string; artifacts: 
 export type MissionToolContext = { missionId: string; runId: string; stage: MissionStage };
 export type MissionArtifactWriteInput = { stage: MissionStage; content: string; expectedRevision?: number };
 export type MissionArtifactReadResult = { stage: MissionStage; content: string; revision: number; updatedAt: string };
+export type MissionTicketDraftInput = { ticketId?: string; title: string; body: string; reference?: string; blockedByTicketIds?: string[] };
+export type MissionTicketDraftResult = { success: true; ticketId: string; index: number; artifactRevision: number };
 
 export function pendingMissionRun(mission: Mission): MissionRun | undefined {
   return mission.execution?.runs.slice().reverse().find(run => ['preparing', 'running', 'awaitingReview'].includes(run.status));
@@ -60,7 +63,7 @@ export function missionSkills(stage: MissionStage, available: BackendSkillSummar
 export function missionDeveloperInstructions(mission: Mission, run: MissionRun, repositories: string[] = []): string {
   const instructions: Record<MissionStage, string> = {
     requirements: "Treat the user's first message as the beginning of requirements shaping. If it does not yet state an outcome, ask what they want to build. Shape the outcome through conversation before assuming a repository or solution. Clarify scope, constraints, non-goals, and observable acceptance criteria. Once the outcome is clear, call codex_claw.set-mission-title with a concise outcome-oriented title. Do not implement code. First grill and clarify with the user; only after that, synthesize the agreed conversation with the spec skill if available. Submit requirements when they are ready for user review.",
-    tickets: 'Read the configured repository issue tracker instructions, including docs/agents/issue-tracker.md when present. Preserve its custom label mappings. Tracker choices are alternatives: never create a duplicate local/GitHub tracker. Turn the approved requirements into a small ordered implementation backlog. Each ticket must describe the change, acceptance criteria, dependencies, and meaningful verification in its title text. Keep tickets independently reviewable. Return each ticket with title, done:false, reference (canonical URL or repo-relative file path for published tickets), and dependsOn (zero-based indices of blocking tickets). Read the published artifact back before reporting its reference. Review the breakdown with the user before publishing according to the ticketing skill. Preserve the configured tracker as the authority; mission completion flags record acceptance of implementation, not remote issue closure. Do not implement code.',
+    tickets: 'Continue as the same Mission orchestrator. Tell the user that the requirements are approved and you are turning them into tickets. Read and apply the to-tickets skill when available. Read the configured repository issue tracker instructions, including docs/agents/issue-tracker.md when present, and preserve its custom label mappings. Tracker choices are alternatives: never create a duplicate local/GitHub tracker. Turn the approved requirements into a small ordered implementation backlog. Each ticket must be a tracer-bullet vertical slice with acceptance criteria, dependencies, and meaningful verification. Use codex_claw.upsert-mission-ticket for every draft and revision so tickets appear in the Mission while you work. The tool assigns a stable Mission ticket ID; tracker issue numbers remain optional external references assigned only when published. Review the breakdown with the user before publishing according to the ticketing skill. You may delegate repository research to agents created in the relevant represented repositories, then incorporate their findings into the Mission tickets yourself. Preserve the configured tracker as the authority; mission completion flags record acceptance of implementation, not remote issue closure. Do not implement code.',
     implementation: `Implement ONLY ticket ${(run.ticketIndex ?? 0) + 1} below. Read the assigned ticket from its canonical reference when present, including tracker comments and configured label meanings. Mission done flags mean accepted implementation, not tracker issue closure. Read repository instructions and follow its test strategy. Run relevant tests and inspect the actual diff. Leave changes in this mission worktree for review. Do not merge, push, or open a PR. Mark only your ticket done after it meets acceptance; record changed paths and exact verification commands/results. If blocked, explain it in the conversation rather than claim completion.`,
     review: 'Review the mission branch and uncommitted changes against the approved requirements and tickets. Inspect actual code/diffs and run appropriate checks. Report concrete findings, risks, and a delivery recommendation. Do not silently fix findings, merge, push, or create a PR. The user controls delivery from the workflow.',
   };
@@ -77,7 +80,7 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
     run.feedback ? `User revision feedback:\n${run.feedback}` : '',
     `Current accepted artifacts:\n${JSON.stringify(mission.artifacts, null, 2)}`,
     `Canonical artifact files:\n${JSON.stringify(mission.artifactFiles, null, 2)}`,
-    'Use codex_claw.list-mission-artifacts and codex_claw.read-mission-artifact to inspect shared mission work. Write your stage artifact with codex_claw.write-mission-artifact before submitting it for review. These tools are the canonical handoff between mission agents. Once the user confirms which team repository this Mission will change, call codex_claw.attach-mission-repository with its exact listed path so later code stages can create an isolated worktree.',
+    'Use codex_claw.list-mission-artifacts and codex_claw.read-mission-artifact to inspect shared mission work. For Requirements, Implementation, and Review, write your stage artifact with codex_claw.write-mission-artifact before submitting it. During Tickets, use only codex_claw.upsert-mission-ticket for ticket content; it rewrites the canonical tickets artifact in the Mission data folder after every change, so do not overwrite it with write-mission-artifact. These tools are the canonical handoff between mission agents. Once the user confirms which team repository this Mission will change, call codex_claw.attach-mission-repository with its exact listed path so later code stages can create an isolated worktree.',
     'When ready, call codex_claw.submit-mission-result with missionId, runId, summary, and the complete artifacts object using the same schema shown above. Update only artifacts belonging to your assigned stage (and only your assigned implementation ticket). This submits a proposal for user review; it does not approve a stage. Do not merely paste the result into chat. Do not claim a stage was approved or a mission completed.',
   ].filter(Boolean).join('\n\n');
   return `<context>\n${context}\n</context>`;

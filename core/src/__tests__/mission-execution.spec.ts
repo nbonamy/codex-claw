@@ -42,6 +42,10 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toContain('codex_claw.read-mission-artifact');
     expect(prompt).toContain('codex_claw.write-mission-artifact');
     expect(prompt.includes('codex_claw.set-mission-title')).toBe(stage === 'requirements');
+    if (stage === 'tickets') {
+      expect(prompt).toContain('Continue as the same Mission orchestrator');
+      expect(prompt).toContain('Use codex_claw.upsert-mission-ticket for every draft');
+    }
     expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Do not automatically invoke setup-matt-pocock-skills');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('do not claim you used an unavailable skill');
@@ -71,4 +75,7 @@ it('validates persisted execution records and dependency graphs before admitting
   expect(isMissionArtifacts({ ...mission.artifacts, tickets: [{ ...tickets[0], dependsOn: [3] }] })).toBe(false);
   expect(isMissionArtifacts({ ...mission.artifacts, tickets: [{ ...tickets[0], dependsOn: [-1] }] })).toBe(false);
   expect(isMissionArtifacts({ ...mission.artifacts, tickets: [{ ...tickets[0], reference: '' }] })).toBe(false);
+  expect(isMissionArtifacts({ ...mission.artifacts, tickets: [{ id: 'mission-ticket-1', title: 'Checkout', body: 'Vertical slice', done: false }] })).toBe(true);
+  expect(isMissionArtifacts({ ...mission.artifacts, tickets: [{ id: 'tracker-1', title: 'Checkout', done: false }] })).toBe(false);
+  expect(isMission({ ...mission, execution: { ...mission.execution, runs: [{ ...run, draftTickets: [{ id: 'tracker-1', title: 'Checkout', done: false }] }] } })).toBe(false);
 });

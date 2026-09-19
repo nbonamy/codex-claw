@@ -13,7 +13,7 @@ import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
 
-it('executes all mission stages across isolated provider sessions, respects ticket dependencies, and restores accepted evidence', async () => {
+it('keeps one orchestrator through shaping, isolates code sessions, respects ticket dependencies, and restores accepted evidence', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'claw-mission-workflow-'));
   const repo = join(folder, 'repo');
   await exec('git', ['init', repo]);
@@ -34,7 +34,7 @@ it('executes all mission stages across isolated provider sessions, respects tick
     const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
       readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
       writeArtifact: async (_missionId, stage, content) => { artifactContents.set(stage, content); return { size: content.length }; },
-      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
+      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {}, continueStage: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       listSkills: async () => ['grill-with-docs', 'to-spec', 'to-tickets', 'implement', 'tdd', 'code-review'].map(name => ({ name, path: `/skills/${name}/SKILL.md`, enabled: true })),
       interrupt: async () => {},
@@ -44,18 +44,17 @@ it('executes all mission stages across isolated provider sessions, respects tick
     await command({ action: 'attachRepository', repoPath: repo });
     const submit = async (artifacts: MissionArtifacts) => {
       const run = current().execution!.runs.at(-1)!;
-      await service.writeArtifact(run.workerId!, { stage: run.stage, content: `# ${run.stage}\nMission artifact.` });
+      if (run.stage !== 'tickets') await service.writeArtifact(run.workerId!, { stage: run.stage, content: `# ${run.stage}\nMission artifact.` });
       await service.submit(run.workerId!, { missionId: mission.id, runId: run.id, summary: `${run.stage} ready`, artifacts });
       expect(current().execution!.runs.at(-1)!.status).toBe('awaitingReview');
       await command({ action: 'accept', runId: run.id });
     };
-    const advance = () => store.mutate('update', { id: mission.id, revision: current().revision, artifacts: current().artifacts, stageAgentIds: current().stageAgentIds, action: 'advance' });
+    await command({ action: 'run' });
     for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
       expect(current().stage).toBe(stage);
       const count = stage === 'implementation' ? 2 : 1;
       for (let attempt = 0; attempt < count; attempt++) {
-        if (stage === 'implementation' && attempt === 0) await expect(command({ action: 'run', ticketIndex: 0 })).rejects.toThrow('implementation ticket');
-        await command({ action: 'run' }); await service.waitForLaunches();
+        await service.waitForLaunches();
         const run = current().execution!.runs.at(-1)!;
         expect(run.status).toBe('running');
         const artifacts = structuredClone(current().artifacts);
@@ -63,9 +62,10 @@ it('executes all mission stages across isolated provider sessions, respects tick
           await service.agentFinished(run.workerId!); // Question/answer rounds remain part of the same stage.
           artifacts.requirements = { problem: 'Team billing', acceptance: 'An owner can buy seats' };
         } else if (stage === 'tickets') {
-          artifacts.tickets = [{ title: 'Owner checkout', done: false, reference: 'https://example.com/issues/2', dependsOn: [1] }, { title: 'Billing account', done: false, reference: 'https://example.com/issues/1' }];
+          const account = await service.upsertTicket(run.workerId!, { title: 'Billing account', body: 'Create the billing account.', reference: 'https://example.com/issues/1' });
+          await service.upsertTicket(run.workerId!, { title: 'Owner checkout', body: 'Add owner checkout.', reference: 'https://example.com/issues/2', blockedByTicketIds: [account.ticketId] });
         } else if (stage === 'implementation') {
-          expect(run.ticketIndex).toBe(attempt === 0 ? 1 : 0);
+          expect(run.ticketIndex).toBe(attempt);
           const workspace = current().execution!.workspace!.path;
           await writeFile(join(workspace, `ticket-${run.ticketIndex}.txt`), 'implemented\n');
           await git(workspace, ['add', '.']);
@@ -75,17 +75,17 @@ it('executes all mission stages across isolated provider sessions, respects tick
         } else artifacts.review = { summary: 'Acceptance checked against the mission baseline and both commits.', pullRequestUrl: '' };
         await submit(artifacts);
       }
-      await advance();
     }
     expect(current().status).toBe('completed');
     expect(current().execution!.workspace!.baseSha).toBe(baseline);
-    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(5);
+    expect(current().execution!.runs[0]!.workerId).toBe(current().execution!.runs[1]!.workerId);
+    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(4);
     expect(await readWorktreeHead(repo)).toBe(baseline);
     expect(await readFile(join(repo, 'billing.txt'), 'utf8')).toBe('original\n');
     expect((await git(repo, ['status', '--porcelain'])).stdout).toBe('');
     const restored = snapshotFromPersistedState(disk);
     expect(restored.missions).toEqual(snapshot.missions);
-    expect(restored.missions![0]!.artifacts.tickets[0]!.reference).toBe('https://example.com/issues/2');
+    expect(restored.missions![0]!.artifacts.tickets[1]!.reference).toBe('https://example.com/issues/2');
     expect(restored.missions![0]!.execution!.runs.every(run => run.status === 'accepted')).toBe(true);
   } finally { await rm(folder, { recursive: true, force: true }); }
 });

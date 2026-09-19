@@ -65,7 +65,7 @@ APIs, or raw backend payloads.
 
 Mission navigation deliberately reuses the native workspace group, session row,
 selection, and status-dot primitives used by Quick Chats. Selecting a mission
-opens a three-part workshop surface: persistent process, stage artifact, and
+opens a three-part process surface: persistent stages, stage artifact, and
 supporting conversation. The artifact is rendered for review and comments flow
 through the conversation; do not add setup or artifact-editing forms to this
 surface. Mission-owned execution agents stay out of the global agent sidebar;

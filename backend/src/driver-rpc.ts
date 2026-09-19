@@ -104,6 +104,13 @@ export class BackendDriverRpc {
     this.unsubscribeDriverEvents = [...drivers.values()].map((driver) => driver.onEvent((event) => this.emit(event)));
   }
 
+  async refreshConversationContext(agent: Agent): Promise<void> {
+    const driver = this.requireDriver(agent.backend);
+    if (!agent.backendSession || !driver.releaseConversation || !driver.loadConversation) return;
+    driver.releaseConversation(agent.id);
+    await driver.loadConversation(agent);
+  }
+
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
       case backendMethods.workspaceFilesList: {

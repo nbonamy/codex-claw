@@ -4,7 +4,7 @@ import { createEntityId } from './ids';
 
 export const featureStages = ['requirements', 'tickets', 'implementation', 'review'] as const;
 export type MissionStage = typeof featureStages[number];
-export type MissionTicket = { title: string; done: boolean; reference?: string; dependsOn?: number[] };
+export type MissionTicket = { id?: string; title: string; body?: string; done: boolean; reference?: string; dependsOn?: number[] };
 export type MissionArtifacts = {
   requirements: { problem: string; acceptance: string };
   tickets: MissionTicket[];
@@ -50,7 +50,7 @@ const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v ===
 const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 100_000;
 export function isMissionArtifacts(v: unknown): v is MissionArtifacts {
   return record(v) && record(v.requirements) && text(v.requirements.problem) && text(v.requirements.acceptance)
-    && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && text(t.title) && typeof t.done === 'boolean' && (t.reference === undefined || (text(t.reference) && !!t.reference.trim())) && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.every(n => Number.isInteger(n) && n >= 0)))) && validTicketDependencies(v.tickets as MissionTicket[])
+    && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && (t.id === undefined || (text(t.id) && /^mission-ticket-[a-zA-Z0-9-]+$/.test(t.id))) && text(t.title) && (t.body === undefined || text(t.body)) && typeof t.done === 'boolean' && (t.reference === undefined || (text(t.reference) && !!t.reference.trim())) && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.every(n => Number.isInteger(n) && n >= 0)))) && validTicketDependencies(v.tickets as MissionTicket[])
     && record(v.implementation) && text(v.implementation.changes) && text(v.implementation.tests)
     && record(v.review) && text(v.review.summary) && text(v.review.pullRequestUrl)
     && (!v.review.pullRequestUrl || /^https?:\/\//.test(v.review.pullRequestUrl));
@@ -155,5 +155,6 @@ function isMissionExecution(v: unknown): v is MissionExecution {
       && text(run.feedback) && text(run.startedAt)
       && (run.finishedAt === undefined || text(run.finishedAt))
       && (run.summary === undefined || text(run.summary)) && (run.error === undefined || text(run.error))
-      && (run.proposal === undefined || isMissionArtifacts(run.proposal)));
+      && (run.proposal === undefined || isMissionArtifacts(run.proposal))
+      && (run.draftTickets === undefined || isMissionArtifacts({ requirements: { problem: '', acceptance: '' }, tickets: run.draftTickets, implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } })));
 }

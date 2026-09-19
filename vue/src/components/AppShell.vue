@@ -191,7 +191,7 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :update-mission="updateMission" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
         <template #code-review="{ agentId }">
           <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :get-workflow="props.getAgentGitWorkflow" :generate-message="props.generateAgentGitMessage" :commit-changes="props.commitAgentGitChanges" :push-branch="props.pushAgentGitBranch" :create-pull-request="props.createAgentGitPullRequest" />
         </template>
@@ -453,7 +453,7 @@ import AgentWorkspace from './AgentWorkspace.vue';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
 import ConversationPane from './ConversationPane.vue';
-import type { Mission, CreateMissionInput, DeleteMissionInput, UpdateMissionInput } from '@codex-claw/core/missions';
+import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -571,7 +571,6 @@ const props = withDefaults(defineProps<{
   deleteMission?: (input: DeleteMissionInput) => Promise<void>;
   readMissionArtifact?: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
   executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
-  updateMission?: (input: UpdateMissionInput) => Promise<void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
@@ -691,7 +690,6 @@ const props = withDefaults(defineProps<{
   createMission: async () => { throw new Error('Missions unavailable.'); },
   deleteMission: async () => { throw new Error('Missions unavailable.'); },
   readMissionArtifact: async () => { throw new Error('Mission artifacts unavailable.'); },
-  updateMission: async () => { throw new Error('Missions unavailable.'); },
   createQuickChat: async () => undefined,
   createTeam: async () => undefined,
   updateTeam: async () => undefined,

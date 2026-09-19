@@ -39,6 +39,7 @@ describe('Claw tool presentation', () => {
     ['read-mission-artifact', MarkdownIcon, 'Read mission artifact'],
     ['write-mission-artifact', SquareCheck, 'Saved mission artifact'],
     ['submit-mission-result', SquareCheck, 'Mission artifact ready for review'],
+    ['upsert-mission-ticket', SquareCheck, 'Drafted mission ticket'],
     ['update-work-item', SquareCheck, 'Updated work item'],
     ['celebrate', SparklesIcon, 'Celebrated with stars'],
     ['announce', VolumeIcon, 'Acknowledged start'],

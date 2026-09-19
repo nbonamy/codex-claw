@@ -45,6 +45,7 @@ const maxMarkdownBytes = 2 * 1024 * 1024;
 export type ClawMcpServiceOptions = {
   getMissionContext?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['getMissionContext'];
   onMissionResult?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onMissionResult'];
+  onUpsertMissionTicket?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onUpsertMissionTicket'];
   onSetMissionTitle?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
   onAttachMissionRepository?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onAttachMissionRepository'];
   onListMissionArtifacts?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
@@ -87,6 +88,7 @@ export class ClawMcpService {
     this.coordinator = new ClawMcpAgentCoordinator({
       getMissionContext: options.getMissionContext,
       onMissionResult: options.onMissionResult,
+      onUpsertMissionTicket: options.onUpsertMissionTicket,
       onSetMissionTitle: options.onSetMissionTitle,
       onAttachMissionRepository: options.onAttachMissionRepository,
       onListMissionArtifacts: options.onListMissionArtifacts,

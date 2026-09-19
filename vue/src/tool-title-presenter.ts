@@ -51,6 +51,7 @@ const TOOL_KEYS: Record<string, string> = {
   'read-mission-artifact': 'readMissionArtifact',
   'write-mission-artifact': 'writeMissionArtifact',
   'submit-mission-result': 'submitMissionResult',
+  'upsert-mission-ticket': 'upsertMissionTicket',
   'update-work-item': 'updateWorkItem',
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',

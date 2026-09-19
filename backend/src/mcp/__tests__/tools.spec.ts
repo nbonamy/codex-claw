@@ -48,6 +48,7 @@ describe('Codex Claw MCP tool registration', () => {
     announce: vi.fn(),
     updateWorkItem: vi.fn(),
     submitMissionResult: vi.fn(),
+    upsertMissionTicket: vi.fn(),
     setMissionTitle: vi.fn(),
     attachMissionRepository: vi.fn(),
     listMissionArtifacts: vi.fn(),
@@ -166,8 +167,8 @@ describe('Codex Claw MCP tool registration', () => {
   it('exposes the mission tool family only to an active mission worker and binds title changes to caller identity', async () => {
     coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-1', stage: 'requirements' });
     createServer();
-    expect([...handlers.keys()].slice(0, 6)).toStrictEqual([
-      'set-mission-title', 'attach-mission-repository', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'submit-mission-result',
+    expect([...handlers.keys()].slice(0, 7)).toStrictEqual([
+      'set-mission-title', 'attach-mission-repository', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result',
     ]);
     coordinator.setMissionTitle.mockResolvedValue({ success: true, title: 'Add team billing' });
     expect(await handlers.get('set-mission-title')!({ title: 'Add team billing' })).toMatchObject({
@@ -195,6 +196,16 @@ describe('Codex Claw MCP tool registration', () => {
     expect(z.object(definition.inputSchema).parse(input)).toEqual(input);
     expect(await handlers.get('submit-mission-result')!(input)).toMatchObject({ structuredContent: { success: true, status: 'awaitingReview' } });
     expect(coordinator.submitMissionResult).toHaveBeenCalledWith('agent-dina', input);
+
+    handlers.clear();
+    coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-2', stage: 'tickets' });
+    createServer();
+    coordinator.upsertMissionTicket.mockResolvedValue({ success: true, ticketId: 'mission-ticket-1', index: 0, artifactRevision: 1 });
+    const draft = { title: 'Add checkout', body: 'Deliver owner checkout.', blockedByTicketIds: [] };
+    expect(await handlers.get('upsert-mission-ticket')!(draft)).toMatchObject({
+      structuredContent: { success: true, ticketId: 'mission-ticket-1', index: 0, artifactRevision: 1 },
+    });
+    expect(coordinator.upsertMissionTicket).toHaveBeenCalledWith('agent-dina', draft);
   });
 
   it('preserves every optional creation and display field', async () => {

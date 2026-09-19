@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, type Mission, type UpdateMissionInput } from '@codex-claw/core/missions';
+import { createMission, type Mission } from '@codex-claw/core/missions';
 import type { MissionArtifactReadResult, MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
 import type { Agent } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
@@ -35,13 +35,11 @@ function mountWorkspace(mission: Mission, options: {
   agents?: Agent[];
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   readMissionArtifact?: (missionId: string, stage: MissionArtifactReadResult['stage']) => Promise<MissionArtifactReadResult>;
-  updateMission?: (input: UpdateMissionInput) => Promise<void>;
 } = {}) {
   return mount(MissionWorkspace, {
     props: {
       mission: structuredClone(mission),
       agents: structuredClone(options.agents ?? createInitialSnapshot().agents),
-      updateMission: options.updateMission ?? vi.fn().mockResolvedValue(undefined),
       executeMission: options.executeMission ?? vi.fn().mockResolvedValue(undefined),
       readMissionArtifact: options.readMissionArtifact,
     },
@@ -54,7 +52,7 @@ function mountWorkspace(mission: Mission, options: {
 }
 
 describe('MissionWorkspace', () => {
-  it('frames a running mission as a four-station workshop with the orchestrator conversation always present', async () => {
+  it('frames a running mission as a four-stage process with the orchestrator conversation always present', async () => {
     const mission = missionWithRun('running');
     const wrapper = mountWorkspace(mission);
     await flushPromises();
@@ -74,17 +72,16 @@ describe('MissionWorkspace', () => {
     expect(wrapper.emitted('expand-sidebar')).toStrictEqual([[]]);
   });
 
-  it('keeps the proposal beside its conversation and carries the accepted artifact into the next station', async () => {
+  it('keeps the proposal beside its conversation and carries the accepted artifact into the next stage', async () => {
     const mission = missionWithRun('awaitingReview', true);
     const executeMission = vi.fn().mockResolvedValue(undefined);
-    const updateMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountWorkspace(mission, { executeMission, updateMission });
+    const wrapper = mountWorkspace(mission, { executeMission });
 
     expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).toContain('Teams need one bill');
     expect(wrapper.get('.mission-workspace__review-hint').text()).toContain('Comment or request changes');
     expect(wrapper.find('.conversation-slot').exists()).toBe(true);
 
-    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenNthCalledWith(1, {
@@ -93,48 +90,30 @@ describe('MissionWorkspace', () => {
       action: 'accept',
       runId: 'run-requirements',
     });
-    expect(updateMission).toHaveBeenCalledWith({
-      id: mission.id,
-      revision: mission.revision + 1,
-      artifacts: mission.execution!.runs[0]!.proposal,
-      stageAgentIds: {},
-      action: 'advance',
-    });
-    expect(executeMission).toHaveBeenNthCalledWith(2, {
-      id: mission.id,
-      revision: mission.revision + 2,
-      action: 'run',
-    });
+    expect(executeMission).toHaveBeenCalledOnce();
   });
 
-  it('keeps the approval command revisions stable when the accepted snapshot arrives during the request', async () => {
+  it('does not synthesize follow-up revisions when the accepted snapshot arrives during approval', async () => {
     const mission = missionWithRun('awaitingReview', true);
     const initialRevision = mission.revision;
     let wrapper!: ReturnType<typeof mountWorkspace>;
-    const updateMission = vi.fn(async () => {
-      mission.revision = initialRevision + 2;
-      mission.stage = 'tickets';
-      await wrapper.setProps({ mission: structuredClone(mission) });
-    });
     const executeMission = vi.fn(async (input: MissionExecutionInput) => {
       if (input.action !== 'accept') return;
       mission.revision = initialRevision + 1;
       mission.execution!.runs[0]!.status = 'accepted';
       await wrapper.setProps({ mission: structuredClone(mission) });
     });
-    wrapper = mountWorkspace(mission, { executeMission, updateMission });
+    wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
     await flushPromises();
 
-    expect(updateMission).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'advance',
-      revision: initialRevision + 1,
-    }));
-    expect(executeMission).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      action: 'run',
-      revision: initialRevision + 2,
-    }));
+    expect(executeMission).toHaveBeenCalledExactlyOnceWith({
+      id: mission.id,
+      revision: initialRevision,
+      action: 'accept',
+      runId: 'run-requirements',
+    });
   });
 
   it('switches among mission-owned agent conversations inside the mission workspace', async () => {
@@ -163,7 +142,7 @@ describe('MissionWorkspace', () => {
     expect(wrapper.emitted('open-conversation')?.at(-1)).toStrictEqual([snapshot.agents[0]!.id]);
   });
 
-  it('keeps accepted artifacts available while work moves through later stations', async () => {
+  it('keeps accepted artifacts available while work moves through later stages', async () => {
     const mission = missionWithRun('accepted', true);
     mission.artifacts = structuredClone(mission.execution!.runs[0]!.proposal!);
     mission.stage = 'tickets';
@@ -180,6 +159,30 @@ describe('MissionWorkspace', () => {
 
     expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Teams need one bill');
     expect(wrapper.get('.mission-workspace__conversation').text()).toContain('Orchestrator');
+  });
+
+  it('shows ticket drafts as the orchestrator creates them without waiting for stage review', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.artifacts = structuredClone(mission.execution!.runs[0]!.proposal!);
+    mission.stage = 'tickets';
+    mission.execution!.runs.push({
+      id: 'run-tickets', stage: 'tickets', memberId: 'agent-dina', workerId: 'agent-dina', status: 'running',
+      skills: [{ name: 'to-tickets', path: '/skills/to-tickets/SKILL.md' }], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+      draftTickets: [
+        { id: 'mission-ticket-foundation', title: 'Create billing account', body: 'Deliver the account with integration coverage.', done: false },
+        { id: 'mission-ticket-checkout', title: 'Add owner checkout', body: 'Let an owner buy seats.', done: false, dependsOn: [0] },
+      ],
+    });
+    const wrapper = mountWorkspace(mission);
+
+    const drafts = wrapper.get('[aria-label="Draft tickets"]');
+    expect(drafts.text()).toContain('2 tickets drafted');
+    expect(drafts.text()).toContain('Create billing account');
+    expect(drafts.text()).toContain('Deliver the account with integration coverage.');
+    expect(drafts.text()).toContain('Blocked by tickets: 1');
+    expect(wrapper.get('[aria-label="Skills in use"]').text()).toContain('to-tickets');
+    expect(wrapper.find('[aria-label="Artifact ready for review"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Mission conversations"]').exists()).toBe(false);
   });
 
   it('renders the canonical persisted artifact instead of the structured handoff projection', async () => {
@@ -202,7 +205,7 @@ describe('MissionWorkspace', () => {
     expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).not.toContain('Teams need one bill');
   });
 
-  it('completes review without starting another station', async () => {
+  it('completes review without starting another stage', async () => {
     const mission = missionWithRun('accepted', true);
     mission.stage = 'review';
     mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
@@ -215,14 +218,12 @@ describe('MissionWorkspace', () => {
       skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', proposal, summary: 'Review complete',
     }];
     const executeMission = vi.fn().mockResolvedValue(undefined);
-    const updateMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountWorkspace(mission, { executeMission, updateMission });
+    const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenCalledTimes(1);
-    expect(updateMission).toHaveBeenCalledWith(expect.objectContaining({ action: 'advance', revision: mission.revision + 1 }));
   });
 
   it('accepts partial implementation evidence and starts the next ready ticket without advancing', async () => {
@@ -238,18 +239,16 @@ describe('MissionWorkspace', () => {
       status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', proposal, summary: 'Checkout complete',
     }];
     const executeMission = vi.fn().mockResolvedValue(undefined);
-    const updateMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountWorkspace(mission, { executeMission, updateMission });
+    const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenNthCalledWith(1, { id: mission.id, revision: mission.revision, action: 'accept', runId: 'run-checkout' });
-    expect(executeMission).toHaveBeenNthCalledWith(2, { id: mission.id, revision: mission.revision + 1, action: 'run' });
-    expect(updateMission).not.toHaveBeenCalled();
+    expect(executeMission).toHaveBeenCalledOnce();
   });
 
-  it('stops active work and can retry a retained failed station', async () => {
+  it('stops active work and can retry a retained failed stage', async () => {
     const mission = missionWithRun('running');
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
@@ -264,7 +263,7 @@ describe('MissionWorkspace', () => {
     expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'run' });
   });
 
-  it('keeps start and stop failures visible beside the mission station', async () => {
+  it('keeps start and stop failures visible beside the mission stage', async () => {
     const mission = missionWithRun('running');
     const executeMission = vi.fn()
       .mockRejectedValueOnce(new Error('Could not stop the worker'))
@@ -310,11 +309,11 @@ describe('MissionWorkspace', () => {
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100');
   });
 
-  it('shows orchestration failures without replacing the workshop', async () => {
+  it('shows orchestration failures without replacing the process', async () => {
     const mission = missionWithRun('awaitingReview', true);
     const wrapper = mountWorkspace(mission, { executeMission: vi.fn().mockRejectedValue(new Error('Worker unavailable')) });
 
-    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
     await flushPromises();
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Worker unavailable');

@@ -682,10 +682,16 @@ Git repository and persists it without exposing a setup form; implementation
 creates the isolated worktree later, when code work begins.
 
 `list-mission-artifacts` and `read-mission-artifact` let any active Mission
-worker discover and consume the canonical Markdown created by earlier stations.
-`write-mission-artifact` writes only the caller's assigned station under the
+worker discover and consume the canonical Markdown created by earlier stages.
+`write-mission-artifact` writes only the caller's assigned stage under the
 Claw-owned Mission home. Existing files use an expected revision so concurrent
 or stale agents cannot silently overwrite each other.
+
+`upsert-mission-ticket` is exposed only to the active Tickets-stage orchestrator.
+It assigns stable Mission ticket IDs, resolves blocking edges against those IDs,
+persists the structured draft, rewrites the canonical Tickets Markdown artifact,
+and publishes the snapshot after every change. Tracker issue numbers are optional
+external references and never serve as the Mission ticket identity.
 
 `submit-mission-result` is an app-owned stage handoff. Only the worker bound to
 the current running mission attempt may report artifacts, and the canonical

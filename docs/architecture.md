@@ -56,7 +56,7 @@ opened as secondary stage support, without transferring transcript ownership.
 Mission navigation uses the same compact workspace-group and session-row
 patterns as project and quick-chat navigation. Sidebar creation persists a
 team-scoped placeholder `New mission`, selects it, and immediately starts the
-requirements station from a Claw-owned mission home without requiring a repository.
+requirements stage from a Claw-owned mission home without requiring a repository.
 Creation prepares an idle hidden worker but does not submit a provider turn. The
 conversation initially asks “What do you want to build?” and the user's first
 message starts the provider session. The Mission execution contract is appended
@@ -67,17 +67,24 @@ the mission-scoped title tool.
 Mission rows use the sidebar context-menu pattern for deletion. Deletion removes
 the persisted Mission and its hidden worker agents after interrupting active work
 and archiving their provider conversations; the mission worktree remains on disk.
-The selected mission is a workshop: persistent stations on the left, the
-current or previously accepted artifact in the central workbench, and the
-station's orchestrator conversation on the right. The conversation drives
+The selected mission has persistent stages on the left, the current or
+previously accepted artifact in the central work surface, and the stage's
+orchestrator conversation on the right. The conversation drives
 ideation and revision; there are no renderer-owned artifact forms. User
-acceptance carries an artifact forward and starts the next station, while prior
+acceptance carries an artifact forward and starts the next stage, while prior
 artifacts remain available for inspection.
 Mission execution is owned by `clawd`: selected team member profiles supply
-provider settings for dedicated stage sessions. Requirements and tickets run
+provider settings for stage work. Requirements and Tickets keep the same hidden
+orchestrator and provider conversation; `clawd` refreshes its hidden Mission
+context and starts the Tickets turn after approval. Later stage kickoffs are also
+queued automatically after approval. Requirements and tickets run
 from `$CODEX_CLAW_HOME/missions/<mission-id>`; a repository is attached later
 and a managed Git worktree is created only when code work begins.
 Canonical Markdown artifacts live under the mission home `artifacts/` directory.
+During Tickets, Mission-scoped upserts assign stable app-owned ticket IDs and
+rewrite `artifacts/tickets.md` after every draft change so the UI and later agents
+observe the backlog as it develops. External tracker identifiers remain optional
+references assigned by the configured tracker.
 The Mission snapshot carries their revisions and sizes rather than exposing file
 access to the renderer or provider.
 Runs persist assignment, installed skill paths, proposal, status, and feedback.
@@ -105,6 +112,11 @@ implicitly. Current and older installed skill names are resolved by capability.
 The workflow reuses Claw's diff and explicit commit/push/PR controls; agents do not
 publish or merge automatically. External ticket refresh and parallel branch
 integration are not part of this first execution policy.
+
+Stage approval is one revision-checked `clawd` command. It accepts the proposal,
+advances or completes the workflow when the stage is ready, and queues the next
+run in the same persisted Mission transaction. Renderer components never compute
+intermediate Mission revisions or chain separate accept, advance, and run writes.
 
 Core persisted entities:
 

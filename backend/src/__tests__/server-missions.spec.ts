@@ -65,9 +65,10 @@ it('prepares a mission without a provider turn, then starts it from the first us
     const interrupt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
     const releaseConversation = vi.fn();
+    const loadConversation = vi.fn().mockResolvedValue('mission-thread');
     const driver: AgentBackendDriver = {
       backend: 'codex', getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }), getCapabilities: () => codexBackendCapabilities,
-      sendPrompt, interrupt, archiveAgentConversation, releaseConversation,
+      sendPrompt, interrupt, archiveAgentConversation, releaseConversation, loadConversation,
       respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
       listSkills: async () => [{ name: 'grill-with-docs', path: '/skills/grill-with-docs/SKILL.md', enabled: true }],
     };
@@ -110,9 +111,16 @@ it('prepares a mission without a provider turn, then starts it from the first us
     await server.submitMissionResult(run.workerId!, { missionId: current().id, runId: run.id, summary: 'Ready', artifacts });
     await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'accept', runId: run.id });
     expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);
-    expect(current().stage).toBe('requirements');
+    expect(current().stage).toBe('tickets');
+    expect(current().execution!.runs).toHaveLength(2);
     expect(worker.backendSession).toEqual({ kind: 'codex', threadId: 'mission-thread' });
-    worker.status = { type: 'working' };
+    await vi.waitFor(() => expect(current().execution!.runs.at(-1)).toMatchObject({ stage: 'tickets', status: 'running' }));
+    expect(current().execution!.runs.at(-1)!.workerId).toBe(run.workerId);
+    await vi.waitFor(() => expect(releaseConversation).toHaveBeenCalledWith(worker.id));
+    expect(loadConversation).toHaveBeenCalledWith(worker);
+    await vi.waitFor(() => expect(snapshot.queuedPrompts).toEqual([
+      expect.objectContaining({ agentId: worker.id, text: expect.stringContaining('to-tickets skill') }),
+    ]));
     const missionId = current().id;
     await call('mission/delete', { id: missionId, revision: current().revision });
     expect(snapshot.missions).toStrictEqual([]);

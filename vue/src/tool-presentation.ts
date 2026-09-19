@@ -109,6 +109,6 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (tool === 'announce') return icons.announcement;
   if (tool === 'display-markdown' || tool === 'list-mission-artifacts' || tool === 'read-mission-artifact') return icons.markdown;
   if (tool === 'set-mission-title') return icons.mission;
-  if (tool === 'update-work-item' || tool === 'write-mission-artifact' || tool === 'submit-mission-result') return icons.workItem;
+  if (tool === 'update-work-item' || tool === 'write-mission-artifact' || tool === 'submit-mission-result' || tool === 'upsert-mission-ticket') return icons.workItem;
   return undefined;
 }

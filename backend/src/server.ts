@@ -209,6 +209,10 @@ export class ClawBackendServer {
       },
       createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
       refreshWorkspace: async agentId => { await this.agentWorkspaces.refreshIdentity(agentId); },
+      refreshConversationContext: async agent => {
+        await this.requireDriverRpc().refreshConversationContext(agent);
+      },
+      continueStage: async (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
       listSkills: agent => this.requireDriverRpc().handle(backendMethods.driverSkillsList, { agent }) as Promise<BackendSkillSummary[]>,
       interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
     });
@@ -286,6 +290,10 @@ export class ClawBackendServer {
 
   async submitMissionResult(agentId: string, input: MissionResultInput) {
     return this.missionExecution.submit(agentId, input);
+  }
+
+  async upsertMissionTicket(agentId: string, input: import('@codex-claw/core/mission-execution').MissionTicketDraftInput) {
+    return this.missionExecution.upsertTicket(agentId, input);
   }
 
   listMissionArtifacts(agentId: string) {
