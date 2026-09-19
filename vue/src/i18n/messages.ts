@@ -484,9 +484,8 @@ export const messages = {
     chat: {
       quickChatHeadline: 'What can I help with?',
       threadFlags: {
-        label: 'Worktree',
-        delegateToWorktree: 'Ready to delegate',
-        delegate: 'Delegate to worktree',
+        prompt: 'Start implementation in a worktree?',
+        accept: 'Start implementation in a worktree',
         dismiss: 'Dismiss worktree delegation',
       },
       subagents: {

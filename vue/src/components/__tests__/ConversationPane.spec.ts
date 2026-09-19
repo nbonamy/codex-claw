@@ -142,22 +142,20 @@ describe('ConversationPane', () => {
   });
 
   it('renders delegate_to_worktree in the composer shelf and emits its actions', async () => {
-    const withoutFlag = mountPane({
+    const wrapper = mountPane({
       controller: controllerFor(messages),
       agent,
     });
-    expect(withoutFlag.find('.chat-composer-shelf').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
 
-    const wrapper = mountPane({
-      controller: controllerFor(messages),
-      agent: { ...agent, threadFlags: { delegate_to_worktree: true } },
-    });
+    await wrapper.setProps({ agent: { ...agent, threadFlags: { delegate_to_worktree: true } } });
     const sdkPane = wrapper.getComponent({ name: 'CodexConversationPane' });
 
     expect(sdkPane.props('hasComposerContext')).toBe(false);
     expect(wrapper.get('.codex-conversation-pane__composer-shelf .thread-flag-affordance').text())
-      .toContain('Worktree');
-    expect(wrapper.get('.thread-flag-affordance').text()).toContain('Ready to delegate');
+      .toContain('Start implementation in a worktree?');
+    expect(wrapper.get('.thread-flag-affordance__action').attributes('aria-label'))
+      .toBe('Start implementation in a worktree');
     await wrapper.get('.thread-flag-affordance__action').trigger('click');
     await wrapper.get('.thread-flag-affordance__dismiss').trigger('click');
     expect(wrapper.emitted('thread-flag')).toStrictEqual([['execute'], ['dismiss']]);

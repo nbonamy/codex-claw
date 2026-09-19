@@ -60,8 +60,9 @@
           </button>
         </el-tooltip>
       </template>
-      <template v-if="delegateToWorktree" #composer-shelf-actions="{ disabled }">
+      <template #composer-shelf-actions="{ disabled }">
         <ThreadFlagAffordance
+          v-if="delegateToWorktree"
           :busy="threadFlagBusy || disabled"
           @execute="emit('thread-flag', 'execute')"
           @dismiss="emit('thread-flag', 'dismiss')"

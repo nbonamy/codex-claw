@@ -1,21 +1,21 @@
 <template>
   <div class="thread-flag-affordance" role="status">
     <GitBranchIcon class="thread-flag-affordance__icon" aria-hidden="true" />
-    <div class="thread-flag-affordance__copy">
-      <span class="thread-flag-affordance__label">{{ t('chat.threadFlags.label') }}</span>
-      <span class="thread-flag-affordance__description">{{ t('chat.threadFlags.delegateToWorktree') }}</span>
-    </div>
+    <span class="thread-flag-affordance__prompt">{{ t('chat.threadFlags.prompt') }}</span>
     <div class="thread-flag-affordance__actions">
       <button
         class="thread-flag-affordance__action"
         type="button"
+        :aria-label="t('chat.threadFlags.accept')"
+        :title="t('chat.threadFlags.accept')"
         :disabled="busy"
         @click="emit('execute')"
-      >{{ t('chat.threadFlags.delegate') }}</button>
+      ><CheckIcon aria-hidden="true" /></button>
       <button
         class="thread-flag-affordance__dismiss"
         type="button"
         :aria-label="t('chat.threadFlags.dismiss')"
+        :title="t('chat.threadFlags.dismiss')"
         :disabled="busy"
         @click="emit('dismiss')"
       ><X aria-hidden="true" /></button>
@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { GitBranchIcon, X } from '../shared/icons/app-icons';
+import { CheckIcon, GitBranchIcon, X } from '../shared/icons/app-icons';
 
 defineProps<{ busy?: boolean }>();
 const emit = defineEmits<{ execute: []; dismiss: [] }>();
@@ -48,25 +48,12 @@ const { t } = useI18n();
   flex: 0 0 auto;
 }
 
-.thread-flag-affordance__copy {
+.thread-flag-affordance__prompt {
   min-width: 0;
-  display: flex;
   flex: 1;
-  align-items: baseline;
-  gap: var(--space-3);
-}
-
-.thread-flag-affordance__label {
-  color: var(--color-text);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-semibold);
-}
-
-.thread-flag-affordance__description {
-  min-width: 0;
   overflow: hidden;
+  color: var(--color-text);
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-xlight);
   line-height: var(--line-height-18);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -94,9 +81,9 @@ const { t } = useI18n();
 }
 
 .thread-flag-affordance__action {
-  width: auto;
+  width: var(--space-12);
   height: var(--space-12);
-  padding: 0 var(--space-3);
+  padding: 0;
   color: var(--color-text-muted);
 }
 
@@ -107,6 +94,7 @@ const { t } = useI18n();
   color: var(--color-text-muted);
 }
 
+.thread-flag-affordance__action svg,
 .thread-flag-affordance__dismiss svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
