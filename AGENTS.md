@@ -158,6 +158,8 @@ commit, or push work. Curate it only when Nicolas explicitly invokes
   tests, coverage, security, UX, docs, worktree hygiene, and handoff.
 - `codex-claw-frontend-dev`: Vue, Element Plus, app shell, chat rendering,
   artifact panes, design tokens, themes, and frontend tests.
+- `codex-claw-live-preview`: isolated, parallel-safe, branch-faithful web
+  previews with seeded state for interactively dogfooding any Claw feature.
 - `codex-claw-testing-coverage`: Vitest, component isolation, IPC contracts,
   fake Codex transports, coverage triage, and verification gates.
 - `update-changelog`: release-time audit of Claw and SDK histories, curated
