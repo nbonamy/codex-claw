@@ -33,6 +33,8 @@ export type MissionExecutionInput = { id: string; revision: number } & (
 );
 export type MissionResultInput = { missionId: string; runId: string; artifacts: MissionArtifacts; summary: string };
 export type MissionToolContext = { missionId: string; runId: string; stage: MissionStage };
+export type MissionArtifactWriteInput = { stage: MissionStage; content: string; expectedRevision?: number };
+export type MissionArtifactReadResult = { stage: MissionStage; content: string; revision: number; updatedAt: string };
 
 export function pendingMissionRun(mission: Mission): MissionRun | undefined {
   return mission.execution?.runs.slice().reverse().find(run => ['preparing', 'running', 'awaitingReview'].includes(run.status));
@@ -74,6 +76,8 @@ export function missionRunPrompt(mission: Mission, run: MissionRun, repositories
     run.skills.length ? `Use these available skills: ${run.skills.map(skill => `${skill.name} (${skill.path})`).join(', ')}. Read their SKILL.md instructions before applying them. The mission task authorizes their relevant work. Do not push code, open pull requests, or merge. Ticket publication must follow the ticketing skill’s human review and configured tracker instructions.` : 'No matching stage skill was available in your backend catalog. Apply the stage instructions and repository guidance directly; do not claim you used an unavailable skill.',
     run.feedback ? `User revision feedback:\n${run.feedback}` : '',
     `Current accepted artifacts:\n${JSON.stringify(mission.artifacts, null, 2)}`,
+    `Canonical artifact files:\n${JSON.stringify(mission.artifactFiles, null, 2)}`,
+    'Use codex_claw.list-mission-artifacts and codex_claw.read-mission-artifact to inspect shared mission work. Write your stage artifact with codex_claw.write-mission-artifact before submitting it for review. These tools are the canonical handoff between mission agents.',
     'When ready, call codex_claw.submit-mission-result with missionId, runId, summary, and the complete artifacts object using the same schema shown above. Update only artifacts belonging to your assigned stage (and only your assigned implementation ticket). This submits a proposal for user review; it does not approve a stage. Do not merely paste the result into chat. Do not claim a stage was approved or a mission completed.',
   ].filter(Boolean).join('\n\n');
 }

@@ -10,8 +10,11 @@ function setup() {
   const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   const persisted = vi.fn().mockResolvedValue(undefined);
   const store = new MissionService(snapshot, persisted);
+  const artifactContents = new Map<string, string>();
   const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), validateRepository: vi.fn().mockResolvedValue(undefined),
     ensureMissionHome: vi.fn().mockResolvedValue('/claw/missions/mission'),
+    readArtifact: vi.fn(async (_missionId: string, stage: string) => artifactContents.get(stage) ?? ''),
+    writeArtifact: vi.fn(async (_missionId: string, stage: string, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
     createWorktree: vi.fn().mockResolvedValue({ name: 'mission', path: '/repo-mission' }),
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -47,6 +50,11 @@ describe('mission execution', () => {
     expect(h.ports.publish).toHaveBeenCalled();
     const artifacts = structuredClone(mission.artifacts); artifacts.requirements = { problem: 'Teams pay together', acceptance: 'Owner can check out' };
     await expect(h.service.submit(h.originalAgents[0]!.id, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' })).rejects.toThrow('does not own');
+    await h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Requirements\nTeams pay together.' });
+    expect(h.service.listArtifacts(run.workerId!)).toEqual([expect.objectContaining({ stage: 'requirements', revision: 1 })]);
+    await expect(h.service.readArtifact(run.workerId!, 'requirements')).resolves.toMatchObject({ content: expect.stringContaining('Teams pay together'), revision: 1 });
+    await expect(h.service.writeArtifact(run.workerId!, { stage: 'tickets', content: '# Tickets' })).rejects.toThrow('assigned stage');
+    await expect(h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Stale', expectedRevision: 0 })).rejects.toThrow('changed');
     await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' });
     expect(h.current().artifacts.requirements.problem).toBe('');
     expect(h.current().execution!.runs[0]!.status).toBe('awaitingReview');
@@ -54,6 +62,7 @@ describe('mission execution', () => {
     await expect(h.service.setTitle(run.workerId!, 'Refined team billing')).resolves.toEqual({ success: true, title: 'Refined team billing' });
     const revisedArtifacts = structuredClone(artifacts);
     revisedArtifacts.requirements.problem = 'Teams need one shared invoice';
+    await h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Requirements\nShared invoice.', expectedRevision: 1 });
     await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts: revisedArtifacts, summary: 'Requirements revised after review' });
     expect(h.current().execution!.runs[0]).toMatchObject({ status: 'awaitingReview', summary: 'Requirements revised after review' });
     expect(() => updateMission(h.snapshot, { id: mission.id, revision: h.current().revision, artifacts, stageAgentIds: {}, action: 'advance' })).toThrow('current mission run');
@@ -80,6 +89,7 @@ describe('mission execution', () => {
       artifacts.requirements.problem = 'Unapproved upstream edit';
       artifacts.tickets[index]!.done = true;
       artifacts.implementation = { changes: `Changed ticket ${index}`, tests: `Tests for ${index} passed` };
+      await h.service.writeArtifact(run.workerId!, { stage: 'implementation', content: `# Implementation\nTicket ${index}` });
       await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Implemented' });
       await h.command({ action: 'accept', runId: run.id });
     }
@@ -110,6 +120,7 @@ describe('mission execution', () => {
     expect(h.current().execution!.runs[2]!.status).toBe('running'); // Shaping questions can span multiple turns.
     const artifacts = structuredClone(h.current().artifacts);
     artifacts.requirements = { problem: 'Clarified after a question', acceptance: 'User answered' };
+    await h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Requirements\nClarified.' });
     await h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, artifacts, summary: 'Ready after discussion' });
     expect(h.current().execution!.runs[2]!.status).toBe('awaitingReview');
   });
@@ -130,6 +141,7 @@ it('rejects invalid configuration, stale commands and inactive worker results wi
   await expect(h.service.execute({ id: 'missing', revision: 0, action: 'run' })).rejects.toThrow('not found');
   await h.command({ action: 'run' }); await h.service.waitForLaunches();
   const run = h.current().execution!.runs[0]!;
+  await h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Requirements' });
   await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'Empty', artifacts: h.current().artifacts })).rejects.toThrow('incomplete');
   const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;
   worker.status = { type: 'working' };
@@ -155,6 +167,7 @@ it('reopens reached stages while invalidating dependent acceptance and retains i
   await h.command({ action: 'run' }); await h.service.waitForLaunches();
   const run = h.current().execution!.runs.at(-1)!;
   const artifacts = structuredClone(h.current().artifacts);
+  await h.service.writeArtifact(run.workerId!, { stage: 'implementation', content: '# Implementation' });
   await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'Not done', artifacts })).rejects.toThrow('assigned ticket');
   artifacts.tickets[0]!.done = true;
   await expect(h.service.submit(run.workerId!, { missionId: h.current().id, runId: run.id, summary: 'No evidence', artifacts })).rejects.toThrow('test evidence');

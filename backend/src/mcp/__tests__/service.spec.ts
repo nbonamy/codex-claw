@@ -195,13 +195,13 @@ describe('ClawMcpService', () => {
     const workerTools = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
     });
-    expect(workerTools.result.tools.map((tool: { name: string }) => tool.name).slice(0, 2))
-      .toStrictEqual(['set-mission-title', 'submit-mission-result']);
+    expect(workerTools.result.tools.map((tool: { name: string }) => tool.name).slice(0, 5))
+      .toStrictEqual(['set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'submit-mission-result']);
     const ordinaryTools = await postJson(agentUrl(url, 'agent-jesse'), {
       jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
     });
     expect(ordinaryTools.result.tools.map((tool: { name: string }) => tool.name))
-      .not.toEqual(expect.arrayContaining(['set-mission-title', 'submit-mission-result']));
+      .not.toEqual(expect.arrayContaining(['set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'submit-mission-result']));
 
     const renamed = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 3, method: 'tools/call',
@@ -215,7 +215,7 @@ describe('ClawMcpService', () => {
       jsonrpc: '2.0', id: 4, method: 'tools/list', params: {},
     });
     expect(inactiveTools.result.tools.map((tool: { name: string }) => tool.name))
-      .not.toEqual(expect.arrayContaining(['set-mission-title', 'submit-mission-result']));
+      .not.toEqual(expect.arrayContaining(['set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'submit-mission-result']));
   });
 
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {

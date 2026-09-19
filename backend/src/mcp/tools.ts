@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
+import { featureStages } from '@codex-claw/core/missions';
 import { logMain, warnMain } from '../log';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { McpToolError } from './agent-coordinator';
@@ -28,6 +29,25 @@ export function createCodexClawMcpServer(
         title: z.string().trim().min(1).max(200),
       },
     }, ({ title }) => toolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
+
+    server.registerTool('list-mission-artifacts', {
+      description: 'List canonical artifact files already written for the active Mission. The Mission is inferred from your authenticated agent identity.',
+      inputSchema: {},
+    }, () => toolResult('list-mission-artifacts', { callerAgentId }, () => coordinator.listMissionArtifacts(callerAgentId)));
+
+    server.registerTool('read-mission-artifact', {
+      description: 'Read a canonical artifact file from the active Mission so work can move between agents and workflow stages.',
+      inputSchema: { stage: z.enum(featureStages) },
+    }, ({ stage }) => toolResult('read-mission-artifact', { callerAgentId, stage }, () => coordinator.readMissionArtifact(callerAgentId, stage)));
+
+    server.registerTool('write-mission-artifact', {
+      description: 'Create or revise the canonical Markdown artifact for your assigned Mission stage. Read the current revision before overwriting an existing artifact.',
+      inputSchema: {
+        stage: z.enum(featureStages),
+        content: z.string().trim().min(1).max(500_000),
+        expectedRevision: z.number().int().nonnegative().optional(),
+      },
+    }, input => toolResult('write-mission-artifact', { callerAgentId, stage: input.stage }, () => coordinator.writeMissionArtifact(callerAgentId, input)));
 
     server.registerTool('submit-mission-result', {
       description: 'Submit the structured result of your assigned Mission stage for user review. Use only with the mission and run IDs from your assignment. This never approves a stage or completes a mission. Include actual verification evidence for implementation work.',

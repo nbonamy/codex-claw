@@ -90,6 +90,9 @@ it('routes mission execution through the backend driver and worktree manager, th
     expect(snapshotFromPersistedState(disk).missions![0]!.outcome).toBe('Add team billing');
     const artifacts = structuredClone(current().artifacts);
     artifacts.requirements = { problem: 'Team billing', acceptance: 'Owners can pay' };
+    await server.writeMissionArtifact(run.workerId!, { stage: 'requirements', content: '# Requirements\nTeam billing.' });
+    await expect(server.readMissionArtifact(run.workerId!, 'requirements')).resolves.toMatchObject({ content: expect.stringContaining('Team billing'), revision: 1 });
+    expect(server.listMissionArtifacts(run.workerId!)).toEqual([expect.objectContaining({ stage: 'requirements', revision: 1 })]);
     await server.submitMissionResult(run.workerId!, { missionId: current().id, runId: run.id, summary: 'Ready', artifacts });
     await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'accept', runId: run.id });
     expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);

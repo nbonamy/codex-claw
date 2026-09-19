@@ -3,6 +3,7 @@ import { MissionExecutionService } from './mission-execution-service';
 import type { BackendSkillSummary } from '@codex-claw/core/contracts';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
+import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
 import os from 'node:os';
@@ -75,6 +76,7 @@ export type ClawBackendServerOptions = {
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
   ensureMissionHome?: (missionId: string) => Promise<string>;
+  missionArtifactStore?: MissionArtifactStorage;
 };
 
 export type SystemPermissionsPort = {
@@ -108,6 +110,7 @@ export class ClawBackendServer {
   private readonly snapshot: AppSnapshot;
   private readonly missions: MissionService;
   private readonly missionExecution: MissionExecutionService;
+  private readonly missionArtifacts: MissionArtifactStorage;
   private remoteControlStatus: DevicePairingStatus = { status: 'disabled' };
   private remoteControlStatusLoaded = false;
   private readonly driverRpc?: BackendDriverRpc;
@@ -186,16 +189,20 @@ export class ClawBackendServer {
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
       onPromptStarting: options.onPromptStarting,
     });
+    const ensureMissionHome = options.ensureMissionHome ?? (async (missionId: string) => {
+      const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
+      await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
+      return home;
+    });
+    this.missionArtifacts = options.missionArtifactStore ?? new FileMissionArtifactStore(ensureMissionHome);
     this.missionExecution = new MissionExecutionService({
       getHead: readWorktreeHead,
       snapshot: this.snapshot,
       missions: this.missions,
       publish: () => this.emitProjectedSnapshot(),
-      ensureMissionHome: options.ensureMissionHome ?? (async missionId => {
-        const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
-        await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
-        return home;
-      }),
+      ensureMissionHome,
+      readArtifact: (missionId, stage) => this.missionArtifacts.read(missionId, stage),
+      writeArtifact: (missionId, stage, content) => this.missionArtifacts.write(missionId, stage, content),
       validateRepository: async folder => {
         const identity = await this.agentGitService.identity(folder);
         if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
@@ -280,6 +287,18 @@ export class ClawBackendServer {
 
   async submitMissionResult(agentId: string, input: MissionResultInput) {
     return this.missionExecution.submit(agentId, input);
+  }
+
+  listMissionArtifacts(agentId: string) {
+    return this.missionExecution.listArtifacts(agentId);
+  }
+
+  readMissionArtifact(agentId: string, stage: import('@codex-claw/core/missions').MissionStage) {
+    return this.missionExecution.readArtifact(agentId, stage);
+  }
+
+  writeMissionArtifact(agentId: string, input: import('@codex-claw/core/mission-execution').MissionArtifactWriteInput) {
+    return this.missionExecution.writeArtifact(agentId, input);
   }
 
   missionContext(agentId: string) {

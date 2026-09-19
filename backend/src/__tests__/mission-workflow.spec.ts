@@ -31,7 +31,11 @@ it('executes all mission stages across isolated provider sessions, respects tick
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
     const started: string[] = [];
-    const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder, validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
+    const artifactContents = new Map<string, string>();
+    const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
+      readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
+      writeArtifact: async (_missionId, stage, content) => { artifactContents.set(stage, content); return { size: content.length }; },
+      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       listSkills: async () => ['grill-with-docs', 'to-spec', 'to-tickets', 'implement', 'tdd', 'code-review'].map(name => ({ name, path: `/skills/${name}/SKILL.md`, enabled: true })),
       send: async agent => { started.push(agent.id); }, interrupt: async () => {},
@@ -41,6 +45,7 @@ it('executes all mission stages across isolated provider sessions, respects tick
     await command({ action: 'attachRepository', repoPath: repo });
     const submit = async (artifacts: MissionArtifacts) => {
       const run = current().execution!.runs.at(-1)!;
+      await service.writeArtifact(run.workerId!, { stage: run.stage, content: `# ${run.stage}\nMission artifact.` });
       await service.submit(run.workerId!, { missionId: mission.id, runId: run.id, summary: `${run.stage} ready`, artifacts });
       expect(current().execution!.runs.at(-1)!.status).toBe('awaitingReview');
       await command({ action: 'accept', runId: run.id });

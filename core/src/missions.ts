@@ -11,6 +11,11 @@ export type MissionArtifacts = {
   implementation: { changes: string; tests: string };
   review: { summary: string; pullRequestUrl: string };
 };
+export type MissionArtifactFile = {
+  revision: number;
+  size: number;
+  updatedAt: string;
+};
 export type Mission = {
   id: string;
   teamId: string;
@@ -19,6 +24,7 @@ export type Mission = {
   stage: MissionStage;
   status: 'active' | 'completed';
   artifacts: MissionArtifacts;
+  artifactFiles?: Partial<Record<MissionStage, MissionArtifactFile>>;
   stageAgentIds: Partial<Record<MissionStage, string>>;
   execution?: MissionExecution;
   revision: number;
@@ -68,11 +74,17 @@ export function missionTicketReady(tickets: MissionTicket[], index: number): boo
 function isStageAgents(v: unknown): v is Mission['stageAgentIds'] {
   return record(v) && Object.entries(v).every(([k, id]) => featureStages.includes(k as MissionStage) && typeof id === 'string');
 }
+function isArtifactFiles(v: unknown): v is Mission['artifactFiles'] {
+  return record(v) && Object.entries(v).every(([stage, file]) => featureStages.includes(stage as MissionStage)
+    && record(file) && Number.isInteger(file.revision) && (file.revision as number) > 0
+    && Number.isInteger(file.size) && (file.size as number) >= 0 && text(file.updatedAt));
+}
 export function isMission(v: unknown): v is Mission {
   return record(v) && text(v.id) && text(v.teamId) && text(v.outcome) && !!v.outcome.trim() && v.outcome.length <= 200
     && record(v.workflow) && v.workflow.type === 'shapeAndShipFeature' && v.workflow.version === 1
     && featureStages.includes(v.stage as MissionStage) && ['active', 'completed'].includes(v.status as string)
-    && (v.status !== 'completed' || v.stage === 'review') && isMissionArtifacts(v.artifacts) && isStageAgents(v.stageAgentIds)
+    && (v.status !== 'completed' || v.stage === 'review') && isMissionArtifacts(v.artifacts)
+    && (v.artifactFiles === undefined || isArtifactFiles(v.artifactFiles)) && isStageAgents(v.stageAgentIds)
     && (v.execution === undefined || isMissionExecution(v.execution))
     && Number.isInteger(v.revision) && (v.revision as number) >= 0 && text(v.createdAt) && text(v.updatedAt);
 }
@@ -95,6 +107,7 @@ export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
     id: createEntityId('mission'), teamId: team.id, outcome: input.outcome.trim(), workflow: { type: 'shapeAndShipFeature', version: 1 },
     stage: 'requirements', status: 'active', revision: 0, createdAt: now, updatedAt: now,
     artifacts: { requirements: { problem: '', acceptance: '' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } },
+    artifactFiles: {},
     stageAgentIds: {},
     execution: { teamId: team.id, memberIds: [...team.agentIds], runs: [] },
   };

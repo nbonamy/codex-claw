@@ -1,4 +1,5 @@
-import type { MissionResultInput, MissionToolContext } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionToolContext } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/missions';
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -114,6 +115,9 @@ export type ClawMcpAgentCoordinatorOptions = {
   getMissionContext?: (agentId: string) => MissionToolContext | undefined;
   onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' }>;
   onSetMissionTitle?: (agentId: string, title: string) => Promise<{ success: true; title: string }>;
+  onListMissionArtifacts?: (agentId: string) => Array<{ stage: MissionStage } & MissionArtifactFile>;
+  onReadMissionArtifact?: (agentId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
+  onWriteMissionArtifact?: (agentId: string, input: MissionArtifactWriteInput) => Promise<MissionArtifactReadResult>;
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
@@ -140,6 +144,9 @@ export class ClawMcpAgentCoordinator {
   private readonly getMissionContext?: ClawMcpAgentCoordinatorOptions['getMissionContext'];
   private readonly onMissionResult?: ClawMcpAgentCoordinatorOptions['onMissionResult'];
   private readonly onSetMissionTitle?: ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
+  private readonly onListMissionArtifacts?: ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
+  private readonly onReadMissionArtifact?: ClawMcpAgentCoordinatorOptions['onReadMissionArtifact'];
+  private readonly onWriteMissionArtifact?: ClawMcpAgentCoordinatorOptions['onWriteMissionArtifact'];
   private readonly messages: McpMessage[] = [];
   private readonly getAgents: () => Agent[];
   private readonly onAgentUpdated?: (agent: Agent) => void;
@@ -159,6 +166,9 @@ export class ClawMcpAgentCoordinator {
     this.getMissionContext = options.getMissionContext;
     this.onMissionResult = options.onMissionResult;
     this.onSetMissionTitle = options.onSetMissionTitle;
+    this.onListMissionArtifacts = options.onListMissionArtifacts;
+    this.onReadMissionArtifact = options.onReadMissionArtifact;
+    this.onWriteMissionArtifact = options.onWriteMissionArtifact;
     this.getAgents = options.getAgents;
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
@@ -308,6 +318,24 @@ export class ClawMcpAgentCoordinator {
     this.requireAgent(agentId);
     if (!this.onSetMissionTitle) throw new McpToolError('Mission title updates are unavailable.');
     return this.onSetMissionTitle(agentId, title);
+  }
+
+  listMissionArtifacts(agentId: string) {
+    this.requireAgent(agentId);
+    if (!this.onListMissionArtifacts) throw new McpToolError('Mission artifact listing is unavailable.');
+    return this.onListMissionArtifacts(agentId);
+  }
+
+  async readMissionArtifact(agentId: string, stage: MissionStage) {
+    this.requireAgent(agentId);
+    if (!this.onReadMissionArtifact) throw new McpToolError('Mission artifact reading is unavailable.');
+    return this.onReadMissionArtifact(agentId, stage);
+  }
+
+  async writeMissionArtifact(agentId: string, input: MissionArtifactWriteInput) {
+    this.requireAgent(agentId);
+    if (!this.onWriteMissionArtifact) throw new McpToolError('Mission artifact writing is unavailable.');
+    return this.onWriteMissionArtifact(agentId, input);
   }
 
   async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {

@@ -14,10 +14,14 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(coordinator.missionContext('agent-dina')).toBeUndefined();
     await expect(coordinator.submitMissionResult('agent-dina', input)).rejects.toThrow('unavailable');
     await expect(coordinator.setMissionTitle('agent-dina', 'Add team billing')).rejects.toThrow('unavailable');
+    expect(() => coordinator.listMissionArtifacts('agent-dina')).toThrow('unavailable');
     const missionContext = vi.fn().mockReturnValue({ missionId: 'mission', runId: 'run', stage: 'requirements' });
     const onMissionResult = vi.fn().mockResolvedValue({ success: true, status: 'awaitingReview' });
     const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
-    const enabled = fixture({ getMissionContext: missionContext, onMissionResult, onSetMissionTitle }).coordinator;
+    const onListMissionArtifacts = vi.fn().mockReturnValue([{ stage: 'requirements', revision: 1, size: 10, updatedAt: 'now' }]);
+    const onReadMissionArtifact = vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 1, updatedAt: 'now' });
+    const onWriteMissionArtifact = vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 2, updatedAt: 'later' });
+    const enabled = fixture({ getMissionContext: missionContext, onMissionResult, onSetMissionTitle, onListMissionArtifacts, onReadMissionArtifact, onWriteMissionArtifact }).coordinator;
     expect(() => enabled.missionContext('missing')).toThrow();
     await expect(enabled.submitMissionResult('missing', input)).rejects.toThrow();
     expect(onMissionResult).not.toHaveBeenCalled();
@@ -25,6 +29,9 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(missionContext).toHaveBeenCalledWith('agent-dina');
     await expect(enabled.setMissionTitle('agent-dina', 'Add team billing')).resolves.toEqual({ success: true, title: 'Add team billing' });
     expect(onSetMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
+    expect(enabled.listMissionArtifacts('agent-dina')).toHaveLength(1);
+    await expect(enabled.readMissionArtifact('agent-dina', 'requirements')).resolves.toMatchObject({ revision: 1 });
+    await expect(enabled.writeMissionArtifact('agent-dina', { stage: 'requirements', content: '# Brief' })).resolves.toMatchObject({ revision: 2 });
     await expect(enabled.submitMissionResult('agent-dina', input)).resolves.toEqual({ success: true, status: 'awaitingReview' });
     expect(onMissionResult).toHaveBeenCalledWith('agent-dina', input);
   });

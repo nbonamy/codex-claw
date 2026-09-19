@@ -676,8 +676,15 @@ label once the outcome is clear. The backend infers the Mission and run from the
 caller identity, trims the title, persists it immediately, and publishes the
 updated snapshot.
 
+`list-mission-artifacts` and `read-mission-artifact` let any active Mission
+worker discover and consume the canonical Markdown created by earlier stations.
+`write-mission-artifact` writes only the caller's assigned station under the
+Claw-owned Mission home. Existing files use an expected revision so concurrent
+or stale agents cannot silently overwrite each other.
+
 `submit-mission-result` is an app-owned stage handoff. Only the worker bound to
-the current running mission attempt may report artifacts. A report becomes a
+the current running mission attempt may report artifacts, and the canonical
+stage artifact must already exist. A report becomes a
 persisted proposal for human review, never an implicit approval. Tickets may carry canonical tracker
 references and zero-based dependency indices; invalid/cyclic dependencies are
 rejected. A completed implementation report updates only its assigned ticket and

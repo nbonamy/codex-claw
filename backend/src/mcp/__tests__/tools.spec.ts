@@ -49,6 +49,9 @@ describe('Codex Claw MCP tool registration', () => {
     updateWorkItem: vi.fn(),
     submitMissionResult: vi.fn(),
     setMissionTitle: vi.fn(),
+    listMissionArtifacts: vi.fn(),
+    readMissionArtifact: vi.fn(),
+    writeMissionArtifact: vi.fn(),
     listSourceRepositories: vi.fn(),
     listSourceWorktrees: vi.fn(),
     createSourceWorktree: vi.fn(),
@@ -162,12 +165,24 @@ describe('Codex Claw MCP tool registration', () => {
   it('exposes the mission tool family only to an active mission worker and binds title changes to caller identity', async () => {
     coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-1', stage: 'requirements' });
     createServer();
-    expect([...handlers.keys()].slice(0, 2)).toStrictEqual(['set-mission-title', 'submit-mission-result']);
+    expect([...handlers.keys()].slice(0, 5)).toStrictEqual([
+      'set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'submit-mission-result',
+    ]);
     coordinator.setMissionTitle.mockResolvedValue({ success: true, title: 'Add team billing' });
     expect(await handlers.get('set-mission-title')!({ title: 'Add team billing' })).toMatchObject({
       structuredContent: { success: true, title: 'Add team billing' },
     });
     expect(coordinator.setMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
+
+    coordinator.listMissionArtifacts.mockReturnValue([{ stage: 'requirements', revision: 1 }]);
+    await handlers.get('list-mission-artifacts')!({});
+    expect(coordinator.listMissionArtifacts).toHaveBeenCalledWith('agent-dina');
+    coordinator.readMissionArtifact.mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 1, updatedAt: 'now' });
+    await handlers.get('read-mission-artifact')!({ stage: 'requirements' });
+    expect(coordinator.readMissionArtifact).toHaveBeenCalledWith('agent-dina', 'requirements');
+    coordinator.writeMissionArtifact.mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 2, updatedAt: 'later' });
+    await handlers.get('write-mission-artifact')!({ stage: 'requirements', content: '# Brief', expectedRevision: 1 });
+    expect(coordinator.writeMissionArtifact).toHaveBeenCalledWith('agent-dina', { stage: 'requirements', content: '# Brief', expectedRevision: 1 });
 
     coordinator.submitMissionResult.mockResolvedValue({ success: true, status: 'awaitingReview' });
     const input = { missionId: 'mission-1', runId: 'run-1', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };

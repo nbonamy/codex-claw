@@ -1,8 +1,8 @@
 import type { Agent, AppSnapshot, BackendSkillSummary, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
-import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts } from '@codex-claw/core/missions';
-import { missionRunPrompt, missionSkills, pendingMissionRun, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
+import { missionRunPrompt, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 
 export type MissionExecutionPorts = {
@@ -10,6 +10,8 @@ export type MissionExecutionPorts = {
   missions: MissionService;
   publish(): Promise<unknown>;
   ensureMissionHome(missionId: string): Promise<string>;
+  readArtifact(missionId: string, stage: MissionStage): Promise<string>;
+  writeArtifact(missionId: string, stage: MissionStage, content: string): Promise<{ size: number }>;
   validateRepository(path: string): Promise<void>;
   createWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   getHead(path: string): Promise<string>;
@@ -137,6 +139,7 @@ export class MissionExecutionService {
     await this.ports.missions.change(input.missionId, mission => {
       const run = mission.execution?.runs.find(run => run.id === input.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
+      if (!mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
       const proposal = structuredClone(mission.artifacts);
       if (run.stage === 'implementation') {
         const index = run.ticketIndex!;
@@ -170,6 +173,46 @@ export class MissionExecutionService {
     return undefined;
   }
 
+  listArtifacts(agentId: string) {
+    const context = this.requireContext(agentId);
+    const mission = this.requireMission(context.missionId);
+    return featureStages.flatMap(stage => {
+      const file = mission.artifactFiles?.[stage];
+      return file ? [{ stage, ...file }] : [];
+    });
+  }
+
+  async readArtifact(agentId: string, stage: MissionStage): Promise<MissionArtifactReadResult> {
+    const context = this.requireContext(agentId);
+    if (!featureStages.includes(stage)) throw new Error('Invalid mission artifact stage.');
+    const mission = this.requireMission(context.missionId);
+    const file = mission.artifactFiles?.[stage];
+    if (!file) throw new Error('Mission artifact not found.');
+    return { stage, content: await this.ports.readArtifact(mission.id, stage), revision: file.revision, updatedAt: file.updatedAt };
+  }
+
+  async writeArtifact(agentId: string, input: MissionArtifactWriteInput): Promise<MissionArtifactReadResult> {
+    const context = this.requireContext(agentId);
+    if (!input || !featureStages.includes(input.stage) || typeof input.content !== 'string') throw new Error('Invalid mission artifact.');
+    if (input.stage !== context.stage) throw new Error('This agent can write only its assigned stage artifact.');
+    const mission = this.requireMission(context.missionId);
+    const currentRevision = mission.artifactFiles?.[input.stage]?.revision ?? 0;
+    if (input.expectedRevision !== undefined && input.expectedRevision !== currentRevision) {
+      throw new Error('This mission artifact changed. Read it again before writing.');
+    }
+    const stored = await this.ports.writeArtifact(mission.id, input.stage, input.content);
+    const updatedAt = new Date().toISOString();
+    await this.ports.missions.change(mission.id, current => {
+      const run = current.execution?.runs.find(run => run.id === context.runId);
+      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== input.stage) {
+        throw new Error('This agent is not working on the active mission stage.');
+      }
+      (current.artifactFiles ??= {})[input.stage] = { revision: currentRevision + 1, size: stored.size, updatedAt };
+    });
+    await this.ports.publish();
+    return { stage: input.stage, content: input.content, revision: currentRevision + 1, updatedAt };
+  }
+
   async setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> {
     const normalized = title.trim();
     if (!normalized || normalized.length > 200) throw new Error('Mission title must be between 1 and 200 characters.');
@@ -184,6 +227,12 @@ export class MissionExecutionService {
     });
     await this.ports.publish();
     return { success: true, title: normalized };
+  }
+
+  private requireContext(agentId: string): MissionToolContext {
+    const context = this.contextForAgent(agentId);
+    if (!context) throw new Error('This agent is not working on an active mission run.');
+    return context;
   }
 
   async agentFinished(agentId: string): Promise<void> {

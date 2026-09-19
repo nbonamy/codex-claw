@@ -55,8 +55,9 @@ team members or provider threads. Existing provider conversation panes can be
 opened as secondary stage support, without transferring transcript ownership.
 Mission navigation uses the same compact workspace-group and session-row
 patterns as project and quick-chat navigation. Sidebar creation persists a
-placeholder `New mission`, selects it, and immediately starts the requirements
-station from the active local project. During that conversation, the assigned
+team-scoped placeholder `New mission`, selects it, and immediately starts the
+requirements station from a Claw-owned mission home without requiring a repository.
+During that conversation, the assigned
 worker replaces the placeholder with a concise outcome through the
 mission-scoped title tool.
 Mission rows use the sidebar context-menu pattern for deletion. Deletion removes
@@ -69,7 +70,12 @@ ideation and revision; there are no renderer-owned artifact forms. User
 acceptance carries an artifact forward and starts the next station, while prior
 artifacts remain available for inspection.
 Mission execution is owned by `clawd`: selected team member profiles supply
-provider settings for dedicated stage sessions in one managed mission worktree.
+provider settings for dedicated stage sessions. Requirements and tickets run
+from `$CODEX_CLAW_HOME/missions/<mission-id>`; a repository is attached later
+and a managed Git worktree is created only when code work begins.
+Canonical Markdown artifacts live under the mission home `artifacts/` directory.
+The Mission snapshot carries their revisions and sizes rather than exposing file
+access to the renderer or provider.
 Runs persist assignment, installed skill paths, proposal, status, and feedback.
 Implementation is serial, dispatching only tickets whose dependencies have been
 accepted. The worktree records a baseline commit for whole-mission diff review;
@@ -79,7 +85,11 @@ continue to own all conversation content and turn mechanics.
 
 Mission MCP tools are registered only for the authenticated worker that owns the
 current running or awaiting-review attempt. `set-mission-title` updates the
-persisted Mission; `submit-mission-result` submits or revises stage proposals.
+persisted Mission. `list-mission-artifacts`, `read-mission-artifact`, and
+`write-mission-artifact` provide the canonical handoff between stage agents;
+writes are limited to the caller's assigned stage and use optimistic artifact
+revisions. `submit-mission-result` submits or revises stage proposals only after
+the stage artifact has been written.
 Only the user can accept an
 artifact and approve advancement. Reports are scoped to
 the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
