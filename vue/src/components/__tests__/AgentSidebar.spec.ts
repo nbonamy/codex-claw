@@ -294,12 +294,12 @@ describe('AgentSidebar sessions', () => {
 });
 
 describe('mission navigation', () => {
-  it('offers mission creation without agents and selects and collapses outcome rows', async () => {
+  it('uses the native workspace-group and session-row layout for missions', async () => {
     const { createMission } = await import('@codex-claw/core/missions');
     const { createEmptySnapshot } = await import('@codex-claw/core/snapshot-construction');
     const mission = createMission(createEmptySnapshot(), { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature' });
     const wrapper = mount(AgentSidebar, {
-      props: { agents: [], activeAgentId: null, activeMissionId: mission.id, missions: [mission], teamName: 'Team' },
+      props: { agents: [], activeAgentId: null, teamName: 'Team' },
       global: { components: { ElPopover } },
     });
     expect(wrapper.get('.agent-sidebar__start-work').findAll('button')
@@ -309,14 +309,19 @@ describe('mission navigation', () => {
     expect(wrapper.find('.agent-sidebar__mission-action [data-icon="target-arrow"]').exists()).toBe(true);
     await wrapper.get('.agent-sidebar__mission-action').trigger('click');
     expect(wrapper.emitted('create-mission')).toStrictEqual([[]]);
-    const row = wrapper.get('.agent-sidebar__mission');
-    expect(row.text()).toContain('Add team billing');
-    expect(row.text()).toContain('1/4');
+
+    await wrapper.setProps({ activeMissionId: mission.id, missions: [mission] });
+    const group = wrapper.get('[data-group-kind="missions"]');
+    expect(group.get('.agent-sidebar__workspace-icon').attributes('data-icon')).toBe('target-arrow');
+    expect(group.get('.agent-sidebar__workspace-label').text()).toBe('Missions');
+    const row = group.get('.agent-sidebar__agent');
+    expect(row.get('.agent-sidebar__session-title').text()).toBe('Add team billing');
+    expect(row.get('.agent-sidebar__status').attributes('aria-label')).toBe('1/4 · Requirements');
     expect(row.attributes('aria-pressed')).toBe('true');
     await row.trigger('click');
     expect(wrapper.emitted('select-mission')).toStrictEqual([[mission.id]]);
-    await wrapper.findAll('button').find(b => b.text() === 'Missions')!.trigger('click');
-    expect(wrapper.find('.agent-sidebar__mission').exists()).toBe(false);
+    await group.get('.agent-sidebar__workspace-label').trigger('click');
+    expect(group.find('.agent-sidebar__agent').exists()).toBe(false);
   });
 
   it('disables mission creation while pending and surfaces creation failures', () => {

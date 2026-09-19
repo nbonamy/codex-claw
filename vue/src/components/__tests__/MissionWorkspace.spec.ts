@@ -2,92 +2,153 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, updateMission, type UpdateMissionInput } from '@codex-claw/core/missions';
+import { createMission, type Mission, type UpdateMissionInput } from '@codex-claw/core/missions';
+import type { MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
 import MissionWorkspace from '../MissionWorkspace.vue';
 
-async function setup() {
+function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
   const snapshot = createInitialSnapshot();
-  const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
-  const save = vi.fn(async (input: UpdateMissionInput) => {
-    updateMission(snapshot, input);
-    await wrapper.setProps({ mission: structuredClone(mission) });
-  });
-  const wrapper = mount(MissionWorkspace, { props: { mission: structuredClone(mission), agents: snapshot.agents, updateMission: save }, global: { plugins: [ElementPlus] } });
-  await flushPromises();
-  const click = async (label: string) => { if (label === 'Save draft') await wrapper.get('form').trigger('submit'); else await wrapper.findAll('button').find(b => b.text() === label)!.trigger('click'); await flushPromises(); };
-  return { wrapper, click, mission, save };
+  const mission = createMission(snapshot, { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature' });
+  const artifacts = structuredClone(mission.artifacts);
+  artifacts.requirements = { problem: 'Teams need one bill', acceptance: 'An owner can pay for the team' };
+  mission.execution = {
+    teamId: snapshot.teams[0]!.id,
+    repoPath: snapshot.agents[0]!.folder!,
+    memberIds: snapshot.agents.map(agent => agent.id),
+    runs: [{
+      id: 'run-requirements',
+      stage: 'requirements',
+      memberId: snapshot.agents[0]!.id,
+      workerId: snapshot.agents[0]!.id,
+      status,
+      skills: [{ name: 'grilling', path: '/skills/grilling/SKILL.md' }],
+      feedback: '',
+      startedAt: '2026-09-19T00:00:00.000Z',
+      ...(proposal ? { proposal: artifacts, summary: 'Billing brief ready' } : {}),
+    }],
+  };
+  return mission;
 }
-describe('MissionWorkspace', () => {
-  it('saves requirements, moves to ticket planning and shows persistent workflow progress', async () => {
-    const { wrapper, click, save } = await setup();
-    await wrapper.setProps({ sidebarCollapsed: true });
-    await click('Show mission navigation');
-    expect(wrapper.emitted('expand-sidebar')).toStrictEqual([[]]);
-    expect(wrapper.findAll('li')).toHaveLength(4);
-    expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
-    expect(wrapper.findAll('button').find(b => b.text() === 'Approve and continue')!.attributes('disabled')).toBeDefined();
-    await wrapper.get('#mission-problem').setValue('Team checkout');
-    await wrapper.get('#mission-acceptance').setValue('Owner can pay');
-    await click('Save draft');
-    expect(save.mock.lastCall?.[0]).toMatchObject({ action: 'save', artifacts: { requirements: { problem: 'Team checkout', acceptance: 'Owner can pay' } } });
-    await click('Approve and continue');
-    expect(wrapper.get('[aria-current="step"]').text()).toContain('Tickets');
-    expect(wrapper.find('#mission-problem').exists()).toBe(false);
-    await click('Add ticket');
-    await wrapper.get('[aria-label="Ticket 1"]').setValue('Implement owner checkout');
-    await click('Approve and continue');
-    expect(wrapper.get('[aria-current="step"]').text()).toContain('Implementation');
-    expect(wrapper.text()).toContain('Implement owner checkout');
-    await wrapper.get('input[type="checkbox"]').setValue(true);
-    await wrapper.get('#mission-changes').setValue('checkout.ts; diff abc');
-    await wrapper.get('#mission-tests').setValue('Checkout integration passes');
-    await click('Approve and continue');
-    await wrapper.get('#mission-review').setValue('Acceptance verified');
-    await click('Complete mission');
-    expect(wrapper.text()).toContain('Completed');
-    expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined();
-  });
-  it('retains edits on a save failure and requires reload after a concurrent edit', async () => {
-    const { wrapper, click, mission } = await setup();
-    await wrapper.setProps({ updateMission: vi.fn().mockRejectedValue(new Error('Disk unavailable')) });
-    await wrapper.get('#mission-problem').setValue('Keep this draft');
-    await click('Save draft');
-    expect(wrapper.get('[role="alert"]').text()).toBe('Disk unavailable');
-    expect((wrapper.get('#mission-problem').element as HTMLTextAreaElement).value).toBe('Keep this draft');
-    await wrapper.setProps({ mission: { ...structuredClone(mission), revision: 1 } });
-    expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined();
-    await click('Reload mission');
-    expect((wrapper.get('#mission-problem').element as HTMLTextAreaElement).value).toBe('');
-  });
-  it('saves the stage agent association before opening its supporting conversation', async () => {
-    const { wrapper, click, save } = await setup();
-    await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'agent-dina');
-    await click('Open conversation');
-    expect(save.mock.lastCall?.[0].stageAgentIds).toStrictEqual({ requirements: 'agent-dina' });
-    expect(wrapper.emitted('open-conversation')).toStrictEqual([['agent-dina']]);
-  });
-});
 
-it('refreshes accepted execution artifacts without a false edit conflict and keeps the run conversation local to the workflow', async () => {
-  const { wrapper, mission, click } = await setup();
-  const execute = vi.fn().mockResolvedValue(undefined);
-  mission.execution = { teamId: 'team', repoPath: '/repo', memberIds: ['agent-dina'], runs: [] };
-  mission.revision++;
-  await wrapper.setProps({ mission: structuredClone(mission), executeMission: execute });
-  for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
-    mission.stage = stage;
-    mission.artifacts.requirements = { problem: 'Owners need billing', acceptance: 'Owner can pay' };
-    mission.artifacts.tickets = [{ title: 'Owner checkout', done: true, reference: 'https://example.com/issue/1' }];
-    mission.artifacts.implementation = { changes: 'owner.ts changed', tests: 'Owner test passed' };
-    mission.artifacts.review = { summary: 'All acceptance checked', pullRequestUrl: '' };
-    mission.stageAgentIds[stage] = 'agent-dina';
-    mission.execution.runs = [{ id: `run-${stage}`, stage, memberId: 'agent-dina', workerId: 'agent-dina', status: 'accepted', skills: [], feedback: '', startedAt: 'now' }];
-    mission.revision++;
-    await wrapper.setProps({ mission: structuredClone(mission) });
-    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
-    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain(stage === 'requirements' ? 'Owners need billing' : stage === 'tickets' ? 'Owner checkout' : stage === 'implementation' ? 'Owner test passed' : 'All acceptance checked');
-    await click('Open conversation');
-    expect(wrapper.emitted('open-conversation')!.at(-1)).toEqual(['agent-dina']);
-    expect(wrapper.text()).not.toContain('Unsaved changes');
-  }
+function mountWorkspace(mission: Mission, options: {
+  executeMission?: (input: MissionExecutionInput) => Promise<void>;
+  updateMission?: (input: UpdateMissionInput) => Promise<void>;
+} = {}) {
+  return mount(MissionWorkspace, {
+    props: {
+      mission: structuredClone(mission),
+      updateMission: options.updateMission ?? vi.fn().mockResolvedValue(undefined),
+      executeMission: options.executeMission ?? vi.fn().mockResolvedValue(undefined),
+    },
+    slots: {
+      conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
+      'code-review': '<div class="code-review-slot">Code for {{ params.agentId }}</div>',
+    },
+    global: { plugins: [ElementPlus] },
+  });
+}
+
+describe('MissionWorkspace', () => {
+  it('frames a running mission as a four-station workshop with the orchestrator conversation always present', async () => {
+    const mission = missionWithRun('running');
+    const wrapper = mountWorkspace(mission);
+    await flushPromises();
+
+    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(4);
+    expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
+    expect(wrapper.get('[aria-label="Skills in use"]').text()).toContain('grilling');
+    expect(wrapper.get('.conversation-slot').text()).toContain(mission.execution!.runs[0]!.workerId);
+    expect(wrapper.emitted('open-conversation')).toStrictEqual([[mission.execution!.runs[0]!.workerId]]);
+    expect(wrapper.find('form').exists()).toBe(false);
+    expect(wrapper.find('input').exists()).toBe(false);
+    expect(wrapper.find('textarea').exists()).toBe(false);
+    expect(wrapper.find('select').exists()).toBe(false);
+  });
+
+  it('keeps the proposal beside its conversation and carries the accepted artifact into the next station', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const updateMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { executeMission, updateMission });
+
+    expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).toContain('Teams need one bill');
+    expect(wrapper.get('.mission-workspace__review-hint').text()).toContain('Comment or request changes');
+    expect(wrapper.find('.conversation-slot').exists()).toBe(true);
+
+    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await flushPromises();
+
+    expect(executeMission).toHaveBeenNthCalledWith(1, {
+      id: mission.id,
+      revision: mission.revision,
+      action: 'accept',
+      runId: 'run-requirements',
+    });
+    expect(updateMission).toHaveBeenCalledWith({
+      id: mission.id,
+      revision: mission.revision + 1,
+      artifacts: mission.execution!.runs[0]!.proposal,
+      stageAgentIds: {},
+      action: 'advance',
+    });
+    expect(executeMission).toHaveBeenNthCalledWith(2, {
+      id: mission.id,
+      revision: mission.revision + 2,
+      action: 'run',
+    });
+  });
+
+  it('keeps accepted artifacts available while work moves through later stations', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.artifacts = structuredClone(mission.execution!.runs[0]!.proposal!);
+    mission.stage = 'tickets';
+    mission.execution!.runs.push({
+      id: 'run-tickets', stage: 'tickets', memberId: 'agent-dina', workerId: 'agent-dina', status: 'running',
+      skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+    });
+    const wrapper = mountWorkspace(mission);
+
+    const [requirements, tickets, implementation] = wrapper.findAll('.mission-workspace__stages button');
+    expect(tickets!.attributes('aria-current')).toBe('step');
+    expect(implementation!.attributes('disabled')).toBeDefined();
+    await requirements!.trigger('click');
+
+    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Teams need one bill');
+    expect(wrapper.get('.mission-workspace__conversation').text()).toContain('Orchestrator');
+  });
+
+  it('completes review without starting another station', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'review';
+    mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
+    mission.artifacts.tickets = [{ title: 'Implement billing', done: true }];
+    mission.artifacts.implementation = { changes: 'billing.ts', tests: 'billing test passes' };
+    const proposal = structuredClone(mission.artifacts);
+    proposal.review = { summary: 'Ready to ship', pullRequestUrl: '' };
+    mission.execution!.runs = [{
+      id: 'run-review', stage: 'review', memberId: 'agent-dina', workerId: 'agent-dina', status: 'awaitingReview',
+      skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', proposal, summary: 'Review complete',
+    }];
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const updateMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { executeMission, updateMission });
+
+    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await flushPromises();
+
+    expect(executeMission).toHaveBeenCalledTimes(1);
+    expect(updateMission).toHaveBeenCalledWith(expect.objectContaining({ action: 'advance', revision: mission.revision + 1 }));
+  });
+
+  it('shows orchestration failures without replacing the workshop', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    const wrapper = mountWorkspace(mission, { executeMission: vi.fn().mockRejectedValue(new Error('Worker unavailable')) });
+
+    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Worker unavailable');
+    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(4);
+    expect(wrapper.find('.conversation-slot').exists()).toBe(true);
+  });
 });

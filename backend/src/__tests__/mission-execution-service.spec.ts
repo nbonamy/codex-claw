@@ -46,12 +46,18 @@ describe('mission execution', () => {
     await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' });
     expect(h.current().artifacts.requirements.problem).toBe('');
     expect(h.current().execution!.runs[0]!.status).toBe('awaitingReview');
-    expect(h.service.contextForAgent(run.workerId!)).toBeUndefined();
-    await expect(h.service.setTitle(run.workerId!, 'Late title')).rejects.toThrow('not working');
+    expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: run.id, stage: 'requirements' });
+    await expect(h.service.setTitle(run.workerId!, 'Refined team billing')).resolves.toEqual({ success: true, title: 'Refined team billing' });
+    const revisedArtifacts = structuredClone(artifacts);
+    revisedArtifacts.requirements.problem = 'Teams need one shared invoice';
+    await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts: revisedArtifacts, summary: 'Requirements revised after review' });
+    expect(h.current().execution!.runs[0]).toMatchObject({ status: 'awaitingReview', summary: 'Requirements revised after review' });
     expect(() => updateMission(h.snapshot, { id: mission.id, revision: h.current().revision, artifacts, stageAgentIds: {}, action: 'advance' })).toThrow('current mission run');
     await h.command({ action: 'accept', runId: run.id });
-    expect(h.current().artifacts.requirements).toStrictEqual(artifacts.requirements);
+    expect(h.current().artifacts.requirements).toStrictEqual(revisedArtifacts.requirements);
     expect(h.current().stage).toBe('requirements');
+    expect(h.service.contextForAgent(run.workerId!)).toBeUndefined();
+    await expect(h.service.setTitle(run.workerId!, 'Late title')).rejects.toThrow('not working');
     await expect(h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Late result' })).rejects.toThrow('does not own');
   });
 

@@ -29,6 +29,7 @@
         <span>{{ t('sidebar.quickChat') }}</span>
       </button>
       <button
+        v-if="!missions?.length"
         class="agent-sidebar__mission-action"
         type="button"
         :aria-busy="missionCreationPending"
@@ -44,12 +45,52 @@
     </div>
 
     <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
-      <section v-if="missions?.length" class="agent-sidebar__workspace-group">
-        <header class="agent-sidebar__workspace-header"><button class="agent-sidebar__workspace-label" type="button" :aria-expanded="!missionsCollapsed" @click="missionsCollapsed = !missionsCollapsed">{{ t('missions.title') }}</button></header>
-        <template v-if="!missionsCollapsed">
-          <button v-for="mission in missions" :key="mission.id" class="agent-sidebar__mission" type="button" :aria-pressed="activeMissionId === mission.id" @click="emit('select-mission', mission.id)">
-            <span>{{ mission.outcome }}</span><small>{{ mission.status === 'completed' ? t('missions.completed') : `${featureStages.indexOf(mission.stage) + 1}/4 · ${t(`missions.${mission.stage}`)}` }}</small>
+      <section v-if="missions?.length" class="agent-sidebar__workspace-group" data-group-kind="missions">
+        <header class="agent-sidebar__workspace-header">
+          <TargetArrowIcon class="agent-sidebar__workspace-icon" data-icon="target-arrow" aria-hidden="true" />
+          <button
+            class="agent-sidebar__workspace-label"
+            type="button"
+            :aria-label="t('missions.title')"
+            :aria-expanded="!missionsCollapsed"
+            @click="missionsCollapsed = !missionsCollapsed"
+          >
+            <strong>{{ t('missions.title') }}</strong>
           </button>
+          <span class="agent-sidebar__workspace-actions agent-sidebar__workspace-actions--persistent">
+            <button
+              type="button"
+              :aria-label="t('missions.new')"
+              :title="t('missions.new')"
+              :disabled="missionCreationPending"
+              @click.stop="emit('create-mission')"
+            >
+              <PlusIcon aria-hidden="true" />
+            </button>
+          </span>
+        </header>
+        <template v-if="!missionsCollapsed">
+          <div v-for="mission in missions" :key="mission.id" class="agent-sidebar__agent-row">
+            <button
+              class="agent-sidebar__agent"
+              :class="{ 'agent-sidebar__agent--active': activeMissionId === mission.id }"
+              type="button"
+              :aria-pressed="activeMissionId === mission.id"
+              @click="emit('select-mission', mission.id)"
+            >
+              <span class="agent-sidebar__meta">
+                <strong
+                  class="agent-sidebar__session-title"
+                  :class="{ 'agent-sidebar__session-title--active': activeMissionId === mission.id }"
+                >{{ mission.outcome }}</strong>
+              </span>
+              <span
+                class="agent-sidebar__status"
+                :data-status="mission.status === 'completed' ? 'idle' : 'working'"
+                :aria-label="mission.status === 'completed' ? t('missions.completed') : `${featureStages.indexOf(mission.stage) + 1}/${featureStages.length} · ${t(`missions.${mission.stage}`)}`"
+              />
+            </button>
+          </div>
         </template>
       </section>
       <section
@@ -631,30 +672,6 @@ function onResizePointerEnd(event: PointerEvent): void {
 </script>
 
 <style scoped>
-.agent-sidebar__mission {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  text-align: left;
-  padding: 8px 12px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
-}
-.agent-sidebar__mission span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-.agent-sidebar__mission small {
-  color: var(--color-text-muted);
-}
-.agent-sidebar__mission[aria-pressed="true"] {
-  background: var(--color-surface-high);
-}
-
 .agent-sidebar {
   --agent-sidebar-width: 260px;
   --agent-sidebar-min-width: 72px;
@@ -999,6 +1016,8 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__workspace-group[data-group-kind="quickChats"]
+  .agent-sidebar__agent,
+.agent-sidebar__workspace-group[data-group-kind="missions"]
   .agent-sidebar__agent {
   grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-status-column-width);
   padding-left: calc(

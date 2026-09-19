@@ -190,7 +190,7 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :agents="missionAgents" :update-mission="updateMission" :execute-mission="executeMission" :teams="snapshot.teams" :choose-repository="chooseSourceFolder" @open-conversation="emit('select-agent', $event)">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :update-mission="updateMission" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
         <template #code-review="{ agentId }">
           <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :get-workflow="props.getAgentGitWorkflow" :generate-message="props.generateAgentGitMessage" :commit-changes="props.commitAgentGitChanges" :push-branch="props.pushAgentGitBranch" :create-pull-request="props.createAgentGitPullRequest" />
         </template>
@@ -790,7 +790,6 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
-const missionAgents = computed(() => props.snapshot.agents.filter(agent => !props.snapshot.teams.find(team => team.id === agent.teamId)?.remoteConnectionId));
 const missionCreationError = ref('');
 const missionCreationPending = ref(false);
 const selectedMissionId = ref<string | null>(null);
@@ -801,8 +800,31 @@ async function createNewMission() {
   missionCreationPending.value = true;
   missionCreationError.value = '';
   try {
+    const executeMission = props.executeMission;
+    if (!executeMission) throw new Error('Missions are unavailable.');
     const mission = await props.createMission({ outcome: translate('missions.new'), workflowType: 'shapeAndShipFeature' });
     selectMission(mission.id);
+    const team = activeTeam.value;
+    const activeAgent = currentAgent.value;
+    let orchestrator = activeTeamAgents.value.find(agent => agent.folder);
+    if (activeAgent && activeAgent.teamId === team?.id && activeAgent.folder) orchestrator = activeAgent;
+    if (!team || !orchestrator?.folder) {
+      throw new Error(translate('missions.projectContextRequired'));
+    }
+    await executeMission({
+      id: mission.id,
+      revision: mission.revision,
+      action: 'configure',
+      teamId: team.id,
+      repoPath: orchestrator.folder,
+      memberIds: activeTeamAgents.value.map(agent => agent.id),
+    });
+    await executeMission({
+      id: mission.id,
+      revision: mission.revision + 1,
+      action: 'run',
+      memberId: orchestrator.id,
+    });
   } catch (error) {
     missionCreationError.value = error instanceof Error ? error.message : String(error);
   } finally {

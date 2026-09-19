@@ -106,7 +106,7 @@ export class MissionExecutionService {
     if (!input || typeof input.missionId !== 'string' || !isMissionArtifacts(input.artifacts) || typeof input.summary !== 'string' || !input.summary.trim() || input.summary.length > 20_000) throw new Error('Invalid mission result.');
     await this.ports.missions.change(input.missionId, mission => {
       const run = mission.execution?.runs.find(run => run.id === input.runId);
-      if (!run || run.workerId !== agentId || run.status !== 'running' || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
+      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
       const proposal = structuredClone(mission.artifacts);
       if (run.stage === 'implementation') {
         const index = run.ticketIndex!;
@@ -133,7 +133,7 @@ export class MissionExecutionService {
   contextForAgent(agentId: string): MissionToolContext | undefined {
     for (const mission of this.ports.snapshot.missions ?? []) {
       const run = mission.execution?.runs.find(run => (
-        run.workerId === agentId && run.status === 'running' && run.stage === mission.stage
+        run.workerId === agentId && ['running', 'awaitingReview'].includes(run.status) && run.stage === mission.stage
       ));
       if (run) return { missionId: mission.id, runId: run.id, stage: run.stage };
     }
@@ -147,7 +147,7 @@ export class MissionExecutionService {
     if (!context) throw new Error('This agent is not working on an active mission run.');
     await this.ports.missions.change(context.missionId, mission => {
       const run = mission.execution?.runs.find(run => run.id === context.runId);
-      if (!run || run.workerId !== agentId || run.status !== 'running' || run.stage !== mission.stage) {
+      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) {
         throw new Error('This agent is not working on an active mission run.');
       }
       mission.outcome = normalized;

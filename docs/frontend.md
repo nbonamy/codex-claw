@@ -63,6 +63,13 @@ product layer, stores, views, or backend clients. Components consume app-owned
 contracts rather than provider protocol types, Electron globals, filesystem
 APIs, or raw backend payloads.
 
+Mission navigation deliberately reuses the native workspace group, session row,
+selection, and status-dot primitives used by Quick Chats. Selecting a mission
+opens a three-part workshop surface: persistent process, stage artifact, and
+supporting conversation. The artifact is rendered for review and comments flow
+through the conversation; do not add setup or artifact-editing forms to this
+surface. Accepted artifacts remain navigable after the workflow advances.
+
 Shells coordinate focused modules; they do not implement multi-step workflows.
 Move polling, timers, persistence transitions, and cleanup for one workflow
 into a colocated composable. Use `AsyncCatalogCache` for keyed async catalogs so

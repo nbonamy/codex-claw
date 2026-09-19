@@ -53,9 +53,18 @@ implementation, review). Core owns its pure validation and transition policy;
 Mission navigation is client-local; missions themselves are backend-wide, not
 team members or provider threads. Existing provider conversation panes can be
 opened as secondary stage support, without transferring transcript ownership.
-Sidebar creation persists a placeholder `New mission` immediately and opens its
-workflow. During the requirements run, the assigned worker replaces that label
-with a concise outcome through the mission-scoped title tool.
+Mission navigation uses the same compact workspace-group and session-row
+patterns as project and quick-chat navigation. Sidebar creation persists a
+placeholder `New mission`, selects it, and immediately starts the requirements
+station from the active local project. During that conversation, the assigned
+worker replaces the placeholder with a concise outcome through the
+mission-scoped title tool.
+The selected mission is a workshop: persistent stations on the left, the
+current or previously accepted artifact in the central workbench, and the
+station's orchestrator conversation on the right. The conversation drives
+ideation and revision; there are no renderer-owned artifact forms. User
+acceptance carries an artifact forward and starts the next station, while prior
+artifacts remain available for inspection.
 Mission execution is owned by `clawd`: selected team member profiles supply
 provider settings for dedicated stage sessions in one managed mission worktree.
 Runs persist assignment, installed skill paths, proposal, status, and feedback.
@@ -66,8 +75,9 @@ Requirements/ticket discussions may span multiple provider turns. Provider hosts
 continue to own all conversation content and turn mechanics.
 
 Mission MCP tools are registered only for the authenticated worker that owns the
-current running attempt. `set-mission-title` updates the persisted Mission;
-`submit-mission-result` submits stage proposals. Only the user can accept an
+current running or awaiting-review attempt. `set-mission-title` updates the
+persisted Mission; `submit-mission-result` submits or revises stage proposals.
+Only the user can accept an
 artifact and approve advancement. Reports are scoped to
 the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
 for published tickets; mission tickets retain canonical references and record local
