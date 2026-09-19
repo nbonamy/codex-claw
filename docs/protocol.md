@@ -133,7 +133,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `mission/create` | `{ input: CreateMissionInput }` | `AppSnapshot` | Creates a team-scoped outcome and immediately starts its orchestrator from a Claw-owned mission home. No repository is required. |
 | `mission/artifact/read` | `{ missionId, stage }` | `MissionArtifactReadResult` | Reads a canonical stage artifact through the app-owned protocol without exposing its Claw data-folder path. |
 | `mission/delete` | `{ input: DeleteMissionInput }` | `AppSnapshot` | Deletes the current persisted revision, interrupts active mission workers, archives and releases their provider conversations, and removes those hidden workers. The managed worktree and its files remain on disk. |
-| `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Attaches a repository when needed, starts a stage attempt, accepts a proposal, stops a run, or reopens a reached stage. Requirements and tickets do not require a repository. An assigned worker may revise and resubmit while the proposal awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
+| `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Starts stage attempts, accepts proposals or ticket evidence, stops a run, or reopens a reached stage. Requirements and tickets run from the Mission home. Accepting Tickets provisions sibling worktrees for affected repositories, then schedules one dependency-ready implementation run per repository. An assigned worker may revise and resubmit while its result awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
 | `mission/update` | `{ input: UpdateMissionInput }` | `AppSnapshot` | Saves structured artifacts and per-stage agent references, optionally approving the current stage. Requires the current revision; rejects stale writes, missing agents, invalid earlier gates, and edits to completed missions. |
 
 Mission writes persist before publishing `snapshot.updated`. Existing snapshots
@@ -147,6 +147,13 @@ Canonical Mission artifacts are Markdown files under
 `$CODEX_CLAW_HOME/missions/<mission-id>/artifacts`. Mission workers access them
 through identity-bound MCP tools; clients receive only app-owned artifact
 metadata in snapshots.
+
+Ticket artifacts carry the exact represented repository path. Mission execution
+persists a common human-readable workspace name, one worktree record per affected
+repository, the per-ticket repository assignment, and the user's review policy.
+Independent repositories may run concurrently; a repository has at most one active
+implementation run. In automatic mode, accepted ticket evidence continues the
+repository queue while the final Review stage remains an explicit user gate.
 
 ## Client To `clawd`: Agents
 

@@ -56,6 +56,7 @@
                   : "missions.ticketReady",
               )
             }}</small>
+            <span v-if="ticket.repositoryPath" class="mission-ticket-board__repository">{{ repositoryName(ticket.repositoryPath) }}</span>
             <ChevronRightIcon aria-hidden="true" />
           </span>
         </button>
@@ -95,10 +96,15 @@
         />
         <footer
           v-if="
+            selectedTicket.ticket.repositoryPath ||
             selectedTicket.ticket.dependsOn?.length ||
             selectedTicket.ticket.reference
           "
         >
+          <span v-if="selectedTicket.ticket.repositoryPath">
+            {{ t("missions.repository") }}:
+            {{ selectedTicket.ticket.repositoryPath }}
+          </span>
           <span v-if="selectedTicket.ticket.dependsOn?.length">
             {{ t("missions.blockedBy") }}:
             {{
@@ -178,6 +184,10 @@ function ticketPreview(ticket: MissionTicket): string {
     .replace(/\s+/g, " ")
     .trim();
   return plainText || t("missions.noTicketDescription");
+}
+
+function repositoryName(repositoryPath: string): string {
+  return repositoryPath.split(/[\\/]/u).filter(Boolean).at(-1) ?? repositoryPath;
 }
 
 function setCardRef(
@@ -325,6 +335,19 @@ async function closeDetails(): Promise<void> {
 
 .mission-ticket-board__card-footer small {
   overflow: hidden;
+  font-size: var(--font-size-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-ticket-board__repository {
+  max-width: 42%;
+  margin-left: auto;
+  overflow: hidden;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  color: var(--color-on-primary-container);
+  background: var(--color-primary-container);
   font-size: var(--font-size-11);
   text-overflow: ellipsis;
   white-space: nowrap;

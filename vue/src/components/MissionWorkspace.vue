@@ -54,7 +54,7 @@
             <p>{{ t(`missions.stageDescription.${viewedStage}`) }}</p>
           </div>
           <button
-            v-if="viewedStage === mission.stage && activeRun?.proposal"
+            v-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal"
             class="claw-button claw-button--primary"
             type="button"
             :disabled="busy"
@@ -67,7 +67,17 @@
 
         <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
 
-        <section v-if="viewedStage === mission.stage && activeRun && !activeRun.proposal" class="mission-workspace__working" aria-live="polite">
+        <MissionImplementationBoard
+          v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
+          :mission="mission"
+          :busy="busy"
+          @approve="approveImplementationRun"
+          @open-conversation="selectConversation"
+          @retry="retryImplementationTicket"
+          @stop="stopRun"
+        />
+
+        <section v-else-if="viewedStage === mission.stage && activeRun && !activeRun.proposal" class="mission-workspace__working" aria-live="polite">
           <span class="mission-workspace__callout-icon"><SparklesIcon aria-hidden="true" /></span>
           <div>
             <small>{{ t(`missions.runStatus.${activeRun.status}`) }}</small>
@@ -89,7 +99,7 @@
           <MissionTicketBoard :tickets="visibleTickets" />
         </section>
 
-        <section v-else-if="viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
+        <section v-else-if="viewedStage !== 'implementation' && viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
           <header class="mission-workspace__artifact-meta">
             <FileTextIcon aria-hidden="true" />
             <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ activeRun.summary }}</span></div>
@@ -103,7 +113,7 @@
           </footer>
         </section>
 
-        <section v-else-if="artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
+        <section v-else-if="viewedStage !== 'implementation' && artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
           <header class="mission-workspace__artifact-meta">
             <FileTextIcon aria-hidden="true" />
             <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ t('missions.acceptedAtStage') }}</span></div>
@@ -113,7 +123,7 @@
           <MarkdownPanel v-else :content="artifactMarkdown" />
         </section>
 
-        <section v-else class="mission-workspace__empty-artifact">
+        <section v-else-if="viewedStage !== 'implementation'" class="mission-workspace__empty-artifact">
           <span class="mission-workspace__callout-icon"><FileTextIcon aria-hidden="true" /></span>
           <h3>{{ t('missions.noArtifactYet') }}</h3>
           <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.orchestratorStarting') }}</p>
@@ -172,6 +182,7 @@ import { featureStages, type Mission, type MissionArtifacts, type MissionStage }
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
+import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import MissionTicketBoard from './MissionTicketBoard.vue';
 
 const props = withDefaults(defineProps<{
@@ -245,6 +256,7 @@ function conversationLabel(conversation: (typeof missionConversations.value)[num
     : '';
   return `${owner} · ${t(`missions.${conversation.run.stage}`)}${ticket}`;
 }
+function selectConversation(agentId: string): void { selectedConversationAgentId.value = agentId; }
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
   const index = featureStages.indexOf(stage);
@@ -291,6 +303,22 @@ async function approveProposal(): Promise<void> {
   busy.value = true; error.value = '';
   try {
     await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId: run.id });
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
+  finally { busy.value = false; }
+}
+async function approveImplementationRun(runId: string): Promise<void> {
+  if (!props.executeMission) return;
+  busy.value = true; error.value = '';
+  try {
+    await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId });
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
+  finally { busy.value = false; }
+}
+async function retryImplementationTicket(ticketIndex: number): Promise<void> {
+  if (!props.executeMission) return;
+  busy.value = true; error.value = '';
+  try {
+    await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'run', ticketIndex });
   } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
   finally { busy.value = false; }
 }

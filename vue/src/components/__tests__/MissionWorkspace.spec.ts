@@ -232,22 +232,46 @@ describe('MissionWorkspace', () => {
     expect(executeMission).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts partial implementation evidence and starts the next ready ticket without advancing', async () => {
+  it('shows affected repository lanes, switches to a ticket agent, and approves its evidence', async () => {
     const mission = missionWithRun('accepted', true);
     mission.stage = 'implementation';
     mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
-    mission.artifacts.tickets = [{ title: 'Checkout', done: false }, { title: 'Invoice', done: false }];
-    const proposal = structuredClone(mission.artifacts);
-    proposal.tickets[0]!.done = true;
-    proposal.implementation = { changes: 'checkout.ts', tests: 'checkout test passes' };
-    mission.execution!.runs = [{
-      id: 'run-checkout', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
-      status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', proposal, summary: 'Checkout complete',
-    }];
+    mission.artifacts.tickets = [
+      { title: 'Checkout', body: 'Implement checkout end to end.', repositoryPath: '/src/billing-service', done: false },
+      { title: 'Invoice', body: 'Render the paid invoice.', repositoryPath: '/src/invoice-app', done: false },
+    ];
+    mission.execution!.reviewPolicy = 'reviewEachTicket';
+    mission.execution!.workspaces = [
+      { repositoryPath: '/src/billing-service', path: '/src/billing-service-add-team-billing', branch: 'mission/add-team-billing' },
+      { repositoryPath: '/src/invoice-app', path: '/src/invoice-app-add-team-billing', branch: 'mission/add-team-billing' },
+    ];
+    mission.execution!.runs = [
+      {
+        id: 'run-checkout', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
+        repositoryPath: '/src/billing-service', status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+        implementationResult: { changes: 'checkout.ts now completes payment.', tests: 'checkout integration test passes' },
+      },
+      {
+        id: 'run-invoice', stage: 'implementation', memberId: 'agent-jesse', workerId: 'agent-jesse', ticketIndex: 1,
+        repositoryPath: '/src/invoice-app', status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:01:01.000Z',
+      },
+    ];
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
+    const board = wrapper.get('[aria-label="Implementation by repository"]');
+    expect(board.text()).toContain('2 affected repositories');
+    expect(board.text()).toContain('mission/add-team-billing');
+    expect(board.text()).toContain('billing-service');
+    expect(board.text()).toContain('invoice-app');
+    expect(board.text()).toContain('Ready for review');
+    expect(board.text()).toContain('Building');
+
+    await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
+    expect(board.get('[aria-label="Implementation ticket details"]').text()).toContain('checkout integration test passes');
+    expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
+
+    await board.get('.mission-implementation__details .claw-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenNthCalledWith(1, { id: mission.id, revision: mission.revision, action: 'accept', runId: 'run-checkout' });

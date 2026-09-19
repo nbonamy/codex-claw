@@ -78,8 +78,12 @@ provider settings for stage work. Requirements and Tickets keep the same hidden
 orchestrator and provider conversation; `clawd` refreshes its hidden Mission
 context and starts the Tickets turn after approval. Later stage kickoffs are also
 queued automatically after approval. Requirements and tickets run
-from `$CODEX_CLAW_HOME/missions/<mission-id>`; a repository is attached later
-and a managed Git worktree is created only when code work begins.
+from `$CODEX_CLAW_HOME/missions/<mission-id>`. Each accepted ticket names exactly
+one repository represented by the Mission team. When code work begins, `clawd`
+creates a sibling managed Git worktree only for each affected repository. Every
+worktree uses the same human-readable Mission suffix and branch name; the normal
+repository basename still distinguishes its physical path. Claw does not create a
+special multi-repository parent directory or rewrite local dependency paths.
 Canonical Markdown artifacts live under the mission home `artifacts/` directory.
 During Tickets, Mission-scoped upserts assign stable app-owned ticket IDs and
 rewrite `artifacts/tickets.md` after every draft change so the UI and later agents
@@ -88,21 +92,26 @@ references assigned by the configured tracker.
 The Mission snapshot carries their revisions and sizes rather than exposing file
 access to the renderer or provider.
 Runs persist assignment, installed skill paths, proposal, status, and feedback.
-Implementation is serial, dispatching only tickets whose dependencies have been
-accepted. The worktree records a baseline commit for whole-mission diff review;
-failed or cancelled attempts retain their workspace and conversation for inspection.
+Implementation dispatches dependency-ready tickets in parallel across different
+repositories and serializes work within each repository worktree. The selected
+execution policy either pauses after every ticket for user review or accepts
+successful ticket evidence automatically until the combined final review. Each
+worktree records a baseline commit for whole-mission diff review; failed or
+cancelled attempts retain their workspace and conversation for inspection.
 Requirements/ticket discussions may span multiple provider turns. Provider hosts
 continue to own all conversation content and turn mechanics.
 
 Mission MCP tools are registered only for the authenticated worker that owns the
 current running or awaiting-review attempt. `set-mission-title` updates the
-persisted Mission. `attach-mission-repository` records the user-confirmed team
-repository that later code stages use to create an isolated worktree.
+persisted Mission. During Tickets, `upsert-mission-ticket` records the affected
+repository and `set-mission-execution-policy` records the user's implementation
+review choice.
 `list-mission-artifacts`, `read-mission-artifact`, and
 `write-mission-artifact` provide the canonical handoff between stage agents;
 writes are limited to the caller's assigned stage and use optimistic artifact
-revisions. `submit-mission-result` submits or revises stage proposals only after
-the stage artifact has been written.
+revisions. Implementation agents submit ticket-scoped code and test evidence;
+`clawd` aggregates it into the canonical implementation artifact. Other stages
+submit or revise proposals only after their stage artifact has been written.
 Only the user can accept an
 artifact and approve advancement. Reports are scoped to
 the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
@@ -110,8 +119,9 @@ for published tickets; mission tickets retain canonical references and record lo
 implementation acceptance, not external issue status. Setup is never invoked
 implicitly. Current and older installed skill names are resolved by capability.
 The workflow reuses Claw's diff and explicit commit/push/PR controls; agents do not
-publish or merge automatically. External ticket refresh and parallel branch
-integration are not part of this first execution policy.
+publish or merge automatically. External ticket refresh, cross-repository branch
+integration, and automatic repair of local relative dependencies are not part of
+this execution policy.
 
 Stage approval is one revision-checked `clawd` command. It accepts the proposal,
 advances or completes the workflow when the stage is ready, and queues the next

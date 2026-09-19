@@ -8,12 +8,14 @@ const tickets: MissionTicket[] = [
     id: 'mission-ticket-foundation',
     title: 'Create the billing account',
     body: 'Introduce the account model and cover its persistence behavior.',
+    repositoryPath: '/Users/nicolas/src/billing-service',
     done: false,
   },
   {
     id: 'mission-ticket-checkout',
     title: 'Add owner checkout',
     body: '## What to build\n\nLet a team owner purchase seats.\n\n## Acceptance criteria\n\n- Payment succeeds',
+    repositoryPath: '/Users/nicolas/src/checkout-app',
     done: false,
     dependsOn: [0],
     reference: 'https://example.com/tickets/BILL-2',
@@ -28,6 +30,7 @@ describe('MissionTicketBoard', () => {
     expect(cards).toHaveLength(2);
     expect(cards[0]!.text()).toContain('01');
     expect(cards[0]!.text()).toContain('Create the billing account');
+    expect(cards[0]!.text()).toContain('billing-service');
     expect(cards[1]!.text()).toContain('After 01');
     expect(wrapper.find('[aria-label="Ticket details"]').exists()).toBe(false);
 
@@ -39,6 +42,7 @@ describe('MissionTicketBoard', () => {
     expect(details.text()).toContain('What to build');
     expect(details.text()).toContain('Payment succeeds');
     expect(details.text()).toContain('Blocked by tickets: 01');
+    expect(details.text()).toContain('Repository: /Users/nicolas/src/checkout-app');
     expect(details.get('a').attributes('href')).toBe('https://example.com/tickets/BILL-2');
 
     await details.get('[aria-label="Close ticket details"]').trigger('click');
