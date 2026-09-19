@@ -15,12 +15,17 @@ export class MissionService {
   }
 
   change(id: string, mutate: (mission: Mission) => void): Promise<void> {
-    return this.transaction(candidate => {
+    return this.changeAsync(id, mission => { mutate(mission); });
+  }
+
+  changeAsync<T>(id: string, mutate: (mission: Mission) => T | Promise<T>): Promise<T> {
+    return this.transaction(async candidate => {
       const mission = candidate.missions?.find(m => m.id === id);
       if (!mission) throw new Error('Mission not found.');
-      mutate(mission);
+      const result = await mutate(mission);
       mission.revision++;
       mission.updatedAt = new Date().toISOString();
+      return result;
     });
   }
 
@@ -37,15 +42,16 @@ export class MissionService {
     }, true);
   }
 
-  private transaction(mutate: (candidate: AppSnapshot) => void | Promise<void>, cloneSnapshot = false): Promise<void> {
+  private transaction<T>(mutate: (candidate: AppSnapshot) => T | Promise<T>, cloneSnapshot = false): Promise<T> {
     const operation = this.pending.then(async () => {
       const candidate = cloneSnapshot
         ? structuredClone(this.snapshot)
         : { ...this.snapshot, missions: structuredClone(this.snapshot.missions ?? []) };
-      await mutate(candidate);
+      const result = await mutate(candidate);
       await this.persist(candidate);
       if (cloneSnapshot) Object.assign(this.snapshot, candidate);
       else this.snapshot.missions = candidate.missions;
+      return result;
     });
     this.pending = operation.catch(() => undefined);
     return operation;

@@ -191,7 +191,7 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :update-mission="updateMission" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :update-mission="updateMission" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
         <template #code-review="{ agentId }">
           <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :get-workflow="props.getAgentGitWorkflow" :generate-message="props.generateAgentGitMessage" :commit-changes="props.commitAgentGitChanges" :push-branch="props.pushAgentGitBranch" :create-pull-request="props.createAgentGitPullRequest" />
         </template>
@@ -569,6 +569,7 @@ const props = withDefaults(defineProps<{
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission?: (input: CreateMissionInput) => Promise<Mission>;
   deleteMission?: (input: DeleteMissionInput) => Promise<void>;
+  readMissionArtifact?: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
   executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
   updateMission?: (input: UpdateMissionInput) => Promise<void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
@@ -689,6 +690,7 @@ const props = withDefaults(defineProps<{
   createAgent: async () => undefined,
   createMission: async () => { throw new Error('Missions unavailable.'); },
   deleteMission: async () => { throw new Error('Missions unavailable.'); },
+  readMissionArtifact: async () => { throw new Error('Mission artifacts unavailable.'); },
   updateMission: async () => { throw new Error('Missions unavailable.'); },
   createQuickChat: async () => undefined,
   createTeam: async () => undefined,

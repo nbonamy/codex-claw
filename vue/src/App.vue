@@ -81,6 +81,7 @@
     :create-agent="createAgent"
     :create-mission="createMission"
     :delete-mission="deleteMission"
+    :read-mission-artifact="readMissionArtifact"
     :update-mission="updateMission"
     :execute-mission="executeMission"
     :create-quick-chat="createQuickChat"
@@ -311,6 +312,7 @@ const {
   clearAgentCreationProgress,
   createMission,
   deleteMission,
+  readMissionArtifact,
   updateMission,
   executeMission,
   createQuickChat,

@@ -114,6 +114,7 @@ export function mountShell(overrides: Partial<{
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission: (input: CreateMissionInput) => Promise<Mission>;
   deleteMission: (input: DeleteMissionInput) => Promise<void>;
+  readMissionArtifact: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
   executeMission: (input: MissionExecutionInput) => Promise<void>;
   createQuickChat: (input: import('@codex-claw/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
@@ -192,6 +193,7 @@ export function mountShell(overrides: Partial<{
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createMission: overrides.createMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
       deleteMission: overrides.deleteMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
+      readMissionArtifact: overrides.readMissionArtifact ?? vi.fn().mockRejectedValue(new Error('Mission artifacts unavailable.')),
       executeMission: overrides.executeMission ?? vi.fn().mockResolvedValue(undefined),
       createQuickChat: overrides.createQuickChat ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),

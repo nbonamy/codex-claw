@@ -70,6 +70,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   executeMission: [backendMethods.missionExecute, named('input')],
   createMission: [backendMethods.missionCreate, named('input')],
   deleteMission: [backendMethods.missionDelete, named('input')],
+  readMissionArtifact: [backendMethods.missionArtifactRead, (args) => ({ missionId: args[0], stage: args[1] })],
   updateMission: [backendMethods.missionUpdate, named('input')],
   createQuickChat: [backendMethods.agentQuickChatCreate, named('input')],
   updateAgent: [backendMethods.agentUpdate, named('input')],

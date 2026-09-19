@@ -184,8 +184,12 @@ export class MissionExecutionService {
 
   async readArtifact(agentId: string, stage: MissionStage): Promise<MissionArtifactReadResult> {
     const context = this.requireContext(agentId);
+    return this.readArtifactForMission(context.missionId, stage);
+  }
+
+  async readArtifactForMission(missionId: string, stage: MissionStage): Promise<MissionArtifactReadResult> {
     if (!featureStages.includes(stage)) throw new Error('Invalid mission artifact stage.');
-    const mission = this.requireMission(context.missionId);
+    const mission = this.requireMission(missionId);
     const file = mission.artifactFiles?.[stage];
     if (!file) throw new Error('Mission artifact not found.');
     return { stage, content: await this.ports.readArtifact(mission.id, stage), revision: file.revision, updatedAt: file.updatedAt };
@@ -195,22 +199,22 @@ export class MissionExecutionService {
     const context = this.requireContext(agentId);
     if (!input || !featureStages.includes(input.stage) || typeof input.content !== 'string') throw new Error('Invalid mission artifact.');
     if (input.stage !== context.stage) throw new Error('This agent can write only its assigned stage artifact.');
-    const mission = this.requireMission(context.missionId);
-    const currentRevision = mission.artifactFiles?.[input.stage]?.revision ?? 0;
-    if (input.expectedRevision !== undefined && input.expectedRevision !== currentRevision) {
-      throw new Error('This mission artifact changed. Read it again before writing.');
-    }
-    const stored = await this.ports.writeArtifact(mission.id, input.stage, input.content);
-    const updatedAt = new Date().toISOString();
-    await this.ports.missions.change(mission.id, current => {
+    const result = await this.ports.missions.changeAsync(context.missionId, async current => {
       const run = current.execution?.runs.find(run => run.id === context.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== input.stage) {
         throw new Error('This agent is not working on the active mission stage.');
       }
+      const currentRevision = current.artifactFiles?.[input.stage]?.revision ?? 0;
+      if (input.expectedRevision !== undefined && input.expectedRevision !== currentRevision) {
+        throw new Error('This mission artifact changed. Read it again before writing.');
+      }
+      const stored = await this.ports.writeArtifact(current.id, input.stage, input.content);
+      const updatedAt = new Date().toISOString();
       (current.artifactFiles ??= {})[input.stage] = { revision: currentRevision + 1, size: stored.size, updatedAt };
+      return { stage: input.stage, content: input.content, revision: currentRevision + 1, updatedAt };
     });
     await this.ports.publish();
-    return { stage: input.stage, content: input.content, revision: currentRevision + 1, updatedAt };
+    return result;
   }
 
   async setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> {

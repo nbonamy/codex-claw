@@ -3,7 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission, type Mission, type UpdateMissionInput } from '@codex-claw/core/missions';
-import type { MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactReadResult, MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
 import type { Agent } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
 
@@ -34,6 +34,7 @@ function missionWithRun(status: MissionRun['status'], proposal = false): Mission
 function mountWorkspace(mission: Mission, options: {
   agents?: Agent[];
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
+  readMissionArtifact?: (missionId: string, stage: MissionArtifactReadResult['stage']) => Promise<MissionArtifactReadResult>;
   updateMission?: (input: UpdateMissionInput) => Promise<void>;
 } = {}) {
   return mount(MissionWorkspace, {
@@ -42,6 +43,7 @@ function mountWorkspace(mission: Mission, options: {
       agents: structuredClone(options.agents ?? createInitialSnapshot().agents),
       updateMission: options.updateMission ?? vi.fn().mockResolvedValue(undefined),
       executeMission: options.executeMission ?? vi.fn().mockResolvedValue(undefined),
+      readMissionArtifact: options.readMissionArtifact,
     },
     slots: {
       conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
@@ -148,6 +150,26 @@ describe('MissionWorkspace', () => {
 
     expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Teams need one bill');
     expect(wrapper.get('.mission-workspace__conversation').text()).toContain('Orchestrator');
+  });
+
+  it('renders the canonical persisted artifact instead of the structured handoff projection', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    mission.artifactFiles = {
+      requirements: { revision: 1, size: 47, updatedAt: '2026-09-19T00:02:00.000Z' },
+    };
+    const readMissionArtifact = vi.fn().mockResolvedValue({
+      stage: 'requirements',
+      content: '# Canonical billing brief\n\nReviewed with the user.',
+      revision: 1,
+      updatedAt: '2026-09-19T00:02:00.000Z',
+    });
+
+    const wrapper = mountWorkspace(mission, { readMissionArtifact });
+    await flushPromises();
+
+    expect(readMissionArtifact).toHaveBeenCalledExactlyOnceWith(mission.id, 'requirements');
+    expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).toContain('Canonical billing brief');
+    expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).not.toContain('Teams need one bill');
   });
 
   it('completes review without starting another station', async () => {

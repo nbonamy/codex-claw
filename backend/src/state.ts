@@ -21,7 +21,7 @@ export function backendProviderTokensFilePath(): string {
   return path.join(backendHomeDir(), 'provider-tokens.json');
 }
 
-export function backendMissionHomeDir(missionId: string): string {
+function backendMissionHomeDir(missionId: string): string {
   if (!/^mission-[a-zA-Z0-9-]+$/.test(missionId)) throw new Error('Invalid mission ID.');
   return path.join(backendHomeDir(), 'missions', missionId);
 }

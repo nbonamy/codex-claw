@@ -65,7 +65,7 @@
           </button>
         </header>
 
-        <p v-if="error" class="mission-workspace__error" role="alert">{{ error }}</p>
+        <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
 
         <section v-if="viewedStage === mission.stage && activeRun && !activeRun.proposal" class="mission-workspace__working" aria-live="polite">
           <span class="mission-workspace__callout-icon"><SparklesIcon aria-hidden="true" /></span>
@@ -86,20 +86,20 @@
             <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ activeRun.summary }}</span></div>
             <span class="mission-workspace__review-status">{{ t('missions.readyForReview') }}</span>
           </header>
-          <MarkdownPanel :content="stageMarkdown(viewedStage, activeRun.proposal)" />
+          <MarkdownPanel :content="artifactMarkdown" />
           <footer class="mission-workspace__review-hint">
             <MessageCircleIcon aria-hidden="true" />
             <span>{{ t('missions.reviewInConversation') }}</span>
           </footer>
         </section>
 
-        <section v-else-if="stageMarkdown(viewedStage, mission.artifacts)" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
+        <section v-else-if="artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
           <header class="mission-workspace__artifact-meta">
             <FileTextIcon aria-hidden="true" />
             <div><strong>{{ artifactTitle(viewedStage) }}</strong><span>{{ t('missions.acceptedAtStation') }}</span></div>
             <span class="mission-workspace__accepted-status"><CheckIcon aria-hidden="true" />{{ t('missions.accepted') }}</span>
           </header>
-          <MarkdownPanel :content="stageMarkdown(viewedStage, mission.artifacts)" />
+          <MarkdownPanel :content="artifactMarkdown" />
         </section>
 
         <section v-else class="mission-workspace__empty-artifact">
@@ -158,7 +158,7 @@ import { useI18n } from 'vue-i18n';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { Agent } from '@codex-claw/core/contracts';
 import { featureStages, missionStageReady, type Mission, type MissionArtifacts, type MissionStage, type UpdateMissionInput } from '@codex-claw/core/missions';
-import { pendingMissionRun, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
 
@@ -167,13 +167,17 @@ const props = withDefaults(defineProps<{
   sidebarCollapsed?: boolean;
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   mission: Mission;
+  readMissionArtifact?: (missionId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
   updateMission: (input: UpdateMissionInput) => Promise<void>;
 }>(), { agents: () => [] });
 const emit = defineEmits<{ 'open-conversation': [agentId: string]; 'expand-sidebar': [] }>();
 const { t } = useI18n();
 const busy = ref(false);
 const error = ref('');
+const artifactError = ref('');
 const viewedStage = ref<MissionStage>(props.mission.stage);
+const canonicalArtifact = ref('');
+let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
 const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
 const completedStageCount = computed(() => props.mission.status === 'completed' ? featureStages.length : currentIndex.value);
@@ -206,6 +210,22 @@ watch(() => props.mission.stage, stage => {
   selectedConversationAgentId.value = preferredConversationAgentId.value;
 });
 watch(conversationAgentId, id => { if (id) emit('open-conversation', id); }, { immediate: true });
+watch(
+  () => [props.mission.id, viewedStage.value, props.mission.artifactFiles?.[viewedStage.value]?.revision] as const,
+  async ([missionId, stage, revision]) => {
+    const request = ++artifactRead;
+    canonicalArtifact.value = '';
+    artifactError.value = '';
+    if (!revision || !props.readMissionArtifact) return;
+    try {
+      const artifact = await props.readMissionArtifact(missionId, stage);
+      if (request === artifactRead) canonicalArtifact.value = artifact.content;
+    } catch (cause) {
+      if (request === artifactRead) artifactError.value = cause instanceof Error ? cause.message : String(cause);
+    }
+  },
+  { immediate: true },
+);
 
 function conversationLabel(conversation: (typeof missionConversations.value)[number]): string {
   const member = props.agents.find(agent => agent.id === conversation.run.memberId);
@@ -230,6 +250,12 @@ function stageStatus(stage: MissionStage): string {
   return t('missions.readyToStart');
 }
 function artifactTitle(stage: MissionStage): string { return t(`missions.artifactTitle.${stage}`); }
+const artifactMarkdown = computed(() => canonicalArtifact.value || stageMarkdown(
+  viewedStage.value,
+  viewedStage.value === props.mission.stage && activeRun.value?.proposal
+    ? activeRun.value.proposal
+    : props.mission.artifacts,
+));
 function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string {
   switch (stage) {
     case 'requirements': return artifacts.requirements.problem.trim() ? `## ${t('missions.problem')}\n\n${artifacts.requirements.problem}\n\n## ${t('missions.acceptance')}\n\n${artifacts.requirements.acceptance}` : '';

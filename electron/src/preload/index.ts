@@ -78,6 +78,7 @@ const api: CodexClawApi = {
   executeMission: (input) => ipc.invoke(ipcChannels.executeMission, input),
   createMission: (input) => ipc.invoke(ipcChannels.createMission, input),
   deleteMission: (input) => ipc.invoke(ipcChannels.deleteMission, input),
+  readMissionArtifact: (missionId, stage) => ipc.invoke(ipcChannels.readMissionArtifact, missionId, stage),
   updateMission: (input) => ipc.invoke(ipcChannels.updateMission, input),
   createQuickChat: (input: CreateQuickChatInput) => ipc.invoke(ipcChannels.createQuickChat, input),
   updateAgent: (input: UpdateAgentInput) => ipc.invoke(ipcChannels.updateAgent, input),

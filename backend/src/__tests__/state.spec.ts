@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendCodexHomeDir, backendHomeDir, backendProviderTokensFilePath, backendStateFilePath, ensureBackendCodexHome, loadBackendSnapshot, saveBackendSnapshot } from '../state';
+import { backendCodexHomeDir, backendHomeDir, backendProviderTokensFilePath, backendStateFilePath, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from '../state';
 import { persistedStateFromSnapshot } from '../state-persistence';
 
 describe('backend state loading', () => {
@@ -37,6 +37,12 @@ describe('backend state loading', () => {
     await expect(ensureBackendCodexHome()).resolves.toBe(path.join(homeDir, 'codex-home'));
     const directory = await stat(path.join(homeDir, 'codex-home'));
     expect(directory.isDirectory()).toBe(true);
+  });
+
+  it('creates a mission-owned artifact directory under the Claw backend home', async () => {
+    await expect(ensureBackendMissionHome('mission-billing')).resolves.toBe(path.join(homeDir, 'missions', 'mission-billing'));
+    expect((await stat(path.join(homeDir, 'missions', 'mission-billing', 'artifacts'))).isDirectory()).toBe(true);
+    await expect(ensureBackendMissionHome('../outside')).rejects.toThrow('Invalid mission ID');
   });
 
   it('creates a default snapshot when no state file exists', async () => {

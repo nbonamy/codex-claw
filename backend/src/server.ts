@@ -639,6 +639,14 @@ export class ClawBackendServer {
         await this.missionExecution.execute(input);
         return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
       }
+      case backendMethods.missionArtifactRead: {
+        const params = requireRecord(message.params);
+        if (typeof params.missionId !== 'string' || typeof params.stage !== 'string') throw new Error('Invalid mission artifact request.');
+        return createClawRpcResult(message.id, await this.missionExecution.readArtifactForMission(
+          params.missionId,
+          params.stage as import('@codex-claw/core/missions').MissionStage,
+        ));
+      }
       case backendMethods.missionCreate: {
         const input = requireRecord(message.params).input as import('@codex-claw/core/missions').CreateMissionInput;
         const previousIds = new Set(this.snapshot.missions?.map(mission => mission.id));

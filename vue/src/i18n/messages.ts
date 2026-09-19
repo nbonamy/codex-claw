@@ -879,6 +879,9 @@ export const messages = {
               running: 'Listing worktrees for {target}',
             },
             setMissionTitle: { running: 'Naming mission', completed: 'Named mission', failed: 'Could not name mission' },
+            listMissionArtifacts: { running: 'Checking mission artifacts', completed: 'Checked mission artifacts', failed: 'Could not check mission artifacts' },
+            readMissionArtifact: { running: 'Reading mission artifact', completed: 'Read mission artifact', failed: 'Could not read mission artifact' },
+            writeMissionArtifact: { running: 'Saving mission artifact', completed: 'Saved mission artifact', failed: 'Could not save mission artifact' },
             submitMissionResult: { running: 'Submitting mission artifact', completed: 'Mission artifact ready for review', failed: 'Could not submit mission artifact' },
             updateWorkItem: {
               completed: 'Updated work item',

@@ -8,5 +8,6 @@ export function registerMissionIpcHandlers(ipc: TypedIpcMain<CodexClawIpcRequest
   ipc.handle(ipcChannels.executeMission, async (_event, input) => adopt(await backend().request<AppSnapshot>(backendMethods.missionExecute, { input })));
   ipc.handle(ipcChannels.createMission, async (_event, input) => adopt(await backend().request<AppSnapshot>(backendMethods.missionCreate, { input })));
   ipc.handle(ipcChannels.deleteMission, async (_event, input) => adopt(await backend().request<AppSnapshot>(backendMethods.missionDelete, { input })));
+  ipc.handle(ipcChannels.readMissionArtifact, (_event, missionId, stage) => backend().request(backendMethods.missionArtifactRead, { missionId, stage }));
   ipc.handle(ipcChannels.updateMission, async (_event, input) => adopt(await backend().request<AppSnapshot>(backendMethods.missionUpdate, { input })));
 }

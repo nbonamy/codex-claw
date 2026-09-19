@@ -100,6 +100,31 @@ describe('mission execution', () => {
     expect(h.ports.createWorktree).toHaveBeenCalledOnce();
   });
 
+  it('serializes competing artifact revisions before writing the canonical file', async () => {
+    const h = setup();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const run = h.current().execution!.runs[0]!;
+    let finishWrite!: () => void;
+    h.ports.writeArtifact.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { finishWrite = resolve; });
+      return { size: 14 };
+    });
+
+    const first = h.service.writeArtifact(run.workerId!, {
+      stage: 'requirements', content: '# First draft', expectedRevision: 0,
+    });
+    await vi.waitFor(() => expect(h.ports.writeArtifact).toHaveBeenCalledOnce());
+    const stale = h.service.writeArtifact(run.workerId!, {
+      stage: 'requirements', content: '# Stale draft', expectedRevision: 0,
+    });
+    finishWrite();
+
+    await expect(first).resolves.toMatchObject({ revision: 1, content: '# First draft' });
+    await expect(stale).rejects.toThrow('changed');
+    expect(h.ports.writeArtifact).toHaveBeenCalledOnce();
+    expect(h.current().artifactFiles?.requirements?.revision).toBe(1);
+  });
+
   it('retains failures, rejects overlapping work, and never starts a cancelled preparation', async () => {
     const h = setup(); await h.configure();
     let release!: (path: string) => void;

@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   updateAutomationConversation: vi.fn(),
   loadBackendSnapshot: vi.fn(),
   ensureBackendCodexHome: vi.fn(),
+  ensureBackendMissionHome: vi.fn(),
   initializeCodexResourceSharing: vi.fn(),
   loadPluginStatus: vi.fn(),
   saveBackendSnapshot: vi.fn(),
@@ -68,6 +69,7 @@ vi.mock('@codex-claw/core/automation-manager', () => ({
 vi.mock('../state', () => ({
   loadBackendSnapshot: mocks.loadBackendSnapshot,
   ensureBackendCodexHome: mocks.ensureBackendCodexHome,
+  ensureBackendMissionHome: mocks.ensureBackendMissionHome,
   saveBackendSnapshot: mocks.saveBackendSnapshot,
   backendProviderTokensFilePath: mocks.backendProviderTokensFilePath,
 }));

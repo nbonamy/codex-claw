@@ -107,8 +107,8 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'celebrate') return icons.celebration;
   if (tool === 'announce') return icons.announcement;
-  if (tool === 'display-markdown') return icons.markdown;
+  if (tool === 'display-markdown' || tool === 'list-mission-artifacts' || tool === 'read-mission-artifact') return icons.markdown;
   if (tool === 'set-mission-title') return icons.mission;
-  if (tool === 'update-work-item' || tool === 'submit-mission-result') return icons.workItem;
+  if (tool === 'update-work-item' || tool === 'write-mission-artifact' || tool === 'submit-mission-result') return icons.workItem;
   return undefined;
 }

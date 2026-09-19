@@ -710,6 +710,11 @@ export function useAppState() {
     adoptNavigationSnapshot(await codexClawApi.deleteMission(input));
   }
 
+  async function readMissionArtifact(missionId: string, stage: import('@codex-claw/core/missions').MissionStage) {
+    if (!codexClawApi) throw new Error('Mission artifacts unavailable.');
+    return codexClawApi.readMissionArtifact(missionId, stage);
+  }
+
   async function updateMission(input: import('@codex-claw/core/missions').UpdateMissionInput) {
     if (!codexClawApi) throw new Error('Backend unavailable.');
     adoptNavigationSnapshot(await codexClawApi.updateMission(input));
@@ -1398,6 +1403,7 @@ export function useAppState() {
     executeMission,
     createMission,
     deleteMission,
+    readMissionArtifact,
     updateMission,
     createQuickChat,
     createTeam,

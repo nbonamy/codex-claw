@@ -130,6 +130,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `mission/create` | `{ input: CreateMissionInput }` | `AppSnapshot` | Creates a team-scoped outcome and immediately starts its orchestrator from a Claw-owned mission home. No repository is required. |
+| `mission/artifact/read` | `{ missionId, stage }` | `MissionArtifactReadResult` | Reads a canonical stage artifact through the app-owned protocol without exposing its Claw data-folder path. |
 | `mission/delete` | `{ input: DeleteMissionInput }` | `AppSnapshot` | Deletes the current persisted revision, interrupts active mission workers, archives and releases their provider conversations, and removes those hidden workers. The managed worktree and its files remain on disk. |
 | `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Attaches a repository when needed, starts a stage attempt, accepts a proposal, stops a run, or reopens a reached stage. Requirements and tickets do not require a repository. An assigned worker may revise and resubmit while the proposal awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
 | `mission/update` | `{ input: UpdateMissionInput }` | `AppSnapshot` | Saves structured artifacts and per-stage agent references, optionally approving the current stage. Requires the current revision; rejects stale writes, missing agents, invalid earlier gates, and edits to completed missions. |
