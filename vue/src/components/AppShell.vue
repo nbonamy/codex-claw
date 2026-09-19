@@ -190,7 +190,7 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :update-mission="updateMission" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :update-mission="updateMission" :execute-mission="executeMission" @open-conversation="emit('select-agent', $event)">
         <template #code-review="{ agentId }">
           <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :get-workflow="props.getAgentGitWorkflow" :generate-message="props.generateAgentGitMessage" :commit-changes="props.commitAgentGitChanges" :push-branch="props.pushAgentGitBranch" :create-pull-request="props.createAgentGitPullRequest" />
         </template>

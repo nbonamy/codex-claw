@@ -125,6 +125,23 @@
           <div><h2>{{ t('missions.orchestrator') }}</h2><p>{{ t('missions.orchestratorHint') }}</p></div>
           <MessageCircleIcon aria-hidden="true" />
         </header>
+        <div
+          v-if="missionConversations.length > 1"
+          class="mission-workspace__conversation-switcher"
+          role="tablist"
+          :aria-label="t('missions.conversations')"
+        >
+          <button
+            v-for="conversation in missionConversations"
+            :key="conversation.agentId"
+            type="button"
+            role="tab"
+            :aria-selected="conversation.agentId === conversationAgentId"
+            @click="selectedConversationAgentId = conversation.agentId"
+          >
+            {{ conversationLabel(conversation) }}
+          </button>
+        </div>
         <slot v-if="conversationAgentId" name="conversation" :agent-id="conversationAgentId" />
         <div v-else class="mission-workspace__conversation-empty">
           <SparklesIcon aria-hidden="true" />
@@ -138,17 +155,20 @@
 <script setup lang="ts">
 import { computed, ref, toRaw, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
+import type { Agent } from '@codex-claw/core/contracts';
 import { featureStages, missionStageReady, type Mission, type MissionArtifacts, type MissionStage, type UpdateMissionInput } from '@codex-claw/core/missions';
 import { pendingMissionRun, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  agents?: Agent[];
   sidebarCollapsed?: boolean;
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   mission: Mission;
   updateMission: (input: UpdateMissionInput) => Promise<void>;
-}>();
+}>(), { agents: () => [] });
 const emit = defineEmits<{ 'open-conversation': [agentId: string]; 'expand-sidebar': [] }>();
 const { t } = useI18n();
 const busy = ref(false);
@@ -159,13 +179,42 @@ const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
 const completedStageCount = computed(() => props.mission.status === 'completed' ? featureStages.length : currentIndex.value);
 const progressPercent = computed(() => Math.round((completedStageCount.value / featureStages.length) * 100));
 const codeAgentId = computed(() => props.mission.execution?.runs.slice().reverse().find(run => run.workerId)?.workerId);
-const conversationAgentId = computed(() => activeRun.value?.workerId
+const preferredConversationAgentId = computed(() => activeRun.value?.workerId
   ?? props.mission.execution?.runs.slice().reverse().find(run => run.stage === props.mission.stage && run.workerId)?.workerId
   ?? props.mission.stageAgentIds[props.mission.stage]
   ?? '');
+const missionConversations = computed(() => {
+  const seen = new Set<string>();
+  return (props.mission.execution?.runs ?? []).flatMap(run => {
+    if (!run.workerId || seen.has(run.workerId)) return [];
+    seen.add(run.workerId);
+    return [{ agentId: run.workerId, run }];
+  });
+});
+const selectedConversationAgentId = ref('');
+const conversationAgentId = computed(() => (
+  missionConversations.value.some(conversation => conversation.agentId === selectedConversationAgentId.value)
+    ? selectedConversationAgentId.value
+    : preferredConversationAgentId.value
+));
 
-watch(() => props.mission.stage, stage => { viewedStage.value = stage; });
+watch(preferredConversationAgentId, (id, previous) => {
+  if (!selectedConversationAgentId.value || selectedConversationAgentId.value === previous) selectedConversationAgentId.value = id;
+}, { immediate: true });
+watch(() => props.mission.stage, stage => {
+  viewedStage.value = stage;
+  selectedConversationAgentId.value = preferredConversationAgentId.value;
+});
 watch(conversationAgentId, id => { if (id) emit('open-conversation', id); }, { immediate: true });
+
+function conversationLabel(conversation: (typeof missionConversations.value)[number]): string {
+  const member = props.agents.find(agent => agent.id === conversation.run.memberId);
+  const owner = member ? agentDisplayName(member) : t('missions.orchestrator');
+  const ticket = conversation.run.stage === 'implementation' && conversation.run.ticketIndex !== undefined
+    ? ` ${conversation.run.ticketIndex + 1}`
+    : '';
+  return `${owner} · ${t(`missions.${conversation.run.stage}`)}${ticket}`;
+}
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
   const index = featureStages.indexOf(stage);
@@ -281,6 +330,10 @@ async function stopRun(runId: string): Promise<void> {
 .mission-workspace__conversation > header h2 { font-size: var(--font-size-16); }
 .mission-workspace__conversation > header p { color: var(--color-text-muted); font-size: var(--font-size-12); line-height: var(--line-height-18); }
 .mission-workspace__conversation > header svg { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-muted); }
+.mission-workspace__conversation-switcher { display: flex; gap: var(--space-2); padding: var(--space-4) var(--space-6); overflow-x: auto; border-bottom: 1px solid var(--color-border); }
+.mission-workspace__conversation-switcher button { flex: 0 0 auto; padding: var(--space-3) var(--space-4); border: 0; border-radius: var(--radius-full); color: var(--color-text-muted); background: transparent; font: inherit; font-size: var(--font-size-12); cursor: pointer; }
+.mission-workspace__conversation-switcher button:hover, .mission-workspace__conversation-switcher button:focus-visible { color: var(--color-text); background: var(--color-surface-high); }
+.mission-workspace__conversation-switcher button[aria-selected='true'] { color: var(--color-on-primary-container); background: var(--color-primary-container); }
 .mission-workspace__conversation :deep(.conversation-pane) { flex: 1; min-height: 0; }
 .mission-workspace__conversation-empty { display: grid; flex: 1; place-items: center; align-content: center; gap: var(--space-4); padding: var(--space-10); color: var(--color-text-muted); text-align: center; }
 .mission-workspace__conversation-empty svg { width: var(--icon-xl); height: var(--icon-xl); color: var(--color-primary); }

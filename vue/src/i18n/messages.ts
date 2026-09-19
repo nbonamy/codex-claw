@@ -26,7 +26,7 @@ export const messages = {
       skillsInUse: 'Skills in use', approveAndContinue: 'Approve and continue', reviewInConversation: 'Comment or request changes in the conversation before approving.',
       acceptedAtStation: 'Accepted at this station', accepted: 'Accepted', noArtifactYet: 'No artifact yet',
       keepWorkingInConversation: 'Continue with the orchestrator to create this station’s artifact.', continueWorkshop: 'Continue workshop',
-      orchestrator: 'Orchestrator', orchestratorHint: 'Your guide through this station and the mission as a whole.', orchestratorStarting: 'Starting the mission orchestrator…',
+      orchestrator: 'Orchestrator', orchestratorHint: 'Your guide through this station and the mission as a whole.', orchestratorStarting: 'Starting the mission orchestrator…', conversations: 'Mission conversations',
       projectContextRequired: 'Open a project agent before starting a mission.', canonicalReference: 'Open canonical ticket',
       active: 'In progress', completed: 'Completed', problem: 'Problem and scope', acceptance: 'Acceptance criteria',
       changes: 'Code changes and diff references', tests: 'Test results and verification evidence',

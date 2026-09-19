@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission, type Mission, type UpdateMissionInput } from '@codex-claw/core/missions';
 import type { MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
+import type { Agent } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
 
 function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
@@ -31,12 +32,14 @@ function missionWithRun(status: MissionRun['status'], proposal = false): Mission
 }
 
 function mountWorkspace(mission: Mission, options: {
+  agents?: Agent[];
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   updateMission?: (input: UpdateMissionInput) => Promise<void>;
 } = {}) {
   return mount(MissionWorkspace, {
     props: {
       mission: structuredClone(mission),
+      agents: structuredClone(options.agents ?? createInitialSnapshot().agents),
       updateMission: options.updateMission ?? vi.fn().mockResolvedValue(undefined),
       executeMission: options.executeMission ?? vi.fn().mockResolvedValue(undefined),
     },
@@ -100,6 +103,32 @@ describe('MissionWorkspace', () => {
       revision: mission.revision + 2,
       action: 'run',
     });
+  });
+
+  it('switches among mission-owned agent conversations inside the mission workspace', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'tickets';
+    mission.execution!.runs.push({
+      id: 'run-tickets', stage: 'tickets', memberId: snapshot.agents[1]!.id,
+      workerId: snapshot.agents[1]!.id, status: 'running', skills: [], feedback: '',
+      startedAt: '2026-09-19T00:01:00.000Z',
+    });
+    const wrapper = mountWorkspace(mission, { agents: snapshot.agents });
+    await flushPromises();
+
+    const conversations = wrapper.get('[aria-label="Mission conversations"]');
+    const tabs = conversations.findAll('[role="tab"]');
+    expect(tabs).toHaveLength(2);
+    expect(tabs.map(tab => tab.text())).toStrictEqual(['Dina · Requirements', 'Jesse · Tickets']);
+    expect(tabs[1]!.attributes('aria-selected')).toBe('true');
+    expect(wrapper.get('.conversation-slot').text()).toContain(snapshot.agents[1]!.id);
+
+    await tabs[0]!.trigger('click');
+
+    expect(tabs[0]!.attributes('aria-selected')).toBe('true');
+    expect(wrapper.get('.conversation-slot').text()).toContain(snapshot.agents[0]!.id);
+    expect(wrapper.emitted('open-conversation')?.at(-1)).toStrictEqual([snapshot.agents[0]!.id]);
   });
 
   it('keeps accepted artifacts available while work moves through later stations', async () => {

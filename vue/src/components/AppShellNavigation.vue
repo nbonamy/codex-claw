@@ -32,7 +32,7 @@
   <Transition name="agent-sidebar">
     <AgentSidebar
       v-if="showAgentSidebar"
-      :agents="activeTeamAgents"
+      :agents="sidebarAgents"
       :forkable-agent-ids="forkableAgentIds"
       :summary-replacement-agent-ids="summaryReplacementAgentIds"
       :active-agent-id="activeMissionId ? null : currentAgent?.id ?? null"
@@ -95,7 +95,7 @@ import type {
   SourceBranch,
   Team,
 } from '@codex-claw/core/contracts';
-import { toRefs } from 'vue';
+import { computed, toRefs } from 'vue';
 import AgentSidebar from './AgentSidebar.vue';
 import TeamRail from './TeamRail.vue';
 
@@ -178,6 +178,13 @@ const emit = defineEmits<{
     },
   ];
 }>();
+
+const missionAgentIds = computed(() => new Set(
+  (props.snapshot.missions ?? []).flatMap(mission => (
+    mission.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? []
+  )),
+));
+const sidebarAgents = computed(() => props.activeTeamAgents.filter(agent => !missionAgentIds.value.has(agent.id)));
 
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
