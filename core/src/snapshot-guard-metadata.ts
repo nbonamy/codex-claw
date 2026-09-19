@@ -1,3 +1,4 @@
+import { isMission } from './missions';
 import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
 import { spokenAnnouncementVoices } from './contracts';
@@ -34,6 +35,7 @@ export function isSnapshotMetadata(value: unknown): value is Record<string, unkn
     isArrayOf(value.teams, isTeam) &&
     isArrayOf(value.agents, isAgent) &&
     isArrayOf(value.automations, isAutomation) &&
+    optional(value, 'missions', (candidate) => isArrayOf(candidate, isMission)) &&
     isNullableString(value.activeTeamId) &&
     isNullableString(value.activeAgentId) &&
     optional(value, 'queuedPrompts', (candidate) => isArrayOf(candidate, isQueuedPrompt)) &&

@@ -693,6 +693,18 @@ export function useAppState() {
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
+  async function createMission(input: import('@codex-claw/core/missions').CreateMissionInput) {
+    if (!codexClawApi) throw new Error('Backend unavailable.');
+    const previous = new Set(snapshot.value.missions?.map(m => m.id));
+    adoptNavigationSnapshot(await codexClawApi.createMission(input));
+    return snapshot.value.missions!.find(m => !previous.has(m.id))!;
+  }
+
+  async function updateMission(input: import('@codex-claw/core/missions').UpdateMissionInput) {
+    if (!codexClawApi) throw new Error('Backend unavailable.');
+    adoptNavigationSnapshot(await codexClawApi.updateMission(input));
+  }
+
   async function createQuickChat(input: CreateQuickChatInput): Promise<Agent | null> {
     if (!codexClawApi?.createQuickChat) return null;
 
@@ -1373,6 +1385,8 @@ export function useAppState() {
     loadOpenInApplications,
     openAgentPath,
     createAgent,
+    createMission,
+    updateMission,
     createQuickChat,
     createTeam,
     updateTeam,

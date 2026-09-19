@@ -292,3 +292,22 @@ describe('AgentSidebar sessions', () => {
     expect(wrapper.emitted('update-collapsed-repositories')).toStrictEqual([[[]]]);
   });
 });
+
+describe('mission navigation', () => {
+  it('offers mission creation without agents and selects and collapses outcome rows', async () => {
+    const { createMission } = await import('@codex-claw/core/missions');
+    const { createEmptySnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const mission = createMission(createEmptySnapshot(), { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature' });
+    const wrapper = mount(AgentSidebar, { props: { agents: [], activeAgentId: null, activeMissionId: mission.id, missions: [mission], teamName: 'Team' } });
+    await wrapper.get('.agent-sidebar__mission-action').trigger('click');
+    expect(wrapper.emitted('create-mission')).toStrictEqual([[]]);
+    const row = wrapper.get('.agent-sidebar__mission');
+    expect(row.text()).toContain('Add team billing');
+    expect(row.text()).toContain('1/4');
+    expect(row.attributes('aria-pressed')).toBe('true');
+    await row.trigger('click');
+    expect(wrapper.emitted('select-mission')).toStrictEqual([[mission.id]]);
+    await wrapper.findAll('button').find(b => b.text() === 'Missions')!.trigger('click');
+    expect(wrapper.find('.agent-sidebar__mission').exists()).toBe(false);
+  });
+});

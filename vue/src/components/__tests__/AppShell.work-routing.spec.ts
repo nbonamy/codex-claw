@@ -629,7 +629,7 @@ describe('AppShell work routing', () => {
     expect(wrapper.text()).toContain('Welcome to Codex Claw');
     expect(wrapper.text()).toContain('Choose a source to start a session');
     expect(wrapper.find('.agent-header').exists()).toBe(false);
-    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(true);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
     expect(wrapper.find('.agent-sidebar__new').exists()).toBe(false);
 

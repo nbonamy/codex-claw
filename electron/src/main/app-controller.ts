@@ -1,3 +1,4 @@
+import { registerMissionIpcHandlers } from './mission-ipc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
 import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
@@ -388,6 +389,7 @@ export class AppController {
       return this.createAgent(input);
     });
 
+    registerMissionIpcHandlers(ipc, () => this.requireBackendClient(), snapshot => this.adoptBackendSnapshot(snapshot));
     ipc.handle(ipcChannels.createQuickChat, async (_event, input: CreateQuickChatInput) => {
       return this.createQuickChat(input);
     });

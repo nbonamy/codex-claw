@@ -35,7 +35,11 @@
       :agents="activeTeamAgents"
       :forkable-agent-ids="forkableAgentIds"
       :summary-replacement-agent-ids="summaryReplacementAgentIds"
-      :active-agent-id="currentAgent?.id ?? null"
+      :active-agent-id="activeMissionId ? null : currentAgent?.id ?? null"
+      :missions="snapshot.missions"
+      :active-mission-id="activeMissionId"
+      @create-mission="$emit('create-mission')"
+      @select-mission="$emit('select-mission', $event)"
       :unread-agent-ids="unreadAgentIds"
       :teams="snapshot.teams"
       :team-id="activeTeam?.id ?? null"
@@ -100,6 +104,7 @@ type RepositorySessionPayload = {
 };
 
 const props = defineProps<{
+  activeMissionId?: string | null;
   activeTeam: Team | null;
   activeTeamAgents: Agent[];
   activeTeamName: string;
@@ -133,6 +138,8 @@ const emit = defineEmits<{
   'create-agent-on-branch': [payload: RepositorySessionPayload & { branch: SourceBranch }];
   'create-agent-worktree-in-repository': [payload: RepositorySessionPayload];
   'create-quick-chat': [];
+  'create-mission': [];
+  'select-mission': [id: string];
   'disconnect-team': [teamId: string];
   'duplicate-agent': [agentId: string];
   'edit-agent': [agentId: string];

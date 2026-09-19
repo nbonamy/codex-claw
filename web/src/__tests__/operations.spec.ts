@@ -78,6 +78,16 @@ describe('Claw web operations', () => {
     });
   });
 
+  it('exposes mission writes through the browser operation allowlist', async () => {
+    const request = vi.fn().mockResolvedValue({ missions: [] });
+    const input = { outcome: 'Billing', workflowType: 'shapeAndShipFeature' };
+    await invokeClawWebOperation({ request }, 'createMission', [input]);
+    expect(request).toHaveBeenLastCalledWith('mission/create', { input });
+    const update = { id: 'mission-1', revision: 0, action: 'save' };
+    await invokeClawWebOperation({ request }, 'updateMission', [update]);
+    expect(request).toHaveBeenLastCalledWith('mission/update', { input: update });
+  });
+
   it('adapts the backend snapshot envelope for the Vue client', async () => {
     const snapshot = { teams: [], agents: [], messages: [], general: {}, workBacklog: { providerSettings: {} } };
     const request = vi.fn().mockResolvedValue({ snapshot, lastEventSeq: 42, clientState: {} });

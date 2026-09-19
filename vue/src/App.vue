@@ -79,6 +79,8 @@
     :open-in-applications="openInApplications"
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
+    :create-mission="createMission"
+    :update-mission="updateMission"
     :create-quick-chat="createQuickChat"
     :create-team="createTeam"
     :update-team="updateTeam"
@@ -305,6 +307,8 @@ const {
   openAgentPath,
   createAgent,
   clearAgentCreationProgress,
+  createMission,
+  updateMission,
   createQuickChat,
   createTeam,
   updateTeam,

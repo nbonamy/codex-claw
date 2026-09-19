@@ -44,6 +44,18 @@ protocol/process communication and the renderer displays app-owned events.
 
 Codex Claw uses "team" for its top-level agent grouping.
 
+Missions are separate app-owned persisted outcomes in `AppSnapshot.missions`.
+A mission references a versioned workflow type, its current stage, structured
+stage artifacts, optional supporting agent IDs per stage, and an optimistic
+revision. The first workflow is `shapeAndShipFeature` (requirements, tickets,
+implementation, review). Core owns its pure validation and transition policy;
+`clawd` serializes mission writes and publishes snapshots only after saving.
+Mission navigation is client-local; missions themselves are backend-wide, not
+team members or provider threads. Existing provider conversation panes can be
+opened as secondary stage support, without transferring transcript ownership.
+The initial workflow uses explicit human approval and recorded evidence; it
+does not execute tickets, verify evidence, or create a pull request automatically.
+
 Core persisted entities:
 
 ```ts

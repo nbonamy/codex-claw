@@ -3,6 +3,20 @@ import { surfaceMessages } from './surface-messages';
 export const messages = {
   en: {
     surface: surfaceMessages,
+    missions: {
+      showNavigation: 'Show mission navigation', noAgents: 'Create a Quick Chat or project agent from the sidebar to get help with this stage.',
+      new: 'New mission', create: 'Create mission', title: 'Missions', outcome: 'What outcome do you want?',
+      workflow: 'Shape and ship a feature', workspace: 'Mission execution', progress: 'Workflow progress',
+      requirements: 'Requirements', tickets: 'Tickets', implementation: 'Implementation', review: 'Review',
+      active: 'In progress', completed: 'Completed', problem: 'Problem and scope', acceptance: 'Acceptance criteria',
+      ticket: 'Ticket {number}', removeTicket: 'Remove ticket {number}', addTicket: 'Add ticket',
+      changes: 'Code changes and diff references', tests: 'Test results and verification evidence',
+      reviewSummary: 'Review findings and delivery decision', pullRequest: 'Pull request URL (optional)',
+      save: 'Save draft', advance: 'Approve and continue', complete: 'Complete mission', saving: 'Saving…',
+      saved: 'Saved', unsaved: 'Unsaved changes', artifacts: 'Mission artifacts', support: 'Stage conversation',
+      supportHint: 'Choose an existing agent to help with this stage. Stage approval stays with you.',
+      openConversation: 'Open conversation', conflict: 'This mission changed in another window. Reload to use the latest version.', reload: 'Reload mission',
+    },
     common: {
       back: 'Back',
       cancel: 'Cancel',

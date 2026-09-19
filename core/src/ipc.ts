@@ -72,6 +72,8 @@ export const ipcChannels = {
   compressAgentSession: 'conversation:compress',
   readConversationMessages: 'conversation:messages:read',
   createAgent: 'agent:create',
+  createMission: 'mission:create',
+  updateMission: 'mission:update',
   createQuickChat: 'agent:quick-chat:create',
   updateAgent: 'agent:update',
   assignWorkItemToAgent: 'agent:work-item:assign',

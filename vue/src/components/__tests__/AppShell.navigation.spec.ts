@@ -273,7 +273,7 @@ describe('AppShell navigation and teams', () => {
     const wrapper = mountShell({ snapshot });
 
     expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
+    expect(wrapper.find('.agent-sidebar').exists()).toBe(true);
     expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
     expect(wrapper.text()).toContain('Welcome to Codex Claw');
 

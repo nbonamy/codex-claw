@@ -24,7 +24,11 @@
       @login="startChatGptLogin"
       @open-github-authorization="openGitHubAuthorization"
     />
+    <NewMissionDialog v-model="newMissionVisible" :create-mission="createMission" @created="selectMission" />
     <AppShellNavigation
+      :active-mission-id="activeSurface === 'mission' ? selectedMissionId : null"
+      @create-mission="newMissionVisible = true"
+      @select-mission="selectMission"
       :active-team="activeTeam"
       :active-team-agents="activeTeamAgents"
       :active-team-name="activeTeamName"
@@ -185,6 +189,11 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :agents="missionAgents" :update-mission="updateMission" @open-conversation="emit('select-agent', $event)">
+        <template #conversation="{ agentId }">
+          <ConversationPane v-if="currentAgent?.id === agentId" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" @retry-history="props.retryAgentHistory" />
+        </template>
+      </MissionWorkspace>
       <AgentWorkspace
         v-else
         ref="agentWorkspace"
@@ -436,6 +445,10 @@ import AppShellNavigation from './AppShellNavigation.vue';
 import BackendConnectionBanner from './BackendConnectionBanner.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
 import AgentWorkspace from './AgentWorkspace.vue';
+import MissionWorkspace from './MissionWorkspace.vue';
+import NewMissionDialog from './NewMissionDialog.vue';
+import ConversationPane from './ConversationPane.vue';
+import type { Mission, CreateMissionInput, UpdateMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -549,6 +562,8 @@ const props = withDefaults(defineProps<{
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createMission?: (input: CreateMissionInput) => Promise<Mission>;
+  updateMission?: (input: UpdateMissionInput) => Promise<void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
@@ -665,6 +680,8 @@ const props = withDefaults(defineProps<{
     throw new Error(translate('surface.appShell.openInIsNotAvailable'));
   },
   createAgent: async () => undefined,
+  createMission: async () => { throw new Error('Missions unavailable.'); },
+  updateMission: async () => { throw new Error('Missions unavailable.'); },
   createQuickChat: async () => undefined,
   createTeam: async () => undefined,
   updateTeam: async () => undefined,
@@ -756,7 +773,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-type AppSurface = 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
+type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
@@ -768,6 +785,11 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
+const missionAgents = computed(() => props.snapshot.agents.filter(agent => !props.snapshot.teams.find(team => team.id === agent.teamId)?.remoteConnectionId));
+const newMissionVisible = ref(false);
+const selectedMissionId = ref<string | null>(null);
+const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
+function selectMission(id: string) { selectedMissionId.value = id; activeSurface.value = 'mission'; }
 const fileQuickOpenVisible = ref(false);
 const agentQuickOpenVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
@@ -1580,7 +1602,8 @@ const automationsVisible = computed(() => activeSurface.value === 'automations')
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
-  agentDialogVisible.value
+  newMissionVisible.value
+  || agentDialogVisible.value
   || modelFavoritesDialogVisible.value
   || newProjectDialogVisible.value
   || teamDialogVisible.value
@@ -1697,7 +1720,7 @@ function clearDebugAgentCreationTimers(): void {
 }
 
 onBeforeUnmount(clearDebugAgentCreationTimers);
-const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
+const showAgentSidebar = computed(() => (isAgentWorkspaceVisible.value || activeSurface.value === 'mission') && !agentSidebarCollapsed.value && (props.snapshot.teams.length > 0 || !!props.snapshot.missions?.length));
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));

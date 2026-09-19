@@ -18,6 +18,7 @@
     </header>
 
     <div class="agent-sidebar__start-work">
+      <button class="agent-sidebar__mission-action" type="button" @click="emit('create-mission')"><span>{{ t('missions.new') }}</span></button>
       <StartWorkMenu @select="emit('start-work', $event)" />
       <button
         v-if="!quickChatGroup"
@@ -31,6 +32,14 @@
     </div>
 
     <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
+      <section v-if="missions?.length" class="agent-sidebar__workspace-group">
+        <header class="agent-sidebar__workspace-header"><button class="agent-sidebar__workspace-label" type="button" :aria-expanded="!missionsCollapsed" @click="missionsCollapsed = !missionsCollapsed">{{ t('missions.title') }}</button></header>
+        <template v-if="!missionsCollapsed">
+          <button v-for="mission in missions" :key="mission.id" class="agent-sidebar__mission" type="button" :aria-pressed="activeMissionId === mission.id" @click="emit('select-mission', mission.id)">
+            <span>{{ mission.outcome }}</span><small>{{ mission.status === 'completed' ? t('missions.completed') : `${featureStages.indexOf(mission.stage) + 1}/4 · ${t(`missions.${mission.stage}`)}` }}</small>
+          </button>
+        </template>
+      </section>
       <section
         v-for="group in workspaceGroups"
         :key="group.id"
@@ -231,6 +240,7 @@
 </template>
 
 <script setup lang="ts">
+import { featureStages, type Mission } from '@codex-claw/core/missions';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@codex-claw/core/contracts';
@@ -255,6 +265,8 @@ import { useRepositorySessionMenu } from './use-repository-session-menu';
 
 const props = defineProps<{
   agents: Agent[];
+  missions?: Mission[];
+  activeMissionId?: string | null;
   activeAgentId: string | null;
   unreadAgentIds?: string[];
   forkableAgentIds?: string[];
@@ -297,9 +309,12 @@ const emit = defineEmits<{
   'select-agent': [agentId: string];
   'start-work': [action: 'new' | 'github' | 'local' | 'url'];
   'create-quick-chat': [];
+  'create-mission': [];
+  'select-mission': [id: string];
   'update-repository-icon': [payload: { repositoryKey: string; repositoryRoot: string; icon: string | undefined }];
 }>();
 
+const missionsCollapsed = ref(false);
 const minWidth = computed(() => props.minWidth ?? 72);
 const maxWidth = computed(() => props.maxWidth ?? 420);
 const resizeStep = 16;
@@ -601,6 +616,30 @@ function onResizePointerEnd(event: PointerEvent): void {
 </script>
 
 <style scoped>
+.agent-sidebar__mission {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.agent-sidebar__mission span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.agent-sidebar__mission small {
+  color: var(--color-text-muted);
+}
+.agent-sidebar__mission[aria-pressed="true"] {
+  background: var(--color-surface-high);
+}
+
 .agent-sidebar {
   --agent-sidebar-width: 260px;
   --agent-sidebar-min-width: 72px;
@@ -732,6 +771,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding-right: 0;
 }
 
+.agent-sidebar__mission-action,
 .agent-sidebar__quick-chat-action {
   min-height: 32px;
   display: flex;

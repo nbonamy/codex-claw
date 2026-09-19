@@ -1,3 +1,4 @@
+import { MissionService } from './mission-service';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
 import { createEntityId } from '@codex-claw/core/ids';
@@ -98,6 +99,7 @@ export class ClawBackendServer {
   private readonly version: string;
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
+  private readonly missions: MissionService;
   private remoteControlStatus: DevicePairingStatus = { status: 'disabled' };
   private remoteControlStatusLoaded = false;
   private readonly driverRpc?: BackendDriverRpc;
@@ -132,6 +134,7 @@ export class ClawBackendServer {
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
+    this.missions = new MissionService(this.snapshot, async snapshot => { await options.saveSnapshot?.(snapshot); });
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
     this.onBackendEventApplied = options.onBackendEventApplied;
@@ -569,6 +572,14 @@ export class ClawBackendServer {
         if (createdAgentId) {
           await this.agentWorkspaces.refreshGitStatus(createdAgentId);
         }
+        return createClawRpcResult(message.id, snapshot);
+      }
+      case backendMethods.missionCreate:
+      case backendMethods.missionUpdate: {
+        const input = isRecord(message.params) ? message.params.input : undefined;
+        await this.missions.mutate(message.method === backendMethods.missionCreate ? 'create' : 'update', input);
+        const snapshot = await this.remoteTeams.clientSnapshot();
+        this.emitSnapshotUpdated(snapshot);
         return createClawRpcResult(message.id, snapshot);
       }
       case backendMethods.agentQuickChatCreate: {

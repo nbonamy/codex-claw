@@ -125,6 +125,20 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `system/permissions/get` | none | `SystemPermissionsStatus` | App-facing permission API owned by `clawd`; desktop status may be delegated to Electron. |
 | `system/permissions/accessibility/open` | none | `SystemPermissionsStatus` | Opens native settings through a client callback, then returns status. |
 
+## Client To `clawd`: Missions
+
+| Method | Params | Result | Notes |
+| --- | --- | --- | --- |
+| `mission/create` | `{ input: CreateMissionInput }` | `AppSnapshot` | Creates a backend-wide outcome with a versioned workflow, independently of agents and client navigation. |
+| `mission/update` | `{ input: UpdateMissionInput }` | `AppSnapshot` | Saves structured artifacts and per-stage agent references, optionally approving the current stage. Requires the current revision; rejects stale writes, missing agents, invalid earlier gates, and edits to completed missions. |
+
+Both operations persist before publishing `snapshot.updated`. Existing snapshots
+without `missions` represent an empty mission collection. Unknown or malformed
+persisted mission records are ignored by the current reader. Workflow selection
+currently accepts only `shapeAndShipFeature`; additional types need their own
+artifact schema and transition policy. Mission selection is ephemeral client UI
+state and never changes another client's navigation.
+
 ## Client To `clawd`: Agents
 
 | Method | Params | Result | Notes |
