@@ -178,6 +178,46 @@ describe('ClawMcpService', () => {
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
   });
 
+  it('exposes mission tools only to the active mission worker over HTTP', async () => {
+    const snapshot = createInitialSnapshot();
+    let active = true;
+    const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
+    service = new ClawMcpService({
+      snapshot,
+      getMissionContext: agentId => active && agentId === 'agent-dina'
+        ? { missionId: 'mission-1', runId: 'run-1', stage: 'requirements' }
+        : undefined,
+      onMissionResult: vi.fn(),
+      onSetMissionTitle,
+    });
+    const url = await service.start();
+
+    const workerTools = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    expect(workerTools.result.tools.map((tool: { name: string }) => tool.name).slice(0, 2))
+      .toStrictEqual(['set-mission-title', 'submit-mission-result']);
+    const ordinaryTools = await postJson(agentUrl(url, 'agent-jesse'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
+    });
+    expect(ordinaryTools.result.tools.map((tool: { name: string }) => tool.name))
+      .not.toEqual(expect.arrayContaining(['set-mission-title', 'submit-mission-result']));
+
+    const renamed = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 3, method: 'tools/call',
+      params: { name: 'set-mission-title', arguments: { title: 'Add team billing' } },
+    });
+    expect(renamed.result.structuredContent).toEqual({ success: true, title: 'Add team billing' });
+    expect(onSetMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
+
+    active = false;
+    const inactiveTools = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 4, method: 'tools/list', params: {},
+    });
+    expect(inactiveTools.result.tools.map((tool: { name: string }) => tool.name))
+      .not.toEqual(expect.arrayContaining(['set-mission-title', 'submit-mission-result']));
+  });
+
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {
     const snapshot = createInitialSnapshot();
     const sendPrompt = vi.fn().mockResolvedValue({

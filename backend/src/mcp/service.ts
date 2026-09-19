@@ -43,7 +43,9 @@ import path from 'node:path';
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
 export type ClawMcpServiceOptions = {
+  getMissionContext?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['getMissionContext'];
   onMissionResult?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onMissionResult'];
+  onSetMissionTitle?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
   snapshot: AppSnapshot;
   now?: () => Date;
   onEvent?: (event: BackendEvent) => void;
@@ -79,7 +81,9 @@ export class ClawMcpService {
     this.worktreeManager = options.worktreeManager ?? new WorktreeManager();
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
+      getMissionContext: options.getMissionContext,
       onMissionResult: options.onMissionResult,
+      onSetMissionTitle: options.onSetMissionTitle,
       getAgents: () => this.snapshot.agents,
       now: this.now,
       onAgentUpdated: (agent) => this.emit({

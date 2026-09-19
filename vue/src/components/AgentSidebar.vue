@@ -18,7 +18,6 @@
     </header>
 
     <div class="agent-sidebar__start-work">
-      <button class="agent-sidebar__mission-action" type="button" @click="emit('create-mission')"><span>{{ t('missions.new') }}</span></button>
       <StartWorkMenu @select="emit('start-work', $event)" />
       <button
         v-if="!quickChatGroup"
@@ -29,6 +28,19 @@
         <MessageIcon data-icon="message" aria-hidden="true" />
         <span>{{ t('sidebar.quickChat') }}</span>
       </button>
+      <button
+        class="agent-sidebar__mission-action"
+        type="button"
+        :aria-busy="missionCreationPending"
+        :disabled="missionCreationPending"
+        @click="emit('create-mission')"
+      >
+        <TargetArrowIcon data-icon="target-arrow" aria-hidden="true" />
+        <span>{{ t('missions.new') }}</span>
+      </button>
+      <p v-if="missionCreationError" class="agent-sidebar__mission-error" role="alert">
+        {{ missionCreationError }}
+      </p>
     </div>
 
     <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
@@ -252,6 +264,7 @@ import {
   MessageIcon,
   PanelLeftCloseIcon,
   PlusIcon,
+  TargetArrowIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
@@ -279,6 +292,8 @@ const props = defineProps<{
   width?: number;
   minWidth?: number;
   maxWidth?: number;
+  missionCreationError?: string;
+  missionCreationPending?: boolean;
   quickSwitchShortcutsVisible?: boolean;
   repositoryIcons?: Record<string, string>;
   listRepositoryBranches?: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
@@ -790,14 +805,28 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__quick-chat-action:hover,
+.agent-sidebar__mission-action:hover,
+.agent-sidebar__mission-action:focus-visible,
 .agent-sidebar__quick-chat-action:focus-visible {
   color: var(--color-text);
   outline: 0;
 }
 
+.agent-sidebar__mission-action svg,
 .agent-sidebar__quick-chat-action svg {
   width: var(--icon-md);
   height: var(--icon-md);
+}
+
+.agent-sidebar__mission-action:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.agent-sidebar__mission-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-12);
 }
 
 .agent-sidebar__workspace-group + .agent-sidebar__workspace-group {

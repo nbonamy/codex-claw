@@ -19,7 +19,7 @@ function setup() {
   const current = () => snapshot.missions![0]!;
   const command = (input: Record<string, unknown>) => service.execute({ id: mission.id, revision: current().revision, ...input } as Parameters<typeof service.execute>[0]);
   const configure = () => command({ action: 'configure', teamId: snapshot.teams[0]!.id, repoPath: '/repo', memberIds: originalAgents.map(agent => agent.id) });
-  return { snapshot, originalAgents, ports, service, current, command, configure, store };
+  return { snapshot, originalAgents, persisted, ports, service, current, command, configure, store };
 }
 
 describe('mission execution', () => {
@@ -33,11 +33,21 @@ describe('mission execution', () => {
     expect(h.ports.send.mock.calls[0]?.[0]).toMatchObject({ id: run.workerId, folder: '/repo-mission', backend: h.originalAgents[0]!.backend });
     expect(run.skills).toStrictEqual([{ name: 'grilling', path: '/skills/grilling/SKILL.md' }]);
     expect(h.ports.send.mock.calls[0]?.[1]).toContain(run.id);
+    expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: run.id, stage: 'requirements' });
+    await expect(h.service.setTitle(h.originalAgents[0]!.id, 'Add team billing')).rejects.toThrow('not working');
+    await expect(h.service.setTitle(run.workerId!, '   ')).rejects.toThrow('between 1 and 200');
+    await expect(h.service.setTitle(run.workerId!, 'x'.repeat(201))).rejects.toThrow('between 1 and 200');
+    await expect(h.service.setTitle(run.workerId!, '  Add team billing  ')).resolves.toEqual({ success: true, title: 'Add team billing' });
+    expect(h.current().outcome).toBe('Add team billing');
+    expect(h.persisted).toHaveBeenCalled();
+    expect(h.ports.publish).toHaveBeenCalled();
     const artifacts = structuredClone(mission.artifacts); artifacts.requirements = { problem: 'Teams pay together', acceptance: 'Owner can check out' };
     await expect(h.service.submit(h.originalAgents[0]!.id, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' })).rejects.toThrow('does not own');
     await h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Requirements ready' });
     expect(h.current().artifacts.requirements.problem).toBe('');
     expect(h.current().execution!.runs[0]!.status).toBe('awaitingReview');
+    expect(h.service.contextForAgent(run.workerId!)).toBeUndefined();
+    await expect(h.service.setTitle(run.workerId!, 'Late title')).rejects.toThrow('not working');
     expect(() => updateMission(h.snapshot, { id: mission.id, revision: h.current().revision, artifacts, stageAgentIds: {}, action: 'advance' })).toThrow('current mission run');
     await h.command({ action: 'accept', runId: run.id });
     expect(h.current().artifacts.requirements).toStrictEqual(artifacts.requirements);

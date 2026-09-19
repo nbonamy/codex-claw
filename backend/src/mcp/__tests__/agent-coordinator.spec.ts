@@ -8,14 +8,23 @@ import {
 } from '../agent-coordinator';
 
 describe('ClawMcpAgentCoordinator', () => {
-  it('requires a known caller before forwarding a mission proposal and reports unavailable hosts', async () => {
+  it('requires a known caller before exposing or invoking mission capabilities', async () => {
     const { coordinator } = fixture();
     const input = { missionId: 'mission', runId: 'run', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
+    expect(coordinator.missionContext('agent-dina')).toBeUndefined();
     await expect(coordinator.submitMissionResult('agent-dina', input)).rejects.toThrow('unavailable');
+    await expect(coordinator.setMissionTitle('agent-dina', 'Add team billing')).rejects.toThrow('unavailable');
+    const missionContext = vi.fn().mockReturnValue({ missionId: 'mission', runId: 'run', stage: 'requirements' });
     const onMissionResult = vi.fn().mockResolvedValue({ success: true, status: 'awaitingReview' });
-    const enabled = fixture({ onMissionResult }).coordinator;
+    const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
+    const enabled = fixture({ getMissionContext: missionContext, onMissionResult, onSetMissionTitle }).coordinator;
+    expect(() => enabled.missionContext('missing')).toThrow();
     await expect(enabled.submitMissionResult('missing', input)).rejects.toThrow();
     expect(onMissionResult).not.toHaveBeenCalled();
+    expect(enabled.missionContext('agent-dina')).toEqual({ missionId: 'mission', runId: 'run', stage: 'requirements' });
+    expect(missionContext).toHaveBeenCalledWith('agent-dina');
+    await expect(enabled.setMissionTitle('agent-dina', 'Add team billing')).resolves.toEqual({ success: true, title: 'Add team billing' });
+    expect(onSetMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
     await expect(enabled.submitMissionResult('agent-dina', input)).resolves.toEqual({ success: true, status: 'awaitingReview' });
     expect(onMissionResult).toHaveBeenCalledWith('agent-dina', input);
   });

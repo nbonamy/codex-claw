@@ -665,12 +665,20 @@ Potential tools are intentionally not exposed yet:
 Add them only when Claw has the matching product capability and a tested
 main-process implementation.
 
-### Mission results
+### Mission tools
 
-`submit-mission-result` is an app-owned stage handoff. Caller identity comes from
-the authenticated backend session. Only the worker bound to the current running
-mission attempt may report artifacts. A report becomes a persisted proposal for
-human review, never an implicit approval. Tickets may carry canonical tracker
+Mission tools are registered only when the authenticated backend agent owns the
+current running Mission attempt. Ordinary agents do not receive them in their
+tool catalog, and backend ownership checks still reject cached or late calls.
+
+`set-mission-title` lets the requirements worker replace the initial `New mission`
+label once the outcome is clear. The backend infers the Mission and run from the
+caller identity, trims the title, persists it immediately, and publishes the
+updated snapshot.
+
+`submit-mission-result` is an app-owned stage handoff. Only the worker bound to
+the current running mission attempt may report artifacts. A report becomes a
+persisted proposal for human review, never an implicit approval. Tickets may carry canonical tracker
 references and zero-based dependency indices; invalid/cyclic dependencies are
 rejected. A completed implementation report updates only its assigned ticket and
 appends verification evidence. Late reports from stopped or accepted attempts

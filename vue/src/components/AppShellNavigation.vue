@@ -38,6 +38,8 @@
       :active-agent-id="activeMissionId ? null : currentAgent?.id ?? null"
       :missions="snapshot.missions"
       :active-mission-id="activeMissionId"
+      :mission-creation-error="missionCreationError"
+      :mission-creation-pending="missionCreationPending"
       @create-mission="$emit('create-mission')"
       @select-mission="$emit('select-mission', $event)"
       :unread-agent-ids="unreadAgentIds"
@@ -105,6 +107,8 @@ type RepositorySessionPayload = {
 
 const props = defineProps<{
   activeMissionId?: string | null;
+  missionCreationError?: string;
+  missionCreationPending?: boolean;
   activeTeam: Team | null;
   activeTeamAgents: Agent[];
   activeTeamName: string;

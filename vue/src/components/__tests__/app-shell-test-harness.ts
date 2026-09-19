@@ -12,6 +12,7 @@ import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { CreateMissionInput, Mission } from '@codex-claw/core/missions';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
@@ -33,6 +34,10 @@ const AgentSidebarStub = defineComponent({
     'forkableAgentIds',
     'maxWidth',
     'minWidth',
+    'missions',
+    'activeMissionId',
+    'missionCreationError',
+    'missionCreationPending',
     'openInCatalog',
     'quickSwitchShortcutsVisible',
     'repositoryIcons',
@@ -50,6 +55,7 @@ const AgentSidebarStub = defineComponent({
     'create-agent-on-branch',
     'create-agent-worktree-in-repository',
     'create-quick-chat',
+    'create-mission',
     'duplicate-agent',
     'edit-agent',
     'fork-agent',
@@ -61,6 +67,7 @@ const AgentSidebarStub = defineComponent({
     'restart-agent',
     'resume-session',
     'select-agent',
+    'select-mission',
     'start-work',
     'update-collapsed-repositories',
     'update-repository-icon',
@@ -103,6 +110,7 @@ export function mountShell(overrides: Partial<{
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createMission: (input: CreateMissionInput) => Promise<Mission>;
   createQuickChat: (input: import('@codex-claw/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
@@ -178,6 +186,7 @@ export function mountShell(overrides: Partial<{
       sourceRepositories: overrides.sourceRepositories ?? [],
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
+      createMission: overrides.createMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
       createQuickChat: overrides.createQuickChat ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),

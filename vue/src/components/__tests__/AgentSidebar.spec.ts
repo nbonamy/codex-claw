@@ -298,7 +298,15 @@ describe('mission navigation', () => {
     const { createMission } = await import('@codex-claw/core/missions');
     const { createEmptySnapshot } = await import('@codex-claw/core/snapshot-construction');
     const mission = createMission(createEmptySnapshot(), { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature' });
-    const wrapper = mount(AgentSidebar, { props: { agents: [], activeAgentId: null, activeMissionId: mission.id, missions: [mission], teamName: 'Team' } });
+    const wrapper = mount(AgentSidebar, {
+      props: { agents: [], activeAgentId: null, activeMissionId: mission.id, missions: [mission], teamName: 'Team' },
+      global: { components: { ElPopover } },
+    });
+    expect(wrapper.get('.agent-sidebar__start-work').findAll('button')
+      .map(button => button.text())
+      .filter(label => ['Add project', 'Quick chat', 'New mission'].includes(label)))
+      .toStrictEqual(['Add project', 'Quick chat', 'New mission']);
+    expect(wrapper.find('.agent-sidebar__mission-action [data-icon="target-arrow"]').exists()).toBe(true);
     await wrapper.get('.agent-sidebar__mission-action').trigger('click');
     expect(wrapper.emitted('create-mission')).toStrictEqual([[]]);
     const row = wrapper.get('.agent-sidebar__mission');
@@ -309,5 +317,24 @@ describe('mission navigation', () => {
     expect(wrapper.emitted('select-mission')).toStrictEqual([[mission.id]]);
     await wrapper.findAll('button').find(b => b.text() === 'Missions')!.trigger('click');
     expect(wrapper.find('.agent-sidebar__mission').exists()).toBe(false);
+  });
+
+  it('disables mission creation while pending and surfaces creation failures', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [],
+        activeAgentId: null,
+        missionCreationError: 'Backend unavailable',
+        missionCreationPending: true,
+        teamName: 'Team',
+      },
+      global: { components: { ElPopover } },
+    });
+
+    expect(wrapper.get('.agent-sidebar__mission-action').attributes()).toMatchObject({
+      'aria-busy': 'true',
+      disabled: '',
+    });
+    expect(wrapper.get('[role="alert"]').text()).toBe('Backend unavailable');
   });
 });

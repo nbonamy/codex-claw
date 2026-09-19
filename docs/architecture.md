@@ -53,6 +53,9 @@ implementation, review). Core owns its pure validation and transition policy;
 Mission navigation is client-local; missions themselves are backend-wide, not
 team members or provider threads. Existing provider conversation panes can be
 opened as secondary stage support, without transferring transcript ownership.
+Sidebar creation persists a placeholder `New mission` immediately and opens its
+workflow. During the requirements run, the assigned worker replaces that label
+with a concise outcome through the mission-scoped title tool.
 Mission execution is owned by `clawd`: selected team member profiles supply
 provider settings for dedicated stage sessions in one managed mission worktree.
 Runs persist assignment, installed skill paths, proposal, status, and feedback.
@@ -62,8 +65,10 @@ failed or cancelled attempts retain their workspace and conversation for inspect
 Requirements/ticket discussions may span multiple provider turns. Provider hosts
 continue to own all conversation content and turn mechanics.
 
-The authenticated `submit-mission-result` MCP tool submits stage proposals; only
-the user can accept an artifact and approve advancement. Reports are scoped to
+Mission MCP tools are registered only for the authenticated worker that owns the
+current running attempt. `set-mission-title` updates the persisted Mission;
+`submit-mission-result` submits stage proposals. Only the user can accept an
+artifact and approve advancement. Reports are scoped to
 the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
 for published tickets; mission tickets retain canonical references and record local
 implementation acceptance, not external issue status. Setup is never invoked

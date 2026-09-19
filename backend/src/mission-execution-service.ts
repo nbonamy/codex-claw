@@ -2,7 +2,7 @@ import type { Agent, AppSnapshot, BackendSkillSummary, CreateSourceWorktreeInput
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
 import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts } from '@codex-claw/core/missions';
-import { missionRunPrompt, missionSkills, pendingMissionRun, type MissionExecutionInput, type MissionResultInput, type MissionRun } from '@codex-claw/core/mission-execution';
+import { missionRunPrompt, missionSkills, pendingMissionRun, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 
 export type MissionExecutionPorts = {
@@ -128,6 +128,32 @@ export class MissionExecutionService {
     });
     await this.ports.publish();
     return { success: true, status: 'awaitingReview' };
+  }
+
+  contextForAgent(agentId: string): MissionToolContext | undefined {
+    for (const mission of this.ports.snapshot.missions ?? []) {
+      const run = mission.execution?.runs.find(run => (
+        run.workerId === agentId && run.status === 'running' && run.stage === mission.stage
+      ));
+      if (run) return { missionId: mission.id, runId: run.id, stage: run.stage };
+    }
+    return undefined;
+  }
+
+  async setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> {
+    const normalized = title.trim();
+    if (!normalized || normalized.length > 200) throw new Error('Mission title must be between 1 and 200 characters.');
+    const context = this.contextForAgent(agentId);
+    if (!context) throw new Error('This agent is not working on an active mission run.');
+    await this.ports.missions.change(context.missionId, mission => {
+      const run = mission.execution?.runs.find(run => run.id === context.runId);
+      if (!run || run.workerId !== agentId || run.status !== 'running' || run.stage !== mission.stage) {
+        throw new Error('This agent is not working on an active mission run.');
+      }
+      mission.outcome = normalized;
+    });
+    await this.ports.publish();
+    return { success: true, title: normalized };
   }
 
   async agentFinished(agentId: string): Promise<void> {

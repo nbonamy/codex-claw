@@ -273,6 +273,14 @@ export class ClawBackendServer {
     return this.missionExecution.submit(agentId, input);
   }
 
+  missionContext(agentId: string) {
+    return this.missionExecution.contextForAgent(agentId);
+  }
+
+  async setMissionTitle(agentId: string, title: string) {
+    return this.missionExecution.setTitle(agentId, title);
+  }
+
   async initialize(): Promise<void> {
     await this.initializeSourceFolderIfNeeded();
     await this.ensureRemoteControlStatus();

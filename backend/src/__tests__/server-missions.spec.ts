@@ -70,6 +70,9 @@ it('routes mission execution through the backend driver and worktree manager, th
     const run = current().execution!.runs[0]!;
     expect(sendPrompt.mock.calls[0]![0]).toMatchObject({ id: run.workerId, folder: current().execution!.workspace!.path });
     expect(sendPrompt.mock.calls[0]![1]).toContain('/skills/grill-with-docs/SKILL.md');
+    expect(server.missionContext(run.workerId!)).toEqual({ missionId: current().id, runId: run.id, stage: 'requirements' });
+    await expect(server.setMissionTitle(run.workerId!, 'Add team billing')).resolves.toEqual({ success: true, title: 'Add team billing' });
+    expect(snapshotFromPersistedState(disk).missions![0]!.outcome).toBe('Add team billing');
     const artifacts = structuredClone(current().artifacts);
     artifacts.requirements = { problem: 'Team billing', acceptance: 'Owners can pay' };
     await server.submitMissionResult(run.workerId!, { missionId: current().id, runId: run.id, summary: 'Ready', artifacts });

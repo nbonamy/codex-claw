@@ -24,10 +24,11 @@
       @login="startChatGptLogin"
       @open-github-authorization="openGitHubAuthorization"
     />
-    <NewMissionDialog v-model="newMissionVisible" :create-mission="createMission" @created="selectMission" />
     <AppShellNavigation
       :active-mission-id="activeSurface === 'mission' ? selectedMissionId : null"
-      @create-mission="newMissionVisible = true"
+      :mission-creation-error="missionCreationError"
+      :mission-creation-pending="missionCreationPending"
+      @create-mission="createNewMission"
       @select-mission="selectMission"
       :active-team="activeTeam"
       :active-team-agents="activeTeamAgents"
@@ -450,7 +451,6 @@ import WhatsNewDialog from './WhatsNewDialog.vue';
 import AgentWorkspace from './AgentWorkspace.vue';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
-import NewMissionDialog from './NewMissionDialog.vue';
 import ConversationPane from './ConversationPane.vue';
 import type { Mission, CreateMissionInput, UpdateMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
@@ -791,10 +791,24 @@ const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const missionAgents = computed(() => props.snapshot.agents.filter(agent => !props.snapshot.teams.find(team => team.id === agent.teamId)?.remoteConnectionId));
-const newMissionVisible = ref(false);
+const missionCreationError = ref('');
+const missionCreationPending = ref(false);
 const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
 function selectMission(id: string) { selectedMissionId.value = id; activeSurface.value = 'mission'; }
+async function createNewMission() {
+  if (missionCreationPending.value) return;
+  missionCreationPending.value = true;
+  missionCreationError.value = '';
+  try {
+    const mission = await props.createMission({ outcome: translate('missions.new'), workflowType: 'shapeAndShipFeature' });
+    selectMission(mission.id);
+  } catch (error) {
+    missionCreationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    missionCreationPending.value = false;
+  }
+}
 const fileQuickOpenVisible = ref(false);
 const agentQuickOpenVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
@@ -1607,8 +1621,7 @@ const automationsVisible = computed(() => activeSurface.value === 'automations')
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
-  newMissionVisible.value
-  || agentDialogVisible.value
+  agentDialogVisible.value
   || modelFavoritesDialogVisible.value
   || newProjectDialogVisible.value
   || teamDialogVisible.value

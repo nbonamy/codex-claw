@@ -15,7 +15,7 @@ export const messages = {
       runStage: 'Run current stage', saveBeforeRun: 'Save or reload your draft before starting a run.', runHistory: 'Run history', revisit: 'Revisit an earlier stage',
       runStatus: { preparing: 'Preparing workspace', running: 'Stage in progress', awaitingReview: 'Awaiting your review', accepted: 'Accepted', cancelled: 'Stopped', failed: 'Failed' },
       showNavigation: 'Show mission navigation', noAgents: 'Create a Quick Chat or project agent from the sidebar to get help with this stage.',
-      new: 'New mission', create: 'Create mission', title: 'Missions', outcome: 'What outcome do you want?',
+      new: 'New mission', title: 'Missions',
       workflow: 'Shape and ship a feature', workspace: 'Mission execution', progress: 'Workflow progress',
       requirements: 'Requirements', tickets: 'Tickets', implementation: 'Implementation', review: 'Review',
       active: 'In progress', completed: 'Completed', problem: 'Problem and scope', acceptance: 'Acceptance criteria',
@@ -871,6 +871,7 @@ export const messages = {
               failed: 'Failed listing worktrees for {target}',
               running: 'Listing worktrees for {target}',
             },
+            setMissionTitle: { running: 'Naming mission', completed: 'Named mission', failed: 'Could not name mission' },
             submitMissionResult: { running: 'Submitting mission artifact', completed: 'Mission artifact ready for review', failed: 'Could not submit mission artifact' },
             updateWorkItem: {
               completed: 'Updated work item',

@@ -74,7 +74,9 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
   const mcpService = new ClawMcpService({
+    getMissionContext: (agentId) => server.missionContext(agentId),
     onMissionResult: (agentId, input) => server.submitMissionResult(agentId, input),
+    onSetMissionTitle: (agentId, title) => server.setMissionTitle(agentId, title),
     snapshot,
     computerUse: computerUseAvailable ? {
       execute: (input) => options.requestClient(backendMethods.clientComputerUseExecute, input),

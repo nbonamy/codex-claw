@@ -8,6 +8,7 @@ import {
   IconMessage as MessageIcon,
   IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
+  IconTargetArrow as TargetArrowIcon,
   IconUsers as UsersIcon,
   IconVolume as VolumeIcon,
 } from '@tabler/icons-vue';
@@ -32,6 +33,7 @@ describe('Claw tool presentation', () => {
     ['list-agents', UsersIcon, 'Listed agents'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
+    ['set-mission-title', TargetArrowIcon, 'Named mission'],
     ['submit-mission-result', SquareCheck, 'Mission artifact ready for review'],
     ['update-work-item', SquareCheck, 'Updated work item'],
     ['celebrate', SparklesIcon, 'Celebrated with stars'],

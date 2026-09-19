@@ -1,4 +1,4 @@
-import type { MissionResultInput } from '@codex-claw/core/mission-execution';
+import type { MissionResultInput, MissionToolContext } from '@codex-claw/core/mission-execution';
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -111,7 +111,9 @@ export type McpCreateAgentResponse = {
 };
 
 export type ClawMcpAgentCoordinatorOptions = {
+  getMissionContext?: (agentId: string) => MissionToolContext | undefined;
   onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' }>;
+  onSetMissionTitle?: (agentId: string, title: string) => Promise<{ success: true; title: string }>;
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
@@ -135,7 +137,9 @@ export class McpToolError extends Error {
 }
 
 export class ClawMcpAgentCoordinator {
+  private readonly getMissionContext?: ClawMcpAgentCoordinatorOptions['getMissionContext'];
   private readonly onMissionResult?: ClawMcpAgentCoordinatorOptions['onMissionResult'];
+  private readonly onSetMissionTitle?: ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
   private readonly messages: McpMessage[] = [];
   private readonly getAgents: () => Agent[];
   private readonly onAgentUpdated?: (agent: Agent) => void;
@@ -152,7 +156,9 @@ export class ClawMcpAgentCoordinator {
   private readonly now: () => Date;
 
   constructor(options: ClawMcpAgentCoordinatorOptions) {
+    this.getMissionContext = options.getMissionContext;
     this.onMissionResult = options.onMissionResult;
+    this.onSetMissionTitle = options.onSetMissionTitle;
     this.getAgents = options.getAgents;
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
@@ -291,6 +297,17 @@ export class ClawMcpAgentCoordinator {
     this.requireAgent(agentId);
     if (!this.onMissionResult) throw new McpToolError('Mission result submission is unavailable.');
     return this.onMissionResult(agentId, input);
+  }
+
+  missionContext(agentId: string): MissionToolContext | undefined {
+    this.requireAgent(agentId);
+    return this.getMissionContext?.(agentId);
+  }
+
+  async setMissionTitle(agentId: string, title: string) {
+    this.requireAgent(agentId);
+    if (!this.onSetMissionTitle) throw new McpToolError('Mission title updates are unavailable.');
+    return this.onSetMissionTitle(agentId, title);
   }
 
   async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {

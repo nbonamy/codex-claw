@@ -20,18 +20,28 @@ export function createCodexClawMcpServer(
     version: '1.0.0',
   });
 
-  server.registerTool('submit-mission-result', {
-    description: 'Submit the structured result of your assigned Mission stage for user review. Use only with the mission and run IDs from your assignment. This never approves a stage or completes a mission. Include actual verification evidence for implementation work.',
-    inputSchema: {
-      missionId: z.string(), runId: z.string(), summary: z.string().min(1).max(20000),
-      artifacts: z.object({
-        requirements: z.object({ problem: z.string().max(100000), acceptance: z.string().max(100000) }),
-        tickets: z.array(z.object({ title: z.string().max(100000), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),
-        implementation: z.object({ changes: z.string().max(100000), tests: z.string().max(100000) }),
-        review: z.object({ summary: z.string().max(100000), pullRequestUrl: z.string().max(100000) }),
-      }),
-    },
-  }, input => toolResult('submit-mission-result', { callerAgentId }, () => coordinator.submitMissionResult(callerAgentId, input)));
+  const missionContext = coordinator.missionContext(callerAgentId);
+  if (missionContext) {
+    server.registerTool('set-mission-title', {
+      description: 'Rename the active Mission once its intended outcome is clear. Use a concise outcome-oriented title. The active Mission and run are inferred from your authenticated agent identity.',
+      inputSchema: {
+        title: z.string().trim().min(1).max(200),
+      },
+    }, ({ title }) => toolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
+
+    server.registerTool('submit-mission-result', {
+      description: 'Submit the structured result of your assigned Mission stage for user review. Use only with the mission and run IDs from your assignment. This never approves a stage or completes a mission. Include actual verification evidence for implementation work.',
+      inputSchema: {
+        missionId: z.string(), runId: z.string(), summary: z.string().min(1).max(20000),
+        artifacts: z.object({
+          requirements: z.object({ problem: z.string().max(100000), acceptance: z.string().max(100000) }),
+          tickets: z.array(z.object({ title: z.string().max(100000), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),
+          implementation: z.object({ changes: z.string().max(100000), tests: z.string().max(100000) }),
+          review: z.object({ summary: z.string().max(100000), pullRequestUrl: z.string().max(100000) }),
+        }),
+      },
+    }, input => toolResult('submit-mission-result', { callerAgentId }, () => coordinator.submitMissionResult(callerAgentId, input)));
+  }
 
   server.registerTool('list-agents', {
     description: 'List all visible agents with their ID, status, name, and folder.',

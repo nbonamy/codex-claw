@@ -5,6 +5,9 @@ import { presentClawToolTitle } from '../tool-title-presenter';
 
 describe('Claw tool title presenter', () => {
   it.each([
+    ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'running', 'Naming mission'],
+    ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'completed', 'Named mission'],
+    ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'error', 'Could not name mission'],
     ['codex_claw.submit-mission-result', {}, 'running', 'Submitting mission artifact'],
     ['codex_claw.submit-mission-result', {}, 'completed', 'Mission artifact ready for review'],
     ['codex_claw.submit-mission-result', {}, 'error', 'Could not submit mission artifact'],
