@@ -52,36 +52,55 @@ Use the same core testing principles as id8, adapted to a desktop app:
   `finally`.
 - Mock external boundaries, not the logic under test.
 
-## Test Value
+## Test Value Gate
 
-Coverage is a guardrail, not a reason to preserve assertions that add no useful
-confidence. Each test should protect at least one of these things:
+Before writing, modifying, or retaining a test, name the regression it protects
+in one sentence. The test is acceptable only when all of these are true:
+
+1. It exercises production behavior through the closest owning public seam.
+2. The named regression would make the test fail for the right reason.
+3. A harmless refactor, rewording, file move, or equivalent implementation
+   would leave the test green.
+4. No test at a closer owning layer already protects the same contract in more
+   detail.
+
+If a proposed test cannot pass this gate, do not add it. Remove an existing test
+when it fails the gate and no realistic regression risk would be lost. Coverage
+is a guardrail, not a reason to preserve or invent assertions without useful
+confidence.
+
+Each accepted test should protect at least one of these things:
 
 - a user-visible outcome or interaction;
 - an app-owned or external contract;
 - a meaningful state transition or persistence guarantee;
 - an error, security, or architecture boundary with realistic regression risk.
 
-Avoid tests that freeze incidental implementation details:
+Reject tests that freeze incidental implementation details:
 
+- Vue components must be tested by mounting them and asserting rendered DOM,
+  accessibility state, user interactions, emitted events, or resulting app
+  behavior. This is production behavior and is explicitly encouraged.
 - Do not assert every sentence or phrase in tool descriptions, model prompts,
   help text, or developer instructions. Test dynamic interpolation, conditional
   sections, schemas, and the behavior those instructions enable. If exact copy
   is itself the product contract, keep one focused assertion at its owning
   layer.
-- Do not scan source text to pin function names, statement counts, exact file
-  inventories, or a particular implementation spelling. Prefer public behavior
-  and dependency-boundary tooling. Reserve source scans for narrow negative
-  security or process-boundary guarantees that cannot be enforced structurally.
+- Never read production `.vue`, TypeScript, stylesheets, scripts, package
+  manifests, or config files as text to assert their contents. There is no test
+  exception for architecture or security rules: enforce those with lint,
+  TypeScript, AST, or dependency tooling in the lint gate. Tests may read source
+  code only when source code is product input to the behavior under test, and
+  should use a fixture rather than the repository's implementation. Tests may
+  inspect generated artifacts when that artifact is the output under test.
 - Do not repeat the same contract at every layer. Give the detailed assertion
   to the owning unit, then keep only one representative integration smoke test
   at the next boundary.
 - A table-driven test is valuable when its rows represent distinct mappings or
   behaviors. Do not multiply cases merely to increase the test count.
 
-When a test would survive replacing the implementation with a constant string,
-or would fail after a harmless rewording or refactor, reconsider what risk it is
-actually protecting.
+When a test would survive replacing the implementation with a constant result,
+or would fail after a harmless rewording or refactor, it fails the value gate.
 
 ## Main Process Tests
 

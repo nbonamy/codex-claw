@@ -103,6 +103,16 @@ Quality is not optional in this repo. Every code change must add or update
 tests unless it is truly docs-only or impossible to test; in that case, say so
 explicitly in the handoff.
 
+Before adding or retaining a test, apply the mandatory **Test Value Gate** in
+`docs/testing.md`. A test must protect observable behavior, an owned contract,
+a meaningful state transition, or a realistic error/security/architecture
+boundary. Mount and exercise UI components through their rendered behavior.
+Tests must never read production source files as text to assert their contents;
+this includes TypeScript, Vue, stylesheets, scripts, package manifests, and
+configuration. Enforce static architecture rules with lint, type, AST, or
+dependency tooling instead. Coverage is evidence of exercised behavior, never
+a reason to invent a test.
+
 Coverage must stay very high. Once coverage tooling exists, the minimum
 threshold is 85% for statements, branches, functions, and lines. Do not lower
 coverage thresholds to land a change.

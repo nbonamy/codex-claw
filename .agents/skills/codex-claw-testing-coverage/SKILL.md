@@ -11,6 +11,9 @@ changing contracts.
 ## First Read
 
 Read `docs/testing.md` before changing tests or testable behavior.
+Apply its mandatory **Test Value Gate** before adding, modifying, or retaining a
+test; if the protected regression cannot be named and made red through the
+owning public seam, the test does not belong.
 
 ## Principles
 
