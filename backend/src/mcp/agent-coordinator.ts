@@ -95,8 +95,10 @@ export type McpCreateAgentInput = {
   branchName?: string;
   createWorktree?: boolean;
   destinationPath?: string;
+  model?: string;
   name?: string;
   prompt?: string;
+  reasoningEffort?: string;
   repoPath: string;
 };
 
@@ -367,6 +369,8 @@ export class ClawMcpAgentCoordinator {
       name: input.name?.trim(),
       prompt: input.prompt?.trim() || undefined,
       backend: input.backend ?? 'codex',
+      model: input.model?.trim() || undefined,
+      reasoningEffort: input.reasoningEffort?.trim() || undefined,
       repoPath: input.repoPath.trim(),
       createWorktree: input.createWorktree,
       branchName: input.branchName?.trim(),

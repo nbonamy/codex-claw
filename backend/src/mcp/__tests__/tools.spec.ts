@@ -112,6 +112,8 @@ describe('Codex Claw MCP tool registration', () => {
     expect(Object.keys(definition?.inputSchema ?? {})).toStrictEqual([
       'name',
       'backend',
+      'model',
+      'reasoningEffort',
       'repoPath',
       'createWorktree',
       'branchName',
@@ -177,6 +179,8 @@ describe('Codex Claw MCP tool registration', () => {
     const agentInput = {
       name: 'Tester',
       backend: 'codex',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
       repoPath: '/src/claw',
       createWorktree: true,
       branchName: 'tests',

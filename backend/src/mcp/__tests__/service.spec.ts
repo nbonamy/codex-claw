@@ -488,6 +488,12 @@ describe('ClawMcpService', () => {
 
   it('creates a background agent and starts its initial prompt as one MCP operation', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backendDefaults = {
+      kind: 'codex',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
+      serviceTier: 'fast',
+    };
     const events: any[] = [];
     const sendPrompt = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-delegated' },
@@ -527,10 +533,24 @@ describe('ClawMcpService', () => {
     });
 
     const createdAgent = snapshot.agents.find((agent) => agent.name === 'SDK worker');
-    expect(createdAgent).toMatchObject({ delegatedByAgentId: 'agent-dina' });
+    expect(createdAgent).toMatchObject({
+      delegatedByAgentId: 'agent-dina',
+      backendDefaults: {
+        kind: 'codex',
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'high',
+      },
+    });
     expect(snapshot.activeAgentId).toBe('agent-dina');
     expect(sendPrompt).toHaveBeenCalledWith(
-      expect.objectContaining({ id: createdAgent!.id }),
+      expect.objectContaining({
+        id: createdAgent!.id,
+        backendDefaults: {
+          kind: 'codex',
+          model: 'gpt-5.6-sol',
+          reasoningEffort: 'high',
+        },
+      }),
       'Implement the SDK contract and run focused tests.',
       undefined,
     );
@@ -567,6 +587,38 @@ describe('ClawMcpService', () => {
     expect(sidebar.find((group) => group.kind === 'quickChats')?.sessions).not.toContainEqual(
       expect.objectContaining({ agentId: createdAgent!.id }),
     );
+  });
+
+  it('lets create-agent override inherited model settings and avoids cross-backend inheritance', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backendDefaults = {
+      kind: 'codex',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
+    };
+    service = new ClawMcpService({ snapshot });
+    const url = await service.start();
+
+    await callTool(url, 'agent-dina', 'create-agent', {
+      repoPath: '/tmp/explicit-worker',
+      name: 'Explicit worker',
+      model: 'gpt-6-astra',
+      reasoningEffort: 'max',
+    });
+    await callTool(url, 'agent-dina', 'create-agent', {
+      repoPath: '/tmp/claude-worker',
+      name: 'Claude worker',
+      backend: 'claude',
+    });
+
+    expect(snapshot.agents.find((agent) => agent.name === 'Explicit worker')?.backendDefaults).toStrictEqual({
+      kind: 'codex',
+      model: 'gpt-6-astra',
+      reasoningEffort: 'max',
+    });
+    expect(snapshot.agents.find((agent) => agent.name === 'Claude worker')?.backendDefaults).toStrictEqual({
+      kind: 'claude',
+    });
   });
 
   it('leaves celebration display policy to the receiving client', async () => {

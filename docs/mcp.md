@@ -504,6 +504,9 @@ Input:
 - `branchName`: required when creating a worktree;
 - `destinationPath`: optional worktree destination;
 - `backend` and `name`: optional agent configuration;
+- `model` and `reasoningEffort`: optional backend overrides. When omitted and
+  the new agent uses the caller's backend, each value inherits from the caller;
+  cross-backend creation uses that backend's defaults instead;
 - `prompt`: optional self-contained initial instructions. The tool stays
   pending until the new agent accepts this prompt.
 
