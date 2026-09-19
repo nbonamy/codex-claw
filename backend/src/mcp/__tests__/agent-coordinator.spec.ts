@@ -249,6 +249,8 @@ describe('ClawMcpAgentCoordinator', () => {
     await coordinator.createAgent('agent-dina', {
       repoPath: ' /src/claw ',
       name: ' New Agent ',
+      model: ' gpt-5.6-sol ',
+      reasoningEffort: ' high ',
       createWorktree: true,
       branchName: ' coverage ',
       destinationPath: ' /src/claw-coverage ',
@@ -258,6 +260,8 @@ describe('ClawMcpAgentCoordinator', () => {
       repoPath: '/src/claw',
       name: 'New Agent',
       backend: 'codex',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
       createWorktree: true,
       branchName: 'coverage',
       destinationPath: '/src/claw-coverage',

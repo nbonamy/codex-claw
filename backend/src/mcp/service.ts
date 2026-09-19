@@ -17,6 +17,7 @@ import type {
   CreateAgentInput,
   CreateSourceWorktreeInput,
   AutomationExecutionLogEntry,
+  BackendDefaults,
   BackendPublishedEvent,
   SpokenAnnouncementRequest,
   SpokenAnnouncementQueueResult,
@@ -458,6 +459,7 @@ export class ClawMcpService {
         name: input.name?.trim() || null,
         folder,
         backend: input.backend ?? 'codex',
+        backendDefaults: delegatedBackendDefaults(caller, input),
         delegatedByAgentId: caller.id,
         teamId: input.teamId ?? caller.teamId,
       };
@@ -568,6 +570,23 @@ export class ClawMcpService {
   private emit(event: BackendEvent): void {
     this.eventSink?.(event);
   }
+}
+
+function delegatedBackendDefaults(caller: Agent, input: McpCreateAgentInput): BackendDefaults {
+  const backend = input.backend ?? 'codex';
+  const callerDefaults = caller.backend === backend && caller.backendDefaults?.kind === backend
+    ? caller.backendDefaults
+    : undefined;
+  const model = input.model?.trim() || callerDefaults?.model;
+  const reasoningEffort = input.reasoningEffort?.trim() || callerDefaults?.reasoningEffort;
+
+  const settings = {
+    ...(model ? { model } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
+  };
+  return backend === 'claude'
+    ? { kind: 'claude', ...settings }
+    : { kind: 'codex', ...settings };
 }
 
 async function readAgentMarkdownFile(filePath: string): Promise<string> {
