@@ -30,6 +30,11 @@ export function createCodexClawMcpServer(
       },
     }, ({ title }) => toolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
 
+    server.registerTool('attach-mission-repository', {
+      description: 'Attach one repository represented in the active Mission team after confirming it with the user. This lets later code stages create an isolated Mission worktree.',
+      inputSchema: { repoPath: z.string().trim().min(1) },
+    }, ({ repoPath }) => toolResult('attach-mission-repository', { callerAgentId, repoPath }, () => coordinator.attachMissionRepository(callerAgentId, repoPath)));
+
     server.registerTool('list-mission-artifacts', {
       description: 'List canonical artifact files already written for the active Mission. The Mission is inferred from your authenticated agent identity.',
       inputSchema: {},

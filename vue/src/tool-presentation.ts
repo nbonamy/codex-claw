@@ -73,7 +73,7 @@ const COMPUTER_USE_TOOLS = new Set([
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
 const AGENT_TOOLS = new Set(['create-agent', 'list-agents', 'register-agent', 'set-status']);
-const WORKSPACE_TOOLS = new Set(['create-worktree', 'list-repos', 'list-worktrees']);
+const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
 
 export function presentClawTool(
   context: CodexToolPresentationContext,

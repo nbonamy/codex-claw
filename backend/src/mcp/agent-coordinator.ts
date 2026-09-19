@@ -115,6 +115,7 @@ export type ClawMcpAgentCoordinatorOptions = {
   getMissionContext?: (agentId: string) => MissionToolContext | undefined;
   onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' }>;
   onSetMissionTitle?: (agentId: string, title: string) => Promise<{ success: true; title: string }>;
+  onAttachMissionRepository?: (agentId: string, repoPath: string) => Promise<{ success: true; repoPath: string }>;
   onListMissionArtifacts?: (agentId: string) => Array<{ stage: MissionStage } & MissionArtifactFile>;
   onReadMissionArtifact?: (agentId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
   onWriteMissionArtifact?: (agentId: string, input: MissionArtifactWriteInput) => Promise<MissionArtifactReadResult>;
@@ -144,6 +145,7 @@ export class ClawMcpAgentCoordinator {
   private readonly getMissionContext?: ClawMcpAgentCoordinatorOptions['getMissionContext'];
   private readonly onMissionResult?: ClawMcpAgentCoordinatorOptions['onMissionResult'];
   private readonly onSetMissionTitle?: ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
+  private readonly onAttachMissionRepository?: ClawMcpAgentCoordinatorOptions['onAttachMissionRepository'];
   private readonly onListMissionArtifacts?: ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
   private readonly onReadMissionArtifact?: ClawMcpAgentCoordinatorOptions['onReadMissionArtifact'];
   private readonly onWriteMissionArtifact?: ClawMcpAgentCoordinatorOptions['onWriteMissionArtifact'];
@@ -166,6 +168,7 @@ export class ClawMcpAgentCoordinator {
     this.getMissionContext = options.getMissionContext;
     this.onMissionResult = options.onMissionResult;
     this.onSetMissionTitle = options.onSetMissionTitle;
+    this.onAttachMissionRepository = options.onAttachMissionRepository;
     this.onListMissionArtifacts = options.onListMissionArtifacts;
     this.onReadMissionArtifact = options.onReadMissionArtifact;
     this.onWriteMissionArtifact = options.onWriteMissionArtifact;
@@ -318,6 +321,12 @@ export class ClawMcpAgentCoordinator {
     this.requireAgent(agentId);
     if (!this.onSetMissionTitle) throw new McpToolError('Mission title updates are unavailable.');
     return this.onSetMissionTitle(agentId, title);
+  }
+
+  async attachMissionRepository(agentId: string, repoPath: string) {
+    this.requireAgent(agentId);
+    if (!this.onAttachMissionRepository) throw new McpToolError('Mission repository attachment is unavailable.');
+    return this.onAttachMissionRepository(agentId, repoPath);
   }
 
   listMissionArtifacts(agentId: string) {

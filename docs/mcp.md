@@ -676,6 +676,11 @@ label once the outcome is clear. The backend infers the Mission and run from the
 caller identity, trims the title, persists it immediately, and publishes the
 updated snapshot.
 
+`attach-mission-repository` lets the active orchestrator record one repository
+already represented by a Mission team member. The tool validates the path as a
+Git repository and persists it without exposing a setup form; implementation
+creates the isolated worktree later, when code work begins.
+
 `list-mission-artifacts` and `read-mission-artifact` let any active Mission
 worker discover and consume the canonical Markdown created by earlier stations.
 `write-mission-artifact` writes only the caller's assigned station under the

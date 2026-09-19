@@ -8,6 +8,7 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'running', 'Naming mission'],
     ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'completed', 'Named mission'],
     ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'error', 'Could not name mission'],
+    ['codex_claw.attach-mission-repository', { repoPath: '/repo' }, 'completed', 'Attached mission repository'],
     ['codex_claw.list-mission-artifacts', {}, 'completed', 'Checked mission artifacts'],
     ['codex_claw.read-mission-artifact', { stage: 'requirements' }, 'completed', 'Read mission artifact'],
     ['codex_claw.write-mission-artifact', { stage: 'requirements' }, 'completed', 'Saved mission artifact'],

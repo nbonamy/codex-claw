@@ -34,6 +34,7 @@ describe('Claw tool presentation', () => {
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
     ['set-mission-title', TargetArrowIcon, 'Named mission'],
+    ['attach-mission-repository', GitBranchIcon, 'Attached mission repository'],
     ['list-mission-artifacts', MarkdownIcon, 'Checked mission artifacts'],
     ['read-mission-artifact', MarkdownIcon, 'Read mission artifact'],
     ['write-mission-artifact', SquareCheck, 'Saved mission artifact'],

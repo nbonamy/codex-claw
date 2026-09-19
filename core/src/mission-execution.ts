@@ -77,7 +77,7 @@ export function missionRunPrompt(mission: Mission, run: MissionRun, repositories
     run.feedback ? `User revision feedback:\n${run.feedback}` : '',
     `Current accepted artifacts:\n${JSON.stringify(mission.artifacts, null, 2)}`,
     `Canonical artifact files:\n${JSON.stringify(mission.artifactFiles, null, 2)}`,
-    'Use codex_claw.list-mission-artifacts and codex_claw.read-mission-artifact to inspect shared mission work. Write your stage artifact with codex_claw.write-mission-artifact before submitting it for review. These tools are the canonical handoff between mission agents.',
+    'Use codex_claw.list-mission-artifacts and codex_claw.read-mission-artifact to inspect shared mission work. Write your stage artifact with codex_claw.write-mission-artifact before submitting it for review. These tools are the canonical handoff between mission agents. Once the user confirms which team repository this Mission will change, call codex_claw.attach-mission-repository with its exact listed path so later code stages can create an isolated worktree.',
     'When ready, call codex_claw.submit-mission-result with missionId, runId, summary, and the complete artifacts object using the same schema shown above. Update only artifacts belonging to your assigned stage (and only your assigned implementation ticket). This submits a proposal for user review; it does not approve a stage. Do not merely paste the result into chat. Do not claim a stage was approved or a mission completed.',
   ].filter(Boolean).join('\n\n');
 }

@@ -100,6 +100,19 @@ describe('mission execution', () => {
     expect(h.ports.createWorktree).toHaveBeenCalledOnce();
   });
 
+  it('lets the active orchestrator attach a repository represented in its team', async () => {
+    const h = setup();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const workerId = h.current().execution!.runs[0]!.workerId!;
+
+    await expect(h.service.attachRepository(workerId, '/outside-team')).rejects.toThrow('represented');
+    await expect(h.service.attachRepository(workerId, `  ${h.originalAgents[0]!.folder}  `)).resolves.toEqual({
+      success: true, repoPath: h.originalAgents[0]!.folder,
+    });
+    expect(h.current().execution!.repoPath).toBe(h.originalAgents[0]!.folder);
+    expect(h.ports.validateRepository).toHaveBeenCalledWith(h.originalAgents[0]!.folder);
+  });
+
   it('serializes competing artifact revisions before writing the canonical file', async () => {
     const h = setup();
     await h.command({ action: 'run' }); await h.service.waitForLaunches();

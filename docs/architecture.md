@@ -85,7 +85,9 @@ continue to own all conversation content and turn mechanics.
 
 Mission MCP tools are registered only for the authenticated worker that owns the
 current running or awaiting-review attempt. `set-mission-title` updates the
-persisted Mission. `list-mission-artifacts`, `read-mission-artifact`, and
+persisted Mission. `attach-mission-repository` records the user-confirmed team
+repository that later code stages use to create an isolated worktree.
+`list-mission-artifacts`, `read-mission-artifact`, and
 `write-mission-artifact` provide the canonical handoff between stage agents;
 writes are limited to the caller's assigned stage and use optimistic artifact
 revisions. `submit-mission-result` submits or revises stage proposals only after

@@ -233,6 +233,14 @@ export class MissionExecutionService {
     return { success: true, title: normalized };
   }
 
+  async attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }> {
+    const context = this.requireContext(agentId);
+    const normalized = repoPath.trim();
+    const mission = this.requireMission(context.missionId);
+    await this.execute({ id: mission.id, revision: mission.revision, action: 'attachRepository', repoPath: normalized });
+    return { success: true, repoPath: normalized };
+  }
+
   private requireContext(agentId: string): MissionToolContext {
     const context = this.contextForAgent(agentId);
     if (!context) throw new Error('This agent is not working on an active mission run.');

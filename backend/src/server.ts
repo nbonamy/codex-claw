@@ -309,6 +309,10 @@ export class ClawBackendServer {
     return this.missionExecution.setTitle(agentId, title);
   }
 
+  async attachMissionRepository(agentId: string, repoPath: string) {
+    return this.missionExecution.attachRepository(agentId, repoPath);
+  }
+
   async initialize(): Promise<void> {
     await this.initializeSourceFolderIfNeeded();
     await this.ensureRemoteControlStatus();
