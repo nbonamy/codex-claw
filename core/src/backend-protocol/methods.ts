@@ -28,6 +28,7 @@ export const backendMethods = {
   agentGitBranchCreate: 'agent/git/branch/create',
   agentGitPullRequestCreate: 'agent/git/pullRequest/create',
   agentGitMerge: 'agent/git/merge',
+  agentGitUpdateFromBase: 'agent/git/base/update',
   agentGoalClear: 'agent/goal/clear',
   agentGoalUpdate: 'agent/goal/update',
   agentConversationLoad: 'agent/conversation/load',
@@ -42,6 +43,7 @@ export const backendMethods = {
   agentPermissionModeUpdate: 'agent/permissionMode/update',
   agentPromptSend: 'agent/prompt/send',
   agentPlanReviewRespond: 'agent/planReview/respond',
+  agentThreadFlagRespond: 'agent/threadFlag/respond',
   agentPromptSteer: 'agent/prompt/steer',
   agentQueuedPromptDelete: 'agent/queuedPrompt/delete',
   agentQueuedPromptSteer: 'agent/queuedPrompt/steer',
@@ -118,6 +120,7 @@ export const backendMethods = {
   debugAgentMessageSend: 'debug/agentMessage/send',
   debugExecutionPlanToggle: 'debug/executionPlan/toggle',
   debugPlanReadyForReviewInject: 'debug/planReadyForReview/inject',
+  debugThreadFlagSet: 'debug/threadFlag/set',
   remoteControlStatusGet: 'remoteControl/status/get',
   remoteControlEnable: 'remoteControl/enable',
   remoteControlDisable: 'remoteControl/disable',
@@ -183,6 +186,7 @@ export const agentGitBackendMethods = [
   backendMethods.agentGitBranchCreate,
   backendMethods.agentGitPullRequestCreate,
   backendMethods.agentGitMerge,
+  backendMethods.agentGitUpdateFromBase,
 ] as const;
 
 export type AgentGitBackendMethod = typeof agentGitBackendMethods[number];

@@ -99,6 +99,10 @@ Current implementation checkpoint:
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
+- `clawd` persists allowlisted typed thread flags authored through MCP.
+  Clients receive them in app snapshots and respond through app-owned methods;
+  executing the first `delegate_to_worktree` flag reuses the normal prompt and
+  co-agent creation paths.
 - Electron main no longer contains backend orchestration implementation modules
   for automations, work integrations, MCP, source scanning, git worktrees, agent file
   reads, or state persistence. Those live under `backend/src`; `core/src`

@@ -126,6 +126,20 @@ export function createCodexClawMcpServer(
     statusLength: status.length,
   }, () => coordinator.setStatus(callerAgentId, status)));
 
+  server.registerTool('toggle_thread_flag', {
+    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent; clear it when that is no longer appropriate. This flag takes no payload.',
+    inputSchema: {
+      id: z.enum(['delegate_to_worktree']).describe('Predefined semantic thread flag.'),
+      value: z.boolean().describe('True sets the flag; false clears it.'),
+      payload: z.unknown().optional().describe('Optional kind-specific payload. delegate_to_worktree does not accept one.'),
+    },
+  }, ({ id, value, payload }) => toolResult('toggle_thread_flag', {
+    agentId: callerAgentId,
+    id,
+    value,
+    hasPayload: payload !== undefined,
+  }, () => coordinator.toggleThreadFlag(callerAgentId, { id, value, payload })));
+
   server.registerTool('celebrate', {
     description: 'Request a transient visual celebration in Codex Claw when celebrations are enabled by the user. Confetti, stars, and shapes fit ordinary wins, while schoolPride marks a major team achievement.',
     inputSchema: {
@@ -192,23 +206,27 @@ export function createCodexClawMcpServer(
   }, () => coordinator.createSourceWorktree(callerAgentId, { repoPath, branchName, destinationPath })));
 
   server.registerTool('create-agent', {
-    description: 'Create a new Codex Claw co-agent in your team, optionally in an isolated worktree. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
+    description: 'Create a new Codex Claw co-agent in your team, optionally in an isolated worktree. Model and reasoning effort inherit from the caller when the backend matches unless explicitly overridden. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
     inputSchema: {
       name: z.string().optional().describe('Optional custom name. When omitted, the agent displays its branch or folder name.'),
       backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to codex.'),
+      model: z.string().optional().describe('Optional model override. Inherits the caller model when the backend matches.'),
+      reasoningEffort: z.string().optional().describe('Optional reasoning effort override. Inherits the caller effort when the backend matches.'),
       repoPath: z.string().describe('Repository or worktree folder path.'),
       createWorktree: z.boolean().optional().describe('If true, create a new worktree from repoPath before creating the agent.'),
       branchName: z.string().optional().describe('Branch name for the new worktree. Required when createWorktree is true.'),
       destinationPath: z.string().optional().describe('Optional destination path for the new worktree.'),
       prompt: z.string().optional().describe('Optional initial instructions. When provided, Claw starts the new agent immediately and waits until the handoff is accepted.'),
     },
-  }, ({ name, backend, repoPath, createWorktree, branchName, destinationPath, prompt }) => toolResult('create-agent', {
+  }, ({ name, backend, model, reasoningEffort, repoPath, createWorktree, branchName, destinationPath, prompt }) => toolResult('create-agent', {
     agentId: callerAgentId,
     repoPath,
     createWorktree: createWorktree === true,
   }, () => coordinator.createAgent(callerAgentId, {
     name,
     backend,
+    model,
+    reasoningEffort,
     repoPath,
     createWorktree,
     branchName,

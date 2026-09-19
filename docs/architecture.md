@@ -139,6 +139,7 @@ type Agent = {
   backend: "codex" | "claude"
   backendSession?: BackendSession
   backendDefaults?: BackendDefaults
+  threadFlags?: { delegate_to_worktree?: true }
   status: AgentStatus
   createdAt: string
   updatedAt: string
@@ -167,7 +168,8 @@ Codex app-server owns Codex conversation state and thread history in
 session transcript. Codex Claw owns only product state: teams, agents,
 selected folders, the global source folder, view preferences, theme
 preference, workspace identity, provider conversation references, and Claw
-metadata. `AppSnapshot` contains no provider transcript. Persisted Git remote
+metadata, including predefined typed thread flags authored through its MCP
+server. `AppSnapshot` contains no provider transcript. Persisted Git remote
 identities are canonical and credential-free.
 
 Backend domain events, provider conversation frames, explicit client effects,

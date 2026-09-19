@@ -1,4 +1,5 @@
 import { isMission } from './missions';
+import { isThreadFlags } from './thread-flags';
 import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
 import { spokenAnnouncementVoices } from './contracts';
@@ -110,6 +111,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'contextUsage', isAgentContextUsage) &&
     optional(value, 'plan', isThreadPlan) &&
     optional(value, 'planReview', isPlanReview) &&
+    optional(value, 'threadFlags', isThreadFlags) &&
     optional(value, 'goal', isThreadGoal) &&
     optional(value, 'isRegistered', isBoolean) &&
     optional(value, 'mcpSessionId', isString) &&

@@ -31,6 +31,7 @@ describe('Claw tool presentation', () => {
     ['computer-use-request-screen-recording', DeviceDesktopIcon, 'Requested macOS Screen Recording access for Computer Use'],
     ['send-message', MessageIcon, 'Sent message to codex-app-sdk'],
     ['list-agents', UsersIcon, 'Listed agents'],
+    ['toggle_thread_flag', UsersIcon, 'Updated thread flag'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
     ['set-mission-title', TargetArrowIcon, 'Named mission'],

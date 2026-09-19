@@ -3,6 +3,7 @@ import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/mission
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { parseToggleThreadFlagInput, type ToggleThreadFlagInput } from '@codex-claw/core/thread-flags';
 
 export type McpAgentInfo = {
   id: string;
@@ -96,8 +97,10 @@ export type McpCreateAgentInput = {
   branchName?: string;
   createWorktree?: boolean;
   destinationPath?: string;
+  model?: string;
   name?: string;
   prompt?: string;
+  reasoningEffort?: string;
   repoPath: string;
 };
 
@@ -267,6 +270,22 @@ export class ClawMcpAgentCoordinator {
     return 'Status updated';
   }
 
+  toggleThreadFlag(agentId: string, input: ToggleThreadFlagInput): {
+    success: true;
+    id: ToggleThreadFlagInput['id'];
+    value: boolean;
+  } {
+    const agent = this.requireAgent(agentId);
+    const flag = parseToggleThreadFlagInput(input);
+    const threadFlags = { ...agent.threadFlags };
+    if (flag.value) threadFlags[flag.id] = true;
+    else delete threadFlags[flag.id];
+    agent.threadFlags = Object.keys(threadFlags).length > 0 ? threadFlags : undefined;
+    agent.updatedAt = this.now().toISOString();
+    this.onAgentUpdated?.(agent);
+    return { success: true, id: flag.id, value: flag.value };
+  }
+
   async displayMarkdown(agentId: string, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
     const agent = this.requireAgent(agentId);
     const markdown = input.markdown?.trim() ?? '';
@@ -423,6 +442,8 @@ export class ClawMcpAgentCoordinator {
       name: input.name?.trim(),
       prompt: input.prompt?.trim() || undefined,
       backend: input.backend ?? 'codex',
+      model: input.model?.trim() || undefined,
+      reasoningEffort: input.reasoningEffort?.trim() || undefined,
       repoPath: input.repoPath.trim(),
       createWorktree: input.createWorktree,
       branchName: input.branchName?.trim(),

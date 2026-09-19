@@ -11,6 +11,52 @@ import { approvalAgentRequest } from '@codex-claw/core/agent-request';
 afterEach(() => { delete window.codexClaw; });
 
 describe('Unified backend → mounted application', () => {
+  it('submits worktree delegation through the complete client seam and clears only on success', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.threadFlags = { delegate_to_worktree: true };
+    const { api } = installBackendFixture(snapshot);
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    api.respondToThreadFlag.mockRejectedValueOnce(new Error('backend unavailable'));
+    await wrapper.get('.thread-flag-affordance__action').trigger('click');
+    await flushPromises();
+    expect(api.respondToThreadFlag).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      id: 'delegate_to_worktree', action: 'execute',
+    });
+    expect(wrapper.find('.thread-flag-affordance').exists()).toBe(true);
+
+    const cleared = structuredClone(snapshot);
+    delete cleared.agents[0]!.threadFlags;
+    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
+    await wrapper.get('.thread-flag-affordance__action').trigger('click');
+    await flushPromises();
+    expect(api.respondToThreadFlag).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('.thread-flag-affordance').exists()).toBe(false);
+  });
+
+  it('dismisses worktree delegation without using the prompt API', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.threadFlags = { delegate_to_worktree: true };
+    const { api } = installBackendFixture(snapshot);
+    const cleared = structuredClone(snapshot);
+    delete cleared.agents[0]!.threadFlags;
+    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    await wrapper.get('.thread-flag-affordance__dismiss').trigger('click');
+    await flushPromises();
+
+    expect(api.respondToThreadFlag).toHaveBeenCalledWith(agent.id, {
+      id: 'delegate_to_worktree', action: 'dismiss',
+    });
+    expect(api.sendPrompt).not.toHaveBeenCalled();
+    expect(wrapper.find('.thread-flag-affordance').exists()).toBe(false);
+  });
+
   it('shows, updates and clears execution progress without opening a review', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

@@ -62,9 +62,13 @@ export function applyRuntimeEventToSnapshot(
     const agent = findAgent(snapshot, event.agentId);
     if (agent) {
       const statusText = event.payload.statusText;
+      const threadFlags = event.payload.threadFlags;
       Object.assign(agent, event.payload);
       if (statusText === null) {
         delete agent.statusText;
+      }
+      if (threadFlags === null) {
+        delete agent.threadFlags;
       }
     }
     return;

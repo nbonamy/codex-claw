@@ -17,6 +17,8 @@ import type {
   AgentGitPushInput,
   AgentGitStageInput,
   AgentGitStatus,
+  AgentGitUpdateFromBaseInput,
+  AgentGitUpdateFromBaseResult,
   AgentGitWorkflow,
   AgentPullRequestTracking,
   TurnGitDiff
@@ -111,6 +113,8 @@ export type {
   AgentGitPushInput,
   AgentGitStageInput,
   AgentGitStatus,
+  AgentGitUpdateFromBaseInput,
+  AgentGitUpdateFromBaseResult,
   AgentGitWorkflow,
   AgentPullRequestTracking,
   TurnGitDiff,
@@ -348,6 +352,7 @@ export type Agent = {
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('./plan-review').PlanReview;
+  threadFlags?: import('./thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   isRegistered?: boolean;
   mcpSessionId?: string;
@@ -726,6 +731,7 @@ export type DesktopUpdateStatus = {
 };
 
 export type CodexClawApi = {
+  respondToThreadFlag(agentId: string, response: import('./thread-flags').ThreadFlagResponse): Promise<AppSnapshot>;
   respondToPlanReview(agentId: string, response: import('./plan-review').PlanReviewResponse): Promise<AppSnapshot>;
   getSnapshot(): Promise<AppSnapshot>;
   getSnapshotState(): Promise<RendererSnapshotState>;
@@ -763,6 +769,7 @@ export type CodexClawApi = {
   createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow>;
   createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
   mergeAgentGitBranch(agentId: string, input: AgentGitMergeInput): Promise<AgentGitWorkflow>;
+  updateAgentGitBranchFromBase(agentId: string, input: AgentGitUpdateFromBaseInput): Promise<AgentGitUpdateFromBaseResult>;
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;
   openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;

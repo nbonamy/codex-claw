@@ -35,8 +35,9 @@ type WorkBacklogAssignmentUpdatedPayload = Omit<WorkBacklogAssignment, 'policy' 
   policy?: WorkBacklogAssignmentPolicy;
   status: WorkBacklogAssignmentStatus | 'working';
 };
-type AgentUpdatedPayload = Omit<Partial<Agent>, 'id' | 'statusText'> & {
+type AgentUpdatedPayload = Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText'> & {
   id: string;
+  threadFlags?: import('../thread-flags').ThreadFlags | null;
   statusText?: string | null;
 };
 type ThreadMode = 'default' | 'plan';

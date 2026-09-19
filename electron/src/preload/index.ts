@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AppCommand, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, CodexClawApi, ConversationListInput, ConversationResumeTarget, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AppCommand, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, CodexClawApi, ConversationListInput, ConversationResumeTarget, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
 const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
 
 const api: CodexClawApi = {
+  respondToThreadFlag: (agentId, response) => ipc.invoke(ipcChannels.respondToThreadFlag, agentId, response),
   getSnapshot: () => ipc.invoke(ipcChannels.getSnapshot),
   getSnapshotState: () => ipc.invoke(ipcChannels.getSnapshotState),
   listSshHosts: () => ipc.invoke(ipcChannels.listSshHosts),
@@ -43,6 +44,7 @@ const api: CodexClawApi = {
   createAgentGitBranch: (agentId: string, input: AgentGitBranchInput) => ipc.invoke(ipcChannels.createAgentGitBranch, agentId, input),
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => ipc.invoke(ipcChannels.createAgentGitPullRequest, agentId, input),
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => ipc.invoke(ipcChannels.mergeAgentGitBranch, agentId, input),
+  updateAgentGitBranchFromBase: (agentId: string, input: AgentGitUpdateFromBaseInput) => ipc.invoke(ipcChannels.updateAgentGitBranchFromBase, agentId, input),
   getOpenInApplications: () => ipc.invoke(ipcChannels.getOpenInApplications),
   openAgentPath: (agentId: string, application: OpenInApplication, filePath?: string) => ipc.invoke(ipcChannels.openAgentPath, agentId, application, filePath),
   chooseAgentFolder: () => ipc.invoke(ipcChannels.chooseAgentFolder),

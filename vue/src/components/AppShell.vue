@@ -210,6 +210,8 @@
         :commit-agent-git-changes="props.commitAgentGitChanges"
         :confirm-plan="confirmPlan"
         :respond-to-plan-review="respondToPlanReview"
+        :respond-to-thread-flag="respondToThreadFlag"
+        :thread-flag-busy="threadFlagBusy"
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
         :chat-text-annotations="activeChatTextAnnotations"
@@ -232,6 +234,7 @@
         :latest-conversation-turn-id="conversationLatestTurnId"
         :load-work-items="props.loadWorkItems"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
+        :update-agent-git-branch-from-base="props.updateAgentGitBranchFromBase"
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
         :open-attachment-image-annotation="openAttachmentImageAnnotation"
@@ -564,6 +567,7 @@ const props = withDefaults(defineProps<{
   createAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   createAgentGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   mergeAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  updateAgentGitBranchFromBase?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
@@ -617,6 +621,7 @@ const props = withDefaults(defineProps<{
   retryAgentHistory?: () => Promise<void>;
   sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
+  respondToThreadFlagAction?: (action: 'execute' | 'dismiss') => Promise<void>;
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
@@ -682,6 +687,7 @@ const props = withDefaults(defineProps<{
   createAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitBranchCreationIsNotAvailable')); },
   createAgentGitPullRequest: async () => { throw new Error(translate('surface.appShell.pullRequestCreationIsNotAvailable')); },
   mergeAgentGitBranch: async () => { throw new Error(translate('surface.appShell.gitMergeIsNotAvailable')); },
+  updateAgentGitBranchFromBase: async () => { throw new Error(translate('surface.appShell.gitUpdateFromBaseIsNotAvailable')); },
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
   openAgentPath: async () => {
     throw new Error(translate('surface.appShell.openInIsNotAvailable'));
@@ -2058,6 +2064,19 @@ async function respondToPlanReview(resolution: 'accept' | 'revise' | 'cancel', f
   }
   if (currentAgent.value?.id === agentId) emit('update:planMode', resolution === 'revise');
   if (agentId) closeRightWorkspaceTab(agentId, 'plan');
+}
+
+const threadFlagBusy = ref(false);
+async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+  if (!props.respondToThreadFlagAction || threadFlagBusy.value) return;
+  threadFlagBusy.value = true;
+  try {
+    await props.respondToThreadFlagAction(action);
+  } catch (error) {
+    ElMessage.error(localizedErrorMessage(error, t));
+  } finally {
+    threadFlagBusy.value = false;
+  }
 }
 
 function confirmPlan(): void {

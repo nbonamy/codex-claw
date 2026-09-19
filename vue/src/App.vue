@@ -13,6 +13,7 @@
     :retry-agent-history="retryActiveAgentHistory"
     :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
+    :respond-to-thread-flag-action="respondToThreadFlag"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
     :retry-turn-action="retryTurn"
@@ -76,6 +77,7 @@
     :create-agent-git-branch="createAgentGitBranch"
     :create-agent-git-pull-request="createAgentGitPullRequest"
     :merge-agent-git-branch="mergeAgentGitBranch"
+    :update-agent-git-branch-from-base="updateAgentGitBranchFromBase"
     :open-in-applications="openInApplications"
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
@@ -305,6 +307,7 @@ const {
   createAgentGitBranch,
   createAgentGitPullRequest,
   mergeAgentGitBranch,
+  updateAgentGitBranchFromBase,
   loadOpenInApplications,
   openAgentPath,
   createAgent,
@@ -382,6 +385,7 @@ const {
   selectTeam,
   sendPrompt,
   respondToPlanReview,
+  respondToThreadFlag,
   sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,

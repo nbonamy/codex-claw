@@ -23,6 +23,7 @@
     :push-git-branch="props.pushAgentGitBranch"
     :create-git-pull-request="props.createAgentGitPullRequest"
     :merge-git-branch="props.mergeAgentGitBranch"
+    :update-git-branch-from-base="props.updateAgentGitBranchFromBase"
     :report-back-agent-name="reportBackAgentName"
     @expand-sidebar="emit('expand-sidebar')"
     @toggle-execution-plan="toggleExecutionPlan"
@@ -47,10 +48,12 @@
       :history-load-failed="historyLoadFailed"
       :history-loading="isConversationLoading"
       :has-visible-messages="hasVisibleMessages"
+      :thread-flag-busy="threadFlagBusy"
       @annotate-attachment="openAttachmentImageAnnotation"
       @add-text-annotation="addChatTextAnnotation($event.selection, $event.comment)"
       @close-plan="closeExecutionPlan"
       @retry-history="retryConversationHistory"
+      @thread-flag="respondToThreadFlag($event)"
       @remove-text-annotation="removeChatTextAnnotation"
     />
     <RightWorkspacePanel
@@ -189,6 +192,8 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
+  respondToThreadFlag: (action: 'execute' | 'dismiss') => Promise<void>;
+  threadFlagBusy: boolean;
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];
@@ -218,6 +223,7 @@ const props = defineProps<{
   hasRunningPlanTool: boolean;
   latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
+  updateAgentGitBranchFromBase: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;

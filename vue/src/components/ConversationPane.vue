@@ -60,6 +60,14 @@
           </button>
         </el-tooltip>
       </template>
+      <template #composer-shelf-actions="{ disabled }">
+        <ThreadFlagAffordance
+          v-if="delegateToWorktree"
+          :busy="threadFlagBusy || disabled"
+          @execute="emit('thread-flag', 'execute')"
+          @dismiss="emit('thread-flag', 'dismiss')"
+        />
+      </template>
       <template #composer-context="{ disabled }">
         <ChatTextAnnotationCards
           v-if="textAnnotations.length > 0"
@@ -109,6 +117,7 @@ import ConversationLoadError from './ConversationLoadError.vue';
 import AgentMention from './AgentMention.vue';
 import ChatTextAnnotationCards from './ChatTextAnnotationCards.vue';
 import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
+import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import {
   presentCollaborationMessage,
@@ -137,6 +146,7 @@ const props = withDefaults(defineProps<{
   hasVisibleMessages?: boolean;
   emptyHeadline?: string;
   emptySubhead?: string;
+  threadFlagBusy?: boolean;
 }>(), {
   agents: () => [],
   attachmentAnnotationCounts: () => ({}),
@@ -145,6 +155,7 @@ const props = withDefaults(defineProps<{
   historyLoadFailed: false,
   historyLoading: false,
   hasVisibleMessages: false,
+  threadFlagBusy: false,
 });
 provideClawToolPresentation(
   (key, params) => t(key, params ?? {}),
@@ -160,9 +171,11 @@ const emit = defineEmits<{
   'close-plan': [];
   'remove-text-annotation': [annotationId: string];
   'retry-history': [];
+  'thread-flag': [action: 'execute' | 'dismiss'];
 }>();
 
 const conversationKey = computed(() => props.agent?.id ?? 'no-agent');
+const delegateToWorktree = computed(() => props.agent?.threadFlags?.delegate_to_worktree === true);
 const messageTextSelection = ref<CodexMessageTextSelection | null>(null);
 const collaborationMessagePresentations = new Map<string, CollaborationMessagePresentation>();
 let transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();

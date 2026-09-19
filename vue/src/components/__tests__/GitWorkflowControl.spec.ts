@@ -9,7 +9,7 @@ import { stubElectronTestWindow } from '../../test/client';
 
 const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktree', backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'idle' }, createdAt: '', updatedAt: '' } as Agent;
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
-const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
+const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, baseBranch: 'main', branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
 function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
   return mount(GitWorkflowControl, { props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides }, global: { plugins: [ElementPlus] } });
 }
@@ -207,6 +207,130 @@ describe('GitWorkflowControl', () => {
       'Create PR',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
+  });
+
+  it('offers updating a linked worktree from its base branch and recommends committing dirty work first', async () => {
+    const updateFromBase = vi.fn();
+    const wrapper = mountControl({ updateFromBase, commitChanges: vi.fn() });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
+
+    expect(wrapper.text()).toContain('Commit your changes first');
+    expect(wrapper.text()).toContain('Updating from main with uncommitted changes can cause conflicts.');
+    expect(updateFromBase).not.toHaveBeenCalled();
+
+    await submitButton(wrapper, 'Commit first').trigger('click');
+    expect(wrapper.text()).toContain('Commit changes');
+    expect(updateFromBase).not.toHaveBeenCalled();
+  });
+
+  it('can continue a dirty update and hands detected conflicts to the agent', async () => {
+    const updateFromBase = vi.fn().mockResolvedValue({
+      workflow,
+      baseBranch: 'main',
+      branch: 'feature/demo',
+      conflicts: ['src/app.ts'],
+    });
+    const wrapper = mountControl({ updateFromBase });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
+    await submitButton(wrapper, 'Update anyway').trigger('click');
+    await flushPromises();
+
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, allowDirty: true });
+    expect(wrapper.text()).toContain('Agent resolving conflicts');
+    expect(wrapper.text()).toContain('The agent has been asked to resolve 1 conflict from main.');
+  });
+
+  it('runs a clean update immediately in the Git progress dialog', async () => {
+    const cleanWorkflow = { ...workflow, files: [], stagedFiles: [], unstagedFiles: [] };
+    const pendingUpdate = deferred<{ workflow: AgentGitWorkflow; baseBranch: string; branch: string; conflicts: string[] }>();
+    const updateFromBase = vi.fn(() => pendingUpdate.promise);
+    const wrapper = mountControl({ getWorkflow: async () => cleanWorkflow, updateFromBase });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
+
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true });
+    expect(wrapper.text()).toContain('Updating from main');
+
+    vi.useFakeTimers();
+    pendingUpdate.resolve({ workflow: cleanWorkflow, baseBranch: 'main', branch: 'feature/demo', conflicts: [] });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Branch updated');
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+  });
+
+  it('requires a stale branch update before reopening the normal merge confirmation', async () => {
+    vi.useFakeTimers();
+    const staleWorkflow = {
+      ...workflow,
+      baseUpdateRequired: true,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+    };
+    const currentWorkflow = { ...staleWorkflow, baseUpdateRequired: false };
+    const getWorkflow = vi.fn(async () => staleWorkflow);
+    const updateFromBase = vi.fn(async () => ({
+      workflow: currentWorkflow,
+      baseBranch: 'main',
+      branch: 'feature/demo',
+      conflicts: [],
+    }));
+    const mergeBranch = vi.fn(async () => currentWorkflow);
+    const wrapper = mountControl({ getWorkflow, updateFromBase, mergeBranch });
+    await vi.runAllTimersAsync();
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
+
+    expect(getWorkflow).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain('Update from main required');
+    expect(wrapper.text()).toContain('This branch must include the latest changes from main before it can be merged.');
+    expect(updateFromBase).not.toHaveBeenCalled();
+    expect(mergeBranch).not.toHaveBeenCalled();
+
+    await submitButton(wrapper, 'Update branch').trigger('click');
+    await flushPromises();
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true });
+    expect(wrapper.text()).toContain('Branch updated');
+
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(wrapper.text()).toContain('Merge branch');
+    expect(wrapper.text()).toContain('Preserve every commit in a merge commit.');
+    expect(mergeBranch).not.toHaveBeenCalled();
+  });
+
+  it('requires committing changes in the target worktree before showing merge options', async () => {
+    const mergeBranch = vi.fn(async () => workflow);
+    const wrapper = mountControl({
+      getWorkflow: async () => ({ ...workflow, baseWorktreeDirty: true }),
+      mergeBranch,
+    });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+
+    expect(wrapper.text()).toContain('Commit changes in main first');
+    expect(wrapper.text()).toContain('The main worktree has uncommitted changes. Commit them before merging feature/demo.');
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
+    expect(mergeBranch).not.toHaveBeenCalled();
+  });
+
+  it('does not offer updating from a base branch outside a linked worktree', async () => {
+    const wrapper = mountControl({
+      getWorkflow: async () => ({ ...workflow, isLinkedWorktree: false, baseBranch: undefined }),
+      updateFromBase: vi.fn(),
+    });
+    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+
+    expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text().includes('Update from'))).toBe(false);
   });
 
   it('reloads action availability when the selected agent changes', async () => {

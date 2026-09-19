@@ -227,16 +227,18 @@
     v-if="mergeDialogOpen"
     v-model="mergeDialogOpen"
     class="claw-dialog git-workflow-control__dialog"
-    :class="{ 'git-workflow-control__dialog--transient': mergeOperation.status === 'success' }"
-    width="min(660px, calc(100vw - 32px))"
+    :class="{
+      'git-workflow-control__dialog--transient': mergeOperation.status === 'success',
+    }"
+    :width="mergeTargetDirtyWarning ? 'min(520px, calc(100vw - 32px))' : 'min(660px, calc(100vw - 32px))'"
     :teleported="false"
     :show-close="false"
     :close-on-click-modal="!mergeOperationRunning"
     :close-on-press-escape="!mergeOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.mergeBranch') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
-    <div v-if="mergeOperation.status === 'confirming'" class="git-workflow-control__dialog-form">
+    <template #header><div class="claw-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !mergeTargetDirtyWarning }"><h2 class="claw-dialog__title">{{ mergeDialogTitle }}</h2><span v-if="mergeTargetDirtyWarning" class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.targetWorktreeHasChanges', { branch: baseBranch, sourceBranch: workflow?.branch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <div v-if="!mergeTargetDirtyWarning && mergeOperation.status === 'confirming'" class="git-workflow-control__dialog-form">
       <div class="git-workflow-control__merge-strategy" role="radiogroup" :aria-label="$t('surface.gitWorkflowControl.mergeStrategy')">
         <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'merge' }">
           <input v-model="mergeStrategy" type="radio" value="merge" />
@@ -283,7 +285,7 @@
       <p v-if="mergeUnavailable" class="git-workflow-control__hint">{{ $t('surface.gitWorkflowControl.mergeIsAvailableOnceAMergeTargetIsConfiguredForThisWorkt') }}</p>
     </div>
     <GitOperationFeedback
-      v-else
+      v-else-if="!mergeTargetDirtyWarning"
       :status="mergeFeedbackStatus"
       :title="mergeOperationTitle"
       :detail="mergeOperationDetail"
@@ -291,9 +293,39 @@
       <template #icon><GitMergeIcon /></template>
     </GitOperationFeedback>
     <template #footer>
-      <div v-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
+      <div v-if="mergeTargetDirtyWarning" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
+      <div v-else-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
       <div v-else-if="mergeOperationRunning" class="claw-dialog__footer"><button class="claw-button claw-button--secondary" type="button" @click="runMergeInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
       <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.retry') }}</button></div>
+    </template>
+  </el-dialog>
+
+  <el-dialog
+    v-if="updateDialogOpen"
+    v-model="updateDialogOpen"
+    class="claw-dialog git-workflow-control__dialog"
+    :class="{ 'git-workflow-control__dialog--transient': updateOperation.status === 'success' }"
+    width="min(560px, calc(100vw - 32px))"
+    :teleported="false"
+    :show-close="false"
+    :close-on-click-modal="!updateOperationRunning"
+    :close-on-press-escape="!updateOperationRunning"
+    destroy-on-close
+  >
+    <template #header><div class="claw-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !updateOperationConfirming }"><h2 class="claw-dialog__title">{{ updateDialogTitle }}</h2><template v-if="updateOperation.status === 'confirmingDirty'"><span class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.commitYourChangesFirst') }}</span><span class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.updatingWithUncommittedChangesCanCauseConflicts', { branch: baseBranch }) }}</span></template><span v-else-if="updateOperation.status === 'confirmingRequired'" class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.branchMustIncludeLatestChanges', { branch: baseBranch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <GitOperationFeedback
+      v-if="!updateOperationConfirming"
+      :status="updateFeedbackStatus"
+      :title="updateOperationTitle"
+      :detail="updateOperationDetail"
+    >
+      <template #icon><RefreshIcon /></template>
+    </GitOperationFeedback>
+    <template #footer>
+      <div v-if="updateOperation.status === 'confirmingDirty'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" @click="updateFromBase(true)">{{ $t('surface.gitWorkflowControl.updateAnyway') }}</button><button class="claw-button claw-button--primary" type="button" @click="commitBeforeUpdate">{{ $t('surface.gitWorkflowControl.commitFirst') }}</button></div>
+      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(false)">{{ $t('surface.gitWorkflowControl.updateBranch') }}</button></div>
+      <div v-else-if="updateOperation.status === 'conflicts'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
+      <div v-else-if="updateOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 </template>
@@ -302,8 +334,8 @@
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
-import { AlertTriangleIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, SparklesIcon } from '../shared/icons/app-icons';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { AlertTriangleIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, RefreshIcon, SparklesIcon } from '../shared/icons/app-icons';
 import { codexClawApi } from '../platform-api';
 import { localizedErrorMessage } from '../i18n/errors';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -319,6 +351,7 @@ const props = defineProps<{
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
+  updateFromBase?: (agentId: string, input: AgentGitUpdateFromBaseInput) => Promise<AgentGitUpdateFromBaseResult>;
   reportBackAgentName?: string | null;
 }>();
 
@@ -332,6 +365,7 @@ const commitDialogOpen = ref(false);
 const pushDialogOpen = ref(false);
 const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
+const updateDialogOpen = ref(false);
 const commitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const squashCommitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const commitMessage = ref('');
@@ -378,10 +412,21 @@ type MergeOperation =
   | { status: 'error'; branch: string; mergeCreated: boolean; pushAfter: boolean; closeAgentAfterPush: boolean; message: string };
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
 const mergeBackgrounded = ref(false);
+const mergeTargetDirtyWarning = ref(false);
+type UpdateFromBaseOperation =
+  | { status: 'confirmingDirty' }
+  | { status: 'confirmingRequired' }
+  | { status: 'updating' }
+  | { status: 'success' }
+  | { status: 'conflicts'; count: number }
+  | { status: 'error'; message: string };
+const updateOperation = ref<UpdateFromBaseOperation>({ status: 'confirmingDirty' });
+const resumeMergeAfterUpdate = ref(false);
 let commitSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pushSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let pullRequestSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 let mergeSuccessTimer: ReturnType<typeof setTimeout> | null = null;
+let updateSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 const debugOperationTimers: Array<ReturnType<typeof setTimeout>> = [];
 const mergeUnavailable = computed(() => !props.mergeBranch);
 const canGenerateMessage = computed(() => props.agent.backend === 'codex' && Boolean(props.generateMessage));
@@ -454,6 +499,42 @@ const mergeOperationDetail = computed(() => mergeOperation.value.status === 'err
     : deleteWorktree.value
       ? translate('surface.gitWorkflowControl.mergingChangesAndCleaningUpTheLinkedWorktree')
       : translate('surface.gitWorkflowControl.mergingChangesIntoTheBaseWorktree'));
+const baseBranch = computed(() => workflow.value?.baseBranch ?? 'base');
+const updateOperationConfirming = computed(() => updateOperation.value.status === 'confirmingDirty'
+  || updateOperation.value.status === 'confirmingRequired');
+const mergeDialogTitle = computed(() => mergeTargetDirtyWarning.value
+  ? translate('surface.gitWorkflowControl.commitChangesInBranchFirst', { branch: baseBranch.value })
+  : translate('surface.gitWorkflowControl.mergeBranch'));
+const updateDialogTitle = computed(() => resumeMergeAfterUpdate.value
+  ? translate('surface.gitWorkflowControl.updateFromBranchRequired', { branch: baseBranch.value })
+  : translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }));
+const updateOperationRunning = computed(() => updateOperation.value.status === 'updating');
+const updateFeedbackStatus = computed<'running' | 'success' | 'warning' | 'error'>(() => updateOperation.value.status === 'success'
+  ? 'success'
+  : updateOperation.value.status === 'conflicts'
+    ? 'warning'
+    : updateOperation.value.status === 'error'
+      ? 'error'
+      : 'running');
+const updateOperationTitle = computed(() => updateOperation.value.status === 'updating'
+  ? translate('surface.gitWorkflowControl.updatingFromBranch', { branch: baseBranch.value })
+  : updateOperation.value.status === 'success'
+    ? translate('surface.gitWorkflowControl.branchUpdated')
+    : updateOperation.value.status === 'conflicts'
+      ? translate('surface.gitWorkflowControl.agentResolvingConflicts')
+      : updateOperation.value.status === 'error'
+        ? translate('surface.gitWorkflowControl.branchUpdateFailed')
+        : '');
+const updateOperationDetail = computed(() => updateOperation.value.status === 'conflicts'
+  ? translate(
+      updateOperation.value.count === 1
+        ? 'surface.gitWorkflowControl.agentAskedToResolveOneConflict'
+        : 'surface.gitWorkflowControl.agentAskedToResolveConflicts',
+      { count: updateOperation.value.count, branch: baseBranch.value },
+    )
+  : updateOperation.value.status === 'error'
+    ? updateOperation.value.message
+    : workflow.value?.branch ? `${baseBranch.value} → ${workflow.value.branch}` : baseBranch.value);
 
 const commitEnabled = computed(() => workflow.value === null
   ? !workflowError.value && (props.gitStatus?.changedFiles ?? 0) > 0
@@ -465,10 +546,12 @@ const integrationBranch = computed(() => ['main', 'master', 'develop', 'developm
 const mergeEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
 const canMerge = computed(() => mergeStrategy.value === 'merge' || Boolean(squashCommitMessage.value.trim()));
 const prEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
+const updateEnabled = computed(() => Boolean(props.updateFromBase && workflow.value?.isLinkedWorktree && workflow.value.baseBranch && currentBranchAvailable.value));
 const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
   { id: 'commit', type: 'action', label: translate('surface.gitWorkflowControl.commit'), icon: GitCommitIcon, disabled: !commitEnabled.value },
   { id: 'push', type: 'action', label: translate('surface.gitWorkflowControl.push'), icon: CloudUploadIcon, disabled: !pushEnabled.value },
+  ...(updateEnabled.value ? [{ id: 'update-from-base', type: 'action' as const, label: translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }), icon: RefreshIcon }] : []),
   { id: 'merge', type: 'action', label: translate('surface.gitWorkflowControl.merge'), icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
   { id: 'create-pr', type: 'action', label: translate('surface.gitWorkflowControl.createPR'), icon: GitForkIcon, disabled: !prEnabled.value },
 ]);
@@ -505,8 +588,13 @@ watch(mergeDialogOpen, (open) => {
       deleteBranch.value = false;
     }
   } else if (!mergeOperationRunning.value) {
+    mergeTargetDirtyWarning.value = false;
     resetMergeOperation();
   }
+});
+
+watch(updateDialogOpen, (open) => {
+  if (!open && !updateOperationRunning.value) resetUpdateOperation();
 });
 
 watch(deleteWorktree, (enabled) => {
@@ -529,6 +617,7 @@ onBeforeUnmount(() => {
   clearPushSuccessTimer();
   clearPullRequestSuccessTimer();
   clearMergeSuccessTimer();
+  clearUpdateSuccessTimer();
   clearDebugOperationTimers();
 });
 watch(() => props.agent.id, () => { void loadWorkflow({ reset: true }); });
@@ -592,7 +681,29 @@ function selectAction(action: string): void {
     pullRequestBody.value = '';
     pullRequestDialogOpen.value = true;
   }
-  else if (action === 'merge' && mergeEnabled.value && !mergeUnavailable.value) mergeDialogOpen.value = true;
+  else if (action === 'merge' && mergeEnabled.value && !mergeUnavailable.value) prepareMerge();
+  else if (action === 'update-from-base' && updateEnabled.value) {
+    resetUpdateOperation();
+    updateDialogOpen.value = true;
+    if (!workflow.value?.files.length) void updateFromBase(false);
+  }
+}
+function prepareMerge(): void {
+  if (workflow.value?.baseWorktreeDirty) {
+    mergeTargetDirtyWarning.value = true;
+    mergeDialogOpen.value = true;
+    return;
+  }
+  if (workflow.value?.baseUpdateRequired && updateEnabled.value) {
+    resetUpdateOperation();
+    resumeMergeAfterUpdate.value = true;
+    updateOperation.value = workflow.value.files.length
+      ? { status: 'confirmingDirty' }
+      : { status: 'confirmingRequired' };
+    updateDialogOpen.value = true;
+    return;
+  }
+  mergeDialogOpen.value = true;
 }
 async function commit(pushAfter: boolean): Promise<void> {
   if (!props.commitChanges) return;
@@ -795,6 +906,42 @@ async function merge(pushAfter: boolean): Promise<void> {
     busy.value = false;
   }
 }
+async function updateFromBase(allowDirty: boolean): Promise<void> {
+  if (!props.updateFromBase) return;
+  clearUpdateSuccessTimer();
+  busy.value = true;
+  workflowError.value = null;
+  updateOperation.value = { status: 'updating' };
+  try {
+    const result = await props.updateFromBase(props.agent.id, {
+      confirmed: true,
+      ...(allowDirty ? { allowDirty: true } : {}),
+    });
+    workflow.value = result.workflow;
+    if (result.conflicts.length > 0) {
+      updateOperation.value = { status: 'conflicts', count: result.conflicts.length };
+    } else {
+      updateOperation.value = { status: 'success' };
+      updateSuccessTimer = setTimeout(() => {
+        const shouldResumeMerge = resumeMergeAfterUpdate.value;
+        resumeMergeAfterUpdate.value = false;
+        updateDialogOpen.value = false;
+        if (shouldResumeMerge) prepareMerge();
+      }, 1500);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    workflowError.value = message;
+    updateOperation.value = { status: 'error', message };
+  } finally {
+    busy.value = false;
+  }
+}
+function commitBeforeUpdate(): void {
+  updateDialogOpen.value = false;
+  resetCommitOperation();
+  commitDialogOpen.value = true;
+}
 async function retryMergePush(): Promise<void> {
   if (!props.pushBranch || mergeOperation.value.status !== 'error' || !mergeOperation.value.mergeCreated) return;
   const branch = mergeOperation.value.branch;
@@ -902,6 +1049,17 @@ function clearMergeSuccessTimer(): void {
   if (mergeSuccessTimer !== null) {
     clearTimeout(mergeSuccessTimer);
     mergeSuccessTimer = null;
+  }
+}
+function resetUpdateOperation(): void {
+  clearUpdateSuccessTimer();
+  resumeMergeAfterUpdate.value = false;
+  updateOperation.value = { status: 'confirmingDirty' };
+}
+function clearUpdateSuccessTimer(): void {
+  if (updateSuccessTimer !== null) {
+    clearTimeout(updateSuccessTimer);
+    updateSuccessTimer = null;
   }
 }
 

@@ -108,6 +108,14 @@ describe('agent prompts', () => {
     expect(instructions).toContain('ask whether the user wants native subagents or Claw co-agents before acting');
   });
 
+  it('proactively suggests worktree delegation for concrete implementation candidates', () => {
+    const instructions = codexClawDeveloperInstructions(agent());
+
+    expect(instructions).toContain('Proactively call toggle_thread_flag with id delegate_to_worktree and value true');
+    expect(instructions).toContain('explicit implementation or delegation language from the user is not required');
+    expect(instructions).toContain('Clear it with value false when delegation is no longer appropriate');
+  });
+
   it('describes workspace-free Quick chats without inventing a folder', () => {
     const quickChat = agent();
     quickChat.folder = null;

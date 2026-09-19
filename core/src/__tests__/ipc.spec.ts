@@ -37,6 +37,7 @@ import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from 
 describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
+      respondToThreadFlag: 'agent:thread-flag:respond',
       respondToPlanReview: 'agent:plan-review:respond',
       readEngineInstructions: 'settings:instructions:read',
       saveEngineInstructions: 'settings:instructions:save',
@@ -77,6 +78,7 @@ describe('ipc channels', () => {
       createAgentGitBranch: 'agent:git-workflow:branch:create',
       createAgentGitPullRequest: 'agent:git-workflow:pull-request:create',
       mergeAgentGitBranch: 'agent:git-workflow:merge',
+      updateAgentGitBranchFromBase: 'agent:git-workflow:update-from-base',
       getOpenInApplications: 'open-in:applications:get',
       openAgentPath: 'agent:path:open-in',
       chooseAgentFolder: 'agent:choose-folder',
@@ -367,7 +369,8 @@ describe('ipc channels', () => {
     type AgentUpdatedEvent = Extract<MainToRendererEvent, { type: 'agent.updated' }>;
     expectTypeOf<AgentUpdatedEvent['payload']>()
       .toEqualTypeOf<
-        Omit<Partial<Agent>, 'id' | 'statusText'> & {
+        Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText'> & {
+          threadFlags?: Agent['threadFlags'] | null;
           id: string;
           statusText?: string | null;
         }

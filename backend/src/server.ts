@@ -44,7 +44,9 @@ import { AgentGitService } from './git/agent-git-service';
 import { AgentGitWorkflowService, parseAgentGitRequest } from './git/agent-git-workflow-service';
 import { AgentPromptManager } from './agents/agent-prompt-manager';
 import { AgentPlanReviewService } from './agents/agent-plan-review-service';
+import { AgentThreadFlagService } from './agents/agent-thread-flag-service';
 import type { PlanReviewResponse } from '@codex-claw/core/plan-review';
+import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { agentConversationId, planReviewFromEvent } from '@codex-claw/core/plan-review';
 import { isAgentRequestResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import { AgentWorkspaceService } from './agents/agent-workspace-service';
@@ -131,6 +133,7 @@ export class ClawBackendServer {
   private readonly clientPreferences: ClientPreferencesService;
   private readonly agentPrompts: AgentPromptManager;
   private readonly planReviews: AgentPlanReviewService;
+  private readonly threadFlags: AgentThreadFlagService;
   private readonly agentConversations: AgentConversationService;
   private readonly delegatedWorkReports: DelegatedWorkReportPort;
   private readonly agentWorkspaces: AgentWorkspaceService;
@@ -220,6 +223,9 @@ export class ClawBackendServer {
       submit: (agent, prompt, planMode) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt, { planMode }),
       emit: (event) => this.applyAndEmitBackendEvent(event),
     });
+    this.threadFlags = new AgentThreadFlagService({
+      submit: (agent, prompt) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt),
+    });
     this.delegatedWorkReports = options.delegatedWorkReports ?? new DelegatedWorkReportService({
       getSnapshot: () => this.snapshot,
       readConversationMessages: async (agent) => {
@@ -284,6 +290,7 @@ export class ClawBackendServer {
       persistAndEmitSnapshot: () => this.persistAndEmitSnapshot(),
       refreshGitStatus: async (agentId) => { await this.agentWorkspaces.refreshGitStatus(agentId); },
       refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
+      sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
     });
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
@@ -510,6 +517,23 @@ export class ClawBackendServer {
             markdown,
           },
         });
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case backendMethods.debugThreadFlagSet: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const value = params.value;
+        if (typeof value !== 'boolean') {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'value must be a boolean');
+        }
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        const threadFlags = { ...agent.threadFlags };
+        if (value) threadFlags.delegate_to_worktree = true;
+        else delete threadFlags.delegate_to_worktree;
+        agent.threadFlags = Object.keys(threadFlags).length > 0 ? threadFlags : undefined;
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.systemPermissionsGet:
@@ -1149,6 +1173,19 @@ export class ClawBackendServer {
         };
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, response }, async (agent) => {
           await this.planReviews.respond(agent, response);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentThreadFlagRespond: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const input = requireRecord(params.response);
+        const response: ThreadFlagResponse = {
+          id: requireString(input.id, 'id') as ThreadFlagResponse['id'],
+          action: requireString(input.action, 'action') as ThreadFlagResponse['action'],
+        };
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, response }, async (agent) => {
+          await this.threadFlags.respond(agent, response);
           return this.persistAndEmitSnapshot();
         });
       }
