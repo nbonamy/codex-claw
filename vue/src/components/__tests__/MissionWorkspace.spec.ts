@@ -63,6 +63,10 @@ describe('MissionWorkspace', () => {
     expect(wrapper.find('input').exists()).toBe(false);
     expect(wrapper.find('textarea').exists()).toBe(false);
     expect(wrapper.find('select').exists()).toBe(false);
+
+    await wrapper.setProps({ sidebarCollapsed: true });
+    await wrapper.get('.mission-workspace__navigation-button').trigger('click');
+    expect(wrapper.emitted('expand-sidebar')).toStrictEqual([[]]);
   });
 
   it('keeps the proposal beside its conversation and carries the accepted artifact into the next station', async () => {
@@ -138,6 +142,73 @@ describe('MissionWorkspace', () => {
 
     expect(executeMission).toHaveBeenCalledTimes(1);
     expect(updateMission).toHaveBeenCalledWith(expect.objectContaining({ action: 'advance', revision: mission.revision + 1 }));
+  });
+
+  it('accepts partial implementation evidence and starts the next ready ticket without advancing', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'implementation';
+    mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
+    mission.artifacts.tickets = [{ title: 'Checkout', done: false }, { title: 'Invoice', done: false }];
+    const proposal = structuredClone(mission.artifacts);
+    proposal.tickets[0]!.done = true;
+    proposal.implementation = { changes: 'checkout.ts', tests: 'checkout test passes' };
+    mission.execution!.runs = [{
+      id: 'run-checkout', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
+      status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', proposal, summary: 'Checkout complete',
+    }];
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const updateMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { executeMission, updateMission });
+
+    await wrapper.get('.mission-workspace__station-header .claw-button').trigger('click');
+    await flushPromises();
+
+    expect(executeMission).toHaveBeenNthCalledWith(1, { id: mission.id, revision: mission.revision, action: 'accept', runId: 'run-checkout' });
+    expect(executeMission).toHaveBeenNthCalledWith(2, { id: mission.id, revision: mission.revision + 1, action: 'run' });
+    expect(updateMission).not.toHaveBeenCalled();
+  });
+
+  it('stops active work and can retry a retained failed station', async () => {
+    const mission = missionWithRun('running');
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { executeMission });
+
+    await wrapper.get('.mission-workspace__working .claw-button').trigger('click');
+    expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-requirements' });
+
+    mission.execution!.runs[0]!.status = 'failed';
+    mission.execution!.runs[0]!.error = 'Provider offline';
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    await wrapper.get('.mission-workspace__empty-artifact .claw-button').trigger('click');
+    expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'run' });
+  });
+
+  it('renders accepted ticket, implementation, and review artifacts as the mission advances', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.artifacts = structuredClone(mission.execution!.runs[0]!.proposal!);
+    mission.artifacts.tickets = [
+      { title: 'Create billing foundation', done: true, reference: 'https://example.com/tickets/1' },
+      { title: 'Add team checkout', done: true, dependsOn: [0] },
+    ];
+    mission.artifacts.implementation = { changes: 'billing.ts changed', tests: 'billing integration passes' };
+    mission.artifacts.review = { summary: 'Acceptance verified', pullRequestUrl: 'https://example.com/pull/2' };
+    mission.execution!.runs = [];
+    const wrapper = mountWorkspace(mission);
+
+    mission.stage = 'tickets';
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Open canonical ticket');
+    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Blocked by tickets: 1');
+
+    mission.stage = 'implementation';
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('billing integration passes');
+
+    mission.stage = 'review';
+    mission.status = 'completed';
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Acceptance verified');
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100');
   });
 
   it('shows orchestration failures without replacing the workshop', async () => {
