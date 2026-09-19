@@ -105,7 +105,8 @@ describe('Codex Claw MCP tool registration', () => {
     createServer();
 
     const registration = mocks.registerTool.mock.calls.find(([name]) => name === 'create-agent');
-    const definition = registration?.[1] as { inputSchema: Record<string, unknown> } | undefined;
+    const definition = registration?.[1] as { description: string; inputSchema: Record<string, unknown> } | undefined;
+    expect(definition?.description).toContain('Codex Claw co-agent');
     expect(Object.keys(definition?.inputSchema ?? {})).toStrictEqual([
       'name',
       'backend',

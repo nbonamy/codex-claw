@@ -63,10 +63,11 @@ describe('agent prompts', () => {
     expect(instructions).toContain('your folder is /src/codex-claw');
     expect(instructions).toContain('computer-use-guide');
     expect(instructions).toContain('chrome:control-chrome');
-    for (const tool of ['create-agent', 'display-markdown', 'celebrate']) {
+    for (const tool of ['display-markdown', 'celebrate']) {
       expect(instructions).toContain(`call ${tool}`);
     }
-    expect(instructions).toContain('single call with createWorktree: true');
+    expect(instructions).toContain('use create-agent');
+    expect(instructions).toContain('single create-agent call with createWorktree: true');
   });
 
   it('does not advertise disabled host plugins by default', () => {
@@ -95,6 +96,16 @@ describe('agent prompts', () => {
     expect(instructions).toContain('Never announce intermediate progress or reasoning');
     expect(instructions).toContain('or the full answer');
     expect(instructions).toContain('do not wait for speech or retry');
+  });
+
+  it('distinguishes engine-native subagents from Claw co-agents', () => {
+    const instructions = codexClawDeveloperInstructions(agent());
+
+    expect(instructions).toContain('a subagent is a Codex or Claude Code native child agent');
+    expect(instructions).toContain("use the engine's native subagent mechanism when the user explicitly asks for subagents");
+    expect(instructions).toContain('A co-agent is a separate Codex Claw agent visible in the team');
+    expect(instructions).toContain('use create-agent when the user explicitly asks for a co-agent, Claw agent, or teammate');
+    expect(instructions).toContain('ask whether the user wants native subagents or Claw co-agents before acting');
   });
 
   it('describes workspace-free Quick chats without inventing a folder', () => {

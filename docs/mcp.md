@@ -341,11 +341,14 @@ that allowlist, so their normal permission flow remains intact.
 
 `clawd` also adds developer instructions that give the backend agent its Claw
 agent ID/name/folder and advertise the product workflows models do not reliably
-discover from schemas alone: delegate or start separate work with
-`create-agent`, keep substantial Markdown visible with `display-markdown`, and
-celebrate meaningful completed work. The same instructions require status and
-constrain teammate messaging. Agents do not need to register or pass their own
-agent ID to tools.
+discover from schemas alone. The instructions distinguish engine-native
+subagents, which remain inside the current Codex or Claude Code session, from
+Claw co-agents, which are separate team agents created with `create-agent`.
+Explicit subagent and co-agent requests use the corresponding mechanism;
+ambiguous requests to delegate, parallelize, or use another agent require a
+clarifying question. The same instructions cover `display-markdown`, meaningful
+celebrations, status, and teammate messaging. Agents do not need to register or
+pass their own agent ID to tools.
 
 For another backend, keep the tool semantics below unchanged and implement the
 smallest equivalent enablement path for that backend.
@@ -465,9 +468,10 @@ Visible agents without an active MCP session are skipped internally.
 
 ### `create-agent`
 
-Creates an agent in the caller's team without selecting it. The tool can also
-create an isolated worktree and start the agent with initial instructions as
-one backend-owned operation.
+Creates a Claw co-agent in the caller's team without selecting it. The tool can
+also create an isolated worktree and start the co-agent with initial
+instructions as one backend-owned operation. It is distinct from the native
+subagent mechanism owned by Codex or Claude Code.
 
 Input:
 

@@ -133,7 +133,7 @@ export function createCodexClawMcpServer(
   }, () => coordinator.createSourceWorktree(callerAgentId, { repoPath, branchName, destinationPath })));
 
   server.registerTool('create-agent', {
-    description: 'Create a new Codex Claw agent in your team, optionally in an isolated worktree. Provide an initial prompt to start the agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
+    description: 'Create a new Codex Claw co-agent in your team, optionally in an isolated worktree. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
     inputSchema: {
       name: z.string().optional().describe('Optional custom name. When omitted, the agent displays its branch or folder name.'),
       backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to codex.'),
