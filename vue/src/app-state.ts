@@ -187,6 +187,17 @@ export function useAppState() {
       reviewId: agent.planReview.id, resolution, ...(feedback ? { feedback } : {}),
     }));
   }
+
+  async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
+    if (agent?.threadFlags?.delegate_to_worktree !== true || !codexClawApi) {
+      throw new Error('No active delegate_to_worktree flag.');
+    }
+    adoptBackgroundSnapshot(await codexClawApi.respondToThreadFlag(agent.id, {
+      id: 'delegate_to_worktree',
+      action,
+    }));
+  }
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
@@ -1362,6 +1373,7 @@ export function useAppState() {
     previewAgentFile,
     getAgentGitDiff,
     respondToPlanReview,
+    respondToThreadFlag,
     getAgentGitWorkflow,
     generateAgentGitMessage,
     stageAgentGitFiles,

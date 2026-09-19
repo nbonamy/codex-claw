@@ -141,6 +141,25 @@ describe('ConversationPane', () => {
     expect(wrapper.emitted('remove-text-annotation')).toStrictEqual([['annotation-1']]);
   });
 
+  it('renders delegate_to_worktree in composer context and emits its actions', async () => {
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent: { ...agent, threadFlags: { delegate_to_worktree: true } },
+    });
+    const sdkPane = wrapper.getComponent({ name: 'CodexConversationPane' });
+
+    expect(sdkPane.props('hasComposerContext')).toBe(true);
+    expect(wrapper.get('.thread-flag-affordance').text()).toContain('Ready to delegate');
+    await wrapper.get('.thread-flag-affordance__action').trigger('click');
+    await wrapper.get('.thread-flag-affordance__dismiss').trigger('click');
+    expect(wrapper.emitted('thread-flag')).toStrictEqual([['execute'], ['dismiss']]);
+
+    await wrapper.setProps({ threadFlagBusy: true });
+    expect(wrapper.get('.thread-flag-affordance__action').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('.thread-flag-affordance__dismiss').attributes('aria-label'))
+      .toBe('Dismiss worktree delegation');
+  });
+
   it('replaces only an empty transcript with the history load recovery state', async () => {
     const wrapper = mountPane({
       controller: controllerFor([]),
@@ -457,6 +476,7 @@ function mountPane(props: {
   historyLoadFailed?: boolean;
   historyLoading?: boolean;
   hasVisibleMessages?: boolean;
+  threadFlagBusy?: boolean;
 }) {
   return mount(ConversationPane, {
     props,

@@ -59,6 +59,7 @@ const callbacks = (): AppMenuCallbacks => ({
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
   injectDebugPlanReview: vi.fn(),
+  setDebugThreadFlag: vi.fn(),
 });
 
 describe('app menu', () => {
@@ -268,6 +269,7 @@ describe('app menu', () => {
       'Mark as Unread',
       'Execution Plan',
       'Plan Review',
+      'Thread Flags',
     ]);
     expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
       'Markdown',
@@ -289,6 +291,7 @@ describe('app menu', () => {
       'Mark as Unread',
       'Execution Plan',
       'Plan Review',
+      'Thread Flags',
     ]);
     expect(nestedSubmenu(debugMenu, 'Debug', 'UI Previews').map(menuEntryLabel)).toStrictEqual([
       'Markdown',
@@ -311,6 +314,8 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Mark as Unread');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Execution Plan');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Plan Review');
+    clickThreadFlagItem(debugMenu, 'Set Delegate to Worktree');
+    clickThreadFlagItem(debugMenu, 'Clear Delegate to Worktree');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Markdown');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Image Annotation');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Worktree Initialization');
@@ -373,6 +378,8 @@ describe('app menu', () => {
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(1, true);
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(2, false);
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);
   });
 
@@ -487,6 +494,14 @@ function clickNestedItem(
   itemLabel: string,
 ): void {
   const item = nestedMenuItem(template, menuLabel, parentLabel, itemLabel);
+  if (!item?.click) throw new Error(`${itemLabel} menu item not found`);
+  item.click({ checked: true } as never, undefined as never, undefined as never);
+}
+
+function clickThreadFlagItem(template: MenuItemConstructorOptions[], itemLabel: string): void {
+  const threadFlags = nestedMenuItem(template, 'Debug', 'Agent Fixtures', 'Thread Flags');
+  if (!threadFlags || !Array.isArray(threadFlags.submenu)) throw new Error('Thread Flags submenu not found');
+  const item = threadFlags.submenu.find((candidate) => candidate.label === itemLabel);
   if (!item?.click) throw new Error(`${itemLabel} menu item not found`);
   item.click({ checked: true } as never, undefined as never, undefined as never);
 }

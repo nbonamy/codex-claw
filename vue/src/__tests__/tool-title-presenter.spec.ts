@@ -7,6 +7,7 @@ describe('Claw tool title presenter', () => {
   it.each([
     ['codex_claw.set-status', { status: 'Reviewing changes' }, 'completed', 'Updated status'],
     ['codex_claw.set-status', { status: '' }, 'completed', 'Cleared status'],
+    ['codex_claw.toggle_thread_flag', { id: 'delegate_to_worktree', value: true }, 'completed', 'Updated thread flag'],
     ['codex_claw.send-message', { to: 'computer-use' }, 'completed', 'Sent message to computer-use'],
     ['codex_claw.list-agents', {}, 'completed', 'Listed agents'],
     ['codex_claw.browser-screenshot', {}, 'running', 'Capturing page screenshot'],

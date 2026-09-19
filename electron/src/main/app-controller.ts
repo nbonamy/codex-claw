@@ -513,6 +513,9 @@ export class AppController {
     ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
     });
+    ipc.handle(ipcChannels.respondToThreadFlag, async (_event, agentId: string, response: import('@codex-claw/core/thread-flags').ThreadFlagResponse) => {
+      return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentThreadFlagRespond, { agentId, response }));
+    });
     ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
       return this.sendPrompt(agentId, prompt, options);
     });
@@ -1523,11 +1526,12 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      setDebugThreadFlag: (value) => this.setDebugThreadFlag(value),
     };
   }
 
@@ -1567,6 +1571,18 @@ export class AppController {
     void this.backendClient.request<AppSnapshot>(backendMethods.debugPlanReadyForReviewInject, { agentId })
       .then((snapshot) => this.adoptBackendSnapshot(snapshot))
       .catch((error) => warnMain('debug', 'failed to inject plan review fixture', {
+        agentId,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+  }
+
+  private setDebugThreadFlag(value: boolean): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app?.isPackaged) return;
+
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugThreadFlagSet, { agentId, value })
+      .then((snapshot) => this.adoptBackendSnapshot(snapshot))
+      .catch((error) => warnMain('debug', 'failed to set thread flag fixture', {
         agentId,
         detail: error instanceof Error ? error.message : String(error),
       }));

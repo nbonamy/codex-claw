@@ -394,6 +394,30 @@ Effects:
 Developer instructions make this mandatory before starting work, changing
 direction, and finishing.
 
+### `toggle_thread_flag`
+
+Sets or clears predefined, typed state for the caller's current conversation.
+
+Input:
+
+- `id`: an allowlisted flag identifier;
+- `value`: `true` to set the flag or `false` to clear it;
+- `payload`: optional kind-specific data, accepted only when that flag's
+  contract defines a payload.
+
+The first supported flag is `delegate_to_worktree`. It takes no payload. Claw
+renders it as a compact **Delegate to worktree** affordance near the composer.
+Activating that affordance submits an app-owned prompt to the current agent to
+delegate the implementation through the existing worktree/co-agent workflow.
+The flag clears only after the prompt is accepted; a failed submission leaves
+it available for retry. The user can also dismiss it, and the agent can clear
+it by calling `toggle_thread_flag` with `value: false`.
+
+Flags are persisted app state and are cleared with the agent's conversation
+runtime when that conversation is restarted or replaced. Clients may present,
+ignore, or programmatically respond to them without interpreting provider
+transcripts.
+
 ### `celebrate`
 
 Requests a transient visual celebration in the Claw renderer after a
@@ -604,6 +628,7 @@ MCP collaboration state is process-local runtime state for now:
 
 - agent connection state lives on the app `Agent` objects;
 - short statuses live as `agent.statusText`;
+- typed thread flags live durably on the app-owned agent snapshot;
 - inbox messages live in the MCP coordinator;
 - unread messages stay until checked;
 - old read messages are bounded so long desktop sessions do not grow without

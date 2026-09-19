@@ -49,6 +49,7 @@ const TOOL_KEYS: Record<string, string> = {
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',
   'set-status': 'setStatus',
+  'toggle-thread-flag': 'toggleThreadFlag',
 };
 
 export function presentClawToolTitle({

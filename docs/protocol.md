@@ -117,6 +117,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `client/state/get` | none | `ClientState` | Backend-derived client hints only. |
 | `agent/request/respond` | `{ response: AgentRequestResponse }` | `AppSnapshot` | Answers a pending normalized approval/question/confirmation using a typed outcome. Include `agentId`; an untargeted response is accepted only when its request ID is unambiguous. |
 | `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
+| `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt and clears only after acceptance. |
 
 ## Client To `clawd`: System
 

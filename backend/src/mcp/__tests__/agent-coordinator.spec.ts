@@ -34,6 +34,21 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(onAgentUpdated).toHaveBeenCalledTimes(3);
   });
 
+  it('sets and clears predefined thread flags through the agent update seam', () => {
+    const { agents, coordinator, onAgentUpdated } = fixture();
+
+    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'delegate_to_worktree', value: true }))
+      .toStrictEqual({ success: true, id: 'delegate_to_worktree', value: true });
+    expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
+    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'delegate_to_worktree', value: false }))
+      .toStrictEqual({ success: true, id: 'delegate_to_worktree', value: false });
+    expect(agents[0]!.threadFlags).toBeUndefined();
+    expect(onAgentUpdated).toHaveBeenCalledTimes(2);
+    expect(() => coordinator.toggleThreadFlag('agent-dina', {
+      id: 'delegate_to_worktree', value: true, payload: {},
+    })).toThrow('does not accept a payload');
+  });
+
   it('labels every backend status variant', () => {
     const { agents, coordinator } = fixture();
     for (const [status, label] of [

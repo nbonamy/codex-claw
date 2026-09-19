@@ -13,6 +13,7 @@
     :retry-agent-history="retryActiveAgentHistory"
     :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
+    :respond-to-thread-flag-action="respondToThreadFlag"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
     :retry-turn-action="retryTurn"
@@ -374,6 +375,7 @@ const {
   selectTeam,
   sendPrompt,
   respondToPlanReview,
+  respondToThreadFlag,
   sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,

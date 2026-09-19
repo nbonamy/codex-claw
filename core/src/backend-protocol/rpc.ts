@@ -68,6 +68,10 @@ export type ClawSnapshotGetResult = {
 };
 
 export type ClawBackendRequestMap = {
+  [backendMethods.agentThreadFlagRespond]: {
+    params: { agentId: string; response: import('../thread-flags').ThreadFlagResponse };
+    result: AppSnapshot;
+  };
   [backendMethods.agentPlanReviewRespond]: {
     params: { agentId: string; response: import('../plan-review').PlanReviewResponse };
     result: AppSnapshot;
