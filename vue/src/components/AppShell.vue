@@ -802,8 +802,6 @@ async function createNewMission() {
   try {
     const executeMission = props.executeMission;
     if (!executeMission) throw new Error('Missions are unavailable.');
-    const mission = await props.createMission({ outcome: translate('missions.new'), workflowType: 'shapeAndShipFeature' });
-    selectMission(mission.id);
     const team = activeTeam.value;
     const activeAgent = currentAgent.value;
     let orchestrator = activeTeamAgents.value.find(agent => agent.folder);
@@ -811,6 +809,8 @@ async function createNewMission() {
     if (!team || !orchestrator?.folder) {
       throw new Error(translate('missions.projectContextRequired'));
     }
+    const mission = await props.createMission({ outcome: translate('missions.new'), workflowType: 'shapeAndShipFeature' });
+    selectMission(mission.id);
     await executeMission({
       id: mission.id,
       revision: mission.revision,

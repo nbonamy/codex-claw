@@ -52,6 +52,20 @@ describe('AppShell missions', () => {
     expect(navigation.props('missionCreationError')).toBe('Could not create mission');
   });
 
+  it('requires project context before persisting a mission', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents.forEach(agent => { agent.folder = null; });
+    const createMissionAction = vi.fn();
+    const wrapper = mountShell({ snapshot, createMission: createMissionAction });
+    const navigation = wrapper.findComponent({ name: 'AppShellNavigation' });
+
+    await navigation.vm.$emit('create-mission');
+    await flushPromises();
+
+    expect(createMissionAction).not.toHaveBeenCalled();
+    expect(navigation.props('missionCreationError')).toBe('Open a project agent before starting a mission.');
+  });
+
   it('replaces the agent workspace with a mission and returns to normal agent navigation', async () => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature' });
