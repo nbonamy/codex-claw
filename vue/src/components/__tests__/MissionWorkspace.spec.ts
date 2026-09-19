@@ -212,6 +212,24 @@ describe('MissionWorkspace', () => {
     expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'run' });
   });
 
+  it('keeps start and stop failures visible beside the mission station', async () => {
+    const mission = missionWithRun('running');
+    const executeMission = vi.fn()
+      .mockRejectedValueOnce(new Error('Could not stop the worker'))
+      .mockRejectedValueOnce('Could not restart the worker');
+    const wrapper = mountWorkspace(mission, { executeMission });
+
+    await wrapper.get('.mission-workspace__working .claw-button').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toBe('Could not stop the worker');
+
+    mission.execution!.runs[0]!.status = 'failed';
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    await wrapper.get('.mission-workspace__empty-artifact .claw-button').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toBe('Could not restart the worker');
+  });
+
   it('renders accepted ticket, implementation, and review artifacts as the mission advances', async () => {
     const mission = missionWithRun('accepted', true);
     mission.artifacts = structuredClone(mission.execution!.runs[0]!.proposal!);
