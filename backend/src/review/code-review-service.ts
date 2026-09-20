@@ -39,6 +39,7 @@ export type CodeReviewServiceOptions = {
 export class CodeReviewService {
   private readonly now: () => Date;
   private readonly activeRoundTurns = new Set<string>();
+  private readonly reviewContexts = new WeakMap<CodeReviewSession, { id: string; url: string }>();
 
   constructor(private readonly options: CodeReviewServiceOptions) {
     this.now = options.now ?? (() => new Date());
@@ -76,6 +77,7 @@ export class CodeReviewService {
     const reviewer = input.threadMode === 'current'
       ? agent
       : this.createIndependentReviewer(agent);
+    if (current?.status === 'failed') this.closeReviewToolContext(current);
     const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);
     if (input.threadMode === 'current') firstRound.reviewerSession = agent.backendSession;
@@ -95,6 +97,7 @@ export class CodeReviewService {
     reviewer: Agent,
     input: CodeReviewStartInput,
   ): CodeReviewSession {
+    if (reviewer.codeReview) this.closeReviewToolContext(reviewer.codeReview);
     const session = this.newSession(target, reviewer, input);
     reviewer.codeReview = session;
     void this.options.changed();
@@ -183,12 +186,14 @@ export class CodeReviewService {
     if (session.status !== 'readyToFinish') throw new Error('The review is not ready to finish.');
     if (session.threadMode === 'independent') {
       await this.options.deleteReviewer(agent);
+      this.closeReviewToolContext(session);
       return;
     }
     const finishedAt = this.timestamp();
     session.status = 'finished';
     session.finishedAt = finishedAt;
     session.updatedAt = finishedAt;
+    this.closeReviewToolContext(session);
     delete agent.codeReview;
   }
 
@@ -196,8 +201,10 @@ export class CodeReviewService {
     const session = this.findSession(agent, sessionId);
     if (session.threadMode === 'independent') {
       await this.options.deleteReviewer(agent);
+      this.closeReviewToolContext(session);
       return;
     }
+    this.closeReviewToolContext(session);
     delete agent.codeReview;
     await this.options.changed();
   }
@@ -258,7 +265,7 @@ export class CodeReviewService {
     initialReviewerSession?: BackendSession,
   ): Promise<void> {
     this.activeRoundTurns.add(round.id);
-    const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
+    const context = this.reviewToolContext(agent, session);
     try {
       const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
       if (agent.codeReview !== session) {
@@ -279,7 +286,6 @@ export class CodeReviewService {
       session.status = 'failed';
       session.updatedAt = round.completedAt;
     } finally {
-      this.options.tools.closeReviewToolContext(context.id);
       this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
@@ -293,7 +299,7 @@ export class CodeReviewService {
     question: string,
   ): Promise<void> {
     this.activeRoundTurns.add(round.id);
-    const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
+    const context = this.reviewToolContext(agent, session);
     try {
       const result = await this.options.runReview(
         agent,
@@ -312,7 +318,6 @@ export class CodeReviewService {
     } catch {
       // A failed discussion turn leaves the user's question in the durable ledger.
     } finally {
-      this.options.tools.closeReviewToolContext(context.id);
       this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
@@ -332,20 +337,16 @@ export class CodeReviewService {
         session.updatedAt = startedAt;
         await this.options.changed();
 
-        const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
-        try {
-          const result = await this.options.runReview(
-            agent,
-            fixPrompt(session, round, findings),
-            context.url,
-            requiredReviewerSession(round),
-          );
-          if (agent.codeReview !== session) return;
-          agent.backendSession = result.reviewerSession;
-          round.reviewerSession = result.reviewerSession;
-        } finally {
-          this.options.tools.closeReviewToolContext(context.id);
-        }
+        const context = this.reviewToolContext(agent, session);
+        const result = await this.options.runReview(
+          agent,
+          fixPrompt(session, round, findings),
+          context.url,
+          requiredReviewerSession(round),
+        );
+        if (agent.codeReview !== session) return;
+        agent.backendSession = result.reviewerSession;
+        round.reviewerSession = result.reviewerSession;
         const incomplete = findings.filter((finding) => (
           this.findFindingInSession(session, finding.id)?.remediation.state !== 'fixed'
         ));
@@ -369,9 +370,24 @@ export class CodeReviewService {
     await this.options.changed();
   }
 
-  private reviewToolHandlers(session: CodeReviewSession, round: CodeReviewRound): ReviewToolHandlers {
+  private reviewToolContext(agent: Agent, session: CodeReviewSession): { id: string; url: string } {
+    const existing = this.reviewContexts.get(session);
+    if (existing) return existing;
+    const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session));
+    this.reviewContexts.set(session, context);
+    return context;
+  }
+
+  private closeReviewToolContext(session: CodeReviewSession): void {
+    const context = this.reviewContexts.get(session);
+    if (!context) return;
+    this.options.tools.closeReviewToolContext(context.id);
+    this.reviewContexts.delete(session);
+  }
+
+  private reviewToolHandlers(session: CodeReviewSession): ReviewToolHandlers {
     return {
-      reportFinding: (input) => this.reportFinding(session, round, input),
+      reportFinding: (input) => this.reportFinding(session, activeCodeReviewRound(session), input),
       updateFinding: (input) => this.updateFinding(session, input),
     };
   }

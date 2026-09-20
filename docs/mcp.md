@@ -643,8 +643,11 @@ state, not Codex transcript duplication.
 
 ### Review-scoped finding tools
 
-An independent review turn receives a short-lived MCP URL whose tool surface
-adds only two model actions: `report_finding` and `update_finding`.
+Each review session receives a dedicated MCP URL whose tool surface adds only
+two model actions: `report_finding` and `update_finding`. The URL remains stable
+across inspection, clarification, remediation, and later rounds because the
+provider conversation may retain its initial MCP configuration. Claw closes
+the context when the user finishes or discards the review.
 `update_finding` may also move an actively remediated finding to `fixed`. The
 ordinary provider harness continues to supply repository reading, search, Git,
 and test tools. The review tools mutate the active app-owned ledger and persist

@@ -330,6 +330,62 @@ describe('CodeReviewService', () => {
     expect(test.snapshot.agents).toStrictEqual([test.owner]);
   });
 
+  it('keeps one review tool URL alive when the provider caches it for the reviewer thread', async () => {
+    const snapshot = createEmptySnapshot();
+    const owner = agent('owner');
+    owner.backendSession = { kind: 'codex', threadId: 'current-thread' };
+    snapshot.agents = [owner];
+    const contexts = new Map<string, ReviewToolHandlers>();
+    const reviewUrls: string[] = [];
+    let cachedReviewUrl = '';
+    let findingId = '';
+    let contextSequence = 0;
+    const closeReviewToolContext = vi.fn((contextId: string) => {
+      contexts.delete(contextId);
+    });
+    const service = new CodeReviewService({
+      snapshot,
+      tools: {
+        createReviewToolContext: (agentId, handlers) => {
+          const id = `context-${++contextSequence}`;
+          contexts.set(id, handlers);
+          return { id, url: `http://review.test/mcp?agentId=${agentId}&reviewContextId=${id}` };
+        },
+        closeReviewToolContext,
+      },
+      runReview: async (_agent, _prompt, reviewMcpServerUrl, reviewerSession) => {
+        reviewUrls.push(reviewMcpServerUrl);
+        cachedReviewUrl ||= reviewMcpServerUrl;
+        const contextId = new URL(cachedReviewUrl).searchParams.get('reviewContextId') ?? '';
+        const tools = contexts.get(contextId);
+        if (!tools) throw new Error('Tool not found: update_finding');
+        if (!findingId) {
+          findingId = (await tools.reportFinding({
+            priority: 'p1', title: 'Keep the review tool context alive',
+            body: 'The reviewer thread retains its initial MCP server configuration.',
+          })).id;
+        } else {
+          await tools.updateFinding({ findingId, status: 'fixed' });
+        }
+        return { text: '', reviewerSession: reviewerSession ?? { kind: 'codex', threadId: 'current-thread' } };
+      },
+      resetReviewer: async () => undefined,
+      deleteReviewer: async () => undefined,
+      changed: vi.fn(),
+    });
+
+    const session = service.start(owner, { scope: { type: 'uncommitted' }, threadMode: 'current' });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    service.submit(owner, session.id);
+    await vi.waitFor(() => expect(session.status).not.toBe('fixing'));
+
+    expect(session.status).toBe('readyToFinish');
+    expect(reviewUrls[1]).toBe(reviewUrls[0]);
+    expect(closeReviewToolContext).not.toHaveBeenCalled();
+    await service.finish(owner, session.id);
+    expect(closeReviewToolContext).toHaveBeenCalledOnce();
+  });
+
   it('sends every selected finding in one fix turn and records each fixed update', async () => {
     const ids: string[] = [];
     let releaseFirst: (() => void) | undefined;
