@@ -193,6 +193,8 @@ describe('App', () => {
 
   it('prompts for linked-worktree cleanup and forwards the confirmed cleanup policy', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents = [snapshot.agents[0]!];
+    snapshot.teams[0]!.agentIds = [snapshot.agents[0]!.id];
     const getAgentGitWorkflow = vi.fn().mockResolvedValue({
       repository: 'owner/repo',
       folder: snapshot.agents[0]!.folder,
@@ -240,6 +242,105 @@ describe('App', () => {
       deleteRemoteBranch: true,
       confirmed: true,
     });
+  });
+
+  it('closes an agent without offering cleanup when another agent uses the same worktree', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const otherAgent = {
+      ...agent,
+      id: 'agent-shared-worktree',
+      name: 'Shared worktree agent',
+    };
+    snapshot.agents = [agent, otherAgent];
+    snapshot.teams[0]!.agentIds = [agent.id, otherAgent.id];
+    const getAgentGitWorkflow = vi.fn();
+    const closeAgent = vi.fn().mockResolvedValue({
+      ...snapshot,
+      agents: snapshot.agents.filter((candidate) => candidate.id !== agent.id),
+    });
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      getAgentGitWorkflow,
+      closeAgent,
+      onEvent: vi.fn(),
+    });
+    const wrapper = mount(App, {
+      global: {
+        plugins: [ElementPlus],
+        stubs: {
+          ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
+        },
+      },
+    });
+    await flushPromises();
+
+    wrapper.findComponent(AppShell).vm.$emit('close-agent', agent.id);
+    await flushPromises();
+
+    expect(wrapper.findComponent(AgentCloseDialog).props('visible')).toBe(false);
+    expect(closeAgent).toHaveBeenCalledWith(agent.id);
+    expect(getAgentGitWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('does not treat matching folder paths on different backend locations as a shared worktree', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const remoteAgent = {
+      ...agent,
+      id: 'agent-remote-same-path',
+      teamId: 'team-remote',
+      name: 'Remote agent',
+    };
+    snapshot.agents = [agent, remoteAgent];
+    snapshot.teams[0]!.agentIds = [agent.id];
+    snapshot.teams.push({
+      id: 'team-remote',
+      name: 'Remote',
+      avatar: 'RE',
+      color: snapshot.teams[0]!.color,
+      agentIds: [remoteAgent.id],
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'remote-team',
+    });
+    const getAgentGitWorkflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo',
+      folder: agent.folder,
+      isLinkedWorktree: true,
+      branch: 'fix/local-worktree',
+      detached: false,
+      remote: 'origin',
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+      githubConnected: true,
+    });
+    const closeAgent = vi.fn();
+    setElectronTestClient({
+      getSnapshot: vi.fn().mockResolvedValue(snapshot),
+      getAgentGitWorkflow,
+      closeAgent,
+      onEvent: vi.fn(),
+    });
+    const wrapper = mount(App, {
+      global: {
+        plugins: [ElementPlus],
+        stubs: {
+          ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
+        },
+      },
+    });
+    await flushPromises();
+
+    wrapper.findComponent(AppShell).vm.$emit('close-agent', agent.id);
+    await flushPromises();
+
+    expect(getAgentGitWorkflow).toHaveBeenCalledWith(agent.id);
+    expect(wrapper.findComponent(AgentCloseDialog).props('visible')).toBe(true);
+    expect(closeAgent).not.toHaveBeenCalled();
   });
 
   it('cleans up a tracked closed pull request from the sidebar alert', async () => {
