@@ -70,7 +70,6 @@ export type CelebrationResponse = {
 export type AnnouncementResponse = {
   success: true;
   phase: AnnouncementPhase;
-  outcome: 'queued' | 'skipped';
 };
 
 export type UpdateWorkItemResponse =
