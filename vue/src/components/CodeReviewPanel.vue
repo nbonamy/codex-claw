@@ -650,6 +650,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 }
 
 .code-review-panel__start {
+  margin-left: auto;
   margin-top: var(--space-6);
 }
 
