@@ -42,6 +42,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toContain('codex_claw.read-mission-artifact');
     expect(prompt).toContain('codex_claw.write-mission-artifact');
     expect(prompt.includes('codex_claw.set-mission-title')).toBe(stage === 'requirements');
+    expect(prompt.includes('request_user_input')).toBe(stage === 'requirements');
     if (stage === 'tickets') {
       expect(prompt).toContain('Continue as the same Mission orchestrator');
       expect(prompt).toContain('Use codex_claw.upsert-mission-ticket for every draft');
