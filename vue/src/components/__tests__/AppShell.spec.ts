@@ -701,6 +701,48 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
   });
 
+  it('moves the Review pane from the source thread to an independent reviewer', async () => {
+    const snapshot = createInitialSnapshot();
+    const source = snapshot.agents[0]!;
+    const reviewer = {
+      ...source,
+      id: 'agent-reviewer',
+      name: 'Review',
+      backendSession: { kind: 'codex' as const, threadId: 'review-thread' },
+    };
+    const next = structuredClone(snapshot);
+    next.agents.push(reviewer);
+    next.teams[0]!.agentIds.push(reviewer.id);
+    next.activeAgentId = reviewer.id;
+    const startCodeReview = vi.fn().mockResolvedValue(next);
+    const wrapper = mountShell({ snapshot, startCodeReview });
+
+    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('open-code-review');
+    await nextTick();
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+
+    await wrapper.getComponent({ name: 'AgentWorkspace' }).props('startCodeReview')(
+      source.id,
+      { scope: { type: 'uncommitted' }, threadMode: 'independent' },
+    );
+    await wrapper.setProps({ snapshot: next, activeAgent: reviewer });
+    await nextTick();
+
+    const reviewerPanel = wrapper.findAllComponents({ name: 'RightWorkspacePanel' })
+      .find((panel) => panel.props('agent').id === reviewer.id)!;
+    expect(reviewerPanel.isVisible()).toBe(true);
+    expect(reviewerPanel.props('tabs')).toContain('codeReview');
+
+    const returned = { ...next, activeAgentId: source.id };
+    await wrapper.setProps({ snapshot: returned, activeAgent: source });
+    await nextTick();
+
+    const sourcePanel = wrapper.findAllComponents({ name: 'RightWorkspacePanel' })
+      .find((panel) => panel.props('agent').id === source.id)!;
+    expect(sourcePanel.props('tabs')).not.toContain('codeReview');
+    expect(sourcePanel.props('activeTab')).toBeNull();
+  });
+
   it('prefills the real composer for a finding clarification and submits through its stable link', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

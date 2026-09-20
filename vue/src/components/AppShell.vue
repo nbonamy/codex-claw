@@ -2048,6 +2048,9 @@ async function startCodeReviewFromShell(
     ? next.activeAgentId
     : agentId;
   if (reviewerAgentId) {
+    if (input.threadMode === 'independent' && reviewerAgentId !== agentId) {
+      closeRightWorkspaceTab(agentId, 'codeReview');
+    }
     selectAgentFromShell(reviewerAgentId);
     openRightWorkspaceTab('codeReview', reviewerAgentId);
   }
