@@ -9,6 +9,7 @@ import {
   type CodeReviewFindingUpdateInput,
   type CodeReviewRound,
   type CodeReviewSession,
+  type CodeReviewStartInput,
 } from '@codex-claw/core/code-review';
 import type { BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
 import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
@@ -28,6 +29,7 @@ export type CodeReviewServiceOptions = {
     reviewMcpServerUrl: string,
     reviewerSession?: BackendSession,
   ): Promise<BackendCodeReviewResult>;
+  disposeReview(agent: Agent, reviewerSession: BackendSession): Promise<void>;
   changed(): Promise<void> | void;
   now?: () => Date;
 };
@@ -40,16 +42,29 @@ export class CodeReviewService {
     this.now = options.now ?? (() => new Date());
   }
 
-  start(agent: Agent): CodeReviewSession {
+  start(agent: Agent, input: CodeReviewStartInput): CodeReviewSession {
     if (!agent.folder) throw new Error('Code review requires an agent workspace.');
+    if (input.threadMode === 'current' && !agent.backendSession) {
+      throw new Error('The current thread is not available for review.');
+    }
+    if (input.scope.type === 'branch' && !input.scope.baseRef.trim()) {
+      throw new Error('A branch review requires a base reference.');
+    }
     const current = agent.codeReview;
     if (current && current.status !== 'finished' && current.status !== 'failed') {
       throw new Error('This agent already has an active code review.');
     }
-    const session = this.newSession(agent);
+    const session = this.newSession(agent, input);
+    const firstRound = activeCodeReviewRound(session);
+    if (input.threadMode === 'current') firstRound.reviewerSession = agent.backendSession;
     agent.codeReview = session;
     void this.options.changed();
-    void this.executeRound(agent, session, activeCodeReviewRound(session));
+    void this.executeRound(
+      agent,
+      session,
+      firstRound,
+      firstRound.reviewerSession,
+    );
     return session;
   }
 
@@ -102,9 +117,13 @@ export class CodeReviewService {
     if (session.status === 'fixing') void this.executeFixes(agent, session, round);
   }
 
-  finish(agent: Agent, sessionId: string): void {
+  async finish(agent: Agent, sessionId: string): Promise<void> {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('The review is not ready to finish.');
+    if (session.threadMode === 'unbiased') {
+      const reviewerSession = activeCodeReviewRound(session).reviewerSession;
+      if (reviewerSession) await this.options.disposeReview(agent, reviewerSession);
+    }
     const finishedAt = this.timestamp();
     session.status = 'finished';
     session.finishedAt = finishedAt;
@@ -112,30 +131,40 @@ export class CodeReviewService {
     delete agent.codeReview;
   }
 
-  reviewAgain(agent: Agent, sessionId: string): CodeReviewRound {
+  async reviewAgain(agent: Agent, sessionId: string): Promise<CodeReviewRound> {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('Complete the current remediation before reviewing again.');
+    const previousRound = activeCodeReviewRound(session);
+    const reviewerSession = previousRound.reviewerSession;
+    if (session.threadMode === 'unbiased' && reviewerSession) {
+      await this.options.disposeReview(agent, reviewerSession);
+      delete previousRound.reviewerSession;
+    }
     const round = this.newRound(session.rounds.length + 1);
+    if (session.threadMode === 'current') round.reviewerSession = requiredReviewerSession(previousRound);
     session.rounds.push(round);
     session.activeRoundId = round.id;
     session.status = 'reviewing';
     session.updatedAt = round.startedAt;
     void this.options.changed();
-    void this.executeRound(agent, session, round);
+    void this.executeRound(agent, session, round, round.reviewerSession);
     return round;
   }
 
-  resumeInterrupted(agent: Agent): void {
+  async resumeInterrupted(agent: Agent): Promise<void> {
     const session = agent.codeReview;
     if (!session) return;
     const round = activeCodeReviewRound(session);
     if (session.status === 'reviewing') {
       round.findings = [];
-      delete round.reviewerSession;
+      if (session.threadMode === 'unbiased' && round.reviewerSession) {
+        await this.options.disposeReview(agent, round.reviewerSession);
+        delete round.reviewerSession;
+      }
       delete round.completedAt;
       delete round.error;
       void this.options.changed();
-      void this.executeRound(agent, session, round);
+      void this.executeRound(agent, session, round, round.reviewerSession);
       return;
     }
     if (session.status !== 'fixing') return;
@@ -152,11 +181,16 @@ export class CodeReviewService {
     void this.executeFixes(agent, session, round);
   }
 
-  private async executeRound(agent: Agent, session: CodeReviewSession, round: CodeReviewRound): Promise<void> {
+  private async executeRound(
+    agent: Agent,
+    session: CodeReviewSession,
+    round: CodeReviewRound,
+    initialReviewerSession?: BackendSession,
+  ): Promise<void> {
     this.activeRoundTurns.add(round.id);
     const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
     try {
-      const result = await this.options.runReview(agent, reviewPrompt(session), context.url);
+      const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
       round.reviewerSession = result.reviewerSession;
       const completedAt = this.timestamp();
       round.status = 'ready';
@@ -337,12 +371,16 @@ export class CodeReviewService {
     return undefined;
   }
 
-  private newSession(agent: Agent): CodeReviewSession {
+  private newSession(agent: Agent, input: CodeReviewStartInput): CodeReviewSession {
     const createdAt = this.timestamp();
     const round = this.newRound(1, createdAt);
     return {
       id: randomUUID(),
       agentId: agent.id,
+      scope: input.scope.type === 'branch'
+        ? { type: 'branch', baseRef: input.scope.baseRef.trim() }
+        : { type: 'uncommitted' },
+      threadMode: input.threadMode,
       status: 'reviewing',
       activeRoundId: round.id,
       rounds: [round],
@@ -391,7 +429,10 @@ export class CodeReviewService {
 
 function reviewPrompt(session: CodeReviewSession): string {
   const ledger = codeReviewLedger(session);
-  return `Review the current branch and working-tree diff independently. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
+  const scope = session.scope.type === 'branch'
+    ? `the current branch against ${session.scope.baseRef}, including uncommitted changes`
+    : 'only the current uncommitted changes (staged, unstaged, and untracked)';
+  return `Review ${scope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
 
 Findings are the only review artifact. For every actionable defect, call report_finding with concrete evidence. Use update_finding to correct or enrich a reported finding. Do not raise an exclusion again unless materially new evidence changes the conclusion; if it does, include that evidence. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.
 

@@ -181,6 +181,15 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     };
   }
 
+  async disposeCodeReview(agent: Agent, reviewerSession: BackendSession): Promise<void> {
+    if (reviewerSession.kind !== 'claude') throw new Error('Claude cannot dispose a non-Claude review conversation.');
+    if (this.transport.deleteSession) {
+      await this.transport.deleteSession(reviewerSession.sessionId, requireAgentFolder(agent));
+    } else {
+      await this.transport.closeSession?.(reviewerSession.sessionId);
+    }
+  }
+
   async setPermissionMode(agent: Agent, mode: string): Promise<BackendPermissionModeResult> {
     return this.catalog.setPermissionMode(agent, mode);
   }

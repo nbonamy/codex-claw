@@ -103,6 +103,7 @@ export const backendMethods = {
   workspaceFilesList: 'workspace/files/list',
   driverTextGenerate: 'driver/text/generate',
   driverCodeReviewRun: 'driver/codeReview/run',
+  driverCodeReviewDispose: 'driver/codeReview/dispose',
   driverGoalClear: 'driver/goal/clear',
   driverGoalUpdate: 'driver/goal/update',
   driverConversationLoad: 'driver/conversation/load',

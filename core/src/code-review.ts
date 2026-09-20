@@ -2,6 +2,17 @@ import type { BackendSession } from './contracts/backend';
 
 export type CodeReviewPriority = 'p0' | 'p1' | 'p2' | 'p3';
 
+export type CodeReviewScope =
+  | { type: 'uncommitted' }
+  | { type: 'branch'; baseRef: string };
+
+export type CodeReviewThreadMode = 'current' | 'unbiased';
+
+export type CodeReviewStartInput = {
+  scope: CodeReviewScope;
+  threadMode: CodeReviewThreadMode;
+};
+
 export type CodeReviewLocation = {
   file: string;
   line?: number;
@@ -51,7 +62,7 @@ export type CodeReviewRound = {
   id: string;
   number: number;
   status: 'reviewing' | 'ready' | 'submitted' | 'completed' | 'failed';
-  /** Provider-owned hidden conversation used for review, clarification, and fixes in this round. */
+  /** Provider conversation used for review, clarification, and fixes in this round. */
   reviewerSession?: BackendSession;
   findings: CodeReviewFinding[];
   startedAt: string;
@@ -62,6 +73,8 @@ export type CodeReviewRound = {
 export type CodeReviewSession = {
   id: string;
   agentId: string;
+  scope: CodeReviewScope;
+  threadMode: CodeReviewThreadMode;
   status: 'reviewing' | 'ready' | 'fixing' | 'readyToFinish' | 'finished' | 'failed';
   activeRoundId: string;
   rounds: CodeReviewRound[];
@@ -189,11 +202,26 @@ export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSe
   return structuredClone(session) as CodeReviewSession;
 }
 
+export function isCodeReviewStartInput(value: unknown): value is CodeReviewStartInput {
+  return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode);
+}
+
 export function isCodeReviewSession(value: unknown): value is CodeReviewSession {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.agentId !== 'string') return false;
+  if (!isCodeReviewScope(value.scope) || !isCodeReviewThreadMode(value.threadMode)) return false;
   if (!isReviewSessionStatus(value.status) || typeof value.activeRoundId !== 'string') return false;
   if (!Array.isArray(value.rounds) || value.rounds.length === 0 || value.rounds.some((round) => !isCodeReviewRound(round))) return false;
   return typeof value.createdAt === 'string' && typeof value.updatedAt === 'string';
+}
+
+function isCodeReviewScope(value: unknown): value is CodeReviewScope {
+  if (!isRecord(value)) return false;
+  if (value.type === 'uncommitted') return true;
+  return value.type === 'branch' && typeof value.baseRef === 'string' && value.baseRef.trim().length > 0;
+}
+
+function isCodeReviewThreadMode(value: unknown): value is CodeReviewThreadMode {
+  return value === 'current' || value === 'unbiased';
 }
 
 function latestFindings(session: CodeReviewSession): Map<string, CodeReviewFinding> {

@@ -6,11 +6,48 @@
       /></span>
       <h2>{{ $t('surface.codeReviewPanel.reviewThisBranch') }}</h2>
       <p>{{ $t('surface.codeReviewPanel.startDescription') }}</p>
+      <div class="code-review-panel__setup">
+        <fieldset>
+          <legend>{{ $t('surface.codeReviewPanel.scope') }}</legend>
+          <el-radio-group v-model="scope" class="code-review-panel__choices">
+            <el-radio value="uncommitted">
+              <span>
+                <strong>{{ $t('surface.codeReviewPanel.uncommittedChanges') }}</strong>
+                <small>{{ $t('surface.codeReviewPanel.uncommittedDescription') }}</small>
+              </span>
+            </el-radio>
+            <el-radio v-if="branchScope" value="branch">
+              <span>
+                <strong>{{ $t('surface.codeReviewPanel.currentBranch') }}</strong>
+                <small>{{ branchDescription }}</small>
+              </span>
+            </el-radio>
+          </el-radio-group>
+        </fieldset>
+
+        <fieldset>
+          <legend>{{ $t('surface.codeReviewPanel.reviewerThread') }}</legend>
+          <el-radio-group v-model="threadMode" class="code-review-panel__choices">
+            <el-radio value="unbiased">
+              <span>
+                <strong>{{ $t('surface.codeReviewPanel.unbiasedReviewer') }}</strong>
+                <small>{{ $t('surface.codeReviewPanel.unbiasedReviewerDescription') }}</small>
+              </span>
+            </el-radio>
+            <el-radio value="current" :disabled="!currentThreadAvailable">
+              <span>
+                <strong>{{ $t('surface.codeReviewPanel.currentThread') }}</strong>
+                <small>{{ currentThreadDescription }}</small>
+              </span>
+            </el-radio>
+          </el-radio-group>
+        </fieldset>
+      </div>
       <button
         class="claw-button claw-button--primary"
         type="button"
         :disabled="busy"
-        @click="run(() => startReview(agent.id))"
+        @click="startSelectedReview"
       >
         <IconSparkles aria-hidden="true" />
         {{ $t('surface.codeReviewPanel.startReview') }}
@@ -286,7 +323,7 @@
             class="claw-button claw-button--primary"
             type="button"
             :disabled="busy"
-            @click="run(() => startReview(agent.id))"
+            @click="retryReview"
           >
             {{ $t('surface.codeReviewPanel.startNewReview') }}
           </button>
@@ -297,7 +334,7 @@
             class="claw-button claw-button--primary"
             type="button"
             :disabled="busy"
-            @click="run(() => startReview(agent.id))"
+            @click="retryReview"
           >
             {{ $t('surface.codeReviewPanel.retryReview') }}
           </button>
@@ -325,12 +362,15 @@ import {
 import {
   codeReviewProgress,
   type CodeReviewFinding,
+  type CodeReviewStartInput,
+  type CodeReviewThreadMode,
 } from "@codex-claw/core/code-review";
-import type { Agent, AppSnapshot } from "@codex-claw/core/contracts";
+import type { Agent, AgentGitStatus, AppSnapshot } from "@codex-claw/core/contracts";
 
 const props = defineProps<{
   agent: Agent;
-  startReview: (agentId: string) => Promise<AppSnapshot>;
+  gitStatus?: AgentGitStatus | null;
+  startReview: (agentId: string, input: CodeReviewStartInput) => Promise<AppSnapshot>;
   decideFinding: (
     agentId: string,
     input: import("@codex-claw/core/code-review").CodeReviewDecisionInput,
@@ -351,6 +391,8 @@ const { t } = useI18n();
 const emit = defineEmits<{ openFile: [path: string] }>();
 const busy = ref(false);
 const error = ref<string | null>(null);
+const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
+const threadMode = ref<CodeReviewThreadMode>("unbiased");
 const selectedRoundId = ref("");
 const decliningId = ref<string | null>(null);
 const declineReason = ref("");
@@ -358,6 +400,15 @@ const discussingId = ref<string | null>(null);
 const question = ref("");
 const expandedFindingId = ref<string | null>(null);
 const session = computed(() => props.agent.codeReview ?? null);
+const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
+const currentThreadAvailable = computed(() => Boolean(props.agent.backendSession));
+const branchDescription = computed(() => t("surface.codeReviewPanel.branchDescription", {
+  branch: props.gitStatus?.branch ?? t("surface.codeReviewPanel.currentBranchFallback"),
+  base: branchScope.value?.baseRef ?? "",
+}));
+const currentThreadDescription = computed(() => currentThreadAvailable.value
+  ? t("surface.codeReviewPanel.currentThreadDescription")
+  : t("surface.codeReviewPanel.currentThreadUnavailable"));
 const selectedRound = computed(
   () =>
     session.value?.rounds.find((round) => round.id === selectedRoundId.value) ??
@@ -532,6 +583,19 @@ function submitRound(): void {
   void run(() => props.submitReviewRound(props.agent.id, session.value!.id));
 }
 
+function startSelectedReview(): void {
+  const reviewScope: CodeReviewStartInput["scope"] = scope.value === "branch" && branchScope.value
+    ? { type: "branch", baseRef: branchScope.value.baseRef }
+    : { type: "uncommitted" };
+  void run(() => props.startReview(props.agent.id, { scope: reviewScope, threadMode: threadMode.value }));
+}
+
+function retryReview(): void {
+  const review = session.value;
+  if (!review) return;
+  void run(() => props.startReview(props.agent.id, { scope: review.scope, threadMode: review.threadMode }));
+}
+
 function findingState(finding: CodeReviewFinding): string {
   return finding.remediation.state;
 }
@@ -594,12 +658,68 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
 }
 .code-review-panel__empty {
   margin: auto;
-  max-width: 340px;
+  width: min(420px, 100%);
   display: grid;
   justify-items: center;
   gap: var(--space-4);
   padding: var(--space-8);
   text-align: center;
+}
+.code-review-panel__setup {
+  width: 100%;
+  display: grid;
+  gap: var(--space-4);
+  text-align: left;
+}
+.code-review-panel__setup fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.code-review-panel__setup legend {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.code-review-panel__choices {
+  width: 100%;
+  display: grid;
+  gap: var(--space-2);
+}
+.code-review-panel__choices :deep(.el-radio) {
+  width: 100%;
+  height: auto;
+  margin: 0;
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-low);
+}
+.code-review-panel__choices :deep(.el-radio.is-checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+.code-review-panel__choices :deep(.el-radio__input) {
+  margin-top: 2px;
+}
+.code-review-panel__choices :deep(.el-radio__label) {
+  min-width: 0;
+  color: var(--color-text);
+  white-space: normal;
+}
+.code-review-panel__choices :deep(.el-radio__label span) {
+  display: grid;
+  gap: 2px;
+}
+.code-review-panel__choices :deep(.el-radio__label small) {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  line-height: 1.35;
 }
 .code-review-panel__empty h2,
 .code-review-panel__header h2 {

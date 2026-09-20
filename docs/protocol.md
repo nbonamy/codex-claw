@@ -118,12 +118,12 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/request/respond` | `{ response: AgentRequestResponse }` | `AppSnapshot` | Answers a pending normalized approval/question/confirmation using a typed outcome. Include `agentId`; an untargeted response is accepted only when its request ID is unambiguous. |
 | `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
 | `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt and clears only after acceptance. |
-| `agent/codeReview/start` | `{ agentId }` | `AppSnapshot` | Starts an independent reviewer context against the agent workspace and creates its active durable review ledger. |
+| `agent/codeReview/start` | `{ agentId, input: { scope, threadMode } }` | `AppSnapshot` | Starts a review for either uncommitted work or the current branch against an explicit base. `threadMode` is `unbiased` (fresh provider conversation) or `current` (the agent's attached conversation), and the choices are stored with the active durable ledger. |
 | `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Selects or rejects a stable finding; rejection requires a reason. Decisions are not remediation statuses. |
-| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the same hidden reviewer conversation for its response. |
+| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the same reviewer conversation for its response. |
 | `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Validates arbitration, maps rejected findings to `skipped` and selected findings to `pending`, then fixes pending findings one at a time in the same reviewer conversation. |
-| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Starts a fresh reviewer conversation with rejected exclusions, fixed regression checks, and behavior decisions from prior discussion. |
-| `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. |
+| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Reuses the same provider conversation for `current` reviews. For `unbiased` reviews, disposes the review-owned conversation and starts a fresh one for the stored scope. Both carry rejected exclusions, fixed regression checks, and behavior decisions from prior discussion. |
+| `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. It leaves a user-owned current conversation intact and disposes an unbiased review-owned conversation. |
 
 ## Client To `clawd`: System
 
@@ -313,13 +313,14 @@ These methods are implemented by `BackendDriverRpc` and may currently be
 reachable through the server fallback. Treat them as backend-internal
 implementation messages, not the preferred app protocol for clients.
 
-| Method | Params | Result |
-| --- | --- | --- |
+| Method | Params | Result | Notes |
+| --- | --- | --- | --- |
 | `workspace/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
 | `workspace/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
 | `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/codeReview/run` | `{ agent, prompt, cwd, reviewMcpServerUrl, reviewerSession? }` | `BackendCodeReviewResult` | Creates a fresh provider conversation when `reviewerSession` is absent; otherwise continues that opaque provider session. |
+| `driver/codeReview/dispose` | `{ agent, reviewerSession }` | `null` | Disposes a review-owned provider conversation. The review service calls this only for the unbiased strategy, never for the user's current conversation. |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
 | `driver/conversation/replaceWithSummary` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |

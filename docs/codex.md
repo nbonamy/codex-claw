@@ -207,12 +207,16 @@ archived through the SDK, while an attached conversation found in the archived
 catalog is restored after an interrupted lifecycle transaction. Claw never
 scans or moves rollout files itself.
 
-Code review uses a separate hidden Codex conversation from the owning agent's
-normal chat. The initial pass creates it with the round-scoped finding tools;
-finding clarification and sequential remediation load and continue that same
-thread. `Review again` creates a new hidden thread. Claw persists only the opaque
-thread reference with its app-owned review round and keeps findings out of the
-provider transcript model.
+Code review defaults to a separate hidden Codex conversation, but the user may
+choose the owning agent's current conversation for the first pass. Either path
+uses the round-scoped finding tools; finding clarification and sequential
+remediation load and continue that same thread. `Review again` creates a new
+hidden thread for the unbiased strategy; current-thread reviews keep
+the same user-owned thread for the whole workflow. Finishing leaves a current
+thread intact, while an unbiased review archives and forgets its review-owned
+thread. Claw persists the selected Git scope, initial thread strategy, and opaque
+thread reference with its app-owned review round, while keeping findings out of
+the provider transcript model.
 
 `thread/settings/updated`
 confirms the active thread settings and should update the app-owned
@@ -462,7 +466,8 @@ passing its own caller ID to each tool.
 
 This keeps normal Codex config and normal Codex data untouched.
 
-Independent product review rounds create a fresh SDK conversation and replace
+Unbiased product review rounds create a fresh SDK conversation; a first round
+configured for the current thread loads that conversation instead. Both replace
 the normal Claw MCP URL with a round-scoped URL. That URL adds only the three
 finding actions documented in `docs/mcp.md`; normal repository tools remain
 owned by the Codex harness. After the turn completes, Claw reads the normal

@@ -259,7 +259,7 @@ const props = defineProps<{
   updateStatus?: DesktopUpdateStatus;
   commitAgentGitChanges: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
-  startCodeReview?: (agentId: string) => Promise<AppSnapshot>;
+  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
   decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
   discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;

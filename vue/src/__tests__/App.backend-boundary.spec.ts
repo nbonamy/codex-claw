@@ -234,7 +234,7 @@ describe('Unified backend → mounted application', () => {
 
     const ready = structuredClone(snapshot);
     ready.agents[0]!.codeReview = {
-      id: 'review-1', agentId: agent.id, status: 'ready', activeRoundId: 'round-1',
+      id: 'review-1', agentId: agent.id, scope: { type: 'uncommitted' }, threadMode: 'unbiased', status: 'ready', activeRoundId: 'round-1',
       createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:01:00.000Z',
       rounds: [{
         id: 'round-1', number: 1, status: 'ready', reviewerSession: { kind: 'codex', threadId: 'reviewer-1' },
@@ -252,7 +252,10 @@ describe('Unified backend → mounted application', () => {
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
     await flushPromises();
 
-    expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id);
+    expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      scope: { type: 'uncommitted' },
+      threadMode: 'unbiased',
+    });
     expect(wrapper.get('.review-finding').text()).toContain('Ownership is skipped');
     expect(wrapper.get('.review-finding__toggle').text()).not.toContain('src/auth.ts');
     await wrapper.get('.review-finding__toggle').trigger('click');

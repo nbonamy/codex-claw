@@ -9,6 +9,7 @@ import type {
   BackendModelOption,
   BackendPluginSummary,
   BackendRuntimeStatus,
+  BackendSession,
   BackendSkillSummary,
   ClientRequestResponse,
   ConversationListInput,
@@ -265,6 +266,7 @@ export class CodexSurfaceAgentAdapter {
     const created = !input.reviewerSession;
     const conversationId = input.reviewerSession?.threadId ?? await this.createReviewConversation(agent, input);
     const conversation = this.surface.conversation(conversationId);
+    const usesAgentConversation = input.reviewerSession?.threadId === codexThreadId(agent);
     if (!created) {
       await conversation.load({ extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
     }
@@ -300,7 +302,16 @@ export class CodexSurfaceAgentAdapter {
       throw error;
     } finally {
       unsubscribe();
+      if (usesAgentConversation) {
+        await conversation.load({ ...agentCwd(agent), extensionContext: agent });
+      }
     }
+  }
+
+  async disposeCodeReview(reviewerSession: BackendSession): Promise<void> {
+    if (reviewerSession.kind !== 'codex') throw new Error('Codex cannot dispose a non-Codex review conversation.');
+    await this.surface.archiveConversation(reviewerSession.threadId);
+    this.surface.forgetConversation(reviewerSession.threadId);
   }
 
   private async createReviewConversation(agent: Agent, input: BackendCodeReviewInput): Promise<string> {
@@ -583,7 +594,11 @@ export class CodexSurfaceAgentAdapter {
   async reconcileConversations(agents: Agent[]): Promise<void> {
     const retainedThreadIds = new Set(agents.flatMap((agent) => {
       const threadId = codexThreadId(agent);
-      return threadId ? [threadId] : [];
+      const reviewRound = agent.codeReview?.rounds.find((round) => round.id === agent.codeReview?.activeRoundId);
+      const reviewThreadId = reviewRound?.reviewerSession?.kind === 'codex'
+        ? reviewRound.reviewerSession.threadId
+        : undefined;
+      return [threadId, reviewThreadId].filter((id): id is string => Boolean(id));
     }));
     const [active, archived] = await Promise.all([
       this.surface.listConversations(),

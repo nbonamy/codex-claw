@@ -48,7 +48,7 @@ import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import type { CodeReviewDecisionInput, CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
+import { isCodeReviewStartInput, type CodeReviewDecisionInput, type CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 
 export type ClawBackendServerOptions = {
@@ -268,6 +268,12 @@ export class ClawBackendServer {
             ...(reviewerSession ? { reviewerSession } : {}),
           }) as import('@codex-claw/core/backend-driver').BackendCodeReviewResult;
         },
+        disposeReview: async (agent, reviewerSession) => {
+          await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewDispose, {
+            agent,
+            reviewerSession,
+          });
+        },
         changed: async () => { await this.persistAndEmitSnapshot(); },
       });
     }
@@ -280,7 +286,7 @@ export class ClawBackendServer {
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
-    for (const agent of this.snapshot.agents) this.codeReviews?.resumeInterrupted(agent);
+    for (const agent of this.snapshot.agents) await this.codeReviews?.resumeInterrupted(agent);
   }
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
@@ -813,8 +819,12 @@ export class ClawBackendServer {
       }
       case backendMethods.agentCodeReviewStart: {
         const agentId = requireStringParam(message.params, 'agentId');
-        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId }, async (agent) => {
-          this.requireCodeReviews().start(agent);
+        const input = requireRecordParam(message.params, 'input');
+        if (!isCodeReviewStartInput(input)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review start input.');
+        }
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          this.requireCodeReviews().start(agent, input);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -846,7 +856,7 @@ export class ClawBackendServer {
         const agentId = requireStringParam(message.params, 'agentId');
         const sessionId = requireStringParam(message.params, 'sessionId');
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
-          this.requireCodeReviews().finish(agent, sessionId);
+          await this.requireCodeReviews().finish(agent, sessionId);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -854,7 +864,7 @@ export class ClawBackendServer {
         const agentId = requireStringParam(message.params, 'agentId');
         const sessionId = requireStringParam(message.params, 'sessionId');
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
-          this.requireCodeReviews().reviewAgain(agent, sessionId);
+          await this.requireCodeReviews().reviewAgain(agent, sessionId);
           return this.persistAndEmitSnapshot();
         });
       }

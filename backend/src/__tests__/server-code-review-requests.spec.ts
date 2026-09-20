@@ -44,11 +44,13 @@ describe('ClawBackendServer code review workflow', () => {
         reviewerSession: input.reviewerSession ?? { kind: 'codex' as const, threadId: `review-thread-${reviewRun}` },
       };
     });
+    const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
       getCapabilities: () => codexBackendCapabilities,
       runCodeReview,
+      disposeCodeReview,
       sendPrompt: vi.fn(),
       interrupt: vi.fn(),
       respondToAgentRequest: vi.fn(),
@@ -70,7 +72,10 @@ describe('ClawBackendServer code review workflow', () => {
       },
     });
 
-    await request(server, backendMethods.agentCodeReviewStart, { agentId: owner.id });
+    await request(server, backendMethods.agentCodeReviewStart, {
+      agentId: owner.id,
+      input: { scope: { type: 'uncommitted' }, threadMode: 'unbiased' },
+    });
     await vi.waitFor(() => expect(owner.codeReview?.status).toBe('ready'));
     const session = owner.codeReview!;
     const round = session.rounds[0]!;
@@ -93,10 +98,16 @@ describe('ClawBackendServer code review workflow', () => {
     await request(server, backendMethods.agentCodeReviewAgain, { agentId: owner.id, sessionId: session.id });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     expect(session.rounds).toHaveLength(2);
+    expect(disposeCodeReview).toHaveBeenCalledExactlyOnceWith(owner, {
+      kind: 'codex', threadId: 'review-thread-1',
+    });
     expect(runCodeReview.mock.calls[2]?.[1]).not.toHaveProperty('reviewerSession');
     await request(server, backendMethods.agentCodeReviewRoundSubmit, { agentId: owner.id, sessionId: session.id });
     await request(server, backendMethods.agentCodeReviewFinish, { agentId: owner.id, sessionId: session.id });
     expect(owner.codeReview).toBeUndefined();
+    expect(disposeCodeReview).toHaveBeenLastCalledWith(owner, {
+      kind: 'codex', threadId: 'review-thread-3',
+    });
 
     await server.close();
   });

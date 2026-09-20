@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AppSnapshot } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot } from '@codex-claw/core/contracts';
 import type { CodeReviewFinding, CodeReviewSession } from '@codex-claw/core/code-review';
 import { i18n } from '../../i18n';
 import CodeReviewPanel from '../CodeReviewPanel.vue';
@@ -32,7 +32,7 @@ function session(findings: CodeReviewFinding[], status: CodeReviewSession['statu
         : status === 'readyToFinish' || status === 'finished' ? 'completed'
           : 'ready';
   return {
-    id: 'review-1', agentId: 'owner', status, activeRoundId: 'round-1',
+    id: 'review-1', agentId: 'owner', scope: { type: 'uncommitted' }, threadMode: 'unbiased', status, activeRoundId: 'round-1',
     createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:05:00.000Z',
     rounds: [{
       id: 'round-1', number: 1, status: roundStatus,
@@ -42,7 +42,7 @@ function session(findings: CodeReviewFinding[], status: CodeReviewSession['statu
   };
 }
 
-function mountPanel(review?: CodeReviewSession) {
+function mountPanel(review?: CodeReviewSession, gitStatus?: AgentGitStatus) {
   const actions = {
     startReview: vi.fn().mockResolvedValue({} as AppSnapshot),
     decideFinding: vi.fn().mockResolvedValue({} as AppSnapshot),
@@ -53,13 +53,14 @@ function mountPanel(review?: CodeReviewSession) {
   };
   const owner: Agent = {
     id: 'owner', name: 'Owner', folder: '/repo', backend: 'codex', status: { type: 'idle' },
+    backendSession: { kind: 'codex', threadId: 'current-thread' },
     createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
     ...(review ? { codeReview: review } : {}),
   };
   return {
     actions,
     wrapper: mount(CodeReviewPanel, {
-      props: { agent: owner, ...actions },
+      props: { agent: owner, gitStatus, ...actions },
       global: { plugins: [ElementPlus, i18n] },
     }),
   };
@@ -71,7 +72,37 @@ describe('CodeReviewPanel', () => {
 
     expect(wrapper.text()).toContain('Findings—not a transcript');
     await wrapper.get('button').trigger('click');
-    expect(actions.startReview).toHaveBeenCalledWith('owner');
+    expect(actions.startReview).toHaveBeenCalledWith('owner', {
+      scope: { type: 'uncommitted' },
+      threadMode: 'unbiased',
+    });
+  });
+
+  it('offers branch scope when available and can review it in the current thread', async () => {
+    const gitStatus: AgentGitStatus = {
+      folder: '/repo', repository: 'claw', branch: 'feature/review-setup',
+      ahead: 2, behind: 0, changedFiles: 3, addedLines: 24, removedLines: 4,
+      hasUntracked: false, state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
+      diffCatalog: {
+        defaultTarget: { type: 'branch', baseRef: 'origin/main' },
+        branch: { baseRef: 'origin/main', addedLines: 24, removedLines: 4, changedFiles: 3 },
+        uncommitted: { addedLines: 5, removedLines: 1, changedFiles: 1 },
+        unstaged: { addedLines: 5, removedLines: 1, changedFiles: 1 },
+        staged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        commits: [],
+      },
+    };
+    const { wrapper, actions } = mountPanel(undefined, gitStatus);
+
+    expect(wrapper.text()).toContain('Review feature/review-setup against origin/main');
+    await wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Current branch'))!.get('input').setValue(true);
+    await wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Use current thread'))!.get('input').setValue(true);
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
+
+    expect(actions.startReview).toHaveBeenCalledWith('owner', {
+      scope: { type: 'branch', baseRef: 'origin/main' },
+      threadMode: 'current',
+    });
   });
 
   it('shows a compact priority-ordered triage list and expands only one finding body from its header', async () => {
@@ -199,6 +230,9 @@ describe('CodeReviewPanel', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Reviewer stopped unexpectedly.');
     await wrapper.get('.code-review-panel__footer button').trigger('click');
-    expect(actions.startReview).toHaveBeenCalledWith('owner');
+    expect(actions.startReview).toHaveBeenCalledWith('owner', {
+      scope: { type: 'uncommitted' },
+      threadMode: 'unbiased',
+    });
   });
 });

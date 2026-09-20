@@ -68,6 +68,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.runCodeReview(agent, input);
   }
 
+  async disposeCodeReview(_agent: Agent, reviewerSession: BackendSession): Promise<void> {
+    await this.sessionManager.disposeCodeReview(reviewerSession);
+  }
+
   async replaceConversationWithSummary(agent: Agent): Promise<BackendConversationReplacementResult> {
     const result = await this.sessionManager.replaceConversationWithSummary(agent);
     return { backendSession: codexBackendSession(result.threadId) };

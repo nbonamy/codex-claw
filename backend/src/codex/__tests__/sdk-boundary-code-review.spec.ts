@@ -2,6 +2,32 @@ import { describe, expect, it } from 'vitest';
 import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
 
 describe('Codex code review boundary', () => {
+  it('uses the agent conversation for current-thread review turns and restores its normal tools afterward', async () => {
+    const { driver, conversation, surface } = codexSdkFixture();
+    const agent = sdkAgent();
+    const current = conversation('conversation-a');
+    current.setSnapshot({ turnIds: [], messages: [] });
+    current.handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', {
+      turnIds: ['turn-review'],
+      turns: [{ id: 'turn-review', status: 'completed' } as never],
+    }));
+
+    await driver.runCodeReview(agent, {
+      cwd: '/repo',
+      prompt: 'Review in this conversation.',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?reviewContextId=current',
+      reviewerSession: agent.backendSession,
+    });
+
+    expect(current.handle.load.mock.calls).toStrictEqual([
+      [{ extensionContext: { agent, reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?reviewContextId=current' } }],
+      [{ cwd: '/repo', extensionContext: agent }],
+    ]);
+    expect(current.handle.sendMessage).toHaveBeenCalledWith('Review in this conversation.');
+    expect(surface.archiveConversation).not.toHaveBeenCalled();
+    expect(surface.forgetConversation).not.toHaveBeenCalled();
+  });
+
   it('creates a fresh reviewer conversation and keeps it available for later round turns', async () => {
     const { driver, surface, conversation } = codexSdkFixture();
     const review = conversation('review-fresh');
@@ -60,5 +86,9 @@ describe('Codex code review boundary', () => {
       },
     });
     expect(review.handle.sendMessage).toHaveBeenCalledWith('Clarify the finding.');
+
+    await driver.disposeCodeReview(sdkAgent(), result.reviewerSession);
+    expect(surface.archiveConversation).toHaveBeenCalledExactlyOnceWith('review-fresh');
+    expect(surface.forgetConversation).toHaveBeenCalledExactlyOnceWith('review-fresh');
   });
 });

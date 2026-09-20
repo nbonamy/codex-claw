@@ -578,6 +578,9 @@ describe('ClaudeBackendDriver', () => {
     }));
     transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'Clarified.' }] } });
     await expect(clarification).resolves.toMatchObject({ text: 'Clarified.', reviewerSession: result.reviewerSession });
+
+    await driver.disposeCodeReview(agent, result.reviewerSession);
+    expect(transport.deleteSession).toHaveBeenCalledWith('review-session-1', '/Users/nbonamy/src/codex-claw');
   });
 
   it('maps Agent SDK permission requests through the app-owned approval contract', async () => {
@@ -1304,6 +1307,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
   startTurn: ReturnType<typeof vi.fn<(params: ClaudeTurnParams, onMessage: (message: ClaudeSdkMessage) => void) => ClaudeTurnHandle>>;
   respondToPermissionRequest: ReturnType<typeof vi.fn>;
   closeSession: ReturnType<typeof vi.fn>;
+  deleteSession: ReturnType<typeof vi.fn>;
   discoverModels: ReturnType<typeof vi.fn>;
   listModels: ReturnType<typeof vi.fn>;
   getContextUsage: ReturnType<typeof vi.fn>;
@@ -1345,6 +1349,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
     },
     respondToPermissionRequest: vi.fn().mockRejectedValue(new Error("Claude permission request 'request-1' is no longer pending.")),
     closeSession: vi.fn().mockResolvedValue(undefined),
+    deleteSession: vi.fn().mockResolvedValue(undefined),
     discoverModels: vi.fn().mockResolvedValue(null),
     listModels: vi.fn().mockResolvedValue(null),
     getContextUsage: vi.fn().mockResolvedValue(null),

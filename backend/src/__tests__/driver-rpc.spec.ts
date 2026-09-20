@@ -88,9 +88,11 @@ describe('BackendDriverRpc', () => {
     const agent = createAgent();
     const result = { text: '', reviewerSession: { kind: 'codex' as const, threadId: 'review-thread' } };
     const runCodeReview = vi.fn().mockResolvedValue(result);
+    const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver({
       getCapabilities: vi.fn().mockReturnValue({ codeReview: true }),
       runCodeReview,
+      disposeCodeReview,
     })]]));
     const input = {
       prompt: 'Review independently.',
@@ -101,6 +103,10 @@ describe('BackendDriverRpc', () => {
 
     await expect(rpc.handle('driver/codeReview/run', { agent, ...input })).resolves.toEqual(result);
     expect(runCodeReview).toHaveBeenCalledWith(agent, input);
+    await expect(rpc.handle('driver/codeReview/dispose', {
+      agent, reviewerSession: result.reviewerSession,
+    })).resolves.toBeNull();
+    expect(disposeCodeReview).toHaveBeenCalledWith(agent, result.reviewerSession);
   });
 
   it('routes only advertised permission modes to the backend driver', async () => {

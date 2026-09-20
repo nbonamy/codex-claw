@@ -91,10 +91,14 @@ agent-identity, instruction, MCP, or permission-safety change restarts and
 resumes the query so stale configuration cannot leak into later turns. The
 transport configures:
 
-Code review uses a hidden Claude session separate from the owning agent's normal
-chat. The initial review pass starts a fresh session with only the round-scoped
-finding tools added; clarification and sequential remediation resume that same
-session id. `Review again` intentionally omits it and starts a fresh session.
+Code review defaults to a hidden Claude session separate from the owning agent's
+normal chat. The user may instead start the first pass from the current session.
+Only the round-scoped finding tools are added; clarification and sequential
+remediation resume that same session id. For the unbiased strategy, `Review
+again` intentionally omits it and starts a fresh session. Current-thread
+reviews preserve the same user-owned session for every round and after finish;
+unbiased review sessions are deleted through the Agent SDK between rounds and
+when the review finishes.
 
 - the Claude Code system-prompt and tool presets;
 - user, project, and local setting sources;
@@ -733,8 +737,9 @@ server replacement. That is promising, but the first implementation should
 prefer startup/session-local config because it mirrors our Codex approach and
 avoids mutating global user state.
 
-Code review uses that session-local shape today: Claw starts a fresh Agent SDK
-turn with the round-scoped MCP URL and allows only `report_finding`,
+Code review uses that session-local shape today: Claw starts or resumes an Agent
+SDK turn according to the initial thread choice, using the round-scoped MCP URL
+and allowing only `report_finding`,
 `update_finding`, and `mark_finding_complete` from that MCP server. Repository
 inspection continues through Claude's ordinary harness tools. Provider output
 is returned through the unified review driver result, while durable findings

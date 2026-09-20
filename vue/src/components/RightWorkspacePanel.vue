@@ -117,6 +117,7 @@
       v-if="tabs.includes('codeReview')"
       v-show="activeTab === 'codeReview'"
       :agent="agent"
+      :git-status="gitStatus"
       :start-review="startCodeReview"
       :decide-finding="decideCodeReviewFinding"
       :discuss-finding="discussCodeReviewFinding"
@@ -345,7 +346,7 @@ const props = withDefaults(defineProps<{
   closeRepositoryWorkAgent?: (agentId: string) => void;
   showRepositoryWorkAgent?: (agentId: string) => void;
   startRepositoryWork?: (input: import('./right-workspace').RepositoryWorkStartInput) => Promise<void>;
-  startCodeReview?: (agentId: string) => Promise<AppSnapshot>;
+  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
   decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
   discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;

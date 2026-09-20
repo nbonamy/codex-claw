@@ -786,13 +786,21 @@ durable projection.
 
 An in-progress code review is app-owned state, not provider transcript state.
 The owning agent carries one active review ledger containing rounds, structured
-findings, user decisions, linked discussion, and remediation progress. Before
+findings, user decisions, linked discussion, remediation progress, the selected
+Git scope, and the initial reviewer-thread strategy. The Git scope is either
+uncommitted work or the current branch against its resolved base. The first
+round may use the agent's current provider conversation, or create a fresh
+provider conversation for an unbiased reviewer; fresh is the default. Before
 submission, findings have decisions (`undecided`, `selected`, or `rejected`),
 not workflow status. Submission starts remediation: rejected findings become
-`skipped`; selected findings become `pending`; the round's hidden reviewer
+`skipped`; selected findings become `pending`; the round's reviewer
 conversation fixes exactly one `fixing` finding at a time and marks it `fixed`.
 Clarification and remediation continue the same provider-owned reviewer session;
-the next review round starts a fresh provider session to reduce anchoring.
+current-thread reviews keep that user-owned conversation intact for every round
+and after completion. Unbiased reviews dispose their review-owned conversation
+between rounds, start a fresh one to reduce anchoring, and dispose the last one
+when the review finishes, while retaining only the structured ledger between
+rounds.
 `clawd` persists the ledger and opaque reviewer session reference in `state.json`
 so reloads and agent switches do not lose unfinished arbitration. Finishing the
 review removes the ledger; completed findings are not permanent project history.

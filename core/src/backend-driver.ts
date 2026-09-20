@@ -104,6 +104,7 @@ export type AgentBackendDriver = {
   getCapabilities(agent: Agent): BackendCapabilities;
   generateText?(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult>;
   runCodeReview?(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult>;
+  disposeCodeReview?(agent: Agent, reviewerSession: BackendSession): Promise<void>;
   tryHandlePromptCommand?(agent: Agent, prompt: string): Promise<BackendSendResult> | null;
   preparePromptOptions?(agent: Agent, options?: SendPromptOptions): SendPromptOptions | undefined;
   sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult>;

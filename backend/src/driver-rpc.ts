@@ -193,6 +193,14 @@ export class BackendDriverRpc {
           ...(record.reviewerSession ? { reviewerSession: record.reviewerSession as BackendSession } : {}),
         });
       }
+      case backendMethods.driverCodeReviewDispose: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.disposeCodeReview) throw unsupportedBackendFeature(agent, 'code review cleanup');
+        await driver.disposeCodeReview(agent, record.reviewerSession as BackendSession);
+        return null;
+      }
       case backendMethods.driverPromptCommandHandle: {
         const { agent } = requireAgentParams(params);
         const record = requireRecord(params);

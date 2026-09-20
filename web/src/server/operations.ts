@@ -12,7 +12,7 @@ export type ClawBackendPort = {
 type ParamsFactory = (args: unknown[]) => unknown;
 
 const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?]>> = {
-  startCodeReview: [backendMethods.agentCodeReviewStart, named('agentId')],
+  startCodeReview: [backendMethods.agentCodeReviewStart, named('agentId', 'input')],
   decideCodeReviewFinding: [backendMethods.agentCodeReviewFindingDecide, named('agentId', 'input')],
   discussCodeReviewFinding: [backendMethods.agentCodeReviewFindingDiscuss, named('agentId', 'input')],
   submitCodeReviewRound: [backendMethods.agentCodeReviewRoundSubmit, named('agentId', 'sessionId')],
