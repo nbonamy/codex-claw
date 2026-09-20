@@ -743,7 +743,7 @@ describe('AppShell authentication and conversation', () => {
     expect(sourcePanel.props('activeTab')).toBeNull();
   });
 
-  it('starts an independent review with the active thread model and effort', async () => {
+  it('does not override an independent reviewer with renderer-local model selection', async () => {
     const snapshot = createInitialSnapshot();
     const source = snapshot.agents[0]!;
     source.backendDefaults = {
@@ -763,8 +763,13 @@ describe('AppShell authentication and conversation', () => {
     const wrapper = mountShell({
       snapshot,
       startCodeReview,
-      selectedModelId: 'gpt-5.6-sol',
-      selectedReasoningEffort: 'high',
+      backendModels: [{
+        id: 'astra-option',
+        model: 'gpt-6-astra',
+        displayName: 'GPT-6 Astra',
+      }],
+      selectedModelId: 'astra-option',
+      selectedReasoningEffort: 'medium',
     });
 
     wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('open-code-review');
@@ -775,8 +780,6 @@ describe('AppShell authentication and conversation', () => {
     expect(startCodeReview).toHaveBeenCalledExactlyOnceWith(source.id, {
       scope: { type: 'uncommitted' },
       threadMode: 'independent',
-      model: 'gpt-5.6-sol',
-      reasoningEffort: 'high',
     });
   });
 

@@ -72,7 +72,7 @@ describe('CodeReviewService', () => {
     test.owner.avatar = 'owl';
     test.owner.openInApplication = 'vscode';
     test.owner.backendDefaults = {
-      kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'medium',
+      kind: 'codex', model: 'gpt-5.6-sol', reasoningEffort: 'high',
     };
     test.owner.workspace = {
       kind: 'git', folder: '/repo', repositoryName: 'claw', repositoryRoot: '/repo',
@@ -88,7 +88,6 @@ describe('CodeReviewService', () => {
 
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
-      model: 'gpt-5.6-sol', reasoningEffort: 'high',
     });
     const visibleReviewer = reviewer(test, session);
 

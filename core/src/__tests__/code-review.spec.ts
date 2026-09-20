@@ -78,12 +78,6 @@ function session(): CodeReviewSession {
 describe('code review ledger', () => {
   it('accepts only complete review setup choices', () => {
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent' })).toBe(true);
-    expect(isCodeReviewStartInput({
-      scope: { type: 'uncommitted' }, threadMode: 'independent',
-      model: 'gpt-5.6-sol', reasoningEffort: 'high',
-    })).toBe(true);
-    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent', model: '' })).toBe(false);
-    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent', reasoningEffort: 7 })).toBe(false);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: 'origin/main' }, threadMode: 'current' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: '' }, threadMode: 'current' })).toBe(false);
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'anchored' })).toBe(false);

@@ -726,12 +726,18 @@ export class CodexSurfaceAgentAdapter {
     if (requestedThreadId) return this.bindAndLoad(agent, requestedThreadId);
 
     await this.start();
-    const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
+    const defaults = agent.backendDefaults?.kind === 'codex'
+      ? { ...agent.backendDefaults }
+      : undefined;
+    const requestedPreset = codexApprovalPresetFromDefaults(defaults);
     const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
     const snapshot = await this.surface.createConversation({
       ...agentCwd(agent),
       threadSource: 'user',
       ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
+      ...(defaults?.model ? { model: defaults.model } : {}),
+      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
+      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
     }, { extensionContext });
     const threadId = snapshot.activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation.');

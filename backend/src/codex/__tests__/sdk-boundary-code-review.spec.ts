@@ -62,7 +62,12 @@ describe('Codex code review boundary', () => {
     });
 
     expect(surface.createConversation).toHaveBeenCalledWith(
-      { cwd: '/repo', threadSource: 'user' },
+      {
+        cwd: '/repo',
+        threadSource: 'user',
+        model: 'gpt-6-astra',
+        reasoningEffort: 'high',
+      },
       { extensionContext: {
         agent,
         reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1',

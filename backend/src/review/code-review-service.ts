@@ -77,7 +77,7 @@ export class CodeReviewService {
 
     const reviewer = input.threadMode === 'current'
       ? agent
-      : this.createIndependentReviewer(agent, input);
+      : this.createIndependentReviewer(agent);
     if (current?.status === 'failed') this.closeReviewToolContext(current);
     const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);
@@ -474,7 +474,7 @@ export class CodeReviewService {
     };
   }
 
-  private createIndependentReviewer(target: Agent, input: CodeReviewStartInput): Agent {
+  private createIndependentReviewer(target: Agent): Agent {
     const sourceDefaults = target.backendDefaults?.kind === target.backend
       ? target.backendDefaults
       : undefined;
@@ -486,8 +486,6 @@ export class CodeReviewService {
       backendDefaults: {
         ...sourceDefaults,
         kind: target.backend,
-        ...(input.model ? { model: input.model.trim() } : {}),
-        ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort.trim() } : {}),
       },
       teamId: target.teamId,
     }, { select: false, afterAgentId: target.id });
