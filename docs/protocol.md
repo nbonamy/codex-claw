@@ -122,7 +122,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Includes or excludes a stable finding from remediation. Findings start selected; decisions are not remediation statuses. |
 | `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the same reviewer conversation for its response. |
 | `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Maps deselected findings to `skipped` and selected findings to `pending`, then fixes pending findings one at a time in the same reviewer conversation. |
-| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Reuses the same provider conversation for `current` reviews. For `unbiased` reviews, disposes the review-owned conversation and starts a fresh one for the stored scope. Both carry deselected exclusions, fixed regression checks, and behavior decisions from prior discussion. |
+| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Reuses the same provider conversation for `current` reviews. For `unbiased` reviews, disposes the review-owned conversation and starts a fresh one for the stored scope. Both carry cumulative deselected exclusions, fixed regression checks, and behavior decisions from every prior round inside the reviewer prompt's `<context>` block. |
 | `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. It leaves a user-owned current conversation intact and disposes an unbiased review-owned conversation. |
 
 ## Client To `clawd`: System

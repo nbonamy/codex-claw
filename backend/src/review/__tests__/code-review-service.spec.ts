@@ -96,6 +96,59 @@ describe('CodeReviewService', () => {
     expect(test.disposed).toStrictEqual([]);
   });
 
+  it('carries skipped findings from every prior round inside the reviewer context', async () => {
+    let firstSkippedId = '';
+    let secondSkippedId = '';
+    const test = harness([
+      async (tools) => {
+        firstSkippedId = (await tools.reportFinding({
+          fingerprint: 'round-1:cache', priority: 'p2', summary: 'Round one cache concern',
+          rationale: 'The cache could be stale.', suggestedResolution: 'Invalidate the cache.',
+        })).id;
+        return { text: '' };
+      },
+      async (tools) => {
+        secondSkippedId = (await tools.reportFinding({
+          fingerprint: 'round-2:logging', priority: 'p3', summary: 'Round two logging concern',
+          rationale: 'The log could be noisy.', suggestedResolution: 'Reduce the log level.',
+        })).id;
+        return { text: '' };
+      },
+      async () => ({ text: '' }),
+    ]);
+
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'unbiased',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    let round = activeCodeReviewRound(session);
+    test.service.decide(test.owner, {
+      sessionId: session.id, roundId: round.id, findingId: firstSkippedId,
+      decision: 'reject', reason: 'The event stream already invalidates this cache.',
+    });
+    test.service.submit(test.owner, session.id);
+
+    await test.service.reviewAgain(test.owner, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    round = activeCodeReviewRound(session);
+    test.service.decide(test.owner, {
+      sessionId: session.id, roundId: round.id, findingId: secondSkippedId,
+      decision: 'reject', reason: 'This verbosity is intentional during migration.',
+    });
+    test.service.submit(test.owner, session.id);
+
+    await test.service.reviewAgain(test.owner, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+
+    const thirdRoundPrompt = test.turns[2]!.prompt;
+    const contextEnd = thirdRoundPrompt.indexOf('</context>');
+    expect(thirdRoundPrompt.startsWith('<context>')).toBe(true);
+    expect(contextEnd).toBeGreaterThan(0);
+    expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Round one cache concern');
+    expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Round two logging concern');
+    expect(thirdRoundPrompt.slice(contextEnd)).toContain('Review only the current uncommitted changes');
+  });
+
   it('uses one reviewer thread for clarification and sequential fixes, then starts review again fresh', async () => {
     let selectedId = '';
     let rejectedId = '';

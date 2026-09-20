@@ -439,12 +439,15 @@ function reviewPrompt(session: CodeReviewSession): string {
   const scope = session.scope.type === 'branch'
     ? `the current branch against ${session.scope.baseRef}, including uncommitted changes`
     : 'only the current uncommitted changes (staged, unstaged, and untracked)';
-  return `Review ${scope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
+  return `<context>
+This structured review ledger is cumulative across every previous round in this review session. The exclusions array contains all findings the user skipped, not only findings from the immediately preceding round. Do not raise an excluded finding again unless materially new evidence changes the conclusion; when it does, include that evidence. Regression checks must be verified against the latest code. Prior discussion records decisions that changed expected behavior.
 
-Findings are the only review artifact. For every actionable defect, call report_finding with concrete evidence. Use update_finding to correct or enrich a reported finding. Do not raise an exclusion again unless materially new evidence changes the conclusion; if it does, include that evidence. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.
+${JSON.stringify(ledger, null, 2)}
+</context>
 
-Structured review ledger:
-${JSON.stringify(ledger, null, 2)}`;
+Review ${scope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
+
+Findings are the only review artifact. For every actionable defect, call report_finding with concrete evidence. Use update_finding to correct or enrich a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.`;
 }
 
 function discussionPrompt(

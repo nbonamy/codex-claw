@@ -800,7 +800,9 @@ current-thread reviews keep that user-owned conversation intact for every round
 and after completion. Unbiased reviews dispose their review-owned conversation
 between rounds, start a fresh one to reduce anchoring, and dispose the last one
 when the review finishes, while retaining only the structured ledger between
-rounds.
+rounds. Every new round receives that cumulative ledger inside a `<context>`
+block. Its exclusions therefore include every finding skipped by the user
+across the review, not only exclusions from the immediately preceding round.
 `clawd` persists the ledger and opaque reviewer session reference in `state.json`
 so reloads and agent switches do not lose unfinished arbitration. Finishing the
 review removes the ledger; completed findings are not permanent project history.
