@@ -131,6 +131,7 @@
       </div>
 
       <div
+        v-if="session.status !== 'reviewing'"
         class="code-review-panel__progress"
         :aria-label="$t('surface.codeReviewPanel.cumulativeProgress')"
       >
@@ -145,11 +146,18 @@
         aria-live="polite"
       >
         <span class="code-review-panel__spinner" aria-hidden="true" />
-        <div>
-          <strong>{{ $t('surface.codeReviewPanel.reviewInProgress') }}</strong
-          ><span>{{ reviewingScope }}</span>
-        </div>
+        <strong>{{ reviewingScope }}</strong>
+        <span v-if="findings.length" class="code-review-panel__working-count">{{
+          $t('surface.codeReviewPanel.findingsFound', { count: findings.length })
+        }}</span>
       </div>
+
+      <p
+        v-if="selectedRound?.status === 'reviewing' && findings.length === 0"
+        class="code-review-panel__awaiting"
+      >
+        {{ $t('surface.codeReviewPanel.noFindingsYet') }}
+      </p>
 
       <p
         v-else-if="selectedRound?.status === 'failed'"
@@ -842,23 +850,48 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   font-size: var(--font-size-16);
 }
 
-.code-review-panel__working,
+.code-review-panel__working {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.code-review-panel__working strong {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.code-review-panel__working-count {
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-low);
+  font-size: var(--font-size-11);
+}
+
+.code-review-panel__awaiting,
 .code-review-panel__clear {
   margin: auto;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.code-review-panel__awaiting {
+  font-size: var(--font-size-12);
+}
+
+.code-review-panel__clear {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--space-4);
   align-items: center;
   padding: var(--space-8);
-  color: var(--color-text-muted);
 }
 
-.code-review-panel__working div,
-.code-review-panel__clear {
-  line-height: 1.4;
-}
-
-.code-review-panel__working span,
 .code-review-panel__clear span {
   display: block;
 }

@@ -196,13 +196,24 @@ describe('CodeReviewPanel', () => {
     expect(actions.startReview).not.toHaveBeenCalled();
   });
 
-  it('describes the active review scope without thread implementation details', async () => {
+  it('shows findings as they arrive while describing the active review scope', async () => {
     const uncommittedReview = session([], 'reviewing');
     const { wrapper } = mountPanel(uncommittedReview);
 
-    expect(wrapper.get('.code-review-panel__working').text()).toContain('Review in progress');
     expect(wrapper.get('.code-review-panel__working').text()).toContain('Inspecting uncommitted changes.');
+    expect(wrapper.text()).toContain('No findings yet');
+    expect(wrapper.find('.code-review-panel__progress').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Independent review');
+
+    const reported = finding({ title: 'Validate the live finding' });
+    await wrapper.setProps({
+      agent: { ...wrapper.props('agent'), codeReview: session([reported], 'reviewing') },
+    });
+
+    expect(wrapper.get('.code-review-panel__working').text()).toContain('1 found');
+    expect(wrapper.get('.review-finding').text()).toContain('Validate the live finding');
+    expect(wrapper.find('.code-review-panel__awaiting').exists()).toBe(false);
+    expect(wrapper.find('.review-finding__quick-actions').exists()).toBe(false);
 
     const branchReview = session([], 'reviewing');
     branchReview.scope = { type: 'branch', baseRef: 'origin/main' };
