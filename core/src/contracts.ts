@@ -737,6 +737,7 @@ export type CodexClawApi = {
   discussCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDiscussionInput): Promise<AppSnapshot>;
   submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot>;
   finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
   reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot>;
   respondToThreadFlag(agentId: string, response: import('./thread-flags').ThreadFlagResponse): Promise<AppSnapshot>;
   respondToPlanReview(agentId: string, response: import('./plan-review').PlanReviewResponse): Promise<AppSnapshot>;

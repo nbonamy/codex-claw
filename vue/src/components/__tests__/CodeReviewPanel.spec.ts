@@ -159,11 +159,32 @@ describe('CodeReviewPanel', () => {
     expect(actions.startReview).not.toHaveBeenCalled();
   });
 
+  it('describes the active review scope without thread implementation details', async () => {
+    const uncommittedReview = session([], 'reviewing');
+    const { wrapper } = mountPanel(uncommittedReview);
+
+    expect(wrapper.get('.code-review-panel__working').text()).toContain('Review in progress');
+    expect(wrapper.get('.code-review-panel__working').text()).toContain('Inspecting uncommitted changes.');
+    expect(wrapper.text()).not.toContain('Independent review');
+
+    const branchReview = session([], 'reviewing');
+    branchReview.scope = { type: 'branch', baseRef: 'origin/main' };
+    await wrapper.setProps({
+      agent: { ...wrapper.props('agent'), codeReview: branchReview },
+      gitStatus: { branch: 'feature/review-copy' } as AgentGitStatus,
+    });
+
+    expect(wrapper.get('.code-review-panel__working').text()).toContain(
+      'Inspecting feature/review-copy against origin/main.',
+    );
+  });
+
   it('shows a compact priority-ordered triage list and expands only one finding body from its header', async () => {
     const low = finding({ id: 'finding-low', priority: 'p3', title: 'Address the low priority issue', location: undefined });
     const critical = finding({ id: 'finding-critical', priority: 'p0', title: 'Address the critical issue', location: { file: 'src/auth.ts', line: 42, endLine: 47 } });
     const { wrapper } = mountPanel(session([low, critical]));
 
+    expect(wrapper.get('[role="tab"]').text()).toBe('Round 1');
     expect(wrapper.findAll('.review-finding').map((node) => node.text())).toEqual([
       expect.stringContaining('Address the critical issue'),
       expect.stringContaining('Address the low priority issue'),
@@ -293,13 +314,23 @@ describe('CodeReviewPanel', () => {
   it('offers retry when a review round fails', async () => {
     const failed = session([], 'failed');
     failed.rounds[0]!.error = 'Reviewer stopped unexpectedly.';
-    const { wrapper, actions } = mountPanel(failed);
+    const { wrapper } = mountPanel(failed);
+    const startReview = vi.fn(async (_agentId: string, input: unknown) => {
+      structuredClone(input);
+      return {} as AppSnapshot;
+    });
+    await wrapper.setProps({ startReview });
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Reviewer stopped unexpectedly.');
     await wrapper.get('.code-review-panel__footer button').trigger('click');
-    expect(actions.startReview).toHaveBeenCalledWith('owner', {
+    await flushPromises();
+
+    expect(startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'uncommitted' },
       threadMode: 'unbiased',
     });
+    expect(wrapper.findAll('[role="alert"]').map((alert) => alert.text())).toEqual([
+      'Reviewer stopped unexpectedly.',
+    ]);
   });
 });

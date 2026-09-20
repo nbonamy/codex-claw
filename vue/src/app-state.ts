@@ -231,6 +231,13 @@ export function useAppState() {
     return next;
   }
 
+  async function discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.discardCodeReview(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
   async function reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
     const next = await codexClawApi.reviewCodeAgain(agentId, sessionId);
@@ -1423,6 +1430,7 @@ export function useAppState() {
     discussCodeReviewFinding,
     submitCodeReviewRound,
     finishCodeReview,
+    discardCodeReview,
     reviewCodeAgain,
     getAgentGitWorkflow,
     generateAgentGitMessage,

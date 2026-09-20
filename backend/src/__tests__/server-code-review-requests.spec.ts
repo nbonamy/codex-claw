@@ -9,6 +9,39 @@ import { createTestSnapshot } from './server-test-fixtures';
 import type { ReviewToolHandlers } from '../review/review-tool-registry';
 
 describe('ClawBackendServer code review workflow', () => {
+  it('discards a review session through the app-owned request', async () => {
+    const snapshot = createTestSnapshot();
+    const owner: Agent = {
+      id: 'agent-owner', teamId: snapshot.teams[0]!.id, name: 'Owner', folder: '/repo',
+      backend: 'codex', status: { type: 'idle' },
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
+      codeReview: {
+        id: 'review-1', agentId: 'agent-owner', scope: { type: 'uncommitted' },
+        threadMode: 'current', status: 'failed', activeRoundId: 'round-1',
+        rounds: [{ id: 'round-1', number: 1, status: 'failed', findings: [], startedAt: 'now' }],
+        createdAt: 'now', updatedAt: 'now',
+      },
+    };
+    snapshot.agents.push(owner);
+    snapshot.teams[0]!.agentIds.push(owner.id);
+    const server = new ClawBackendServer({
+      version: 'test', snapshot,
+      driverRpc: new BackendDriverRpc(new Map()),
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+      codeReviewTools: {
+        createReviewToolContext: () => ({ id: 'unused', url: 'http://review.test/mcp' }),
+        closeReviewToolContext: vi.fn(),
+      },
+    });
+
+    await request(server, backendMethods.agentCodeReviewDiscard, {
+      agentId: owner.id, sessionId: 'review-1',
+    });
+
+    expect(owner.codeReview).toBeUndefined();
+    await server.close();
+  });
+
   it('owns readiness, arbitration, same-thread remediation, review again, and finish', async () => {
     const snapshot = createTestSnapshot();
     const owner: Agent = {

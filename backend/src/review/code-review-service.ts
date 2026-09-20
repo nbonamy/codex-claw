@@ -138,6 +138,22 @@ export class CodeReviewService {
     delete agent.codeReview;
   }
 
+  async discard(agent: Agent, sessionId: string): Promise<void> {
+    const session = this.findSession(agent, sessionId);
+    const reviewerSession = session.threadMode === 'unbiased'
+      ? activeCodeReviewRound(session).reviewerSession
+      : undefined;
+    delete agent.codeReview;
+    await this.options.changed();
+    if (reviewerSession) {
+      try {
+        await this.options.disposeReview(agent, reviewerSession);
+      } catch {
+        // Closing the product workflow still wins when temporary-thread cleanup fails.
+      }
+    }
+  }
+
   async reviewAgain(agent: Agent, sessionId: string): Promise<CodeReviewRound> {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('Complete the current remediation before reviewing again.');
@@ -198,6 +214,10 @@ export class CodeReviewService {
     const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
     try {
       const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
+      if (agent.codeReview !== session) {
+        if (session.threadMode === 'unbiased') await this.options.disposeReview(agent, result.reviewerSession);
+        return;
+      }
       round.reviewerSession = result.reviewerSession;
       const completedAt = this.timestamp();
       round.status = 'ready';
@@ -205,6 +225,7 @@ export class CodeReviewService {
       session.status = 'ready';
       session.updatedAt = completedAt;
     } catch (error) {
+      if (agent.codeReview !== session) return;
       round.status = 'failed';
       round.error = error instanceof Error ? error.message : String(error);
       round.completedAt = this.timestamp();
@@ -253,6 +274,7 @@ export class CodeReviewService {
     this.activeRoundTurns.add(round.id);
     try {
       for (;;) {
+        if (agent.codeReview !== session) return;
         const finding = round.findings.find((candidate) => candidate.remediation.state === 'pending');
         if (!finding) break;
         const startedAt = this.timestamp();
@@ -269,6 +291,7 @@ export class CodeReviewService {
             context.url,
             requiredReviewerSession(round),
           );
+          if (agent.codeReview !== session) return;
           round.reviewerSession = result.reviewerSession;
         } finally {
           this.options.tools.closeReviewToolContext(context.id);

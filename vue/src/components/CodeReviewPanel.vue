@@ -85,7 +85,6 @@
           @click="selectedRoundId = round.id"
         >
           {{ $t('surface.codeReviewPanel.roundNumber', { number: round.number }) }}
-          <span>{{ round.findings.length }}</span>
         </button>
       </div>
 
@@ -106,7 +105,7 @@
         <span class="code-review-panel__spinner" aria-hidden="true" />
         <div>
           <strong>{{ $t('surface.codeReviewPanel.reviewInProgress') }}</strong
-          ><span>{{ $t('surface.codeReviewPanel.reviewerInspecting') }}</span>
+          ><span>{{ reviewingScope }}</span>
         </div>
       </div>
 
@@ -453,6 +452,16 @@ const sessionStatus = computed(
       failed: t("surface.codeReviewPanel.statusFailed"),
     })[session.value?.status ?? "reviewing"],
 );
+const reviewingScope = computed(() => {
+  const reviewScope = session.value?.scope;
+  if (reviewScope?.type === "branch") {
+    return t("surface.codeReviewPanel.inspectingBranch", {
+      branch: props.gitStatus?.branch ?? t("surface.codeReviewPanel.currentBranchFallback"),
+      base: reviewScope.baseRef,
+    });
+  }
+  return t("surface.codeReviewPanel.inspectingUncommitted");
+});
 const footerMessage = computed(() =>
   t("surface.codeReviewPanel.findingsSelected", {
     count: selectedCount.value,
@@ -544,7 +553,13 @@ function startSelectedReview(): void {
 function retryReview(): void {
   const review = session.value;
   if (!review) return;
-  void run(() => props.startReview(props.agent.id, { scope: review.scope, threadMode: review.threadMode }));
+  const reviewScope: CodeReviewStartInput["scope"] = review.scope.type === "branch"
+    ? { type: "branch", baseRef: review.scope.baseRef }
+    : { type: "uncommitted" };
+  void run(() => props.startReview(props.agent.id, {
+    scope: reviewScope,
+    threadMode: review.threadMode,
+  }));
 }
 
 function findingState(finding: CodeReviewFinding): string {
@@ -769,11 +784,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 .code-review-panel__rounds button.is-active {
   border-color: var(--color-primary);
   color: var(--color-text);
-}
-
-.code-review-panel__rounds span {
-  margin-left: var(--space-1);
-  font-size: var(--font-size-11);
 }
 
 .code-review-panel__progress {

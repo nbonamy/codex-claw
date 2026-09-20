@@ -804,8 +804,10 @@ rounds. Every new round receives that cumulative ledger inside a `<context>`
 block. Its exclusions therefore include every finding skipped by the user
 across the review, not only exclusions from the immediately preceding round.
 `clawd` persists the ledger and opaque reviewer session reference in `state.json`
-so reloads and agent switches do not lose unfinished arbitration. Finishing the
-review removes the ledger; completed findings are not permanent project history.
+so reloads and agent switches do not lose unfinished arbitration while the Review
+pane remains open. Finishing the review or closing its pane removes the ledger;
+reopening Review starts from zero, and completed findings are not permanent project
+history.
 
 ## Work Backlog Integrations
 

@@ -51,6 +51,21 @@ function harness(scripts: ReviewScript[], dispose = async (_session: BackendSess
 }
 
 describe('CodeReviewService', () => {
+  it('discards review state and its temporary reviewer thread', async () => {
+    const test = harness([async () => ({ text: '' })], async () => {
+      throw new Error('Reviewer thread could not be deleted.');
+    });
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'unbiased',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+
+    await test.service.discard(test.owner, session.id);
+
+    expect(test.owner.codeReview).toBeUndefined();
+    expect(test.disposed).toStrictEqual([{ kind: 'codex', threadId: 'review-thread-1' }]);
+  });
+
   it('retains an unbiased review ledger when its owned thread cannot be deleted', async () => {
     const test = harness([async () => ({ text: '' })], async () => {
       throw new Error('Reviewer thread could not be deleted.');

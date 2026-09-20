@@ -107,7 +107,7 @@
       :submit-code-review-round="submitCodeReviewRound"
       :finish-code-review="finishCodeReview"
       :review-code-again="reviewCodeAgain"
-      @close-tab="closeRightWorkspaceTab(agent.id, $event)"
+      @close-tab="closeWorkspaceTab(agent, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
       @confirm-plan="confirmPlan"
@@ -267,6 +267,7 @@ const props = defineProps<{
   discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>();
 
@@ -323,6 +324,7 @@ const {
   discussCodeReviewFinding,
   submitCodeReviewRound,
   finishCodeReview,
+  discardCodeReview,
   reviewCodeAgain,
   startRightWorkspaceResize,
   toggleFileExplorer,
@@ -420,6 +422,13 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
 
 function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
   return props.rightWorkspaceFor(agentId);
+}
+
+async function closeWorkspaceTab(agent: Agent, tab: RightWorkspaceTab): Promise<void> {
+  if (tab === 'codeReview' && agent.codeReview && props.discardCodeReview) {
+    await props.discardCodeReview(agent.id, agent.codeReview.id);
+  }
+  props.closeRightWorkspaceTab(agent.id, tab);
 }
 
 const lastTurnGitDiff = computed(() => {

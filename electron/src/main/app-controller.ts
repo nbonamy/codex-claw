@@ -528,6 +528,9 @@ export class AppController {
     ipc.handle(ipcChannels.finishCodeReview, async (_event, agentId: string, sessionId: string) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFinish, { agentId, sessionId }))
     ));
+    ipc.handle(ipcChannels.discardCodeReview, async (_event, agentId: string, sessionId: string) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewDiscard, { agentId, sessionId }))
+    ));
     ipc.handle(ipcChannels.reviewCodeAgain, async (_event, agentId: string, sessionId: string) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewAgain, { agentId, sessionId }))
     ));

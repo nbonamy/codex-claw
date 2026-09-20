@@ -19,6 +19,7 @@
     :discuss-code-review-finding="discussCodeReviewFinding"
     :submit-code-review-round="submitCodeReviewRound"
     :finish-code-review="finishCodeReview"
+    :discard-code-review="discardCodeReview"
     :review-code-again="reviewCodeAgain"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
@@ -389,6 +390,7 @@ const {
   discussCodeReviewFinding,
   submitCodeReviewRound,
   finishCodeReview,
+  discardCodeReview,
   reviewCodeAgain,
   sendAgentPrompt,
   steerPrompt,

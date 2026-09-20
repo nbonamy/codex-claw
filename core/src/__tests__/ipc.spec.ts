@@ -42,6 +42,7 @@ describe('ipc channels', () => {
       discussCodeReviewFinding: 'agent:code-review:finding:discuss',
       submitCodeReviewRound: 'agent:code-review:round:submit',
       finishCodeReview: 'agent:code-review:finish',
+      discardCodeReview: 'agent:code-review:discard',
       reviewCodeAgain: 'agent:code-review:again',
       respondToThreadFlag: 'agent:thread-flag:respond',
       respondToPlanReview: 'agent:plan-review:respond',

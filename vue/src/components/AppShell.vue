@@ -249,6 +249,7 @@
         :discuss-code-review-finding="props.discussCodeReviewFinding"
         :submit-code-review-round="props.submitCodeReviewRound"
         :finish-code-review="props.finishCodeReview"
+        :discard-code-review="props.discardCodeReview"
         :review-code-again="props.reviewCodeAgain"
         @close-agent="$emit('close-agent', $event)"
         @expand-sidebar="agentSidebarCollapsed = false"
@@ -616,6 +617,7 @@ const props = withDefaults(defineProps<{
   discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
@@ -654,6 +656,7 @@ const props = withDefaults(defineProps<{
   discussCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
   submitCodeReviewRound: async () => { throw new Error('Code review is not available.'); },
   finishCodeReview: async () => { throw new Error('Code review is not available.'); },
+  discardCodeReview: async () => { throw new Error('Code review is not available.'); },
   reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
   daemonStatus: null,
   daemonStatusError: null,

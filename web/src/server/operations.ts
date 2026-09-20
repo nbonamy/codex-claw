@@ -17,6 +17,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   discussCodeReviewFinding: [backendMethods.agentCodeReviewFindingDiscuss, named('agentId', 'input')],
   submitCodeReviewRound: [backendMethods.agentCodeReviewRoundSubmit, named('agentId', 'sessionId')],
   finishCodeReview: [backendMethods.agentCodeReviewFinish, named('agentId', 'sessionId')],
+  discardCodeReview: [backendMethods.agentCodeReviewDiscard, named('agentId', 'sessionId')],
   reviewCodeAgain: [backendMethods.agentCodeReviewAgain, named('agentId', 'sessionId')],
   respondToThreadFlag: [backendMethods.agentThreadFlagRespond, named('agentId', 'response')],
   respondToPlanReview: [backendMethods.agentPlanReviewRespond, named('agentId', 'response')],

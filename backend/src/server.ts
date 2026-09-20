@@ -860,6 +860,14 @@ export class ClawBackendServer {
           return this.persistAndEmitSnapshot();
         });
       }
+      case backendMethods.agentCodeReviewDiscard: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          await this.requireCodeReviews().discard(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
       case backendMethods.agentCodeReviewAgain: {
         const agentId = requireStringParam(message.params, 'agentId');
         const sessionId = requireStringParam(message.params, 'sessionId');
