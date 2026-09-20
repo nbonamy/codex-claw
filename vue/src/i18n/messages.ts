@@ -859,6 +859,16 @@ export const messages = {
               failed: 'Failed listing worktrees for {target}',
               running: 'Listing worktrees for {target}',
             },
+            markFindingComplete: {
+              completed: 'Verified finding fix',
+              failed: 'Failed verifying finding fix',
+              running: 'Verifying finding fix',
+            },
+            reportFinding: {
+              completed: 'Reported finding',
+              failed: 'Failed reporting finding',
+              running: 'Reporting finding',
+            },
             updateWorkItem: {
               completed: 'Updated work item',
               failed: 'Failed updating work item',
@@ -884,6 +894,11 @@ export const messages = {
               completed: 'Updated thread flag',
               failed: 'Failed updating thread flag',
               running: 'Updating thread flag',
+            },
+            updateFinding: {
+              completed: 'Updated finding',
+              failed: 'Failed updating finding',
+              running: 'Updating finding',
             },
           },
         },

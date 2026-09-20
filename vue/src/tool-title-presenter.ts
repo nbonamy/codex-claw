@@ -45,11 +45,14 @@ const TOOL_KEYS: Record<string, string> = {
   'list-agents': 'listAgents',
   'list-repos': 'listRepos',
   'list-worktrees': 'listWorktrees',
+  'mark-finding-complete': 'markFindingComplete',
+  'report-finding': 'reportFinding',
   'update-work-item': 'updateWorkItem',
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',
   'set-status': 'setStatus',
   'toggle-thread-flag': 'toggleThreadFlag',
+  'update-finding': 'updateFinding',
 };
 
 export function presentClawToolTitle({

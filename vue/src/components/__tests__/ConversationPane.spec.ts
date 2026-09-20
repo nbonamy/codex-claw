@@ -415,6 +415,32 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.tabler-icon-users').exists()).toBe(true);
   });
 
+  it('renders review tool activity as finding actions instead of raw MCP names', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([{
+        id: 'message-review-tool',
+        agentId: agent.id,
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{
+          type: 'tool',
+          id: 'call-report-finding',
+          kind: 'mcp',
+          title: 'codex_claw.report_finding',
+          status: 'completed',
+          input: { title: 'Keep tool copy product-facing' },
+          metadata: { server: 'codex_claw', tool: 'report_finding' },
+        }],
+      }]),
+      agent,
+    });
+
+    expect(wrapper.text()).toContain('Reported finding');
+    expect(wrapper.text()).not.toContain('codex_claw.report_finding');
+    expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
+  });
+
   it('preserves structured attachment parts supplied by the controller', () => {
     const wrapper = mountPane({
       controller: controllerFor([{
