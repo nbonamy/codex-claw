@@ -796,8 +796,9 @@ ordinary provider transcript, approvals, status, and composer remain available
 while the Review pane presents the structured findings. Before
 submission, new findings are selected by default and may be deselected; this
 choice is not workflow status. Submission starts remediation: deselected
-findings become `skipped`; selected findings become `pending`; the round's reviewer
-conversation fixes exactly one `fixing` finding at a time and marks it `fixed`.
+findings become `skipped`; selected findings become `pending`, then enter
+`fixing` together in one reviewer turn. The reviewer calls `update_finding`
+after fixing and verifying each item, moving it to `fixed` in the durable ledger.
 Clarification and remediation continue the same provider-owned reviewer session;
 current-thread reviews keep that user-owned conversation intact for every round
 and after completion. Independent reviews reset the visible reviewer's

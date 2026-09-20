@@ -11,16 +11,11 @@ const finding = (): CodeReviewFinding => ({
 });
 
 describe('ReviewToolRegistry', () => {
-  it('routes only the three model-owned finding actions through an agent-scoped context', async () => {
+  it('routes only the two model-owned finding actions through an agent-scoped context', async () => {
     const registry = new ReviewToolRegistry();
     const handlers = {
       reportFinding: vi.fn(async () => finding()),
       updateFinding: vi.fn(async () => ({ ...finding(), priority: 'p0' as const })),
-      markFindingComplete: vi.fn(async () => ({
-        ...finding(),
-        decision: { state: 'selected' as const, decidedAt: '2026-09-19T10:01:00.000Z' },
-        remediation: { state: 'fixed' as const, completedAt: '2026-09-19T10:02:00.000Z' },
-      })),
     };
     const context = registry.create('agent-1', handlers);
 
@@ -28,12 +23,14 @@ describe('ReviewToolRegistry', () => {
       priority: 'p1', title: 'Authorize before the write',
       body: 'The handler writes before checking ownership.',
     });
-    await context.updateFinding({ findingId: 'finding-1', priority: 'p0' });
-    await context.markFindingComplete({ findingId: 'finding-1', evidence: 'Focused test passes.' });
+    await context.updateFinding({
+      findingId: 'finding-1', priority: 'p0', status: 'fixed', evidence: 'Focused test passes.',
+    });
 
     expect(handlers.reportFinding).toHaveBeenCalledOnce();
-    expect(handlers.updateFinding).toHaveBeenCalledWith({ findingId: 'finding-1', priority: 'p0' });
-    expect(handlers.markFindingComplete).toHaveBeenCalledWith({ findingId: 'finding-1', evidence: 'Focused test passes.' });
+    expect(handlers.updateFinding).toHaveBeenCalledWith({
+      findingId: 'finding-1', priority: 'p0', status: 'fixed', evidence: 'Focused test passes.',
+    });
     expect(registry.resolve('agent-2', context.id)).toBeNull();
 
     registry.close(context.id);

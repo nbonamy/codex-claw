@@ -889,6 +889,12 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   text-align: center;
 }
 
+.code-review-panel__working.is-waiting .code-review-panel__spinner {
+  width: var(--space-20);
+  height: var(--space-20);
+  margin-bottom: var(--space-8);
+}
+
 .code-review-panel__working-copy {
   display: grid;
   gap: var(--space-1);
@@ -924,13 +930,12 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 }
 
 .code-review-panel__spinner {
-  width: var(--space-20);
-  height: var(--space-20);
+  width: var(--space-10);
+  height: var(--space-10);
   border: 2px solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: review-spin 0.8s linear infinite;
-  margin-bottom: var(--space-8);
 }
 
 @keyframes review-spin {
@@ -959,11 +964,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface);
-}
-
-.review-finding[data-state="fixing"],
-.review-finding[data-state="pending"] {
-  border-color: var(--color-primary);
 }
 
 .review-finding[data-state="skipped"] {

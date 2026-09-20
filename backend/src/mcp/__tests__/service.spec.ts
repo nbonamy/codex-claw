@@ -75,10 +75,10 @@ describe('ClawMcpService', () => {
     service = new ClawMcpService({ snapshot });
     const ordinaryUrl = await service.start();
     const reportFinding = vi.fn().mockResolvedValue({ id: 'finding-1' });
+    const updateFinding = vi.fn().mockResolvedValue({ id: 'finding-1', status: 'fixed' });
     const review = service.createReviewToolContext('agent-dina', {
       reportFinding,
-      updateFinding: vi.fn(),
-      markFindingComplete: vi.fn(),
+      updateFinding,
     });
 
     const ordinary = await postJson(agentUrl(ordinaryUrl, 'agent-dina'), {
@@ -91,11 +91,12 @@ describe('ClawMcpService', () => {
     const scopedNames = scoped.result.tools.map((tool: { name: string }) => tool.name);
 
     expect(ordinaryNames).not.toEqual(expect.arrayContaining([
-      'report_finding', 'update_finding', 'mark_finding_complete',
+      'report_finding', 'update_finding',
     ]));
     expect(scopedNames).toEqual(expect.arrayContaining([
-      'report_finding', 'update_finding', 'mark_finding_complete',
+      'report_finding', 'update_finding',
     ]));
+    expect(scopedNames).not.toContain('mark_finding_complete');
     expect(scopedNames).not.toEqual(expect.arrayContaining([
       'verify_finding', 'respond_to_finding', 'complete_review',
     ]));
@@ -104,6 +105,8 @@ describe('ClawMcpService', () => {
     expect(reportTool.inputSchema.properties.priority.description).toContain('P1: urgent');
     expect(reportTool.inputSchema.properties.priority.description).toContain('P2: normal');
     expect(reportTool.inputSchema.properties.priority.description).toContain('P3: low');
+    const updateTool = scoped.result.tools.find((tool: { name: string }) => tool.name === 'update_finding');
+    expect(updateTool.inputSchema.properties.status.const).toBe('fixed');
 
     const called = await postJson(review.url, {
       jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
@@ -127,6 +130,19 @@ describe('ClawMcpService', () => {
     });
     expect(verbose.result.isError).toBe(true);
     expect(reportFinding).toHaveBeenCalledOnce();
+
+    const updated = await postJson(review.url, {
+      jsonrpc: '2.0', id: 5, method: 'tools/call', params: {
+        name: 'update_finding',
+        arguments: {
+          findingId: 'finding-1', status: 'fixed', evidence: 'Focused test passes.',
+        },
+      },
+    });
+    expect(updated.result.isError).toBe(false);
+    expect(updateFinding).toHaveBeenCalledWith({
+      findingId: 'finding-1', status: 'fixed', evidence: 'Focused test passes.',
+    });
 
     service.closeReviewToolContext(review.id);
   });

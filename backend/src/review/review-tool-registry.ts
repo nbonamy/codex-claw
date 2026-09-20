@@ -5,15 +5,9 @@ import type {
   CodeReviewFindingUpdateInput,
 } from '@codex-claw/core/code-review';
 
-export type ReviewFindingCompletionInput = {
-  findingId: string;
-  evidence?: string;
-};
-
 export type ReviewToolHandlers = {
   reportFinding(input: CodeReviewFindingInput): Promise<CodeReviewFinding> | CodeReviewFinding;
   updateFinding(input: CodeReviewFindingUpdateInput): Promise<CodeReviewFinding> | CodeReviewFinding;
-  markFindingComplete(input: ReviewFindingCompletionInput): Promise<CodeReviewFinding> | CodeReviewFinding;
 };
 
 export type ReviewToolContext = ReviewToolHandlers & {
@@ -30,7 +24,6 @@ export class ReviewToolRegistry {
       agentId,
       reportFinding: (input) => this.run(context, () => handlers.reportFinding(input)),
       updateFinding: (input) => this.run(context, () => handlers.updateFinding(input)),
-      markFindingComplete: (input) => this.run(context, () => handlers.markFindingComplete(input)),
     };
     this.contexts.set(context.id, context);
     return context;

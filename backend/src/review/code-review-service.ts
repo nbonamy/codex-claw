@@ -14,7 +14,7 @@ import {
 import type { BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
 import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
 import { duplicateAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import type { ReviewFindingCompletionInput, ReviewToolHandlers } from './review-tool-registry';
+import type { ReviewToolHandlers } from './review-tool-registry';
 
 export type CodeReviewToolPort = {
   createReviewToolContext(agentId: string, handlers: ReviewToolHandlers): { id: string; url: string };
@@ -321,13 +321,14 @@ export class CodeReviewService {
   private async executeFixes(agent: Agent, session: CodeReviewSession, round: CodeReviewRound): Promise<void> {
     this.activeRoundTurns.add(round.id);
     try {
-      for (;;) {
-        if (agent.codeReview !== session) return;
-        const finding = round.findings.find((candidate) => candidate.remediation.state === 'pending');
-        if (!finding) break;
+      if (agent.codeReview !== session) return;
+      const findings = round.findings.filter((candidate) => candidate.remediation.state === 'pending');
+      if (findings.length > 0) {
         const startedAt = this.timestamp();
-        finding.remediation = { state: 'fixing', startedAt };
-        finding.updatedAt = startedAt;
+        for (const finding of findings) {
+          finding.remediation = { state: 'fixing', startedAt };
+          finding.updatedAt = startedAt;
+        }
         session.updatedAt = startedAt;
         await this.options.changed();
 
@@ -335,7 +336,7 @@ export class CodeReviewService {
         try {
           const result = await this.options.runReview(
             agent,
-            fixPrompt(session, round, finding),
+            fixPrompt(session, round, findings),
             context.url,
             requiredReviewerSession(round),
           );
@@ -345,9 +346,11 @@ export class CodeReviewService {
         } finally {
           this.options.tools.closeReviewToolContext(context.id);
         }
-        const completedFinding = this.findFindingInSession(session, finding.id);
-        if (completedFinding?.remediation.state !== 'fixed') {
-          throw new Error(`Reviewer did not mark “${finding.title}” fixed.`);
+        const incomplete = findings.filter((finding) => (
+          this.findFindingInSession(session, finding.id)?.remediation.state !== 'fixed'
+        ));
+        if (incomplete.length > 0) {
+          throw new Error(`Reviewer did not update ${incomplete.length} finding(s) to fixed: ${incomplete.map((finding) => finding.title).join(', ')}.`);
         }
       }
       const completedAt = this.timestamp();
@@ -370,7 +373,6 @@ export class CodeReviewService {
     return {
       reportFinding: (input) => this.reportFinding(session, round, input),
       updateFinding: (input) => this.updateFinding(session, input),
-      markFindingComplete: (input) => this.markFindingComplete(session, input),
     };
   }
 
@@ -407,27 +409,23 @@ export class CodeReviewService {
   private async updateFinding(session: CodeReviewSession, input: CodeReviewFindingUpdateInput): Promise<CodeReviewFinding> {
     const finding = this.findFindingInSession(session, input.findingId);
     if (!finding) throw new Error('Code review finding was not found.');
+    if (input.status === 'fixed' && finding.remediation.state !== 'fixing') {
+      throw new Error('Only a finding currently being fixed can be marked fixed.');
+    }
     if (input.priority) finding.priority = input.priority;
     if (input.title) finding.title = input.title;
     if (input.body) finding.body = input.body;
     if (input.location) finding.location = { ...input.location };
-    finding.updatedAt = this.timestamp();
+    const updatedAt = this.timestamp();
+    if (input.status === 'fixed') {
+      finding.remediation = {
+        state: 'fixed',
+        completedAt: updatedAt,
+        ...(input.evidence ? { evidence: input.evidence } : {}),
+      };
+    }
+    finding.updatedAt = updatedAt;
     session.updatedAt = finding.updatedAt;
-    await this.options.changed();
-    return structuredClone(finding);
-  }
-
-  private async markFindingComplete(
-    session: CodeReviewSession,
-    input: ReviewFindingCompletionInput,
-  ): Promise<CodeReviewFinding> {
-    const finding = this.findFindingInSession(session, input.findingId);
-    if (!finding) throw new Error('Code review finding was not found.');
-    if (finding.remediation.state !== 'fixing') throw new Error('Only the finding currently being fixed can be marked complete.');
-    const completedAt = this.timestamp();
-    finding.remediation = { state: 'fixed', completedAt, ...(input.evidence ? { evidence: input.evidence } : {}) };
-    finding.updatedAt = completedAt;
-    session.updatedAt = completedAt;
     await this.options.changed();
     return structuredClone(finding);
   }
@@ -533,20 +531,25 @@ Findings are the only review artifact. For every actionable defect, call report_
 Review ${visibleScope}.`;
 }
 
-function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, finding: CodeReviewFinding): string {
-  return `Continue this same review conversation by fixing the one selected finding below. Keep the change focused and add or update behavior-level tests when appropriate. After the code and checks are complete, call mark_finding_complete for this finding. Do not start another finding; Claw will send it separately.
+function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, findings: CodeReviewFinding[]): string {
+  const noun = findings.length === 1 ? 'finding' : 'findings';
+  const findingContext = findings.map((finding) => [
+    `${finding.id}: ${finding.title}`,
+    `  priority: ${finding.priority}`,
+    `  body: ${finding.body}`,
+    ...(finding.location ? [`  location: ${JSON.stringify(finding.location)}`] : []),
+    ...(finding.discussion.length > 0 ? [`  discussion: ${JSON.stringify(finding.discussion)}`] : []),
+  ].join('\n')).join('\n\n');
+  return `Fix the ${findings.length} following ${noun}.
 
+<context>
 Review: ${session.id}
 Round: ${round.number}
-Finding:
-${JSON.stringify({
-    id: finding.id,
-    priority: finding.priority,
-    title: finding.title,
-    body: finding.body,
-    location: finding.location,
-    discussion: finding.discussion,
-  }, null, 2)}`;
+
+${findingContext}
+
+Keep the changes focused and add or update behavior-level tests when appropriate. After fixing and verifying each finding, call update_finding with its id and status "fixed". Include concise verification evidence when useful.
+</context>`;
 }
 
 function requiredReviewerSession(round: CodeReviewRound): BackendSession {

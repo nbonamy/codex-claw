@@ -186,7 +186,6 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       allowedTools: [
         'mcp__codex_claw__report_finding',
         'mcp__codex_claw__update_finding',
-        'mcp__codex_claw__mark_finding_complete',
       ],
       });
       targetTurnId = started.turnId ?? null;

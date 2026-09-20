@@ -252,7 +252,7 @@ describe('Unified backend → mounted application', () => {
       .find((button) => button.text().includes('Review'))!
       .trigger('click');
     await flushPromises();
-    expect(wrapper.get('.code-review-panel').text()).toContain('Review this branch');
+    expect(wrapper.get('.code-review-panel').text()).toContain('Start a review');
 
     const ready = structuredClone(snapshot);
     const reviewer = {

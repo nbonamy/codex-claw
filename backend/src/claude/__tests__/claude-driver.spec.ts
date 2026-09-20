@@ -556,7 +556,6 @@ describe('ClaudeBackendDriver', () => {
       allowedTools: [
         'mcp__codex_claw__report_finding',
         'mcp__codex_claw__update_finding',
-        'mcp__codex_claw__mark_finding_complete',
       ],
     }), expect.any(Function), expect.any(Function), expect.any(Function));
     expect(transport.startTurn.mock.calls[0]?.[0].sessionId).toBeUndefined();

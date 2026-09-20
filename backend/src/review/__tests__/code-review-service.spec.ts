@@ -247,7 +247,7 @@ describe('CodeReviewService', () => {
     );
   });
 
-  it('uses one reviewer thread for clarification and sequential fixes, then starts review again fresh', async () => {
+  it('uses one reviewer thread for clarification and batched fixes, then starts review again fresh', async () => {
     let selectedId = '';
     let rejectedId = '';
     const test = harness([
@@ -262,11 +262,20 @@ describe('CodeReviewService', () => {
           body: 'The value may be stale.',
         })).id;
         await tools.updateFinding({ findingId: selectedId, priority: 'p0' });
+        await expect(tools.updateFinding({
+          findingId: selectedId,
+          title: 'This mutation must not stick',
+          status: 'fixed',
+        })).rejects.toThrow('Only a finding currently being fixed can be marked fixed.');
         return { text: '' };
       },
       async () => ({ text: 'The public route reaches the mutation directly.' }),
       async (tools) => {
-        await tools.markFindingComplete({ findingId: selectedId, evidence: 'Focused regression test passes.' });
+        await tools.updateFinding({
+          findingId: selectedId,
+          status: 'fixed',
+          evidence: 'Focused regression test passes.',
+        });
         return { text: '' };
       },
       async () => ({ text: '' }),
@@ -277,6 +286,7 @@ describe('CodeReviewService', () => {
     const visibleReviewer = reviewer(test, session);
     const firstRound = activeCodeReviewRound(session);
     expect(firstRound.findings[0]?.priority).toBe('p0');
+    expect(firstRound.findings[0]?.title).toBe('Authorize before writing');
     expect(firstRound.findings.map((finding) => finding.decision.state)).toEqual(['selected', 'selected']);
     expect(firstRound.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
 
@@ -320,7 +330,7 @@ describe('CodeReviewService', () => {
     expect(test.snapshot.agents).toStrictEqual([test.owner]);
   });
 
-  it('moves selected findings through pending, fixing, and fixed one at a time', async () => {
+  it('sends every selected finding in one fix turn and records each fixed update', async () => {
     const ids: string[] = [];
     let releaseFirst: (() => void) | undefined;
     const firstFixCanFinish = new Promise<void>((resolve) => { releaseFirst = resolve; });
@@ -335,11 +345,8 @@ describe('CodeReviewService', () => {
       },
       async (tools) => {
         await firstFixCanFinish;
-        await tools.markFindingComplete({ findingId: ids[0]! });
-        return { text: '' };
-      },
-      async (tools) => {
-        await tools.markFindingComplete({ findingId: ids[1]! });
+        await tools.updateFinding({ findingId: ids[0]!, status: 'fixed' });
+        await tools.updateFinding({ findingId: ids[1]!, status: 'fixed' });
         return { text: '' };
       },
     ]);
@@ -352,10 +359,16 @@ describe('CodeReviewService', () => {
 
     test.service.submit(visibleReviewer, session.id);
     expect(round.findings[0]!.decision.state).toBe('selected');
-    await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixing', 'pending']));
+    await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixing', 'fixing']));
+    expect(test.turns).toHaveLength(2);
+    expect(test.turns[1]?.prompt).toContain('Fix the 2 following findings.');
+    expect(test.turns[1]?.prompt).toContain(`${ids[0]}: First`);
+    expect(test.turns[1]?.prompt).toContain(`${ids[1]}: Second`);
+    expect(test.turns[1]?.prompt).toContain('call update_finding with its id and status "fixed"');
     releaseFirst?.();
     await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixed', 'fixed']));
     expect(session.status).toBe('readyToFinish');
+    expect(test.turns).toHaveLength(2);
   });
 
   it('restores an interrupted fixing round and resumes it in the persisted reviewer thread', async () => {
@@ -376,7 +389,7 @@ describe('CodeReviewService', () => {
     session.status = 'fixing';
 
     const restored = harness([async (tools) => {
-      await tools.markFindingComplete({ findingId });
+      await tools.updateFinding({ findingId, status: 'fixed' });
       return { text: '' };
     }]);
     const restoredReviewer: Agent = {

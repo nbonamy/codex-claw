@@ -30,7 +30,7 @@ export function registerReviewTools(server: McpServer, context: ReviewToolContex
   })));
 
   server.registerTool('update_finding', {
-    description: 'Correct or enrich a finding already stored in the current review ledger.',
+    description: 'Correct a finding or mark it fixed after completing and verifying its remediation.',
     inputSchema: {
       findingId: z.string().trim().min(1).describe('Stable finding ID returned by report_finding or supplied in the ledger.'),
       priority: priority.optional(),
@@ -39,6 +39,8 @@ export function registerReviewTools(server: McpServer, context: ReviewToolContex
       file: z.string().trim().min(1).optional(),
       line: z.number().int().positive().optional(),
       endLine: z.number().int().positive().optional(),
+      status: z.literal('fixed').optional().describe('Set to fixed only after the finding is fully remediated and verified.'),
+      evidence: z.string().trim().min(1).optional().describe('Concise verification evidence when setting status to fixed.'),
     },
   }, (input) => reviewToolResult(() => context.updateFinding({
     findingId: input.findingId,
@@ -46,17 +48,8 @@ export function registerReviewTools(server: McpServer, context: ReviewToolContex
     ...(input.title ? { title: input.title } : {}),
     ...(input.body ? { body: input.body } : {}),
     ...(input.file ? { location: { file: input.file, ...(input.line ? { line: input.line } : {}), ...(input.endLine ? { endLine: input.endLine } : {}) } } : {}),
-  })));
-
-  server.registerTool('mark_finding_complete', {
-    description: 'Mark a prior accepted finding as successfully verified in the current review pass.',
-    inputSchema: {
-      findingId: z.string().trim().min(1).describe('Stable finding ID supplied in the regression-check ledger.'),
-      evidence: z.string().trim().min(1).optional().describe('Concrete verification evidence when useful.'),
-    },
-  }, ({ findingId, evidence }) => reviewToolResult(() => context.markFindingComplete({
-    findingId,
-    ...(evidence ? { evidence } : {}),
+    ...(input.status ? { status: input.status } : {}),
+    ...(input.evidence ? { evidence: input.evidence } : {}),
   })));
 }
 

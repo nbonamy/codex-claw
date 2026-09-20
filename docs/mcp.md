@@ -644,11 +644,11 @@ state, not Codex transcript duplication.
 ### Review-scoped finding tools
 
 An independent review turn receives a short-lived MCP URL whose tool surface
-adds only three model actions: `report_finding`, `update_finding`, and
-`mark_finding_complete`. The ordinary provider harness continues to supply
-repository reading, search, Git, and test tools. The review tools mutate the
-active app-owned ledger and persist it before returning; the registry itself
-does not own finding storage.
+adds only two model actions: `report_finding` and `update_finding`.
+`update_finding` may also move an actively remediated finding to `fixed`. The
+ordinary provider harness continues to supply repository reading, search, Git,
+and test tools. The review tools mutate the active app-owned ledger and persist
+it before returning; the registry itself does not own finding storage.
 
 User decisions and workflow actions are backend methods, not model tools. The
 renderer uses the unified client contract to accept, decline, assign, discuss,

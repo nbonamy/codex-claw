@@ -97,6 +97,8 @@ export type CodeReviewFindingUpdateInput = {
   title?: string;
   body?: string;
   location?: CodeReviewLocation;
+  status?: 'fixed';
+  evidence?: string;
 };
 
 export type CodeReviewLedger = {

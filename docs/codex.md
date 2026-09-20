@@ -209,7 +209,7 @@ scans or moves rollout files itself.
 
 Code review defaults to a separate visible reviewer agent in the same workspace,
 but the user may choose the owning agent's current conversation. Either path
-uses the round-scoped finding tools; finding clarification and sequential
+uses the round-scoped finding tools; finding clarification and batched
 remediation continue through the normal Codex conversation replica. `Review
 again` archives the independent reviewer's conversation and binds a fresh one
 to the same sidebar agent, while current-thread reviews keep the user-owned
@@ -468,9 +468,9 @@ passing its own caller ID to each tool.
 
 This keeps normal Codex config and normal Codex data untouched.
 
-Unbiased product review rounds create a fresh SDK conversation; a first round
+Independent product review rounds create a fresh SDK conversation; a first round
 configured for the current thread loads that conversation instead. Both replace
-the normal Claw MCP URL with a round-scoped URL. That URL adds only the three
+the normal Claw MCP URL with a round-scoped URL. That URL adds only the two
 finding actions documented in `docs/mcp.md`; normal repository tools remain
 owned by the Codex harness. After the turn completes, Claw reads the normal
 assistant response for finding discussion, archives the temporary conversation,

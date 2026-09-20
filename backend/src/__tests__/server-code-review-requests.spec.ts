@@ -75,7 +75,7 @@ describe('ClawBackendServer code review workflow', () => {
         });
         findingId = finding.id;
       } else if (reviewRun === 2) {
-        await activeHandlers.markFindingComplete({ findingId });
+        await activeHandlers.updateFinding({ findingId, status: 'fixed' });
       }
       return {
         text: '',

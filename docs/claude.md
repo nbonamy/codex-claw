@@ -94,7 +94,7 @@ transport configures:
 Code review defaults to a separate visible reviewer agent in the same workspace.
 The user may instead use the current agent and session. Review turns use the
 normal Claude conversation replica while adding only the round-scoped finding
-tools; clarification and sequential remediation resume that same session id.
+tools; clarification and batched remediation resume that same session id.
 For an independent reviewer, `Review again` deletes the old Claude session and
 starts a fresh one on the same sidebar agent. Current-thread reviews preserve
 the user-owned session for every round and after finish; an independent
@@ -739,11 +739,10 @@ avoids mutating global user state.
 
 Code review uses that session-local shape today: Claw starts or resumes an Agent
 SDK turn according to the initial thread choice, using the round-scoped MCP URL
-and allowing only `report_finding`,
-`update_finding`, and `mark_finding_complete` from that MCP server. Repository
-inspection continues through Claude's ordinary harness tools. Provider output
-is returned through the unified review driver result, while durable findings
-and workflow decisions remain app-owned.
+and allowing only `report_finding` and `update_finding` from that MCP server.
+Repository inspection continues through Claude's ordinary harness tools.
+Provider output is returned through the unified review driver result, while
+durable findings and workflow decisions remain app-owned.
 
 ### Models, Thinking, Skills
 
