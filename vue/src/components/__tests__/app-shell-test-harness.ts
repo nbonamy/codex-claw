@@ -142,6 +142,8 @@ export function mountShell(overrides: Partial<{
   loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  createAgentGitPullRequest: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  mergeAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
@@ -216,6 +218,8 @@ export function mountShell(overrides: Partial<{
       loadGlobalWorkItems: overrides.loadGlobalWorkItems ?? vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 }),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),
+      createAgentGitPullRequest: overrides.createAgentGitPullRequest ?? vi.fn().mockResolvedValue({}),
+      mergeAgentGitBranch: overrides.mergeAgentGitBranch ?? vi.fn().mockResolvedValue({}),
       duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
       assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),
       getAutomationSnapshot: overrides.getAutomationSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),

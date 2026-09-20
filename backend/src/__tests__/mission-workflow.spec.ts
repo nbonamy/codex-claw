@@ -76,6 +76,10 @@ it('keeps one orchestrator through shaping, isolates code sessions, respects tic
         await submit(artifacts);
       }
     }
+    expect(current().stage).toBe('ship');
+    expect(current().status).toBe('active');
+    expect(current().execution!.deliveries).toEqual([expect.objectContaining({ repositoryPath: repo, status: 'pending' })]);
+    await command({ action: 'recordDelivery', repositoryPath: repo, result: { kind: 'merge' } });
     expect(current().status).toBe('completed');
     expect(current().execution!.workspaces![0]!.baseSha).toBe(baseline);
     expect(current().execution!.runs[0]!.workerId).toBe(current().execution!.runs[1]!.workerId);

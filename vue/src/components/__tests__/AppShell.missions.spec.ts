@@ -134,4 +134,22 @@ describe('AppShell missions', () => {
     expect(wrapper.findComponent({ name: 'ConversationPane' }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('agent').id).toBe(snapshot.agents[1]!.id);
   });
+
+  it('wires repository delivery controls into the Ship stage', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    mission.stage = 'ship';
+    mission.execution!.workspaces = [{ repositoryPath: snapshot.agents[0]!.folder!, path: '/tmp/billing-mission', branch: 'mission/add-billing' }];
+    mission.execution!.deliveries = [{ repositoryPath: snapshot.agents[0]!.folder!, agentId: snapshot.agents[0]!.id, status: 'pending' }];
+    const mergeAgentGitBranch = vi.fn();
+    const createAgentGitPullRequest = vi.fn();
+    const wrapper = mountShell({ snapshot, mergeAgentGitBranch, createAgentGitPullRequest });
+
+    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+
+    const board = wrapper.getComponent({ name: 'MissionShipBoard' });
+    expect(board.props('mission')).toMatchObject({ id: mission.id, stage: 'ship' });
+    expect(board.props('mergeBranch')).toBe(mergeAgentGitBranch);
+    expect(board.props('createPullRequest')).toBe(createAgentGitPullRequest);
+  });
 });

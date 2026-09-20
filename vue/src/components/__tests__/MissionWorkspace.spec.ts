@@ -48,18 +48,19 @@ function mountWorkspace(mission: Mission, options: {
     slots: {
       conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
       'code-review': '<div class="code-review-slot">Code for {{ params.agentId }}</div>',
+      ship: '<div class="ship-slot">Repository delivery</div>',
     },
     global: { plugins: [ElementPlus] },
   });
 }
 
 describe('MissionWorkspace', () => {
-  it('frames a running mission as a four-stage process with the orchestrator conversation always present', async () => {
+  it('frames a running mission as a five-stage process with the orchestrator conversation always present', async () => {
     const mission = missionWithRun('running');
     const wrapper = mountWorkspace(mission);
     await flushPromises();
 
-    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(4);
+    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(5);
     expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
     expect(wrapper.get('[aria-label="Skills in use"]').text()).toContain('grilling');
     expect(wrapper.get('.conversation-slot').text()).toContain(mission.execution!.runs[0]!.workerId);
@@ -240,7 +241,7 @@ describe('MissionWorkspace', () => {
     expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).not.toContain('Teams need one bill');
   });
 
-  it('completes review without starting another stage', async () => {
+  it('approves review before entering Ship', async () => {
     const mission = missionWithRun('accepted', true);
     mission.stage = 'review';
     mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
@@ -420,7 +421,7 @@ describe('MissionWorkspace', () => {
     await flushPromises();
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Worker unavailable');
-    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(4);
+    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(5);
     expect(wrapper.find('.conversation-slot').exists()).toBe(true);
   });
 });

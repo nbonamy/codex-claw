@@ -59,7 +59,7 @@
             :disabled="busy"
             @click="approveProposal"
           >
-            {{ mission.stage === 'review' ? t('missions.complete') : t('missions.approveAndContinue') }}
+            {{ t('missions.approveAndContinue') }}
             <ArrowRightIcon aria-hidden="true" />
           </button>
         </header>
@@ -76,6 +76,8 @@
           @retry="retryImplementationTicket"
           @stop="stopRun"
         />
+
+        <slot v-else-if="viewedStage === 'ship'" name="ship" :open-conversation="selectConversation" />
 
         <section v-else-if="viewedStage === mission.stage && activeRun && !activeRun.proposal" class="mission-workspace__working" aria-live="polite">
           <span class="mission-workspace__callout-icon"><SparklesIcon aria-hidden="true" /></span>
@@ -100,7 +102,7 @@
           <MissionTicketBoard :tickets="visibleTickets" />
         </section>
 
-        <section v-else-if="viewedStage !== 'implementation' && viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
+        <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
           <header class="mission-workspace__artifact-toolbar">
             <FileTextIcon aria-hidden="true" />
             <strong>{{ artifactTitle(viewedStage) }}</strong>
@@ -122,7 +124,7 @@
           </footer>
         </section>
 
-        <section v-else-if="viewedStage !== 'implementation' && artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
+        <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
           <header class="mission-workspace__artifact-toolbar">
             <FileTextIcon aria-hidden="true" />
             <strong>{{ artifactTitle(viewedStage) }}</strong>
@@ -132,7 +134,7 @@
           <MarkdownPanel v-else :content="artifactMarkdown" />
         </section>
 
-        <section v-else-if="viewedStage !== 'implementation'" class="mission-workspace__empty-artifact">
+        <section v-else-if="!['implementation', 'ship'].includes(viewedStage)" class="mission-workspace__empty-artifact">
           <span class="mission-workspace__callout-icon"><FileTextIcon aria-hidden="true" /></span>
           <h3>{{ t('missions.noArtifactYet') }}</h3>
           <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.orchestratorStarting') }}</p>
@@ -175,7 +177,7 @@
         <slot v-if="conversationAgentId" name="conversation" :agent-id="conversationAgentId" />
         <div v-else class="mission-workspace__conversation-empty">
           <SparklesIcon aria-hidden="true" />
-          <p>{{ t('missions.orchestratorStarting') }}</p>
+          <p>{{ t(mission.stage === 'ship' ? 'missions.shipConversationHint' : 'missions.orchestratorStarting') }}</p>
         </div>
       </aside>
     </div>
@@ -297,6 +299,10 @@ function stageStatus(stage: MissionStage): string {
   if (state === 'upcoming') return t('missions.notStarted');
   if (activeRun.value?.proposal) return t('missions.readyForReview');
   if (activeRun.value) return t(`missions.runStatus.${activeRun.value.status}`);
+  if (stage === 'ship') {
+    const deliveries = props.mission.execution?.deliveries ?? [];
+    return t('missions.shipRepositoryCount', { complete: deliveries.filter(delivery => delivery.status !== 'pending').length, total: deliveries.length });
+  }
   return t('missions.readyToStart');
 }
 function artifactTitle(stage: MissionStage): string { return t(`missions.artifactTitle.${stage}`); }
@@ -323,6 +329,7 @@ function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string
     ].filter(Boolean).join('\n\n')).join('\n\n');
     case 'implementation': return artifacts.implementation.changes.trim() ? `## ${t('missions.changes')}\n\n${artifacts.implementation.changes}\n\n## ${t('missions.tests')}\n\n${artifacts.implementation.tests}` : '';
     case 'review': return artifacts.review.summary.trim() ? `## ${t('missions.reviewSummary')}\n\n${artifacts.review.summary}${artifacts.review.pullRequestUrl ? `\n\n[${t('missions.pullRequest')}](${artifacts.review.pullRequestUrl})` : ''}` : '';
+    case 'ship': return '';
   }
 }
 async function approveProposal(): Promise<void> {

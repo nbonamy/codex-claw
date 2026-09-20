@@ -69,6 +69,11 @@ it('validates persisted execution records and dependency graphs before admitting
   expect(isMission({ ...mission, execution: { ...mission.execution, workspace: { path: '/repo', branch: 'x', baseSha: 'bad' } } })).toBe(false);
   expect(isMission({ ...mission, execution: { ...mission.execution, reviewPolicy: 'unknown' } })).toBe(false);
   expect(isMission({ ...mission, execution: { ...mission.execution, workspaces: [{ repositoryPath: '', path: '/repo', branch: 'x' }] } })).toBe(false);
+  const delivery = { repositoryPath: '/repo', agentId: 'worker', status: 'pullRequestCreated', pullRequest: { number: 42, url: 'https://github.com/acme/repo/pull/42' } };
+  expect(isMission({ ...mission, execution: { ...mission.execution, deliveries: [delivery] } })).toBe(true);
+  expect(isMission({ ...mission, execution: { ...mission.execution, deliveries: [{ ...delivery, repositoryPath: '' }] } })).toBe(false);
+  expect(isMission({ ...mission, execution: { ...mission.execution, deliveries: [delivery, delivery] } })).toBe(false);
+  expect(isMission({ ...mission, execution: { ...mission.execution, deliveries: [{ ...delivery, status: 'pending' }] } })).toBe(false);
   const tickets = [{ title: 'Checkout', done: false, reference: 'https://example.com/1', dependsOn: [1] }, { title: 'Account', done: false }];
   expect(isMissionArtifacts({ ...mission.artifacts, tickets })).toBe(true);
   expect(missionTicketReady(tickets, 0)).toBe(false);

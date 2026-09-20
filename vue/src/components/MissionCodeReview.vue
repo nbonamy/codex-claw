@@ -7,7 +7,6 @@
         <el-option value="uncommitted" :label="t('missions.uncommittedDiff')" />
       </el-select>
       <button class="claw-button" type="button" @click="refresh">{{ t('missions.refreshDiff') }}</button>
-      <GitWorkflowControl :agent="agent" :git-status="gitStatus" :get-workflow="getWorkflow" :generate-message="generateMessage" :commit-changes="commitChanges" :push-branch="pushBranch" :create-pull-request="createPullRequest" @open-git-diff="refresh" />
     </header>
     <GitDiffPreviewPanel :diff="diff" :state="state" :error="error" />
   </section>
@@ -17,17 +16,11 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitStatus, CodexClawApi } from '@codex-claw/core/contracts';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
-import GitWorkflowControl from './GitWorkflowControl.vue';
 const props = defineProps<{
   agent: Agent;
   baseSha?: string;
   gitStatus?: AgentGitStatus | null;
   getDiff: CodexClawApi['getAgentGitDiff'];
-  getWorkflow?: CodexClawApi['getAgentGitWorkflow'];
-  generateMessage?: CodexClawApi['generateAgentGitMessage'];
-  commitChanges?: CodexClawApi['commitAgentGitChanges'];
-  pushBranch?: CodexClawApi['pushAgentGitBranch'];
-  createPullRequest?: CodexClawApi['createAgentGitPullRequest'];
 }>();
 const { t } = useI18n();
 const target = ref<'branch' | 'uncommitted'>('branch');

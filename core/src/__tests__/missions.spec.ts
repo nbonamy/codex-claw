@@ -9,7 +9,7 @@ describe('missions', () => {
     teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
   });
 
-  it('persists a team-scoped outcome through four explicit artifact gates without creating another agent', () => {
+  it('persists a team-scoped outcome through five explicit workflow stages without creating another agent', () => {
     const snapshot = createInitialSnapshot();
     const originalAgentIds = snapshot.agents.map(agent => agent.id);
     const mission = createMission(snapshot, createInput(snapshot, ' Add team billing '));
@@ -31,8 +31,9 @@ describe('missions', () => {
     update('advance'); expect(mission.stage).toBe('review');
     expect(() => update('advance')).toThrow('required stage');
     artifacts.review.summary = 'Reviewed acceptance; ready to deliver';
-    update('advance'); expect(mission.status).toBe('completed');
-    expect(() => update('save')).toThrow('completed');
+    update('advance'); expect(mission.stage).toBe('ship');
+    expect(mission.status).toBe('active');
+    expect(() => update('advance')).toThrow('Complete delivery');
     expect(decodeAppSnapshot(snapshot)?.value.missions).toStrictEqual([mission]);
   });
   it('rejects malformed input, stale writers, dangling agents, and invalidated earlier gates without mutation', () => {

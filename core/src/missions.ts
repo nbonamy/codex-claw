@@ -2,7 +2,7 @@ import { pendingMissionRun, type MissionExecution } from './mission-execution';
 import type { AppSnapshot } from './contracts';
 import { createEntityId } from './ids';
 
-export const featureStages = ['requirements', 'tickets', 'implementation', 'review'] as const;
+export const featureStages = ['requirements', 'tickets', 'implementation', 'review', 'ship'] as const;
 export type MissionStage = typeof featureStages[number];
 export type MissionTicket = {
   id?: string;
@@ -91,7 +91,7 @@ export function isMission(v: unknown): v is Mission {
   return record(v) && text(v.id) && text(v.teamId) && text(v.outcome) && !!v.outcome.trim() && v.outcome.length <= 200
     && record(v.workflow) && v.workflow.type === 'shapeAndShipFeature' && v.workflow.version === 1
     && featureStages.includes(v.stage as MissionStage) && ['active', 'completed'].includes(v.status as string)
-    && (v.status !== 'completed' || v.stage === 'review') && isMissionArtifacts(v.artifacts)
+    && (v.status !== 'completed' || v.stage === 'review' || v.stage === 'ship') && isMissionArtifacts(v.artifacts)
     && (v.artifactFiles === undefined || isArtifactFiles(v.artifactFiles)) && isStageAgents(v.stageAgentIds)
     && (v.execution === undefined || isMissionExecution(v.execution))
     && Number.isInteger(v.revision) && (v.revision as number) >= 0 && text(v.createdAt) && text(v.updatedAt);
@@ -102,6 +102,7 @@ export function missionStageReady(stage: MissionStage, a: MissionArtifacts): boo
     case 'tickets': return a.tickets.length > 0 && a.tickets.every(t => !!t.title.trim() && !!t.repositoryPath?.trim());
     case 'implementation': return a.tickets.length > 0 && a.tickets.every(t => t.done) && !!a.implementation.changes.trim() && !!a.implementation.tests.trim();
     case 'review': return !!a.review.summary.trim();
+    case 'ship': return false;
   }
 }
 export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
@@ -138,14 +139,14 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
   if (mission.status === 'completed') throw new Error('This mission is completed.');
   if (pendingMissionRun(mission)) throw new Error('Review or stop the current mission run before editing artifacts or advancing.');
   if (Object.values(input.stageAgentIds).some(id => !snapshot.agents.some(a => a.id === id))) throw new Error('Supporting agent not found.');
+  if (input.action === 'advance' && mission.stage === 'ship') throw new Error('Complete delivery from the Ship stage.');
   // Earlier gates remain true even when revising their artifacts in later stages.
   const stageIndex = featureStages.indexOf(mission.stage);
   const requiredStages = featureStages.slice(0, stageIndex + (input.action === 'advance' ? 1 : 0));
   if (requiredStages.some(stage => !missionStageReady(stage, input.artifacts as MissionArtifacts))) throw new Error('Complete the required stage artifacts before continuing.');
   const updated = { ...mission, artifacts: structuredClone(input.artifacts), stageAgentIds: { ...input.stageAgentIds }, revision: mission.revision + 1, updatedAt: new Date().toISOString() };
   if (input.action === 'advance') {
-    if (mission.stage === 'review') updated.status = 'completed';
-    else updated.stage = featureStages[stageIndex + 1]!;
+    updated.stage = featureStages[stageIndex + 1]!;
   }
   Object.assign(mission, updated);
   return mission;
@@ -160,6 +161,8 @@ function isMissionExecution(v: unknown): v is MissionExecution {
       && text(workspace.path) && !!workspace.path.trim() && text(workspace.branch) && !!workspace.branch.trim()
       && (workspace.baseSha === undefined || (typeof workspace.baseSha === 'string' && /^[a-f0-9]{40,64}$/.test(workspace.baseSha))))))
     && (v.workspace === undefined || (record(v.workspace) && text(v.workspace.path) && text(v.workspace.branch) && (v.workspace.baseSha === undefined || (typeof v.workspace.baseSha === 'string' && /^[a-f0-9]{40,64}$/.test(v.workspace.baseSha)))))
+    && (v.deliveries === undefined || (Array.isArray(v.deliveries) && v.deliveries.every(isMissionDelivery)
+      && new Set(v.deliveries.map(delivery => record(delivery) ? delivery.repositoryPath : undefined)).size === v.deliveries.length))
     && Array.isArray(v.runs) && v.runs.every(run => record(run) && text(run.id) && text(run.memberId)
       && featureStages.includes(run.stage as MissionStage)
       && ['preparing', 'running', 'awaitingReview', 'accepted', 'cancelled', 'failed'].includes(run.status as string)
@@ -173,4 +176,12 @@ function isMissionExecution(v: unknown): v is MissionExecution {
       && (run.summary === undefined || text(run.summary)) && (run.error === undefined || text(run.error))
       && (run.proposal === undefined || isMissionArtifacts(run.proposal))
       && (run.draftTickets === undefined || isMissionArtifacts({ requirements: { problem: '', acceptance: '' }, tickets: run.draftTickets, implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } })));
+}
+
+function isMissionDelivery(v: unknown): boolean {
+  if (!record(v) || !text(v.repositoryPath) || !v.repositoryPath.trim() || !text(v.agentId) || !v.agentId.trim()
+    || !['pending', 'pullRequestCreated', 'merged'].includes(v.status as string)) return false;
+  if (v.status !== 'pullRequestCreated') return v.pullRequest === undefined;
+  return record(v.pullRequest) && Number.isInteger(v.pullRequest.number) && (v.pullRequest.number as number) > 0
+    && text(v.pullRequest.url) && /^https?:\/\//.test(v.pullRequest.url as string);
 }

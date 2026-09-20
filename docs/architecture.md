@@ -48,7 +48,10 @@ Missions are separate app-owned persisted outcomes in `AppSnapshot.missions`.
 A mission references a versioned workflow type, its current stage, structured
 stage artifacts, optional supporting agent IDs per stage, and an optimistic
 revision. The first workflow is `shapeAndShipFeature` (requirements, tickets,
-implementation, review). Core owns its pure validation and transition policy;
+implementation, review, ship). Review records findings without delivering code.
+Ship persists one delivery result per affected repository and completes only
+after every repository has either produced a pull request or merged. Core owns
+its pure validation and transition policy;
 `clawd` serializes mission writes and publishes snapshots only after saving.
 Mission navigation is client-local; missions themselves are backend-wide, not
 team members or provider threads. Existing provider conversation panes can be

@@ -52,6 +52,28 @@ export class MissionExecutionService {
       });
       return;
     }
+    if (input.action === 'recordDelivery') {
+      if (typeof input.repositoryPath !== 'string' || !input.repositoryPath.trim() || !input.result
+        || !['pullRequest', 'merge'].includes(input.result.kind)
+        || (input.result.kind === 'pullRequest' && (!Number.isInteger(input.result.number) || input.result.number <= 0 || typeof input.result.url !== 'string' || !/^https?:\/\//.test(input.result.url)))) {
+        throw new Error('Invalid Mission delivery result.');
+      }
+      await this.change(input, current => {
+        if (current.stage !== 'ship') throw new Error('Repositories can be delivered only from the Ship stage.');
+        const delivery = current.execution?.deliveries?.find(candidate => candidate.repositoryPath === input.repositoryPath);
+        if (!delivery) throw new Error('This repository is not part of the Mission delivery.');
+        if (delivery.status !== 'pending') throw new Error('This repository has already been delivered.');
+        if (input.result.kind === 'pullRequest') {
+          delivery.status = 'pullRequestCreated';
+          delivery.pullRequest = { number: input.result.number, url: input.result.url };
+        } else {
+          delivery.status = 'merged';
+          delete delivery.pullRequest;
+        }
+        if (current.execution!.deliveries!.every(candidate => candidate.status !== 'pending')) current.status = 'completed';
+      });
+      return;
+    }
     if (input.action === 'cancel') {
       const run = mission.execution?.runs.find(run => run.id === input.runId);
       if (!run || !['preparing', 'running', 'awaitingReview'].includes(run.status)) throw new Error('No cancellable mission run.');
@@ -79,12 +101,9 @@ export class MissionExecutionService {
           run.status = 'accepted';
         }
         if (missionStageReady(current.stage, current.artifacts)) {
-          if (current.stage === 'review') {
-            current.status = 'completed';
-            return;
-          }
           current.stage = featureStages[featureStages.indexOf(current.stage) + 1]!;
           if (current.stage === 'implementation') await this.provisionImplementationWorkspaces(current);
+          if (current.stage === 'ship') this.prepareDeliveries(current);
         }
         nextRunIds = this.enqueueRuns(current, {});
       });
@@ -103,6 +122,7 @@ export class MissionExecutionService {
           current.artifacts.implementation = { changes: '', tests: '' };
         }
         if (input.stage !== 'review') current.artifacts.review = { summary: '', pullRequestUrl: '' };
+        if (input.stage !== 'ship') delete current.execution!.deliveries;
       }, true);
       return;
     }
@@ -414,6 +434,7 @@ export class MissionExecutionService {
     return mission;
   }
   private enqueueRuns(mission: Mission, input: { memberId?: string; ticketIndex?: number; feedback?: string }): string[] {
+    if (mission.stage === 'ship') return [];
     if (mission.stage !== 'implementation') return [this.enqueueRun(mission, input)];
     const execution = mission.execution;
     if (!execution) throw new Error('Configure the Mission team first.');
@@ -511,6 +532,18 @@ export class MissionExecutionService {
       tests: [mission.artifacts.implementation.tests, result.tests].filter(Boolean).join('\n\n'),
     };
     run.status = 'accepted';
+  }
+
+  private prepareDeliveries(mission: Mission): void {
+    const execution = mission.execution;
+    if (!execution?.workspaces?.length) throw new Error('This Mission has no repository workspaces to ship.');
+    execution.deliveries = execution.workspaces.map(workspace => {
+      const run = execution.runs.slice().reverse().find(candidate => (
+        candidate.stage === 'implementation' && candidate.repositoryPath === workspace.repositoryPath && candidate.workerId
+      ));
+      if (!run?.workerId) throw new Error(`No implementation agent is available to ship ${workspace.repositoryPath}.`);
+      return { repositoryPath: workspace.repositoryPath, agentId: run.workerId, status: 'pending' };
+    });
   }
 
   private async persistImplementationArtifact(mission: Mission): Promise<void> {

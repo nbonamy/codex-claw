@@ -21,6 +21,12 @@ export type MissionRun = {
 };
 export type MissionReviewPolicy = 'reviewEachTicket' | 'reviewAfterImplementation';
 export type MissionWorkspace = { repositoryPath: string; path: string; branch: string; baseSha?: string };
+export type MissionDelivery = {
+  repositoryPath: string;
+  agentId: string;
+  status: 'pending' | 'pullRequestCreated' | 'merged';
+  pullRequest?: { number: number; url: string };
+};
 export type MissionExecution = {
   teamId: string;
   repoPath?: string;
@@ -28,6 +34,7 @@ export type MissionExecution = {
   workspace?: { path: string; branch: string; baseSha?: string };
   workspaceName?: string;
   workspaces?: MissionWorkspace[];
+  deliveries?: MissionDelivery[];
   reviewPolicy?: MissionReviewPolicy;
   runs: MissionRun[];
 };
@@ -37,6 +44,7 @@ export type MissionExecutionInput = { id: string; revision: number } & (
   | { action: 'run'; memberId?: string; ticketIndex?: number; feedback?: string }
   | { action: 'accept'; runId: string }
   | { action: 'cancel'; runId: string }
+  | { action: 'recordDelivery'; repositoryPath: string; result: { kind: 'pullRequest'; number: number; url: string } | { kind: 'merge' } }
   | { action: 'reopen'; stage: MissionStage }
 );
 export type MissionResultInput = { missionId: string; runId: string; artifacts: MissionArtifacts; summary: string };
@@ -57,6 +65,7 @@ const skillNames: Record<MissionStage, string[][]> = {
   tickets: [['to-tickets', 'to-issues', 'prd-to-issues', 'design']],
   implementation: [['implement'], ['tdd'], ['codex-claw-testing-coverage']],
   review: [['code-review', 'review'], ['codex-claw-dod']],
+  ship: [],
 };
 export function missionSkills(stage: MissionStage, available: BackendSkillSummary[]): MissionRun['skills'] {
   return skillNames[stage].flatMap(alternatives => {
@@ -74,6 +83,7 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
     tickets: 'Continue as the same Mission orchestrator. Tell the user that the requirements are approved and you are turning them into tickets. Read and apply the to-tickets skill when available. Read the configured repository issue tracker instructions, including docs/agents/issue-tracker.md when present, and preserve its custom label mappings. Tracker choices are alternatives: never create a duplicate local/GitHub tracker. Turn the approved requirements into a small ordered implementation backlog. Each ticket must be a tracer-bullet vertical slice assigned to exactly one represented repository, with acceptance criteria, dependencies, and meaningful verification. Use codex_claw.upsert-mission-ticket for every draft and revision so tickets appear in the Mission while you work. Ask whether the user wants to review every completed ticket or review once after implementation, then record that choice with codex_claw.set-mission-execution-policy. The tool assigns a stable Mission ticket ID; tracker issue numbers remain optional external references assigned only when published. Review the breakdown, affected repositories, and execution policy with the user before publishing according to the ticketing skill. You may delegate repository research to agents created in the relevant represented repositories, then incorporate their findings into the Mission tickets yourself. Preserve the configured tracker as the authority; mission completion flags record acceptance of implementation, not remote issue closure. Do not implement code.',
     implementation: `Implement ONLY ticket ${(run.ticketIndex ?? 0) + 1} in ${run.repositoryPath ?? 'the assigned repository'}. Read the assigned ticket from its canonical reference when present, including tracker comments and configured label meanings. Mission done flags mean accepted implementation, not tracker issue closure. Read repository instructions and follow its test strategy. Run relevant tests and inspect the actual diff. Leave changes in this mission worktree for review. Do not merge, push, or open a PR. Mark only your ticket done after it meets acceptance; record changed paths and exact verification commands/results in submit-mission-result. Do not write the shared Implementation artifact directly; Claw aggregates accepted ticket evidence. If blocked, explain it in the conversation rather than claim completion.`,
     review: 'Review the mission branch and uncommitted changes against the approved requirements and tickets. Inspect actual code/diffs and run appropriate checks. Report concrete findings, risks, and a delivery recommendation. Do not silently fix findings, merge, push, or create a PR. The user controls delivery from the workflow.',
+    ship: 'Shipping is controlled by the Mission workspace. Do not start an agent run for this stage.',
   };
   const context = [
     `Mission: ${mission.outcome}`,

@@ -252,6 +252,47 @@ describe('mission execution', () => {
     expect(h.current().artifactFiles?.implementation?.revision).toBe(2);
   });
 
+  it('advances an approved review into Ship and completes only after every repository is delivered', async () => {
+    const h = setup();
+    const repositories = ['/repo/billing-api', '/repo/billing-web'];
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'review';
+      mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
+      mission.artifacts.tickets = repositories.map((repositoryPath, index) => ({ title: `Slice ${index + 1}`, repositoryPath, done: true }));
+      mission.artifacts.implementation = { changes: 'Implemented both slices', tests: 'All checks pass' };
+      const proposal = structuredClone(mission.artifacts);
+      proposal.review = { summary: 'Reviewed and ready to ship', pullRequestUrl: '' };
+      mission.execution!.workspaces = repositories.map((repositoryPath, index) => ({ repositoryPath, path: `${repositoryPath}-mission`, branch: 'mission/team-billing', baseSha: String(index + 1).repeat(40) }));
+      mission.execution!.runs = [
+        ...repositories.map((repositoryPath, index) => ({
+          id: `implementation-${index}`, stage: 'implementation' as const, memberId: h.originalAgents[index]!.id,
+          workerId: h.originalAgents[index]!.id, ticketIndex: index, repositoryPath, status: 'accepted' as const,
+          skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+        })),
+        { id: 'review-run', stage: 'review', memberId: h.originalAgents[0]!.id, workerId: h.originalAgents[0]!.id, status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z', proposal },
+      ];
+    });
+
+    await h.command({ action: 'accept', runId: 'review-run' });
+    expect(h.current()).toMatchObject({
+      stage: 'ship',
+      status: 'active',
+      execution: { deliveries: [
+        { repositoryPath: repositories[0], agentId: h.originalAgents[0]!.id, status: 'pending' },
+        { repositoryPath: repositories[1], agentId: h.originalAgents[1]!.id, status: 'pending' },
+      ] },
+    });
+    expect(h.current().execution!.runs).toHaveLength(3);
+
+    await expect(h.command({ action: 'recordDelivery', repositoryPath: '/not-affected', result: { kind: 'merge' } })).rejects.toThrow('not part');
+    await h.command({ action: 'recordDelivery', repositoryPath: repositories[0], result: { kind: 'pullRequest', number: 42, url: 'https://github.com/acme/billing/pull/42' } });
+    expect(h.current().status).toBe('active');
+    expect(h.current().execution!.deliveries![0]).toMatchObject({ status: 'pullRequestCreated', pullRequest: { number: 42 } });
+    await h.command({ action: 'recordDelivery', repositoryPath: repositories[1], result: { kind: 'merge' } });
+    expect(h.current().status).toBe('completed');
+    expect(h.current().execution!.deliveries![1]).toMatchObject({ status: 'merged' });
+  });
+
   it('lets the active orchestrator attach a repository represented in its team', async () => {
     const h = setup();
     await h.command({ action: 'run' }); await h.service.waitForLaunches();

@@ -317,7 +317,7 @@ describe('mission navigation', () => {
     expect(group.get('.agent-sidebar__workspace-label').text()).toBe('Missions');
     const row = group.get('.agent-sidebar__agent');
     expect(row.get('.agent-sidebar__session-title').text()).toBe('Add team billing');
-    expect(row.get('.agent-sidebar__status').attributes('aria-label')).toBe('1/4 · Requirements');
+    expect(row.get('.agent-sidebar__status').attributes('aria-label')).toBe('1/5 · Requirements');
     expect(row.attributes('aria-pressed')).toBe('true');
     await row.trigger('click');
     expect(wrapper.emitted('select-mission')).toStrictEqual([[mission.id]]);
