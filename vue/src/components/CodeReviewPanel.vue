@@ -262,7 +262,7 @@
       </ol>
 
       <footer
-        v-if="selectedRoundId === session.activeRoundId"
+        v-if="selectedRoundId === session.activeRoundId && session.status !== 'reviewing' && session.status !== 'fixing'"
         class="code-review-panel__footer"
       >
         <template v-if="session.status === 'ready'">
@@ -275,9 +275,6 @@
           >
             {{ selectedCount ? $t('surface.codeReviewPanel.remediateSelected') : $t('surface.codeReviewPanel.completeRound') }}
           </button>
-        </template>
-        <template v-else-if="session.status === 'fixing'">
-          <span>{{ $t('surface.codeReviewPanel.fixesInProgressDescription') }}</span>
         </template>
         <template v-else-if="session.status === 'readyToFinish'">
           <button
@@ -970,8 +967,23 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   opacity: 0.74;
 }
 
+.review-finding[data-state="skipped"] .review-finding__state {
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-high);
+}
+
+.review-finding[data-state="fixing"] .review-finding__state {
+  color: var(--color-primary);
+  background-color: var(--color-primary-container);
+}
+
 .review-finding[data-state="fixed"] {
   border-color: var(--color-success);
+}
+
+.review-finding[data-state="fixed"] .review-finding__state {
+  color: var(--color-success);
+  background-color: var(--color-success-container);
 }
 
 .review-finding__title-row {

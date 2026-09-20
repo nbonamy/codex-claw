@@ -337,6 +337,23 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.text()).toContain('Expected by contract.');
   });
 
+  it('colors skipped, fixing, and fixed remediation badges by state', () => {
+    const { wrapper } = mountPanel(session([
+      finding({ id: 'skipped', remediation: { state: 'skipped', startedAt: 'now' } }),
+      finding({ id: 'fixing', remediation: { state: 'fixing', startedAt: 'now' } }),
+      finding({ id: 'fixed', remediation: { state: 'fixed', completedAt: 'now' } }),
+    ], 'fixing'));
+
+    const badges = wrapper.findAll('.review-finding__state')
+      .map((badge) => getComputedStyle(badge.element));
+    expect(badges.map((badge) => [badge.color, badge.backgroundColor])).toEqual([
+      ['var(--color-text-muted)', 'var(--color-surface-high)'],
+      ['var(--color-primary)', 'var(--color-primary-container)'],
+      ['var(--color-success)', 'var(--color-success-container)'],
+    ]);
+    expect(wrapper.find('.code-review-panel__footer').exists()).toBe(false);
+  });
+
   it('offers the exact finish and repeat actions after fixes complete', async () => {
     const { wrapper, actions } = mountPanel(session([], 'readyToFinish'));
     const buttons = wrapper.findAll('.code-review-panel__footer button');

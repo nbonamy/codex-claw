@@ -548,7 +548,7 @@ Round: ${round.number}
 
 ${findingContext}
 
-Keep the changes focused and add or update behavior-level tests when appropriate. After fixing and verifying each finding, call update_finding with its id and status "fixed". Include concise verification evidence when useful.
+Keep the changes focused and add or update behavior-level tests when appropriate. Immediately after each individual finding is fixed and verified, call update_finding with its id and status "fixed" before moving to the next finding. Do not wait until all findings are fixed to update their statuses. Include concise verification evidence when useful.
 </context>`;
 }
 

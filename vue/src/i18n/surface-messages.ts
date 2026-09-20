@@ -240,7 +240,6 @@ export const surfaceMessages = {
     "findingsSelected": "{count} of {total} selected",
     "remediateSelected": "Remediate selected findings",
     "completeRound": "Complete review round",
-    "fixesInProgressDescription": "The reviewer is fixing selected findings one at a time.",
     "finishReview": "Finish review",
     "reviewAgain": "Review again",
     "reviewFinished": "Review finished.",

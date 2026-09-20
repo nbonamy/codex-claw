@@ -364,7 +364,12 @@ describe('CodeReviewService', () => {
     expect(test.turns[1]?.prompt).toContain('Fix the 2 following findings.');
     expect(test.turns[1]?.prompt).toContain(`${ids[0]}: First`);
     expect(test.turns[1]?.prompt).toContain(`${ids[1]}: Second`);
-    expect(test.turns[1]?.prompt).toContain('call update_finding with its id and status "fixed"');
+    expect(test.turns[1]?.prompt).toContain(
+      'Immediately after each individual finding is fixed and verified, call update_finding',
+    );
+    expect(test.turns[1]?.prompt).toContain(
+      'Do not wait until all findings are fixed to update their statuses.',
+    );
     releaseFirst?.();
     await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixed', 'fixed']));
     expect(session.status).toBe('readyToFinish');
