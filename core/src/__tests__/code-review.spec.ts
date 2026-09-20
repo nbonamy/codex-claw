@@ -126,13 +126,15 @@ describe('code review ledger', () => {
     expect(codeReviewProgress(review)).toMatchObject({ total: 3, undecided: 2, fixed: 0 });
   });
 
-  it('rejects a persisted session with an incomplete rejection decision', () => {
-    const invalid = structuredClone(session()) as unknown as Record<string, unknown>;
-    const rounds = invalid.rounds as Array<Record<string, unknown>>;
-    const findings = rounds[0]!.findings as Array<Record<string, unknown>>;
-    findings[1]!.decision = { state: 'rejected' };
+  it('restores deselected findings without requiring a rejection reason', () => {
+    const restored = structuredClone(session());
+    restored.rounds[0]!.findings[1]!.decision = {
+      state: 'rejected',
+      decidedAt: '2026-09-19T10:20:00.000Z',
+    };
 
-    expect(isCodeReviewSession(invalid)).toBe(false);
+    expect(isCodeReviewSession(restored)).toBe(true);
+    expect(codeReviewLedger(restored).exclusions[0]?.reason).toBe('Not selected for remediation.');
     expect(isCodeReviewSession(session())).toBe(true);
   });
 });

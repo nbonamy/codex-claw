@@ -791,9 +791,9 @@ Git scope, and the initial reviewer-thread strategy. The Git scope is either
 uncommitted work or the current branch against its resolved base. The first
 round may use the agent's current provider conversation, or create a fresh
 provider conversation for an unbiased reviewer; fresh is the default. Before
-submission, findings have decisions (`undecided`, `selected`, or `rejected`),
-not workflow status. Submission starts remediation: rejected findings become
-`skipped`; selected findings become `pending`; the round's reviewer
+submission, new findings are selected by default and may be deselected; this
+choice is not workflow status. Submission starts remediation: deselected
+findings become `skipped`; selected findings become `pending`; the round's reviewer
 conversation fixes exactly one `fixing` finding at a time and marks it `fixed`.
 Clarification and remediation continue the same provider-owned reviewer session;
 current-thread reviews keep that user-owned conversation intact for every round

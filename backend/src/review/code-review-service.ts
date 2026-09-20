@@ -74,7 +74,11 @@ export class CodeReviewService {
     const decidedAt = this.timestamp();
     finding.decision = input.decision === 'select'
       ? { state: 'selected', decidedAt }
-      : { state: 'rejected', decidedAt, reason: requiredText(input.reason, 'A rejection reason is required.') };
+      : {
+          state: 'rejected',
+          decidedAt,
+          ...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
+        };
     finding.updatedAt = decidedAt;
     session.updatedAt = decidedAt;
   }
@@ -97,10 +101,13 @@ export class CodeReviewService {
     this.requireArbitration(session);
     const round = activeCodeReviewRound(session);
     this.requireIdleRound(round);
-    if (round.findings.some((finding) => finding.decision.state === 'undecided')) {
-      throw new Error('Select or reject every finding before starting remediation.');
-    }
     const submittedAt = this.timestamp();
+    for (const finding of round.findings) {
+      if (finding.decision.state === 'undecided') {
+        finding.decision = { state: 'selected', decidedAt: submittedAt };
+        finding.updatedAt = submittedAt;
+      }
+    }
     round.status = 'submitted';
     session.status = round.findings.some((finding) => finding.decision.state === 'selected')
       ? 'fixing'
@@ -318,7 +325,7 @@ export class CodeReviewService {
       rationale: input.rationale,
       suggestedResolution: input.suggestedResolution,
       ...(input.location ? { location: { ...input.location } } : {}),
-      decision: { state: 'undecided' },
+      decision: { state: 'selected', decidedAt: now },
       discussion: prior?.discussion.map((message) => ({ ...message })) ?? [],
       remediation: { state: 'notStarted' },
       ...(input.materiallyNewEvidence ? { materiallyNewEvidence: input.materiallyNewEvidence } : {}),

@@ -263,7 +263,7 @@ describe('Unified backend → mounted application', () => {
           id: 'finding-1', roundId: 'round-1', fingerprint: 'src/auth.ts:ownership', priority: 'p1',
           summary: 'Ownership is skipped', rationale: 'The public mutation writes before authorizing.',
           suggestedResolution: 'Authorize before writing.', location: { file: 'src/auth.ts', line: 42 },
-          decision: { state: 'undecided' }, discussion: [], remediation: { state: 'notStarted' },
+          decision: { state: 'selected', decidedAt: '2026-09-19T10:00:30.000Z' }, discussion: [], remediation: { state: 'notStarted' },
           createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
         }],
       }],
@@ -281,17 +281,18 @@ describe('Unified backend → mounted application', () => {
     await wrapper.get('.review-finding__toggle').trigger('click');
     expect(wrapper.get('.review-finding').text()).toContain('src/auth.ts:42');
 
-    const accepted = structuredClone(ready);
-    accepted.agents[0]!.codeReview!.rounds[0]!.findings[0]!.decision = {
-      state: 'selected', decidedAt: '2026-09-19T10:02:00.000Z',
+    const excluded = structuredClone(ready);
+    excluded.agents[0]!.codeReview!.rounds[0]!.findings[0]!.decision = {
+      state: 'rejected', decidedAt: '2026-09-19T10:02:00.000Z',
     };
-    api.decideCodeReviewFinding.mockResolvedValueOnce(accepted);
-    await wrapper.findAll('.review-finding button').find((button) => button.text() === 'Select')!.trigger('click');
+    api.decideCodeReviewFinding.mockResolvedValueOnce(excluded);
+    await wrapper.get('.review-finding__selection').trigger('click');
     await flushPromises();
 
     expect(api.decideCodeReviewFinding).toHaveBeenCalledWith(agent.id, {
-      sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', decision: 'select',
+      sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', decision: 'reject',
     });
-    expect(wrapper.get('.review-finding .review-finding__quick-action').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('.review-finding').attributes('data-decision')).toBe('rejected');
+    expect(wrapper.get('.review-finding__selection input').attributes('aria-checked')).toBe('false');
   });
 });

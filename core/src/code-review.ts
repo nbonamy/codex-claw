@@ -30,7 +30,7 @@ export type CodeReviewDiscussionMessage = {
 export type CodeReviewDecision =
   | { state: 'undecided' }
   | { state: 'selected'; decidedAt: string }
-  | { state: 'rejected'; decidedAt: string; reason: string };
+  | { state: 'rejected'; decidedAt: string; reason?: string };
 
 /** Remediation begins only after the user submits a fully arbitrated round. */
 export type CodeReviewRemediation =
@@ -141,7 +141,7 @@ export type CodeReviewFindingRef = {
 
 export type CodeReviewDecisionInput = CodeReviewFindingRef & (
   | { decision: 'select' }
-  | { decision: 'reject'; reason: string }
+  | { decision: 'reject'; reason?: string }
 );
 
 export type CodeReviewDiscussionInput = CodeReviewFindingRef & {
@@ -162,7 +162,7 @@ export function codeReviewLedger(session: CodeReviewSession): CodeReviewLedger {
           findingId: finding.id,
           fingerprint: finding.fingerprint,
           summary: finding.summary,
-          reason: finding.decision.reason,
+          reason: finding.decision.reason ?? 'Not selected for remediation.',
         }]
       : []),
     regressionChecks: findings.flatMap((finding) => finding.remediation.state === 'fixed'
@@ -272,7 +272,9 @@ function isDecision(value: unknown): value is CodeReviewDecision {
   if (!isRecord(value)) return false;
   if (value.state === 'undecided') return true;
   if (value.state === 'selected') return typeof value.decidedAt === 'string';
-  return value.state === 'rejected' && typeof value.decidedAt === 'string' && typeof value.reason === 'string';
+  return value.state === 'rejected'
+    && typeof value.decidedAt === 'string'
+    && (value.reason === undefined || typeof value.reason === 'string');
 }
 
 function isRemediation(value: unknown): value is CodeReviewRemediation {

@@ -16,7 +16,7 @@ function finding(overrides: Partial<CodeReviewFinding> = {}): CodeReviewFinding 
     rationale: 'The public mutation writes before checking ownership.',
     suggestedResolution: 'Authorize before writing.',
     location: { file: 'src/auth.ts', line: 42 },
-    decision: { state: 'undecided' },
+    decision: { state: 'selected', decidedAt: '2026-09-19T10:00:00.000Z' },
     discussion: [],
     remediation: { state: 'notStarted' },
     createdAt: '2026-09-19T10:00:00.000Z',
@@ -115,12 +115,16 @@ describe('CodeReviewPanel', () => {
       expect.stringContaining('Low priority issue'),
     ]);
     expect(wrapper.find('.review-finding__body').exists()).toBe(false);
-    expect(wrapper.findAll('.review-finding__quick-action').map((button) => button.text())).toEqual([
-      'Select', 'Reject', 'Clarify', 'Select', 'Reject', 'Clarify',
+    expect(wrapper.findAll('.review-finding__quick-action')).toHaveLength(2);
+    expect(wrapper.findAll('.review-finding__quick-action').map((button) => button.attributes('aria-label'))).toEqual([
+      'Clarify', 'Clarify',
     ]);
+    expect(wrapper.findAll('.review-finding__selection')).toHaveLength(2);
 
     const criticalCard = wrapper.findAll('.review-finding')[0]!;
-    await criticalCard.findAll('.review-finding__quick-action')[0]!.trigger('click');
+    await criticalCard.get('.review-finding__selection').trigger('click');
+    expect(criticalCard.find('.review-finding__body').exists()).toBe(false);
+    await criticalCard.get('.review-finding__quick-action').trigger('click');
     expect(criticalCard.find('.review-finding__body').exists()).toBe(false);
     await criticalCard.get('.review-finding__toggle').trigger('click');
     expect(criticalCard.text()).toContain('The public mutation writes before checking ownership.');
@@ -134,24 +138,32 @@ describe('CodeReviewPanel', () => {
     expect(lowCard.find('.review-finding__location').exists()).toBe(false);
   });
 
-  it('treats selection and rejection as decisions without displaying finding status', async () => {
-    const low = finding({ id: 'finding-low', priority: 'p3', summary: 'Low priority issue' });
+  it('deselects findings through compact toggles and visually mutes unselected cards', async () => {
+    const low = finding({
+      id: 'finding-low',
+      priority: 'p3',
+      summary: 'Low priority issue',
+      decision: { state: 'rejected', decidedAt: 'now' },
+    });
     const critical = finding({ id: 'finding-critical', priority: 'p0', summary: 'Critical issue' });
     const { wrapper, actions } = mountPanel(session([low, critical]));
 
     expect(wrapper.find('.review-finding__state').exists()).toBe(false);
     const criticalCard = wrapper.findAll('.review-finding')[0]!;
-    await criticalCard.findAll('.review-finding__quick-action')[0]!.trigger('click');
-    await flushPromises();
-    expect(actions.decideFinding).toHaveBeenCalledWith('owner', expect.objectContaining({ findingId: 'finding-critical', decision: 'select' }));
-
-    const lowCard = wrapper.findAll('.review-finding')[1]!;
-    await lowCard.findAll('.review-finding__quick-action')[1]!.trigger('click');
-    await lowCard.get('textarea').setValue('The event stream invalidates this cache.');
-    await lowCard.get('form').trigger('submit');
+    expect((criticalCard.get('.review-finding__selection input').element as HTMLInputElement).checked).toBe(true);
+    await criticalCard.get('.review-finding__selection').trigger('click');
     await flushPromises();
     expect(actions.decideFinding).toHaveBeenCalledWith('owner', expect.objectContaining({
-      findingId: 'finding-low', decision: 'reject', reason: 'The event stream invalidates this cache.',
+      findingId: 'finding-critical', decision: 'reject',
+    }));
+
+    const lowCard = wrapper.findAll('.review-finding')[1]!;
+    expect(lowCard.attributes('data-decision')).toBe('rejected');
+    expect((lowCard.get('.review-finding__selection input').element as HTMLInputElement).checked).toBe(false);
+    await lowCard.get('.review-finding__selection').trigger('click');
+    await flushPromises();
+    expect(actions.decideFinding).toHaveBeenCalledWith('owner', expect.objectContaining({
+      findingId: 'finding-low', decision: 'select',
     }));
   });
 
@@ -159,7 +171,7 @@ describe('CodeReviewPanel', () => {
     const selected = finding({ decision: { state: 'selected', decidedAt: 'now' } });
     const { wrapper, actions } = mountPanel(session([selected]));
 
-    await wrapper.findAll('.review-finding__quick-action')[2]!.trigger('click');
+    await wrapper.get('.review-finding__quick-action').trigger('click');
     const textarea = wrapper.get('textarea');
     expect(textarea.element.value).toContain('Finding finding-1: Ownership is skipped');
     expect(textarea.element.value).toContain('Location: src/auth.ts:42');

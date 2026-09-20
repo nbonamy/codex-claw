@@ -125,6 +125,7 @@ describe('CodeReviewService', () => {
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     const firstRound = activeCodeReviewRound(session);
     expect(firstRound.findings[0]?.priority).toBe('p0');
+    expect(firstRound.findings.map((finding) => finding.decision.state)).toEqual(['selected', 'selected']);
     expect(firstRound.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
 
     test.service.discuss(test.owner, {
@@ -133,10 +134,9 @@ describe('CodeReviewService', () => {
     });
     await vi.waitFor(() => expect(firstRound.findings[0]?.discussion).toHaveLength(2));
 
-    test.service.decide(test.owner, { sessionId: session.id, roundId: firstRound.id, findingId: selectedId, decision: 'select' });
     test.service.decide(test.owner, {
       sessionId: session.id, roundId: firstRound.id, findingId: rejectedId,
-      decision: 'reject', reason: 'Event invalidation makes this safe.',
+      decision: 'reject',
     });
     test.service.submit(test.owner, session.id);
     await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
@@ -154,7 +154,7 @@ describe('CodeReviewService', () => {
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     expect(secondRound.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-4' });
     expect(test.turns[3]?.reviewerSession).toBeUndefined();
-    expect(test.turns[3]?.prompt).toContain('Event invalidation makes this safe.');
+    expect(test.turns[3]?.prompt).toContain('Not selected for remediation.');
     expect(test.turns[3]?.prompt).toContain(selectedId);
     expect(test.disposed).toStrictEqual([{ kind: 'codex', threadId: 'review-thread-1' }]);
 
@@ -195,9 +195,11 @@ describe('CodeReviewService', () => {
     const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'unbiased' });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     const round = activeCodeReviewRound(session);
-    for (const id of ids) test.service.decide(test.owner, { sessionId: session.id, roundId: round.id, findingId: id, decision: 'select' });
+    expect(round.findings.map((finding) => finding.decision.state)).toEqual(['selected', 'selected']);
+    round.findings[0]!.decision = { state: 'undecided' };
 
     test.service.submit(test.owner, session.id);
+    expect(round.findings[0]!.decision.state).toBe('selected');
     await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixing', 'pending']));
     releaseFirst?.();
     await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixed', 'fixed']));

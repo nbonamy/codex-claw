@@ -154,33 +154,25 @@
               <button
                 class="claw-button claw-button--tertiary review-finding__quick-action"
                 type="button"
-                :aria-pressed="finding.decision.state === 'selected'"
-                :disabled="busy"
-                @click="selectFinding(finding)"
-              >
-                <IconCheck aria-hidden="true" /> {{ $t('surface.codeReviewPanel.select') }}
-              </button>
-              <button
-                class="claw-button claw-button--tertiary review-finding__quick-action"
-                type="button"
-                :aria-pressed="finding.decision.state === 'rejected'"
-                :aria-expanded="decliningId === finding.id"
-                :aria-controls="`finding-reject-${finding.id}`"
-                :disabled="busy"
-                @click="toggleDecline(finding.id)"
-              >
-                <IconX aria-hidden="true" /> {{ $t('surface.codeReviewPanel.reject') }}
-              </button>
-              <button
-                class="claw-button claw-button--tertiary review-finding__quick-action"
-                type="button"
+                :aria-label="$t('surface.codeReviewPanel.clarify')"
+                :title="$t('surface.codeReviewPanel.clarify')"
                 :aria-expanded="discussingId === finding.id"
                 :aria-controls="`finding-clarify-${finding.id}`"
                 :disabled="busy"
                 @click="toggleDiscussion(finding)"
               >
-                <IconMessageCircle aria-hidden="true" /> {{ $t('surface.codeReviewPanel.clarify') }}
+                <IconMessageQuestion aria-hidden="true" />
               </button>
+              <el-switch
+                class="review-finding__selection"
+                size="small"
+                :model-value="finding.decision.state !== 'rejected'"
+                :aria-label="$t('surface.codeReviewPanel.includeFinding')"
+                :title="$t('surface.codeReviewPanel.includeFinding')"
+                :disabled="busy"
+                @click.stop
+                @change="setFindingSelected(finding, $event)"
+              />
             </div>
           </div>
 
@@ -204,7 +196,7 @@
             </p>
 
             <blockquote
-              v-if="finding.decision.state === 'rejected'"
+              v-if="finding.decision.state === 'rejected' && finding.decision.reason"
               class="review-finding__decision"
             >
               <strong>{{ $t('surface.codeReviewPanel.stateRejected') }}</strong>
@@ -230,30 +222,6 @@
               </article>
             </div>
           </div>
-
-          <form
-            v-if="canArbitrate && decliningId === finding.id"
-            :id="`finding-reject-${finding.id}`"
-            class="review-finding__composer"
-            @submit.prevent="decline(finding)"
-          >
-            <label :for="`decline-${finding.id}`"
-              >{{ $t('surface.codeReviewPanel.rejectReason') }}</label
-            >
-            <textarea
-              :id="`decline-${finding.id}`"
-              v-model="declineReason"
-              rows="2"
-              required
-            />
-            <button
-              class="claw-button claw-button--primary"
-              type="submit"
-              :disabled="busy || !declineReason.trim()"
-            >
-              {{ $t('surface.codeReviewPanel.rejectFinding') }}
-            </button>
-          </form>
 
           <form
             v-if="canArbitrate && discussingId === finding.id"
@@ -290,7 +258,7 @@
           <button
             class="claw-button claw-button--primary"
             type="button"
-            :disabled="busy || !canSubmit"
+            :disabled="busy"
             @click="submitRound"
           >
             {{ selectedCount ? $t('surface.codeReviewPanel.remediateSelected') : $t('surface.codeReviewPanel.completeRound') }}
@@ -351,13 +319,11 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
-  IconCheck,
   IconChecklist,
   IconChevronDown,
   IconCircleCheck,
-  IconMessageCircle,
+  IconMessageQuestion,
   IconSparkles,
-  IconX,
 } from "@tabler/icons-vue";
 import {
   codeReviewProgress,
@@ -394,8 +360,6 @@ const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
 const threadMode = ref<CodeReviewThreadMode>("unbiased");
 const selectedRoundId = ref("");
-const decliningId = ref<string | null>(null);
-const declineReason = ref("");
 const discussingId = ref<string | null>(null);
 const question = ref("");
 const expandedFindingId = ref<string | null>(null);
@@ -436,9 +400,8 @@ const progress = computed(() =>
 const progressItems = computed(() =>
   session.value?.status === "ready"
     ? [
-        { value: progress.value.undecided, label: t("surface.codeReviewPanel.undecided") },
-        { value: progress.value.selected, label: t("surface.codeReviewPanel.selected") },
-        { value: progress.value.rejected, label: t("surface.codeReviewPanel.rejected") },
+        { value: selectedCount.value, label: t("surface.codeReviewPanel.selected") },
+        { value: progress.value.rejected, label: t("surface.codeReviewPanel.unselected") },
         { value: progress.value.fixed, label: t("surface.codeReviewPanel.fixed") },
       ]
     : [
@@ -453,19 +416,12 @@ const canArbitrate = computed(
     session.value?.status === "ready" &&
     selectedRoundId.value === session.value.activeRoundId,
 );
-const undecidedCount = computed(
-  () =>
-    selectedRound.value?.findings.filter(
-      (finding) => finding.decision.state === "undecided",
-    ).length ?? 0,
-);
 const selectedCount = computed(
   () =>
     selectedRound.value?.findings.filter(
-      (finding) => finding.decision.state === "selected",
+      (finding) => finding.decision.state !== "rejected",
     ).length ?? 0,
 );
-const canSubmit = computed(() => undecidedCount.value === 0);
 const sessionTitle = computed(
   () =>
     t("surface.codeReviewPanel.roundNumber", {
@@ -483,24 +439,18 @@ const sessionStatus = computed(
       failed: t("surface.codeReviewPanel.statusFailed"),
     })[session.value?.status ?? "reviewing"],
 );
-const footerMessage = computed(() => {
-  if (undecidedCount.value === 1) {
-    return t("surface.codeReviewPanel.resolveOneFinding");
-  }
-  if (undecidedCount.value > 1) {
-    return t("surface.codeReviewPanel.resolveFindings", {
-      count: undecidedCount.value,
-    });
-  }
-  return t("surface.codeReviewPanel.decisionsReady");
-});
+const footerMessage = computed(() =>
+  t("surface.codeReviewPanel.findingsSelected", {
+    count: selectedCount.value,
+    total: selectedRound.value?.findings.length ?? 0,
+  }),
+);
 
 watch(
   () => session.value?.activeRoundId,
   (roundId) => {
     if (roundId) selectedRoundId.value = roundId;
     expandedFindingId.value = null;
-    decliningId.value = null;
     discussingId.value = null;
   },
   { immediate: true },
@@ -518,47 +468,24 @@ async function run(action: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function selectFinding(finding: CodeReviewFinding): void {
+function setFindingSelected(
+  finding: CodeReviewFinding,
+  value: string | number | boolean,
+): void {
   const round = selectedRound.value;
   if (!session.value || !round) return;
-  if (decliningId.value === finding.id) decliningId.value = null;
-  if (discussingId.value === finding.id) discussingId.value = null;
   void run(() =>
     props.decideFinding(props.agent.id, {
       sessionId: session.value!.id,
       roundId: round.id,
       findingId: finding.id,
-      decision: "select",
+      decision: value === true ? "select" : "reject",
     }),
   );
 }
 
-function toggleDecline(findingId: string): void {
-  decliningId.value = decliningId.value === findingId ? null : findingId;
-  discussingId.value = null;
-  declineReason.value = "";
-}
-
-function decline(finding: CodeReviewFinding): void {
-  const round = selectedRound.value;
-  if (!session.value || !round || !declineReason.value.trim()) return;
-  const reason = declineReason.value.trim();
-  void run(async () => {
-    await props.decideFinding(props.agent.id, {
-      sessionId: session.value!.id,
-      roundId: round.id,
-      findingId: finding.id,
-      decision: "reject",
-      reason,
-    });
-    decliningId.value = null;
-    declineReason.value = "";
-  });
-}
-
 function toggleDiscussion(finding: CodeReviewFinding): void {
   discussingId.value = discussingId.value === finding.id ? null : finding.id;
-  decliningId.value = null;
   question.value = discussingId.value ? clarificationPrompt(finding) : "";
 }
 
@@ -656,6 +583,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   background: var(--color-surface);
   color: var(--color-text);
 }
+
 .code-review-panel__empty {
   margin: auto;
   width: min(420px, 100%);
@@ -665,18 +593,21 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   padding: var(--space-8);
   text-align: center;
 }
+
 .code-review-panel__setup {
   width: 100%;
   display: grid;
   gap: var(--space-4);
   text-align: left;
 }
+
 .code-review-panel__setup fieldset {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
+
 .code-review-panel__setup legend {
   margin-bottom: var(--space-2);
   color: var(--color-text-muted);
@@ -685,11 +616,13 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
 .code-review-panel__choices {
   width: 100%;
   display: grid;
   gap: var(--space-2);
 }
+
 .code-review-panel__choices :deep(.el-radio) {
   width: 100%;
   height: auto;
@@ -700,37 +633,45 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   border-radius: var(--radius-md);
   background: var(--color-surface-low);
 }
+
 .code-review-panel__choices :deep(.el-radio.is-checked) {
   border-color: var(--color-primary);
   background: var(--color-primary-container);
 }
+
 .code-review-panel__choices :deep(.el-radio__input) {
   margin-top: 2px;
 }
+
 .code-review-panel__choices :deep(.el-radio__label) {
   min-width: 0;
   color: var(--color-text);
   white-space: normal;
 }
+
 .code-review-panel__choices :deep(.el-radio__label span) {
   display: grid;
   gap: 2px;
 }
+
 .code-review-panel__choices :deep(.el-radio__label small) {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
   line-height: 1.35;
 }
+
 .code-review-panel__empty h2,
 .code-review-panel__header h2 {
   margin: 0;
   font-size: var(--font-size-18);
 }
+
 .code-review-panel__empty p {
   margin: 0 0 var(--space-3);
   color: var(--color-text-muted);
   line-height: 1.5;
 }
+
 .code-review-panel__empty-icon {
   display: grid;
   place-items: center;
@@ -740,10 +681,12 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   color: var(--color-primary);
   background: var(--color-primary-container);
 }
+
 .code-review-panel__empty-icon svg {
   width: 26px;
   height: 26px;
 }
+
 .code-review-panel__header {
   display: flex;
   align-items: center;
@@ -752,6 +695,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   padding: var(--space-6);
   border-bottom: 1px solid var(--color-border);
 }
+
 .code-review-panel__eyebrow {
   display: block;
   margin-bottom: var(--space-1);
@@ -760,6 +704,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
 .code-review-panel__status,
 .review-finding__state {
   padding: 3px 8px;
@@ -769,17 +714,20 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   font-size: var(--font-size-11);
   white-space: nowrap;
 }
+
 .code-review-panel__status[data-status="ready"],
 .code-review-panel__status[data-status="readyToFinish"] {
   color: var(--color-primary);
   background: var(--color-primary-container);
 }
+
 .code-review-panel__rounds {
   display: flex;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-6) 0;
   overflow-x: auto;
 }
+
 .code-review-panel__rounds button {
   border: 0;
   border-bottom: 2px solid transparent;
@@ -789,17 +737,21 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   font: inherit;
   cursor: pointer;
 }
+
 .code-review-panel__rounds button.is-active {
   border-color: var(--color-primary);
   color: var(--color-text);
 }
+
 .code-review-panel__rounds span {
   margin-left: var(--space-1);
   font-size: var(--font-size-11);
 }
+
 .code-review-panel__progress {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 1px;
   margin: var(--space-4) var(--space-6);
   border: 1px solid var(--color-border);
@@ -807,6 +759,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   overflow: hidden;
   background: var(--color-border);
 }
+
 .code-review-panel__progress span {
   display: grid;
   gap: 2px;
@@ -815,10 +768,12 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
 }
+
 .code-review-panel__progress strong {
   color: var(--color-text);
   font-size: var(--font-size-16);
 }
+
 .code-review-panel__working,
 .code-review-panel__clear {
   margin: auto;
@@ -829,17 +784,21 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   padding: var(--space-8);
   color: var(--color-text-muted);
 }
+
 .code-review-panel__working div,
 .code-review-panel__clear {
   line-height: 1.4;
 }
+
 .code-review-panel__working span,
 .code-review-panel__clear span {
   display: block;
 }
+
 .code-review-panel__clear svg {
   color: var(--color-success);
 }
+
 .code-review-panel__spinner {
   width: 20px;
   height: 20px;
@@ -848,11 +807,13 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   border-radius: 50%;
   animation: review-spin 0.8s linear infinite;
 }
+
 @keyframes review-spin {
   to {
     transform: rotate(360deg);
   }
 }
+
 .code-review-panel__findings {
   flex: 1;
   min-height: 0;
@@ -865,6 +826,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   padding: 0 var(--space-6) var(--space-6);
   list-style: none;
 }
+
 .review-finding {
   display: flex;
   flex-direction: column;
@@ -873,18 +835,29 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   overflow: hidden;
   background: var(--color-surface);
 }
+
 .review-finding[data-state="fixing"],
 .review-finding[data-state="pending"] {
   border-color: var(--color-primary);
 }
+
 .review-finding[data-state="skipped"] {
   opacity: 0.74;
 }
+
 .review-finding[data-state="fixed"] {
   border-color: var(--color-success);
 }
+
+.review-finding__summary-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
 .review-finding__toggle {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 46px;
   display: flex;
   align-items: center;
@@ -896,14 +869,17 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   text-align: left;
   cursor: pointer;
 }
+
 .review-finding__toggle:hover,
 .review-finding__toggle:focus-visible {
   background: var(--color-surface-low);
 }
+
 .review-finding__summary {
   flex: 1;
   min-width: 0;
 }
+
 .review-finding__summary strong {
   display: block;
   overflow: hidden;
@@ -912,6 +888,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
 }
+
 .review-finding__priority {
   padding: 2px 6px;
   border-radius: var(--radius-sm);
@@ -920,42 +897,54 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   font-weight: 700;
   font-size: var(--font-size-11);
 }
+
 .review-finding[data-priority="p2"] .review-finding__priority,
 .review-finding[data-priority="p3"] .review-finding__priority {
   background: var(--color-surface-high);
   color: var(--color-text-muted);
 }
+
+.review-finding[data-decision="rejected"] .review-finding__summary {
+  color: var(--color-text-muted);
+}
+
+.review-finding[data-decision="rejected"] .review-finding__priority {
+  opacity: 0.55;
+}
+
 .review-finding__chevron {
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--color-text-muted);
   transition: transform 120ms ease;
 }
+
 .review-finding__toggle[aria-expanded="true"] .review-finding__chevron {
   transform: rotate(180deg);
 }
+
 .review-finding__quick-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-top: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
 }
+
 .review-finding__quick-action {
+  width: 28px;
   min-height: 28px;
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
-  font-size: var(--font-size-12);
+  padding: 0;
 }
+
 .review-finding__quick-action svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
 }
-.review-finding__quick-action[aria-pressed="true"] {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-primary-container);
+
+.review-finding__selection {
+  flex: 0 0 auto;
 }
+
 .review-finding__location {
   justify-self: start;
   max-width: 100%;
@@ -970,12 +959,14 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   white-space: nowrap;
   cursor: pointer;
 }
+
 .review-finding__body {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
   border-top: 1px solid var(--color-border);
 }
+
 .review-finding__composer label {
   display: block;
   margin-bottom: var(--space-1);
@@ -985,28 +976,34 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
 .review-finding__body p,
 .review-finding__discussion p {
   margin: 0;
   font-size: var(--font-size-13);
   line-height: var(--line-height-20);
 }
+
 .review-finding__resolution {
   color: var(--color-text-muted);
 }
+
 .review-finding__resolution strong {
   color: var(--color-text);
 }
+
 .review-finding__decision {
   margin: 0;
   padding: var(--space-3);
   border-left: 3px solid var(--color-text-muted);
   background: var(--color-surface-low);
 }
+
 .review-finding__decision strong {
   display: block;
   margin-bottom: var(--space-1);
 }
+
 .review-finding__composer {
   display: grid;
   gap: var(--space-2);
@@ -1014,6 +1011,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
 }
+
 .review-finding__composer textarea {
   resize: vertical;
   width: 100%;
@@ -1025,26 +1023,32 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   background: var(--color-surface);
   font: inherit;
 }
+
 .review-finding__composer .claw-button {
   justify-self: end;
 }
+
 .review-finding__discussion {
   display: grid;
   gap: var(--space-2);
 }
+
 .review-finding__discussion article {
   padding: var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
 }
+
 .review-finding__discussion article[data-author="reviewer"] {
   border-left: 2px solid var(--color-primary);
 }
+
 .review-finding__discussion strong {
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
 }
+
 .code-review-panel__footer {
   position: sticky;
   bottom: 0;
@@ -1056,11 +1060,13 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
 }
+
 .code-review-panel__footer > span {
   margin-right: auto;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
 }
+
 .code-review-panel__error {
   margin: var(--space-4) var(--space-6);
   padding: var(--space-4);
