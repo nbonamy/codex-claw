@@ -888,16 +888,12 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   text-align: center;
 }
 
-.code-review-panel__working.is-waiting .code-review-panel__spinner {
-  width: 28px;
-  height: 28px;
-}
-
 .code-review-panel__working-copy {
   display: grid;
   gap: var(--space-1);
   justify-items: center;
   line-height: 1.4;
+  font-size: var(--font-size-14);
 }
 
 .code-review-panel__working-count {
@@ -927,12 +923,13 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 }
 
 .code-review-panel__spinner {
-  width: 20px;
-  height: 20px;
+  width: var(--space-20);
+  height: var(--space-20);
   border: 2px solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: review-spin 0.8s linear infinite;
+  margin-bottom: var(--space-8);
 }
 
 @keyframes review-spin {
