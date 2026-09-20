@@ -152,7 +152,7 @@
 
       <aside class="mission-workspace__conversation" :aria-label="t('missions.support')">
         <header>
-          <div><h2>{{ t('missions.orchestrator') }}</h2><p>{{ t('missions.orchestratorHint') }}</p></div>
+          <div><h2>{{ conversationHeaderTitle }}</h2><p>{{ conversationHeaderHint }}</p></div>
           <MessageCircleIcon aria-hidden="true" />
         </header>
         <div
@@ -235,6 +235,21 @@ const conversationAgentId = computed(() => (
     ? selectedConversationAgentId.value
     : preferredConversationAgentId.value
 ));
+const selectedConversation = computed(() => missionConversations.value.find(conversation => conversation.agentId === conversationAgentId.value));
+const conversationHeaderTitle = computed(() => {
+  const conversation = selectedConversation.value;
+  if (conversation?.run.stage !== 'implementation') return t('missions.orchestrator');
+  const agent = props.agents.find(agent => agent.id === conversation.agentId)
+    ?? props.agents.find(agent => agent.id === conversation.run.memberId);
+  return agent ? agentDisplayName(agent) : t('missions.implementationAgent');
+});
+const conversationHeaderHint = computed(() => {
+  const run = selectedConversation.value?.run;
+  if (run?.stage === 'implementation' && run.ticketIndex !== undefined) {
+    return props.mission.artifacts.tickets[run.ticketIndex]?.title ?? t('missions.implementationAgentHint');
+  }
+  return t('missions.orchestratorHint');
+});
 
 watch(preferredConversationAgentId, (id, previous) => {
   if (!selectedConversationAgentId.value || selectedConversationAgentId.value === previous) selectedConversationAgentId.value = id;

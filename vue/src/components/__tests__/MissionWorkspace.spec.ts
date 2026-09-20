@@ -307,6 +307,8 @@ describe('MissionWorkspace', () => {
     expect(board.findAll('.mission-implementation__ticket')[0]!.attributes('aria-current')).toBe('true');
     expect(board.get('[aria-label="Implementation ticket details"]').text()).toContain('checkout integration test passes');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
+    expect(wrapper.get('.mission-workspace__conversation > header h2').text()).toBe('Dina');
+    expect(wrapper.get('.mission-workspace__conversation > header p').text()).toBe('Checkout');
 
     await board.get('.mission-implementation__details .claw-button').trigger('click');
     await flushPromises();

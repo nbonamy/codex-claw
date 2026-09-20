@@ -39,6 +39,7 @@ export const messages = {
       acceptedAtStage: 'Accepted at this stage', accepted: 'Accepted', noArtifactYet: 'No artifact yet',
       keepWorkingInConversation: 'Continue with the orchestrator to create this stage’s artifact.', continueMission: 'Continue mission',
       orchestrator: 'Orchestrator', orchestratorHint: 'Guides this stage.', orchestratorStarting: 'Starting the mission orchestrator…', conversations: 'Mission conversations',
+      implementationAgent: 'Implementation agent', implementationAgentHint: 'Working on this ticket.',
       requirementReview: 'Requirements review', requirementCommentHelp: 'Select text to leave an inline comment.', requirementComments: 'Requirement comments',
       requirementCommentLabel: 'Requirement comment', requirementCommentPlaceholder: 'What should change?', saveRequirementComment: 'Save requirement comment',
       editRequirementComment: 'Edit requirement comment', removeRequirementComment: 'Remove requirement comment', sendRequirementComments: 'Send {count} requirement comment | Send {count} requirement comments',
