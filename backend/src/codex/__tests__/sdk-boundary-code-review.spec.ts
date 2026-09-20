@@ -53,7 +53,13 @@ describe('Codex code review boundary', () => {
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1',
     });
 
-    expect(surface.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, { extensionContext: agent });
+    expect(surface.createConversation).toHaveBeenCalledWith(
+      { cwd: '/repo', threadSource: 'user' },
+      { extensionContext: {
+        agent,
+        reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1',
+      } },
+    );
     expect(review.handle.load).toHaveBeenNthCalledWith(1, {
       extensionContext: { agent, reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1' },
     });

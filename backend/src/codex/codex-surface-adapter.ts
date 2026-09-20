@@ -266,11 +266,12 @@ export class CodexSurfaceAgentAdapter {
     const requestedAgent = input.reviewerSession
       ? { ...agent, backendSession: input.reviewerSession }
       : agent;
-    const session = await this.ensureSession(requestedAgent);
+    const reviewExtensionContext = { agent, reviewMcpServerUrl: input.reviewMcpServerUrl };
+    const session = await this.ensureSession(requestedAgent, reviewExtensionContext);
     session.agent = agent;
     const conversationId = session.handle.id;
     const conversation = session.handle;
-    await conversation.load({ extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
+    await conversation.load({ extensionContext: reviewExtensionContext });
     let targetTurnId: string | null = null;
     const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
     let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
@@ -708,7 +709,10 @@ export class CodexSurfaceAgentAdapter {
     await this.closeSurface();
   }
 
-  private async ensureSession(agent: Agent): Promise<AgentConversation> {
+  private async ensureSession(
+    agent: Agent,
+    extensionContext: unknown = agent,
+  ): Promise<AgentConversation> {
     const existing = this.sessionsByAgentId.get(agent.id);
     const requestedThreadId = codexThreadId(agent);
     if (existing && (!requestedThreadId || existing.handle.id === requestedThreadId)) {
@@ -725,7 +729,7 @@ export class CodexSurfaceAgentAdapter {
       ...agentCwd(agent),
       threadSource: 'user',
       ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
-    }, { extensionContext: agent });
+    }, { extensionContext });
     const threadId = snapshot.activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation.');
     const session = this.bindRuntime(agent, threadId, true, false);
