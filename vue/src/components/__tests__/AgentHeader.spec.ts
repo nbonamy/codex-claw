@@ -234,6 +234,10 @@ describe('AgentHeader', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Staged');
+    expect(wrapper.emitted('open-git-diff')).toBeUndefined();
+
+    await wrapper.get('.git-diff-control__open').trigger('click');
+
     expect(wrapper.emitted('open-git-diff')).toContainEqual([{ type: 'staged' }]);
   });
 
