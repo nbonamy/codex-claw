@@ -281,17 +281,19 @@ export class CodexSurfaceAgentAdapter {
     });
     try {
       const beforeTurnIds = conversation.getSnapshot().turnIds;
-      const started = created
-        ? await conversation.startReview({ target: { type: 'custom', instructions: input.prompt } })
-        : await conversation.sendMessage(input.prompt);
+      const started = await conversation.sendMessage(input.prompt);
       targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
       if (!targetTurnId) throw new Error('Codex did not start the review round.');
       const immediate = completedBeforeTarget.get(targetTurnId)
         ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
       const status = immediate ?? await reviewCompletion(completion);
-      if (status !== 'completed') throw new Error(`Code review was ${status}.`);
+      const snapshot = conversation.getSnapshot();
+      const completedFinalAnswer = sessionFinalAnswerText(snapshot.messages, targetTurnId);
+      if (status !== 'completed' && !(status === 'interrupted' && completedFinalAnswer)) {
+        throw new Error(`Code review was ${status}.`);
+      }
       return {
-        text: sessionHandoffText(conversation.getSnapshot().messages, targetTurnId),
+        text: sessionHandoffText(snapshot.messages, targetTurnId),
         reviewerSession: { kind: 'codex', threadId: conversationId },
       };
     } catch (error) {
@@ -1438,12 +1440,18 @@ function sessionHandoffText(messages: readonly SurfaceMessage[], turnId: string)
   const assistantMessages = messages.filter((message) => (
     message.role === 'assistant' && message.turnId === turnId
   ));
-  const finalText = assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
-    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
-  ))).join('\n').trim();
+  const finalText = sessionFinalAnswerText(messages, turnId);
   if (finalText) return finalText;
   return assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
     part.type === 'text' ? [part.text] : []
+  ))).join('\n').trim();
+}
+
+function sessionFinalAnswerText(messages: readonly SurfaceMessage[], turnId: string): string {
+  return messages.filter((message) => (
+    message.role === 'assistant' && message.turnId === turnId && message.status === 'complete'
+  )).flatMap((message) => message.parts.flatMap((part) => (
+    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
   ))).join('\n').trim();
 }
 

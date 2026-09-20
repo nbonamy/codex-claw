@@ -99,6 +99,7 @@ describe('CodeReviewService', () => {
     expect(session.threadMode).toBe('current');
     expect(test.turns[0]?.reviewerSession).toStrictEqual({ kind: 'codex', threadId: 'current-thread' });
     expect(test.turns[0]?.prompt).toContain('the current branch against origin/main');
+    expect(test.turns[0]?.prompt).toContain('respond with exactly "Review complete." and end the turn');
 
     test.service.submit(test.owner, session.id);
     await test.service.reviewAgain(test.owner, session.id);

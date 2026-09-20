@@ -460,7 +460,7 @@ ${JSON.stringify(ledger, null, 2)}
 
 Review ${scope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
 
-Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.`;
+Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, respond with exactly "Review complete." and end the turn. There is no tool for completing the review workflow.`;
 }
 
 function discussionPrompt(
