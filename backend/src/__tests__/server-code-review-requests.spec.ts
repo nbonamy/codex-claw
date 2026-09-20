@@ -31,8 +31,8 @@ describe('ClawBackendServer code review workflow', () => {
       if (!activeHandlers) throw new Error('Missing review tool context.');
       if (reviewRun === 1) {
         const finding = await activeHandlers.reportFinding({
-          fingerprint: 'src/auth.ts:ownership', priority: 'p1', summary: 'Ownership is skipped',
-          rationale: 'The public mutation writes before authorizing.', suggestedResolution: 'Authorize before writing.',
+          priority: 'p1', title: 'Authorize before writing',
+          body: 'The public mutation writes before checking ownership.',
           location: { file: 'src/auth.ts', line: 42 },
         });
         findingId = finding.id;

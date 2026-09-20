@@ -262,9 +262,9 @@ describe('Unified backend → mounted application', () => {
         id: 'round-1', number: 1, status: 'ready', reviewerSession: { kind: 'codex', threadId: 'reviewer-1' },
         startedAt: '2026-09-19T10:00:00.000Z', completedAt: '2026-09-19T10:01:00.000Z',
         findings: [{
-          id: 'finding-1', roundId: 'round-1', fingerprint: 'src/auth.ts:ownership', priority: 'p1',
-          summary: 'Ownership is skipped', rationale: 'The public mutation writes before authorizing.',
-          suggestedResolution: 'Authorize before writing.', location: { file: 'src/auth.ts', line: 42 },
+          id: 'finding-1', roundId: 'round-1', priority: 'p1',
+          title: 'Authorize before writing', body: 'The public mutation writes before checking ownership.',
+          location: { file: 'src/auth.ts', line: 42 },
           decision: { state: 'selected', decidedAt: '2026-09-19T10:00:30.000Z' }, discussion: [], remediation: { state: 'notStarted' },
           createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
         }],
@@ -278,7 +278,7 @@ describe('Unified backend → mounted application', () => {
       scope: { type: 'uncommitted' },
       threadMode: 'unbiased',
     });
-    expect(wrapper.get('.review-finding').text()).toContain('Ownership is skipped');
+    expect(wrapper.get('.review-finding').text()).toContain('Authorize before writing');
     expect(wrapper.get('.review-finding__toggle').text()).not.toContain('src/auth.ts');
     await wrapper.get('.review-finding__toggle').trigger('click');
     expect(wrapper.get('.review-finding').text()).toContain('src/auth.ts:42');

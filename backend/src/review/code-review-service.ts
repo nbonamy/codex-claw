@@ -275,7 +275,7 @@ export class CodeReviewService {
         }
         const completedFinding = this.findFindingInSession(session, finding.id);
         if (completedFinding?.remediation.state !== 'fixed') {
-          throw new Error(`Reviewer did not mark “${finding.summary}” fixed.`);
+          throw new Error(`Reviewer did not mark “${finding.title}” fixed.`);
         }
       }
       const completedAt = this.timestamp();
@@ -308,27 +308,19 @@ export class CodeReviewService {
     input: CodeReviewFindingInput,
   ): Promise<CodeReviewFinding> {
     const now = this.timestamp();
-    const ledger = codeReviewLedger(session);
-    const excluded = ledger.exclusions.find((finding) => finding.fingerprint === input.fingerprint);
-    if (excluded && !input.materiallyNewEvidence) {
-      throw new Error(`Finding ${excluded.findingId} was rejected and requires materially new evidence to be raised again.`);
-    }
     const prior = input.priorFindingId
       ? this.findFindingInSession(session, input.priorFindingId)
       : undefined;
     const finding: CodeReviewFinding = {
       id: prior?.id ?? randomUUID(),
       roundId: round.id,
-      fingerprint: input.fingerprint,
       priority: input.priority,
-      summary: input.summary,
-      rationale: input.rationale,
-      suggestedResolution: input.suggestedResolution,
+      title: input.title,
+      body: input.body,
       ...(input.location ? { location: { ...input.location } } : {}),
       decision: { state: 'selected', decidedAt: now },
       discussion: prior?.discussion.map((message) => ({ ...message })) ?? [],
       remediation: { state: 'notStarted' },
-      ...(input.materiallyNewEvidence ? { materiallyNewEvidence: input.materiallyNewEvidence } : {}),
       createdAt: prior?.createdAt ?? now,
       updatedAt: now,
     };
@@ -344,11 +336,9 @@ export class CodeReviewService {
     const finding = this.findFindingInSession(session, input.findingId);
     if (!finding) throw new Error('Code review finding was not found.');
     if (input.priority) finding.priority = input.priority;
-    if (input.summary) finding.summary = input.summary;
-    if (input.rationale) finding.rationale = input.rationale;
-    if (input.suggestedResolution) finding.suggestedResolution = input.suggestedResolution;
+    if (input.title) finding.title = input.title;
+    if (input.body) finding.body = input.body;
     if (input.location) finding.location = { ...input.location };
-    if (input.materiallyNewEvidence) finding.materiallyNewEvidence = input.materiallyNewEvidence;
     finding.updatedAt = this.timestamp();
     session.updatedAt = finding.updatedAt;
     await this.options.changed();
@@ -440,14 +430,14 @@ function reviewPrompt(session: CodeReviewSession): string {
     ? `the current branch against ${session.scope.baseRef}, including uncommitted changes`
     : 'only the current uncommitted changes (staged, unstaged, and untracked)';
   return `<context>
-This structured review ledger is cumulative across every previous round in this review session. The exclusions array contains all findings the user skipped, not only findings from the immediately preceding round. Do not raise an excluded finding again unless materially new evidence changes the conclusion; when it does, include that evidence. Regression checks must be verified against the latest code. Prior discussion records decisions that changed expected behavior.
+This structured review ledger is cumulative across every previous round in this review session. The exclusions array contains all findings the user skipped, not only findings from the immediately preceding round. Do not raise an excluded finding again unless materially new evidence changes the conclusion. Regression checks must be verified against the latest code. Prior discussion records decisions that changed expected behavior.
 
 ${JSON.stringify(ledger, null, 2)}
 </context>
 
 Review ${scope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
 
-Findings are the only review artifact. For every actionable defect, call report_finding with concrete evidence. Use update_finding to correct or enrich a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.`;
+Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.`;
 }
 
 function discussionPrompt(
@@ -474,10 +464,9 @@ Finding:
 ${JSON.stringify({
     id: finding.id,
     priority: finding.priority,
-    summary: finding.summary,
-    rationale: finding.rationale,
+    title: finding.title,
+    body: finding.body,
     location: finding.location,
-    suggestedResolution: finding.suggestedResolution,
     discussion: finding.discussion,
   }, null, 2)}`;
 }

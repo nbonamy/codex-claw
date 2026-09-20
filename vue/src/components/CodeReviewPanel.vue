@@ -129,7 +129,7 @@
           :data-state="findingState(finding)"
           :data-decision="finding.decision.state"
         >
-          <div class="review-finding__summary-row">
+          <div class="review-finding__title-row">
             <button
               class="review-finding__toggle"
               type="button"
@@ -140,8 +140,8 @@
               <span class="review-finding__priority">{{
                 finding.priority.toUpperCase()
               }}</span>
-              <span class="review-finding__summary">
-                <strong>{{ finding.summary }}</strong>
+              <span class="review-finding__title">
+                <strong>{{ finding.title }}</strong>
               </span>
               <span v-if="findingStateLabel(finding)" class="review-finding__state">{{ findingStateLabel(finding) }}</span>
               <IconChevronDown
@@ -189,11 +189,7 @@
             >
               {{ locationLabel(finding) }}
             </button>
-            <p class="review-finding__rationale">{{ finding.rationale }}</p>
-            <p class="review-finding__resolution">
-              <strong>{{ $t('surface.codeReviewPanel.suggestedResolution') }}:</strong>
-              {{ finding.suggestedResolution }}
-            </p>
+            <div class="review-finding__description" v-html="renderMarkdown(finding.body)" />
 
             <blockquote
               v-if="finding.decision.state === 'rejected' && finding.decision.reason"
@@ -332,6 +328,7 @@ import {
   type CodeReviewThreadMode,
 } from "@codex-claw/core/code-review";
 import type { Agent, AgentGitStatus, AppSnapshot } from "@codex-claw/core/contracts";
+import { renderMarkdown } from "@codex-app-sdk/vue";
 
 const props = defineProps<{
   agent: Agent;
@@ -544,7 +541,7 @@ function findingStateLabel(finding: CodeReviewFinding): string {
 
 function clarificationPrompt(finding: CodeReviewFinding): string {
   const location = finding.location ? `\nLocation: ${locationLabel(finding)}` : "";
-  return `Finding ${finding.id}: ${finding.summary}${location}\n\n${finding.rationale}\nSuggested fix: ${finding.suggestedResolution}\n\nQuestion: `;
+  return `Finding ${finding.id}: ${finding.title}${location}\n\n${finding.body}\n\nQuestion: `;
 }
 
 function isFindingExpanded(findingId: string): boolean {
@@ -849,7 +846,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   border-color: var(--color-success);
 }
 
-.review-finding__summary-row {
+.review-finding__title-row {
   display: flex;
   align-items: stretch;
   min-width: 0;
@@ -875,12 +872,12 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   background: var(--color-surface-low);
 }
 
-.review-finding__summary {
+.review-finding__title {
   flex: 1;
   min-width: 0;
 }
 
-.review-finding__summary strong {
+.review-finding__title strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -904,7 +901,7 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   color: var(--color-text-muted);
 }
 
-.review-finding[data-decision="rejected"] .review-finding__summary {
+.review-finding[data-decision="rejected"] .review-finding__title {
   color: var(--color-text-muted);
 }
 
@@ -977,19 +974,11 @@ function priorityRank(priority: CodeReviewFinding["priority"]): number {
   letter-spacing: 0.04em;
 }
 
-.review-finding__body p,
+.review-finding__description :deep(p),
 .review-finding__discussion p {
   margin: 0;
   font-size: var(--font-size-13);
   line-height: var(--line-height-20);
-}
-
-.review-finding__resolution {
-  color: var(--color-text-muted);
-}
-
-.review-finding__resolution strong {
-  color: var(--color-text);
 }
 
 .review-finding__decision {

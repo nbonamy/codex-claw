@@ -3,9 +3,9 @@ import type { CodeReviewFinding } from '@codex-claw/core/code-review';
 import { ReviewToolRegistry } from '../review-tool-registry';
 
 const finding = (): CodeReviewFinding => ({
-  id: 'finding-1', roundId: 'round-1', fingerprint: 'src/auth.ts:ownership', priority: 'p1',
-  summary: 'Ownership is not checked', rationale: 'The handler writes before authorizing.',
-  suggestedResolution: 'Authorize before the write.', decision: { state: 'undecided' },
+  id: 'finding-1', roundId: 'round-1', priority: 'p1',
+  title: 'Authorize before the write', body: 'The handler writes before checking ownership.',
+  decision: { state: 'undecided' },
   discussion: [], remediation: { state: 'notStarted' },
   createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
 });
@@ -25,8 +25,8 @@ describe('ReviewToolRegistry', () => {
     const context = registry.create('agent-1', handlers);
 
     await context.reportFinding({
-      fingerprint: 'src/auth.ts:ownership', priority: 'p1', summary: 'Ownership is not checked',
-      rationale: 'The handler writes before authorizing.', suggestedResolution: 'Authorize before the write.',
+      priority: 'p1', title: 'Authorize before the write',
+      body: 'The handler writes before checking ownership.',
     });
     await context.updateFinding({ findingId: 'finding-1', priority: 'p0' });
     await context.markFindingComplete({ findingId: 'finding-1', evidence: 'Focused test passes.' });
@@ -39,7 +39,7 @@ describe('ReviewToolRegistry', () => {
     registry.close(context.id);
     expect(registry.resolve('agent-1', context.id)).toBeNull();
     expect(() => context.reportFinding({
-      fingerprint: 'later', priority: 'p3', summary: 'Later', rationale: 'Later', suggestedResolution: 'Later',
+      priority: 'p3', title: 'Handle this later', body: 'This can be handled later.',
     })).toThrow('no longer available');
   });
 });

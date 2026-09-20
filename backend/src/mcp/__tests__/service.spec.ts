@@ -104,12 +104,23 @@ describe('ClawMcpService', () => {
       jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
         name: 'report_finding',
         arguments: {
-          fingerprint: 'src/auth.ts:ownership', priority: 'p1', summary: 'Ownership is skipped',
-          rationale: 'The mutation writes before authorizing.', suggestedResolution: 'Authorize first.',
+          priority: 'p1', title: 'Authorize before writing',
+          body: 'The mutation writes before checking ownership.',
         },
       },
     });
     expect(called.result.isError).toBe(false);
+    expect(reportFinding).toHaveBeenCalledOnce();
+
+    const verbose = await postJson(review.url, {
+      jsonrpc: '2.0', id: 4, method: 'tools/call', params: {
+        name: 'report_finding',
+        arguments: {
+          priority: 'p2', title: 'x'.repeat(81), body: 'This title is too long.',
+        },
+      },
+    });
+    expect(verbose.result.isError).toBe(true);
     expect(reportFinding).toHaveBeenCalledOnce();
 
     service.closeReviewToolContext(review.id);

@@ -117,11 +117,9 @@ describe('AppStatePersistence', () => {
         findings: [{
           id: 'finding-1',
           roundId: 'round-1',
-          fingerprint: 'src/auth.ts:ownership',
           priority: 'p1',
-          summary: 'Ownership is skipped',
-          rationale: 'The public path writes before authorizing.',
-          suggestedResolution: 'Authorize before writing.',
+          title: 'Authorize before writing',
+          body: 'The public path writes before checking ownership.',
           decision: { state: 'rejected', decidedAt: '2026-09-19T10:10:00.000Z', reason: 'Admin-only by contract.' },
           discussion: [{ id: 'message-1', author: 'user', body: 'This route is admin-only.', createdAt: '2026-09-19T10:09:00.000Z' }],
           remediation: { state: 'skipped', startedAt: '2026-09-19T10:10:00.000Z' },

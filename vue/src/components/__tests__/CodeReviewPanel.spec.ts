@@ -10,11 +10,9 @@ function finding(overrides: Partial<CodeReviewFinding> = {}): CodeReviewFinding 
   return {
     id: 'finding-1',
     roundId: 'round-1',
-    fingerprint: 'src/auth.ts:ownership',
     priority: 'p1',
-    summary: 'Ownership is skipped',
-    rationale: 'The public mutation writes before checking ownership.',
-    suggestedResolution: 'Authorize before writing.',
+    title: 'Authorize before writing',
+    body: 'The public mutation writes before checking `ownership`. Authorize before writing.',
     location: { file: 'src/auth.ts', line: 42 },
     decision: { state: 'selected', decidedAt: '2026-09-19T10:00:00.000Z' },
     discussion: [],
@@ -106,13 +104,13 @@ describe('CodeReviewPanel', () => {
   });
 
   it('shows a compact priority-ordered triage list and expands only one finding body from its header', async () => {
-    const low = finding({ id: 'finding-low', priority: 'p3', summary: 'Low priority issue', location: undefined });
-    const critical = finding({ id: 'finding-critical', priority: 'p0', summary: 'Critical issue', location: { file: 'src/auth.ts', line: 42, endLine: 47 } });
+    const low = finding({ id: 'finding-low', priority: 'p3', title: 'Address the low priority issue', location: undefined });
+    const critical = finding({ id: 'finding-critical', priority: 'p0', title: 'Address the critical issue', location: { file: 'src/auth.ts', line: 42, endLine: 47 } });
     const { wrapper } = mountPanel(session([low, critical]));
 
     expect(wrapper.findAll('.review-finding').map((node) => node.text())).toEqual([
-      expect.stringContaining('Critical issue'),
-      expect.stringContaining('Low priority issue'),
+      expect.stringContaining('Address the critical issue'),
+      expect.stringContaining('Address the low priority issue'),
     ]);
     expect(wrapper.find('.review-finding__body').exists()).toBe(false);
     expect(wrapper.findAll('.review-finding__quick-action')).toHaveLength(2);
@@ -129,6 +127,7 @@ describe('CodeReviewPanel', () => {
     await criticalCard.get('.review-finding__toggle').trigger('click');
     expect(criticalCard.text()).toContain('The public mutation writes before checking ownership.');
     expect(criticalCard.text()).toContain('Authorize before writing.');
+    expect(criticalCard.get('code').text()).toBe('ownership');
     expect(criticalCard.get('.review-finding__location').text()).toBe('src/auth.ts:42–47');
 
     const lowCard = wrapper.findAll('.review-finding')[1]!;
@@ -142,10 +141,10 @@ describe('CodeReviewPanel', () => {
     const low = finding({
       id: 'finding-low',
       priority: 'p3',
-      summary: 'Low priority issue',
+      title: 'Address the low priority issue',
       decision: { state: 'rejected', decidedAt: 'now' },
     });
-    const critical = finding({ id: 'finding-critical', priority: 'p0', summary: 'Critical issue' });
+    const critical = finding({ id: 'finding-critical', priority: 'p0', title: 'Address the critical issue' });
     const { wrapper, actions } = mountPanel(session([low, critical]));
 
     expect(wrapper.find('.review-finding__state').exists()).toBe(false);
@@ -173,9 +172,9 @@ describe('CodeReviewPanel', () => {
 
     await wrapper.get('.review-finding__quick-action').trigger('click');
     const textarea = wrapper.get('textarea');
-    expect(textarea.element.value).toContain('Finding finding-1: Ownership is skipped');
+    expect(textarea.element.value).toContain('Finding finding-1: Authorize before writing');
     expect(textarea.element.value).toContain('Location: src/auth.ts:42');
-    expect(textarea.element.value).toContain('The public mutation writes before checking ownership.');
+    expect(textarea.element.value).toContain('The public mutation writes before checking `ownership`.');
     await textarea.setValue(`${textarea.element.value}Does this change the expected behavior?`);
     await wrapper.get('form').trigger('submit');
 

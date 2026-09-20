@@ -44,16 +44,13 @@ export type CodeReviewFinding = {
   /** Stable across rounds when a finding is raised again. */
   id: string;
   roundId: string;
-  fingerprint: string;
   priority: CodeReviewPriority;
-  summary: string;
-  rationale: string;
-  suggestedResolution: string;
+  title: string;
+  body: string;
   location?: CodeReviewLocation;
   decision: CodeReviewDecision;
   discussion: CodeReviewDiscussionMessage[];
   remediation: CodeReviewRemediation;
-  materiallyNewEvidence?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -85,39 +82,35 @@ export type CodeReviewSession = {
 
 export type CodeReviewFindingInput = Pick<
   CodeReviewFinding,
-  'fingerprint' | 'priority' | 'summary' | 'rationale' | 'suggestedResolution'
+  'priority' | 'title' | 'body'
 > & {
   location?: CodeReviewLocation;
   priorFindingId?: string;
-  materiallyNewEvidence?: string;
 };
 
 export type CodeReviewFindingUpdateInput = {
   findingId: string;
   priority?: CodeReviewPriority;
-  summary?: string;
-  rationale?: string;
-  suggestedResolution?: string;
+  title?: string;
+  body?: string;
   location?: CodeReviewLocation;
-  materiallyNewEvidence?: string;
 };
 
 export type CodeReviewLedger = {
   exclusions: Array<{
     findingId: string;
-    fingerprint: string;
-    summary: string;
+    title: string;
+    body: string;
     reason: string;
   }>;
   regressionChecks: Array<{
     findingId: string;
-    fingerprint: string;
-    summary: string;
-    suggestedResolution: string;
+    title: string;
+    body: string;
   }>;
   behaviorDecisions: Array<{
     findingId: string;
-    summary: string;
+    title: string;
     discussion: CodeReviewDiscussionMessage[];
   }>;
 };
@@ -160,24 +153,23 @@ export function codeReviewLedger(session: CodeReviewSession): CodeReviewLedger {
     exclusions: findings.flatMap((finding) => finding.decision.state === 'rejected'
       ? [{
           findingId: finding.id,
-          fingerprint: finding.fingerprint,
-          summary: finding.summary,
+          title: finding.title,
+          body: finding.body,
           reason: finding.decision.reason ?? 'Not selected for remediation.',
         }]
       : []),
     regressionChecks: findings.flatMap((finding) => finding.remediation.state === 'fixed'
       ? [{
           findingId: finding.id,
-          fingerprint: finding.fingerprint,
-          summary: finding.summary,
-          suggestedResolution: finding.suggestedResolution,
+          title: finding.title,
+          body: finding.body,
         }]
       : []),
     behaviorDecisions: findings
       .filter((finding) => finding.discussion.length > 0)
       .map((finding) => ({
         findingId: finding.id,
-        summary: finding.summary,
+        title: finding.title,
         discussion: finding.discussion.map((message) => ({ ...message })),
       })),
   };
@@ -255,11 +247,9 @@ function isCodeReviewFinding(value: unknown): value is CodeReviewFinding {
   return isRecord(value)
     && typeof value.id === 'string'
     && typeof value.roundId === 'string'
-    && typeof value.fingerprint === 'string'
     && isPriority(value.priority)
-    && typeof value.summary === 'string'
-    && typeof value.rationale === 'string'
-    && typeof value.suggestedResolution === 'string'
+    && typeof value.title === 'string'
+    && typeof value.body === 'string'
     && isDecision(value.decision)
     && Array.isArray(value.discussion)
     && value.discussion.every(isDiscussionMessage)

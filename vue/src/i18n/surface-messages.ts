@@ -231,7 +231,6 @@ export const surfaceMessages = {
     "clarify": "Clarify",
     "includeFinding": "Include finding in remediation",
     "whyItMatters": "Why it matters",
-    "suggestedResolution": "Suggested fix",
     "location": "Location",
     "findingDiscussion": "Finding discussion",
     "you": "You",

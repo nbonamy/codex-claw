@@ -102,15 +102,15 @@ describe('CodeReviewService', () => {
     const test = harness([
       async (tools) => {
         firstSkippedId = (await tools.reportFinding({
-          fingerprint: 'round-1:cache', priority: 'p2', summary: 'Round one cache concern',
-          rationale: 'The cache could be stale.', suggestedResolution: 'Invalidate the cache.',
+          priority: 'p2', title: 'Invalidate the round one cache',
+          body: 'The cache could be stale.',
         })).id;
         return { text: '' };
       },
       async (tools) => {
         secondSkippedId = (await tools.reportFinding({
-          fingerprint: 'round-2:logging', priority: 'p3', summary: 'Round two logging concern',
-          rationale: 'The log could be noisy.', suggestedResolution: 'Reduce the log level.',
+          priority: 'p3', title: 'Reduce round two logging',
+          body: 'The log could be noisy.',
         })).id;
         return { text: '' };
       },
@@ -144,8 +144,8 @@ describe('CodeReviewService', () => {
     const contextEnd = thirdRoundPrompt.indexOf('</context>');
     expect(thirdRoundPrompt.startsWith('<context>')).toBe(true);
     expect(contextEnd).toBeGreaterThan(0);
-    expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Round one cache concern');
-    expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Round two logging concern');
+    expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Invalidate the round one cache');
+    expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Reduce round two logging');
     expect(thirdRoundPrompt.slice(contextEnd)).toContain('Review only the current uncommitted changes');
   });
 
@@ -155,13 +155,13 @@ describe('CodeReviewService', () => {
     const test = harness([
       async (tools) => {
         selectedId = (await tools.reportFinding({
-          fingerprint: 'src/auth.ts:ownership', priority: 'p1', summary: 'Ownership is skipped',
-          rationale: 'The public mutation writes before checking ownership.',
-          suggestedResolution: 'Authorize before writing.', location: { file: 'src/auth.ts', line: 42 },
+          priority: 'p1', title: 'Authorize before writing',
+          body: 'The public mutation writes before checking ownership.',
+          location: { file: 'src/auth.ts', line: 42 },
         })).id;
         rejectedId = (await tools.reportFinding({
-          fingerprint: 'src/cache.ts:ttl', priority: 'p3', summary: 'Cache lifetime looks long',
-          rationale: 'The value may be stale.', suggestedResolution: 'Reduce the TTL.',
+          priority: 'p3', title: 'Reduce the cache lifetime',
+          body: 'The value may be stale.',
         })).id;
         await tools.updateFinding({ findingId: selectedId, priority: 'p0' });
         return { text: '' };
@@ -183,7 +183,7 @@ describe('CodeReviewService', () => {
 
     test.service.discuss(test.owner, {
       sessionId: session.id, roundId: firstRound.id, findingId: selectedId,
-      question: 'Finding: Ownership is skipped\n\nQuestion: Is this reachable outside admin routes?',
+      question: 'Finding: Authorize before writing\n\nQuestion: Is this reachable outside admin routes?',
     });
     await vi.waitFor(() => expect(firstRound.findings[0]?.discussion).toHaveLength(2));
 
@@ -227,10 +227,9 @@ describe('CodeReviewService', () => {
     const firstFixCanFinish = new Promise<void>((resolve) => { releaseFirst = resolve; });
     const test = harness([
       async (tools) => {
-        for (const summary of ['First', 'Second']) {
+        for (const title of ['First', 'Second']) {
           ids.push((await tools.reportFinding({
-            fingerprint: summary, priority: 'p2', summary,
-            rationale: `${summary} rationale`, suggestedResolution: `${summary} fix`,
+            priority: 'p2', title, body: `${title} finding body.`,
           })).id);
         }
         return { text: '' };
@@ -263,8 +262,8 @@ describe('CodeReviewService', () => {
     let findingId = '';
     const original = harness([async (tools) => {
       findingId = (await tools.reportFinding({
-        fingerprint: 'restore', priority: 'p1', summary: 'Restore this fix',
-        rationale: 'The process stopped mid-fix.', suggestedResolution: 'Resume the same review thread.',
+        priority: 'p1', title: 'Restore this fix',
+        body: 'The process stopped mid-fix; resume the same review thread.',
       })).id;
       return { text: '' };
     }]);
