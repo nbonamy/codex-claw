@@ -103,7 +103,6 @@
       :show-repository-work-agent="selectAgentFromShell"
       :start-code-review="startCodeReview"
       :decide-code-review-finding="decideCodeReviewFinding"
-      :discuss-code-review-finding="discussCodeReviewFinding"
       :submit-code-review-round="submitCodeReviewRound"
       :finish-code-review="finishCodeReview"
       :review-code-again="reviewCodeAgain"
@@ -119,6 +118,7 @@
       @open-link="openConversationLink"
       @refresh-git-diff="openAgentGitDiffPreview(agent.id, $event)"
       @refresh-backlog="loadRepositoryBacklog(agent.id)"
+      @clarify-finding="emit('clarifyCodeReviewFinding', { agentId: agent.id, ...$event })"
       @select-tab="selectRightWorkspaceTab(agent.id, $event)"
       @send-prompt="forwardPrompt"
     />
@@ -264,7 +264,6 @@ const props = defineProps<{
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
   decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
-  discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
@@ -280,6 +279,12 @@ const emit = defineEmits<{
   'expand-sidebar': [];
   'install-update': [];
   'remove-work-item-assignment': [item: WorkItem];
+  clarifyCodeReviewFinding: [payload: {
+    agentId: string;
+    sessionId: string;
+    roundId: string;
+    finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+  }];
   sendPrompt: [prompt: string];
   'update:planMode': [enabled: boolean];
 }>();
@@ -321,7 +326,6 @@ const {
   startRepositoryWork,
   startCodeReview,
   decideCodeReviewFinding,
-  discussCodeReviewFinding,
   submitCodeReviewRound,
   finishCodeReview,
   discardCodeReview,

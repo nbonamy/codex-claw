@@ -263,13 +263,14 @@ export class CodexSurfaceAgentAdapter {
     if (input.reviewerSession && input.reviewerSession.kind !== 'codex') {
       throw new Error('Codex cannot continue a non-Codex review conversation.');
     }
-    const created = !input.reviewerSession;
-    const conversationId = input.reviewerSession?.threadId ?? await this.createReviewConversation(agent, input);
-    const conversation = this.surface.conversation(conversationId);
-    const usesAgentConversation = input.reviewerSession?.threadId === codexThreadId(agent);
-    if (!created) {
-      await conversation.load({ extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
-    }
+    const requestedAgent = input.reviewerSession
+      ? { ...agent, backendSession: input.reviewerSession }
+      : agent;
+    const session = await this.ensureSession(requestedAgent);
+    session.agent = agent;
+    const conversationId = session.handle.id;
+    const conversation = session.handle;
+    await conversation.load({ extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
     let targetTurnId: string | null = null;
     const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
     let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
@@ -296,17 +297,9 @@ export class CodexSurfaceAgentAdapter {
         text: sessionHandoffText(snapshot.messages, targetTurnId),
         reviewerSession: { kind: 'codex', threadId: conversationId },
       };
-    } catch (error) {
-      if (created) {
-        await this.surface.archiveConversation(conversationId).catch(() => undefined);
-        this.surface.forgetConversation(conversationId);
-      }
-      throw error;
     } finally {
       unsubscribe();
-      if (usesAgentConversation) {
-        await conversation.load({ ...agentCwd(agent), extensionContext: agent });
-      }
+      await conversation.load({ ...agentCwd(agent), extensionContext: agent });
     }
   }
 
@@ -314,16 +307,6 @@ export class CodexSurfaceAgentAdapter {
     if (reviewerSession.kind !== 'codex') throw new Error('Codex cannot dispose a non-Codex review conversation.');
     await this.surface.archiveConversation(reviewerSession.threadId);
     this.surface.forgetConversation(reviewerSession.threadId);
-  }
-
-  private async createReviewConversation(agent: Agent, input: BackendCodeReviewInput): Promise<string> {
-    const snapshot = await this.surface.createConversation({
-      cwd: expandHome(input.cwd),
-      threadSource: 'user',
-    }, { extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
-    const conversationId = snapshot.activeConversationId;
-    if (!conversationId) throw new Error('Codex did not create a fresh review conversation.');
-    return conversationId;
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}) {

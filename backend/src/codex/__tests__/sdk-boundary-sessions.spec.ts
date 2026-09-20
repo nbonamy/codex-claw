@@ -24,9 +24,10 @@ describe('Codex SDK → Claw session policy', () => {
 
   it('reconciles only unowned top-level sessions and restores attached archived sessions', async () => {
     const { driver, surface } = setup();
-    const reviewAgent = sdkAgent('review-owner', 'review-owner-thread');
+    const reviewAgent = sdkAgent('review-owner', 'review-thread');
     reviewAgent.codeReview = {
-      id: 'review', agentId: reviewAgent.id, scope: { type: 'uncommitted' }, threadMode: 'unbiased',
+      id: 'review', targetAgentId: 'agent-a', reviewerAgentId: reviewAgent.id,
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
       status: 'ready', activeRoundId: 'round', createdAt: metadata.occurredAt, updatedAt: metadata.occurredAt,
       rounds: [{
         id: 'round', number: 1, status: 'ready', findings: [], startedAt: metadata.occurredAt,

@@ -100,9 +100,10 @@ describe('AppStatePersistence', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].codeReview = {
       id: 'review-1',
-      agentId: snapshot.agents[0].id,
+      targetAgentId: snapshot.agents[0].id,
+      reviewerAgentId: snapshot.agents[0].id,
       scope: { type: 'uncommitted' },
-      threadMode: 'unbiased',
+      threadMode: 'current',
       status: 'readyToFinish',
       activeRoundId: 'round-1',
       createdAt: '2026-09-19T10:00:00.000Z',

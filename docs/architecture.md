@@ -785,22 +785,26 @@ writes are coalesced so bursts of backend metadata events write only the latest
 durable projection.
 
 An in-progress code review is app-owned state, not provider transcript state.
-The owning agent carries one active review ledger containing rounds, structured
+The visible reviewer agent carries one active review ledger containing rounds, structured
 findings, user decisions, linked discussion, remediation progress, the selected
-Git scope, and the initial reviewer-thread strategy. The Git scope is either
+Git scope, the target agent, and the reviewer agent. The Git scope is either
 uncommitted work or the current branch against its resolved base. The first
-round may use the agent's current provider conversation, or create a fresh
-provider conversation for an unbiased reviewer; fresh is the default. Before
+round may use the target agent's current provider conversation, or create a
+normal visible agent with an independent provider conversation; independent is
+the default. The independent reviewer appears in the repository sidebar and its
+ordinary provider transcript, approvals, status, and composer remain available
+while the Review pane presents the structured findings. Before
 submission, new findings are selected by default and may be deselected; this
 choice is not workflow status. Submission starts remediation: deselected
 findings become `skipped`; selected findings become `pending`; the round's reviewer
 conversation fixes exactly one `fixing` finding at a time and marks it `fixed`.
 Clarification and remediation continue the same provider-owned reviewer session;
 current-thread reviews keep that user-owned conversation intact for every round
-and after completion. Unbiased reviews dispose their review-owned conversation
-between rounds, start a fresh one to reduce anchoring, and dispose the last one
-when the review finishes, while retaining only the structured ledger between
-rounds. Every new round receives that cumulative ledger inside a `<context>`
+and after completion. Independent reviews reset the visible reviewer's
+conversation between rounds to reduce anchoring while keeping the reviewer agent
+and structured ledger. Finishing or discarding removes that review-owned agent;
+the target agent and its conversation remain intact. Every new round receives
+the cumulative ledger inside a `<context>`
 block. Its exclusions therefore include every finding skipped by the user
 across the review, not only exclusions from the immediately preceding round.
 `clawd` persists the ledger and opaque reviewer session reference in `state.json`

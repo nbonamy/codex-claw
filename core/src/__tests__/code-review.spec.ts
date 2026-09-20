@@ -10,9 +10,10 @@ import {
 function session(): CodeReviewSession {
   return {
     id: 'review-1',
-    agentId: 'agent-1',
+    targetAgentId: 'agent-1',
+    reviewerAgentId: 'agent-reviewer',
     scope: { type: 'uncommitted' },
-    threadMode: 'unbiased',
+    threadMode: 'independent',
     status: 'ready',
     activeRoundId: 'round-2',
     createdAt: '2026-09-19T10:00:00.000Z',
@@ -76,7 +77,7 @@ function session(): CodeReviewSession {
 
 describe('code review ledger', () => {
   it('accepts only complete review setup choices', () => {
-    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'unbiased' })).toBe(true);
+    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: 'origin/main' }, threadMode: 'current' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: '' }, threadMode: 'current' })).toBe(false);
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'anchored' })).toBe(false);

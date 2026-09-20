@@ -16,7 +16,7 @@ describe('ClawBackendServer code review workflow', () => {
       backend: 'codex', status: { type: 'idle' },
       createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
       codeReview: {
-        id: 'review-1', agentId: 'agent-owner', scope: { type: 'uncommitted' },
+        id: 'review-1', targetAgentId: 'agent-owner', reviewerAgentId: 'agent-owner', scope: { type: 'uncommitted' },
         threadMode: 'current', status: 'failed', activeRoundId: 'round-1',
         rounds: [{ id: 'round-1', number: 1, status: 'failed', findings: [], startedAt: 'now' }],
         createdAt: 'now', updatedAt: 'now',
@@ -24,6 +24,11 @@ describe('ClawBackendServer code review workflow', () => {
     };
     snapshot.agents.push(owner);
     snapshot.teams[0]!.agentIds.push(owner.id);
+    snapshot.agentGitStatuses[owner.id] = {
+      folder: '/repo', branch: 'feat/review', ahead: 1, behind: 0,
+      changedFiles: 2, addedLines: 12, removedLines: 3, hasUntracked: false,
+      state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
+    };
     const server = new ClawBackendServer({
       version: 'test', snapshot,
       driverRpc: new BackendDriverRpc(new Map()),
@@ -78,12 +83,14 @@ describe('ClawBackendServer code review workflow', () => {
       };
     });
     const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
+    const releaseConversation = vi.fn();
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
       getCapabilities: () => codexBackendCapabilities,
       runCodeReview,
       disposeCodeReview,
+      releaseConversation,
       sendPrompt: vi.fn(),
       interrupt: vi.fn(),
       respondToAgentRequest: vi.fn(),
@@ -105,48 +112,60 @@ describe('ClawBackendServer code review workflow', () => {
       },
     });
 
-    await request(server, backendMethods.agentCodeReviewStart, {
+    const started = await request(server, backendMethods.agentCodeReviewStart, {
       agentId: owner.id,
-      input: { scope: { type: 'uncommitted' }, threadMode: 'unbiased' },
+      input: { scope: { type: 'uncommitted' }, threadMode: 'independent' },
     });
-    await vi.waitFor(() => expect(owner.codeReview?.status).toBe('ready'));
-    const session = owner.codeReview!;
+    const reviewer = snapshot.agents.find((candidate) => candidate.id !== owner.id)!;
+    await vi.waitFor(() => expect(reviewer.codeReview?.status).toBe('ready'));
+    const session = reviewer.codeReview!;
+    expect(started.activeAgentId).toBe(reviewer.id);
+    expect(session).toMatchObject({ targetAgentId: owner.id, reviewerAgentId: reviewer.id, threadMode: 'independent' });
+    expect(reviewer).toMatchObject({
+      folder: owner.folder,
+      backend: owner.backend,
+      teamId: owner.teamId,
+    });
+    expect(snapshot.agentGitStatuses[reviewer.id]).toStrictEqual(snapshot.agentGitStatuses[owner.id]);
     const round = session.rounds[0]!;
-    expect(runCodeReview).toHaveBeenNthCalledWith(1, owner, expect.objectContaining({
+    expect(runCodeReview).toHaveBeenNthCalledWith(1, reviewer, expect.objectContaining({
       reviewMcpServerUrl: expect.stringContaining('reviewContextId=1'),
     }));
 
     await request(server, backendMethods.agentCodeReviewFindingDecide, {
-      agentId: owner.id,
+      agentId: reviewer.id,
       input: { sessionId: session.id, roundId: round.id, findingId, decision: 'select' },
     });
-    await request(server, backendMethods.agentCodeReviewRoundSubmit, { agentId: owner.id, sessionId: session.id });
+    await request(server, backendMethods.agentCodeReviewRoundSubmit, { agentId: reviewer.id, sessionId: session.id });
     await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
 
-    expect(runCodeReview).toHaveBeenNthCalledWith(2, owner, expect.objectContaining({
+    expect(runCodeReview).toHaveBeenNthCalledWith(2, reviewer, expect.objectContaining({
       reviewerSession: { kind: 'codex', threadId: 'review-thread-1' },
     }));
     expect(round.findings[0]!.remediation.state).toBe('fixed');
 
-    await request(server, backendMethods.agentCodeReviewAgain, { agentId: owner.id, sessionId: session.id });
+    await request(server, backendMethods.agentCodeReviewAgain, { agentId: reviewer.id, sessionId: session.id });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     expect(session.rounds).toHaveLength(2);
-    expect(disposeCodeReview).toHaveBeenCalledExactlyOnceWith(owner, {
-      kind: 'codex', threadId: 'review-thread-1',
-    });
+    expect(disposeCodeReview).toHaveBeenCalledExactlyOnceWith(
+      reviewer,
+      { kind: 'codex', threadId: 'review-thread-1' },
+    );
+    expect(releaseConversation).toHaveBeenCalledExactlyOnceWith(reviewer.id);
     expect(runCodeReview.mock.calls[2]?.[1]).not.toHaveProperty('reviewerSession');
-    await request(server, backendMethods.agentCodeReviewRoundSubmit, { agentId: owner.id, sessionId: session.id });
-    await request(server, backendMethods.agentCodeReviewFinish, { agentId: owner.id, sessionId: session.id });
-    expect(owner.codeReview).toBeUndefined();
-    expect(disposeCodeReview).toHaveBeenLastCalledWith(owner, {
-      kind: 'codex', threadId: 'review-thread-3',
-    });
+    await request(server, backendMethods.agentCodeReviewRoundSubmit, { agentId: reviewer.id, sessionId: session.id });
+    const finished = await request(server, backendMethods.agentCodeReviewFinish, { agentId: reviewer.id, sessionId: session.id });
+    expect(snapshot.agents).toStrictEqual([owner]);
+    expect(snapshot.agentGitStatuses[reviewer.id]).toBeUndefined();
+    expect(disposeCodeReview).toHaveBeenCalledTimes(2);
+    expect(finished.activeAgentId).toBe(owner.id);
 
     await server.close();
   });
 });
 
-async function request(server: ClawBackendServer, method: string, params: unknown): Promise<void> {
+async function request(server: ClawBackendServer, method: string, params: unknown): Promise<import('@codex-claw/core/contracts').AppSnapshot> {
   const response = await server.handleMessage({ jsonrpc: '2.0', id: method, method, params });
   expect(response).toHaveProperty('result');
+  return (response as { result: import('@codex-claw/core/contracts').AppSnapshot }).result;
 }

@@ -30,7 +30,7 @@ function session(findings: CodeReviewFinding[], status: CodeReviewSession['statu
         : status === 'readyToFinish' || status === 'finished' ? 'completed'
           : 'ready';
   return {
-    id: 'review-1', agentId: 'owner', scope: { type: 'uncommitted' }, threadMode: 'unbiased', status, activeRoundId: 'round-1',
+    id: 'review-1', targetAgentId: 'owner', reviewerAgentId: 'reviewer', scope: { type: 'uncommitted' }, threadMode: 'independent', status, activeRoundId: 'round-1',
     createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:05:00.000Z',
     rounds: [{
       id: 'round-1', number: 1, status: roundStatus,
@@ -40,18 +40,23 @@ function session(findings: CodeReviewFinding[], status: CodeReviewSession['statu
   };
 }
 
-function mountPanel(review?: CodeReviewSession, gitStatus?: AgentGitStatus) {
+function mountPanel(
+  review?: CodeReviewSession,
+  gitStatus?: AgentGitStatus,
+  currentThreadAvailable = true,
+) {
   const actions = {
     startReview: vi.fn().mockResolvedValue({} as AppSnapshot),
     decideFinding: vi.fn().mockResolvedValue({} as AppSnapshot),
-    discussFinding: vi.fn().mockResolvedValue({} as AppSnapshot),
     submitReviewRound: vi.fn().mockResolvedValue({} as AppSnapshot),
     finishReview: vi.fn().mockResolvedValue({} as AppSnapshot),
     reviewAgain: vi.fn().mockResolvedValue({} as AppSnapshot),
   };
   const owner: Agent = {
     id: 'owner', name: 'Owner', folder: '/repo', backend: 'codex', status: { type: 'idle' },
-    backendSession: { kind: 'codex', threadId: 'current-thread' },
+    ...(currentThreadAvailable
+      ? { backendSession: { kind: 'codex' as const, threadId: 'current-thread' } }
+      : {}),
     createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
     ...(review ? { codeReview: review } : {}),
   };
@@ -68,11 +73,17 @@ describe('CodeReviewPanel', () => {
   it('starts an independent review from an artifact-first empty state', async () => {
     const { wrapper, actions } = mountPanel();
 
-    expect(wrapper.text()).toContain('Findings—not a transcript');
-    await wrapper.get('button').trigger('click');
+    expect(wrapper.text()).toContain('Start a review');
+    expect(wrapper.text()).not.toContain('Choose a scope and reviewer.');
+    expect(wrapper.findAll('fieldset')).toHaveLength(2);
+    expect(wrapper.findAll('.code-review-panel__choices')).toHaveLength(2);
+    expect(wrapper.findAll('.code-review-panel__choice-icon')).toHaveLength(4);
+    const independent = wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Independent reviewer'))!;
+    expect(independent.attributes('aria-checked')).toBe('true');
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
     expect(actions.startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'uncommitted' },
-      threadMode: 'unbiased',
+      threadMode: 'independent',
     });
   });
 
@@ -95,10 +106,10 @@ describe('CodeReviewPanel', () => {
     };
     const { wrapper, actions } = mountPanel(undefined, gitStatus);
 
-    expect(wrapper.text()).toContain('Review feature/review-setup against origin/main');
-    expect((wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Uncommitted changes'))!.get('input').element as HTMLInputElement).checked).toBe(true);
-    await wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Current branch'))!.get('input').setValue(true);
-    await wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Use current thread'))!.get('input').setValue(true);
+    expect(wrapper.text()).toContain('Against origin/main');
+    expect(wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Uncommitted changes'))!.attributes('aria-checked')).toBe('true');
+    await wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current branch'))!.trigger('click');
+    await wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current thread'))!.trigger('click');
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
 
     expect(actions.startReview).toHaveBeenCalledWith('owner', {
@@ -126,15 +137,41 @@ describe('CodeReviewPanel', () => {
     };
     const { wrapper, actions } = mountPanel(undefined, gitStatus);
 
-    expect(wrapper.text()).not.toContain('Uncommitted changes');
-    const branch = wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Current branch'))!;
-    expect((branch.get('input').element as HTMLInputElement).checked).toBe(true);
+    const uncommitted = wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Uncommitted changes'))!;
+    expect(uncommitted.attributes('disabled')).toBeDefined();
+    expect(uncommitted.text()).toContain('No uncommitted changes');
+    const branch = wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current branch'))!;
+    expect(branch.attributes('aria-checked')).toBe('true');
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
 
     expect(actions.startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'branch', baseRef: 'origin/main' },
-      threadMode: 'unbiased',
+      threadMode: 'independent',
     });
+  });
+
+  it('keeps unavailable branch and current-thread choices visible but disabled', () => {
+    const gitStatus: AgentGitStatus = {
+      folder: '/repo', repository: 'claw', branch: 'feature/review-setup',
+      ahead: 0, behind: 0, changedFiles: 1, addedLines: 3, removedLines: 0,
+      hasUntracked: false, state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
+      diffCatalog: {
+        defaultTarget: { type: 'uncommitted' },
+        branch: { baseRef: 'origin/main', addedLines: 0, removedLines: 0, changedFiles: 0 },
+        uncommitted: { addedLines: 3, removedLines: 0, changedFiles: 1 },
+        unstaged: { addedLines: 3, removedLines: 0, changedFiles: 1 },
+        staged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        commits: [],
+      },
+    };
+    const { wrapper } = mountPanel(undefined, gitStatus, false);
+
+    const branch = wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current branch'))!;
+    const current = wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current thread'))!;
+    expect(branch.attributes('disabled')).toBeDefined();
+    expect(branch.text()).toContain('No branch changes');
+    expect(current.attributes('disabled')).toBeDefined();
+    expect(current.text()).toContain('Start a conversation first');
   });
 
   it('shows nothing to review when the working tree and branch are clean', () => {
@@ -243,22 +280,26 @@ describe('CodeReviewPanel', () => {
     }));
   });
 
-  it('prefills clarification with finding context and sends the user addition through the finding link', async () => {
-    const selected = finding({ decision: { state: 'selected', decidedAt: 'now' } });
-    const { wrapper, actions } = mountPanel(session([selected]));
+  it('hands clarification to the owning conversation without rendering a local composer or history', async () => {
+    const selected = finding({
+      decision: { state: 'selected', decidedAt: 'now' },
+      discussion: [{
+        id: 'discussion-1',
+        author: 'reviewer',
+        body: 'This belongs in the conversation.',
+        createdAt: 'now',
+      }],
+    });
+    const { wrapper } = mountPanel(session([selected]));
 
     await wrapper.get('.review-finding__quick-action').trigger('click');
-    const textarea = wrapper.get('textarea');
-    expect(textarea.element.value).toContain('Finding finding-1: Authorize before writing');
-    expect(textarea.element.value).toContain('Location: src/auth.ts:42');
-    expect(textarea.element.value).toContain('The public mutation writes before checking `ownership`.');
-    await textarea.setValue(`${textarea.element.value}Does this change the expected behavior?`);
-    await wrapper.get('form').trigger('submit');
-
-    expect(actions.discussFinding).toHaveBeenCalledWith('owner', expect.objectContaining({
-      findingId: 'finding-1',
-      question: expect.stringContaining('Question: Does this change the expected behavior?'),
-    }));
+    expect(wrapper.emitted('clarifyFinding')).toEqual([[
+      { sessionId: 'review-1', roundId: 'round-1', finding: selected },
+    ]]);
+    expect(wrapper.find('textarea').exists()).toBe(false);
+    expect(wrapper.find('form').exists()).toBe(false);
+    await wrapper.get('.review-finding__toggle').trigger('click');
+    expect(wrapper.text()).not.toContain('This belongs in the conversation.');
   });
 
   it('shows only remediation statuses after the round starts', async () => {
@@ -305,7 +346,7 @@ describe('CodeReviewPanel', () => {
     const { wrapper } = mountPanel();
     await wrapper.setProps({ startReview: vi.fn().mockRejectedValue(new Error('Reviewer unavailable.')) });
 
-    await wrapper.get('button').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
     await flushPromises();
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Reviewer unavailable.');
@@ -327,7 +368,7 @@ describe('CodeReviewPanel', () => {
 
     expect(startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'uncommitted' },
-      threadMode: 'unbiased',
+      threadMode: 'independent',
     });
     expect(wrapper.findAll('[role="alert"]').map((alert) => alert.text())).toEqual([
       'Reviewer stopped unexpectedly.',

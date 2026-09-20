@@ -199,7 +199,8 @@ export function useAppState() {
   async function startCodeReview(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
     const next = await codexClawApi.startCodeReview(agentId, input);
-    adoptBackgroundSnapshot(next);
+    if (input.threadMode === 'independent') adoptNavigationSnapshot(next);
+    else adoptBackgroundSnapshot(next);
     return next;
   }
 

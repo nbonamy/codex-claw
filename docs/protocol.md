@@ -118,13 +118,13 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/request/respond` | `{ response: AgentRequestResponse }` | `AppSnapshot` | Answers a pending normalized approval/question/confirmation using a typed outcome. Include `agentId`; an untargeted response is accepted only when its request ID is unambiguous. |
 | `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
 | `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt; `ready_for_review` clears readiness so the requesting client can enter review. |
-| `agent/codeReview/start` | `{ agentId, input: { scope, threadMode } }` | `AppSnapshot` | Starts a review for either uncommitted work or the current branch against an explicit base. `threadMode` is `unbiased` (fresh provider conversation) or `current` (the agent's attached conversation), and the choices are stored with the active durable ledger. |
+| `agent/codeReview/start` | `{ agentId, input: { scope, threadMode } }` | `AppSnapshot` | Starts a review for either uncommitted work or the current branch against an explicit base. `threadMode` is `independent` (a normal visible reviewer agent, selected on creation) or `current` (the target agent's attached conversation). The reviewer owns the active durable ledger, which identifies both target and reviewer agents. |
 | `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Includes or excludes a stable finding from remediation. Findings start selected; decisions are not remediation statuses. |
-| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the same reviewer conversation for its response. |
+| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the visible reviewer conversation for its response while retaining the exchange in the structured ledger. |
 | `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Maps deselected findings to `skipped` and selected findings to `pending`, then fixes pending findings one at a time in the same reviewer conversation. |
-| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Reuses the same provider conversation for `current` reviews. For `unbiased` reviews, disposes the review-owned conversation and starts a fresh one for the stored scope. Both carry cumulative deselected exclusions, fixed regression checks, and behavior decisions from every prior round inside the reviewer prompt's `<context>` block. |
-| `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. It leaves a user-owned current conversation intact and disposes an unbiased review-owned conversation. |
-| `agent/codeReview/discard` | `{ agentId, sessionId }` | `AppSnapshot` | Closes the product workflow from any state and removes its review ledger. Temporary reviewer cleanup is best-effort; a user-owned current conversation is never disposed. |
+| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Reuses the same provider conversation for `current` reviews. For `independent` reviews, resets the visible reviewer agent's provider conversation while keeping its sidebar identity and ledger. Both carry cumulative deselected exclusions, fixed regression checks, and behavior decisions from every prior round inside the reviewer prompt's `<context>` block. |
+| `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. It leaves a current-thread agent intact; an independent review removes its visible review-owned agent and returns selection to the target. |
+| `agent/codeReview/discard` | `{ agentId, sessionId }` | `AppSnapshot` | Closes the product workflow from any state and removes its review ledger. An independent review removes its visible review-owned agent; a user-owned current conversation is never disposed. |
 
 ## Client To `clawd`: System
 
@@ -321,7 +321,6 @@ implementation messages, not the preferred app protocol for clients.
 | `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/codeReview/run` | `{ agent, prompt, cwd, reviewMcpServerUrl, reviewerSession? }` | `BackendCodeReviewResult` | Creates a fresh provider conversation when `reviewerSession` is absent; otherwise continues that opaque provider session. |
-| `driver/codeReview/dispose` | `{ agent, reviewerSession }` | `null` | Disposes a review-owned provider conversation. The review service calls this only for the unbiased strategy, never for the user's current conversation. |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
 | `driver/conversation/replaceWithSummary` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |

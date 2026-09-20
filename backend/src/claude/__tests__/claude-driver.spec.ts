@@ -541,6 +541,8 @@ describe('ClaudeBackendDriver', () => {
   it('runs review in a fresh context with only review-domain MCP tools added', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
+    const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const review = driver.runCodeReview(agent, {
       cwd: '/Users/nbonamy/src/codex-claw',
@@ -556,7 +558,7 @@ describe('ClaudeBackendDriver', () => {
         'mcp__codex_claw__update_finding',
         'mcp__codex_claw__mark_finding_complete',
       ],
-    }), expect.any(Function));
+    }), expect.any(Function), expect.any(Function), expect.any(Function));
     expect(transport.startTurn.mock.calls[0]?.[0].sessionId).toBeUndefined();
     transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'The finding is reachable.' }] } });
     transport.resolveDone();
@@ -565,6 +567,12 @@ describe('ClaudeBackendDriver', () => {
       text: 'The finding is reachable.',
       reviewerSession: { kind: 'claude', sessionId: 'review-session-1', transport: 'stdio' },
     });
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'turn.started' }),
+      expect.objectContaining({ type: 'message.userSubmitted' }),
+      expect.objectContaining({ type: 'message.delta' }),
+      expect.objectContaining({ type: 'turn.completed' }),
+    ]));
 
     const clarification = driver.runCodeReview(agent, {
       cwd: '/Users/nbonamy/src/codex-claw',
@@ -579,8 +587,7 @@ describe('ClaudeBackendDriver', () => {
     transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'Clarified.' }] } });
     await expect(clarification).resolves.toMatchObject({ text: 'Clarified.', reviewerSession: result.reviewerSession });
 
-    await driver.disposeCodeReview(agent, result.reviewerSession);
-    expect(transport.deleteSession).toHaveBeenCalledWith('review-session-1', '/Users/nbonamy/src/codex-claw');
+    expect(transport.deleteSession).not.toHaveBeenCalled();
   });
 
   it('maps Agent SDK permission requests through the app-owned approval contract', async () => {

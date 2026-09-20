@@ -14,14 +14,15 @@ function agent(id: string): Agent {
 
 type ReviewScript = (handlers: ReviewToolHandlers) => Promise<{ text: string }>;
 
-function harness(scripts: ReviewScript[], dispose = async (_session: BackendSession): Promise<void> => undefined) {
+function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent): Promise<void> => undefined) {
   const snapshot: AppSnapshot = createEmptySnapshot();
   const owner = agent('owner');
   snapshot.agents = [owner];
   let context = 0;
   let activeHandlers: ReviewToolHandlers | null = null;
   const turns: Array<{ prompt: string; reviewerSession?: BackendSession }> = [];
-  const disposed: BackendSession[] = [];
+  const reset: string[] = [];
+  const deleted: string[] = [];
   const changed = vi.fn();
   const tools: CodeReviewToolPort = {
     createReviewToolContext: (agentId, handlers) => {
@@ -41,45 +42,117 @@ function harness(scripts: ReviewScript[], dispose = async (_session: BackendSess
       const result = script && activeHandlers ? await script(activeHandlers) : { text: '' };
       return { ...result, reviewerSession: reviewerSession ?? { kind: 'codex', threadId: `review-thread-${turns.length}` } };
     },
-    disposeReview: async (_agent, reviewerSession) => {
-      disposed.push(reviewerSession);
-      await dispose(reviewerSession);
+    resetReviewer: async (reviewer) => {
+      reset.push(reviewer.id);
+      delete reviewer.backendSession;
+    },
+    deleteReviewer: async (reviewer) => {
+      deleted.push(reviewer.id);
+      await deleteReviewer(reviewer);
+      snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== reviewer.id);
     },
     changed,
   });
-  return { owner, service, turns, disposed, changed };
+  return { owner, snapshot, service, turns, reset, deleted, changed };
+}
+
+function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: string }): Agent {
+  const found = test.snapshot.agents.find((candidate) => candidate.id === session.reviewerAgentId);
+  if (!found) throw new Error('Reviewer agent missing from test snapshot.');
+  return found;
 }
 
 describe('CodeReviewService', () => {
-  it('discards review state and its temporary reviewer thread', async () => {
-    const test = harness([async () => ({ text: '' })], async () => {
-      throw new Error('Reviewer thread could not be deleted.');
-    });
+  it('creates an independent reviewer as a normal adjacent agent for the same workspace', async () => {
+    const test = harness([async () => ({ text: '' })]);
+    const neighbor = agent('neighbor');
+    test.owner.avatar = 'owl';
+    test.owner.openInApplication = 'vscode';
+    test.owner.workspace = {
+      kind: 'git', folder: '/repo', repositoryName: 'claw', repositoryRoot: '/repo',
+      branch: 'feat/review', isLinkedWorktree: false, primaryWorktreeRoot: '/repo',
+      updatedAt: '2026-09-19T10:00:00.000Z',
+    };
+    test.snapshot.agents.push(neighbor);
+    test.snapshot.agentGitStatuses[test.owner.id] = {
+      folder: '/repo', branch: 'feat/review', ahead: 1, behind: 0,
+      changedFiles: 2, addedLines: 12, removedLines: 3, hasUntracked: false,
+      state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
+    };
+
     const session = test.service.start(test.owner, {
-      scope: { type: 'uncommitted' }, threadMode: 'unbiased',
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
-    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
 
-    await test.service.discard(test.owner, session.id);
-
-    expect(test.owner.codeReview).toBeUndefined();
-    expect(test.disposed).toStrictEqual([{ kind: 'codex', threadId: 'review-thread-1' }]);
+    expect(test.snapshot.agents.map((candidate) => candidate.id)).toEqual([
+      test.owner.id, visibleReviewer.id, neighbor.id,
+    ]);
+    expect(visibleReviewer).toMatchObject({
+      name: 'Review', avatar: 'owl', folder: '/repo', workspace: test.owner.workspace,
+      backend: test.owner.backend, openInApplication: 'vscode', status: { type: 'idle' },
+    });
+    expect(visibleReviewer.backendSession).toBeUndefined();
+    expect(test.snapshot.agentGitStatuses[visibleReviewer.id]).toStrictEqual(
+      test.snapshot.agentGitStatuses[test.owner.id],
+    );
+    expect(test.snapshot.agentGitStatuses[visibleReviewer.id]).not.toBe(
+      test.snapshot.agentGitStatuses[test.owner.id],
+    );
   });
 
-  it('retains an unbiased review ledger when its owned thread cannot be deleted', async () => {
-    const test = harness([async () => ({ text: '' })], async () => {
-      throw new Error('Reviewer thread could not be deleted.');
-    });
+  it('discards an independent review by deleting its visible reviewer agent', async () => {
+    const test = harness([async () => ({ text: '' })]);
     const session = test.service.start(test.owner, {
-      scope: { type: 'uncommitted' }, threadMode: 'unbiased',
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
-    test.service.submit(test.owner, session.id);
+    const visibleReviewer = reviewer(test, session);
 
-    await expect(test.service.finish(test.owner, session.id)).rejects.toThrow('could not be deleted');
+    await test.service.discard(visibleReviewer, session.id);
 
-    expect(test.owner.codeReview).toBe(session);
+    expect(test.snapshot.agents).toStrictEqual([test.owner]);
+    expect(test.deleted).toStrictEqual([visibleReviewer.id]);
+  });
+
+  it('retains an independent review ledger when its visible reviewer cannot be deleted', async () => {
+    const test = harness([async () => ({ text: '' })], async () => {
+      throw new Error('Reviewer agent could not be deleted.');
+    });
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
+    test.service.submit(visibleReviewer, session.id);
+
+    await expect(test.service.finish(visibleReviewer, session.id)).rejects.toThrow('could not be deleted');
+
+    expect(visibleReviewer.codeReview).toBe(session);
     expect(session.status).toBe('readyToFinish');
+  });
+
+  it('retries a failed independent review against the original target in the same visible reviewer', async () => {
+    const test = harness([
+      async () => { throw new Error('Reviewer stopped.'); },
+      async () => ({ text: '' }),
+    ]);
+    const failed = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(failed.status).toBe('failed'));
+    const visibleReviewer = reviewer(test, failed);
+
+    const retried = test.service.start(visibleReviewer, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(retried.status).toBe('ready'));
+
+    expect(retried.targetAgentId).toBe(test.owner.id);
+    expect(retried.reviewerAgentId).toBe(visibleReviewer.id);
+    expect(test.snapshot.agents).toHaveLength(2);
+    expect(test.reset).toStrictEqual([visibleReviewer.id]);
+    expect(test.turns[1]?.reviewerSession).toBeUndefined();
   });
 
   it('keeps every round in the current thread and never disposes that user-owned conversation', async () => {
@@ -109,7 +182,8 @@ describe('CodeReviewService', () => {
     expect(session.rounds[1]?.reviewerSession).toStrictEqual({ kind: 'codex', threadId: 'current-thread' });
     test.service.submit(test.owner, session.id);
     await test.service.finish(test.owner, session.id);
-    expect(test.disposed).toStrictEqual([]);
+    expect(test.reset).toStrictEqual([]);
+    expect(test.deleted).toStrictEqual([]);
   });
 
   it('carries skipped findings from every prior round inside the reviewer context', async () => {
@@ -134,26 +208,27 @@ describe('CodeReviewService', () => {
     ]);
 
     const session = test.service.start(test.owner, {
-      scope: { type: 'uncommitted' }, threadMode: 'unbiased',
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
     let round = activeCodeReviewRound(session);
-    test.service.decide(test.owner, {
+    test.service.decide(visibleReviewer, {
       sessionId: session.id, roundId: round.id, findingId: firstSkippedId,
       decision: 'reject', reason: 'The event stream already invalidates this cache.',
     });
-    test.service.submit(test.owner, session.id);
+    test.service.submit(visibleReviewer, session.id);
 
-    await test.service.reviewAgain(test.owner, session.id);
+    await test.service.reviewAgain(visibleReviewer, session.id);
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     round = activeCodeReviewRound(session);
-    test.service.decide(test.owner, {
+    test.service.decide(visibleReviewer, {
       sessionId: session.id, roundId: round.id, findingId: secondSkippedId,
       decision: 'reject', reason: 'This verbosity is intentional during migration.',
     });
-    test.service.submit(test.owner, session.id);
+    test.service.submit(visibleReviewer, session.id);
 
-    await test.service.reviewAgain(test.owner, session.id);
+    await test.service.reviewAgain(visibleReviewer, session.id);
     await vi.waitFor(() => expect(session.status).toBe('ready'));
 
     const thirdRoundPrompt = test.turns[2]!.prompt;
@@ -190,24 +265,28 @@ describe('CodeReviewService', () => {
       async () => ({ text: '' }),
     ]);
 
-    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'unbiased' });
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
     const firstRound = activeCodeReviewRound(session);
     expect(firstRound.findings[0]?.priority).toBe('p0');
     expect(firstRound.findings.map((finding) => finding.decision.state)).toEqual(['selected', 'selected']);
     expect(firstRound.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
 
-    test.service.discuss(test.owner, {
+    test.service.discuss(visibleReviewer, {
       sessionId: session.id, roundId: firstRound.id, findingId: selectedId,
       question: 'Finding: Authorize before writing\n\nQuestion: Is this reachable outside admin routes?',
     });
     await vi.waitFor(() => expect(firstRound.findings[0]?.discussion).toHaveLength(2));
+    expect(test.turns[1]?.prompt).toBe(
+      'Finding: Authorize before writing\n\nQuestion: Is this reachable outside admin routes?',
+    );
 
-    test.service.decide(test.owner, {
+    test.service.decide(visibleReviewer, {
       sessionId: session.id, roundId: firstRound.id, findingId: rejectedId,
       decision: 'reject',
     });
-    test.service.submit(test.owner, session.id);
+    test.service.submit(visibleReviewer, session.id);
     await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
 
     expect(firstRound.findings.find((finding) => finding.id === selectedId)?.remediation).toMatchObject({
@@ -219,22 +298,19 @@ describe('CodeReviewService', () => {
       { kind: 'codex', threadId: 'review-thread-1' },
     ]);
 
-    const secondRound = await test.service.reviewAgain(test.owner, session.id);
+    const secondRound = await test.service.reviewAgain(visibleReviewer, session.id);
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     expect(secondRound.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-4' });
     expect(test.turns[3]?.reviewerSession).toBeUndefined();
     expect(test.turns[3]?.prompt).toContain('Not selected for remediation.');
     expect(test.turns[3]?.prompt).toContain(selectedId);
-    expect(test.disposed).toStrictEqual([{ kind: 'codex', threadId: 'review-thread-1' }]);
+    expect(test.reset).toStrictEqual([visibleReviewer.id]);
 
-    test.service.submit(test.owner, session.id);
+    test.service.submit(visibleReviewer, session.id);
     expect(session.status).toBe('readyToFinish');
-    await test.service.finish(test.owner, session.id);
-    expect(test.disposed).toStrictEqual([
-      { kind: 'codex', threadId: 'review-thread-1' },
-      { kind: 'codex', threadId: 'review-thread-4' },
-    ]);
-    expect(test.owner.codeReview).toBeUndefined();
+    await test.service.finish(visibleReviewer, session.id);
+    expect(test.deleted).toStrictEqual([visibleReviewer.id]);
+    expect(test.snapshot.agents).toStrictEqual([test.owner]);
   });
 
   it('moves selected findings through pending, fixing, and fixed one at a time', async () => {
@@ -260,13 +336,14 @@ describe('CodeReviewService', () => {
         return { text: '' };
       },
     ]);
-    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'unbiased' });
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
     const round = activeCodeReviewRound(session);
     expect(round.findings.map((finding) => finding.decision.state)).toEqual(['selected', 'selected']);
     round.findings[0]!.decision = { state: 'undecided' };
 
-    test.service.submit(test.owner, session.id);
+    test.service.submit(visibleReviewer, session.id);
     expect(round.findings[0]!.decision.state).toBe('selected');
     await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixing', 'pending']));
     releaseFirst?.();
@@ -283,7 +360,7 @@ describe('CodeReviewService', () => {
       })).id;
       return { text: '' };
     }]);
-    const session = original.service.start(original.owner, { scope: { type: 'uncommitted' }, threadMode: 'unbiased' });
+    const session = original.service.start(original.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     const round = activeCodeReviewRound(session);
     round.status = 'submitted';
@@ -295,11 +372,15 @@ describe('CodeReviewService', () => {
       await tools.markFindingComplete({ findingId });
       return { text: '' };
     }]);
-    restored.owner.codeReview = structuredClone(session);
-    await restored.service.resumeInterrupted(restored.owner);
+    const restoredReviewer: Agent = {
+      ...structuredClone(reviewer(original, session)),
+      codeReview: structuredClone(session),
+    };
+    restored.snapshot.agents.push(restoredReviewer);
+    await restored.service.resumeInterrupted(restoredReviewer);
 
-    await vi.waitFor(() => expect(restored.owner.codeReview?.status).toBe('readyToFinish'));
-    expect(restored.owner.codeReview?.rounds[0]?.findings[0]?.remediation.state).toBe('fixed');
+    await vi.waitFor(() => expect(restoredReviewer.codeReview?.status).toBe('readyToFinish'));
+    expect(restoredReviewer.codeReview?.rounds[0]?.findings[0]?.remediation.state).toBe('fixed');
     expect(restored.turns[0]?.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
   });
 });

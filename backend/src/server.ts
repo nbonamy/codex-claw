@@ -268,16 +268,37 @@ export class ClawBackendServer {
             ...(reviewerSession ? { reviewerSession } : {}),
           }) as import('@codex-claw/core/backend-driver').BackendCodeReviewResult;
         },
-        disposeReview: async (agent, reviewerSession) => {
-          await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewDispose, {
-            agent,
-            reviewerSession,
-          });
+        resetReviewer: async (agent) => {
+          await this.disposeAndReleaseReviewConversation(agent);
+          restartAgentConversation(this.snapshot, agent.id);
+          this.agentRequests.clearAgent(agent.id);
+        },
+        deleteReviewer: async (agent) => {
+          await this.disposeAndReleaseReviewConversation(agent);
+          closeAgentInSnapshot(this.snapshot, agent.id);
+          delete this.snapshot.agentGitStatuses[agent.id];
+          this.agentRequests.clearAgent(agent.id);
         },
         changed: async () => { await this.persistAndEmitSnapshot(); },
       });
     }
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
+  }
+
+  private async disposeAndReleaseReviewConversation(agent: Agent): Promise<void> {
+    if (agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
+      await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }).catch(() => undefined);
+    }
+    if (agent.backendSession) {
+      await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewDispose, {
+        agent,
+        reviewerSession: agent.backendSession,
+      }).catch(() => undefined);
+    }
+    await this.driverRpc?.handle(backendMethods.driverConversationRelease, {
+      backend: agent.backend,
+      agentId: agent.id,
+    });
   }
 
   async initialize(): Promise<void> {
@@ -301,9 +322,18 @@ export class ClawBackendServer {
       try { return createClawRpcResult(message.id, await preferences.update(clientId, message.method, params ?? {})); }
       catch (error) { return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error)); }
     }
-    const createsAgent = [backendMethods.agentCreate, backendMethods.agentQuickChatCreate, backendMethods.agentDuplicate, backendMethods.agentFork].some((method) => method === message.method);
+    const startsIndependentReview = message.method === backendMethods.agentCodeReviewStart
+      && isRecord(params?.input)
+      && params.input.threadMode === 'independent';
+    const completesReview = message.method === backendMethods.agentCodeReviewFinish
+      || message.method === backendMethods.agentCodeReviewDiscard;
+    const createsAgent = startsIndependentReview
+      || [backendMethods.agentCreate, backendMethods.agentQuickChatCreate, backendMethods.agentDuplicate, backendMethods.agentFork].some((method) => method === message.method);
     const createsTeam = message.method === backendMethods.teamCreate || message.method === backendMethods.teamConnect;
-    const before = createsAgent || createsTeam ? await this.remoteTeams.clientSnapshot() : undefined;
+    const before = createsAgent || createsTeam || completesReview ? await this.remoteTeams.clientSnapshot() : undefined;
+    const reviewTargetAgentId = completesReview && before && typeof params?.agentId === 'string'
+      ? projectClientSnapshot(before, clientId).agents.find((agent) => agent.id === params.agentId)?.codeReview?.targetAgentId
+      : undefined;
     if (before && (message.method === backendMethods.agentCreate || message.method === backendMethods.agentQuickChatCreate)) {
       const input = isRecord(params?.input) ? params.input : {};
       const teamId = input.teamId ?? projectClientSnapshot(before, clientId).activeTeamId;
@@ -326,6 +356,9 @@ export class ClawBackendServer {
         if (created && shouldSelect) return { ...response, result: await preferences.update(clientId,
           createsAgent ? backendMethods.clientNavigationSelectAgent : backendMethods.clientNavigationSelectTeam,
           createsAgent ? { agentId: created.id } : { teamId: created.id }) };
+      }
+      if (isAppSnapshot(response.result) && reviewTargetAgentId && response.result.agents.some((agent) => agent.id === reviewTargetAgentId)) {
+        return { ...response, result: await preferences.update(clientId, backendMethods.clientNavigationSelectAgent, { agentId: reviewTargetAgentId }) };
       }
       if (isAppSnapshot(response.result)) return { ...response, result: projectClientSnapshot(response.result, clientId) };
       if (isClawSnapshotGetResult(response.result)) return { ...response, result: { ...response.result, snapshot: projectClientSnapshot(response.result.snapshot, clientId) } };
@@ -824,7 +857,8 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review start input.');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
-          this.requireCodeReviews().start(agent, input);
+          const session = this.requireCodeReviews().start(agent, input);
+          if (session.threadMode === 'independent') onCreated(session.reviewerAgentId);
           return this.persistAndEmitSnapshot();
         });
       }

@@ -701,6 +701,68 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
   });
 
+  it('prefills the real composer for a finding clarification and submits through its stable link', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'review-thread' };
+    const finding = {
+      id: 'finding-1', roundId: 'round-1', priority: 'p1' as const,
+      title: 'Authorize before writing',
+      body: 'The public mutation writes before checking ownership.',
+      location: { file: 'src/auth.ts', line: 42, endLine: 44 },
+      decision: { state: 'selected' as const, decidedAt: '2026-09-19T10:00:30.000Z' },
+      discussion: [], remediation: { state: 'notStarted' as const },
+      createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
+    };
+    agent.codeReview = {
+      id: 'review-1', targetAgentId: agent.id, reviewerAgentId: agent.id,
+      scope: { type: 'uncommitted' }, threadMode: 'current', status: 'ready', activeRoundId: 'round-1',
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:01:00.000Z',
+      rounds: [{
+        id: 'round-1', number: 1, status: 'ready', reviewerSession: agent.backendSession,
+        startedAt: '2026-09-19T10:00:00.000Z', completedAt: '2026-09-19T10:01:00.000Z', findings: [finding],
+      }],
+    };
+    const discussCodeReviewFinding = vi.fn().mockResolvedValue(snapshot);
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      discussCodeReviewFinding,
+      sendPromptAction,
+    });
+
+    wrapper.getComponent({ name: 'AgentWorkspace' }).vm.$emit('clarifyCodeReviewFinding', {
+      agentId: agent.id,
+      sessionId: 'review-1',
+      roundId: 'round-1',
+      finding,
+    });
+    await nextTick();
+
+    const composerUpdate = wrapper.emitted('update:composerState')?.at(-1)?.[0] as {
+      agentId: string;
+      state: { text: string; selectionStart: number; selectionEnd: number };
+    };
+    expect(composerUpdate.agentId).toBe(agent.id);
+    expect(composerUpdate.state.text).toContain('Review review-1 · Round round-1 · Finding finding-1');
+    expect(composerUpdate.state.text).toContain('Location: src/auth.ts:42–44');
+    expect(composerUpdate.state.text).toContain('Question: ');
+
+    const question = `${composerUpdate.state.text}Could this race with another request?`;
+    await wrapper.setProps({
+      composerState: { text: question, selectionStart: question.length, selectionEnd: question.length },
+    });
+    await nextTick();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(discussCodeReviewFinding).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', question,
+    });
+    expect(sendPromptAction).not.toHaveBeenCalled();
+  });
+
   it('keeps the first submitted prompt visible while its Codex conversation is created', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

@@ -124,10 +124,10 @@
       :git-status="gitStatus"
       :start-review="startCodeReview"
       :decide-finding="decideCodeReviewFinding"
-      :discuss-finding="discussCodeReviewFinding"
       :submit-review-round="submitCodeReviewRound"
       :finish-review="finishCodeReview"
       :review-again="reviewCodeAgain"
+      @clarify-finding="emit('clarifyFinding', $event)"
       @open-file="emit('previewFile', $event)"
     />
 
@@ -352,7 +352,6 @@ const props = withDefaults(defineProps<{
   startRepositoryWork?: (input: import('./right-workspace').RepositoryWorkStartInput) => Promise<void>;
   startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
   decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
-  discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
@@ -366,7 +365,6 @@ const props = withDefaults(defineProps<{
   workAssignments: () => ({}),
   startCodeReview: async () => { throw new Error('Code review is not available.'); },
   decideCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
-  discussCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
   submitCodeReviewRound: async () => { throw new Error('Code review is not available.'); },
   finishCodeReview: async () => { throw new Error('Code review is not available.'); },
   reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
@@ -382,6 +380,11 @@ const emit = defineEmits<{
   openLink: [link: CodexConversationLink];
   refreshGitDiff: [target?: import('@codex-claw/core/contracts').AgentGitDiffTarget];
   refreshBacklog: [];
+  clarifyFinding: [payload: {
+    sessionId: string;
+    roundId: string;
+    finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+  }];
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];
   previewFile: [path: string];

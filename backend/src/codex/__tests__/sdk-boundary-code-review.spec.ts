@@ -20,6 +20,7 @@ describe('Codex code review boundary', () => {
     });
 
     expect(current.handle.load.mock.calls).toStrictEqual([
+      [{ cwd: '/repo', extensionContext: agent }],
       [{ extensionContext: { agent, reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?reviewContextId=current' } }],
       [{ cwd: '/repo', extensionContext: agent }],
     ]);
@@ -29,7 +30,8 @@ describe('Codex code review boundary', () => {
   });
 
   it('creates a fresh reviewer conversation and keeps it available for later round turns', async () => {
-    const { driver, surface, conversation } = codexSdkFixture();
+    const { driver, surface, conversation, events } = codexSdkFixture();
+    const agent = { ...sdkAgent(), backendSession: undefined };
     const review = conversation('review-fresh');
     surface.createConversation.mockResolvedValue(sdkSnapshot('review-fresh'));
     review.setSnapshot({
@@ -45,17 +47,15 @@ describe('Codex code review boundary', () => {
       turns: [{ id: 'turn-review', status: 'completed' } as never],
     }));
 
-    const result = await driver.runCodeReview(sdkAgent(), {
+    const result = await driver.runCodeReview(agent, {
       cwd: '/repo',
       prompt: 'Review independently and report findings.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1',
     });
 
-    expect(surface.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, {
-      extensionContext: {
-        agent: sdkAgent(),
-        reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1',
-      },
+    expect(surface.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, { extensionContext: agent });
+    expect(review.handle.load).toHaveBeenNthCalledWith(1, {
+      extensionContext: { agent, reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1' },
     });
     expect(review.handle.sendMessage).toHaveBeenCalledWith('Review independently and report findings.');
     expect(review.handle.startReview).not.toHaveBeenCalled();
@@ -65,13 +65,18 @@ describe('Codex code review boundary', () => {
     });
     expect(surface.archiveConversation).not.toHaveBeenCalled();
     expect(surface.forgetConversation).not.toHaveBeenCalled();
+    expect(events).toContainEqual(expect.objectContaining({
+      agentId: agent.id,
+      type: 'agent.conversationAttached',
+      conversationId: 'review-fresh',
+    }));
 
     review.setSnapshot({ turnIds: ['turn-review'], messages: [] });
     review.handle.sendMessage.mockResolvedValue(sdkSnapshot('review-fresh', {
       turnIds: ['turn-review', 'turn-follow-up'],
       turns: [{ id: 'turn-follow-up', status: 'completed' } as never],
     }));
-    await driver.runCodeReview(sdkAgent(), {
+    await driver.runCodeReview({ ...agent, backendSession: result.reviewerSession }, {
       cwd: '/repo',
       prompt: 'Clarify the finding.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-2',
@@ -80,15 +85,14 @@ describe('Codex code review boundary', () => {
 
     expect(review.handle.load).toHaveBeenCalledWith({
       extensionContext: {
-        agent: sdkAgent(),
+        agent: { ...agent, backendSession: result.reviewerSession },
         reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-2',
       },
     });
     expect(review.handle.sendMessage).toHaveBeenCalledWith('Clarify the finding.');
 
-    await driver.disposeCodeReview(sdkAgent(), result.reviewerSession);
-    expect(surface.archiveConversation).toHaveBeenCalledExactlyOnceWith('review-fresh');
-    expect(surface.forgetConversation).toHaveBeenCalledExactlyOnceWith('review-fresh');
+    expect(surface.archiveConversation).not.toHaveBeenCalled();
+    expect(surface.forgetConversation).not.toHaveBeenCalled();
   });
 
   it('accepts a completed final answer when Codex labels the ordinary review turn interrupted', async () => {
@@ -108,7 +112,7 @@ describe('Codex code review boundary', () => {
       turns: [{ id: 'turn-review', status: 'interrupted' } as never],
     }));
 
-    await expect(driver.runCodeReview(sdkAgent(), {
+    await expect(driver.runCodeReview({ ...sdkAgent(), backendSession: undefined }, {
       cwd: '/repo',
       prompt: 'Review independently and report findings.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1',

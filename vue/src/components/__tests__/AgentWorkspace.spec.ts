@@ -120,8 +120,8 @@ describe('AgentWorkspace', () => {
   it('discards review state before closing its workspace tab', async () => {
     const { closeRightWorkspaceTab, currentAgent, discardCodeReview, wrapper } = mountWorkspace((snapshot) => {
       snapshot.agents[0]!.codeReview = {
-        id: 'review-1', agentId: snapshot.agents[0]!.id, scope: { type: 'uncommitted' },
-        threadMode: 'unbiased', status: 'failed', activeRoundId: 'round-1',
+        id: 'review-1', targetAgentId: snapshot.agents[0]!.id, reviewerAgentId: snapshot.agents[0]!.id,
+        scope: { type: 'uncommitted' }, threadMode: 'current', status: 'failed', activeRoundId: 'round-1',
         rounds: [{ id: 'round-1', number: 1, status: 'failed', findings: [], startedAt: 'now' }],
         createdAt: 'now', updatedAt: 'now',
       };

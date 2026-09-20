@@ -13,6 +13,7 @@ import {
 } from '@codex-claw/core/code-review';
 import type { BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
 import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
+import { duplicateAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import type { ReviewFindingCompletionInput, ReviewToolHandlers } from './review-tool-registry';
 
 export type CodeReviewToolPort = {
@@ -29,7 +30,8 @@ export type CodeReviewServiceOptions = {
     reviewMcpServerUrl: string,
     reviewerSession?: BackendSession,
   ): Promise<BackendCodeReviewResult>;
-  disposeReview(agent: Agent, reviewerSession: BackendSession): Promise<void>;
+  resetReviewer(agent: Agent): Promise<void>;
+  deleteReviewer(agent: Agent): Promise<void>;
   changed(): Promise<void> | void;
   now?: () => Date;
 };
@@ -51,21 +53,73 @@ export class CodeReviewService {
       throw new Error('A branch review requires a base reference.');
     }
     const current = agent.codeReview;
+    if (
+      current?.status === 'failed'
+      && current.threadMode === 'independent'
+      && current.reviewerAgentId === agent.id
+      && input.threadMode === 'independent'
+    ) {
+      const target = this.options.snapshot.agents.find((candidate) => candidate.id === current.targetAgentId);
+      if (!target) throw new Error('The review target is no longer available.');
+      return this.restartFailedIndependentReview(target, agent, input);
+    }
     if (current && current.status !== 'finished' && current.status !== 'failed') {
       throw new Error('This agent already has an active code review.');
     }
-    const session = this.newSession(agent, input);
+    const existing = this.options.snapshot.agents.find((candidate) => (
+      candidate.codeReview?.targetAgentId === agent.id
+      && candidate.codeReview.status !== 'finished'
+      && candidate.codeReview.status !== 'failed'
+    ));
+    if (existing) throw new Error('This agent already has an active code review.');
+
+    const reviewer = input.threadMode === 'current'
+      ? agent
+      : this.createIndependentReviewer(agent);
+    const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);
     if (input.threadMode === 'current') firstRound.reviewerSession = agent.backendSession;
-    agent.codeReview = session;
+    reviewer.codeReview = session;
     void this.options.changed();
     void this.executeRound(
-      agent,
+      reviewer,
       session,
       firstRound,
       firstRound.reviewerSession,
     );
     return session;
+  }
+
+  private restartFailedIndependentReview(
+    target: Agent,
+    reviewer: Agent,
+    input: CodeReviewStartInput,
+  ): CodeReviewSession {
+    const session = this.newSession(target, reviewer, input);
+    reviewer.codeReview = session;
+    void this.options.changed();
+    void this.resetAndExecuteRound(reviewer, session, activeCodeReviewRound(session));
+    return session;
+  }
+
+  private async resetAndExecuteRound(
+    reviewer: Agent,
+    session: CodeReviewSession,
+    round: CodeReviewRound,
+  ): Promise<void> {
+    try {
+      await this.options.resetReviewer(reviewer);
+    } catch (error) {
+      round.status = 'failed';
+      round.error = error instanceof Error ? error.message : String(error);
+      round.completedAt = this.timestamp();
+      session.status = 'failed';
+      session.updatedAt = round.completedAt;
+      await this.options.changed();
+      return;
+    }
+    if (reviewer.codeReview !== session) return;
+    await this.executeRound(reviewer, session, round, undefined);
   }
 
   decide(agent: Agent, input: CodeReviewDecisionInput): void {
@@ -127,9 +181,9 @@ export class CodeReviewService {
   async finish(agent: Agent, sessionId: string): Promise<void> {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('The review is not ready to finish.');
-    if (session.threadMode === 'unbiased') {
-      const reviewerSession = activeCodeReviewRound(session).reviewerSession;
-      if (reviewerSession) await this.options.disposeReview(agent, reviewerSession);
+    if (session.threadMode === 'independent') {
+      await this.options.deleteReviewer(agent);
+      return;
     }
     const finishedAt = this.timestamp();
     session.status = 'finished';
@@ -140,27 +194,20 @@ export class CodeReviewService {
 
   async discard(agent: Agent, sessionId: string): Promise<void> {
     const session = this.findSession(agent, sessionId);
-    const reviewerSession = session.threadMode === 'unbiased'
-      ? activeCodeReviewRound(session).reviewerSession
-      : undefined;
+    if (session.threadMode === 'independent') {
+      await this.options.deleteReviewer(agent);
+      return;
+    }
     delete agent.codeReview;
     await this.options.changed();
-    if (reviewerSession) {
-      try {
-        await this.options.disposeReview(agent, reviewerSession);
-      } catch {
-        // Closing the product workflow still wins when temporary-thread cleanup fails.
-      }
-    }
   }
 
   async reviewAgain(agent: Agent, sessionId: string): Promise<CodeReviewRound> {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('Complete the current remediation before reviewing again.');
     const previousRound = activeCodeReviewRound(session);
-    const reviewerSession = previousRound.reviewerSession;
-    if (session.threadMode === 'unbiased' && reviewerSession) {
-      await this.options.disposeReview(agent, reviewerSession);
+    if (session.threadMode === 'independent') {
+      await this.options.resetReviewer(agent);
       delete previousRound.reviewerSession;
     }
     const round = this.newRound(session.rounds.length + 1);
@@ -180,8 +227,8 @@ export class CodeReviewService {
     const round = activeCodeReviewRound(session);
     if (session.status === 'reviewing') {
       round.findings = [];
-      if (session.threadMode === 'unbiased' && round.reviewerSession) {
-        await this.options.disposeReview(agent, round.reviewerSession);
+      if (session.threadMode === 'independent' && round.reviewerSession) {
+        await this.options.resetReviewer(agent);
         delete round.reviewerSession;
       }
       delete round.completedAt;
@@ -215,9 +262,9 @@ export class CodeReviewService {
     try {
       const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
       if (agent.codeReview !== session) {
-        if (session.threadMode === 'unbiased') await this.options.disposeReview(agent, result.reviewerSession);
         return;
       }
+      agent.backendSession = result.reviewerSession;
       round.reviewerSession = result.reviewerSession;
       const completedAt = this.timestamp();
       round.status = 'ready';
@@ -250,10 +297,11 @@ export class CodeReviewService {
     try {
       const result = await this.options.runReview(
         agent,
-        discussionPrompt(session, round, finding, question),
+        question,
         context.url,
         requiredReviewerSession(round),
       );
+      agent.backendSession = result.reviewerSession;
       round.reviewerSession = result.reviewerSession;
       const body = result.text.trim();
       if (!body) throw new Error('Reviewer did not answer the finding discussion.');
@@ -292,6 +340,7 @@ export class CodeReviewService {
             requiredReviewerSession(round),
           );
           if (agent.codeReview !== session) return;
+          agent.backendSession = result.reviewerSession;
           round.reviewerSession = result.reviewerSession;
         } finally {
           this.options.tools.closeReviewToolContext(context.id);
@@ -391,12 +440,13 @@ export class CodeReviewService {
     return undefined;
   }
 
-  private newSession(agent: Agent, input: CodeReviewStartInput): CodeReviewSession {
+  private newSession(target: Agent, reviewer: Agent, input: CodeReviewStartInput): CodeReviewSession {
     const createdAt = this.timestamp();
     const round = this.newRound(1, createdAt);
     return {
       id: randomUUID(),
-      agentId: agent.id,
+      targetAgentId: target.id,
+      reviewerAgentId: reviewer.id,
       scope: input.scope.type === 'branch'
         ? { type: 'branch', baseRef: input.scope.baseRef.trim() }
         : { type: 'uncommitted' },
@@ -407,6 +457,21 @@ export class CodeReviewService {
       createdAt,
       updatedAt: createdAt,
     };
+  }
+
+  private createIndependentReviewer(target: Agent): Agent {
+    const createdAt = this.timestamp();
+    const reviewer = duplicateAgentInSnapshot(
+      this.options.snapshot,
+      target.id,
+      createdAt,
+      undefined,
+      { name: 'Review', select: false },
+    );
+    if (!reviewer) throw new Error('Independent reviewer could not be created.');
+    const gitStatus = this.options.snapshot.agentGitStatuses[target.id];
+    if (gitStatus) this.options.snapshot.agentGitStatuses[reviewer.id] = structuredClone(gitStatus);
+    return reviewer;
   }
 
   private newRound(number: number, startedAt = this.timestamp()): CodeReviewRound {
@@ -463,21 +528,6 @@ Review ${scope} independently. Do not report findings outside this scope. Use th
 Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, respond with exactly "Review complete." and end the turn. There is no tool for completing the review workflow.`;
 }
 
-function discussionPrompt(
-  session: CodeReviewSession,
-  round: CodeReviewRound,
-  finding: CodeReviewFinding,
-  question: string,
-): string {
-  return `Continue this review conversation by answering the user's clarification about one existing finding. Inspect the current code when useful. Do not create findings or change workflow state. Answer directly in your normal assistant response.
-
-Session: ${session.id}
-Round: ${round.id}
-Finding ID: ${finding.id}
-User prompt:
-${question}`;
-}
-
 function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, finding: CodeReviewFinding): string {
   return `Continue this same review conversation by fixing the one selected finding below. Keep the change focused and add or update behavior-level tests when appropriate. After the code and checks are complete, call mark_finding_complete for this finding. Do not start another finding; Claw will send it separately.
 
@@ -499,8 +549,8 @@ function requiredReviewerSession(round: CodeReviewRound): BackendSession {
   return round.reviewerSession;
 }
 
-function requiredText(value: string, message: string): string {
-  const text = value.trim();
+function requiredText(value: string | null | undefined, message: string): string {
+  const text = value?.trim();
   if (!text) throw new Error(message);
   return text;
 }

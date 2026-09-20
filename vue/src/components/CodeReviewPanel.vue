@@ -9,46 +9,88 @@
       <template v-else>
         <span class="code-review-panel__empty-icon"><IconChecklist aria-hidden="true" /></span>
         <h2>{{ $t('surface.codeReviewPanel.reviewThisBranch') }}</h2>
-        <p>{{ $t('surface.codeReviewPanel.startDescription') }}</p>
         <div class="code-review-panel__setup">
           <fieldset>
             <legend>{{ $t('surface.codeReviewPanel.scope') }}</legend>
-            <el-radio-group v-model="scope" class="code-review-panel__choices">
-              <el-radio v-if="hasUncommittedChanges" value="uncommitted">
-                <span>
-                  <strong>{{ $t('surface.codeReviewPanel.uncommittedChanges') }}</strong>
-                  <small>{{ $t('surface.codeReviewPanel.uncommittedDescription') }}</small>
+            <div class="code-review-panel__choices" role="radiogroup">
+              <button
+                class="code-review-panel__choice"
+                :class="{ 'is-selected': scope === 'uncommitted' }"
+                type="button"
+                role="radio"
+                :aria-checked="scope === 'uncommitted'"
+                :disabled="!hasUncommittedChanges"
+                @click="scope = 'uncommitted'"
+              >
+                <span class="code-review-panel__choice-content">
+                  <FileDiffIcon class="code-review-panel__choice-icon" aria-hidden="true" />
+                  <span class="code-review-panel__choice-copy">
+                    <strong>{{ $t('surface.codeReviewPanel.uncommittedChanges') }}</strong>
+                    <small>{{ uncommittedDescription }}</small>
+                  </span>
                 </span>
-              </el-radio>
-              <el-radio v-if="hasBranchChanges" value="branch">
-                <span>
-                  <strong>{{ $t('surface.codeReviewPanel.currentBranch') }}</strong>
-                  <small>{{ branchDescription }}</small>
+              </button>
+              <button
+                class="code-review-panel__choice"
+                :class="{ 'is-selected': scope === 'branch' }"
+                type="button"
+                role="radio"
+                :aria-checked="scope === 'branch'"
+                :disabled="!hasBranchChanges"
+                @click="scope = 'branch'"
+              >
+                <span class="code-review-panel__choice-content">
+                  <GitBranchIcon class="code-review-panel__choice-icon" aria-hidden="true" />
+                  <span class="code-review-panel__choice-copy">
+                    <strong>{{ $t('surface.codeReviewPanel.currentBranch') }}</strong>
+                    <small>{{ branchDescription }}</small>
+                  </span>
                 </span>
-              </el-radio>
-            </el-radio-group>
+              </button>
+            </div>
           </fieldset>
 
           <fieldset>
             <legend>{{ $t('surface.codeReviewPanel.reviewerThread') }}</legend>
-            <el-radio-group v-model="threadMode" class="code-review-panel__choices">
-              <el-radio value="unbiased">
-                <span>
-                  <strong>{{ $t('surface.codeReviewPanel.unbiasedReviewer') }}</strong>
-                  <small>{{ $t('surface.codeReviewPanel.unbiasedReviewerDescription') }}</small>
+            <div class="code-review-panel__choices" role="radiogroup">
+              <button
+                class="code-review-panel__choice"
+                :class="{ 'is-selected': threadMode === 'independent' }"
+                type="button"
+                role="radio"
+                :aria-checked="threadMode === 'independent'"
+                @click="threadMode = 'independent'"
+              >
+                <span class="code-review-panel__choice-content">
+                  <RobotFaceIcon class="code-review-panel__choice-icon" aria-hidden="true" />
+                  <span class="code-review-panel__choice-copy">
+                    <strong>{{ $t('surface.codeReviewPanel.independentReviewer') }}</strong>
+                    <small>{{ $t('surface.codeReviewPanel.independentReviewerDescription') }}</small>
+                  </span>
                 </span>
-              </el-radio>
-              <el-radio value="current" :disabled="!currentThreadAvailable">
-                <span>
-                  <strong>{{ $t('surface.codeReviewPanel.currentThread') }}</strong>
-                  <small>{{ currentThreadDescription }}</small>
+              </button>
+              <button
+                class="code-review-panel__choice"
+                :class="{ 'is-selected': threadMode === 'current' }"
+                type="button"
+                role="radio"
+                :aria-checked="threadMode === 'current'"
+                :disabled="!currentThreadAvailable"
+                @click="threadMode = 'current'"
+              >
+                <span class="code-review-panel__choice-content">
+                  <MessageCircleIcon class="code-review-panel__choice-icon" aria-hidden="true" />
+                  <span class="code-review-panel__choice-copy">
+                    <strong>{{ $t('surface.codeReviewPanel.currentThread') }}</strong>
+                    <small>{{ currentThreadDescription }}</small>
+                  </span>
                 </span>
-              </el-radio>
-            </el-radio-group>
+              </button>
+            </div>
           </fieldset>
         </div>
         <button
-          class="claw-button claw-button--primary"
+          class="claw-button claw-button--primary code-review-panel__start"
           type="button"
           :disabled="busy"
           @click="startSelectedReview"
@@ -160,10 +202,8 @@
                 type="button"
                 :aria-label="$t('surface.codeReviewPanel.clarify')"
                 :title="$t('surface.codeReviewPanel.clarify')"
-                :aria-expanded="discussingId === finding.id"
-                :aria-controls="`finding-clarify-${finding.id}`"
                 :disabled="busy"
-                @click="toggleDiscussion(finding)"
+                @click="clarifyFinding(finding)"
               >
                 <IconMessageQuestion aria-hidden="true" />
               </button>
@@ -203,49 +243,7 @@
               {{ finding.decision.reason }}
             </blockquote>
 
-            <div
-              v-if="finding.discussion.length"
-              class="review-finding__discussion"
-              :aria-label="$t('surface.codeReviewPanel.findingDiscussion')"
-            >
-              <article
-                v-for="message in finding.discussion"
-                :key="message.id"
-                :data-author="message.author"
-              >
-                <strong>{{
-                  message.author === "user"
-                    ? $t('surface.codeReviewPanel.you')
-                    : $t('surface.codeReviewPanel.reviewer')
-                }}</strong>
-                <p>{{ message.body }}</p>
-              </article>
-            </div>
           </div>
-
-          <form
-            v-if="canArbitrate && discussingId === finding.id"
-            :id="`finding-clarify-${finding.id}`"
-            class="review-finding__composer"
-            @submit.prevent="ask(finding)"
-          >
-            <label :for="`question-${finding.id}`"
-              >{{ $t('surface.codeReviewPanel.questionAboutFinding') }}</label
-            >
-            <textarea
-              :id="`question-${finding.id}`"
-              v-model="question"
-              rows="7"
-              required
-            />
-            <button
-              class="claw-button claw-button--secondary"
-              type="submit"
-              :disabled="busy || !question.trim()"
-            >
-              {{ $t('surface.codeReviewPanel.askReviewer') }}
-            </button>
-          </form>
         </li>
       </ol>
 
@@ -326,6 +324,12 @@ import {
   IconSparkles,
 } from "@tabler/icons-vue";
 import {
+  FileDiffIcon,
+  GitBranchIcon,
+  MessageCircleIcon,
+  RobotFaceIcon,
+} from "../shared/icons/app-icons";
+import {
   codeReviewProgress,
   type CodeReviewFinding,
   type CodeReviewStartInput,
@@ -342,10 +346,6 @@ const props = defineProps<{
     agentId: string,
     input: import("@codex-claw/core/code-review").CodeReviewDecisionInput,
   ) => Promise<AppSnapshot>;
-  discussFinding: (
-    agentId: string,
-    input: import("@codex-claw/core/code-review").CodeReviewDiscussionInput,
-  ) => Promise<AppSnapshot>;
   submitReviewRound: (
     agentId: string,
     sessionId: string,
@@ -355,14 +355,19 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const emit = defineEmits<{ openFile: [path: string] }>();
+const emit = defineEmits<{
+  clarifyFinding: [payload: {
+    sessionId: string;
+    roundId: string;
+    finding: CodeReviewFinding;
+  }];
+  openFile: [path: string];
+}>();
 const busy = ref(false);
 const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
-const threadMode = ref<CodeReviewThreadMode>("unbiased");
+const threadMode = ref<CodeReviewThreadMode>("independent");
 const selectedRoundId = ref("");
-const discussingId = ref<string | null>(null);
-const question = ref("");
 const expandedFindingId = ref<string | null>(null);
 const session = computed(() => props.agent.codeReview ?? null);
 const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
@@ -379,10 +384,15 @@ const nothingToReview = computed(() => scopeCatalogReady.value
   && !hasUncommittedChanges.value
   && !hasBranchChanges.value);
 const currentThreadAvailable = computed(() => Boolean(props.agent.backendSession));
-const branchDescription = computed(() => t("surface.codeReviewPanel.branchDescription", {
-  branch: props.gitStatus?.branch ?? t("surface.codeReviewPanel.currentBranchFallback"),
-  base: branchScope.value?.baseRef ?? "",
-}));
+const uncommittedDescription = computed(() => hasUncommittedChanges.value
+  ? t("surface.codeReviewPanel.uncommittedDescription")
+  : t("surface.codeReviewPanel.uncommittedUnavailable"));
+const branchDescription = computed(() => hasBranchChanges.value && branchScope.value
+  ? t("surface.codeReviewPanel.branchDescription", {
+      branch: props.gitStatus?.branch ?? t("surface.codeReviewPanel.currentBranchFallback"),
+      base: branchScope.value.baseRef,
+    })
+  : t("surface.codeReviewPanel.branchUnavailable"));
 const currentThreadDescription = computed(() => currentThreadAvailable.value
   ? t("surface.codeReviewPanel.currentThreadDescription")
   : t("surface.codeReviewPanel.currentThreadUnavailable"));
@@ -474,7 +484,6 @@ watch(
   (roundId) => {
     if (roundId) selectedRoundId.value = roundId;
     expandedFindingId.value = null;
-    discussingId.value = null;
   },
   { immediate: true },
 );
@@ -516,24 +525,13 @@ function setFindingSelected(
   );
 }
 
-function toggleDiscussion(finding: CodeReviewFinding): void {
-  discussingId.value = discussingId.value === finding.id ? null : finding.id;
-  question.value = discussingId.value ? clarificationPrompt(finding) : "";
-}
-
-function ask(finding: CodeReviewFinding): void {
+function clarifyFinding(finding: CodeReviewFinding): void {
   const round = selectedRound.value;
-  if (!session.value || !round || !question.value.trim()) return;
-  const body = question.value.trim();
-  void run(async () => {
-    await props.discussFinding(props.agent.id, {
-      sessionId: session.value!.id,
-      roundId: round.id,
-      findingId: finding.id,
-      question: body,
-    });
-    discussingId.value = null;
-    question.value = "";
+  if (!session.value || !round) return;
+  emit("clarifyFinding", {
+    sessionId: session.value.id,
+    roundId: round.id,
+    finding,
   });
 }
 
@@ -581,11 +579,6 @@ function findingStateLabel(finding: CodeReviewFinding): string {
   );
 }
 
-function clarificationPrompt(finding: CodeReviewFinding): string {
-  const location = finding.location ? `\nLocation: ${locationLabel(finding)}` : "";
-  return `Finding ${finding.id}: ${finding.title}${location}\n\n${finding.body}\n\nQuestion: `;
-}
-
 function isFindingExpanded(findingId: string): boolean {
   return expandedFindingId.value === findingId;
 }
@@ -629,19 +622,24 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 
 .code-review-panel__empty {
   margin: auto;
-  width: min(420px, 100%);
+  width: min(720px, 100%);
+  box-sizing: border-box;
   display: grid;
   justify-items: center;
-  gap: var(--space-4);
-  padding: var(--space-8);
+  gap: var(--space-6);
+  padding: var(--space-16);
   text-align: center;
 }
 
 .code-review-panel__setup {
   width: 100%;
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-10);
   text-align: left;
+}
+
+.code-review-panel__start {
+  margin-top: var(--space-6);
 }
 
 .code-review-panel__setup fieldset {
@@ -652,7 +650,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 }
 
 .code-review-panel__setup legend {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
   font-weight: 600;
@@ -663,44 +661,76 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 .code-review-panel__choices {
   width: 100%;
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
 }
 
-.code-review-panel__choices :deep(.el-radio) {
+.code-review-panel__choice {
+  min-width: 0;
+  min-height: 132px;
+  box-sizing: border-box;
   width: 100%;
   height: auto;
   margin: 0;
-  align-items: flex-start;
-  padding: var(--space-3);
+  padding: var(--space-6);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.code-review-panel__choice:hover:not(:disabled):not(.is-selected) {
+  border-color: var(--color-outline);
   background: var(--color-surface-low);
 }
 
-.code-review-panel__choices :deep(.el-radio.is-checked) {
+.code-review-panel__choice.is-selected {
   border-color: var(--color-primary);
   background: var(--color-primary-container);
 }
 
-.code-review-panel__choices :deep(.el-radio__input) {
-  margin-top: 2px;
+.code-review-panel__choice:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
-.code-review-panel__choices :deep(.el-radio__label) {
-  min-width: 0;
-  color: var(--color-text);
-  white-space: normal;
+.code-review-panel__choice:focus-visible {
+  border-color: var(--color-primary);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
-.code-review-panel__choices :deep(.el-radio__label span) {
+.code-review-panel__choice-content {
   display: grid;
-  gap: 2px;
+  justify-items: center;
+  gap: var(--space-4);
+  text-align: center;
 }
 
-.code-review-panel__choices :deep(.el-radio__label small) {
+.code-review-panel__choice-icon {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  color: var(--color-primary);
+  stroke-width: 1.7;
+}
+
+.code-review-panel__choice-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.code-review-panel__choice-copy strong {
+  color: var(--color-text);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+}
+
+.code-review-panel__choice-copy small {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
-  line-height: 1.35;
+  line-height: var(--line-height-18);
 }
 
 .code-review-panel__empty h2,
@@ -1005,18 +1035,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   border-top: 1px solid var(--color-border);
 }
 
-.review-finding__composer label {
-  display: block;
-  margin-bottom: var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.review-finding__description :deep(p),
-.review-finding__discussion p {
+.review-finding__description :deep(p) {
   margin: 0;
   font-size: var(--font-size-13);
   line-height: var(--line-height-20);
@@ -1032,51 +1051,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 .review-finding__decision strong {
   display: block;
   margin-bottom: var(--space-1);
-}
-
-.review-finding__composer {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.review-finding__composer textarea {
-  resize: vertical;
-  width: 100%;
-  box-sizing: border-box;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface);
-  font: inherit;
-}
-
-.review-finding__composer .claw-button {
-  justify-self: end;
-}
-
-.review-finding__discussion {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.review-finding__discussion article {
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.review-finding__discussion article[data-author="reviewer"] {
-  border-left: 2px solid var(--color-primary);
-}
-
-.review-finding__discussion strong {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
 }
 
 .code-review-panel__footer {

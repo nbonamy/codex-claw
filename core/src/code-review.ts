@@ -6,7 +6,7 @@ export type CodeReviewScope =
   | { type: 'uncommitted' }
   | { type: 'branch'; baseRef: string };
 
-export type CodeReviewThreadMode = 'current' | 'unbiased';
+export type CodeReviewThreadMode = 'current' | 'independent';
 
 export type CodeReviewStartInput = {
   scope: CodeReviewScope;
@@ -69,7 +69,10 @@ export type CodeReviewRound = {
 
 export type CodeReviewSession = {
   id: string;
-  agentId: string;
+  /** Agent whose workspace and changes are being reviewed. */
+  targetAgentId: string;
+  /** Visible agent whose provider conversation performs the review. */
+  reviewerAgentId: string;
   scope: CodeReviewScope;
   threadMode: CodeReviewThreadMode;
   status: 'reviewing' | 'ready' | 'fixing' | 'readyToFinish' | 'finished' | 'failed';
@@ -199,7 +202,8 @@ export function isCodeReviewStartInput(value: unknown): value is CodeReviewStart
 }
 
 export function isCodeReviewSession(value: unknown): value is CodeReviewSession {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.agentId !== 'string') return false;
+  if (!isRecord(value) || typeof value.id !== 'string') return false;
+  if (typeof value.targetAgentId !== 'string' || typeof value.reviewerAgentId !== 'string') return false;
   if (!isCodeReviewScope(value.scope) || !isCodeReviewThreadMode(value.threadMode)) return false;
   if (!isReviewSessionStatus(value.status) || typeof value.activeRoundId !== 'string') return false;
   if (!Array.isArray(value.rounds) || value.rounds.length === 0 || value.rounds.some((round) => !isCodeReviewRound(round))) return false;
@@ -213,7 +217,7 @@ function isCodeReviewScope(value: unknown): value is CodeReviewScope {
 }
 
 function isCodeReviewThreadMode(value: unknown): value is CodeReviewThreadMode {
-  return value === 'current' || value === 'unbiased';
+  return value === 'current' || value === 'independent';
 }
 
 function latestFindings(session: CodeReviewSession): Map<string, CodeReviewFinding> {

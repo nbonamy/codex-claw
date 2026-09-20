@@ -244,14 +244,14 @@
         :toggle-file-explorer="toggleFileExplorer"
         :toggle-right-workspace="toggleRightWorkspace"
         :update-status="updateStatus"
-        :start-code-review="props.startCodeReview"
+        :start-code-review="startCodeReviewFromShell"
         :decide-code-review-finding="props.decideCodeReviewFinding"
-        :discuss-code-review-finding="props.discussCodeReviewFinding"
         :submit-code-review-round="props.submitCodeReviewRound"
         :finish-code-review="props.finishCodeReview"
         :discard-code-review="props.discardCodeReview"
         :review-code-again="props.reviewCodeAgain"
         @close-agent="$emit('close-agent', $event)"
+        @clarify-code-review-finding="clarifyCodeReviewFinding"
         @expand-sidebar="agentSidebarCollapsed = false"
         @install-update="emit('install-update')"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
@@ -784,8 +784,16 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+type PendingReviewClarification = {
+  agentId: string;
+  sessionId: string;
+  roundId: string;
+  findingId: string;
+};
+
 type AppSurface = 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
+const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
 const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((agent) => (
@@ -1098,6 +1106,11 @@ const currentAgent = computed(() => {
   }
 
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
+});
+watch(() => currentAgent.value?.id, (agentId) => {
+  if (pendingReviewClarification.value && pendingReviewClarification.value.agentId !== agentId) {
+    pendingReviewClarification.value = null;
+  }
 });
 const rightWorkspaceState = useRightWorkspaceState({
   currentAgentId: () => currentAgent.value?.id,
@@ -2026,10 +2039,80 @@ function forwardApprovalResolution(
   emit('resolve-approval', approvalId, decision, scope);
 }
 
+async function startCodeReviewFromShell(
+  agentId: string,
+  input: import('@codex-claw/core/code-review').CodeReviewStartInput,
+): Promise<AppSnapshot> {
+  const next = await props.startCodeReview(agentId, input);
+  const reviewerAgentId = input.threadMode === 'independent'
+    ? next.activeAgentId
+    : agentId;
+  if (reviewerAgentId) {
+    selectAgentFromShell(reviewerAgentId);
+    openRightWorkspaceTab('codeReview', reviewerAgentId);
+  }
+  return next;
+}
+
+function clarifyCodeReviewFinding(payload: {
+  agentId: string;
+  sessionId: string;
+  roundId: string;
+  finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+}): void {
+  const { finding } = payload;
+  const location = finding.location
+    ? `\nLocation: ${formatReviewLocation(finding.location)}`
+    : '';
+  const text = [
+    `<context>Review ${payload.sessionId} · Round ${payload.roundId} · Finding ${finding.id}`,
+    `${finding.priority.toUpperCase()} · ${finding.title}${location}`,
+    '',
+    finding.body,
+    '</context>',
+    '',
+    'Question: ',
+  ].join('\n');
+  pendingReviewClarification.value = {
+    agentId: payload.agentId,
+    sessionId: payload.sessionId,
+    roundId: payload.roundId,
+    findingId: finding.id,
+  };
+  selectAgentFromShell(payload.agentId);
+  emit('update:composerState', {
+    agentId: payload.agentId,
+    state: { text, selectionStart: text.length, selectionEnd: text.length },
+  });
+  void nextTick(() => agentWorkspace.value?.focusComposer());
+}
+
+function formatReviewLocation(location: import('@codex-claw/core/code-review').CodeReviewLocation): string {
+  if (!location.line) return location.file;
+  return `${location.file}:${location.line}${location.endLine && location.endLine !== location.line ? `–${location.endLine}` : ''}`;
+}
+
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
   if (prompt.trim() === '/review' && !options?.attachments?.length) {
     openRightWorkspaceTab('codeReview');
     return Promise.resolve();
+  }
+  const clarification = pendingReviewClarification.value;
+  if (
+    clarification
+    && clarification.agentId === currentAgent.value?.id
+    && !options?.attachments?.length
+  ) {
+    return props.discussCodeReviewFinding(clarification.agentId, {
+      sessionId: clarification.sessionId,
+      roundId: clarification.roundId,
+      findingId: clarification.findingId,
+      question: prompt,
+    }).then(() => {
+      if (pendingReviewClarification.value === clarification) {
+        pendingReviewClarification.value = null;
+      }
+    });
   }
   if (props.sendPromptAction) return props.sendPromptAction(prompt, options);
   if (options) {

@@ -91,14 +91,14 @@ agent-identity, instruction, MCP, or permission-safety change restarts and
 resumes the query so stale configuration cannot leak into later turns. The
 transport configures:
 
-Code review defaults to a hidden Claude session separate from the owning agent's
-normal chat. The user may instead start the first pass from the current session.
-Only the round-scoped finding tools are added; clarification and sequential
-remediation resume that same session id. For the unbiased strategy, `Review
-again` intentionally omits it and starts a fresh session. Current-thread
-reviews preserve the same user-owned session for every round and after finish;
-unbiased review sessions are deleted through the Agent SDK between rounds and
-when the review finishes.
+Code review defaults to a separate visible reviewer agent in the same workspace.
+The user may instead use the current agent and session. Review turns use the
+normal Claude conversation replica while adding only the round-scoped finding
+tools; clarification and sequential remediation resume that same session id.
+For an independent reviewer, `Review again` deletes the old Claude session and
+starts a fresh one on the same sidebar agent. Current-thread reviews preserve
+the user-owned session for every round and after finish; an independent
+reviewer's agent and session are removed when the review finishes.
 
 - the Claude Code system-prompt and tool presets;
 - user, project, and local setting sources;

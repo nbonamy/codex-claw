@@ -207,16 +207,17 @@ archived through the SDK, while an attached conversation found in the archived
 catalog is restored after an interrupted lifecycle transaction. Claw never
 scans or moves rollout files itself.
 
-Code review defaults to a separate hidden Codex conversation, but the user may
-choose the owning agent's current conversation for the first pass. Either path
+Code review defaults to a separate visible reviewer agent in the same workspace,
+but the user may choose the owning agent's current conversation. Either path
 uses the round-scoped finding tools; finding clarification and sequential
-remediation load and continue that same thread. `Review again` creates a new
-hidden thread for the unbiased strategy; current-thread reviews keep
-the same user-owned thread for the whole workflow. Finishing leaves a current
-thread intact, while an unbiased review archives and forgets its review-owned
-thread. Claw persists the selected Git scope, initial thread strategy, and opaque
-thread reference with its app-owned review round, while keeping findings out of
-the provider transcript model.
+remediation continue through the normal Codex conversation replica. `Review
+again` archives the independent reviewer's conversation and binds a fresh one
+to the same sidebar agent, while current-thread reviews keep the user-owned
+conversation for the whole workflow. Finishing removes an independent reviewer
+agent and its conversation but leaves a current-thread conversation intact.
+Claw persists the selected Git scope, reviewer identity, opaque conversation
+reference, and app-owned finding ledger without creating a second transcript
+model.
 
 `thread/settings/updated`
 confirms the active thread settings and should update the app-owned
