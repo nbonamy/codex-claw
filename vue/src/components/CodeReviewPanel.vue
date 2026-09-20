@@ -143,37 +143,43 @@
       <div
         v-if="selectedRound?.status === 'reviewing'"
         class="code-review-panel__working"
+        :class="{ 'is-waiting': findings.length === 0 }"
         aria-live="polite"
       >
-        <span class="code-review-panel__spinner" aria-hidden="true" />
-        <strong>{{ reviewingScope }}</strong>
-        <span v-if="findings.length" class="code-review-panel__working-count">{{
-          $t('surface.codeReviewPanel.findingsFound', { count: findings.length })
-        }}</span>
+        <template v-if="findings.length === 0">
+          <span class="code-review-panel__spinner" aria-hidden="true" />
+          <div class="code-review-panel__working-copy">
+            <strong>{{ $t('surface.codeReviewPanel.reviewInProgress') }}</strong>
+            <span>{{ reviewingScope }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <span class="code-review-panel__spinner" aria-hidden="true" />
+          <strong>{{ reviewingScope }}</strong>
+          <span class="code-review-panel__working-count">{{
+            $t('surface.codeReviewPanel.findingsFound', { count: findings.length })
+          }}</span>
+        </template>
       </div>
 
       <p
-        v-if="selectedRound?.status === 'reviewing' && findings.length === 0"
-        class="code-review-panel__awaiting"
-      >
-        {{ $t('surface.codeReviewPanel.noFindingsYet') }}
-      </p>
-
-      <p
-        v-else-if="selectedRound?.status === 'failed'"
+        v-if="selectedRound?.status === 'failed'"
         class="code-review-panel__error"
         role="alert"
       >
         {{ selectedRound.error || $t('surface.codeReviewPanel.reviewRoundFailed') }}
       </p>
 
-      <div v-else-if="findings.length === 0" class="code-review-panel__clear">
+      <div
+        v-else-if="selectedRound?.status !== 'reviewing' && findings.length === 0"
+        class="code-review-panel__clear"
+      >
         <IconCircleCheck aria-hidden="true" />
         <strong>{{ $t('surface.codeReviewPanel.noFindings') }}</strong>
         <span>{{ $t('surface.codeReviewPanel.noFindingsDescription') }}</span>
       </div>
 
-      <ol v-else class="code-review-panel__findings">
+      <ol v-else-if="findings.length" class="code-review-panel__findings">
         <li
           v-for="finding in findings"
           :id="`finding-${finding.id}`"
@@ -454,10 +460,7 @@ const selectedCount = computed(
     ).length ?? 0,
 );
 const sessionTitle = computed(
-  () =>
-    t("surface.codeReviewPanel.roundNumber", {
-      number: selectedRound.value?.number ?? session.value?.rounds.length ?? 1,
-    }),
+  () => props.gitStatus?.branch?.trim() || t("surface.codeReviewPanel.codeReview"),
 );
 const sessionStatus = computed(
   () =>
@@ -777,6 +780,16 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   border-bottom: 1px solid var(--color-border);
 }
 
+.code-review-panel__header > div {
+  min-width: 0;
+}
+
+.code-review-panel__header h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .code-review-panel__eyebrow {
   display: block;
   margin-bottom: var(--space-1);
@@ -866,6 +879,27 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   font-weight: var(--font-weight-medium);
 }
 
+.code-review-panel__working.is-waiting {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  margin: auto;
+  padding: var(--space-8);
+  border-bottom: 0;
+  text-align: center;
+}
+
+.code-review-panel__working.is-waiting .code-review-panel__spinner {
+  width: 28px;
+  height: 28px;
+}
+
+.code-review-panel__working-copy {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  line-height: 1.4;
+}
+
 .code-review-panel__working-count {
   padding: 2px var(--space-2);
   border-radius: 999px;
@@ -873,18 +907,10 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   font-size: var(--font-size-11);
 }
 
-.code-review-panel__awaiting,
 .code-review-panel__clear {
   margin: auto;
   color: var(--color-text-muted);
   line-height: 1.4;
-}
-
-.code-review-panel__awaiting {
-  font-size: var(--font-size-12);
-}
-
-.code-review-panel__clear {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--space-4);

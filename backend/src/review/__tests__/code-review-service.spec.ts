@@ -171,8 +171,13 @@ describe('CodeReviewService', () => {
     expect(session.scope).toStrictEqual({ type: 'branch', baseRef: 'origin/main' });
     expect(session.threadMode).toBe('current');
     expect(test.turns[0]?.reviewerSession).toStrictEqual({ kind: 'codex', threadId: 'current-thread' });
-    expect(test.turns[0]?.prompt).toContain('the current branch against origin/main');
-    expect(test.turns[0]?.prompt).toContain('respond with exactly "Review complete." and end the turn');
+    const initialPrompt = test.turns[0]!.prompt;
+    const contextEnd = initialPrompt.indexOf('</context>');
+    expect(initialPrompt.slice(0, contextEnd)).toContain('the current branch against origin/main');
+    expect(initialPrompt.slice(0, contextEnd)).toContain('respond with exactly "Review complete." and end the turn');
+    expect(initialPrompt.slice(contextEnd + '</context>'.length).trim()).toBe(
+      'Review the current branch against origin/main.',
+    );
 
     test.service.submit(test.owner, session.id);
     await test.service.reviewAgain(test.owner, session.id);
@@ -237,7 +242,9 @@ describe('CodeReviewService', () => {
     expect(contextEnd).toBeGreaterThan(0);
     expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Invalidate the round one cache');
     expect(thirdRoundPrompt.slice(0, contextEnd)).toContain('Reduce round two logging');
-    expect(thirdRoundPrompt.slice(contextEnd)).toContain('Review only the current uncommitted changes');
+    expect(thirdRoundPrompt.slice(contextEnd + '</context>'.length).trim()).toBe(
+      'Review the current uncommitted changes.',
+    );
   });
 
   it('uses one reviewer thread for clarification and sequential fixes, then starts review again fresh', async () => {

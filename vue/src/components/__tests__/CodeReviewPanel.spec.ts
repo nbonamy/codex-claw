@@ -198,10 +198,15 @@ describe('CodeReviewPanel', () => {
 
   it('shows findings as they arrive while describing the active review scope', async () => {
     const uncommittedReview = session([], 'reviewing');
-    const { wrapper } = mountPanel(uncommittedReview);
+    const { wrapper } = mountPanel(
+      uncommittedReview,
+      { branch: 'feat/iterative-review' } as AgentGitStatus,
+    );
 
+    expect(wrapper.get('.code-review-panel__header h2').text()).toBe('feat/iterative-review');
+    expect(wrapper.get('.code-review-panel__working').classes()).toContain('is-waiting');
+    expect(wrapper.get('.code-review-panel__working').text()).toContain('Review in progress');
     expect(wrapper.get('.code-review-panel__working').text()).toContain('Inspecting uncommitted changes.');
-    expect(wrapper.text()).toContain('No findings yet');
     expect(wrapper.find('.code-review-panel__progress').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Independent review');
 
@@ -211,8 +216,8 @@ describe('CodeReviewPanel', () => {
     });
 
     expect(wrapper.get('.code-review-panel__working').text()).toContain('1 found');
+    expect(wrapper.get('.code-review-panel__working').classes()).not.toContain('is-waiting');
     expect(wrapper.get('.review-finding').text()).toContain('Validate the live finding');
-    expect(wrapper.find('.code-review-panel__awaiting').exists()).toBe(false);
     expect(wrapper.find('.review-finding__quick-actions').exists()).toBe(false);
 
     const branchReview = session([], 'reviewing');
@@ -225,6 +230,7 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.get('.code-review-panel__working').text()).toContain(
       'Inspecting feature/review-copy against origin/main.',
     );
+    expect(wrapper.get('.code-review-panel__header h2').text()).toBe('feature/review-copy');
   });
 
   it('shows a compact priority-ordered triage list and expands only one finding body from its header', async () => {

@@ -514,18 +514,23 @@ export class CodeReviewService {
 
 function reviewPrompt(session: CodeReviewSession): string {
   const ledger = codeReviewLedger(session);
-  const scope = session.scope.type === 'branch'
+  const detailedScope = session.scope.type === 'branch'
     ? `the current branch against ${session.scope.baseRef}, including uncommitted changes`
     : 'only the current uncommitted changes (staged, unstaged, and untracked)';
+  const visibleScope = session.scope.type === 'branch'
+    ? `the current branch against ${session.scope.baseRef}`
+    : 'the current uncommitted changes';
   return `<context>
 This structured review ledger is cumulative across every previous round in this review session. The exclusions array contains all findings the user skipped, not only findings from the immediately preceding round. Do not raise an excluded finding again unless materially new evidence changes the conclusion. Regression checks must be verified against the latest code. Prior discussion records decisions that changed expected behavior.
 
 ${JSON.stringify(ledger, null, 2)}
+
+Review ${detailedScope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
+
+Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, respond with exactly "Review complete." and end the turn. There is no tool for completing the review workflow.
 </context>
 
-Review ${scope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
-
-Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, respond with exactly "Review complete." and end the turn. There is no tool for completing the review workflow.`;
+Review ${visibleScope}.`;
 }
 
 function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, finding: CodeReviewFinding): string {
