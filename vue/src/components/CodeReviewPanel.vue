@@ -1,57 +1,62 @@
 <template>
   <section class="code-review-panel" :aria-label="$t('surface.codeReviewPanel.codeReview')">
     <div v-if="!session" class="code-review-panel__empty">
-      <span class="code-review-panel__empty-icon"
-        ><IconChecklist aria-hidden="true"
-      /></span>
-      <h2>{{ $t('surface.codeReviewPanel.reviewThisBranch') }}</h2>
-      <p>{{ $t('surface.codeReviewPanel.startDescription') }}</p>
-      <div class="code-review-panel__setup">
-        <fieldset>
-          <legend>{{ $t('surface.codeReviewPanel.scope') }}</legend>
-          <el-radio-group v-model="scope" class="code-review-panel__choices">
-            <el-radio value="uncommitted">
-              <span>
-                <strong>{{ $t('surface.codeReviewPanel.uncommittedChanges') }}</strong>
-                <small>{{ $t('surface.codeReviewPanel.uncommittedDescription') }}</small>
-              </span>
-            </el-radio>
-            <el-radio v-if="branchScope" value="branch">
-              <span>
-                <strong>{{ $t('surface.codeReviewPanel.currentBranch') }}</strong>
-                <small>{{ branchDescription }}</small>
-              </span>
-            </el-radio>
-          </el-radio-group>
-        </fieldset>
+      <template v-if="nothingToReview">
+        <span class="code-review-panel__empty-icon"><IconCircleCheck aria-hidden="true" /></span>
+        <h2>{{ $t('surface.codeReviewPanel.nothingToReview') }}</h2>
+        <p>{{ $t('surface.codeReviewPanel.nothingToReviewDescription') }}</p>
+      </template>
+      <template v-else>
+        <span class="code-review-panel__empty-icon"><IconChecklist aria-hidden="true" /></span>
+        <h2>{{ $t('surface.codeReviewPanel.reviewThisBranch') }}</h2>
+        <p>{{ $t('surface.codeReviewPanel.startDescription') }}</p>
+        <div class="code-review-panel__setup">
+          <fieldset>
+            <legend>{{ $t('surface.codeReviewPanel.scope') }}</legend>
+            <el-radio-group v-model="scope" class="code-review-panel__choices">
+              <el-radio v-if="hasUncommittedChanges" value="uncommitted">
+                <span>
+                  <strong>{{ $t('surface.codeReviewPanel.uncommittedChanges') }}</strong>
+                  <small>{{ $t('surface.codeReviewPanel.uncommittedDescription') }}</small>
+                </span>
+              </el-radio>
+              <el-radio v-if="hasBranchChanges" value="branch">
+                <span>
+                  <strong>{{ $t('surface.codeReviewPanel.currentBranch') }}</strong>
+                  <small>{{ branchDescription }}</small>
+                </span>
+              </el-radio>
+            </el-radio-group>
+          </fieldset>
 
-        <fieldset>
-          <legend>{{ $t('surface.codeReviewPanel.reviewerThread') }}</legend>
-          <el-radio-group v-model="threadMode" class="code-review-panel__choices">
-            <el-radio value="unbiased">
-              <span>
-                <strong>{{ $t('surface.codeReviewPanel.unbiasedReviewer') }}</strong>
-                <small>{{ $t('surface.codeReviewPanel.unbiasedReviewerDescription') }}</small>
-              </span>
-            </el-radio>
-            <el-radio value="current" :disabled="!currentThreadAvailable">
-              <span>
-                <strong>{{ $t('surface.codeReviewPanel.currentThread') }}</strong>
-                <small>{{ currentThreadDescription }}</small>
-              </span>
-            </el-radio>
-          </el-radio-group>
-        </fieldset>
-      </div>
-      <button
-        class="claw-button claw-button--primary"
-        type="button"
-        :disabled="busy"
-        @click="startSelectedReview"
-      >
-        <IconSparkles aria-hidden="true" />
-        {{ $t('surface.codeReviewPanel.startReview') }}
-      </button>
+          <fieldset>
+            <legend>{{ $t('surface.codeReviewPanel.reviewerThread') }}</legend>
+            <el-radio-group v-model="threadMode" class="code-review-panel__choices">
+              <el-radio value="unbiased">
+                <span>
+                  <strong>{{ $t('surface.codeReviewPanel.unbiasedReviewer') }}</strong>
+                  <small>{{ $t('surface.codeReviewPanel.unbiasedReviewerDescription') }}</small>
+                </span>
+              </el-radio>
+              <el-radio value="current" :disabled="!currentThreadAvailable">
+                <span>
+                  <strong>{{ $t('surface.codeReviewPanel.currentThread') }}</strong>
+                  <small>{{ currentThreadDescription }}</small>
+                </span>
+              </el-radio>
+            </el-radio-group>
+          </fieldset>
+        </div>
+        <button
+          class="claw-button claw-button--primary"
+          type="button"
+          :disabled="busy"
+          @click="startSelectedReview"
+        >
+          <IconSparkles aria-hidden="true" />
+          {{ $t('surface.codeReviewPanel.startReview') }}
+        </button>
+      </template>
     </div>
 
     <template v-else>
@@ -362,6 +367,18 @@ const question = ref("");
 const expandedFindingId = ref<string | null>(null);
 const session = computed(() => props.agent.codeReview ?? null);
 const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
+const scopeCatalogReady = computed(() => Boolean(props.gitStatus?.diffCatalog) && props.gitStatus?.state !== "unknown");
+const hasUncommittedChanges = computed(() => {
+  const catalog = props.gitStatus?.diffCatalog;
+  return !scopeCatalogReady.value || !catalog || hasDiffChanges(catalog.uncommitted);
+});
+const hasBranchChanges = computed(() => {
+  const catalog = props.gitStatus?.diffCatalog;
+  return Boolean(catalog?.branch && catalog.commits.length > 0 && hasDiffChanges(catalog.branch));
+});
+const nothingToReview = computed(() => scopeCatalogReady.value
+  && !hasUncommittedChanges.value
+  && !hasBranchChanges.value);
 const currentThreadAvailable = computed(() => Boolean(props.agent.backendSession));
 const branchDescription = computed(() => t("surface.codeReviewPanel.branchDescription", {
   branch: props.gitStatus?.branch ?? t("surface.codeReviewPanel.currentBranchFallback"),
@@ -453,6 +470,15 @@ watch(
   { immediate: true },
 );
 
+watch(
+  [hasUncommittedChanges, hasBranchChanges],
+  ([uncommitted, branch]) => {
+    if (scope.value === "uncommitted" && !uncommitted && branch) scope.value = "branch";
+    if (scope.value === "branch" && !branch && uncommitted) scope.value = "uncommitted";
+  },
+  { immediate: true },
+);
+
 async function run(action: () => Promise<unknown>): Promise<void> {
   busy.value = true;
   error.value = null;
@@ -508,6 +534,7 @@ function submitRound(): void {
 }
 
 function startSelectedReview(): void {
+  if (nothingToReview.value) return;
   const reviewScope: CodeReviewStartInput["scope"] = scope.value === "branch" && branchScope.value
     ? { type: "branch", baseRef: branchScope.value.baseRef }
     : { type: "uncommitted" };
@@ -569,6 +596,10 @@ function locationLabel(finding: CodeReviewFinding): string {
 
 function priorityRank(priority: CodeReviewFinding["priority"]): number {
   return { p0: 0, p1: 1, p2: 2, p3: 3 }[priority];
+}
+
+function hasDiffChanges(summary: { addedLines: number; removedLines: number; changedFiles: number }): boolean {
+  return summary.changedFiles > 0 || summary.addedLines > 0 || summary.removedLines > 0;
 }
 </script>
 

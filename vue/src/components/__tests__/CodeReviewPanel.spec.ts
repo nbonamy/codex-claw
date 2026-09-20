@@ -87,12 +87,16 @@ describe('CodeReviewPanel', () => {
         uncommitted: { addedLines: 5, removedLines: 1, changedFiles: 1 },
         unstaged: { addedLines: 5, removedLines: 1, changedFiles: 1 },
         staged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
-        commits: [],
+        commits: [{
+          sha: 'abcdef123456', shortSha: 'abcdef1', subject: 'add review setup',
+          addedLines: 19, removedLines: 3, changedFiles: 2,
+        }],
       },
     };
     const { wrapper, actions } = mountPanel(undefined, gitStatus);
 
     expect(wrapper.text()).toContain('Review feature/review-setup against origin/main');
+    expect((wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Uncommitted changes'))!.get('input').element as HTMLInputElement).checked).toBe(true);
     await wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Current branch'))!.get('input').setValue(true);
     await wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Use current thread'))!.get('input').setValue(true);
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
@@ -101,6 +105,58 @@ describe('CodeReviewPanel', () => {
       scope: { type: 'branch', baseRef: 'origin/main' },
       threadMode: 'current',
     });
+  });
+
+  it('defaults to the branch when there are commits but no uncommitted changes', async () => {
+    const gitStatus: AgentGitStatus = {
+      folder: '/repo', repository: 'claw', branch: 'feature/review-setup',
+      ahead: 1, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
+      hasUntracked: false, state: 'clean', updatedAt: '2026-09-19T10:00:00.000Z',
+      diffCatalog: {
+        defaultTarget: { type: 'branch', baseRef: 'origin/main' },
+        branch: { baseRef: 'origin/main', addedLines: 19, removedLines: 3, changedFiles: 2 },
+        uncommitted: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        unstaged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        staged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        commits: [{
+          sha: 'abcdef123456', shortSha: 'abcdef1', subject: 'add review setup',
+          addedLines: 19, removedLines: 3, changedFiles: 2,
+        }],
+      },
+    };
+    const { wrapper, actions } = mountPanel(undefined, gitStatus);
+
+    expect(wrapper.text()).not.toContain('Uncommitted changes');
+    const branch = wrapper.findAll('.el-radio').find((radio) => radio.text().includes('Current branch'))!;
+    expect((branch.get('input').element as HTMLInputElement).checked).toBe(true);
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
+
+    expect(actions.startReview).toHaveBeenCalledWith('owner', {
+      scope: { type: 'branch', baseRef: 'origin/main' },
+      threadMode: 'unbiased',
+    });
+  });
+
+  it('shows nothing to review when the working tree and branch are clean', () => {
+    const gitStatus: AgentGitStatus = {
+      folder: '/repo', repository: 'claw', branch: 'main',
+      ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
+      hasUntracked: false, state: 'clean', updatedAt: '2026-09-19T10:00:00.000Z',
+      diffCatalog: {
+        defaultTarget: { type: 'uncommitted' },
+        branch: { baseRef: 'origin/main', addedLines: 0, removedLines: 0, changedFiles: 0 },
+        uncommitted: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        unstaged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        staged: { addedLines: 0, removedLines: 0, changedFiles: 0 },
+        commits: [],
+      },
+    };
+    const { wrapper, actions } = mountPanel(undefined, gitStatus);
+
+    expect(wrapper.text()).toContain('Nothing to review');
+    expect(wrapper.text()).not.toContain('Start review');
+    expect(wrapper.find('.code-review-panel__setup').exists()).toBe(false);
+    expect(actions.startReview).not.toHaveBeenCalled();
   });
 
   it('shows a compact priority-ordered triage list and expands only one finding body from its header', async () => {

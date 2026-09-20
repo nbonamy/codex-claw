@@ -201,6 +201,8 @@ export const surfaceMessages = {
     "codeReview": "Code review",
     "reviewThisBranch": "Review this branch",
     "startDescription": "Choose what to inspect and how much context the reviewer should have. Findings—not a transcript—will appear here.",
+    "nothingToReview": "Nothing to review",
+    "nothingToReviewDescription": "The working tree is clean and this branch has no changes against its base.",
     "scope": "Scope",
     "uncommittedChanges": "Uncommitted changes",
     "uncommittedDescription": "Review staged, unstaged, and untracked work only.",
