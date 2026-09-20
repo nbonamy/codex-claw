@@ -148,7 +148,6 @@ function selectTarget(itemId: string): void {
   hasUserSelection.value = true;
   selectedTarget.value = target;
   menuOpen.value = false;
-  emit('open', { ...target });
 }
 
 function targetFromId(id: string): AgentGitDiffTarget | null {
