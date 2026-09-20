@@ -63,4 +63,15 @@ describe('MissionTicketBoard', () => {
     expect(cards[0]!.element).toBe(firstCard);
     expect(cards[1]!.text()).toContain('Add owner checkout');
   });
+
+  it('uses the build section as the compact preview without repeating its heading', () => {
+    const wrapper = mount(MissionTicketBoard, { props: { tickets: [{
+      title: 'Connect Linear',
+      body: '**What to build** Add a read-only connection.\n\n**Acceptance criteria** The user can disconnect it.',
+      done: false,
+    }] } });
+
+    const preview = wrapper.get('.mission-ticket-board__preview');
+    expect(preview.text()).toBe('Add a read-only connection.');
+  });
 });

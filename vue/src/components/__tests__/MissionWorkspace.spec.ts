@@ -35,6 +35,7 @@ function mountWorkspace(mission: Mission, options: {
   agents?: Agent[];
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   readMissionArtifact?: (missionId: string, stage: MissionArtifactReadResult['stage']) => Promise<MissionArtifactReadResult>;
+  sendMissionPrompt?: (prompt: string) => Promise<void>;
 } = {}) {
   return mount(MissionWorkspace, {
     props: {
@@ -42,6 +43,7 @@ function mountWorkspace(mission: Mission, options: {
       agents: structuredClone(options.agents ?? createInitialSnapshot().agents),
       executeMission: options.executeMission ?? vi.fn().mockResolvedValue(undefined),
       readMissionArtifact: options.readMissionArtifact,
+      sendMissionPrompt: options.sendMissionPrompt,
     },
     slots: {
       conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
@@ -78,7 +80,7 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission, { executeMission });
 
     expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).toContain('Teams need one bill');
-    expect(wrapper.get('.mission-workspace__review-hint').text()).toContain('Comment or request changes');
+    expect(wrapper.get('.mission-requirement-review__footer').text()).toContain('Select text to leave an inline comment.');
     expect(wrapper.find('.conversation-slot').exists()).toBe(true);
 
     await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
@@ -91,6 +93,33 @@ describe('MissionWorkspace', () => {
       runId: 'run-requirements',
     });
     expect(executeMission).toHaveBeenCalledOnce();
+  });
+
+  it('sends selected requirement comments to the stage conversation as one revision request', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    const sendMissionPrompt = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { sendMissionPrompt });
+    const markdown = wrapper.get('.mission-requirement-review .markdown-panel');
+    vi.spyOn(window, 'getSelection').mockReturnValue({
+      rangeCount: 1,
+      toString: () => 'Teams need one bill',
+      getRangeAt: () => ({
+        commonAncestorContainer: markdown.element,
+        getBoundingClientRect: () => ({ left: 20, top: 60, width: 180, height: 20 } as DOMRect),
+      } as unknown as Range),
+      removeAllRanges: vi.fn(),
+    } as unknown as Selection);
+
+    await markdown.trigger('mouseup');
+    await wrapper.get('.annotation-popup__input').setValue('Clarify which team roles can pay.');
+    await wrapper.get('form.annotation-popup').trigger('submit');
+    await wrapper.get('[aria-label="Send 1 requirement comment"]').trigger('click');
+    await flushPromises();
+
+    expect(sendMissionPrompt).toHaveBeenCalledOnce();
+    expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Teams need one bill');
+    expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Clarify which team roles can pay.');
+    expect(wrapper.find('.mission-requirement-review__comment').exists()).toBe(false);
   });
 
   it('does not synthesize follow-up revisions when the accepted snapshot arrives during approval', async () => {
@@ -176,7 +205,7 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission);
 
     const drafts = wrapper.get('[aria-label="Draft tickets"]');
-    expect(drafts.text()).toContain('2 tickets drafted');
+    expect(drafts.text()).toContain('2 drafts');
     const ticketCards = drafts.findAll('.mission-ticket-board__card');
     expect(ticketCards).toHaveLength(2);
     expect(ticketCards[0]!.text()).toContain('Create billing account');

@@ -174,8 +174,10 @@ function ticketNumber(index: number): string {
 }
 
 function ticketPreview(ticket: MissionTicket): string {
-  const plainText = ticket.body
-    ?.replace(/```[\s\S]*?```/g, " ")
+  const body = ticket.body?.replace(/```[\s\S]*?```/g, " ") ?? "";
+  const whatToBuild = body.match(/(?:^|\n)\s*(?:#{1,6}\s+)?(?:\*\*)?What to build(?:\*\*)?\s*:?\s*([\s\S]*)/iu)?.[1];
+  const previewSource = (whatToBuild ?? body).split(/\n\s*(?:#{1,6}\s+)?(?:\*\*)?(?:Acceptance criteria|Verification|Dependencies)(?:\*\*)?\s*:?\s*/iu)[0] ?? "";
+  const plainText = previewSource
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/^#{1,6}\s+.*$/gm, " ")
