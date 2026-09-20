@@ -198,6 +198,48 @@ export function useAppState() {
       action,
     }));
   }
+
+  async function startCodeReview(agentId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.startCodeReview(agentId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function decideCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.decideCodeReviewFinding(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function discussCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.discussCodeReviewFinding(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.submitCodeReviewRound(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.finishCodeReview(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.reviewCodeAgain(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
   });
@@ -1379,6 +1421,12 @@ export function useAppState() {
     getAgentGitDiff,
     respondToPlanReview,
     respondToThreadFlag,
+    startCodeReview,
+    decideCodeReviewFinding,
+    discussCodeReviewFinding,
+    submitCodeReviewRound,
+    finishCodeReview,
+    reviewCodeAgain,
     getAgentGitWorkflow,
     generateAgentGitMessage,
     stageAgentGitFiles,

@@ -220,4 +220,55 @@ describe('Unified backend → mounted application', () => {
     expect(api.respondToPlanReview).not.toHaveBeenCalled();
     expect(api.sendPrompt).not.toHaveBeenCalled();
   });
+
+  it('adopts durable review findings and decisions through the unified client seam', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const { api, emitAppCommand } = installBackendFixture(snapshot);
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    emitAppCommand({ type: 'open-review' });
+    await flushPromises();
+    expect(wrapper.get('.code-review-panel').text()).toContain('Review this branch');
+
+    const ready = structuredClone(snapshot);
+    ready.agents[0]!.codeReview = {
+      id: 'review-1', agentId: agent.id, status: 'ready', activeRoundId: 'round-1',
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:01:00.000Z',
+      rounds: [{
+        id: 'round-1', number: 1, status: 'ready', reviewerSession: { kind: 'codex', threadId: 'reviewer-1' },
+        startedAt: '2026-09-19T10:00:00.000Z', completedAt: '2026-09-19T10:01:00.000Z',
+        findings: [{
+          id: 'finding-1', roundId: 'round-1', fingerprint: 'src/auth.ts:ownership', priority: 'p1',
+          summary: 'Ownership is skipped', rationale: 'The public mutation writes before authorizing.',
+          suggestedResolution: 'Authorize before writing.', location: { file: 'src/auth.ts', line: 42 },
+          decision: { state: 'undecided' }, discussion: [], remediation: { state: 'notStarted' },
+          createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
+        }],
+      }],
+    };
+    api.startCodeReview.mockResolvedValueOnce(ready);
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
+    await flushPromises();
+
+    expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id);
+    expect(wrapper.get('.review-finding').text()).toContain('Ownership is skipped');
+    expect(wrapper.get('.review-finding__toggle').text()).not.toContain('src/auth.ts');
+    await wrapper.get('.review-finding__toggle').trigger('click');
+    expect(wrapper.get('.review-finding').text()).toContain('src/auth.ts:42');
+
+    const accepted = structuredClone(ready);
+    accepted.agents[0]!.codeReview!.rounds[0]!.findings[0]!.decision = {
+      state: 'selected', decidedAt: '2026-09-19T10:02:00.000Z',
+    };
+    api.decideCodeReviewFinding.mockResolvedValueOnce(accepted);
+    await wrapper.findAll('.review-finding button').find((button) => button.text() === 'Select')!.trigger('click');
+    await flushPromises();
+
+    expect(api.decideCodeReviewFinding).toHaveBeenCalledWith(agent.id, {
+      sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', decision: 'select',
+    });
+    expect(wrapper.get('.review-finding .review-finding__quick-action').attributes('aria-pressed')).toBe('true');
+  });
 });

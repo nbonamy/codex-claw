@@ -88,11 +88,14 @@ export type BackendCodeReviewInput = {
   prompt: string;
   cwd: string;
   reviewMcpServerUrl: string;
+  reviewerSession?: BackendSession;
 };
 
 export type BackendCodeReviewResult = {
-  /** Normal assistant response from the isolated reviewer turn, used for finding discussion. */
+  /** Normal assistant response from the reviewer turn, used for finding discussion. */
   text: string;
+  /** Provider-owned conversation continued by clarification and remediation in this round. */
+  reviewerSession: BackendSession;
 };
 
 export type AgentBackendDriver = {

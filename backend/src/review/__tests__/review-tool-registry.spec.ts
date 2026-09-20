@@ -5,8 +5,8 @@ import { ReviewToolRegistry } from '../review-tool-registry';
 const finding = (): CodeReviewFinding => ({
   id: 'finding-1', roundId: 'round-1', fingerprint: 'src/auth.ts:ownership', priority: 'p1',
   summary: 'Ownership is not checked', rationale: 'The handler writes before authorizing.',
-  suggestedResolution: 'Authorize before the write.', disposition: { state: 'unresolved' },
-  discussion: [], verification: { state: 'notRequested' },
+  suggestedResolution: 'Authorize before the write.', decision: { state: 'undecided' },
+  discussion: [], remediation: { state: 'notStarted' },
   createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
 });
 
@@ -18,8 +18,8 @@ describe('ReviewToolRegistry', () => {
       updateFinding: vi.fn(async () => ({ ...finding(), priority: 'p0' as const })),
       markFindingComplete: vi.fn(async () => ({
         ...finding(),
-        disposition: { state: 'accepted' as const, decidedAt: '2026-09-19T10:01:00.000Z' },
-        verification: { state: 'passed' as const, verifiedAt: '2026-09-19T10:02:00.000Z', roundId: 'round-2' },
+        decision: { state: 'selected' as const, decidedAt: '2026-09-19T10:01:00.000Z' },
+        remediation: { state: 'fixed' as const, completedAt: '2026-09-19T10:02:00.000Z' },
       })),
     };
     const context = registry.create('agent-1', handlers);

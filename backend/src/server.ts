@@ -48,7 +48,7 @@ import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import type { CodeReviewAssignmentInput, CodeReviewDecisionInput, CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
+import type { CodeReviewDecisionInput, CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 
 export type ClawBackendServerOptions = {
@@ -259,15 +259,15 @@ export class ClawBackendServer {
       this.codeReviews = new CodeReviewService({
         snapshot: this.snapshot,
         tools: options.codeReviewTools,
-        runReview: async (agent, prompt, reviewMcpServerUrl) => {
+        runReview: async (agent, prompt, reviewMcpServerUrl, reviewerSession) => {
           return await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewRun, {
             agent,
             prompt,
             cwd: requireAgentFolder(agent),
             reviewMcpServerUrl,
-          }) as { text: string };
+            ...(reviewerSession ? { reviewerSession } : {}),
+          }) as import('@codex-claw/core/backend-driver').BackendCodeReviewResult;
         },
-        sendFixPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
         changed: async () => { await this.persistAndEmitSnapshot(); },
       });
     }
@@ -280,6 +280,7 @@ export class ClawBackendServer {
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
+    for (const agent of this.snapshot.agents) this.codeReviews?.resumeInterrupted(agent);
   }
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
@@ -822,14 +823,6 @@ export class ClawBackendServer {
         const input = requireRecordParam(message.params, 'input') as CodeReviewDecisionInput;
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
           this.requireCodeReviews().decide(agent, input);
-          return this.persistAndEmitSnapshot();
-        });
-      }
-      case backendMethods.agentCodeReviewFindingAssign: {
-        const agentId = requireStringParam(message.params, 'agentId');
-        const input = requireRecordParam(message.params, 'input') as CodeReviewAssignmentInput;
-        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
-          this.requireCodeReviews().assign(agent, input);
           return this.persistAndEmitSnapshot();
         });
       }
@@ -2142,9 +2135,6 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
-    if (event.type === 'agent.statusChanged' && event.agentId) {
-      this.codeReviews?.handleAgentStatusChanged(event.agentId, event.payload);
-    }
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
@@ -2162,9 +2152,6 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
-    if (event.type === 'agent.statusChanged' && event.agentId) {
-      this.codeReviews?.handleAgentStatusChanged(event.agentId, event.payload);
-    }
     if (
       event.agentId && (
         providerConversationEventView(fullEvent).type === 'turn.completed' ||

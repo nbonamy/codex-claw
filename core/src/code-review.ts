@@ -1,3 +1,5 @@
+import type { BackendSession } from './contracts/backend';
+
 export type CodeReviewPriority = 'p0' | 'p1' | 'p2' | 'p3';
 
 export type CodeReviewLocation = {
@@ -13,21 +15,22 @@ export type CodeReviewDiscussionMessage = {
   createdAt: string;
 };
 
-export type CodeReviewDisposition =
-  | { state: 'unresolved' }
-  | { state: 'accepted'; decidedAt: string }
-  | { state: 'declined'; decidedAt: string; reason: string };
+/** A user's arbitration choice. This is intentionally not presented as workflow status. */
+export type CodeReviewDecision =
+  | { state: 'undecided' }
+  | { state: 'selected'; decidedAt: string }
+  | { state: 'rejected'; decidedAt: string; reason: string };
 
-export type CodeReviewVerification =
-  | { state: 'notRequested' }
-  | { state: 'queued'; assignedAgentId: string; requestedAt: string }
-  | { state: 'fixing'; assignedAgentId: string; startedAt: string }
-  | { state: 'awaitingVerification'; assignedAgentId: string; completedAt: string }
-  | { state: 'passed'; verifiedAt: string; roundId: string; evidence?: string }
-  | { state: 'failed'; verifiedAt: string; roundId: string; evidence: string };
+/** Remediation begins only after the user submits a fully arbitrated round. */
+export type CodeReviewRemediation =
+  | { state: 'notStarted' }
+  | { state: 'skipped'; startedAt: string }
+  | { state: 'pending'; queuedAt: string }
+  | { state: 'fixing'; startedAt: string }
+  | { state: 'fixed'; completedAt: string; evidence?: string };
 
 export type CodeReviewFinding = {
-  /** Stable across rounds when a finding is re-observed or verified. */
+  /** Stable across rounds when a finding is raised again. */
   id: string;
   roundId: string;
   fingerprint: string;
@@ -36,10 +39,9 @@ export type CodeReviewFinding = {
   rationale: string;
   suggestedResolution: string;
   location?: CodeReviewLocation;
-  disposition: CodeReviewDisposition;
-  assignedAgentId?: string;
+  decision: CodeReviewDecision;
   discussion: CodeReviewDiscussionMessage[];
-  verification: CodeReviewVerification;
+  remediation: CodeReviewRemediation;
   materiallyNewEvidence?: string;
   createdAt: string;
   updatedAt: string;
@@ -49,7 +51,8 @@ export type CodeReviewRound = {
   id: string;
   number: number;
   status: 'reviewing' | 'ready' | 'submitted' | 'completed' | 'failed';
-  reviewerContextId: string;
+  /** Provider-owned hidden conversation used for review, clarification, and fixes in this round. */
+  reviewerSession?: BackendSession;
   findings: CodeReviewFinding[];
   startedAt: string;
   completedAt?: string;
@@ -98,7 +101,6 @@ export type CodeReviewLedger = {
     fingerprint: string;
     summary: string;
     suggestedResolution: string;
-    verification: CodeReviewVerification['state'];
   }>;
   behaviorDecisions: Array<{
     findingId: string;
@@ -109,11 +111,13 @@ export type CodeReviewLedger = {
 
 export type CodeReviewProgress = {
   total: number;
-  unresolved: number;
-  accepted: number;
-  declined: number;
-  awaitingVerification: number;
-  verified: number;
+  undecided: number;
+  selected: number;
+  rejected: number;
+  skipped: number;
+  pending: number;
+  fixing: number;
+  fixed: number;
 };
 
 export type CodeReviewFindingRef = {
@@ -123,13 +127,9 @@ export type CodeReviewFindingRef = {
 };
 
 export type CodeReviewDecisionInput = CodeReviewFindingRef & (
-  | { decision: 'accept' }
-  | { decision: 'decline'; reason: string }
+  | { decision: 'select' }
+  | { decision: 'reject'; reason: string }
 );
-
-export type CodeReviewAssignmentInput = CodeReviewFindingRef & {
-  assignedAgentId: string;
-};
 
 export type CodeReviewDiscussionInput = CodeReviewFindingRef & {
   question: string;
@@ -142,27 +142,22 @@ export function activeCodeReviewRound(session: CodeReviewSession): CodeReviewRou
 }
 
 export function codeReviewLedger(session: CodeReviewSession): CodeReviewLedger {
-  const latestByFindingId = new Map<string, CodeReviewFinding>();
-  for (const round of session.rounds) {
-    for (const finding of round.findings) latestByFindingId.set(finding.id, finding);
-  }
-  const findings = [...latestByFindingId.values()];
+  const findings = [...latestFindings(session).values()];
   return {
-    exclusions: findings.flatMap((finding) => finding.disposition.state === 'declined'
+    exclusions: findings.flatMap((finding) => finding.decision.state === 'rejected'
       ? [{
           findingId: finding.id,
           fingerprint: finding.fingerprint,
           summary: finding.summary,
-          reason: finding.disposition.reason,
+          reason: finding.decision.reason,
         }]
       : []),
-    regressionChecks: findings.flatMap((finding) => finding.disposition.state === 'accepted'
+    regressionChecks: findings.flatMap((finding) => finding.remediation.state === 'fixed'
       ? [{
           findingId: finding.id,
           fingerprint: finding.fingerprint,
           summary: finding.summary,
           suggestedResolution: finding.suggestedResolution,
-          verification: finding.verification.state,
         }]
       : []),
     behaviorDecisions: findings
@@ -176,20 +171,18 @@ export function codeReviewLedger(session: CodeReviewSession): CodeReviewLedger {
 }
 
 export function codeReviewProgress(session: CodeReviewSession): CodeReviewProgress {
-  const latestByFindingId = new Map<string, CodeReviewFinding>();
-  for (const round of session.rounds) {
-    for (const finding of round.findings) latestByFindingId.set(finding.id, finding);
-  }
-  const findings = [...latestByFindingId.values()];
+  const findings = [...latestFindings(session).values()];
   return findings.reduce<CodeReviewProgress>((progress, finding) => {
     progress.total += 1;
-    if (finding.disposition.state === 'unresolved') progress.unresolved += 1;
-    if (finding.disposition.state === 'accepted') progress.accepted += 1;
-    if (finding.disposition.state === 'declined') progress.declined += 1;
-    if (finding.verification.state === 'awaitingVerification') progress.awaitingVerification += 1;
-    if (finding.verification.state === 'passed') progress.verified += 1;
+    if (finding.decision.state === 'undecided') progress.undecided += 1;
+    if (finding.decision.state === 'selected') progress.selected += 1;
+    if (finding.decision.state === 'rejected') progress.rejected += 1;
+    if (finding.remediation.state === 'skipped') progress.skipped += 1;
+    if (finding.remediation.state === 'pending') progress.pending += 1;
+    if (finding.remediation.state === 'fixing') progress.fixing += 1;
+    if (finding.remediation.state === 'fixed') progress.fixed += 1;
     return progress;
-  }, { total: 0, unresolved: 0, accepted: 0, declined: 0, awaitingVerification: 0, verified: 0 });
+  }, { total: 0, undecided: 0, selected: 0, rejected: 0, skipped: 0, pending: 0, fixing: 0, fixed: 0 });
 }
 
 export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSession {
@@ -203,15 +196,31 @@ export function isCodeReviewSession(value: unknown): value is CodeReviewSession 
   return typeof value.createdAt === 'string' && typeof value.updatedAt === 'string';
 }
 
+function latestFindings(session: CodeReviewSession): Map<string, CodeReviewFinding> {
+  const latestByFindingId = new Map<string, CodeReviewFinding>();
+  for (const round of session.rounds) {
+    for (const finding of round.findings) latestByFindingId.set(finding.id, finding);
+  }
+  return latestByFindingId;
+}
+
 function isCodeReviewRound(value: unknown): value is CodeReviewRound {
   return isRecord(value)
     && typeof value.id === 'string'
     && Number.isInteger(value.number)
-    && typeof value.reviewerContextId === 'string'
+    && (value.reviewerSession === undefined || isBackendSession(value.reviewerSession))
     && isReviewRoundStatus(value.status)
     && Array.isArray(value.findings)
     && value.findings.every(isCodeReviewFinding)
     && typeof value.startedAt === 'string';
+}
+
+function isBackendSession(value: unknown): value is BackendSession {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'codex') return typeof value.threadId === 'string';
+  return value.kind === 'claude'
+    && typeof value.sessionId === 'string'
+    && (value.transport === 'stdio' || value.transport === 'websocket');
 }
 
 function isCodeReviewFinding(value: unknown): value is CodeReviewFinding {
@@ -223,36 +232,30 @@ function isCodeReviewFinding(value: unknown): value is CodeReviewFinding {
     && typeof value.summary === 'string'
     && typeof value.rationale === 'string'
     && typeof value.suggestedResolution === 'string'
-    && isDisposition(value.disposition)
+    && isDecision(value.decision)
     && Array.isArray(value.discussion)
     && value.discussion.every(isDiscussionMessage)
-    && isVerification(value.verification)
+    && isRemediation(value.remediation)
     && typeof value.createdAt === 'string'
     && typeof value.updatedAt === 'string';
 }
 
-function isDisposition(value: unknown): value is CodeReviewDisposition {
+function isDecision(value: unknown): value is CodeReviewDecision {
   if (!isRecord(value)) return false;
-  if (value.state === 'unresolved') return true;
-  if (value.state === 'accepted') return typeof value.decidedAt === 'string';
-  return value.state === 'declined' && typeof value.decidedAt === 'string' && typeof value.reason === 'string';
+  if (value.state === 'undecided') return true;
+  if (value.state === 'selected') return typeof value.decidedAt === 'string';
+  return value.state === 'rejected' && typeof value.decidedAt === 'string' && typeof value.reason === 'string';
 }
 
-function isVerification(value: unknown): value is CodeReviewVerification {
+function isRemediation(value: unknown): value is CodeReviewRemediation {
   if (!isRecord(value) || typeof value.state !== 'string') return false;
-  if (value.state === 'notRequested') return true;
-  if (value.state === 'queued') return typeof value.assignedAgentId === 'string' && typeof value.requestedAt === 'string';
-  if (value.state === 'fixing') return typeof value.assignedAgentId === 'string' && typeof value.startedAt === 'string';
-  if (value.state === 'awaitingVerification') return typeof value.assignedAgentId === 'string' && typeof value.completedAt === 'string';
-  if (value.state === 'passed') {
-    return typeof value.verifiedAt === 'string'
-      && typeof value.roundId === 'string'
-      && (value.evidence === undefined || typeof value.evidence === 'string');
-  }
-  return value.state === 'failed'
-    && typeof value.verifiedAt === 'string'
-    && typeof value.roundId === 'string'
-    && typeof value.evidence === 'string';
+  if (value.state === 'notStarted') return true;
+  if (value.state === 'skipped') return typeof value.startedAt === 'string';
+  if (value.state === 'pending') return typeof value.queuedAt === 'string';
+  if (value.state === 'fixing') return typeof value.startedAt === 'string';
+  return value.state === 'fixed'
+    && typeof value.completedAt === 'string'
+    && (value.evidence === undefined || typeof value.evidence === 'string');
 }
 
 function isDiscussionMessage(value: unknown): value is CodeReviewDiscussionMessage {

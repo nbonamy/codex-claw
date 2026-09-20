@@ -734,7 +734,6 @@ export type DesktopUpdateStatus = {
 export type CodexClawApi = {
   startCodeReview(agentId: string): Promise<AppSnapshot>;
   decideCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDecisionInput): Promise<AppSnapshot>;
-  assignCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewAssignmentInput): Promise<AppSnapshot>;
   discussCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDiscussionInput): Promise<AppSnapshot>;
   submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot>;
   finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;

@@ -99,6 +99,12 @@
       :close-repository-work-agent="(agentId) => $emit('close-agent', agentId)"
       :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
       :show-repository-work-agent="selectAgentFromShell"
+      :start-code-review="startCodeReview"
+      :decide-code-review-finding="decideCodeReviewFinding"
+      :discuss-code-review-finding="discussCodeReviewFinding"
+      :submit-code-review-round="submitCodeReviewRound"
+      :finish-code-review="finishCodeReview"
+      :review-code-again="reviewCodeAgain"
       @close-tab="closeRightWorkspaceTab(agent.id, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
@@ -253,6 +259,12 @@ const props = defineProps<{
   updateStatus?: DesktopUpdateStatus;
   commitAgentGitChanges: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
+  startCodeReview?: (agentId: string) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
+  submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>();
 
 const agentHeader = ref<{
@@ -303,6 +315,12 @@ const {
   selectRightWorkspaceTab,
   snapshot,
   startRepositoryWork,
+  startCodeReview,
+  decideCodeReviewFinding,
+  discussCodeReviewFinding,
+  submitCodeReviewRound,
+  finishCodeReview,
+  reviewCodeAgain,
   startRightWorkspaceResize,
   toggleFileExplorer,
   toggleRightWorkspace,

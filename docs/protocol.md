@@ -119,11 +119,10 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
 | `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt and clears only after acceptance. |
 | `agent/codeReview/start` | `{ agentId }` | `AppSnapshot` | Starts an independent reviewer context against the agent workspace and creates its active durable review ledger. |
-| `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Accepts or declines a stable finding; declines require a reason. |
-| `agent/codeReview/finding/assign` | `{ agentId, input }` | `AppSnapshot` | Assigns an accepted finding to an agent. |
-| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked question and obtains the reviewer response without exposing UI commands to the provider. |
-| `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Validates arbitration and sends accepted findings to their assigned agents. |
-| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Starts a fresh reviewer context with declined exclusions, accepted regression checks, and behavior decisions from prior discussion. |
+| `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Selects or rejects a stable finding; rejection requires a reason. Decisions are not remediation statuses. |
+| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the same hidden reviewer conversation for its response. |
+| `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Validates arbitration, maps rejected findings to `skipped` and selected findings to `pending`, then fixes pending findings one at a time in the same reviewer conversation. |
+| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Starts a fresh reviewer conversation with rejected exclusions, fixed regression checks, and behavior decisions from prior discussion. |
 | `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. |
 
 ## Client To `clawd`: System
@@ -320,6 +319,7 @@ implementation messages, not the preferred app protocol for clients.
 | `workspace/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
 | `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
+| `driver/codeReview/run` | `{ agent, prompt, cwd, reviewMcpServerUrl, reviewerSession? }` | `BackendCodeReviewResult` | Creates a fresh provider conversation when `reviewerSession` is absent; otherwise continues that opaque provider session. |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
 | `driver/conversation/replaceWithSummary` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |

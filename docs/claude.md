@@ -91,6 +91,11 @@ agent-identity, instruction, MCP, or permission-safety change restarts and
 resumes the query so stale configuration cannot leak into later turns. The
 transport configures:
 
+Code review uses a hidden Claude session separate from the owning agent's normal
+chat. The initial review pass starts a fresh session with only the round-scoped
+finding tools added; clarification and sequential remediation resume that same
+session id. `Review again` intentionally omits it and starts a fresh session.
+
 - the Claude Code system-prompt and tool presets;
 - user, project, and local setting sources;
 - the active Claw agent's working directory, model, and permission mode;

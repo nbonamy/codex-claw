@@ -14,6 +14,12 @@
     :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
     :respond-to-thread-flag-action="respondToThreadFlag"
+    :start-code-review="startCodeReview"
+    :decide-code-review-finding="decideCodeReviewFinding"
+    :discuss-code-review-finding="discussCodeReviewFinding"
+    :submit-code-review-round="submitCodeReviewRound"
+    :finish-code-review="finishCodeReview"
+    :review-code-again="reviewCodeAgain"
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
     :retry-turn-action="retryTurn"
@@ -378,6 +384,12 @@ const {
   sendPrompt,
   respondToPlanReview,
   respondToThreadFlag,
+  startCodeReview,
+  decideCodeReviewFinding,
+  discussCodeReviewFinding,
+  submitCodeReviewRound,
+  finishCodeReview,
+  reviewCodeAgain,
   sendAgentPrompt,
   steerPrompt,
   interruptActiveAgent,

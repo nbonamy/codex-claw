@@ -244,6 +244,12 @@
         :toggle-file-explorer="toggleFileExplorer"
         :toggle-right-workspace="toggleRightWorkspace"
         :update-status="updateStatus"
+        :start-code-review="props.startCodeReview"
+        :decide-code-review-finding="props.decideCodeReviewFinding"
+        :discuss-code-review-finding="props.discussCodeReviewFinding"
+        :submit-code-review-round="props.submitCodeReviewRound"
+        :finish-code-review="props.finishCodeReview"
+        :review-code-again="props.reviewCodeAgain"
         @close-agent="$emit('close-agent', $event)"
         @expand-sidebar="agentSidebarCollapsed = false"
         @install-update="emit('install-update')"
@@ -604,6 +610,12 @@ const props = withDefaults(defineProps<{
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
   quit?: () => Promise<void>;
+  startCodeReview?: (agentId: string) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
+  submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   approvals: () => [],
@@ -636,6 +648,12 @@ const props = withDefaults(defineProps<{
   assignedWorkItemsByProvider: () => ({}),
   workBacklogStatus: 'notLoaded',
   workBacklogError: null,
+  startCodeReview: async () => { throw new Error('Code review is not available.'); },
+  decideCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
+  discussCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
+  submitCodeReviewRound: async () => { throw new Error('Code review is not available.'); },
+  finishCodeReview: async () => { throw new Error('Code review is not available.'); },
+  reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
   daemonStatus: null,
   daemonStatusError: null,
   codexResourceSharingMigrationRequired: false,
@@ -1626,7 +1644,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openDebugImageAnnotation,
     openDebugOperationProgress,
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
-    openGitReview: openAgentGitDiffPreview,
+    openGitReview: () => openRightWorkspaceTab('codeReview'),
     openMarkdown: openMarkdownRequest,
     openRightWorkspaceTab: (tab) => openRightWorkspaceTab(tab),
     openSettings,

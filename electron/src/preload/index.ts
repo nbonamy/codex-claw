@@ -8,7 +8,6 @@ const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRe
 const api: CodexClawApi = {
   startCodeReview: (agentId) => ipc.invoke(ipcChannels.startCodeReview, agentId),
   decideCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.decideCodeReviewFinding, agentId, input),
-  assignCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.assignCodeReviewFinding, agentId, input),
   discussCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.discussCodeReviewFinding, agentId, input),
   submitCodeReviewRound: (agentId, sessionId) => ipc.invoke(ipcChannels.submitCodeReviewRound, agentId, sessionId),
   finishCodeReview: (agentId, sessionId) => ipc.invoke(ipcChannels.finishCodeReview, agentId, sessionId),

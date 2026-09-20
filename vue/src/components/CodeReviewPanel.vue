@@ -1,0 +1,953 @@
+<template>
+  <section class="code-review-panel" :aria-label="$t('surface.codeReviewPanel.codeReview')">
+    <div v-if="!session" class="code-review-panel__empty">
+      <span class="code-review-panel__empty-icon"
+        ><IconChecklist aria-hidden="true"
+      /></span>
+      <h2>{{ $t('surface.codeReviewPanel.reviewThisBranch') }}</h2>
+      <p>{{ $t('surface.codeReviewPanel.startDescription') }}</p>
+      <button
+        class="claw-button claw-button--primary"
+        type="button"
+        :disabled="busy"
+        @click="run(() => startReview(agent.id))"
+      >
+        <IconSparkles aria-hidden="true" />
+        {{ $t('surface.codeReviewPanel.startReview') }}
+      </button>
+    </div>
+
+    <template v-else>
+      <header class="code-review-panel__header">
+        <div>
+          <span class="code-review-panel__eyebrow">{{ $t('surface.codeReviewPanel.codeReview') }}</span>
+          <h2>{{ sessionTitle }}</h2>
+        </div>
+        <span class="code-review-panel__status" :data-status="session.status">{{
+          sessionStatus
+        }}</span>
+      </header>
+
+      <div
+        class="code-review-panel__rounds"
+        role="tablist"
+        :aria-label="$t('surface.codeReviewPanel.reviewRounds')"
+      >
+        <button
+          v-for="round in session.rounds"
+          :key="round.id"
+          type="button"
+          role="tab"
+          :aria-selected="selectedRoundId === round.id"
+          :class="{ 'is-active': selectedRoundId === round.id }"
+          @click="selectedRoundId = round.id"
+        >
+          {{ $t('surface.codeReviewPanel.roundNumber', { number: round.number }) }}
+          <span>{{ round.findings.length }}</span>
+        </button>
+      </div>
+
+      <div
+        class="code-review-panel__progress"
+        :aria-label="$t('surface.codeReviewPanel.cumulativeProgress')"
+      >
+        <span v-for="item in progressItems" :key="item.label"
+          ><strong>{{ item.value }}</strong> {{ item.label }}</span
+        >
+      </div>
+
+      <div
+        v-if="selectedRound?.status === 'reviewing'"
+        class="code-review-panel__working"
+        aria-live="polite"
+      >
+        <span class="code-review-panel__spinner" aria-hidden="true" />
+        <div>
+          <strong>{{ $t('surface.codeReviewPanel.reviewInProgress') }}</strong
+          ><span>{{ $t('surface.codeReviewPanel.reviewerInspecting') }}</span>
+        </div>
+      </div>
+
+      <p
+        v-else-if="selectedRound?.status === 'failed'"
+        class="code-review-panel__error"
+        role="alert"
+      >
+        {{ selectedRound.error || $t('surface.codeReviewPanel.reviewRoundFailed') }}
+      </p>
+
+      <div v-else-if="findings.length === 0" class="code-review-panel__clear">
+        <IconCircleCheck aria-hidden="true" />
+        <strong>{{ $t('surface.codeReviewPanel.noFindings') }}</strong>
+        <span>{{ $t('surface.codeReviewPanel.noFindingsDescription') }}</span>
+      </div>
+
+      <ol v-else class="code-review-panel__findings">
+        <li
+          v-for="finding in findings"
+          :id="`finding-${finding.id}`"
+          :key="`${selectedRound?.id}:${finding.id}`"
+          class="review-finding"
+          :data-priority="finding.priority"
+          :data-state="findingState(finding)"
+          :data-decision="finding.decision.state"
+        >
+          <div class="review-finding__summary-row">
+            <button
+              class="review-finding__toggle"
+              type="button"
+              :aria-expanded="isFindingExpanded(finding.id)"
+              :aria-controls="`finding-details-${finding.id}`"
+              @click="toggleFinding(finding.id)"
+            >
+              <span class="review-finding__priority">{{
+                finding.priority.toUpperCase()
+              }}</span>
+              <span class="review-finding__summary">
+                <strong>{{ finding.summary }}</strong>
+              </span>
+              <span v-if="findingStateLabel(finding)" class="review-finding__state">{{ findingStateLabel(finding) }}</span>
+              <IconChevronDown
+                class="review-finding__chevron"
+                aria-hidden="true"
+              />
+            </button>
+
+            <div v-if="canArbitrate" class="review-finding__quick-actions">
+              <button
+                class="claw-button claw-button--tertiary review-finding__quick-action"
+                type="button"
+                :aria-pressed="finding.decision.state === 'selected'"
+                :disabled="busy"
+                @click="selectFinding(finding)"
+              >
+                <IconCheck aria-hidden="true" /> {{ $t('surface.codeReviewPanel.select') }}
+              </button>
+              <button
+                class="claw-button claw-button--tertiary review-finding__quick-action"
+                type="button"
+                :aria-pressed="finding.decision.state === 'rejected'"
+                :aria-expanded="decliningId === finding.id"
+                :aria-controls="`finding-reject-${finding.id}`"
+                :disabled="busy"
+                @click="toggleDecline(finding.id)"
+              >
+                <IconX aria-hidden="true" /> {{ $t('surface.codeReviewPanel.reject') }}
+              </button>
+              <button
+                class="claw-button claw-button--tertiary review-finding__quick-action"
+                type="button"
+                :aria-expanded="discussingId === finding.id"
+                :aria-controls="`finding-clarify-${finding.id}`"
+                :disabled="busy"
+                @click="toggleDiscussion(finding)"
+              >
+                <IconMessageCircle aria-hidden="true" /> {{ $t('surface.codeReviewPanel.clarify') }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="isFindingExpanded(finding.id)"
+            :id="`finding-details-${finding.id}`"
+            class="review-finding__body"
+          >
+            <button
+              v-if="finding.location"
+              class="review-finding__location"
+              type="button"
+              @click="emit('openFile', finding.location.file)"
+            >
+              {{ locationLabel(finding) }}
+            </button>
+            <p class="review-finding__rationale">{{ finding.rationale }}</p>
+            <p class="review-finding__resolution">
+              <strong>{{ $t('surface.codeReviewPanel.suggestedResolution') }}:</strong>
+              {{ finding.suggestedResolution }}
+            </p>
+
+            <blockquote
+              v-if="finding.decision.state === 'rejected'"
+              class="review-finding__decision"
+            >
+              <strong>{{ $t('surface.codeReviewPanel.stateRejected') }}</strong>
+              {{ finding.decision.reason }}
+            </blockquote>
+
+            <div
+              v-if="finding.discussion.length"
+              class="review-finding__discussion"
+              :aria-label="$t('surface.codeReviewPanel.findingDiscussion')"
+            >
+              <article
+                v-for="message in finding.discussion"
+                :key="message.id"
+                :data-author="message.author"
+              >
+                <strong>{{
+                  message.author === "user"
+                    ? $t('surface.codeReviewPanel.you')
+                    : $t('surface.codeReviewPanel.reviewer')
+                }}</strong>
+                <p>{{ message.body }}</p>
+              </article>
+            </div>
+          </div>
+
+          <form
+            v-if="canArbitrate && decliningId === finding.id"
+            :id="`finding-reject-${finding.id}`"
+            class="review-finding__composer"
+            @submit.prevent="decline(finding)"
+          >
+            <label :for="`decline-${finding.id}`"
+              >{{ $t('surface.codeReviewPanel.rejectReason') }}</label
+            >
+            <textarea
+              :id="`decline-${finding.id}`"
+              v-model="declineReason"
+              rows="2"
+              required
+            />
+            <button
+              class="claw-button claw-button--primary"
+              type="submit"
+              :disabled="busy || !declineReason.trim()"
+            >
+              {{ $t('surface.codeReviewPanel.rejectFinding') }}
+            </button>
+          </form>
+
+          <form
+            v-if="canArbitrate && discussingId === finding.id"
+            :id="`finding-clarify-${finding.id}`"
+            class="review-finding__composer"
+            @submit.prevent="ask(finding)"
+          >
+            <label :for="`question-${finding.id}`"
+              >{{ $t('surface.codeReviewPanel.questionAboutFinding') }}</label
+            >
+            <textarea
+              :id="`question-${finding.id}`"
+              v-model="question"
+              rows="7"
+              required
+            />
+            <button
+              class="claw-button claw-button--secondary"
+              type="submit"
+              :disabled="busy || !question.trim()"
+            >
+              {{ $t('surface.codeReviewPanel.askReviewer') }}
+            </button>
+          </form>
+        </li>
+      </ol>
+
+      <footer
+        v-if="selectedRoundId === session.activeRoundId"
+        class="code-review-panel__footer"
+      >
+        <template v-if="session.status === 'ready'">
+          <span>{{ footerMessage }}</span>
+          <button
+            class="claw-button claw-button--primary"
+            type="button"
+            :disabled="busy || !canSubmit"
+            @click="submitRound"
+          >
+            {{ selectedCount ? $t('surface.codeReviewPanel.remediateSelected') : $t('surface.codeReviewPanel.completeRound') }}
+          </button>
+        </template>
+        <template v-else-if="session.status === 'fixing'">
+          <span>{{ $t('surface.codeReviewPanel.fixesInProgressDescription') }}</span>
+        </template>
+        <template v-else-if="session.status === 'readyToFinish'">
+          <button
+            class="claw-button claw-button--secondary"
+            type="button"
+            :disabled="busy"
+            @click="run(() => finishReview(agent.id, session!.id))"
+          >
+            {{ $t('surface.codeReviewPanel.finishReview') }}
+          </button>
+          <button
+            class="claw-button claw-button--primary"
+            type="button"
+            :disabled="busy"
+            @click="run(() => reviewAgain(agent.id, session!.id))"
+          >
+            {{ $t('surface.codeReviewPanel.reviewAgain') }}
+          </button>
+        </template>
+        <template v-else-if="session.status === 'finished'">
+          <span>{{ $t('surface.codeReviewPanel.reviewFinished') }}</span>
+          <button
+            class="claw-button claw-button--primary"
+            type="button"
+            :disabled="busy"
+            @click="run(() => startReview(agent.id))"
+          >
+            {{ $t('surface.codeReviewPanel.startNewReview') }}
+          </button>
+        </template>
+        <template v-else-if="session.status === 'failed'">
+          <span>{{ $t('surface.codeReviewPanel.reviewStopped') }}</span>
+          <button
+            class="claw-button claw-button--primary"
+            type="button"
+            :disabled="busy"
+            @click="run(() => startReview(agent.id))"
+          >
+            {{ $t('surface.codeReviewPanel.retryReview') }}
+          </button>
+        </template>
+      </footer>
+    </template>
+    <p v-if="error" class="code-review-panel__error" role="alert">
+      {{ error }}
+    </p>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import {
+  IconCheck,
+  IconChecklist,
+  IconChevronDown,
+  IconCircleCheck,
+  IconMessageCircle,
+  IconSparkles,
+  IconX,
+} from "@tabler/icons-vue";
+import {
+  codeReviewProgress,
+  type CodeReviewFinding,
+} from "@codex-claw/core/code-review";
+import type { Agent, AppSnapshot } from "@codex-claw/core/contracts";
+
+const props = defineProps<{
+  agent: Agent;
+  startReview: (agentId: string) => Promise<AppSnapshot>;
+  decideFinding: (
+    agentId: string,
+    input: import("@codex-claw/core/code-review").CodeReviewDecisionInput,
+  ) => Promise<AppSnapshot>;
+  discussFinding: (
+    agentId: string,
+    input: import("@codex-claw/core/code-review").CodeReviewDiscussionInput,
+  ) => Promise<AppSnapshot>;
+  submitReviewRound: (
+    agentId: string,
+    sessionId: string,
+  ) => Promise<AppSnapshot>;
+  finishReview: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  reviewAgain: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+}>();
+
+const { t } = useI18n();
+const emit = defineEmits<{ openFile: [path: string] }>();
+const busy = ref(false);
+const error = ref<string | null>(null);
+const selectedRoundId = ref("");
+const decliningId = ref<string | null>(null);
+const declineReason = ref("");
+const discussingId = ref<string | null>(null);
+const question = ref("");
+const expandedFindingId = ref<string | null>(null);
+const session = computed(() => props.agent.codeReview ?? null);
+const selectedRound = computed(
+  () =>
+    session.value?.rounds.find((round) => round.id === selectedRoundId.value) ??
+    session.value?.rounds.at(-1),
+);
+const findings = computed(() =>
+  [...(selectedRound.value?.findings ?? [])].sort(
+    (a, b) => priorityRank(a.priority) - priorityRank(b.priority),
+  ),
+);
+const progress = computed(() =>
+  session.value
+    ? codeReviewProgress(session.value)
+    : {
+        total: 0,
+        undecided: 0,
+        selected: 0,
+        rejected: 0,
+        skipped: 0,
+        pending: 0,
+        fixing: 0,
+        fixed: 0,
+      },
+);
+const progressItems = computed(() =>
+  session.value?.status === "ready"
+    ? [
+        { value: progress.value.undecided, label: t("surface.codeReviewPanel.undecided") },
+        { value: progress.value.selected, label: t("surface.codeReviewPanel.selected") },
+        { value: progress.value.rejected, label: t("surface.codeReviewPanel.rejected") },
+        { value: progress.value.fixed, label: t("surface.codeReviewPanel.fixed") },
+      ]
+    : [
+        { value: progress.value.skipped, label: t("surface.codeReviewPanel.skipped") },
+        { value: progress.value.pending, label: t("surface.codeReviewPanel.pending") },
+        { value: progress.value.fixing, label: t("surface.codeReviewPanel.fixing") },
+        { value: progress.value.fixed, label: t("surface.codeReviewPanel.fixed") },
+      ],
+);
+const canArbitrate = computed(
+  () =>
+    session.value?.status === "ready" &&
+    selectedRoundId.value === session.value.activeRoundId,
+);
+const undecidedCount = computed(
+  () =>
+    selectedRound.value?.findings.filter(
+      (finding) => finding.decision.state === "undecided",
+    ).length ?? 0,
+);
+const selectedCount = computed(
+  () =>
+    selectedRound.value?.findings.filter(
+      (finding) => finding.decision.state === "selected",
+    ).length ?? 0,
+);
+const canSubmit = computed(() => undecidedCount.value === 0);
+const sessionTitle = computed(
+  () =>
+    t("surface.codeReviewPanel.roundNumber", {
+      number: selectedRound.value?.number ?? session.value?.rounds.length ?? 1,
+    }),
+);
+const sessionStatus = computed(
+  () =>
+    ({
+      reviewing: t("surface.codeReviewPanel.statusReviewing"),
+      ready: t("surface.codeReviewPanel.statusReady"),
+      fixing: t("surface.codeReviewPanel.statusFixing"),
+      readyToFinish: t("surface.codeReviewPanel.statusReadyToFinish"),
+      finished: t("surface.codeReviewPanel.statusFinished"),
+      failed: t("surface.codeReviewPanel.statusFailed"),
+    })[session.value?.status ?? "reviewing"],
+);
+const footerMessage = computed(() => {
+  if (undecidedCount.value === 1) {
+    return t("surface.codeReviewPanel.resolveOneFinding");
+  }
+  if (undecidedCount.value > 1) {
+    return t("surface.codeReviewPanel.resolveFindings", {
+      count: undecidedCount.value,
+    });
+  }
+  return t("surface.codeReviewPanel.decisionsReady");
+});
+
+watch(
+  () => session.value?.activeRoundId,
+  (roundId) => {
+    if (roundId) selectedRoundId.value = roundId;
+    expandedFindingId.value = null;
+    decliningId.value = null;
+    discussingId.value = null;
+  },
+  { immediate: true },
+);
+
+async function run(action: () => Promise<unknown>): Promise<void> {
+  busy.value = true;
+  error.value = null;
+  try {
+    await action();
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  } finally {
+    busy.value = false;
+  }
+}
+
+function selectFinding(finding: CodeReviewFinding): void {
+  const round = selectedRound.value;
+  if (!session.value || !round) return;
+  if (decliningId.value === finding.id) decliningId.value = null;
+  if (discussingId.value === finding.id) discussingId.value = null;
+  void run(() =>
+    props.decideFinding(props.agent.id, {
+      sessionId: session.value!.id,
+      roundId: round.id,
+      findingId: finding.id,
+      decision: "select",
+    }),
+  );
+}
+
+function toggleDecline(findingId: string): void {
+  decliningId.value = decliningId.value === findingId ? null : findingId;
+  discussingId.value = null;
+  declineReason.value = "";
+}
+
+function decline(finding: CodeReviewFinding): void {
+  const round = selectedRound.value;
+  if (!session.value || !round || !declineReason.value.trim()) return;
+  const reason = declineReason.value.trim();
+  void run(async () => {
+    await props.decideFinding(props.agent.id, {
+      sessionId: session.value!.id,
+      roundId: round.id,
+      findingId: finding.id,
+      decision: "reject",
+      reason,
+    });
+    decliningId.value = null;
+    declineReason.value = "";
+  });
+}
+
+function toggleDiscussion(finding: CodeReviewFinding): void {
+  discussingId.value = discussingId.value === finding.id ? null : finding.id;
+  decliningId.value = null;
+  question.value = discussingId.value ? clarificationPrompt(finding) : "";
+}
+
+function ask(finding: CodeReviewFinding): void {
+  const round = selectedRound.value;
+  if (!session.value || !round || !question.value.trim()) return;
+  const body = question.value.trim();
+  void run(async () => {
+    await props.discussFinding(props.agent.id, {
+      sessionId: session.value!.id,
+      roundId: round.id,
+      findingId: finding.id,
+      question: body,
+    });
+    discussingId.value = null;
+    question.value = "";
+  });
+}
+
+function submitRound(): void {
+  if (!session.value) return;
+  void run(() => props.submitReviewRound(props.agent.id, session.value!.id));
+}
+
+function findingState(finding: CodeReviewFinding): string {
+  return finding.remediation.state;
+}
+
+function findingStateLabel(finding: CodeReviewFinding): string {
+  const state = findingState(finding);
+  return (
+    (
+      {
+        notStarted: "",
+        skipped: t("surface.codeReviewPanel.stateSkipped"),
+        pending: t("surface.codeReviewPanel.statePending"),
+        fixing: t("surface.codeReviewPanel.stateFixing"),
+        fixed: t("surface.codeReviewPanel.stateFixed"),
+      } as Record<string, string>
+    )[state] ?? state
+  );
+}
+
+function clarificationPrompt(finding: CodeReviewFinding): string {
+  const location = finding.location ? `\nLocation: ${locationLabel(finding)}` : "";
+  return `Finding ${finding.id}: ${finding.summary}${location}\n\n${finding.rationale}\nSuggested fix: ${finding.suggestedResolution}\n\nQuestion: `;
+}
+
+function isFindingExpanded(findingId: string): boolean {
+  return expandedFindingId.value === findingId;
+}
+
+function toggleFinding(findingId: string): void {
+  expandedFindingId.value =
+    expandedFindingId.value === findingId ? null : findingId;
+  if (expandedFindingId.value) {
+    void nextTick(() => {
+      document
+        .getElementById(`finding-${findingId}`)
+        ?.scrollIntoView?.({ block: "nearest" });
+    });
+  }
+}
+
+function locationLabel(finding: CodeReviewFinding): string {
+  if (!finding.location) return "";
+  const { file, line, endLine } = finding.location;
+  if (!line) return file;
+  return `${file}:${line}${endLine && endLine !== line ? `–${endLine}` : ""}`;
+}
+
+function priorityRank(priority: CodeReviewFinding["priority"]): number {
+  return { p0: 0, p1: 1, p2: 2, p3: 3 }[priority];
+}
+</script>
+
+<style scoped>
+.code-review-panel {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.code-review-panel__empty {
+  margin: auto;
+  max-width: 340px;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+}
+.code-review-panel__empty h2,
+.code-review-panel__header h2 {
+  margin: 0;
+  font-size: var(--font-size-18);
+}
+.code-review-panel__empty p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+.code-review-panel__empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+.code-review-panel__empty-icon svg {
+  width: 26px;
+  height: 26px;
+}
+.code-review-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+.code-review-panel__eyebrow {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.code-review-panel__status,
+.review-finding__state {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-low);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  white-space: nowrap;
+}
+.code-review-panel__status[data-status="ready"],
+.code-review-panel__status[data-status="readyToFinish"] {
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+.code-review-panel__rounds {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6) 0;
+  overflow-x: auto;
+}
+.code-review-panel__rounds button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-2) var(--space-1);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.code-review-panel__rounds button.is-active {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+.code-review-panel__rounds span {
+  margin-left: var(--space-1);
+  font-size: var(--font-size-11);
+}
+.code-review-panel__progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-border);
+}
+.code-review-panel__progress span {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  background: var(--color-surface-low);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+}
+.code-review-panel__progress strong {
+  color: var(--color-text);
+  font-size: var(--font-size-16);
+}
+.code-review-panel__working,
+.code-review-panel__clear {
+  margin: auto;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+}
+.code-review-panel__working div,
+.code-review-panel__clear {
+  line-height: 1.4;
+}
+.code-review-panel__working span,
+.code-review-panel__clear span {
+  display: block;
+}
+.code-review-panel__clear svg {
+  color: var(--color-success);
+}
+.code-review-panel__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: review-spin 0.8s linear infinite;
+}
+@keyframes review-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.code-review-panel__findings {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 var(--space-6) var(--space-6);
+  list-style: none;
+}
+.review-finding {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+.review-finding[data-state="fixing"],
+.review-finding[data-state="pending"] {
+  border-color: var(--color-primary);
+}
+.review-finding[data-state="skipped"] {
+  opacity: 0.74;
+}
+.review-finding[data-state="fixed"] {
+  border-color: var(--color-success);
+}
+.review-finding__toggle {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.review-finding__toggle:hover,
+.review-finding__toggle:focus-visible {
+  background: var(--color-surface-low);
+}
+.review-finding__summary {
+  flex: 1;
+  min-width: 0;
+}
+.review-finding__summary strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+}
+.review-finding__priority {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-error-container);
+  color: var(--color-error);
+  font-weight: 700;
+  font-size: var(--font-size-11);
+}
+.review-finding[data-priority="p2"] .review-finding__priority,
+.review-finding[data-priority="p3"] .review-finding__priority {
+  background: var(--color-surface-high);
+  color: var(--color-text-muted);
+}
+.review-finding__chevron {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-muted);
+  transition: transform 120ms ease;
+}
+.review-finding__toggle[aria-expanded="true"] .review-finding__chevron {
+  transform: rotate(180deg);
+}
+.review-finding__quick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.review-finding__quick-action {
+  min-height: 28px;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-12);
+}
+.review-finding__quick-action svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+.review-finding__quick-action[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+.review-finding__location {
+  justify-self: start;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-12);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.review-finding__body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border);
+}
+.review-finding__composer label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.review-finding__body p,
+.review-finding__discussion p {
+  margin: 0;
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+.review-finding__resolution {
+  color: var(--color-text-muted);
+}
+.review-finding__resolution strong {
+  color: var(--color-text);
+}
+.review-finding__decision {
+  margin: 0;
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-text-muted);
+  background: var(--color-surface-low);
+}
+.review-finding__decision strong {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+.review-finding__composer {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.review-finding__composer textarea {
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+}
+.review-finding__composer .claw-button {
+  justify-self: end;
+}
+.review-finding__discussion {
+  display: grid;
+  gap: var(--space-2);
+}
+.review-finding__discussion article {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.review-finding__discussion article[data-author="reviewer"] {
+  border-left: 2px solid var(--color-primary);
+}
+.review-finding__discussion strong {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+}
+.code-review-panel__footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.code-review-panel__footer > span {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+.code-review-panel__error {
+  margin: var(--space-4) var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  background: var(--color-error-container);
+  font-size: var(--font-size-13);
+}
+</style>

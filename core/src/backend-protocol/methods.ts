@@ -4,7 +4,6 @@ export const backendMethods = {
   agentApprovalPresetUpdate: 'agent/approvalPreset/update',
   agentCodeReviewStart: 'agent/codeReview/start',
   agentCodeReviewFindingDecide: 'agent/codeReview/finding/decide',
-  agentCodeReviewFindingAssign: 'agent/codeReview/finding/assign',
   agentCodeReviewFindingDiscuss: 'agent/codeReview/finding/discuss',
   agentCodeReviewRoundSubmit: 'agent/codeReview/round/submit',
   agentCodeReviewFinish: 'agent/codeReview/finish',

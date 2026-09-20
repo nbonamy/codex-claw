@@ -39,7 +39,6 @@ describe('ipc channels', () => {
     expect(ipcChannels).toStrictEqual({
       startCodeReview: 'agent:code-review:start',
       decideCodeReviewFinding: 'agent:code-review:finding:decide',
-      assignCodeReviewFinding: 'agent:code-review:finding:assign',
       discussCodeReviewFinding: 'agent:code-review:finding:discuss',
       submitCodeReviewRound: 'agent:code-review:round:submit',
       finishCodeReview: 'agent:code-review:finish',

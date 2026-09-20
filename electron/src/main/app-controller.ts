@@ -519,9 +519,6 @@ export class AppController {
     ipc.handle(ipcChannels.decideCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingDecide, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.assignCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewAssignmentInput) => (
-      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingAssign, { agentId, input }))
-    ));
     ipc.handle(ipcChannels.discussCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingDiscuss, { agentId, input }))
     ));

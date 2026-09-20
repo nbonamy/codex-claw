@@ -21,7 +21,7 @@ import {
   type ClaudeConversationReplica,
 } from '@codex-claw/core/claude-conversation-replica';
 import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
-import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
+import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
@@ -142,13 +142,18 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return this.catalog.listSkills(agent);
   }
 
-  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<{ text: string }> {
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult> {
+    if (input.reviewerSession && input.reviewerSession.kind !== 'claude') {
+      throw new Error('Claude cannot continue a non-Claude review conversation.');
+    }
     const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
     const assistantText: string[] = [];
+    let sessionId = input.reviewerSession?.sessionId ?? null;
     const handle = this.transport.startTurn({
       ownerId: agent.id,
       cwd: input.cwd,
       prompt: input.prompt,
+      ...(sessionId ? { sessionId } : {}),
       model: defaults?.model ?? null,
       effort: claudeEffort(defaults?.reasoningEffort),
       permissionMode: defaults?.permissionMode ?? null,
@@ -162,13 +167,18 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         'mcp__codex_claw__mark_finding_complete',
       ],
     }, (message) => {
+      sessionId = claudeMessageSessionId(message) ?? sessionId;
       if (message.type !== 'assistant') return;
       for (const block of claudeMessageContentBlocks(message)) {
         if (block.type === 'text' && typeof block.text === 'string') assistantText.push(block.text);
       }
     });
     await handle.done;
-    return { text: assistantText.join('\n').trim() };
+    if (!sessionId) throw new Error('Claude did not create a review conversation.');
+    return {
+      text: assistantText.join('\n').trim(),
+      reviewerSession: { kind: 'claude', sessionId, transport: 'stdio' },
+    };
   }
 
   async setPermissionMode(agent: Agent, mode: string): Promise<BackendPermissionModeResult> {

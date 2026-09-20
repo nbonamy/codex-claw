@@ -206,6 +206,14 @@ detaching the agent. On startup, `clawd` reconciles the isolated Claw
 archived through the SDK, while an attached conversation found in the archived
 catalog is restored after an interrupted lifecycle transaction. Claw never
 scans or moves rollout files itself.
+
+Code review uses a separate hidden Codex conversation from the owning agent's
+normal chat. The initial pass creates it with the round-scoped finding tools;
+finding clarification and sequential remediation load and continue that same
+thread. `Review again` creates a new hidden thread. Claw persists only the opaque
+thread reference with its app-owned review round and keeps findings out of the
+provider transcript model.
+
 `thread/settings/updated`
 confirms the active thread settings and should update the app-owned
 agent/session mapping so the id is saved in backend-owned state and reused

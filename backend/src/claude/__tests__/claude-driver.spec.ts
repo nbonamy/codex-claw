@@ -558,9 +558,26 @@ describe('ClaudeBackendDriver', () => {
       ],
     }), expect.any(Function));
     expect(transport.startTurn.mock.calls[0]?.[0].sessionId).toBeUndefined();
-    transport.emit({ type: 'assistant', message: { content: [{ type: 'text', text: 'The finding is reachable.' }] } });
+    transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'The finding is reachable.' }] } });
     transport.resolveDone();
-    await expect(review).resolves.toEqual({ text: 'The finding is reachable.' });
+    const result = await review;
+    expect(result).toEqual({
+      text: 'The finding is reachable.',
+      reviewerSession: { kind: 'claude', sessionId: 'review-session-1', transport: 'stdio' },
+    });
+
+    const clarification = driver.runCodeReview(agent, {
+      cwd: '/Users/nbonamy/src/codex-claw',
+      prompt: 'Clarify this finding.',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-2',
+      reviewerSession: result.reviewerSession,
+    });
+    expect(transport.startTurn.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      prompt: 'Clarify this finding.',
+      sessionId: 'review-session-1',
+    }));
+    transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'Clarified.' }] } });
+    await expect(clarification).resolves.toMatchObject({ text: 'Clarified.', reviewerSession: result.reviewerSession });
   });
 
   it('maps Agent SDK permission requests through the app-owned approval contract', async () => {

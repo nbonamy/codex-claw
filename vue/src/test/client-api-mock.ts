@@ -27,6 +27,12 @@ export function createClientApiMock(
   const updates = channel<Parameters<Parameters<Api['onUpdateStatusChanged']>[0]>[0]>();
   // Enumerating the public interface makes new required AND optional methods a type error here.
   const api = {
+    startCodeReview: unscripted('startCodeReview'),
+    decideCodeReviewFinding: unscripted('decideCodeReviewFinding'),
+    discussCodeReviewFinding: unscripted('discussCodeReviewFinding'),
+    submitCodeReviewRound: unscripted('submitCodeReviewRound'),
+    finishCodeReview: unscripted('finishCodeReview'),
+    reviewCodeAgain: unscripted('reviewCodeAgain'),
     respondToThreadFlag: unscripted('respondToThreadFlag'),
     respondToPlanReview: unscripted('respondToPlanReview'),
     getSnapshot: unscripted('getSnapshot'),

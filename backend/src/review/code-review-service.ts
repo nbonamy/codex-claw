@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import {
   activeCodeReviewRound,
   codeReviewLedger,
-  type CodeReviewAssignmentInput,
   type CodeReviewDecisionInput,
   type CodeReviewDiscussionInput,
   type CodeReviewFinding,
@@ -11,7 +10,8 @@ import {
   type CodeReviewRound,
   type CodeReviewSession,
 } from '@codex-claw/core/code-review';
-import type { Agent, AgentStatus, AppSnapshot } from '@codex-claw/core/contracts';
+import type { BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
+import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
 import type { ReviewFindingCompletionInput, ReviewToolHandlers } from './review-tool-registry';
 
 export type CodeReviewToolPort = {
@@ -22,14 +22,19 @@ export type CodeReviewToolPort = {
 export type CodeReviewServiceOptions = {
   snapshot: AppSnapshot;
   tools: CodeReviewToolPort;
-  runReview(agent: Agent, prompt: string, reviewMcpServerUrl: string): Promise<{ text: string }>;
-  sendFixPrompt(agentId: string, prompt: string): void;
+  runReview(
+    agent: Agent,
+    prompt: string,
+    reviewMcpServerUrl: string,
+    reviewerSession?: BackendSession,
+  ): Promise<BackendCodeReviewResult>;
   changed(): Promise<void> | void;
   now?: () => Date;
 };
 
 export class CodeReviewService {
   private readonly now: () => Date;
+  private readonly activeRoundTurns = new Set<string>();
 
   constructor(private readonly options: CodeReviewServiceOptions) {
     this.now = options.now ?? (() => new Date());
@@ -52,28 +57,17 @@ export class CodeReviewService {
     const { session, finding } = this.findFinding(agent, input);
     this.requireArbitration(session);
     const decidedAt = this.timestamp();
-    finding.disposition = input.decision === 'accept'
-      ? { state: 'accepted', decidedAt }
-      : { state: 'declined', decidedAt, reason: requiredText(input.reason, 'A decline reason is required.') };
+    finding.decision = input.decision === 'select'
+      ? { state: 'selected', decidedAt }
+      : { state: 'rejected', decidedAt, reason: requiredText(input.reason, 'A rejection reason is required.') };
     finding.updatedAt = decidedAt;
     session.updatedAt = decidedAt;
-  }
-
-  assign(agent: Agent, input: CodeReviewAssignmentInput): void {
-    const { session, finding } = this.findFinding(agent, input);
-    this.requireArbitration(session);
-    if (finding.disposition.state !== 'accepted') throw new Error('Only accepted findings can be assigned.');
-    if (!this.options.snapshot.agents.some((candidate) => candidate.id === input.assignedAgentId)) {
-      throw new Error('Assigned agent was not found.');
-    }
-    finding.assignedAgentId = input.assignedAgentId;
-    finding.updatedAt = this.timestamp();
-    session.updatedAt = finding.updatedAt;
   }
 
   discuss(agent: Agent, input: CodeReviewDiscussionInput): void {
     const { session, round, finding } = this.findFinding(agent, input);
     this.requireArbitration(session);
+    this.requireIdleRound(round);
     const question = requiredText(input.question, 'A finding question is required.');
     const createdAt = this.timestamp();
     finding.discussion.push({ id: randomUUID(), author: 'user', body: question, createdAt });
@@ -87,24 +81,25 @@ export class CodeReviewService {
     const session = this.findSession(agent, sessionId);
     this.requireArbitration(session);
     const round = activeCodeReviewRound(session);
-    if (round.findings.some((finding) => finding.disposition.state === 'unresolved')) {
-      throw new Error('Resolve every finding before submitting the review round.');
+    this.requireIdleRound(round);
+    if (round.findings.some((finding) => finding.decision.state === 'undecided')) {
+      throw new Error('Select or reject every finding before starting remediation.');
     }
-    const accepted = round.findings.filter((finding) => finding.disposition.state === 'accepted');
-    const unassigned = accepted.find((finding) => !finding.assignedAgentId);
-    if (unassigned) throw new Error(`Assign accepted finding “${unassigned.summary}” before submitting.`);
     const submittedAt = this.timestamp();
     round.status = 'submitted';
-    session.status = accepted.length > 0 ? 'fixing' : 'readyToFinish';
+    session.status = round.findings.some((finding) => finding.decision.state === 'selected')
+      ? 'fixing'
+      : 'readyToFinish';
     session.updatedAt = submittedAt;
-    for (const finding of accepted) {
-      const assignedAgentId = finding.assignedAgentId!;
-      finding.verification = { state: 'queued', assignedAgentId, requestedAt: submittedAt };
+    for (const finding of round.findings) {
+      finding.remediation = finding.decision.state === 'selected'
+        ? { state: 'pending', queuedAt: submittedAt }
+        : { state: 'skipped', startedAt: submittedAt };
       finding.updatedAt = submittedAt;
     }
-    for (const [assignedAgentId, findings] of groupByAssignee(accepted)) {
-      this.options.sendFixPrompt(assignedAgentId, fixPrompt(session, round, findings));
-    }
+    if (session.status === 'readyToFinish') round.status = 'completed';
+    void this.options.changed();
+    if (session.status === 'fixing') void this.executeFixes(agent, session, round);
   }
 
   finish(agent: Agent, sessionId: string): void {
@@ -119,7 +114,7 @@ export class CodeReviewService {
 
   reviewAgain(agent: Agent, sessionId: string): CodeReviewRound {
     const session = this.findSession(agent, sessionId);
-    if (session.status !== 'readyToFinish') throw new Error('Complete the current fix round before reviewing again.');
+    if (session.status !== 'readyToFinish') throw new Error('Complete the current remediation before reviewing again.');
     const round = this.newRound(session.rounds.length + 1);
     session.rounds.push(round);
     session.activeRoundId = round.id;
@@ -130,42 +125,39 @@ export class CodeReviewService {
     return round;
   }
 
-  handleAgentStatusChanged(agentId: string, status: AgentStatus): void {
-    let changed = false;
-    const now = this.timestamp();
-    for (const owner of this.options.snapshot.agents) {
-      for (const session of owner.codeReview ? [owner.codeReview] : []) {
-        if (session.status !== 'fixing') continue;
-        let sessionChanged = false;
-        const accepted = session.rounds.flatMap((round) => round.findings)
-          .filter((finding) => finding.disposition.state === 'accepted' && finding.assignedAgentId === agentId);
-        for (const finding of accepted) {
-          if (status.type === 'working' && finding.verification.state === 'queued') {
-            finding.verification = { state: 'fixing', assignedAgentId: agentId, startedAt: now };
-            finding.updatedAt = now;
-            changed = true;
-            sessionChanged = true;
-          } else if (status.type === 'idle' && finding.verification.state === 'fixing') {
-            finding.verification = { state: 'awaitingVerification', assignedAgentId: agentId, completedAt: now };
-            finding.updatedAt = now;
-            changed = true;
-            sessionChanged = true;
-          }
-        }
-        if (sessionChanged && this.fixesComplete(session)) {
-          activeCodeReviewRound(session).status = 'completed';
-          session.status = 'readyToFinish';
-          session.updatedAt = now;
-        }
-      }
+  resumeInterrupted(agent: Agent): void {
+    const session = agent.codeReview;
+    if (!session) return;
+    const round = activeCodeReviewRound(session);
+    if (session.status === 'reviewing') {
+      round.findings = [];
+      delete round.reviewerSession;
+      delete round.completedAt;
+      delete round.error;
+      void this.options.changed();
+      void this.executeRound(agent, session, round);
+      return;
     }
-    if (changed) void this.options.changed();
+    if (session.status !== 'fixing') return;
+    const resumedAt = this.timestamp();
+    for (const finding of round.findings) {
+      if (finding.remediation.state !== 'fixing') continue;
+      finding.remediation = { state: 'pending', queuedAt: resumedAt };
+      finding.updatedAt = resumedAt;
+    }
+    round.status = 'submitted';
+    delete round.error;
+    session.updatedAt = resumedAt;
+    void this.options.changed();
+    void this.executeFixes(agent, session, round);
   }
 
   private async executeRound(agent: Agent, session: CodeReviewSession, round: CodeReviewRound): Promise<void> {
+    this.activeRoundTurns.add(round.id);
     const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
     try {
-      await this.options.runReview(agent, reviewPrompt(session), context.url);
+      const result = await this.options.runReview(agent, reviewPrompt(session), context.url);
+      round.reviewerSession = result.reviewerSession;
       const completedAt = this.timestamp();
       round.status = 'ready';
       round.completedAt = completedAt;
@@ -179,6 +171,7 @@ export class CodeReviewService {
       session.updatedAt = round.completedAt;
     } finally {
       this.options.tools.closeReviewToolContext(context.id);
+      this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
   }
@@ -190,9 +183,16 @@ export class CodeReviewService {
     finding: CodeReviewFinding,
     question: string,
   ): Promise<void> {
+    this.activeRoundTurns.add(round.id);
     const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
     try {
-      const result = await this.options.runReview(agent, discussionPrompt(session, round, finding, question), context.url);
+      const result = await this.options.runReview(
+        agent,
+        discussionPrompt(session, round, finding, question),
+        context.url,
+        requiredReviewerSession(round),
+      );
+      round.reviewerSession = result.reviewerSession;
       const body = result.text.trim();
       if (!body) throw new Error('Reviewer did not answer the finding discussion.');
       const createdAt = this.timestamp();
@@ -203,6 +203,52 @@ export class CodeReviewService {
       // A failed discussion turn leaves the user's question in the durable ledger.
     } finally {
       this.options.tools.closeReviewToolContext(context.id);
+      this.activeRoundTurns.delete(round.id);
+    }
+    await this.options.changed();
+  }
+
+  private async executeFixes(agent: Agent, session: CodeReviewSession, round: CodeReviewRound): Promise<void> {
+    this.activeRoundTurns.add(round.id);
+    try {
+      for (;;) {
+        const finding = round.findings.find((candidate) => candidate.remediation.state === 'pending');
+        if (!finding) break;
+        const startedAt = this.timestamp();
+        finding.remediation = { state: 'fixing', startedAt };
+        finding.updatedAt = startedAt;
+        session.updatedAt = startedAt;
+        await this.options.changed();
+
+        const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session, round));
+        try {
+          const result = await this.options.runReview(
+            agent,
+            fixPrompt(session, round, finding),
+            context.url,
+            requiredReviewerSession(round),
+          );
+          round.reviewerSession = result.reviewerSession;
+        } finally {
+          this.options.tools.closeReviewToolContext(context.id);
+        }
+        const completedFinding = this.findFindingInSession(session, finding.id);
+        if (completedFinding?.remediation.state !== 'fixed') {
+          throw new Error(`Reviewer did not mark “${finding.summary}” fixed.`);
+        }
+      }
+      const completedAt = this.timestamp();
+      round.status = 'completed';
+      round.completedAt = completedAt;
+      session.status = 'readyToFinish';
+      session.updatedAt = completedAt;
+    } catch (error) {
+      round.status = 'failed';
+      round.error = error instanceof Error ? error.message : String(error);
+      session.status = 'failed';
+      session.updatedAt = this.timestamp();
+    } finally {
+      this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
   }
@@ -211,7 +257,7 @@ export class CodeReviewService {
     return {
       reportFinding: (input) => this.reportFinding(session, round, input),
       updateFinding: (input) => this.updateFinding(session, input),
-      markFindingComplete: (input) => this.markFindingComplete(session, round, input),
+      markFindingComplete: (input) => this.markFindingComplete(session, input),
     };
   }
 
@@ -224,7 +270,7 @@ export class CodeReviewService {
     const ledger = codeReviewLedger(session);
     const excluded = ledger.exclusions.find((finding) => finding.fingerprint === input.fingerprint);
     if (excluded && !input.materiallyNewEvidence) {
-      throw new Error(`Finding ${excluded.findingId} was declined and requires materially new evidence to be raised again.`);
+      throw new Error(`Finding ${excluded.findingId} was rejected and requires materially new evidence to be raised again.`);
     }
     const prior = input.priorFindingId
       ? this.findFindingInSession(session, input.priorFindingId)
@@ -238,12 +284,9 @@ export class CodeReviewService {
       rationale: input.rationale,
       suggestedResolution: input.suggestedResolution,
       ...(input.location ? { location: { ...input.location } } : {}),
-      disposition: prior?.disposition.state === 'accepted' ? { ...prior.disposition } : { state: 'unresolved' },
-      ...(prior?.assignedAgentId ? { assignedAgentId: prior.assignedAgentId } : {}),
+      decision: { state: 'undecided' },
       discussion: prior?.discussion.map((message) => ({ ...message })) ?? [],
-      verification: prior?.disposition.state === 'accepted'
-        ? { state: 'failed', verifiedAt: now, roundId: round.id, evidence: input.rationale }
-        : { state: 'notRequested' },
+      remediation: { state: 'notStarted' },
       ...(input.materiallyNewEvidence ? { materiallyNewEvidence: input.materiallyNewEvidence } : {}),
       createdAt: prior?.createdAt ?? now,
       updatedAt: now,
@@ -273,16 +316,15 @@ export class CodeReviewService {
 
   private async markFindingComplete(
     session: CodeReviewSession,
-    round: CodeReviewRound,
     input: ReviewFindingCompletionInput,
   ): Promise<CodeReviewFinding> {
     const finding = this.findFindingInSession(session, input.findingId);
     if (!finding) throw new Error('Code review finding was not found.');
-    if (finding.disposition.state !== 'accepted') throw new Error('Only an accepted finding can be marked complete.');
-    const verifiedAt = this.timestamp();
-    finding.verification = { state: 'passed', verifiedAt, roundId: round.id, ...(input.evidence ? { evidence: input.evidence } : {}) };
-    finding.updatedAt = verifiedAt;
-    session.updatedAt = verifiedAt;
+    if (finding.remediation.state !== 'fixing') throw new Error('Only the finding currently being fixed can be marked complete.');
+    const completedAt = this.timestamp();
+    finding.remediation = { state: 'fixed', completedAt, ...(input.evidence ? { evidence: input.evidence } : {}) };
+    finding.updatedAt = completedAt;
+    session.updatedAt = completedAt;
     await this.options.changed();
     return structuredClone(finding);
   }
@@ -293,13 +335,6 @@ export class CodeReviewService {
       if (finding) return finding;
     }
     return undefined;
-  }
-
-  private fixesComplete(session: CodeReviewSession): boolean {
-    const accepted = session.rounds.flatMap((round) => round.findings)
-      .filter((finding) => finding.disposition.state === 'accepted');
-    return accepted.every((finding) => finding.verification.state === 'awaitingVerification'
-      || finding.verification.state === 'passed');
   }
 
   private newSession(agent: Agent): CodeReviewSession {
@@ -321,7 +356,6 @@ export class CodeReviewService {
       id: randomUUID(),
       number,
       status: 'reviewing',
-      reviewerContextId: randomUUID(),
       findings: [],
       startedAt,
     };
@@ -343,7 +377,11 @@ export class CodeReviewService {
   }
 
   private requireArbitration(session: CodeReviewSession): void {
-    if (session.status !== 'ready') throw new Error('The review round is not ready for arbitration.');
+    if (session.status !== 'ready') throw new Error('The review round is not ready for decisions.');
+  }
+
+  private requireIdleRound(round: CodeReviewRound): void {
+    if (this.activeRoundTurns.has(round.id)) throw new Error('The reviewer is already responding in this round.');
   }
 
   private timestamp(): string {
@@ -355,7 +393,7 @@ function reviewPrompt(session: CodeReviewSession): string {
   const ledger = codeReviewLedger(session);
   return `Review the current branch and working-tree diff independently. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
 
-Findings are the only review artifact. For every actionable defect, call report_finding with concrete evidence. Use update_finding to correct or enrich a reported finding. For each regression check that is fixed, call mark_finding_complete. If a regression remains, report it again with its prior finding ID. Do not raise an exclusion again unless materially new evidence changes the conclusion; if it does, include that evidence. Ending your turn ends the review pass; there is no tool for completing the review workflow.
+Findings are the only review artifact. For every actionable defect, call report_finding with concrete evidence. Use update_finding to correct or enrich a reported finding. Do not raise an exclusion again unless materially new evidence changes the conclusion; if it does, include that evidence. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. Ending your turn ends this review pass; there is no tool for completing the review workflow.
 
 Structured review ledger:
 ${JSON.stringify(ledger, null, 2)}`;
@@ -367,18 +405,22 @@ function discussionPrompt(
   finding: CodeReviewFinding,
   question: string,
 ): string {
-  return `Answer a question about one existing code review finding. Inspect the current code when useful. Do not create new findings and do not change review workflow state. Answer directly in your normal assistant response.
+  return `Continue this review conversation by answering the user's clarification about one existing finding. Inspect the current code when useful. Do not create findings or change workflow state. Answer directly in your normal assistant response.
 
 Session: ${session.id}
 Round: ${round.id}
-Finding: ${JSON.stringify(finding, null, 2)}
-Question: ${question}`;
+Finding ID: ${finding.id}
+User prompt:
+${question}`;
 }
 
-function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, findings: CodeReviewFinding[]): string {
-  return `Fix the accepted findings from code review ${session.id}, round ${round.number}. Keep the work focused, add or update behavior-level tests, and report completion normally.
+function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, finding: CodeReviewFinding): string {
+  return `Continue this same review conversation by fixing the one selected finding below. Keep the change focused and add or update behavior-level tests when appropriate. After the code and checks are complete, call mark_finding_complete for this finding. Do not start another finding; Claw will send it separately.
 
-${JSON.stringify(findings.map((finding) => ({
+Review: ${session.id}
+Round: ${round.number}
+Finding:
+${JSON.stringify({
     id: finding.id,
     priority: finding.priority,
     summary: finding.summary,
@@ -386,16 +428,12 @@ ${JSON.stringify(findings.map((finding) => ({
     location: finding.location,
     suggestedResolution: finding.suggestedResolution,
     discussion: finding.discussion,
-  })), null, 2)}`;
+  }, null, 2)}`;
 }
 
-function groupByAssignee(findings: CodeReviewFinding[]): Map<string, CodeReviewFinding[]> {
-  const grouped = new Map<string, CodeReviewFinding[]>();
-  for (const finding of findings) {
-    const agentId = finding.assignedAgentId!;
-    grouped.set(agentId, [...(grouped.get(agentId) ?? []), finding]);
-  }
-  return grouped;
+function requiredReviewerSession(round: CodeReviewRound): BackendSession {
+  if (!round.reviewerSession) throw new Error('Review conversation is not available.');
+  return round.reviewerSession;
 }
 
 function requiredText(value: string, message: string): string {

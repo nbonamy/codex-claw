@@ -111,8 +111,7 @@ describe('AppShell dialogs and commands', () => {
       color: '#46A857',
       agentIds: [],
     });
-    const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, getAgentGitDiff });
+    const wrapper = mountShell({ snapshot });
     await flushPromises();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
@@ -120,7 +119,6 @@ describe('AppShell dialogs and commands', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, cancelable: true }));
     await flushPromises();
-    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina');
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', metaKey: true, cancelable: true }));
@@ -304,8 +302,7 @@ describe('AppShell dialogs and commands', () => {
       agentIds: [],
     });
     const quit = vi.fn().mockResolvedValue(undefined);
-    const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit, getAgentGitDiff });
+    const wrapper = mountShell({ snapshot, quit });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
@@ -354,7 +351,6 @@ describe('AppShell dialogs and commands', () => {
     expect(quit).toHaveBeenCalledOnce();
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
-    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina');
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
     expect(wrapper.text()).toContain('Edit agent');
 

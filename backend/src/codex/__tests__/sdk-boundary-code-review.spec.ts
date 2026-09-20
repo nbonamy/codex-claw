@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
 
 describe('Codex code review boundary', () => {
-  it('uses a fresh conversation with the round-scoped MCP context and archives it afterward', async () => {
+  it('creates a fresh reviewer conversation and keeps it available for later round turns', async () => {
     const { driver, surface, conversation } = codexSdkFixture();
     const review = conversation('review-fresh');
     surface.createConversation.mockResolvedValue(sdkSnapshot('review-fresh'));
@@ -34,8 +34,31 @@ describe('Codex code review boundary', () => {
     expect(review.handle.startReview).toHaveBeenCalledWith({
       target: { type: 'custom', instructions: 'Review independently and report findings.' },
     });
-    expect(result).toEqual({ text: 'The finding is reachable.' });
-    expect(surface.archiveConversation).toHaveBeenCalledWith('review-fresh');
-    expect(surface.forgetConversation).toHaveBeenCalledWith('review-fresh');
+    expect(result).toEqual({
+      text: 'The finding is reachable.',
+      reviewerSession: { kind: 'codex', threadId: 'review-fresh' },
+    });
+    expect(surface.archiveConversation).not.toHaveBeenCalled();
+    expect(surface.forgetConversation).not.toHaveBeenCalled();
+
+    review.setSnapshot({ turnIds: ['turn-review'], messages: [] });
+    review.handle.sendMessage.mockResolvedValue(sdkSnapshot('review-fresh', {
+      turnIds: ['turn-review', 'turn-follow-up'],
+      turns: [{ id: 'turn-follow-up', status: 'completed' } as never],
+    }));
+    await driver.runCodeReview(sdkAgent(), {
+      cwd: '/repo',
+      prompt: 'Clarify the finding.',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-2',
+      reviewerSession: result.reviewerSession,
+    });
+
+    expect(review.handle.load).toHaveBeenCalledWith({
+      extensionContext: {
+        agent: sdkAgent(),
+        reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-2',
+      },
+    });
+    expect(review.handle.sendMessage).toHaveBeenCalledWith('Clarify the finding.');
   });
 });

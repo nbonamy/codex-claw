@@ -26,7 +26,7 @@ import type {
   SubagentOperationChange,
   SubagentStatusChange
 } from '@codex-claw/core/contracts';
-import type { BackendCodeReviewInput, BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
+import type { BackendCodeReviewInput, BackendCodeReviewResult, BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -257,15 +257,17 @@ export class CodexSurfaceAgentAdapter {
     });
   }
 
-  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<{ text: string }> {
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult> {
     await this.start();
-    const snapshot = await this.surface.createConversation({
-      cwd: expandHome(input.cwd),
-      threadSource: 'user',
-    }, { extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
-    const conversationId = snapshot.activeConversationId;
-    if (!conversationId) throw new Error('Codex did not create a fresh review conversation.');
+    if (input.reviewerSession && input.reviewerSession.kind !== 'codex') {
+      throw new Error('Codex cannot continue a non-Codex review conversation.');
+    }
+    const created = !input.reviewerSession;
+    const conversationId = input.reviewerSession?.threadId ?? await this.createReviewConversation(agent, input);
     const conversation = this.surface.conversation(conversationId);
+    if (!created) {
+      await conversation.load({ extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
+    }
     let targetTurnId: string | null = null;
     const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
     let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
@@ -277,21 +279,38 @@ export class CodexSurfaceAgentAdapter {
     });
     try {
       const beforeTurnIds = conversation.getSnapshot().turnIds;
-      const started = await conversation.startReview({
-        target: { type: 'custom', instructions: input.prompt },
-      });
+      const started = created
+        ? await conversation.startReview({ target: { type: 'custom', instructions: input.prompt } })
+        : await conversation.sendMessage(input.prompt);
       targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
       if (!targetTurnId) throw new Error('Codex did not start the review round.');
       const immediate = completedBeforeTarget.get(targetTurnId)
         ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
       const status = immediate ?? await reviewCompletion(completion);
       if (status !== 'completed') throw new Error(`Code review was ${status}.`);
-      return { text: sessionHandoffText(conversation.getSnapshot().messages, targetTurnId) };
+      return {
+        text: sessionHandoffText(conversation.getSnapshot().messages, targetTurnId),
+        reviewerSession: { kind: 'codex', threadId: conversationId },
+      };
+    } catch (error) {
+      if (created) {
+        await this.surface.archiveConversation(conversationId).catch(() => undefined);
+        this.surface.forgetConversation(conversationId);
+      }
+      throw error;
     } finally {
       unsubscribe();
-      await this.surface.archiveConversation(conversationId).catch(() => undefined);
-      this.surface.forgetConversation(conversationId);
     }
+  }
+
+  private async createReviewConversation(agent: Agent, input: BackendCodeReviewInput): Promise<string> {
+    const snapshot = await this.surface.createConversation({
+      cwd: expandHome(input.cwd),
+      threadSource: 'user',
+    }, { extensionContext: { agent, reviewMcpServerUrl: input.reviewMcpServerUrl } });
+    const conversationId = snapshot.activeConversationId;
+    if (!conversationId) throw new Error('Codex did not create a fresh review conversation.');
+    return conversationId;
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}) {
