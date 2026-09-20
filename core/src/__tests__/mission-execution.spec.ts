@@ -50,6 +50,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     }
     expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Do not automatically invoke setup-matt-pocock-skills');
+    expect(prompt).toContain('already visible in the Mission workspace');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('do not claim you used an unavailable skill');
   }
 });
