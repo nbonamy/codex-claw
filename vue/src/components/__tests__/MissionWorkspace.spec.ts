@@ -295,8 +295,16 @@ describe('MissionWorkspace', () => {
     expect(board.text()).toContain('invoice-app');
     expect(board.text()).toContain('Ready for review');
     expect(board.text()).toContain('Building');
+    expect(board.get('[aria-label="Execution status"]').text()).toContain('1 active');
+    expect(board.get('[aria-label="Execution status"]').text()).toContain('1 to review');
+    expect(board.get('[role="progressbar"]').attributes()).toMatchObject({
+      'aria-valuemax': '2',
+      'aria-valuenow': '0',
+    });
+    expect(board.findAll('.mission-implementation__agent').map(agent => agent.text())).toStrictEqual(['Dina', 'Jesse']);
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
+    expect(board.findAll('.mission-implementation__ticket')[0]!.attributes('aria-current')).toBe('true');
     expect(board.get('[aria-label="Implementation ticket details"]').text()).toContain('checkout integration test passes');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
 
@@ -320,6 +328,7 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission, { executeMission });
 
     await wrapper.get('.mission-implementation__ticket').trigger('click');
+    expect(wrapper.get('.mission-implementation__ticket').text()).toContain('Failed');
     await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'run', ticketIndex: 0,
@@ -328,6 +337,8 @@ describe('MissionWorkspace', () => {
     mission.revision++;
     mission.execution!.runs[0]!.status = 'running';
     await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.get('.mission-implementation__ticket').text()).toContain('Building');
+    expect(wrapper.get('.mission-implementation__ticket').attributes('aria-current')).toBe('true');
     await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-checkout',

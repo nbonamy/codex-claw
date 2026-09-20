@@ -4,15 +4,45 @@
     :aria-label="t('missions.implementationBoard')"
   >
     <header class="mission-implementation__summary">
-      <div>
-        <strong>{{
-          t("missions.repositoryCount", { count: lanes.length })
-        }}</strong>
+      <div class="mission-implementation__summary-copy">
+        <strong>{{ t("missions.executionBoard") }}</strong>
+        <span>{{
+          t("missions.executionProgress", {
+            complete: completeCount,
+            total: ticketItems.length,
+          })
+        }}</span>
+      </div>
+      <div
+        class="mission-implementation__summary-statuses"
+        :aria-label="t('missions.executionStatusSummary')"
+      >
+        <span v-if="activeCount" data-state="active">{{
+          t("missions.activeTicketCount", { count: activeCount })
+        }}</span>
+        <span v-if="reviewCount" data-state="review">{{
+          t("missions.reviewTicketCount", { count: reviewCount })
+        }}</span>
+        <span data-state="complete">{{
+          t("missions.completeTicketCount", { count: completeCount })
+        }}</span>
+      </div>
+      <div
+        class="mission-implementation__progress"
+        role="progressbar"
+        :aria-valuenow="completeCount"
+        aria-valuemin="0"
+        :aria-valuemax="ticketItems.length"
+      >
+        <span :style="{ width: `${completionPercent}%` }" />
+      </div>
+      <div class="mission-implementation__summary-meta">
+        <span>{{ t("missions.repositoryCount", { count: lanes.length }) }}</span>
         <span v-if="branch"
           ><GitBranchIcon aria-hidden="true" />{{ branch }}</span
         >
+        <span>{{ policyLabel }}</span>
       </div>
-      <span class="mission-implementation__policy">{{ policyLabel }}</span>
     </header>
 
     <div class="mission-implementation__lanes">
@@ -38,18 +68,58 @@
                   selectedIndex === item.index,
               }"
               :aria-expanded="selectedIndex === item.index"
+              :aria-current="
+                selectedIndex === item.index ? 'true' : undefined
+              "
+              :aria-label="
+                item.run?.workerId
+                  ? t('missions.openTicketThread', {
+                      title: item.ticket.title,
+                    })
+                  : t('missions.openTicketDetails', {
+                      title: item.ticket.title,
+                    })
+              "
               @click="selectTicket(item.index, item.run?.workerId)"
             >
               <span class="mission-implementation__ticket-heading">
                 <small>{{ ticketNumber(item.index) }}</small>
-                <strong>{{ item.ticket.title }}</strong>
                 <span :data-status="ticketStatus(item)">{{
                   t(`missions.ticketRunStatus.${ticketStatus(item)}`)
                 }}</span>
               </span>
+              <strong class="mission-implementation__ticket-title">{{
+                item.ticket.title
+              }}</strong>
               <span class="mission-implementation__ticket-preview">{{
                 ticketPreview(item.ticket)
               }}</span>
+              <span class="mission-implementation__ticket-footer">
+                <span
+                  v-if="item.ticket.dependsOn?.length"
+                  class="mission-implementation__dependencies"
+                >
+                  {{
+                    t("missions.blockedByShort", {
+                      tickets: item.ticket.dependsOn
+                        .map(ticketNumber)
+                        .join(", "),
+                    })
+                  }}
+                </span>
+                <span v-else class="mission-implementation__repository">{{
+                  repositoryName(lane.repositoryPath)
+                }}</span>
+                <span
+                  v-if="assignedAgent(item)"
+                  class="mission-implementation__agent"
+                >
+                  <MessageCircleIcon aria-hidden="true" />{{
+                    assignedAgent(item)
+                  }}
+                </span>
+                <ChevronRightIcon aria-hidden="true" />
+              </span>
             </button>
           </li>
         </TransitionGroup>
@@ -151,21 +221,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { agentDisplayName } from "@codex-claw/core/agent-display";
+import type { Agent } from "@codex-claw/core/contracts";
 import type { Mission, MissionTicket } from "@codex-claw/core/missions";
 import type { MissionRun } from "@codex-claw/core/mission-execution";
 import {
   CheckIcon,
+  ChevronRightIcon,
   FolderIcon,
   GitBranchIcon,
+  MessageCircleIcon,
   X,
 } from "../shared/icons/app-icons";
 import MarkdownPanel from "./MarkdownPanel.vue";
 
 type TicketItem = { ticket: MissionTicket; index: number; run?: MissionRun };
 
-const props = defineProps<{ mission: Mission; busy?: boolean }>();
+const props = withDefaults(
+  defineProps<{ agents?: Agent[]; mission: Mission; busy?: boolean }>(),
+  { agents: () => [] },
+);
 const emit = defineEmits<{
   approve: [runId: string];
   "open-conversation": [agentId: string];
@@ -207,11 +284,38 @@ const lanes = computed(() => {
     tickets,
   }));
 });
-const selected = computed(() =>
-  lanes.value
-    .flatMap((lane) => lane.tickets)
-    .find((item) => item.index === selectedIndex.value),
+const ticketItems = computed(() =>
+  lanes.value.flatMap((lane) => lane.tickets),
 );
+const selected = computed(() =>
+  ticketItems.value.find((item) => item.index === selectedIndex.value),
+);
+const completeCount = computed(
+  () =>
+    ticketItems.value.filter((item) => ticketStatus(item) === "accepted")
+      .length,
+);
+const activeCount = computed(
+  () =>
+    ticketItems.value.filter((item) =>
+      ["preparing", "running"].includes(ticketStatus(item)),
+    ).length,
+);
+const reviewCount = computed(
+  () =>
+    ticketItems.value.filter(
+      (item) => ticketStatus(item) === "awaitingReview",
+    ).length,
+);
+const completionPercent = computed(() =>
+  ticketItems.value.length
+    ? Math.round((completeCount.value / ticketItems.value.length) * 100)
+    : 0,
+);
+
+watch(ticketItems, () => {
+  if (selectedIndex.value >= 0 && !selected.value) selectedIndex.value = -1;
+});
 
 function selectTicket(index: number, workerId?: string): void {
   selectedIndex.value = index;
@@ -224,6 +328,12 @@ function repositoryName(repositoryPath: string): string {
 }
 function ticketNumber(index: number): string {
   return String(index + 1).padStart(2, "0");
+}
+function assignedAgent(item: TicketItem): string {
+  const agent =
+    props.agents.find((agent) => agent.id === item.run?.workerId) ??
+    props.agents.find((agent) => agent.id === item.run?.memberId);
+  return agent ? agentDisplayName(agent) : "";
 }
 function ticketStatus(
   item: TicketItem,
@@ -262,22 +372,24 @@ function ticketPreview(ticket: MissionTicket): string {
 }
 
 .mission-implementation__summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-6);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-4) var(--space-8);
   padding: var(--space-6) var(--space-8);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-low);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-sm);
 }
 
-.mission-implementation__summary > div {
+.mission-implementation__summary-copy {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
-.mission-implementation__summary span {
+.mission-implementation__summary-copy span,
+.mission-implementation__summary-meta span {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -285,17 +397,63 @@ function ticketPreview(ticket: MissionTicket): string {
   font-size: var(--font-size-12);
 }
 
-.mission-implementation__summary svg {
+.mission-implementation__summary-meta svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
 }
 
-.mission-implementation__policy {
-  padding: var(--space-2) var(--space-6);
+.mission-implementation__summary-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.mission-implementation__summary-statuses span {
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
-  color: var(--color-on-primary-container) !important;
-  background: var(--color-primary-container);
+  color: var(--color-text-muted);
+  background: var(--color-surface-high);
+  font-size: var(--font-size-11);
   white-space: nowrap;
+}
+
+.mission-implementation__summary-statuses span[data-state="active"] {
+  color: var(--color-on-primary-container);
+  background: var(--color-primary-container);
+}
+
+.mission-implementation__summary-statuses span[data-state="review"] {
+  color: var(--color-on-warning-container);
+  background: var(--color-warning-container);
+}
+
+.mission-implementation__summary-statuses span[data-state="complete"] {
+  color: var(--color-on-success-container);
+  background: var(--color-success-container);
+}
+
+.mission-implementation__progress {
+  height: 5px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+}
+
+.mission-implementation__progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-success);
+  transition: width 220ms ease;
+}
+
+.mission-implementation__summary-meta {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: var(--space-6);
 }
 
 .mission-implementation__lanes {
@@ -337,6 +495,7 @@ function ticketPreview(ticket: MissionTicket): string {
 
 .mission-implementation__lane ol {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--space-3);
   margin: 0;
   padding: var(--space-6);
@@ -346,6 +505,8 @@ function ticketPreview(ticket: MissionTicket): string {
 .mission-implementation__ticket {
   display: grid;
   width: 100%;
+  min-height: 164px;
+  grid-template-rows: auto auto 1fr auto;
   gap: var(--space-3);
   padding: var(--space-6);
   border: 1px solid transparent;
@@ -373,9 +534,9 @@ function ticketPreview(ticket: MissionTicket): string {
 }
 
 .mission-implementation__ticket-heading {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
 }
 
@@ -385,11 +546,13 @@ function ticketPreview(ticket: MissionTicket): string {
   font-weight: var(--font-weight-semibold);
 }
 
-.mission-implementation__ticket-heading strong {
+.mission-implementation__ticket-title {
+  display: -webkit-box;
   overflow: hidden;
   font-size: var(--font-size-14);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--line-height-20);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .mission-implementation__ticket-heading > span {
@@ -424,9 +587,47 @@ function ticketPreview(ticket: MissionTicket): string {
 }
 
 .mission-implementation__ticket-preview {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
+  line-height: var(--line-height-18);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mission-implementation__ticket-footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+}
+
+.mission-implementation__ticket-footer > span:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-implementation__ticket-footer > svg,
+.mission-implementation__agent svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.mission-implementation__agent {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  overflow: hidden;
+  color: var(--color-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -579,6 +780,7 @@ function ticketPreview(ticket: MissionTicket): string {
 
 @media (prefers-reduced-motion: reduce) {
   .mission-implementation__ticket,
+  .mission-implementation__progress span,
   .mission-run-card-enter-active,
   .mission-run-card-leave-active {
     transition-duration: 1ms;

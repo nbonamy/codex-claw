@@ -68,6 +68,7 @@
 
         <MissionImplementationBoard
           v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
+          :agents="agents"
           :mission="mission"
           :busy="busy"
           @approve="approveImplementationRun"
