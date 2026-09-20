@@ -210,11 +210,13 @@ scans or moves rollout files itself.
 Code review defaults to a separate visible reviewer agent in the same workspace,
 but the user may choose the owning agent's current conversation. Either path
 uses the review-session finding tools; finding clarification and batched
-remediation continue through the normal Codex conversation replica. `Review
-again` archives the independent reviewer's conversation and binds a fresh one
-to the same sidebar agent, while current-thread reviews keep the user-owned
-conversation for the whole workflow. Finishing removes an independent reviewer
-agent and its conversation but leaves a current-thread conversation intact.
+remediation continue through the normal Codex conversation replica. An
+independent reviewer starts without the source conversation history but inherits
+its selected model and reasoning effort. `Review again` archives the independent
+reviewer's conversation and binds a fresh one to the same sidebar agent, while
+current-thread reviews keep the user-owned conversation for the whole workflow.
+Finishing removes an independent reviewer agent and its conversation but leaves
+a current-thread conversation intact.
 Claw persists the selected Git scope, reviewer identity, opaque conversation
 reference, and app-owned finding ledger without creating a second transcript
 model.

@@ -283,7 +283,10 @@ export class CodexSurfaceAgentAdapter {
     });
     try {
       const beforeTurnIds = conversation.getSnapshot().turnIds;
-      const started = await conversation.sendMessage(input.prompt);
+      const reviewOptions = codeReviewPromptOptions(agent);
+      const started = reviewOptions
+        ? await conversation.sendMessage(input.prompt, reviewOptions)
+        : await conversation.sendMessage(input.prompt);
       targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
       if (!targetTurnId) throw new Error('Codex did not start the review round.');
       const immediate = completedBeforeTarget.get(targetTurnId)
@@ -1534,6 +1537,15 @@ function surfacePromptOptions(options: SendPromptOptions = {}): SendCodexMessage
     ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
       ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }
       : {}),
+  };
+}
+
+function codeReviewPromptOptions(agent: Agent): SendCodexMessageOptions | undefined {
+  const defaults = agent.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
+  if (!defaults?.model && !defaults?.reasoningEffort) return undefined;
+  return {
+    ...(defaults.model ? { model: defaults.model } : {}),
+    ...(defaults.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
   };
 }
 

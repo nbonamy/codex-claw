@@ -31,7 +31,15 @@ describe('Codex code review boundary', () => {
 
   it('creates a fresh reviewer conversation and keeps it available for later round turns', async () => {
     const { driver, surface, conversation, events } = codexSdkFixture();
-    const agent = { ...sdkAgent(), backendSession: undefined };
+    const agent = {
+      ...sdkAgent(),
+      backendSession: undefined,
+      backendDefaults: {
+        kind: 'codex' as const,
+        model: 'gpt-6-astra',
+        reasoningEffort: 'high',
+      },
+    };
     const review = conversation('review-fresh');
     surface.createConversation.mockResolvedValue(sdkSnapshot('review-fresh'));
     review.setSnapshot({
@@ -63,7 +71,10 @@ describe('Codex code review boundary', () => {
     expect(review.handle.load).toHaveBeenNthCalledWith(1, {
       extensionContext: { agent, reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-1' },
     });
-    expect(review.handle.sendMessage).toHaveBeenCalledWith('Review independently and report findings.');
+    expect(review.handle.sendMessage).toHaveBeenCalledWith('Review independently and report findings.', {
+      model: 'gpt-6-astra',
+      reasoningEffort: 'high',
+    });
     expect(review.handle.startReview).not.toHaveBeenCalled();
     expect(result).toEqual({
       text: 'The finding is reachable.',
@@ -95,7 +106,10 @@ describe('Codex code review boundary', () => {
         reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-a&reviewContextId=review-2',
       },
     });
-    expect(review.handle.sendMessage).toHaveBeenCalledWith('Clarify the finding.');
+    expect(review.handle.sendMessage).toHaveBeenCalledWith('Clarify the finding.', {
+      model: 'gpt-6-astra',
+      reasoningEffort: 'high',
+    });
 
     expect(surface.archiveConversation).not.toHaveBeenCalled();
     expect(surface.forgetConversation).not.toHaveBeenCalled();

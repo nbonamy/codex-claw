@@ -94,11 +94,13 @@ transport configures:
 Code review defaults to a separate visible reviewer agent in the same workspace.
 The user may instead use the current agent and session. Review turns use the
 normal Claude conversation replica while adding only the review-session finding
-tools; clarification and batched remediation resume that same session id.
-For an independent reviewer, `Review again` deletes the old Claude session and
-starts a fresh one on the same sidebar agent. Current-thread reviews preserve
-the user-owned session for every round and after finish; an independent
-reviewer's agent and session are removed when the review finishes.
+tools; clarification and batched remediation resume that same session id. An
+independent reviewer starts without the source conversation history but inherits
+its selected model and reasoning effort. For an independent reviewer, `Review
+again` deletes the old Claude session and starts a fresh one on the same sidebar
+agent. Current-thread reviews preserve the user-owned session for every round
+and after finish; an independent reviewer's agent and session are removed when
+the review finishes.
 
 - the Claude Code system-prompt and tool presets;
 - user, project, and local setting sources;

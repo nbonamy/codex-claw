@@ -68,6 +68,9 @@ describe('CodeReviewService', () => {
     const neighbor = agent('neighbor');
     test.owner.avatar = 'owl';
     test.owner.openInApplication = 'vscode';
+    test.owner.backendDefaults = {
+      kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'high',
+    };
     test.owner.workspace = {
       kind: 'git', folder: '/repo', repositoryName: 'claw', repositoryRoot: '/repo',
       branch: 'feat/review', isLinkedWorktree: false, primaryWorktreeRoot: '/repo',
@@ -90,7 +93,8 @@ describe('CodeReviewService', () => {
     ]);
     expect(visibleReviewer).toMatchObject({
       name: 'Review', avatar: 'owl', folder: '/repo', workspace: test.owner.workspace,
-      backend: test.owner.backend, openInApplication: 'vscode', status: { type: 'idle' },
+      backend: test.owner.backend, backendDefaults: test.owner.backendDefaults,
+      openInApplication: 'vscode', status: { type: 'idle' },
     });
     expect(visibleReviewer.backendSession).toBeUndefined();
     expect(test.snapshot.agentGitStatuses[visibleReviewer.id]).toStrictEqual(

@@ -541,10 +541,14 @@ describe('ClaudeBackendDriver', () => {
   it('runs review in a fresh context with only review-domain MCP tools added', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
+    const reviewerAgent: Agent = {
+      ...agent,
+      backendDefaults: { kind: 'claude', model: 'opus', reasoningEffort: 'xhigh' },
+    };
     const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
-    const review = driver.runCodeReview(agent, {
+    const review = driver.runCodeReview(reviewerAgent, {
       cwd: '/Users/nbonamy/src/codex-claw',
       prompt: 'Review the current diff.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
@@ -557,6 +561,8 @@ describe('ClaudeBackendDriver', () => {
         'mcp__codex_claw__report_finding',
         'mcp__codex_claw__update_finding',
       ],
+      model: 'opus',
+      effort: 'xhigh',
     }), expect.any(Function), expect.any(Function), expect.any(Function));
     expect(transport.startTurn.mock.calls[0]?.[0].sessionId).toBeUndefined();
     transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'The finding is reachable.' }] } });
@@ -573,7 +579,7 @@ describe('ClaudeBackendDriver', () => {
       expect.objectContaining({ type: 'turn.completed' }),
     ]));
 
-    const clarification = driver.runCodeReview(agent, {
+    const clarification = driver.runCodeReview(reviewerAgent, {
       cwd: '/Users/nbonamy/src/codex-claw',
       prompt: 'Clarify this finding.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-2',
