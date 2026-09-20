@@ -1,21 +1,30 @@
 <template>
   <div class="thread-flag-affordance" role="status">
-    <GitBranchIcon class="thread-flag-affordance__icon" aria-hidden="true" />
-    <span class="thread-flag-affordance__prompt">{{ t('chat.threadFlags.prompt') }}</span>
+    <GitBranchIcon
+      v-if="id === 'delegate_to_worktree'"
+      class="thread-flag-affordance__icon"
+      aria-hidden="true"
+    />
+    <IconChecklist
+      v-else
+      class="thread-flag-affordance__icon"
+      aria-hidden="true"
+    />
+    <span class="thread-flag-affordance__prompt">{{ t(copyKey('prompt')) }}</span>
     <div class="thread-flag-affordance__actions">
       <button
         class="thread-flag-affordance__action"
         type="button"
-        :aria-label="t('chat.threadFlags.accept')"
-        :title="t('chat.threadFlags.accept')"
+        :aria-label="t(copyKey('accept'))"
+        :title="t(copyKey('accept'))"
         :disabled="busy"
         @click="emit('execute')"
       ><CheckIcon aria-hidden="true" /></button>
       <button
         class="thread-flag-affordance__dismiss"
         type="button"
-        :aria-label="t('chat.threadFlags.dismiss')"
-        :title="t('chat.threadFlags.dismiss')"
+        :aria-label="t(copyKey('dismiss'))"
+        :title="t(copyKey('dismiss'))"
         :disabled="busy"
         @click="emit('dismiss')"
       ><X aria-hidden="true" /></button>
@@ -25,11 +34,18 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
+import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
+import { IconChecklist } from '@tabler/icons-vue';
 import { CheckIcon, GitBranchIcon, X } from '../shared/icons/app-icons';
 
-defineProps<{ busy?: boolean }>();
+const props = defineProps<{ id: ThreadFlagId; busy?: boolean }>();
 const emit = defineEmits<{ execute: []; dismiss: [] }>();
 const { t } = useI18n();
+
+function copyKey(kind: 'prompt' | 'accept' | 'dismiss'): string {
+  const flag = props.id === 'ready_for_review' ? 'readyForReview' : 'delegateToWorktree';
+  return `chat.threadFlags.${flag}.${kind}`;
+}
 </script>
 
 <style scoped>

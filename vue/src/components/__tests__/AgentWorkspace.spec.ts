@@ -105,6 +105,15 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
 }
 
 describe('AgentWorkspace', () => {
+  it('opens code review from the agent header in the current workspace', async () => {
+    const { currentAgent, openRightWorkspaceTab, wrapper } = mountWorkspace();
+
+    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('open-code-review');
+    await wrapper.vm.$nextTick();
+
+    expect(openRightWorkspaceTab).toHaveBeenCalledWith('codeReview', currentAgent.id);
+  });
+
   it('resolves the delegating agent name for Git workflow report-back', () => {
     const { wrapper } = mountWorkspace((snapshot) => {
       const worker = snapshot.agents[0] as Agent;

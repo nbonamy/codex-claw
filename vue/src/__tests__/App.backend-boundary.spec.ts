@@ -57,6 +57,26 @@ describe('Unified backend → mounted application', () => {
     expect(wrapper.find('.thread-flag-affordance').exists()).toBe(false);
   });
 
+  it('opens review after accepting the app-owned ready-for-review flag', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.threadFlags = { ready_for_review: true };
+    const { api } = installBackendFixture(snapshot);
+    const cleared = structuredClone(snapshot);
+    delete cleared.agents[0]!.threadFlags;
+    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    await wrapper.get('[aria-label="Open code review"]').trigger('click');
+    await flushPromises();
+
+    expect(api.respondToThreadFlag).toHaveBeenCalledWith(agent.id, {
+      id: 'ready_for_review', action: 'execute',
+    });
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+  });
+
   it('shows, updates and clears execution progress without opening a review', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

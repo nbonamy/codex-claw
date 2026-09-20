@@ -99,6 +99,17 @@
         <ListIcon aria-hidden="true" />
       </button>
       <button
+        v-if="codeReviewAvailable"
+        class="agent-header__review"
+        type="button"
+        :aria-label="$t('surface.agentHeader.openCodeReview')"
+        :title="$t('surface.agentHeader.openCodeReview')"
+        :aria-pressed="codeReviewOpen"
+        @click="emit('open-code-review')"
+      >
+        <IconChecklist aria-hidden="true" />
+      </button>
+      <button
         class="agent-header__workspace"
         type="button"
         :aria-label="$t('surface.agentHeader.toggleRightWorkspace')"
@@ -124,7 +135,7 @@ import { computed, ref } from 'vue';
 import type { Agent, AgentGitDiffTarget, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog, TurnGitDiff } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
-import { IconLayoutSidebarRight } from '@tabler/icons-vue';
+import { IconChecklist, IconLayoutSidebarRight } from '@tabler/icons-vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
 import OpenInControl from '../shared/OpenInControl.vue';
@@ -145,6 +156,7 @@ const props = defineProps<{
   updateStatus?: DesktopUpdateStatus;
   executionPlanAvailable?: boolean;
   executionPlanOpen?: boolean;
+  codeReviewOpen?: boolean;
   openInAvailable?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
@@ -163,6 +175,7 @@ const emit = defineEmits<{
   'expand-sidebar': [];
   'toggle-workspace': [];
   'toggle-execution-plan': [];
+  'open-code-review': [];
   'open-git-diff': [target: AgentGitDiffTarget];
   'install-update': [];
   'open-in': [application: OpenInApplication];
@@ -248,6 +261,9 @@ const gitReviewAvailable = computed(() => {
   const gitStatus = props.gitStatus;
   return Boolean(gitStatus && gitStatus.state !== 'unknown');
 });
+const codeReviewAvailable = computed(() => (
+  props.agent?.workspace?.kind === 'git' || gitReviewAvailable.value
+));
 
 </script>
 
@@ -322,7 +338,8 @@ const gitReviewAvailable = computed(() => {
   text-align: right;
 }
 
-.agent-header__workspace {
+.agent-header__workspace,
+.agent-header__review {
   -webkit-app-region: no-drag;
   border: 0;
   border-radius: var(--radius-md);
@@ -351,12 +368,15 @@ const gitReviewAvailable = computed(() => {
 }
 
 .agent-header__execution-plan:hover,
-.agent-header__execution-plan[aria-pressed="true"] {
+.agent-header__execution-plan[aria-pressed="true"],
+.agent-header__review:hover,
+.agent-header__review[aria-pressed="true"] {
   background: var(--color-surface-high);
   color: var(--color-text);
 }
 
-.agent-header__execution-plan :deep(svg) {
+.agent-header__execution-plan :deep(svg),
+.agent-header__review :deep(svg) {
   width: var(--icon-md);
   height: var(--icon-md);
 }

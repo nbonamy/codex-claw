@@ -138,13 +138,16 @@ describe('AppStatePersistence', () => {
 
   it('round-trips valid thread flags and drops invalid persisted values', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].threadFlags = { delegate_to_worktree: true };
+    snapshot.agents[0].threadFlags = {
+      delegate_to_worktree: true,
+      ready_for_review: true,
+    };
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
       agents: Array<Record<string, unknown>>;
     };
 
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags)
-      .toStrictEqual({ delegate_to_worktree: true });
+      .toStrictEqual({ delegate_to_worktree: true, ready_for_review: true });
     persisted.agents[0].threadFlags = { delegate_to_worktree: false };
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags).toBeUndefined();
   });

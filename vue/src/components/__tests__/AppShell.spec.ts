@@ -686,6 +686,21 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
   });
 
+  it('intercepts /review and opens the app-owned review workflow without sending a provider prompt', async () => {
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ realConversationPane: true, sendPromptAction });
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = '/review';
+    await editor.trigger('input');
+    await nextTick();
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+  });
+
   it('keeps the first submitted prompt visible while its Codex conversation is created', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

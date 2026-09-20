@@ -130,6 +130,7 @@ describe('Codex Claw MCP tool registration', () => {
     ['broadcast-message', { content: 'hello all' }, 'broadcastMessage', ['agent-dina', 'hello all']],
     ['set-status', { status: 'Testing' }, 'setStatus', ['agent-dina', 'Testing']],
     ['toggle_thread_flag', { id: 'delegate_to_worktree', value: true }, 'toggleThreadFlag', ['agent-dina', { id: 'delegate_to_worktree', value: true, payload: undefined }]],
+    ['toggle_thread_flag', { id: 'ready_for_review', value: true }, 'toggleThreadFlag', ['agent-dina', { id: 'ready_for_review', value: true, payload: undefined }]],
     ['celebrate', { kind: 'stars' }, 'celebrate', ['agent-dina', 'stars']],
     ['announce', { phase: 'start', text: 'On it.' }, 'announce', ['agent-dina', 'start', 'On it.']],
     ['update-work-item', { workItemId: 'github:o/r#1', status: 'readyForReview' }, 'updateWorkItem', ['agent-dina', 'github:o/r#1', 'readyForReview', undefined]],

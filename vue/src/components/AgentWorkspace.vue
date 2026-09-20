@@ -13,6 +13,7 @@
     :update-status="clawHostCapabilities.appUpdates ? updateStatus : undefined"
     :execution-plan-available="Boolean(currentTurnPlan)"
     :execution-plan-open="executionPlanVisible"
+    :code-review-open="rightWorkspaceVisible && rightWorkspaceFor(currentAgent.id).activeTab === 'codeReview'"
     :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(currentAgent)"
     :open-in-catalog="openInApplications"
     :subagent-tree="currentSubagentTree"
@@ -27,6 +28,7 @@
     :report-back-agent-name="reportBackAgentName"
     @expand-sidebar="emit('expand-sidebar')"
     @toggle-execution-plan="toggleExecutionPlan"
+    @open-code-review="openRightWorkspaceTab('codeReview', currentAgent.id)"
     @toggle-workspace="toggleRightWorkspace"
     @open-git-diff="openAgentGitDiffPreview(currentAgent.id, $event)"
     @open-in="openAgentIn(currentAgent.id, $event)"
@@ -180,6 +182,7 @@ import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
+import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { fileBasename } from './use-workspace-previews';
 import {
   isRightWorkspaceSubagentTab,
@@ -198,7 +201,7 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
-  respondToThreadFlag: (action: 'execute' | 'dismiss') => Promise<void>;
+  respondToThreadFlag: (response: ThreadFlagResponse) => Promise<void>;
   threadFlagBusy: boolean;
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;

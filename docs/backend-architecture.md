@@ -101,8 +101,9 @@ Current implementation checkpoint:
   app-owned backend events.
 - `clawd` persists allowlisted typed thread flags authored through MCP.
   Clients receive them in app snapshots and respond through app-owned methods;
-  executing the first `delegate_to_worktree` flag reuses the normal prompt and
-  co-agent creation paths.
+  executing `delegate_to_worktree` reuses the normal prompt and co-agent
+  creation paths, while `ready_for_review` remains presentation-independent
+  readiness state that a client may use to enter the review workflow.
 - Electron main no longer contains backend orchestration implementation modules
   for automations, work integrations, MCP, source scanning, git worktrees, agent file
   reads, or state persistence. Those live under `backend/src`; `core/src`

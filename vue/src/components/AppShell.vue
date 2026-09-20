@@ -467,6 +467,7 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import {
   copyModelFavorite,
@@ -605,7 +606,7 @@ const props = withDefaults(defineProps<{
   retryAgentHistory?: () => Promise<void>;
   sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
-  respondToThreadFlagAction?: (action: 'execute' | 'dismiss') => Promise<void>;
+  respondToThreadFlagAction?: (response: ThreadFlagResponse) => Promise<void>;
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
@@ -1991,11 +1992,14 @@ async function respondToPlanReview(resolution: 'accept' | 'revise' | 'cancel', f
 }
 
 const threadFlagBusy = ref(false);
-async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+async function respondToThreadFlag(response: ThreadFlagResponse): Promise<void> {
   if (!props.respondToThreadFlagAction || threadFlagBusy.value) return;
   threadFlagBusy.value = true;
   try {
-    await props.respondToThreadFlagAction(action);
+    await props.respondToThreadFlagAction(response);
+    if (response.id === 'ready_for_review' && response.action === 'execute') {
+      openRightWorkspaceTab('codeReview');
+    }
   } catch (error) {
     ElMessage.error(localizedErrorMessage(error, t));
   } finally {
@@ -2020,6 +2024,10 @@ function forwardApprovalResolution(
 }
 
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
+  if (prompt.trim() === '/review' && !options?.attachments?.length) {
+    openRightWorkspaceTab('codeReview');
+    return Promise.resolve();
+  }
   if (props.sendPromptAction) return props.sendPromptAction(prompt, options);
   if (options) {
     emit('sendPrompt', prompt, options);

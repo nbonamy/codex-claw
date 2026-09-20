@@ -103,6 +103,7 @@ export const surfaceMessages = {
     "removedLines": "Removed lines",
     "openRepositoryBacklog": "Open repository backlog",
     "toggleExecutionPlan": "Toggle execution plan",
+    "openCodeReview": "Open code review",
     "toggleRightWorkspace": "Toggle right workspace",
     "closeRightWorkspace": "Close right workspace",
     "openRightWorkspace": "Open right workspace",

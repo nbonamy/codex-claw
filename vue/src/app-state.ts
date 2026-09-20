@@ -188,15 +188,12 @@ export function useAppState() {
     }));
   }
 
-  async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+  async function respondToThreadFlag(response: import('@codex-claw/core/thread-flags').ThreadFlagResponse): Promise<void> {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
-    if (agent?.threadFlags?.delegate_to_worktree !== true || !codexClawApi) {
-      throw new Error('No active delegate_to_worktree flag.');
+    if (!agent || agent.threadFlags?.[response.id] !== true || !codexClawApi) {
+      throw new Error('No active thread flag.');
     }
-    adoptBackgroundSnapshot(await codexClawApi.respondToThreadFlag(agent.id, {
-      id: 'delegate_to_worktree',
-      action,
-    }));
+    adoptBackgroundSnapshot(await codexClawApi.respondToThreadFlag(agent.id, response));
   }
 
   async function startCodeReview(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput): Promise<AppSnapshot> {

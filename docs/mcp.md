@@ -405,13 +405,13 @@ Input:
 - `payload`: optional kind-specific data, accepted only when that flag's
   contract defines a payload.
 
-The first supported flag is `delegate_to_worktree`. It takes no payload. Claw
-renders it as a compact **Delegate to worktree** action in the composer shelf.
-Activating that affordance submits an app-owned prompt to the current agent to
-delegate the implementation through the existing worktree/co-agent workflow.
-The flag clears only after the prompt is accepted; a failed submission leaves
-it available for retry. The user can also dismiss it, and the agent can clear
-it by calling `toggle_thread_flag` with `value: false`.
+The supported payload-free flags are `delegate_to_worktree` and
+`ready_for_review`. Claw renders each as a compact composer-shelf action.
+Activating delegation submits an app-owned prompt through the existing
+worktree/co-agent workflow. Activating review readiness opens Claw's review
+setup after the backend accepts and clears the flag. A failed action leaves its
+flag available for retry. The user can also dismiss either flag, and the agent
+can clear one by calling `toggle_thread_flag` with `value: false`.
 
 Flags are persisted app state and are cleared with the agent's conversation
 runtime when that conversation is restarted or replaced. Clients may present,

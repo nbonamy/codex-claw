@@ -283,6 +283,52 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
+  it('opens code review from the toolbar for a Git workspace', async () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'feature',
+      ahead: 1,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 4,
+      removedLines: 2,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    await wrapper.get('[aria-label="Open code review"]').trigger('click');
+
+    expect(wrapper.emitted('open-code-review')).toStrictEqual([[]]);
+  });
+
+  it('keeps code review available from persisted Git identity before status refresh', () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent: {
+          ...agent,
+          workspace: {
+            kind: 'git',
+            folder: '/Users/nbonamy/src/id8',
+            repositoryName: 'id8',
+            repositoryRoot: '/Users/nbonamy/src/id8',
+            branch: 'feature',
+            isLinkedWorktree: false,
+            primaryWorktreeRoot: '/Users/nbonamy/src/id8',
+            updatedAt: '2026-06-05T00:00:00.000Z',
+          },
+        },
+        backendRuntime: { backend: 'codex', status: 'running' },
+        gitStatus: null,
+        isLoading: false,
+        sidebarCollapsed: false,
+      },
+      global: { plugins: [ElementPlus, i18n] },
+    });
+
+    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(true);
+  });
+
   it('opens the agent folder in its remembered application from the header', async () => {
     const wrapper = mount(AgentHeader, {
       props: {
@@ -326,6 +372,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('Untitled conversation');
     expect(wrapper.find('.agent-header__folder').exists()).toBe(false);
     expect(wrapper.find('.open-in-control').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
   });
 
   it('shows the execution-plan toggle only when a plan is available', async () => {
@@ -603,6 +650,7 @@ describe('AgentHeader', () => {
       'open-in-control',
       'subagent-control',
       'agent-header__execution-plan',
+      'agent-header__review',
       'agent-header__workspace',
       'update-available-badge',
     ]);

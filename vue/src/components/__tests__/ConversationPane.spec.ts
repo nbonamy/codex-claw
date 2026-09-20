@@ -158,12 +158,29 @@ describe('ConversationPane', () => {
       .toBe('Start implementation in a worktree');
     await wrapper.get('.thread-flag-affordance__action').trigger('click');
     await wrapper.get('.thread-flag-affordance__dismiss').trigger('click');
-    expect(wrapper.emitted('thread-flag')).toStrictEqual([['execute'], ['dismiss']]);
+    expect(wrapper.emitted('thread-flag')).toStrictEqual([
+      [{ id: 'delegate_to_worktree', action: 'execute' }],
+      [{ id: 'delegate_to_worktree', action: 'dismiss' }],
+    ]);
 
     await wrapper.setProps({ threadFlagBusy: true });
     expect(wrapper.get('.thread-flag-affordance__action').attributes('disabled')).toBeDefined();
     expect(wrapper.get('.thread-flag-affordance__dismiss').attributes('aria-label'))
       .toBe('Dismiss worktree delegation');
+  });
+
+  it('renders review readiness through the same composer-shelf flag contract', async () => {
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent: { ...agent, threadFlags: { ready_for_review: true } },
+    });
+
+    expect(wrapper.get('.thread-flag-affordance').text()).toContain('Ready to review these changes?');
+    await wrapper.get('[aria-label="Open code review"]').trigger('click');
+
+    expect(wrapper.emitted('thread-flag')).toStrictEqual([
+      [{ id: 'ready_for_review', action: 'execute' }],
+    ]);
   });
 
   it('replaces only an empty transcript with the history load recovery state', async () => {

@@ -65,7 +65,7 @@ type Agent = {
   backend: "codex" | "claude"
   backendSession?: BackendSession
   backendDefaults?: BackendDefaults
-  threadFlags?: { delegate_to_worktree?: true }
+  threadFlags?: { delegate_to_worktree?: true; ready_for_review?: true }
   status: AgentStatus
   createdAt: string
   updatedAt: string

@@ -1,4 +1,4 @@
-export type ThreadFlagId = 'delegate_to_worktree';
+export type ThreadFlagId = 'delegate_to_worktree' | 'ready_for_review';
 
 /** Durable, predefined thread state authored by an agent and interpreted by Claw. */
 export type ThreadFlags = Partial<Record<ThreadFlagId, true>>;
@@ -17,7 +17,7 @@ export type ThreadFlagResponse = {
 export function isThreadFlags(value: unknown): value is ThreadFlags {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   return Object.entries(value).every(([id, enabled]) => (
-    id === 'delegate_to_worktree' && enabled === true
+    (id === 'delegate_to_worktree' || id === 'ready_for_review') && enabled === true
   ));
 }
 
@@ -28,13 +28,13 @@ export function parseToggleThreadFlagInput(value: unknown): ToggleThreadFlagInpu
   const input = value as Record<string, unknown>;
   if (
     Object.keys(input).some((key) => !['id', 'value', 'payload'].includes(key))
-    || input.id !== 'delegate_to_worktree'
+    || !['delegate_to_worktree', 'ready_for_review'].includes(input.id as string)
     || typeof input.value !== 'boolean'
   ) {
     throw new Error('Invalid thread flag. Use an allowed id and a boolean value.');
   }
   if (input.payload !== undefined) {
-    throw new Error('delegate_to_worktree does not accept a payload.');
+    throw new Error(`${input.id} does not accept a payload.`);
   }
-  return { id: input.id, value: input.value };
+  return { id: input.id as ThreadFlagId, value: input.value };
 }

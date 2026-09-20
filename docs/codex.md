@@ -399,10 +399,11 @@ intercepts the bare slash form before normal prompt submission so the warning
 and blocking transition are always applied. `/compact <text>` remains a normal
 prompt.
 
-`review` is a backend prompt command. The Codex driver intercepts recognized
-review forms before appending a visible user message or calling `turn/start`:
+Bare `/review` is a Claw app command. The renderer intercepts it and opens the
+app-owned review setup without appending a visible user message or starting a
+provider turn. The same command is present for Codex and Claude agents. The
+Codex driver continues to own custom provider review prompts:
 
-- bare `/review` calls `review/start` with `target.type = "uncommittedChanges"`;
 - `/review <instructions>` calls `review/start` with a custom review target.
 
 `plan` is handled earlier in the renderer/app prompt path because Codex CLI

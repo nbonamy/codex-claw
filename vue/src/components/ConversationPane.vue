@@ -61,12 +61,16 @@
         </el-tooltip>
       </template>
       <template #composer-shelf-actions="{ disabled }">
-        <ThreadFlagAffordance
-          v-if="delegateToWorktree"
-          :busy="threadFlagBusy || disabled"
-          @execute="emit('thread-flag', 'execute')"
-          @dismiss="emit('thread-flag', 'dismiss')"
-        />
+        <div v-if="activeThreadFlags.length > 0" class="conversation-pane__thread-flags">
+          <ThreadFlagAffordance
+            v-for="flag in activeThreadFlags"
+            :id="flag"
+            :key="flag"
+            :busy="threadFlagBusy || disabled"
+            @execute="emit('thread-flag', { id: flag, action: 'execute' })"
+            @dismiss="emit('thread-flag', { id: flag, action: 'dismiss' })"
+          />
+        </div>
       </template>
       <template #composer-context="{ disabled }">
         <ChatTextAnnotationCards
@@ -111,6 +115,7 @@ import type {
   RendererMessage,
   ThreadPlan,
 } from '@codex-claw/core/contracts';
+import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import ConversationLoadError from './ConversationLoadError.vue';
@@ -169,11 +174,14 @@ const emit = defineEmits<{
   'close-plan': [];
   'remove-text-annotation': [annotationId: string];
   'retry-history': [];
-  'thread-flag': [action: 'execute' | 'dismiss'];
+  'thread-flag': [response: ThreadFlagResponse];
 }>();
 
 const conversationKey = computed(() => props.agent?.id ?? 'no-agent');
-const delegateToWorktree = computed(() => props.agent?.threadFlags?.delegate_to_worktree === true);
+const activeThreadFlags = computed<ThreadFlagId[]>(() => (
+  (['ready_for_review', 'delegate_to_worktree'] as const)
+    .filter((id) => props.agent?.threadFlags?.[id] === true)
+));
 const messageTextSelection = ref<CodexMessageTextSelection | null>(null);
 const collaborationMessagePresentations = new Map<string, CollaborationMessagePresentation>();
 let transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
@@ -263,6 +271,12 @@ defineExpose({ focusComposer });
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+
+.conversation-pane__thread-flags {
+  width: 100%;
+  display: grid;
+  gap: var(--space-4);
 }
 
 .conversation-pane__empty {
