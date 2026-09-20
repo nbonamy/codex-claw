@@ -1645,7 +1645,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openDebugImageAnnotation,
     openDebugOperationProgress,
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
-    openGitReview: () => openRightWorkspaceTab('codeReview'),
+    openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,
     openRightWorkspaceTab: (tab) => openRightWorkspaceTab(tab),
     openSettings,

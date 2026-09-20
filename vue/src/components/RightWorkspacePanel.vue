@@ -17,7 +17,7 @@
           >
             <BacklogIcon v-if="tab === 'backlog'" aria-hidden="true" />
             <IconChecklist v-if="tab === 'codeReview'" aria-hidden="true" />
-            <GitHubIcon v-else-if="tab === 'review'" aria-hidden="true" />
+            <FileDiffIcon v-else-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
             <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
             <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
@@ -90,6 +90,10 @@
       <button type="button" @click="emit('openTab', 'codeReview')">
         <IconChecklist aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.review') }}</span>
+      </button>
+      <button type="button" @click="emit('openTab', 'review')">
+        <FileDiffIcon aria-hidden="true" />
+        <span>{{ $t('surface.rightWorkspacePanel.changes') }}</span>
         <kbd>{{ $t('surface.rightWorkspacePanel.g') }}</kbd>
       </button>
       <button v-if="browserAvailable" type="button" @click="emit('openTab', 'browser')">
@@ -275,7 +279,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconChecklist, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { BacklogIcon, CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, GitHubIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { BacklogIcon, CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import OpenInControl from '../shared/OpenInControl.vue';
@@ -412,7 +416,7 @@ const activeProjectFilePath = computed(() => {
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'codeReview', type: 'action', label: translate('surface.rightWorkspacePanel.review'), icon: IconChecklist },
-  { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.changes'), icon: GitHubIcon },
+  { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.changes'), icon: FileDiffIcon },
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },
 ]);

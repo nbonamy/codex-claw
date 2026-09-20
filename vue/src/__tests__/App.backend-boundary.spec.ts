@@ -244,11 +244,13 @@ describe('Unified backend → mounted application', () => {
   it('adopts durable review findings and decisions through the unified client seam', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
-    const { api, emitAppCommand } = installBackendFixture(snapshot);
+    const { api } = installBackendFixture(snapshot);
     const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
     await flushPromises();
 
-    emitAppCommand({ type: 'open-review' });
+    await wrapper.findAll('.right-workspace-panel__launcher button')
+      .find((button) => button.text().includes('Review'))!
+      .trigger('click');
     await flushPromises();
     expect(wrapper.get('.code-review-panel').text()).toContain('Review this branch');
 

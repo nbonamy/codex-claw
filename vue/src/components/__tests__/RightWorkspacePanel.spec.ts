@@ -70,6 +70,7 @@ describe('RightWorkspacePanel', () => {
     const wrapper = mountPanel([], null);
 
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Changes');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Browser');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘G');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘B');
@@ -80,8 +81,9 @@ describe('RightWorkspacePanel', () => {
     await wrapper.findAll('.right-workspace-panel__launcher button')[0]?.trigger('click');
     await wrapper.findAll('.right-workspace-panel__launcher button')[1]?.trigger('click');
     await wrapper.findAll('.right-workspace-panel__launcher button')[2]?.trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button')[3]?.trigger('click');
 
-    expect(wrapper.emitted('openTab')).toStrictEqual([['codeReview'], ['browser'], ['files']]);
+    expect(wrapper.emitted('openTab')).toStrictEqual([['codeReview'], ['review'], ['browser'], ['files']]);
   });
 
   it('switches and closes Browser and Review tabs', async () => {
