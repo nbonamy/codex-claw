@@ -426,6 +426,10 @@ async function installUpdate(): Promise<void> {
 async function requestCloseAgent(agentId: string): Promise<void> {
   const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
   if (!agent) return;
+  if (isAgentFolderShared(agent)) {
+    await closeAgentAction(agentId);
+    return;
+  }
   try {
     const workflow = await getAgentGitWorkflow(agentId);
     if (workflow.isLinkedWorktree) {
@@ -437,6 +441,21 @@ async function requestCloseAgent(agentId: string): Promise<void> {
     // Non-Git folders and unavailable Git hosts use the normal close behavior.
   }
   await closeAgentAction(agentId);
+}
+
+function isAgentFolderShared(agent: Agent): boolean {
+  if (!agent.folder) return false;
+  const location = agentBackendLocation(agent);
+  return snapshot.value.agents.some((candidate) => (
+    candidate.id !== agent.id
+    && candidate.folder === agent.folder
+    && agentBackendLocation(candidate) === location
+  ));
+}
+
+function agentBackendLocation(agent: Agent): string {
+  const team = snapshot.value.teams.find((candidate) => candidate.id === agent.teamId);
+  return team?.remoteConnectionId ? `remote:${team.remoteConnectionId}` : 'local';
 }
 
 function cancelAgentClose(): void {

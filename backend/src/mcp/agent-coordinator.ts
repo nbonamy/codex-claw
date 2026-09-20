@@ -70,7 +70,6 @@ export type CelebrationResponse = {
 export type AnnouncementResponse = {
   success: true;
   phase: AnnouncementPhase;
-  outcome: 'queued' | 'skipped';
 };
 
 export type UpdateWorkItemResponse =
@@ -251,6 +250,9 @@ export class ClawMcpAgentCoordinator {
   } {
     const agent = this.requireAgent(agentId);
     const flag = parseToggleThreadFlagInput(input);
+    if (flag.id === 'delegate_to_worktree' && flag.value && agent.delegatedByAgentId) {
+      throw new McpToolError('delegate_to_worktree is unavailable because this agent is already a delegated co-agent.');
+    }
     const threadFlags = { ...agent.threadFlags };
     if (flag.value) threadFlags[flag.id] = true;
     else delete threadFlags[flag.id];

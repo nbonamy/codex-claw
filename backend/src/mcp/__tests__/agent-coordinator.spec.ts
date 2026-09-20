@@ -58,6 +58,23 @@ describe('ClawMcpAgentCoordinator', () => {
     })).toThrow('does not accept a payload');
   });
 
+  it('rejects recursive worktree delegation suggestions from delegated co-agents', () => {
+    const { agents, coordinator, onAgentUpdated } = fixture();
+    agents[0]!.delegatedByAgentId = 'agent-parent';
+
+    expect(() => coordinator.toggleThreadFlag('agent-dina', {
+      id: 'delegate_to_worktree', value: true,
+    })).toThrow('already a delegated co-agent');
+    expect(agents[0]!.threadFlags).toBeUndefined();
+    expect(onAgentUpdated).not.toHaveBeenCalled();
+
+    agents[0]!.threadFlags = { delegate_to_worktree: true };
+    expect(coordinator.toggleThreadFlag('agent-dina', {
+      id: 'delegate_to_worktree', value: false,
+    })).toStrictEqual({ success: true, id: 'delegate_to_worktree', value: false });
+    expect(agents[0]!.threadFlags).toBeUndefined();
+  });
+
   it('labels every backend status variant', () => {
     const { agents, coordinator } = fixture();
     for (const [status, label] of [
@@ -342,14 +359,12 @@ describe('ClawMcpAgentCoordinator', () => {
     const onAnnounce = vi.fn().mockResolvedValue({
       success: true,
       phase: 'start',
-      outcome: 'queued',
     });
     const { agents, coordinator, onAgentUpdated } = fixture({ onAnnounce });
 
     await expect(coordinator.announce('agent-dina', 'start', '  I’ll take it.  ')).resolves.toStrictEqual({
       success: true,
       phase: 'start',
-      outcome: 'queued',
     });
     expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'start', 'I’ll take it.');
     expect(onAgentUpdated).not.toHaveBeenCalled();
