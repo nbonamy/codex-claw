@@ -3,7 +3,9 @@ import * as z from 'zod/v4';
 import type { ReviewToolContext } from '../review/review-tool-registry';
 import { errorToolResult, structuredToolResult } from './tool-result';
 
-const priority = z.enum(['p0', 'p1', 'p2', 'p3']);
+const priority = z.enum(['p0', 'p1', 'p2', 'p3']).describe(
+  'P0: drop everything; universally blocks release, operations, or major usage. P1: urgent; fix in the next cycle. P2: normal; fix eventually. P3: low; nice to have.',
+);
 const findingTitle = z.string().trim().min(1).max(80).describe('Imperative finding title, at most 80 characters.');
 const findingBody = z.string().trim().min(1).describe('One concise Markdown paragraph explaining why this is a problem.');
 
@@ -11,7 +13,7 @@ export function registerReviewTools(server: McpServer, context: ReviewToolContex
   server.registerTool('report_finding', {
     description: 'Create one durable structured code review finding supported by concrete evidence.',
     inputSchema: {
-      priority: priority.describe('P0 critical, P1 high, P2 medium, or P3 low.'),
+      priority,
       title: findingTitle,
       body: findingBody,
       file: z.string().trim().min(1).optional().describe('Repository-relative file path when available.'),

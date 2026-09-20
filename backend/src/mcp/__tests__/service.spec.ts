@@ -99,6 +99,11 @@ describe('ClawMcpService', () => {
     expect(scopedNames).not.toEqual(expect.arrayContaining([
       'verify_finding', 'respond_to_finding', 'complete_review',
     ]));
+    const reportTool = scoped.result.tools.find((tool: { name: string }) => tool.name === 'report_finding');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P0: drop everything');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P1: urgent');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P2: normal');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P3: low');
 
     const called = await postJson(review.url, {
       jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
