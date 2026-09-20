@@ -20,10 +20,10 @@ function setup() {
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
     refreshConversationContext: vi.fn().mockResolvedValue(undefined),
     continueStage: vi.fn().mockResolvedValue(undefined),
-    listSkills: vi.fn().mockResolvedValue([
-      { name: 'grilling', path: '/skills/grilling/SKILL.md', enabled: true },
-      { name: 'to-tickets', path: '/skills/to-tickets/SKILL.md', enabled: true },
-    ]),
+    ensureStageSkills: vi.fn(async (_missionId: string, stage) => [{
+      name: `mission-${stage}`,
+      path: `/claw/missions/mission/skills/mission-${stage}/SKILL.md`,
+    }]),
     interrupt: vi.fn().mockResolvedValue(undefined) };
   const service = new MissionExecutionService(ports);
   const current = () => snapshot.missions![0]!;
@@ -33,6 +33,37 @@ function setup() {
 }
 
 describe('mission execution', () => {
+  it('replaces an active installed workflow skill with the Claw-owned Mission skill', async () => {
+    const h = setup(); await h.configure();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    await h.store.change(h.current().id, mission => {
+      mission.execution!.runs[0]!.skills = [{ name: 'to-tickets', path: '/installed/to-tickets/SKILL.md' }];
+    });
+
+    await h.service.refreshOwnedSkills();
+
+    expect(h.current().execution!.runs[0]!.skills).toStrictEqual([
+      { name: 'mission-requirements', path: '/claw/missions/mission/skills/mission-requirements/SKILL.md' },
+    ]);
+  });
+
+  it('does not launch or rewrite simulated debug runs during recovery', async () => {
+    const h = setup(); await h.configure();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    await h.store.change(h.current().id, mission => {
+      mission.execution!.debugFixture = true;
+      mission.execution!.runs[0]!.status = 'preparing';
+      mission.execution!.runs[0]!.skills = [];
+    });
+    h.ports.ensureStageSkills.mockClear();
+
+    await h.service.refreshOwnedSkills();
+    await h.service.recoverInterruptedRuns();
+
+    expect(h.ports.ensureStageSkills).not.toHaveBeenCalled();
+    expect(h.current().execution!.runs[0]).toMatchObject({ status: 'preparing', skills: [] });
+  });
+
   it('prepares an isolated mission worker without starting its provider conversation', async () => {
     const h = setup(); await h.configure();
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
@@ -43,7 +74,7 @@ describe('mission execution', () => {
     const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;
     expect(worker).toMatchObject({ folder: '/claw/missions/mission', backend: h.originalAgents[0]!.backend, status: { type: 'idle' } });
     expect(worker).not.toHaveProperty('backendSession');
-    expect(run.skills).toStrictEqual([{ name: 'grilling', path: '/skills/grilling/SKILL.md' }]);
+    expect(run.skills).toStrictEqual([{ name: 'mission-requirements', path: '/claw/missions/mission/skills/mission-requirements/SKILL.md' }]);
     const instructions = h.service.developerInstructionsForAgent(run.workerId!);
     expect(instructions).toMatch(/^<context>\n/);
     expect(instructions).toContain(h.originalAgents[0]!.folder);
@@ -84,11 +115,11 @@ describe('mission execution', () => {
     expect(h.current().execution!.runs[0]!.status).toBe('accepted');
     expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'preparing', workerId: run.workerId });
     await h.service.waitForLaunches();
-    expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'running', workerId: run.workerId, skills: [{ name: 'to-tickets', path: '/skills/to-tickets/SKILL.md' }] });
+    expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'running', workerId: run.workerId, skills: [{ name: 'mission-tickets', path: '/claw/missions/mission/skills/mission-tickets/SKILL.md' }] });
     expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: h.current().execution!.runs[1]!.id, stage: 'tickets' });
     expect(h.service.developerInstructionsForAgent(run.workerId!)).toContain('Continue as the same Mission orchestrator');
     expect(h.ports.refreshConversationContext).toHaveBeenCalledWith(worker);
-    expect(h.ports.continueStage).toHaveBeenCalledWith(run.workerId, expect.stringContaining('to-tickets skill'));
+    expect(h.ports.continueStage).toHaveBeenCalledWith(run.workerId, expect.stringContaining('assigned Claw Mission skill'));
     await expect(h.service.submit(run.workerId!, { missionId: mission.id, runId: run.id, artifacts, summary: 'Late result' })).rejects.toThrow('does not own');
   });
 

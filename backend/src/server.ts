@@ -1,8 +1,8 @@
 import { readWorktreeHead } from './git-worktrees';
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
+import { FileMissionSkillStore } from './mission-skill-store';
 import { featureStages, type MissionStage } from '@codex-claw/core/missions';
-import type { BackendSkillSummary } from '@codex-claw/core/contracts';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
 import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
@@ -200,6 +200,7 @@ export class ClawBackendServer {
       return home;
     });
     this.missionArtifacts = options.missionArtifactStore ?? new FileMissionArtifactStore(ensureMissionHome);
+    const missionSkills = new FileMissionSkillStore(ensureMissionHome);
     this.missionExecution = new MissionExecutionService({
       getHead: readWorktreeHead,
       snapshot: this.snapshot,
@@ -213,12 +214,12 @@ export class ClawBackendServer {
         if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
       },
       createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
+      ensureStageSkills: (missionId, stage) => missionSkills.ensure(missionId, stage),
       refreshWorkspace: async agentId => { await this.agentWorkspaces.refreshIdentity(agentId); },
       refreshConversationContext: async agent => {
         await this.requireDriverRpc().refreshConversationContext(agent);
       },
       continueStage: async (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
-      listSkills: agent => this.requireDriverRpc().handle(backendMethods.driverSkillsList, { agent }) as Promise<BackendSkillSummary[]>,
       interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
     });
     this.planReviews = new AgentPlanReviewService({
@@ -343,6 +344,7 @@ export class ClawBackendServer {
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
+    await this.missionExecution.refreshOwnedSkills();
     await this.missionExecution.recoverInterruptedRuns();
   }
 

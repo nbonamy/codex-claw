@@ -1,8 +1,8 @@
-import type { Agent, AppSnapshot, BackendSkillSummary, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
 import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
-import { missionDeveloperInstructions, missionSkills, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionResultInput, type MissionReviewPolicy, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { missionDeveloperInstructions, pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionResultInput, type MissionReviewPolicy, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 
 export type MissionExecutionPorts = {
@@ -15,10 +15,10 @@ export type MissionExecutionPorts = {
   validateRepository(path: string): Promise<void>;
   createWorktree(input: CreateSourceWorktreeInput): Promise<SourceWorktree>;
   getHead(path: string): Promise<string>;
+  ensureStageSkills(missionId: string, stage: MissionStage): Promise<MissionRun['skills']>;
   refreshWorkspace(agentId: string): Promise<void>;
   refreshConversationContext(agent: Agent): Promise<void>;
   continueStage(agentId: string, prompt: string): Promise<void>;
-  listSkills(agent: Agent): Promise<BackendSkillSummary[]>;
   interrupt(agent: Agent): Promise<unknown>;
 };
 
@@ -138,11 +138,32 @@ export class MissionExecutionService {
 
   async recoverInterruptedRuns(): Promise<void> {
     const interrupted = (this.ports.snapshot.missions ?? []).flatMap(mission => (
-      mission.execution?.runs
+      mission.execution?.debugFixture ? [] : mission.execution?.runs
         .filter(run => run.status === 'preparing' || (run.status === 'running' && !this.agent(run.workerId)?.backendSession))
         .map(run => ({ missionId: mission.id, runId: run.id })) ?? []
     ));
     await Promise.all(interrupted.map(({ missionId, runId }) => this.startLaunch(missionId, runId)));
+  }
+
+  async refreshOwnedSkills(): Promise<void> {
+    let changed = false;
+    for (const mission of this.ports.snapshot.missions ?? []) {
+      if (mission.execution?.debugFixture) continue;
+      const activeRuns = mission.execution?.runs.filter(run => ['preparing', 'running', 'awaitingReview'].includes(run.status)) ?? [];
+      const replacements = await Promise.all(activeRuns.map(async run => ({
+        runId: run.id,
+        skills: await this.ports.ensureStageSkills(mission.id, run.stage),
+      })));
+      if (!replacements.some(({ runId, skills }) => !sameSkills(activeRuns.find(run => run.id === runId)!.skills, skills))) continue;
+      await this.ports.missions.change(mission.id, current => {
+        for (const replacement of replacements) {
+          const run = current.execution!.runs.find(candidate => candidate.id === replacement.runId)!;
+          run.skills = replacement.skills;
+        }
+      });
+      changed = true;
+    }
+    if (changed) await this.ports.publish();
   }
 
   private startLaunch(missionId: string, runId: string): Promise<void> {
@@ -418,7 +439,7 @@ export class MissionExecutionService {
       current.stageAgentIds[currentRun.stage] = worker.id;
     });
     await this.ports.publish();
-    const skills = missionSkills(run.stage, await this.ports.listSkills(worker).catch(() => []));
+    const skills = await this.ports.ensureStageSkills(mission.id, run.stage);
     await this.ports.missions.change(id, current => {
       const currentRun = current.execution!.runs.find(candidate => candidate.id === runId)!;
       if (currentRun.status !== 'cancelled') currentRun.skills = skills;
@@ -623,7 +644,11 @@ function missionTicketsMarkdown(tickets: MissionTicket[]): string {
 }
 
 function stageKickoffPrompt(run: MissionRun): string {
-  if (run.stage === 'tickets') return 'The requirements are approved. Continue this Mission in the Tickets stage now: read and use the to-tickets skill, then work with the user to shape and publish the backlog.';
+  if (run.stage === 'tickets') return 'The requirements are approved. Continue this Mission in the Tickets stage now: follow the assigned Claw Mission skill, then work with the user to shape and publish the backlog.';
   if (run.stage === 'implementation') return `The tickets are approved. Begin implementation of assigned ticket ${(run.ticketIndex ?? 0) + 1} now and report progress in this Mission conversation.`;
   return 'The implementation is approved. Begin the Mission review now and prepare the delivery decision for the user.';
+}
+
+function sameSkills(left: MissionRun['skills'], right: MissionRun['skills']): boolean {
+  return left.length === right.length && left.every((skill, index) => skill.name === right[index]?.name && skill.path === right[index]?.path);
 }

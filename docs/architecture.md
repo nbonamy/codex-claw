@@ -94,7 +94,12 @@ observe the backlog as it develops. External tracker identifiers remain optional
 references assigned by the configured tracker.
 The Mission snapshot carries their revisions and sizes rather than exposing file
 access to the renderer or provider.
-Runs persist assignment, installed skill paths, proposal, status, and feedback.
+Runs persist assignment, Claw-owned Mission skill paths, proposal, status, and feedback.
+`clawd` materializes those stage skills under the Mission home before a run
+starts. Mission workflow behavior therefore stays provider-neutral and does not
+depend on a user's installed skill catalog. Repository instructions still
+provide project and tracker conventions, but they cannot replace Mission stage
+gates or require a separate skill setup flow.
 Implementation dispatches dependency-ready tickets in parallel across different
 repositories and serializes work within each repository worktree. The selected
 execution policy either pauses after every ticket for user review or accepts
@@ -119,8 +124,8 @@ Only the user can accept an
 artifact and approve advancement. Reports are scoped to
 the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
 for published tickets; mission tickets retain canonical references and record local
-implementation acceptance, not external issue status. Setup is never invoked
-implicitly. Current and older installed skill names are resolved by capability.
+implementation acceptance, not external issue status. Mission ticketing proceeds
+without tracker setup when no tracker is already configured.
 The workflow reuses Claw's diff and explicit commit/push/PR controls; agents do not
 publish or merge automatically. External ticket refresh, cross-repository branch
 integration, and automatic repair of local relative dependencies are not part of

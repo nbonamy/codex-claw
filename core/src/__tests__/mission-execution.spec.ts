@@ -1,20 +1,4 @@
-import { describe, expect, it } from 'vitest';
-import { missionSkills } from '../mission-execution';
-
-describe('mission stage skills', () => {
-  it('prefers current Pocock capabilities, skips disabled skills, and retains installed paths', () => {
-    const available = ['grill-me', 'grill-with-docs', 'to-prd', 'pocock:to-spec', 'setup-matt-pocock-skills', 'to-tickets', 'implement', 'tdd', 'review', 'code-review'].map(name => ({ name, path: `/installed/${name}/SKILL.md`, enabled: true }));
-    expect(missionSkills('requirements', available).map(skill => skill.name)).toEqual(['grill-with-docs', 'pocock:to-spec']);
-    expect(missionSkills('tickets', available)).toEqual([{ name: 'to-tickets', path: '/installed/to-tickets/SKILL.md' }]);
-    expect(missionSkills('implementation', available).map(skill => skill.name)).toEqual(['implement', 'tdd']);
-    expect(missionSkills('review', available).map(skill => skill.name)).toEqual(['code-review']);
-    expect(missionSkills('requirements', available.map(skill => ({ ...skill, enabled: false })))).toEqual([]);
-  });
-  it('supports older installed names without inventing unavailable skills', () => {
-    expect(missionSkills('tickets', [{ name: 'legacy:prd-to-issues', path: '/legacy/SKILL.md', enabled: true }])).toEqual([{ name: 'legacy:prd-to-issues', path: '/legacy/SKILL.md' }]);
-    expect(missionSkills('implementation', [])).toEqual([]);
-  });
-});
+import { expect, it } from 'vitest';
 
 import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, isMission, isMissionArtifacts, missionTicketReady, updateMission } from '../missions';
@@ -26,7 +10,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
   mission.execution = { teamId: 'team', memberIds: ['member'], workspaceName: 'billing-work', reviewPolicy: 'reviewAfterImplementation', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [] };
   mission.artifacts.requirements = { problem: 'Owners pay', acceptance: 'Only owners' };
   for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
-    const run: MissionRun = { id: 'run', stage, memberId: 'member', ticketIndex: 1, status: 'running', skills: [{ name: 'tdd', path: '/skills/tdd' }], feedback: 'Check permissions', startedAt: 'now' };
+    const run: MissionRun = { id: 'run', stage, memberId: 'member', ticketIndex: 1, status: 'running', skills: [{ name: `mission-${stage}`, path: `/mission/skills/mission-${stage}/SKILL.md` }], feedback: 'Check permissions', startedAt: 'now' };
     const prompt = missionDeveloperInstructions(mission, run);
     expect(prompt).toMatch(/^<context>\n/);
     expect(prompt).toMatch(/\n<\/context>$/);
@@ -34,24 +18,20 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toContain(`Stage: ${stage}.`);
     expect(prompt).toContain('/isolated');
     expect(prompt).toContain('a'.repeat(40));
-    expect(prompt).toContain('/skills/tdd');
+    expect(prompt).toContain(`/mission/skills/mission-${stage}/SKILL.md`);
     expect(prompt).toContain('Check permissions');
     expect(prompt).toContain('Only owners');
     expect(prompt).toContain('codex_claw.submit-mission-result');
     expect(prompt).toContain('codex_claw.list-mission-artifacts');
     expect(prompt).toContain('codex_claw.read-mission-artifact');
     expect(prompt).toContain('codex_claw.write-mission-artifact');
-    expect(prompt.includes('codex_claw.set-mission-title')).toBe(stage === 'requirements');
-    expect(prompt.includes('request_user_input')).toBe(stage === 'requirements');
     if (stage === 'tickets') {
       expect(prompt).toContain('Continue as the same Mission orchestrator');
-      expect(prompt).toContain('Use codex_claw.upsert-mission-ticket for every draft');
-      expect(prompt).toContain('set-mission-execution-policy');
     }
     expect(prompt).toContain('does not approve a stage');
-    expect(prompt).toContain('Do not automatically invoke setup-matt-pocock-skills');
+    expect(prompt).toContain('Claw-owned Mission skill');
     expect(prompt).toContain('already visible in the Mission workspace');
-    expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('do not claim you used an unavailable skill');
+    expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('no agent-run skill');
   }
 });
 

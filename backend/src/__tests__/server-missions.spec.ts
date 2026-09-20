@@ -20,7 +20,10 @@ describe('mission backend boundary', () => {
       const mission = (created as { result: AppSnapshot }).result.missions![0]!;
       expect(mission.teamId).toBe(snapshot.teams[0]!.id);
       expect(mission.execution!.repoPath).toBeUndefined();
-      await vi.waitFor(() => expect(snapshot.missions![0]!.execution!.runs[0]!.status).toBe('failed'));
+      await vi.waitFor(() => expect(snapshot.missions![0]!.execution!.runs[0]!.status).toBe('running'));
+      const run = snapshot.missions![0]!.execution!.runs[0]!;
+      expect(run.skills[0]?.name).toBe('mission-shape-requirements');
+      await call('mission/execution/update', { id: mission.id, revision: snapshot.missions![0]!.revision, action: 'cancel', runId: run.id });
       const artifacts = { ...mission.artifacts, requirements: { problem: 'Billing', acceptance: 'Owner checkout' } };
       await call('mission/update', { id: mission.id, revision: snapshot.missions![0]!.revision, artifacts, stageAgentIds: {}, action: 'advance' });
       const restored = snapshotFromPersistedState(disk);
@@ -90,7 +93,8 @@ it('prepares a mission without a provider turn, then starts it from the first us
     expect(instructions).toMatch(/^<context>\n/);
     expect(instructions).toContain("Treat the user's first message as the beginning of requirements shaping");
     expect(instructions).toContain(repo);
-    expect(instructions).toContain('/skills/grill-with-docs/SKILL.md');
+    expect(instructions).toContain(join(missionHome, 'skills', 'mission-shape-requirements', 'SKILL.md'));
+    expect(instructions).not.toContain('/skills/grill-with-docs/SKILL.md');
     expect(server.missionContext(run.workerId!)).toEqual({ missionId: current().id, runId: run.id, stage: 'requirements' });
     await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'agent/prompt/send', params: { agentId: run.workerId, prompt: 'Build team billing' } });
     await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
@@ -119,7 +123,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     await vi.waitFor(() => expect(releaseConversation).toHaveBeenCalledWith(worker.id));
     expect(loadConversation).toHaveBeenCalledWith(worker);
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toEqual([
-      expect.objectContaining({ agentId: worker.id, text: expect.stringContaining('to-tickets skill') }),
+      expect.objectContaining({ agentId: worker.id, text: expect.stringContaining('assigned Claw Mission skill') }),
     ]));
     const missionId = current().id;
     await call('mission/delete', { id: missionId, revision: current().revision });

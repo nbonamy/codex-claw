@@ -1,4 +1,3 @@
-import type { BackendSkillSummary } from './contracts';
 import type { Mission, MissionArtifacts, MissionStage, MissionTicket } from './missions';
 
 export type MissionRun = {
@@ -60,28 +59,10 @@ export function pendingMissionRun(mission: Mission): MissionRun | undefined {
   return mission.execution?.runs.slice().reverse().find(run => ['preparing', 'running', 'awaitingReview'].includes(run.status));
 }
 
-// Each group represents one capability, with current names preferred over older aliases.
-const skillNames: Record<MissionStage, string[][]> = {
-  requirements: [['grill-with-docs', 'grilling', 'grill-me'], ['to-spec', 'to-prd', 'write-a-prd']],
-  tickets: [['to-tickets', 'to-issues', 'prd-to-issues', 'design']],
-  implementation: [['implement'], ['tdd'], ['codex-claw-testing-coverage']],
-  review: [['code-review', 'review'], ['codex-claw-dod']],
-  ship: [],
-};
-export function missionSkills(stage: MissionStage, available: BackendSkillSummary[]): MissionRun['skills'] {
-  return skillNames[stage].flatMap(alternatives => {
-    for (const name of alternatives) {
-      const match = available.find(skill => skill.enabled && (skill.name === name || skill.name.endsWith(`:${name}`)));
-      if (match) return [{ name: match.name, path: match.path }];
-    }
-    return [];
-  });
-}
-
 export function missionDeveloperInstructions(mission: Mission, run: MissionRun, repositories: string[] = []): string {
   const instructions: Record<MissionStage, string> = {
-    requirements: "Treat the user's first message as the beginning of requirements shaping. If it does not yet state an outcome, ask what they want to build. Shape the outcome through conversation before assuming a repository or solution. Clarify scope, constraints, non-goals, and observable acceptance criteria. For bounded choices during grilling, use the provider's structured ask-user-question tool when available (for Codex, request_user_input) so the user can answer interactively; keep open-ended ideation in normal conversation. Once the outcome is clear, call codex_claw.set-mission-title with a concise outcome-oriented title. Do not implement code. First grill and clarify with the user; only after that, synthesize the agreed conversation with the spec skill if available. Submit requirements when they are ready for user review.",
-    tickets: 'Continue as the same Mission orchestrator. Tell the user that the requirements are approved and you are turning them into tickets. Read and apply the to-tickets skill when available. Read the configured repository issue tracker instructions, including docs/agents/issue-tracker.md when present, and preserve its custom label mappings. Tracker choices are alternatives: never create a duplicate local/GitHub tracker. Turn the approved requirements into a small ordered implementation backlog. Each ticket must be a tracer-bullet vertical slice assigned to exactly one represented repository, with acceptance criteria, dependencies, and meaningful verification. Use codex_claw.upsert-mission-ticket for every draft and revision so tickets appear in the Mission while you work. Ask whether the user wants to review every completed ticket or review once after implementation, then record that choice with codex_claw.set-mission-execution-policy. The tool assigns a stable Mission ticket ID; tracker issue numbers remain optional external references assigned only when published. Review the breakdown, affected repositories, and execution policy with the user before publishing according to the ticketing skill. You may delegate repository research to agents created in the relevant represented repositories, then incorporate their findings into the Mission tickets yourself. Preserve the configured tracker as the authority; mission completion flags record acceptance of implementation, not remote issue closure. Do not implement code.',
+    requirements: "Treat the user's first message as the beginning of requirements shaping. Follow the assigned Mission skill to interview the user, use the provider's structured question tool for bounded choices, title the Mission, and prepare the requirements proposal. Repository attachment remains optional during shaping. Do not implement code.",
+    tickets: 'Continue as the same Mission orchestrator. Tell the user that the requirements are approved and follow the assigned Mission skill to create the backlog. Repository issue-tracker instructions provide labels and publication details only when a tracker is already configured. Mission tickets remain canonical and tracker references remain optional. You may delegate repository research to agents in represented repositories. Do not implement code.',
     implementation: `Implement ONLY ticket ${(run.ticketIndex ?? 0) + 1} in ${run.repositoryPath ?? 'the assigned repository'}. Read the assigned ticket from its canonical reference when present, including tracker comments and configured label meanings. Mission done flags mean accepted implementation, not tracker issue closure. Read repository instructions and follow its test strategy. Run relevant tests and inspect the actual diff. Leave changes in this mission worktree for review. Do not merge, push, or open a PR. Mark only your ticket done after it meets acceptance; record changed paths and exact verification commands/results in submit-mission-result. Do not write the shared Implementation artifact directly; Claw aggregates accepted ticket evidence. If blocked, explain it in the conversation rather than claim completion.`,
     review: 'Review the mission branch and uncommitted changes against the approved requirements and tickets. Inspect actual code/diffs and run appropriate checks. Report concrete findings, risks, and a delivery recommendation. Do not silently fix findings, merge, push, or create a PR. The user controls delivery from the workflow.',
     ship: 'Shipping is controlled by the Mission workspace. Do not start an agent run for this stage.',
@@ -95,10 +76,10 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
       : mission.execution?.workspace
         ? `Mission baseline commit: ${mission.execution.workspace.baseSha ?? 'unavailable'}. Work only in the isolated mission worktree: ${mission.execution.workspace.path}. Do not edit the source checkout or other worktrees.`
       : 'This stage runs from the Claw-owned mission home. No Git worktree is attached yet.',
-    'Do not automatically invoke setup-matt-pocock-skills: setup is an explicit user action. If tracker setup is missing and a skill needs it, explain the missing setup to the user in the stage conversation.\nThis is an explicitly assigned mission task. Follow repository instructions. User approval of artifacts and delivery remains required.',
+    'This is an explicitly assigned Mission task. Follow repository instructions for project facts and conventions. The Claw-owned Mission skill controls the workflow, stage completion criteria, and handoff. User approval of artifacts and delivery remains required.',
     'Keep stage conversation concise. Use it for questions, decisions, progress, and blockers; do not restate complete requirements, tickets, or evidence that is already visible in the Mission workspace.',
     instructions[run.stage],
-    run.skills.length ? `Use these available skills: ${run.skills.map(skill => `${skill.name} (${skill.path})`).join(', ')}. Read their SKILL.md instructions before applying them. The mission task authorizes their relevant work. Do not push code, open pull requests, or merge. Ticket publication must follow the ticketing skill’s human review and configured tracker instructions.` : 'No matching stage skill was available in your backend catalog. Apply the stage instructions and repository guidance directly; do not claim you used an unavailable skill.',
+    run.skills.length ? `Use this Claw-owned Mission skill as the authoritative stage procedure: ${run.skills.map(skill => `${skill.name} (${skill.path})`).join(', ')}. Read its SKILL.md before acting. Do not substitute an installed workflow skill or invoke skill setup. Do not push code, open pull requests, or merge.` : 'This stage has no agent-run skill.',
     run.feedback ? `User revision feedback:\n${run.feedback}` : '',
     `Current accepted artifacts:\n${JSON.stringify(mission.artifacts, null, 2)}`,
     `Canonical artifact files:\n${JSON.stringify(mission.artifactFiles, null, 2)}`,

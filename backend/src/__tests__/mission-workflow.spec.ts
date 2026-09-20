@@ -9,6 +9,7 @@ import { createMission, type MissionArtifacts } from '@codex-claw/core/missions'
 import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
+import { FileMissionSkillStore } from '../mission-skill-store';
 import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
@@ -31,12 +32,13 @@ it('keeps one orchestrator through shaping, isolates code sessions, respects tic
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
     const artifactContents = new Map<string, string>();
+    const missionSkills = new FileMissionSkillStore(async () => folder);
     const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
       readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
       writeArtifact: async (_missionId, stage, content) => { artifactContents.set(stage, content); return { size: content.length }; },
       validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {}, continueStage: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
-      listSkills: async () => ['grill-with-docs', 'to-spec', 'to-tickets', 'implement', 'tdd', 'code-review'].map(name => ({ name, path: `/skills/${name}/SKILL.md`, enabled: true })),
+      ensureStageSkills: (missionId, stage) => missionSkills.ensure(missionId, stage),
       interrupt: async () => {},
     });
     const current = () => snapshot.missions![0]!;
