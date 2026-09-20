@@ -187,6 +187,7 @@
         }}</span>
         <button
           v-if="
+            !readOnly &&
             selected.run?.status === 'awaitingReview' &&
             reviewPolicy === 'reviewEachTicket'
           "
@@ -198,7 +199,7 @@
           <CheckIcon aria-hidden="true" />{{ t("missions.approveTicket") }}
         </button>
         <button
-          v-else-if="selected.run && ['preparing', 'running'].includes(selected.run.status)"
+          v-else-if="!readOnly && selected.run && ['preparing', 'running'].includes(selected.run.status)"
           type="button"
           class="claw-button"
           :disabled="busy"
@@ -207,7 +208,7 @@
           {{ t("missions.stopTicket") }}
         </button>
         <button
-          v-else-if="selected.run && ['failed', 'cancelled'].includes(selected.run.status)"
+          v-else-if="!readOnly && selected.run && ['failed', 'cancelled'].includes(selected.run.status)"
           type="button"
           class="claw-button claw-button--primary"
           :disabled="busy"
@@ -240,7 +241,7 @@ import MarkdownPanel from "./MarkdownPanel.vue";
 type TicketItem = { ticket: MissionTicket; index: number; run?: MissionRun };
 
 const props = withDefaults(
-  defineProps<{ agents?: Agent[]; mission: Mission; busy?: boolean }>(),
+  defineProps<{ agents?: Agent[]; mission: Mission; busy?: boolean; readOnly?: boolean }>(),
   { agents: () => [] },
 );
 const emit = defineEmits<{

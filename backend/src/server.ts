@@ -1,5 +1,7 @@
 import { readWorktreeHead } from './git-worktrees';
 import { MissionExecutionService } from './mission-execution-service';
+import { applyMissionDebugFixture } from './mission-debug-fixtures';
+import { featureStages, type MissionStage } from '@codex-claw/core/missions';
 import type { BackendSkillSummary } from '@codex-claw/core/contracts';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
@@ -521,6 +523,23 @@ export class ClawBackendServer {
             markdown,
           },
         });
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
+      case backendMethods.debugMissionStageSet: {
+        const params = requireRecord(message.params);
+        const missionId = requireString(params.missionId, 'missionId');
+        const stage = params.stage;
+        if (typeof stage !== 'string' || !featureStages.includes(stage as MissionStage)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'stage must be a supported Mission stage');
+        }
+        const mission = this.snapshot.missions?.find(candidate => candidate.id === missionId);
+        for (const workerId of new Set(mission?.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? [])) {
+          const worker = this.snapshot.agents.find(agent => agent.id === workerId);
+          if (worker && (worker.status.type === 'working' || worker.status.type === 'awaitingInput')) {
+            await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
+          }
+        }
+        applyMissionDebugFixture(this.snapshot, missionId, stage as MissionStage);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugThreadFlagSet: {

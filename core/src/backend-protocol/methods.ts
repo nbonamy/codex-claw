@@ -120,6 +120,7 @@ export const backendMethods = {
   debugAgentMessageSend: 'debug/agentMessage/send',
   debugExecutionPlanToggle: 'debug/executionPlan/toggle',
   debugPlanReadyForReviewInject: 'debug/planReadyForReview/inject',
+  debugMissionStageSet: 'debug/missionStage/set',
   debugThreadFlagSet: 'debug/threadFlag/set',
   remoteControlStatusGet: 'remoteControl/status/get',
   remoteControlEnable: 'remoteControl/enable',

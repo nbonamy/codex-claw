@@ -59,6 +59,8 @@ const callbacks = (): AppMenuCallbacks => ({
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
   injectDebugPlanReview: vi.fn(),
+  getDebugMissionStage: vi.fn(() => 'tickets' as const),
+  setDebugMissionStage: vi.fn(),
   isDebugThreadFlagSet: vi.fn(() => false),
   setDebugThreadFlag: vi.fn(),
 });
@@ -259,6 +261,7 @@ describe('app menu', () => {
     const debugItems = submenu(debugMenu, 'Debug');
     expect(debugItems.map((item) => item.type === 'separator' ? 'separator' : item.label)).toStrictEqual([
       'Agent Fixtures',
+      'Mission Fixtures',
       'Thread Flags',
       'UI Previews',
       'Effects',
@@ -272,6 +275,18 @@ describe('app menu', () => {
       'Execution Plan',
       'Plan Review',
     ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'Mission Fixtures')).toStrictEqual([
+      'Requirements',
+      'Tickets',
+      'Implementation',
+      'Review',
+      'Ship',
+    ]);
+    expect(nestedMenuItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets')).toMatchObject({
+      type: 'radio',
+      checked: true,
+      enabled: true,
+    });
     expect(nestedMenuItem(debugMenu, 'Debug', 'Thread Flags', 'Delegate to Worktree')).toMatchObject({
       type: 'checkbox',
       checked: false,
@@ -318,6 +333,11 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Mark as Unread');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Execution Plan');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Plan Review');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Requirements');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Implementation');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Ship');
     clickThreadFlagItem(debugMenu, true);
     clickThreadFlagItem(debugMenu, false);
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Markdown');
@@ -382,6 +402,11 @@ describe('app menu', () => {
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(1, 'requirements');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(2, 'tickets');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(3, 'implementation');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(4, 'review');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(5, 'ship');
     expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(1, true);
     expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(2, false);
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);

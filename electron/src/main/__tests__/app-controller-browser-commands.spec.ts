@@ -5,6 +5,7 @@ import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ipcChannels } from '@codex-claw/core/ipc';
+import { createMission, type MissionStage } from '@codex-claw/core/missions';
 import type { OpenInProvider } from '../open-in';
 import { setMainWindowSend, createBackendClient } from './app-controller-test-harness';
 
@@ -22,6 +23,28 @@ describe('AppController', () => {
     await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
       backendMethods.debugAgentMessageSend,
       { agentId: 'agent-dina' },
+    ));
+  });
+
+  it('routes Mission stage fixtures for the Mission containing the active agent', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Debug mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    mission.execution!.runs.push({
+      id: 'run-debug', stage: 'requirements', memberId: snapshot.agents[0]!.id, workerId: snapshot.agents[0]!.id,
+      status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+    });
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const options = (controller as unknown as {
+      debugMenuOptions(): { getDebugMissionStage(): MissionStage | undefined; setDebugMissionStage(stage: MissionStage): void };
+    }).debugMenuOptions();
+
+    expect(options.getDebugMissionStage()).toBe('requirements');
+    options.setDebugMissionStage('implementation');
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+      backendMethods.debugMissionStageSet,
+      { missionId: mission.id, stage: 'implementation' },
     ));
   });
 

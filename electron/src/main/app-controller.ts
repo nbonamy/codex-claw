@@ -1,4 +1,5 @@
 import { registerMissionIpcHandlers } from './mission-ipc';
+import type { MissionStage } from '@codex-claw/core/missions';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
 import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
@@ -1532,14 +1533,35 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      getDebugMissionStage: () => this.debugMission()?.stage,
+      setDebugMissionStage: (stage) => this.setDebugMissionStage(stage),
       isDebugThreadFlagSet: () => this.isDebugThreadFlagSet(),
       setDebugThreadFlag: (value) => this.setDebugThreadFlag(value),
     };
+  }
+
+  private debugMission(snapshot = this.snapshot) {
+    const activeAgentId = snapshot?.activeAgentId;
+    if (!activeAgentId) return undefined;
+    return snapshot.missions?.slice().reverse().find(mission => mission.execution?.runs.some(run => run.workerId === activeAgentId));
+  }
+
+  private setDebugMissionStage(stage: MissionStage): void {
+    const mission = this.debugMission();
+    if (!mission || !this.backendClient || app?.isPackaged) return;
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugMissionStageSet, { missionId: mission.id, stage })
+      .then(snapshot => this.adoptBackendSnapshot(snapshot))
+      .then(() => this.refreshAppMenu())
+      .catch((error) => warnMain('debug', 'failed to load mission fixture', {
+        missionId: mission.id,
+        stage,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
   }
 
   private isDebugThreadFlagSet(snapshot = this.snapshot): boolean {

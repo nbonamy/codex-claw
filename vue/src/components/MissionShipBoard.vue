@@ -23,8 +23,9 @@
         </div>
         <template v-if="delivery.status === 'pending'">
           <p>{{ t('missions.shipActionsHint') }}</p>
+          <p v-if="mission.execution?.debugFixture" class="mission-ship__debug">{{ t('missions.shipDebugFixture') }}</p>
           <GitWorkflowControl
-            v-if="agent(delivery.agentId)"
+            v-else-if="agent(delivery.agentId)"
             :agent="agent(delivery.agentId)!"
             :git-status="gitStatuses[delivery.agentId]"
             :get-workflow="getWorkflow"
@@ -230,5 +231,10 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 
 .mission-ship__error {
   color: var(--color-error) !important;
+}
+
+.mission-ship__debug {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
 }
 </style>

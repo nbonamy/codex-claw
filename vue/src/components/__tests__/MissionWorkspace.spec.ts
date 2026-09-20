@@ -348,6 +348,26 @@ describe('MissionWorkspace', () => {
     });
   });
 
+  it('keeps simulated implementation fixtures visual and non-interactive', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'implementation';
+    mission.execution!.debugFixture = true;
+    mission.artifacts.tickets = [{ title: 'Execution board', repositoryPath: '/src/codex-claw', done: false }];
+    mission.execution!.workspaces = [{ repositoryPath: '/src/codex-claw', path: '/src/codex-claw', branch: 'mission/debug' }];
+    mission.execution!.runs = [{
+      id: 'run-debug', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
+      repositoryPath: '/src/codex-claw', status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+      implementationResult: { changes: 'Rendered the execution board.', tests: 'Component behavior passes.' },
+    }];
+    const wrapper = mountWorkspace(mission);
+
+    await wrapper.get('.mission-implementation__ticket').trigger('click');
+
+    expect(wrapper.get('[aria-label="Implementation ticket details"]').text()).toContain('Rendered the execution board.');
+    expect(wrapper.find('.mission-implementation__details footer .claw-button').exists()).toBe(false);
+    expect(wrapper.find('.code-review-slot').exists()).toBe(false);
+  });
+
   it('stops active work and can retry a retained failed stage', async () => {
     const mission = missionWithRun('running');
     const executeMission = vi.fn().mockResolvedValue(undefined);

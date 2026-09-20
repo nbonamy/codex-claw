@@ -53,7 +53,7 @@
             <p>{{ t(`missions.stageDescription.${viewedStage}`) }}</p>
           </div>
           <button
-            v-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal"
+            v-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal && !debugFixture"
             class="claw-button claw-button--primary"
             type="button"
             :disabled="busy"
@@ -71,6 +71,7 @@
           :agents="agents"
           :mission="mission"
           :busy="busy"
+          :read-only="debugFixture"
           @approve="approveImplementationRun"
           @open-conversation="selectConversation"
           @retry="retryImplementationTicket"
@@ -113,7 +114,7 @@
           <MissionRequirementReview
             v-else-if="viewedStage === 'requirements'"
             :content="artifactMarkdown"
-            :disabled="feedbackBusy"
+            :disabled="feedbackBusy || debugFixture"
             :reset-key="feedbackReset"
             @send-comments="sendRequirementComments"
           />
@@ -149,7 +150,7 @@
           </button>
         </section>
 
-        <slot v-if="codeAgentId && ['implementation', 'review'].includes(viewedStage)" name="code-review" :agent-id="codeAgentId" />
+        <slot v-if="codeAgentId && ['implementation', 'review'].includes(viewedStage) && !debugFixture" name="code-review" :agent-id="codeAgentId" />
       </main>
 
       <aside class="mission-workspace__conversation" :aria-label="t('missions.support')">
@@ -216,6 +217,7 @@ const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
+const debugFixture = computed(() => props.mission.execution?.debugFixture === true);
 const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
 const completedStageCount = computed(() => props.mission.status === 'completed' ? featureStages.length : currentIndex.value);
 const progressPercent = computed(() => Math.round((completedStageCount.value / featureStages.length) * 100));

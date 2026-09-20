@@ -1,5 +1,6 @@
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import { featureStages, type MissionStage } from '@codex-claw/core/missions';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';
@@ -16,6 +17,8 @@ export type AppMenuCallbacks = {
   sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
+  getDebugMissionStage?: () => MissionStage | undefined;
+  setDebugMissionStage?: (stage: MissionStage) => void;
   isDebugThreadFlagSet?: () => boolean;
   setDebugThreadFlag?: (value: boolean) => void;
   reload(): void;
@@ -23,7 +26,7 @@ export type AppMenuCallbacks = {
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -36,6 +39,8 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
+    getDebugMissionStage: options.getDebugMissionStage,
+    setDebugMissionStage: options.setDebugMissionStage,
     isDebugThreadFlagSet: options.isDebugThreadFlagSet,
     setDebugThreadFlag: options.setDebugThreadFlag,
   };
@@ -81,6 +86,10 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         submenu: buildDebugAgentFixtures(callbacks),
       },
       {
+        label: 'Mission Fixtures',
+        submenu: buildDebugMissionFixtures(callbacks),
+      },
+      {
         label: 'Thread Flags',
         submenu: [
           {
@@ -110,6 +119,23 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
       },
     ],
   };
+}
+
+function buildDebugMissionFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  const labels: Record<MissionStage, string> = {
+    requirements: 'Requirements',
+    tickets: 'Tickets',
+    implementation: 'Implementation',
+    review: 'Review',
+    ship: 'Ship',
+  };
+  return featureStages.map(stage => ({
+    label: labels[stage],
+    type: 'radio',
+    checked: callbacks.getDebugMissionStage?.() === stage,
+    enabled: Boolean(callbacks.setDebugMissionStage && callbacks.getDebugMissionStage?.()),
+    click: () => callbacks.setDebugMissionStage?.(stage),
+  }));
 }
 
 function buildDebugAgentFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {

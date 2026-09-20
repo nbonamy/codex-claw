@@ -50,4 +50,19 @@ describe('MissionShipBoard', () => {
       result: { kind: 'merge' },
     });
   });
+
+  it('renders simulated pending delivery without exposing destructive Git actions', () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Debug delivery', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    mission.stage = 'ship';
+    mission.execution!.debugFixture = true;
+    mission.execution!.deliveries = [{ repositoryPath: '/repo/api', agentId: snapshot.agents[0]!.id, status: 'pending' }];
+    const wrapper = mount(MissionShipBoard, {
+      props: { mission, agents: snapshot.agents, gitStatuses: {} },
+      global: { plugins: [ElementPlus], stubs: { GitWorkflowControl: true } },
+    });
+
+    expect(wrapper.text()).toContain('Debug fixture — delivery actions are disabled.');
+    expect(wrapper.findComponent({ name: 'GitWorkflowControl' }).exists()).toBe(false);
+  });
 });

@@ -29,6 +29,7 @@ export type MissionDelivery = {
 };
 export type MissionExecution = {
   teamId: string;
+  debugFixture?: true;
   repoPath?: string;
   memberIds: string[];
   workspace?: { path: string; branch: string; baseSha?: string };
