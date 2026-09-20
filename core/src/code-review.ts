@@ -11,6 +11,8 @@ export type CodeReviewThreadMode = 'current' | 'independent';
 export type CodeReviewStartInput = {
   scope: CodeReviewScope;
   threadMode: CodeReviewThreadMode;
+  model?: string;
+  reasoningEffort?: string;
 };
 
 export type CodeReviewLocation = {
@@ -200,7 +202,11 @@ export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSe
 }
 
 export function isCodeReviewStartInput(value: unknown): value is CodeReviewStartInput {
-  return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode);
+  return isRecord(value)
+    && isCodeReviewScope(value.scope)
+    && isCodeReviewThreadMode(value.threadMode)
+    && isOptionalNonEmptyString(value.model)
+    && isOptionalNonEmptyString(value.reasoningEffort);
 }
 
 export function isCodeReviewSession(value: unknown): value is CodeReviewSession {
@@ -220,6 +226,10 @@ function isCodeReviewScope(value: unknown): value is CodeReviewScope {
 
 function isCodeReviewThreadMode(value: unknown): value is CodeReviewThreadMode {
   return value === 'current' || value === 'independent';
+}
+
+function isOptionalNonEmptyString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === 'string' && value.trim().length > 0);
 }
 
 function latestFindings(session: CodeReviewSession): Map<string, CodeReviewFinding> {

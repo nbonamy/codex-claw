@@ -10,7 +10,7 @@ import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-cla
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendConversationReplacementResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, restartAgentConversation, resumeAgentConversationInSnapshot, updateAgentFromInput } from '@codex-claw/core/agent-manager';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, restartAgentConversation, resumeAgentConversationInSnapshot, updateAgentFromInput } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { readEngineInstructions, saveEngineInstructions } from './engine-instructions';
@@ -50,6 +50,7 @@ import { providerConversationEventView } from '@codex-claw/core/provider-convers
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { isCodeReviewStartInput, type CodeReviewDecisionInput, type CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
+import { AgentCreationService } from './agents/agent-creation-service';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -72,6 +73,7 @@ export type ClawBackendServerOptions = {
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
   codeReviewTools?: CodeReviewToolPort;
+  agentCreation?: AgentCreationService;
 };
 
 export type SystemPermissionsPort = {
@@ -131,6 +133,7 @@ export class ClawBackendServer {
   private readonly agentGitService: AgentGitService;
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private readonly codeReviews?: CodeReviewService;
+  private readonly agentCreation: AgentCreationService;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
   private conversationsReconciliation?: Promise<void>;
@@ -139,6 +142,7 @@ export class ClawBackendServer {
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
+    this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
     this.onBackendEventApplied = options.onBackendEventApplied;
@@ -258,6 +262,7 @@ export class ClawBackendServer {
     if (options.codeReviewTools) {
       this.codeReviews = new CodeReviewService({
         snapshot: this.snapshot,
+        createAgent: (input, creationOptions) => this.agentCreation.create(input, creationOptions),
         tools: options.codeReviewTools,
         runReview: async (agent, prompt, reviewMcpServerUrl, reviewerSession) => {
           return await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewRun, {
@@ -642,17 +647,12 @@ export class ClawBackendServer {
           return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.validateAgentInput(input, null);
-        const createdAgentId = createEntityId('agent');
-        createAgentInSnapshot(this.snapshot, input, undefined, createdAgentId, { select: false });
-        onCreated(createdAgentId);
+        const createdAgent = this.agentCreation.create(input, { select: false });
+        onCreated(createdAgent.id);
         this.addRecentSourceRepository(input.sourceRepositoryName);
-        if (createdAgentId) {
-          await this.agentWorkspaces.refreshIdentity(createdAgentId);
-        }
+        await this.agentWorkspaces.refreshIdentity(createdAgent.id);
         const snapshot = await this.persistAndEmitSnapshot();
-        if (createdAgentId) {
-          await this.agentWorkspaces.refreshGitStatus(createdAgentId);
-        }
+        await this.agentWorkspaces.refreshGitStatus(createdAgent.id);
         return createClawRpcResult(message.id, snapshot);
       }
       case backendMethods.agentQuickChatCreate: {

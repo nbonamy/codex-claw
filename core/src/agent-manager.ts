@@ -38,8 +38,25 @@ export function createAgentFromInput(input: CreateAgentInput, createdAt = new Da
   };
 }
 
-export function createAgentInSnapshot(snapshot: AppSnapshot, input: CreateAgentInput, createdAt = new Date().toISOString(), id = createEntityId('agent'), options: { select?: boolean } = {}): AppSnapshot {
+export function createAgentInSnapshot(
+  snapshot: AppSnapshot,
+  input: CreateAgentInput,
+  createdAt = new Date().toISOString(),
+  id = createEntityId('agent'),
+  options: { select?: boolean; afterAgentId?: string } = {},
+): AppSnapshot {
   const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
+  const source = options.afterAgentId
+    ? snapshot.agents.find((candidate) => candidate.id === options.afterAgentId)
+    : undefined;
+  if (source) {
+    insertAgentAfterSource(snapshot, source, agent);
+    if (options.select !== false) {
+      snapshot.activeTeamId = agent.teamId ?? snapshot.activeTeamId;
+      snapshot.activeAgentId = agent.id;
+    }
+    return snapshot;
+  }
   return insertAgentInSnapshot(snapshot, agent, options.select);
 }
 

@@ -2043,7 +2043,14 @@ async function startCodeReviewFromShell(
   agentId: string,
   input: import('@codex-claw/core/code-review').CodeReviewStartInput,
 ): Promise<AppSnapshot> {
-  const next = await props.startCodeReview(agentId, input);
+  const configuredInput = input.threadMode === 'independent'
+    ? {
+        ...input,
+        ...(props.selectedModelId ? { model: props.selectedModelId } : {}),
+        ...(props.selectedReasoningEffort ? { reasoningEffort: props.selectedReasoningEffort } : {}),
+      }
+    : input;
+  const next = await props.startCodeReview(agentId, configuredInput);
   const reviewerAgentId = input.threadMode === 'independent'
     ? next.activeAgentId
     : agentId;

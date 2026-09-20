@@ -12,8 +12,8 @@ import {
   type CodeReviewStartInput,
 } from '@codex-claw/core/code-review';
 import type { BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
-import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
-import { duplicateAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import type { Agent, AppSnapshot, BackendSession, CreateAgentInput } from '@codex-claw/core/contracts';
+import type { AgentCreationOptions } from '../agents/agent-creation-service';
 import type { ReviewToolHandlers } from './review-tool-registry';
 
 export type CodeReviewToolPort = {
@@ -23,6 +23,7 @@ export type CodeReviewToolPort = {
 
 export type CodeReviewServiceOptions = {
   snapshot: AppSnapshot;
+  createAgent(input: CreateAgentInput, options?: AgentCreationOptions): Agent;
   tools: CodeReviewToolPort;
   runReview(
     agent: Agent,
@@ -76,7 +77,7 @@ export class CodeReviewService {
 
     const reviewer = input.threadMode === 'current'
       ? agent
-      : this.createIndependentReviewer(agent);
+      : this.createIndependentReviewer(agent, input);
     if (current?.status === 'failed') this.closeReviewToolContext(current);
     const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);
@@ -473,16 +474,25 @@ export class CodeReviewService {
     };
   }
 
-  private createIndependentReviewer(target: Agent): Agent {
-    const createdAt = this.timestamp();
-    const reviewer = duplicateAgentInSnapshot(
-      this.options.snapshot,
-      target.id,
-      createdAt,
-      undefined,
-      { name: 'Review', select: false },
-    );
-    if (!reviewer) throw new Error('Independent reviewer could not be created.');
+  private createIndependentReviewer(target: Agent, input: CodeReviewStartInput): Agent {
+    const sourceDefaults = target.backendDefaults?.kind === target.backend
+      ? target.backendDefaults
+      : undefined;
+    const reviewer = this.options.createAgent({
+      name: 'Review',
+      folder: target.folder ?? '',
+      avatar: target.avatar,
+      backend: target.backend,
+      backendDefaults: {
+        ...sourceDefaults,
+        kind: target.backend,
+        ...(input.model ? { model: input.model.trim() } : {}),
+        ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort.trim() } : {}),
+      },
+      teamId: target.teamId,
+    }, { select: false, afterAgentId: target.id });
+    if (target.workspace) reviewer.workspace = structuredClone(target.workspace);
+    if (target.openInApplication) reviewer.openInApplication = target.openInApplication;
     const gitStatus = this.options.snapshot.agentGitStatuses[target.id];
     if (gitStatus) this.options.snapshot.agentGitStatuses[reviewer.id] = structuredClone(gitStatus);
     return reviewer;

@@ -4,6 +4,7 @@ import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { activeCodeReviewRound } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from '../code-review-service';
 import type { ReviewToolHandlers } from '../review-tool-registry';
+import { AgentCreationService } from '../../agents/agent-creation-service';
 
 function agent(id: string): Agent {
   return {
@@ -24,6 +25,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   const reset: string[] = [];
   const deleted: string[] = [];
   const changed = vi.fn();
+  const agentCreation = new AgentCreationService(snapshot);
   const tools: CodeReviewToolPort = {
     createReviewToolContext: (agentId, handlers) => {
       activeHandlers = handlers;
@@ -34,6 +36,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   let tick = 0;
   const service = new CodeReviewService({
     snapshot,
+    createAgent: (input, options) => agentCreation.create(input, options),
     tools,
     now: () => new Date(`2026-09-19T10:${String(tick++).padStart(2, '0')}:00.000Z`),
     runReview: async (_agent, prompt, _url, reviewerSession) => {
@@ -69,7 +72,7 @@ describe('CodeReviewService', () => {
     test.owner.avatar = 'owl';
     test.owner.openInApplication = 'vscode';
     test.owner.backendDefaults = {
-      kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'high',
+      kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'medium',
     };
     test.owner.workspace = {
       kind: 'git', folder: '/repo', repositoryName: 'claw', repositoryRoot: '/repo',
@@ -85,6 +88,7 @@ describe('CodeReviewService', () => {
 
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
+      model: 'gpt-5.6-sol', reasoningEffort: 'high',
     });
     const visibleReviewer = reviewer(test, session);
 
@@ -93,7 +97,8 @@ describe('CodeReviewService', () => {
     ]);
     expect(visibleReviewer).toMatchObject({
       name: 'Review', avatar: 'owl', folder: '/repo', workspace: test.owner.workspace,
-      backend: test.owner.backend, backendDefaults: test.owner.backendDefaults,
+      backend: test.owner.backend,
+      backendDefaults: { kind: 'codex', model: 'gpt-5.6-sol', reasoningEffort: 'high' },
       openInApplication: 'vscode', status: { type: 'idle' },
     });
     expect(visibleReviewer.backendSession).toBeUndefined();
@@ -349,6 +354,7 @@ describe('CodeReviewService', () => {
     });
     const service = new CodeReviewService({
       snapshot,
+      createAgent: (input, options) => new AgentCreationService(snapshot).create(input, options),
       tools: {
         createReviewToolContext: (agentId, handlers) => {
           const id = `context-${++contextSequence}`;

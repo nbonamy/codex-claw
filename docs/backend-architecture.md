@@ -183,6 +183,9 @@ Current implementation checkpoint:
 - Queued prompt admission, draining, retry scheduling, and timer cleanup live
   in `AgentPromptManager`; `ClawBackendServer` routes the protocol methods and
   backend events into that service rather than owning its lifecycle state.
+- Normal agents created through the app protocol, MCP delegation, and the
+  independent-review workflow share `AgentCreationService`; each caller adapts
+  its own input into `CreateAgentInput` before that single backend mutation.
 - Conversation hydration, turn-action snapshot replacement, and provider title synchronization live in
   `AgentConversationService`. This keeps conversation mutation policy together
   while the server remains the protocol and local/remote routing boundary.

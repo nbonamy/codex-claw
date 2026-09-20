@@ -743,6 +743,43 @@ describe('AppShell authentication and conversation', () => {
     expect(sourcePanel.props('activeTab')).toBeNull();
   });
 
+  it('starts an independent review with the active thread model and effort', async () => {
+    const snapshot = createInitialSnapshot();
+    const source = snapshot.agents[0]!;
+    source.backendDefaults = {
+      kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'medium',
+    };
+    const reviewer = {
+      ...source,
+      id: 'agent-reviewer',
+      name: 'Review',
+      backendSession: { kind: 'codex' as const, threadId: 'review-thread' },
+    };
+    const next = structuredClone(snapshot);
+    next.agents.push(reviewer);
+    next.teams[0]!.agentIds.push(reviewer.id);
+    next.activeAgentId = reviewer.id;
+    const startCodeReview = vi.fn().mockResolvedValue(next);
+    const wrapper = mountShell({
+      snapshot,
+      startCodeReview,
+      selectedModelId: 'gpt-5.6-sol',
+      selectedReasoningEffort: 'high',
+    });
+
+    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('open-code-review');
+    await nextTick();
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
+    await flushPromises();
+
+    expect(startCodeReview).toHaveBeenCalledExactlyOnceWith(source.id, {
+      scope: { type: 'uncommitted' },
+      threadMode: 'independent',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
+    });
+  });
+
   it('prefills the real composer for a finding clarification and submits through its stable link', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

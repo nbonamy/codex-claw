@@ -27,7 +27,7 @@ import type {
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus
 } from '@codex-claw/core/contracts';
-import { createAgentInSnapshot, updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
+import { updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
@@ -41,6 +41,7 @@ import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway } from './hosted-mcp-gateway';
 import path from 'node:path';
 import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
+import { AgentCreationService } from '../agents/agent-creation-service';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -55,6 +56,7 @@ export type ClawMcpServiceOptions = {
   queueSpokenAnnouncement?: (input: Omit<SpokenAnnouncementRequest, 'voice'>) => Promise<SpokenAnnouncementQueueResult>;
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
+  agentCreation?: AgentCreationService;
 };
 
 export class ClawMcpService {
@@ -71,6 +73,7 @@ export class ClawMcpService {
   private readonly queuedMessageIds = new Set<string>();
   private readonly promptInputMethodsByAgentId = new Map<string, SendPromptOptions['inputMethod']>();
   private readonly reviewTools = new ReviewToolRegistry();
+  private readonly agentCreation: AgentCreationService;
 
   constructor(options: ClawMcpServiceOptions) {
     this.snapshot = options.snapshot;
@@ -79,6 +82,7 @@ export class ClawMcpService {
     this.resolveWorkspaceIdentity = options.resolveWorkspaceIdentity;
     this.queueSpokenAnnouncement = options.queueSpokenAnnouncement;
     this.worktreeManager = options.worktreeManager ?? new WorktreeManager();
+    this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
       getAgents: () => this.snapshot.agents,
@@ -478,12 +482,7 @@ export class ClawMcpService {
         delegatedByAgentId: caller.id,
         teamId: input.teamId ?? caller.teamId,
       };
-      const previousAgentIds = new Set(this.snapshot.agents.map((agent) => agent.id));
-      createAgentInSnapshot(this.snapshot, createInput, undefined, undefined, { select: false });
-      const createdAgent = this.snapshot.agents.find((agent) => !previousAgentIds.has(agent.id));
-      if (!createdAgent) {
-        throw new Error('Agent could not be created.');
-      }
+      const createdAgent = this.agentCreation.create(createInput, { select: false });
       if (this.resolveWorkspaceIdentity) {
         const workspace = await this.resolveWorkspaceIdentity(folder);
         updateAgentWorkspace(this.snapshot, createdAgent.id, workspace, workspace.updatedAt);

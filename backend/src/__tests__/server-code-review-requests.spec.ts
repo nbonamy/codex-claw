@@ -47,7 +47,7 @@ describe('ClawBackendServer code review workflow', () => {
     await server.close();
   });
 
-  it('owns readiness, arbitration, same-thread remediation, review again, and finish', async () => {
+  it('owns reviewer configuration, readiness, arbitration, remediation, review again, and finish', async () => {
     const snapshot = createTestSnapshot();
     const owner: Agent = {
       id: 'agent-owner',
@@ -55,6 +55,7 @@ describe('ClawBackendServer code review workflow', () => {
       name: 'Owner',
       folder: '/repo',
       backend: 'codex' as const,
+      backendDefaults: { kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'medium' },
       status: { type: 'idle' as const },
       createdAt: '2026-09-19T10:00:00.000Z',
       updatedAt: '2026-09-19T10:00:00.000Z',
@@ -114,7 +115,10 @@ describe('ClawBackendServer code review workflow', () => {
 
     const started = await request(server, backendMethods.agentCodeReviewStart, {
       agentId: owner.id,
-      input: { scope: { type: 'uncommitted' }, threadMode: 'independent' },
+      input: {
+        scope: { type: 'uncommitted' }, threadMode: 'independent',
+        model: 'gpt-5.6-sol', reasoningEffort: 'high',
+      },
     });
     const reviewer = snapshot.agents.find((candidate) => candidate.id !== owner.id)!;
     await vi.waitFor(() => expect(reviewer.codeReview?.status).toBe('ready'));
@@ -124,6 +128,7 @@ describe('ClawBackendServer code review workflow', () => {
     expect(reviewer).toMatchObject({
       folder: owner.folder,
       backend: owner.backend,
+      backendDefaults: { kind: 'codex', model: 'gpt-5.6-sol', reasoningEffort: 'high' },
       teamId: owner.teamId,
     });
     expect(snapshot.agentGitStatuses[reviewer.id]).toStrictEqual(snapshot.agentGitStatuses[owner.id]);
