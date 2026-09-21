@@ -624,7 +624,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface), var(--color-shell-main) 80%);
   color: var(--color-text);
 }
 
@@ -1131,7 +1131,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-shell-main);
 }
 
 .code-review-panel__footer > span {
