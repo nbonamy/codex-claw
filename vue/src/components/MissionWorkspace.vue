@@ -128,7 +128,8 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent } from '@codex-claw/core/contracts';
-import { featureStages, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
+import type { Mission, MissionArtifacts, MissionStage } from '@codex-claw/core/missions';
+import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
@@ -177,7 +178,8 @@ const stageHeadingTitle = computed(() => (
     ? t('missions.implementation')
     : t(`missions.artifactTitle.${viewedStage.value}`)
 ));
-const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
+const workflow = computed(() => missionWorkflow(props.mission.workflow.type));
+const currentIndex = computed(() => workflow.value.stages.indexOf(props.mission.stage));
 const codeAgentId = computed(() => props.mission.execution?.runs.slice().reverse().find(run => run.workerId)?.workerId);
 const conversationAgentId = ref('');
 watch(() => props.mission.stage, stage => {
@@ -205,7 +207,7 @@ function selectConversation(agentId: string): void {
 }
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
-  const index = featureStages.indexOf(stage);
+  const index = workflow.value.stages.indexOf(stage);
   if (index < currentIndex.value || props.mission.status === 'completed') return 'complete';
   return stage === props.mission.stage ? 'current' : 'upcoming';
 }

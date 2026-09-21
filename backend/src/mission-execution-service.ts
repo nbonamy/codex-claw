@@ -1,7 +1,8 @@
 import type { Agent, AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
 import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
-import { featureStages, isMissionArtifacts, missionTicketReady, missionStageReady, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
+import { isMissionArtifacts, missionTicketReady, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
+import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionResultInput, type MissionReviewPolicy, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { MissionAgentTools } from './mission-agent-tools';
@@ -98,20 +99,21 @@ export class MissionExecutionService {
     if (input.action === 'accept') {
       let nextRunIds: string[] = [];
       await this.changeAsync(input, async current => {
+        const workflow = missionWorkflow(current.workflow.type);
         const run = current.execution?.runs.find(run => run.id === input.runId);
         if (!run || run.status !== 'awaitingReview' || !run.proposal || run.stage !== current.stage) throw new Error('No current proposal to accept.');
         if (run.stage === 'implementation') {
           this.acceptImplementationResult(current, run);
           await this.persistImplementationArtifact(current);
         } else {
-          if (run.stage === 'tickets' && !missionStageReady('tickets', run.proposal)) {
+          if (run.stage === 'tickets' && !workflow.stageReady('tickets', run.proposal)) {
             throw new Error('Assign one represented repository to every ticket before starting implementation.');
           }
           current.artifacts = structuredClone(run.proposal);
           run.status = 'accepted';
         }
-        if (missionStageReady(current.stage, current.artifacts)) {
-          current.stage = featureStages[featureStages.indexOf(current.stage) + 1]!;
+        if (workflow.stageReady(current.stage, current.artifacts)) {
+          current.stage = workflow.stages[workflow.stages.indexOf(current.stage) + 1]!;
           if (current.stage === 'implementation') await this.workspaces.provisionImplementationWorkspaces(current);
           if (current.stage === 'ship') this.workspaces.prepareDeliveries(current);
         }
@@ -122,8 +124,9 @@ export class MissionExecutionService {
     }
     if (input.action === 'reopen') {
       await this.change(input, current => {
+        const workflow = missionWorkflow(current.workflow.type);
         this.requireNoActiveRun(current);
-        if (!featureStages.includes(input.stage) || featureStages.indexOf(input.stage) > featureStages.indexOf(current.stage)) throw new Error('Only reached stages can be reopened.');
+        if (!workflow.stages.includes(input.stage) || workflow.stages.indexOf(input.stage) > workflow.stages.indexOf(current.stage)) throw new Error('Only reached stages can be reopened.');
         current.stage = input.stage;
         current.status = 'active';
         // Changes to upstream decisions invalidate downstream completion claims.
@@ -198,6 +201,7 @@ export class MissionExecutionService {
     let status: 'awaitingReview' | 'accepted' = 'awaitingReview';
     let nextRunIds: string[] = [];
     await this.ports.missions.changeAsync(input.missionId, async mission => {
+      const workflow = missionWorkflow(mission.workflow.type);
       const run = mission.execution?.runs.find(run => run.id === input.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
       if (run.stage !== 'implementation' && !mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
@@ -219,7 +223,7 @@ export class MissionExecutionService {
           proposal.tickets = run.draftTickets.map(ticket => ({ ...structuredClone(ticket), done: false }));
         }
         if (run.stage === 'review') proposal.review = structuredClone(input.artifacts.review);
-        if (!missionStageReady(run.stage, proposal)) throw new Error('The stage result is incomplete.');
+        if (!workflow.stageReady(run.stage, proposal)) throw new Error('The stage result is incomplete.');
       }
       if (!isMissionArtifacts(proposal)) throw new Error('Mission evidence is too large. Submit a concise report with references.');
       run.proposal = proposal; run.summary = input.summary.trim(); run.status = 'awaitingReview'; run.finishedAt = new Date().toISOString();
@@ -227,7 +231,7 @@ export class MissionExecutionService {
         this.acceptImplementationResult(mission, run);
         await this.persistImplementationArtifact(mission);
         status = 'accepted';
-        if (missionStageReady('implementation', mission.artifacts)) mission.stage = 'review';
+        if (workflow.stageReady('implementation', mission.artifacts)) mission.stage = 'review';
         nextRunIds = this.enqueueRuns(mission, {});
       }
     });

@@ -1,6 +1,7 @@
 import { createEntityId } from '@codex-claw/core/ids';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { featureStages, isMissionArtifacts, type Mission, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
+import { isMissionArtifacts, type Mission, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
+import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionReviewPolicy, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { missionTeamRepositories } from './mission-execution-policy';
@@ -41,7 +42,7 @@ export class MissionAgentTools {
   listArtifacts(agentId: string) {
     const context = this.requireContext(agentId);
     const mission = this.requireMission(context.missionId);
-    return featureStages.flatMap(stage => {
+    return missionWorkflow(mission.workflow.type).stages.flatMap(stage => {
       const file = mission.artifactFiles?.[stage];
       return file ? [{ stage, ...file }] : [];
     });
@@ -53,8 +54,8 @@ export class MissionAgentTools {
   }
 
   async readArtifactForMission(missionId: string, stage: MissionStage): Promise<MissionArtifactReadResult> {
-    if (!featureStages.includes(stage)) throw new Error('Invalid mission artifact stage.');
     const mission = this.requireMission(missionId);
+    if (!missionWorkflow(mission.workflow.type).stages.includes(stage)) throw new Error('Invalid mission artifact stage.');
     const file = mission.artifactFiles?.[stage];
     if (!file) throw new Error('Mission artifact not found.');
     return { stage, content: await this.ports.readArtifact(mission.id, stage), revision: file.revision, updatedAt: file.updatedAt };
@@ -62,7 +63,8 @@ export class MissionAgentTools {
 
   async writeArtifact(agentId: string, input: MissionArtifactWriteInput): Promise<MissionArtifactReadResult> {
     const context = this.requireContext(agentId);
-    if (!input || !featureStages.includes(input.stage) || typeof input.content !== 'string') throw new Error('Invalid mission artifact.');
+    const mission = this.requireMission(context.missionId);
+    if (!input || !missionWorkflow(mission.workflow.type).stages.includes(input.stage) || typeof input.content !== 'string') throw new Error('Invalid mission artifact.');
     if (input.stage !== context.stage) throw new Error('This agent can write only its assigned stage artifact.');
     if (input.stage === 'implementation') throw new Error('Submit implementation evidence with the assigned ticket result.');
     const result = await this.ports.missions.changeAsync(context.missionId, async current => {
@@ -204,4 +206,3 @@ function missionTicketsMarkdown(tickets: MissionTicket[]): string {
     ticket.reference ? `**External reference:** ${ticket.reference}` : '',
   ].filter(Boolean).join('\n\n')).join('\n\n---\n\n');
 }
-

@@ -88,7 +88,7 @@
               <span
                 class="agent-sidebar__status"
                 :data-status="mission.status === 'completed' ? 'idle' : 'working'"
-                :aria-label="mission.status === 'completed' ? t('missions.completed') : `${featureStages.indexOf(mission.stage) + 1}/${featureStages.length} · ${t(`missions.${mission.stage}`)}`"
+                :aria-label="missionProgressLabel(mission)"
               />
             </button>
           </div>
@@ -302,7 +302,8 @@
 </template>
 
 <script setup lang="ts">
-import { featureStages, type Mission } from '@codex-claw/core/missions';
+import type { Mission } from '@codex-claw/core/missions';
+import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@codex-claw/core/contracts';
@@ -554,6 +555,12 @@ function repositorySessionMenuItems(
 
 function statusLabel(status: Agent['status']['type']): string {
   return t(`status.${status}`);
+}
+
+function missionProgressLabel(mission: Mission): string {
+  if (mission.status === 'completed') return t('missions.completed');
+  const stages = missionWorkflow(mission.workflow.type).stages;
+  return `${stages.indexOf(mission.stage) + 1}/${stages.length} · ${t(`missions.${mission.stage}`)}`;
 }
 
 function isPullRequestFinished(session: WorkspaceSidebarSession): boolean {

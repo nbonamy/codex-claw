@@ -5,7 +5,7 @@
       <strong>{{ t('missions.process') }}</strong>
     </div>
     <ol class="mission-stage-rail__stages">
-      <li v-for="(stage, index) in featureStages" :key="stage">
+      <li v-for="(stage, index) in stages" :key="stage">
         <button
           type="button"
           :class="{ 'mission-stage-rail__stage--viewed': viewedStage === stage }"
@@ -25,7 +25,7 @@
       </li>
     </ol>
     <div class="mission-stage-rail__progress">
-      <span>{{ t('missions.stageCount', { current: completedStageCount, total: featureStages.length }) }}</span>
+      <span>{{ t('missions.stageCount', { current: completedStageCount, total: stages.length }) }}</span>
       <strong>{{ progressPercent }}%</strong>
       <div role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100">
         <span :style="{ width: `${progressPercent}%` }" />
@@ -37,20 +37,22 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { featureStages, type Mission, type MissionStage } from '@codex-claw/core/missions';
+import type { Mission, MissionStage } from '@codex-claw/core/missions';
+import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { pendingMissionRun } from '@codex-claw/core/mission-execution';
 import { CheckIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{ mission: Mission; viewedStage: MissionStage }>();
 const emit = defineEmits<{ 'view-stage': [stage: MissionStage] }>();
 const { t } = useI18n();
+const stages = computed(() => missionWorkflow(props.mission.workflow.type).stages);
 const activeRun = computed(() => pendingMissionRun(props.mission));
-const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
-const completedStageCount = computed(() => props.mission.status === 'completed' ? featureStages.length : currentIndex.value);
-const progressPercent = computed(() => Math.round((completedStageCount.value / featureStages.length) * 100));
+const currentIndex = computed(() => stages.value.indexOf(props.mission.stage));
+const completedStageCount = computed(() => props.mission.status === 'completed' ? stages.value.length : currentIndex.value);
+const progressPercent = computed(() => Math.round((completedStageCount.value / stages.value.length) * 100));
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
-  const index = featureStages.indexOf(stage);
+  const index = stages.value.indexOf(stage);
   if (index < currentIndex.value || props.mission.status === 'completed') return 'complete';
   return stage === props.mission.stage ? 'current' : 'upcoming';
 }
