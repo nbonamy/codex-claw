@@ -54,7 +54,7 @@
           </div>
           <div class="mission-workspace__stage-actions">
             <div v-if="activeStageRun" class="mission-workspace__run-status" role="status" aria-live="polite">
-              <span class="mission-workspace__activity-dot" aria-hidden="true" />
+              <span class="mission-workspace__activity-indicator" aria-hidden="true" />
               <span>{{ activeStageStatus }}</span>
             </div>
             <button
@@ -452,8 +452,8 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__progress-summary [role='progressbar'] { height: 6px; grid-column: 1 / -1; overflow: hidden; border-radius: var(--radius-full); background: var(--color-surface-high); }
 .mission-workspace__progress-summary [role='progressbar'] span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
 .mission-workspace__workbench { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
-.mission-workspace__stage-header { z-index: 3; display: flex; min-height: 38px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--space-10); padding: var(--space-6) var(--space-12) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
-.mission-workspace__workbench-scroll { min-height: 0; flex: 1; padding: var(--space-4) var(--space-12) var(--space-12); overflow: auto; }
+.mission-workspace__stage-header { z-index: 3; display: flex; min-height: 38px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--space-10); padding: var(--space-6) var(--space-12); border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
+.mission-workspace__workbench-scroll { min-height: 0; flex: 1; padding: var(--space-8) var(--space-12) var(--space-12); overflow: auto; }
 .mission-workspace__stage-heading { display: flex; min-width: 0; align-items: baseline; gap: var(--space-4); }
 .mission-workspace__stage-heading > span { color: var(--color-text-muted); font-size: var(--font-size-12); white-space: nowrap; }
 .mission-workspace__stage-header h2 { overflow: hidden; font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); line-height: var(--line-height-32); text-overflow: ellipsis; white-space: nowrap; }
@@ -462,7 +462,7 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__stage-header button svg, .mission-workspace__empty-artifact button svg { width: var(--icon-sm); height: var(--icon-sm); }
 .mission-workspace__stage-actions { display: flex; min-height: 34px; align-items: center; }
 .mission-workspace__run-status { display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--font-size-13); white-space: nowrap; }
-.mission-workspace__activity-dot { width: var(--space-4); height: var(--space-4); border-radius: var(--radius-full); background: var(--color-primary); animation: mission-workspace-activity-pulse 1.4s ease-in-out infinite; }
+.mission-workspace__activity-indicator { width: var(--space-8); height: var(--space-8); border: 2px solid var(--color-border); border-top-color: var(--color-primary); border-radius: var(--radius-full); animation: mission-workspace-activity-spin 900ms linear infinite; }
 .mission-workspace__error { margin-top: var(--space-8) !important; padding: var(--space-6); border-radius: var(--radius-md); color: var(--color-on-error-container); background: var(--color-error-container); }
 .mission-workspace__empty-artifact { display: flex; max-width: 700px; align-items: center; flex-direction: column; gap: var(--space-8); margin: var(--space-16) auto; padding: var(--space-10); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-low); text-align: center; }
 .mission-workspace__callout-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: var(--radius-lg); color: var(--color-primary); background: var(--color-primary-container); }
@@ -483,8 +483,8 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__conversation :deep(.conversation-pane) { flex: 1; min-height: 0; }
 .mission-workspace__conversation-empty { display: grid; flex: 1; place-items: center; align-content: center; gap: var(--space-4); padding: var(--space-10); color: var(--color-text-muted); text-align: center; }
 .mission-workspace__conversation-empty svg { width: var(--icon-xl); height: var(--icon-xl); color: var(--color-primary); }
-@keyframes mission-workspace-activity-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .mission-workspace__activity-dot { animation: none; } }
+@keyframes mission-workspace-activity-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { .mission-workspace__activity-indicator { animation: none; } }
 @container (max-width: 980px) { .mission-workspace__body { grid-template-columns: 200px minmax(360px, 1fr); } .mission-workspace__conversation { display: none; } }
 @container (max-width: 680px) { .mission-workspace__body { display: flex; overflow: auto; flex-direction: column; } .mission-workspace__process { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); } .mission-workspace__stages { grid-template-columns: repeat(4, minmax(120px, 1fr)); overflow-x: auto; } .mission-workspace__progress-summary { margin-top: var(--space-8); } .mission-workspace__workbench { min-height: auto; overflow: visible; } .mission-workspace__workbench-scroll { overflow: visible; } .mission-workspace__stage-header { position: sticky; top: 0; align-items: flex-start; flex-direction: column; } .mission-workspace__stage-heading { flex-wrap: wrap; } }
 </style>
