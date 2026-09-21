@@ -13,6 +13,7 @@ const longRunningRequestMethods = new Set<string>([
   backendMethods.agentSkillsList,
   backendMethods.agentPromptSend,
   backendMethods.sourceRepositoryClone,
+  backendMethods.sourceWorktreeCreate,
   backendMethods.agentConversationMessagesGet,
   backendMethods.agentDelete,
   backendMethods.agentFork,
