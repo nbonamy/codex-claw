@@ -451,7 +451,7 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__progress-summary [role='progressbar'] { height: 6px; grid-column: 1 / -1; overflow: hidden; border-radius: var(--radius-full); background: var(--color-surface-high); }
 .mission-workspace__progress-summary [role='progressbar'] span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
 .mission-workspace__workbench { min-width: 0; padding: var(--space-12); overflow: auto; }
-.mission-workspace__stage-header { display: flex; min-height: 38px; align-items: center; justify-content: space-between; gap: var(--space-10); padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border); }
+.mission-workspace__stage-header { position: sticky; top: 0; z-index: 3; display: flex; min-height: 38px; align-items: center; justify-content: space-between; gap: var(--space-10); margin-top: calc(-1 * var(--space-6)); padding-top: var(--space-6); padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
 .mission-workspace__stage-heading { display: flex; min-width: 0; align-items: baseline; gap: var(--space-4); }
 .mission-workspace__stage-heading > span { color: var(--color-text-muted); font-size: var(--font-size-12); white-space: nowrap; }
 .mission-workspace__stage-header h2 { overflow: hidden; font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
