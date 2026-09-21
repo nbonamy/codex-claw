@@ -39,7 +39,7 @@ import { AgentPromptManager } from './agents/agent-prompt-manager';
 import { AgentPlanReviewService } from './agents/agent-plan-review-service';
 import { AgentThreadFlagService } from './agents/agent-thread-flag-service';
 import type { PlanReviewResponse } from '@codex-claw/core/plan-review';
-import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { agentConversationId, planReviewFromEvent } from '@codex-claw/core/plan-review';
 import { isAgentRequestResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import { AgentWorkspaceService } from './agents/agent-workspace-service';
@@ -49,7 +49,7 @@ import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import { isCodeReviewStartInput, type CodeReviewDecisionInput, type CodeReviewDiscussionInput } from '@codex-claw/core/code-review';
+import { isCodeReviewStartInput, type CodeReviewDecisionInput, type CodeReviewDiscussionInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
 
@@ -507,9 +507,21 @@ export class ClawBackendServer {
         });
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case backendMethods.debugCodeReviewSet: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const scenario = debugCodeReviewScenario(params.scenario);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        agent.codeReview = createDebugCodeReviewSession(agent, scenario);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.debugThreadFlagSet: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
+        const id = debugThreadFlagId(params.id);
         const value = params.value;
         if (typeof value !== 'boolean') {
           return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'value must be a boolean');
@@ -519,8 +531,8 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
         const threadFlags = { ...agent.threadFlags };
-        if (value) threadFlags.delegate_to_worktree = true;
-        else delete threadFlags.delegate_to_worktree;
+        if (value) threadFlags[id] = true;
+        else delete threadFlags[id];
         agent.threadFlags = Object.keys(threadFlags).length > 0 ? threadFlags : undefined;
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
@@ -2708,6 +2720,101 @@ function locationRemoteConnectionId(params: unknown, label: string): string | nu
     throw new Error(`Invalid ${label} location.`);
   }
   return requireString(locationRecord.remoteConnectionId, 'remoteConnectionId');
+}
+
+type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing';
+
+function debugCodeReviewScenario(value: unknown): DebugCodeReviewScenario {
+  if (value === 'reviewing' || value === 'ready' || value === 'fixing') return value;
+  throw new Error('Invalid code review debug scenario.');
+}
+
+function debugThreadFlagId(value: unknown): ThreadFlagId {
+  if (value === 'delegate_to_worktree' || value === 'ready_for_review') return value;
+  throw new Error('Invalid thread flag id.');
+}
+
+function createDebugCodeReviewSession(agent: Agent, scenario: DebugCodeReviewScenario): CodeReviewSession {
+  const now = new Date().toISOString();
+  const roundId = 'debug-review-round-1';
+  const findings = debugCodeReviewFindings(roundId, scenario, now);
+  return {
+    id: 'debug-review',
+    targetAgentId: agent.id,
+    reviewerAgentId: agent.id,
+    scope: { type: 'uncommitted' },
+    threadMode: 'current',
+    status: scenario === 'reviewing' ? 'reviewing' : scenario === 'ready' ? 'ready' : 'fixing',
+    activeRoundId: roundId,
+    rounds: [{
+      id: roundId,
+      number: 1,
+      status: scenario === 'reviewing' ? 'reviewing' : scenario === 'ready' ? 'ready' : 'submitted',
+      ...(agent.backendSession ? { reviewerSession: structuredClone(agent.backendSession) } : {}),
+      findings,
+      startedAt: now,
+    }],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function debugCodeReviewFindings(
+  roundId: string,
+  scenario: DebugCodeReviewScenario,
+  now: string,
+): CodeReviewFinding[] {
+  const fixtures: Array<Pick<CodeReviewFinding, 'id' | 'priority' | 'title' | 'body' | 'location'>> = [
+    {
+      id: 'debug-review-restoration',
+      priority: 'p0',
+      title: 'Preserve the review across reloads',
+      body: 'A renderer reload must restore the active round and every finding before the user continues arbitration.',
+      location: { file: 'backend/src/state-persistence.ts', line: 133, endLine: 178 },
+    },
+    {
+      id: 'debug-provider-boundary',
+      priority: 'p1',
+      title: 'Keep review state provider-independent',
+      body: 'Route review state through the unified backend contract so every provider exposes the same workflow.',
+      location: { file: 'backend/src/review/code-review-service.ts', line: 40, endLine: 58 },
+    },
+    {
+      id: 'debug-stable-context',
+      priority: 'p2',
+      title: 'Keep clarification linked to its finding',
+      body: 'The clarification prompt should retain the finding and round identifiers when it returns to the reviewer thread.',
+    },
+    {
+      id: 'debug-compact-finding',
+      priority: 'p3',
+      title: 'Keep finding rows compact',
+      body: 'Collapsed findings should remain scannable while expanded findings show the complete evidence without nested cards.',
+      location: { file: 'vue/src/components/CodeReviewPanel.vue', line: 182, endLine: 251 },
+    },
+  ];
+
+  return fixtures.map((fixture) => {
+    const remediation = scenario !== 'fixing'
+      ? { state: 'notStarted' as const }
+      : fixture.priority === 'p1'
+        ? { state: 'skipped' as const, startedAt: now }
+        : fixture.priority === 'p2'
+          ? { state: 'fixing' as const, startedAt: now }
+          : { state: 'fixed' as const, completedAt: now, evidence: 'Focused review checks passed.' };
+    const decision = scenario === 'fixing' && fixture.priority === 'p1'
+      ? { state: 'rejected' as const, decidedAt: now, reason: 'The existing behavior is intentional for this workflow.' }
+      : { state: 'selected' as const, decidedAt: now };
+    return {
+      ...fixture,
+      roundId,
+      decision,
+      discussion: [],
+      remediation,
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
 }
 
 function requireSourceFolderListInput(params: unknown): { path?: string; remoteConnectionId?: string } {

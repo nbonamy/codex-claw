@@ -1,5 +1,6 @@
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';
@@ -10,20 +11,23 @@ export type AppMenuOptions = {
   updateStatus?: DesktopUpdateStatus;
 };
 
+export type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing';
+
 export type AppMenuCallbacks = {
   checkForUpdates?: () => void;
   installUpdate?: () => void;
   sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
-  isDebugThreadFlagSet?: () => boolean;
-  setDebugThreadFlag?: (value: boolean) => void;
+  injectDebugCodeReview?: (scenario: DebugCodeReviewScenario) => void;
+  isDebugThreadFlagSet?: (id: ThreadFlagId) => boolean;
+  setDebugThreadFlag?: (id: ThreadFlagId, value: boolean) => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -36,6 +40,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
+    injectDebugCodeReview: options.injectDebugCodeReview,
     isDebugThreadFlagSet: options.isDebugThreadFlagSet,
     setDebugThreadFlag: options.setDebugThreadFlag,
   };
@@ -81,14 +86,25 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         submenu: buildDebugAgentFixtures(callbacks),
       },
       {
+        label: 'Review',
+        submenu: buildDebugCodeReviewFixtures(callbacks),
+      },
+      {
         label: 'Thread Flags',
         submenu: [
           {
             label: 'Delegate to Worktree',
             type: 'checkbox',
-            checked: callbacks.isDebugThreadFlagSet?.() ?? false,
+            checked: callbacks.isDebugThreadFlagSet?.('delegate_to_worktree') ?? false,
             enabled: Boolean(callbacks.setDebugThreadFlag),
-            click: (item) => callbacks.setDebugThreadFlag?.(item.checked),
+            click: (item) => callbacks.setDebugThreadFlag?.('delegate_to_worktree', item.checked),
+          },
+          {
+            label: 'Ready for Review',
+            type: 'checkbox',
+            checked: callbacks.isDebugThreadFlagSet?.('ready_for_review') ?? false,
+            enabled: Boolean(callbacks.setDebugThreadFlag),
+            click: (item) => callbacks.setDebugThreadFlag?.('ready_for_review', item.checked),
           },
         ],
       },
@@ -110,6 +126,26 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
       },
     ],
   };
+}
+
+function buildDebugCodeReviewFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Findings While Reviewing',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('reviewing'),
+    },
+    {
+      label: 'Findings Ready for Selection',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('ready'),
+    },
+    {
+      label: 'Remediation Mix',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('fixing'),
+    },
+  ];
 }
 
 function buildDebugAgentFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {

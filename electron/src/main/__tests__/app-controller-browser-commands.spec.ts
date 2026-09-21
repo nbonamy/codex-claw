@@ -25,6 +25,35 @@ describe('AppController', () => {
     ));
   });
 
+  it('routes Review fixtures through clawd and opens the real Review pane', async () => {
+    const snapshot = createInitialSnapshot();
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const send = vi.fn();
+    setMainWindowSend(controller, send);
+    const options = (controller as unknown as {
+      debugMenuOptions(): {
+        injectDebugCodeReview(scenario: 'reviewing' | 'ready' | 'fixing'): void;
+        setDebugThreadFlag(id: 'delegate_to_worktree' | 'ready_for_review', value: boolean): void;
+      };
+    }).debugMenuOptions();
+
+    options.injectDebugCodeReview('fixing');
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+      backendMethods.debugCodeReviewSet,
+      { agentId: 'agent-dina', scenario: 'fixing' },
+    ));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith('app:command', {
+      type: 'debug-open-code-review',
+    }));
+
+    options.setDebugThreadFlag('ready_for_review', true);
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+      backendMethods.debugThreadFlagSet,
+      { agentId: 'agent-dina', id: 'ready_for_review', value: true },
+    ));
+  });
+
   it('queues valid deep links until the renderer is ready, then focuses and dispatches them', () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();
