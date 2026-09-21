@@ -25,6 +25,8 @@ export type MissionExecutionPorts = {
 /** Mission policy owns durable runs; provider hosts still own conversations and turns. */
 export class MissionExecutionService {
   private readonly launches = new Map<string, Promise<void>>();
+  private readonly postTurnLaunches = new Map<string, { missionId: string; runIds: string[] }>();
+  private readonly nonResultTurns = new Set<string>();
   constructor(private readonly ports: MissionExecutionPorts) {}
 
   async execute(input: MissionExecutionInput): Promise<void> {
@@ -222,7 +224,7 @@ export class MissionExecutionService {
       }
     });
     await this.ports.publish();
-    for (const runId of nextRunIds) void this.startLaunch(input.missionId, runId);
+    if (nextRunIds.length) this.postTurnLaunches.set(agentId, { missionId: input.missionId, runIds: nextRunIds });
     return { success: true, status };
   }
 
@@ -393,6 +395,13 @@ export class MissionExecutionService {
   }
 
   async agentFinished(agentId: string): Promise<void> {
+    const postTurnLaunch = this.postTurnLaunches.get(agentId);
+    if (postTurnLaunch) {
+      this.postTurnLaunches.delete(agentId);
+      for (const runId of postTurnLaunch.runIds) void this.startLaunch(postTurnLaunch.missionId, runId);
+      return;
+    }
+    if (this.nonResultTurns.delete(agentId)) return;
     const mission = this.ports.snapshot.missions?.find(mission => mission.execution?.runs.some(run => run.workerId === agentId && run.status === 'running' && ['implementation', 'review'].includes(run.stage)));
     if (!mission) return;
     await this.ports.missions.change(mission.id, current => {
@@ -447,7 +456,15 @@ export class MissionExecutionService {
     await this.ports.publish();
     if (reusedWorker && worker.backendSession) {
       await this.ports.refreshConversationContext(worker);
-      if (shouldCompactBeforeRun(mission, run, worker.id)) await this.ports.continueStage(worker.id, '/compact');
+      if (shouldCompactBeforeRun(mission, run, worker.id)) {
+        this.nonResultTurns.add(worker.id);
+        try {
+          await this.ports.continueStage(worker.id, '/compact');
+        } catch (error) {
+          this.nonResultTurns.delete(worker.id);
+          throw error;
+        }
+      }
     }
     if (run.stage !== 'requirements') await this.ports.continueStage(worker.id, stageKickoffPrompt(run));
   }

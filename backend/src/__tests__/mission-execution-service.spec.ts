@@ -272,6 +272,9 @@ describe('mission execution', () => {
       missionId: h.current().id, runId: firstRun.id, artifacts: firstResult, summary: 'Foundation complete',
     })).resolves.toEqual({ success: true, status: 'accepted' });
     await h.service.waitForLaunches();
+    await h.service.agentFinished(implementationWorkerId!);
+    await h.service.waitForLaunches();
+    await h.service.agentFinished(implementationWorkerId!); // /compact completed before the queued ticket prompt starts.
 
     const implementationRuns = h.current().execution!.runs.filter(run => run.stage === 'implementation');
     expect(implementationRuns).toHaveLength(2);
@@ -289,6 +292,8 @@ describe('mission execution', () => {
     await expect(h.service.submit(implementationRuns[1]!.workerId!, {
       missionId: h.current().id, runId: implementationRuns[1]!.id, artifacts: secondResult, summary: 'Checkout complete',
     })).resolves.toEqual({ success: true, status: 'accepted' });
+    await h.service.waitForLaunches();
+    await h.service.agentFinished(implementationWorkerId!);
     await h.service.waitForLaunches();
 
     expect(h.current().stage).toBe('review');
