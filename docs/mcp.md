@@ -383,16 +383,18 @@ Updates the caller's short collaboration status.
 
 Input:
 
-- `status`: short status text; an empty string clears the status.
+- `status`: short status text; an empty string clears the status early.
 
 Effects:
 
 - stores `agent.statusText`;
 - emits `agent.updated`;
+- clears automatically when the current provider turn completes;
 - lets other agents understand who is working, idle, blocked, or ready.
 
 Developer instructions make this mandatory before starting work, changing
-direction, and finishing.
+direction, and finishing, while explicitly telling the model not to issue a
+second empty `set-status` call at final handoff.
 
 ### `toggle_thread_flag`
 
@@ -413,10 +415,11 @@ setup after the backend accepts and clears the flag. A failed action leaves its
 flag available for retry. The user can also dismiss either flag, and the agent
 can clear one by calling `toggle_thread_flag` with `value: false`.
 
-Developer instructions reserve `ready_for_review` for final handoff. Agents set
-it as one of their last actions only after implementation, verification,
-documentation decisions, and diff/worktree cleanup are complete, and clear it
-if repository work resumes.
+Developer instructions reserve `ready_for_review` for pre-commit review. Agents
+set it only when the intended uncommitted diff is complete and validated, clear
+it when work resumes or before commit/push, and skip it for an explicit
+immediate commit/push request. Starting review clears the accepted flag through
+the normal app-owned action lifecycle.
 
 Flags are persisted app state and are cleared with the agent's conversation
 runtime when that conversation is restarted or replaced. Clients may present,

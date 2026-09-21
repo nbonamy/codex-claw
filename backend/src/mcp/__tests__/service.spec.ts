@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { Agent, AppSnapshot, Automation } from '@codex-claw/core/contracts';
+import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@codex-claw/core/contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
@@ -30,6 +30,44 @@ describe('ClawMcpService', () => {
 
     expect(response.result.isError).toBe(false);
     expect(events).toContainEqual(expect.objectContaining({
+      agentId: 'agent-dina',
+      type: 'agent.updated',
+      payload: expect.objectContaining({ statusText: null }),
+    }));
+  });
+
+  it('clears the current status when the agent turn ends', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: any[] = [];
+    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    const url = await service.start();
+
+    await callTool(url, 'agent-dina', 'set-status', { status: 'Running verification' });
+    expect(snapshot.agents[0]!.statusText).toBe('Running verification');
+
+    service.handleBackendEvent({
+      seq: 1,
+      occurredAt: '2026-08-02T00:00:00.000Z',
+      agentId: 'agent-dina',
+      backend: 'codex',
+      threadId: 'thread-dina',
+      type: 'codex.conversationEventReceived',
+      payload: {
+        revision: 1,
+        event: {
+          seq: 1,
+          occurredAt: '2026-08-02T00:00:00.000Z',
+          origin: 'notification',
+          conversationId: 'thread-dina',
+          turnId: 'turn-1',
+          type: 'turn.completed',
+          payload: { status: 'completed' },
+        },
+      },
+    } as BackendPublishedEvent);
+
+    expect(snapshot.agents[0]!.statusText).toBeUndefined();
+    expect(events.at(-1)).toEqual(expect.objectContaining({
       agentId: 'agent-dina',
       type: 'agent.updated',
       payload: expect.objectContaining({ statusText: null }),

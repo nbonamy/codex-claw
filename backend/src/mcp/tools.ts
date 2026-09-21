@@ -123,9 +123,9 @@ export function createCodexClawMcpServer(
   }, () => coordinator.broadcastMessage(callerAgentId, content)));
 
   server.registerTool('set-status', {
-    description: "MANDATORY: Set your status so other agents know what you are doing. Call before starting any task, after completing it, and when changing direction. Keep it short and specific (e.g. 'Implementing auth module', 'Running tests', 'Done - PR ready'). Use empty string to clear.",
+    description: "MANDATORY: Set your status so other agents know what you are doing. Call before starting any task, after completing it, and when changing direction. Keep it short and specific (e.g. 'Implementing auth module', 'Running tests', 'Done - PR ready'). Status clears automatically when the turn ends; use an empty string only to clear it earlier.",
     inputSchema: {
-      status: z.string().describe('Short status text describing what you are currently doing. Use empty string to clear.'),
+      status: z.string().describe('Short status text describing what you are currently doing. It clears automatically when the turn ends; use an empty string only to clear it earlier.'),
     },
   }, ({ status }) => toolResult('set-status', {
     agentId: callerAgentId,
@@ -134,7 +134,7 @@ export function createCodexClawMcpServer(
 
   if (!missionContext) {
     server.registerTool('toggle_thread_flag', {
-      description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. Set ready_for_review only at final handoff, after implementation, verification, documentation decisions, and diff/worktree cleanup are complete; make it one of the last actions before the final response. Clear a flag when it is no longer appropriate. These flags take no payload.',
+      description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. ready_for_review is a pre-commit affordance: set it only when the intended uncommitted diff is complete, validated, and ready for user review; clear it if work resumes or before commit/push, and skip it for an explicit immediate commit/push request. Clear a flag when it is no longer appropriate. These flags take no payload.',
       inputSchema: {
         id: z.enum(['delegate_to_worktree', 'ready_for_review']).describe('Predefined semantic thread flag.'),
         value: z.boolean().describe('True sets the flag; false clears it.'),

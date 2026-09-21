@@ -29,6 +29,7 @@ import type {
 } from '@codex-claw/core/contracts';
 import { updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
+import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
@@ -131,6 +132,9 @@ export class ClawMcpService {
   }
 
   handleBackendEvent(event: BackendPublishedEvent): void {
+    if (event.agentId && providerConversationEventView(event).type === 'turn.completed') {
+      this.coordinator.clearStatus(event.agentId);
+    }
     if (event.type === 'agent.promptDequeued') {
       const ids = event.payload.ids;
       for (const id of ids) this.queuedMessageIds.delete(id);

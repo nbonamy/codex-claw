@@ -91,9 +91,11 @@ set-status
   -> renderer shows the short status to users and teammates
 ```
 
-An empty value clears the status. `statusText` is independent from the agent's
-runtime state (`idle`, `working`, `awaitingInput`, or `error`). It should remain
-short and describe the current activity, not repeat a transcript.
+The service clears the status automatically when the provider turn completes.
+An empty value remains available for an intentional early clear. `statusText`
+is independent from the agent's runtime state (`idle`, `working`,
+`awaitingInput`, or `error`). It should remain short and describe the current
+activity, not repeat a transcript.
 
 If a new tool changes agent state, make the state transition explicit and emit
 the matching app-owned event. Do not infer agent state from how a tool row is
@@ -177,6 +179,7 @@ expanded content or logs.
 - schema and behavioral description in `backend/src/mcp/tools.ts`;
 - normalization and state mutation in `ClawMcpAgentCoordinator.setStatus()`;
 - `agent.updated` emission in `ClawMcpService`;
+- automatic cleanup from the provider-independent `turn.completed` lifecycle;
 - a special completed title for clearing status in
   `vue/src/tool-title-presenter.ts`.
 
@@ -191,9 +194,10 @@ typed thread state rather than presentation. The payload-free flags are:
 
 - `delegate_to_worktree`, which submits a fixed delegation prompt through the
   normal app-owned prompt path when the user accepts it;
-- `ready_for_review`, a final-handoff marker set only after implementation,
-  verification, documentation decisions, and diff/worktree cleanup are complete;
-  it tells clients that the repository is ready to enter Claw's code review workflow.
+- `ready_for_review`, a pre-commit affordance set only when the intended
+  uncommitted diff is complete, validated, and ready for user review. Agents
+  clear it when work resumes or before commit/push and skip it for explicit
+  immediate commit/push requests.
 
 Claw clears a flag after its accepted action succeeds, on manual dismissal, or
 when the agent calls `toggle_thread_flag` with `value: false`. Failed actions
