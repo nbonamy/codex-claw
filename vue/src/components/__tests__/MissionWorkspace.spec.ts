@@ -346,7 +346,11 @@ describe('MissionWorkspace', () => {
 
     const board = wrapper.get('[aria-label="Implementation by repository"]');
     expect(board.text()).toContain('2 affected repositories');
-    expect(board.text()).toContain('mission/add-team-billing');
+    expect(board.get('.mission-implementation__summary').text()).not.toContain('mission/add-team-billing');
+    expect(board.findAll('.mission-implementation__workspace').map(workspace => workspace.text())).toStrictEqual([
+      'mission/add-team-billing',
+      'mission/add-team-billing',
+    ]);
     expect(board.text()).toContain('billing-service');
     expect(board.text()).toContain('invoice-app');
     expect(board.text()).toContain('Ready for review');

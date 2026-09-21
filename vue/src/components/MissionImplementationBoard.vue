@@ -38,9 +38,6 @@
       </div>
       <div class="mission-implementation__summary-meta">
         <span>{{ t("missions.repositoryCount", { count: lanes.length }) }}</span>
-        <span v-if="branch"
-          ><GitBranchIcon aria-hidden="true" />{{ branch }}</span
-        >
         <span>{{ policyLabel }}</span>
       </div>
     </header>
@@ -57,6 +54,14 @@
             <strong>{{ repositoryName(lane.repositoryPath) }}</strong>
             <span>{{ laneProgress(lane.tickets) }}</span>
           </div>
+          <span
+            v-if="workspaceBranch(lane.repositoryPath)"
+            class="mission-implementation__workspace"
+          >
+            <GitBranchIcon aria-hidden="true" />{{
+              workspaceBranch(lane.repositoryPath)
+            }}
+          </span>
         </header>
         <TransitionGroup name="mission-run-card" tag="ol" appear>
           <li v-for="item in lane.tickets" :key="item.ticket.id ?? item.index" class="mission-implementation__ticket-item">
@@ -232,9 +237,6 @@ const reviewPolicy = computed(
 const policyLabel = computed(() =>
   t(`missions.reviewPolicy.${reviewPolicy.value}`),
 );
-const branch = computed(
-  () => props.mission.execution?.workspaces?.[0]?.branch ?? "",
-);
 const implementationRuns = computed(
   () =>
     props.mission.execution?.runs.filter(
@@ -298,6 +300,16 @@ function openConversation(workerId?: string): void {
 function repositoryName(repositoryPath: string): string {
   return (
     repositoryPath.split(/[\\/]/u).filter(Boolean).at(-1) ?? repositoryPath
+  );
+}
+function workspaceBranch(repositoryPath: string): string {
+  return (
+    props.mission.execution?.workspaces?.find(
+      (workspace) => workspace.repositoryPath === repositoryPath,
+    )?.branch ??
+    (lanes.value.length === 1
+      ? (props.mission.execution?.workspace?.branch ?? "")
+      : "")
   );
 }
 function ticketNumber(index: number): string {
@@ -465,6 +477,24 @@ function ticketPreview(ticket: MissionTicket): string {
 .mission-implementation__lane > header span {
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
+}
+
+.mission-implementation__lane > header .mission-implementation__workspace {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-implementation__lane > header .mission-implementation__workspace svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
 }
 
 .mission-implementation__lane ol {
