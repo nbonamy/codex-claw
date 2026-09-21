@@ -766,7 +766,9 @@ describe('agent git service parsers', () => {
       return { stdout: '' };
     });
     const service = new AgentGitService(() => new Date(), runGit);
-    await expect(service.merge('/repo-feature', 'squash', true, true, 'feat: combine the workflow')).resolves.toBe('/repo');
+    await expect(service.merge('/repo-feature', 'squash', true, true, 'feat: combine the workflow')).resolves.toStrictEqual({
+      targetFolder: '/repo',
+    });
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--squash', 'feature']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', 'feat: combine the workflow']);
@@ -775,6 +777,38 @@ describe('agent git service parsers', () => {
     const removeWorktreeCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'worktree' && args[1] === 'remove');
     const deleteBranchCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'branch' && args[1] === '-D');
     expect(removeWorktreeCall).toBeLessThan(deleteBranchCall);
+  });
+
+  it('continues merge cleanup when Git removed the worktree registration but left its folder', async () => {
+    let worktreeListCalls = 0;
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote') return { stdout: '' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## feature\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        worktreeListCalls += 1;
+        return {
+          stdout: worktreeListCalls === 1
+            ? 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n'
+            : 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n',
+        };
+      }
+      if (args[0] === 'worktree' && args[1] === 'remove') {
+        throw new Error("failed to delete '/repo-feature': Directory not empty");
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+
+    await expect(service.merge('/repo-feature', 'merge', true, true)).resolves.toStrictEqual({
+      targetFolder: '/repo',
+      warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+    });
+
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-d', 'feature']);
   });
 
   it('requires a commit message before starting a squash merge', async () => {
@@ -916,7 +950,7 @@ describe('agent git service parsers', () => {
     });
     const service = new AgentGitService(() => new Date(), runGit);
 
-    await expect(service.merge('/repo', 'merge', false, false)).resolves.toBe('/repo');
+    await expect(service.merge('/repo', 'merge', false, false)).resolves.toStrictEqual({ targetFolder: '/repo' });
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature/demo']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['switch', 'main']);
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--no-ff', 'feature/demo']);

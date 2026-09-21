@@ -259,27 +259,29 @@ export class AgentGitWorkflowService {
     const strategy = input.strategy === 'squash' ? 'squash' : 'merge';
     const commitMessage = strategy === 'squash' ? requireString(input.commitMessage, 'commitMessage') : undefined;
     const deleteWorktree = input.deleteWorktree === true;
-    const workflow = input.reportBack === true ? await this.workflow(agent) : null;
+    const sourceWorkflow = input.reportBack === true ? await this.workflow(agent) : null;
     if (input.reportBack === true) this.emitOperationProgress(agentId, 'merge', 'handoff');
     const handoff = input.reportBack === true
       ? await this.options.delegatedWorkReports.prepare(agent, {
         kind: 'merge',
-        branch: workflow?.branch ?? 'branch',
-        repository: workflow?.repository ?? 'the base branch',
+        branch: sourceWorkflow?.branch ?? 'branch',
+        repository: sourceWorkflow?.repository ?? 'the base branch',
       })
       : null;
     if (input.reportBack === true) this.emitOperationProgress(agentId, 'merge', 'delivery');
-    const targetFolder = await this.options.git.merge(folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
+    const mergeResult = await this.options.git.merge(folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
+    const targetFolder = mergeResult.targetFolder;
     const outcome = {
       kind: 'merge' as const,
-      branch: workflow?.branch ?? 'branch',
-      repository: workflow?.repository ?? 'the base branch',
+      branch: sourceWorkflow?.branch ?? 'branch',
+      repository: sourceWorkflow?.repository ?? 'the base branch',
     };
     if (deleteWorktree) {
       updateAgentFolder(this.options.getSnapshot(), agentId, targetFolder);
       await this.options.releaseConversation(agent);
     }
-    const result = await this.workflow(agent, { refreshStatus: true });
+    const targetWorkflow = await this.workflow(agent, { refreshStatus: true });
+    const result = mergeResult.warning ? { ...targetWorkflow, warning: mergeResult.warning } : targetWorkflow;
     if (input.reportBack === true) {
       this.options.delegatedWorkReports.deliver(agent, outcome, handoff);
     }

@@ -13,6 +13,11 @@ export type AgentGitServiceClock = () => Date;
 export type AgentGitRunner = (cwd: string, args: string[]) => Promise<{ stdout: string }>;
 type AgentGitWorktreeCreator = (input: GitWorktreeCreateInput) => Promise<{ path: string }>;
 
+export type AgentGitMergeResult = {
+  targetFolder: string;
+  warning?: NonNullable<AgentGitWorkflow['warning']>;
+};
+
 export type AgentGitGenerationContext = {
   context: string;
   baseRef?: string;
@@ -522,7 +527,7 @@ export class AgentGitService {
     }
   }
 
-  async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string): Promise<string> {
+  async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string): Promise<AgentGitMergeResult> {
     const normalizedCommitMessage = commitMessage?.trim();
     if (strategy === 'squash' && !normalizedCommitMessage) throw new Error('Enter a squash commit message.');
     const current = await this.workflow(folder);
@@ -561,9 +566,23 @@ export class AgentGitService {
     if (switchTargetBranch) await this.runGit(current.folder, ['switch', targetBranch]);
     await this.runGit(targetFolder, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', '--no-ff', current.branch]);
     if (strategy === 'squash') await this.runGit(targetFolder, ['commit', '-m', normalizedCommitMessage!]);
-    if (deleteWorktree) await this.runGit(targetFolder, ['worktree', 'remove', current.folder]);
+    const warning = deleteWorktree
+      ? await this.removeMergedWorktree(targetFolder, current.folder)
+      : undefined;
     if (deleteBranch) await this.runGit(targetFolder, ['branch', strategy === 'squash' ? '-D' : '-d', current.branch]);
-    return targetFolder;
+    return { targetFolder, ...(warning ? { warning } : {}) };
+  }
+
+  private async removeMergedWorktree(targetFolder: string, worktreeFolder: string): Promise<NonNullable<AgentGitWorkflow['warning']> | undefined> {
+    try {
+      await this.runGit(targetFolder, ['worktree', 'remove', worktreeFolder]);
+      return undefined;
+    } catch (error) {
+      const worktrees = parseWorktrees((await this.runGit(targetFolder, ['worktree', 'list', '--porcelain'])).stdout);
+      const remainsRegistered = worktrees.some((worktree) => resolve(worktree.path) === resolve(worktreeFolder));
+      if (remainsRegistered) throw error;
+      return { type: 'worktreeFolderRetained', folder: worktreeFolder };
+    }
   }
 
   private async resolveBaseRef(folder: string, branch: string, remote?: string): Promise<string> {

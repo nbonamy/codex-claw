@@ -458,6 +458,8 @@ export const surfaceMessages = {
     "mergeComplete": "Merge complete",
     "mergeCompleteButPushFailed": "Merge complete, but push failed",
     "mergeFailed": "Merge failed",
+    "worktreeFolderRemains": "Worktree folder remains",
+    "worktreeFolderCouldNotBeDeleted": "The worktree was removed, but its folder could not be deleted. Remove {folder} manually.",
     "commitChangesInBranchFirst": "Commit changes in {branch} first",
     "targetWorktreeHasChanges": "The {branch} worktree has uncommitted changes. Commit them before merging {sourceBranch}.",
     "pushingMergedBranch": "Pushing merged branch",

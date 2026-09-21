@@ -130,6 +130,44 @@ describe('AgentGitWorkflowService', () => {
     expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
   });
 
+  it('closes the merged agent while returning a non-blocking retained-folder warning', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0] as Agent;
+    agent.folder = '/repo-feature';
+    const releaseConversation = vi.fn().mockResolvedValue(undefined);
+    const archiveConversation = vi.fn().mockResolvedValue(undefined);
+    const persistAndEmitSnapshot = vi.fn().mockResolvedValue(snapshot);
+    const merge = vi.fn().mockResolvedValue({
+      targetFolder: '/repo',
+      warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+    });
+    const workflow = vi.fn().mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo', isLinkedWorktree: false,
+      branch: 'main', detached: false, ahead: 1, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [], githubConnected: false,
+    });
+    const service = new AgentGitWorkflowService({
+      applyEvent: vi.fn(), archiveConversation, delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(), releaseConversation, getSnapshot: () => snapshot,
+      getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
+      git: { merge, workflow } as unknown as AgentGitService,
+      persistAndEmitSnapshot, refreshGitStatus: vi.fn(), refreshWorkspaceIdentity: vi.fn(), sendPrompt: vi.fn(),
+    });
+
+    await expect(service.execute({
+      method: backendMethods.agentGitMerge,
+      agentId: agent.id,
+      params: { input: { strategy: 'merge', deleteBranch: true, deleteWorktree: true, confirmed: true } },
+    }, agent)).resolves.toMatchObject({
+      warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+    });
+
+    expect(releaseConversation).toHaveBeenCalledWith(agent);
+    expect(archiveConversation).toHaveBeenCalledWith(agent);
+    expect(snapshot.agents.some((candidate) => candidate.id === agent.id)).toBe(false);
+    expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
+  });
+
   it('hands merge conflicts to the affected agent with branch context', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0] as Agent;

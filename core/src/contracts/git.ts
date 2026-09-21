@@ -109,6 +109,10 @@ export type AgentGitWorkflow = {
   existingPullRequest?: AgentGitPullRequest;
   githubConnected: boolean;
   githubError?: string;
+  warning?: {
+    type: 'worktreeFolderRetained';
+    folder: string;
+  };
 };
 
 export type AgentGitStageInput = { paths: string[]; confirmed: boolean };
