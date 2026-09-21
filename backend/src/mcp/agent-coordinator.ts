@@ -243,6 +243,15 @@ export class ClawMcpAgentCoordinator {
     return 'Status updated';
   }
 
+  clearStatus(agentId: string): boolean {
+    const agent = this.getAgents().find((candidate) => candidate.id === agentId);
+    if (!agent || agent.statusText === undefined) return false;
+    delete agent.statusText;
+    agent.updatedAt = this.now().toISOString();
+    this.onAgentUpdated?.(agent);
+    return true;
+  }
+
   toggleThreadFlag(agentId: string, input: ToggleThreadFlagInput): {
     success: true;
     id: ToggleThreadFlagInput['id'];
