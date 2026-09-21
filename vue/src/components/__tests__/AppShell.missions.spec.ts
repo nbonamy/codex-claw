@@ -63,13 +63,18 @@ describe('AppShell missions', () => {
   it('replaces the agent workspace with a mission and returns to normal agent navigation', async () => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
-    const wrapper = mountShell({ snapshot });
+    const selectMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, selectMission });
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
     expect(wrapper.find('.mission-workspace').exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(false);
+    expect(selectMission).toHaveBeenLastCalledWith(mission.id);
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-agent', snapshot.agents[0]!.id);
+    await flushPromises();
     expect(wrapper.find('.mission-workspace').exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
+    expect(selectMission).toHaveBeenLastCalledWith(null);
   });
 
   it('asks for the outcome in the empty mission conversation', async () => {

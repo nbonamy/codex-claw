@@ -89,6 +89,7 @@
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
     :create-mission="createMission"
+    :select-mission="selectMission"
     :delete-mission="deleteMission"
     :read-mission-artifact="readMissionArtifact"
     :execute-mission="executeMission"
@@ -320,6 +321,7 @@ const {
   createAgent,
   clearAgentCreationProgress,
   createMission,
+  selectMission,
   deleteMission,
   readMissionArtifact,
   executeMission,

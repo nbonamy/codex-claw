@@ -768,6 +768,10 @@ export function useAppState() {
     return snapshot.value.missions!.find(m => !previous.has(m.id))!;
   }
 
+  async function selectMission(missionId: string | null): Promise<void> {
+    await codexClawApi?.selectMission(missionId);
+  }
+
   async function deleteMission(input: import('@codex-claw/core/missions').DeleteMissionInput) {
     if (!codexClawApi) throw new Error('Missions unavailable.');
     adoptNavigationSnapshot(await codexClawApi.deleteMission(input));
@@ -1474,6 +1478,7 @@ export function useAppState() {
     createAgent,
     executeMission,
     createMission,
+    selectMission,
     deleteMission,
     readMissionArtifact,
     updateMission,

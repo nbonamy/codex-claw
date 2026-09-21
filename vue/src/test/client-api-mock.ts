@@ -106,6 +106,7 @@ export function createClientApiMock(
     createAgent: unscripted('createAgent'),
     executeMission: unscripted('executeMission'),
     createMission: unscripted('createMission'),
+    selectMission: unscripted('selectMission'),
     deleteMission: unscripted('deleteMission'),
     readMissionArtifact: unscripted('readMissionArtifact'),
     updateMission: unscripted('updateMission'),

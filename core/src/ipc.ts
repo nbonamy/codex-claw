@@ -83,6 +83,7 @@ export const ipcChannels = {
   createAgent: 'agent:create',
   executeMission: 'mission:execute',
   createMission: 'mission:create',
+  selectMission: 'mission:select',
   deleteMission: 'mission:delete',
   readMissionArtifact: 'mission:artifact:read',
   updateMission: 'mission:update',

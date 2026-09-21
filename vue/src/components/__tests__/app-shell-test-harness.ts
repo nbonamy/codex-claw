@@ -113,6 +113,7 @@ export function mountShell(overrides: Partial<{
   createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission: (input: CreateMissionInput) => Promise<Mission>;
+  selectMission: (missionId: string | null) => Promise<void>;
   deleteMission: (input: DeleteMissionInput) => Promise<void>;
   readMissionArtifact: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
   executeMission: (input: MissionExecutionInput) => Promise<void>;
@@ -206,6 +207,7 @@ export function mountShell(overrides: Partial<{
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
       createMission: overrides.createMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
+      selectMission: overrides.selectMission ?? vi.fn().mockResolvedValue(undefined),
       deleteMission: overrides.deleteMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
       readMissionArtifact: overrides.readMissionArtifact ?? vi.fn().mockRejectedValue(new Error('Mission artifacts unavailable.')),
       executeMission: overrides.executeMission ?? vi.fn().mockResolvedValue(undefined),

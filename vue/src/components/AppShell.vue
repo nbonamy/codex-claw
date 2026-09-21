@@ -608,6 +608,7 @@ const props = withDefaults(defineProps<{
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission?: (input: CreateMissionInput) => Promise<Mission>;
+  selectMission?: (missionId: string | null) => Promise<void>;
   deleteMission?: (input: DeleteMissionInput) => Promise<void>;
   readMissionArtifact?: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
   executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
@@ -744,6 +745,7 @@ const props = withDefaults(defineProps<{
   },
   createAgent: async () => undefined,
   createMission: async () => { throw new Error('Missions unavailable.'); },
+  selectMission: async () => undefined,
   deleteMission: async () => { throw new Error('Missions unavailable.'); },
   readMissionArtifact: async () => { throw new Error('Mission artifacts unavailable.'); },
   createQuickChat: async () => undefined,
@@ -873,6 +875,10 @@ const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
 const missionDeleteTarget = computed(() => props.snapshot.missions?.find(m => m.id === missionDeleteTargetId.value) ?? null);
 function selectMissionSurface(id: string): void { selectedMissionId.value = id; activeSurface.value = 'mission'; }
+watch(
+  () => activeSurface.value === 'mission' ? selectedMissionId.value : null,
+  missionId => { void props.selectMission(missionId); },
+);
 function missionTeamContext(): { team: Team; orchestrator: Agent } {
   const team = activeTeam.value;
   const activeAgent = currentAgent.value;

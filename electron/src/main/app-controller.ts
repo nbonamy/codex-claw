@@ -75,6 +75,7 @@ export class AppController {
   private autoUpdateService: DesktopAutoUpdateService | null = null;
   private manualUpdateCheckController: ManualUpdateCheckController | null = null;
   private desktopUpdateStatus: DesktopUpdateStatus = { state: 'idle' };
+  private selectedMissionId: string | null = null;
   private appshotCapturePending = false;
 
   private readonly browserPane = new BrowserPane({
@@ -391,7 +392,12 @@ export class AppController {
       return this.createAgent(input);
     });
 
-    registerMissionIpcHandlers(ipc, () => this.requireBackendClient(), snapshot => this.adoptBackendSnapshot(snapshot));
+    registerMissionIpcHandlers(
+      ipc,
+      () => this.requireBackendClient(),
+      snapshot => this.adoptBackendSnapshot(snapshot),
+      missionId => this.selectMission(missionId),
+    );
     ipc.handle(ipcChannels.createQuickChat, async (_event, input: CreateQuickChatInput) => {
       return this.createQuickChat(input);
     });
@@ -1569,9 +1575,15 @@ export class AppController {
   }
 
   private debugMission(snapshot = this.snapshot) {
-    const activeAgentId = snapshot?.activeAgentId;
-    if (!activeAgentId) return undefined;
-    return snapshot.missions?.slice().reverse().find(mission => mission.execution?.runs.some(run => run.workerId === activeAgentId));
+    if (!this.selectedMissionId) return undefined;
+    return snapshot?.missions?.find(mission => mission.id === this.selectedMissionId);
+  }
+
+  private selectMission(missionId: string | null): void {
+    this.selectedMissionId = missionId && this.snapshot?.missions?.some(mission => mission.id === missionId)
+      ? missionId
+      : null;
+    this.refreshAppMenu();
   }
 
   private setDebugMissionStage(stage: MissionStage): void {

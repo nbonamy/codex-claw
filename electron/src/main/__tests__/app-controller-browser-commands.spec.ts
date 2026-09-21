@@ -26,15 +26,12 @@ describe('AppController', () => {
     ));
   });
 
-  it('routes Mission stage fixtures for the Mission containing the active agent', async () => {
+  it('routes Mission stage fixtures for the Mission selected by the renderer', async () => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, { outcome: 'Debug mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
-    mission.execution!.runs.push({
-      id: 'run-debug', stage: 'requirements', memberId: snapshot.agents[0]!.id, workerId: snapshot.agents[0]!.id,
-      status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
-    });
     const request = vi.fn().mockResolvedValue(snapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
+    (controller as unknown as { selectMission(missionId: string | null): void }).selectMission(mission.id);
     const options = (controller as unknown as {
       debugMenuOptions(): { getDebugMissionStage(): MissionStage | undefined; setDebugMissionStage(stage: MissionStage): void };
     }).debugMenuOptions();

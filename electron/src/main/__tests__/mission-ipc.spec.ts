@@ -12,7 +12,10 @@ describe('mission IPC', () => {
     const artifact = { stage: 'requirements', content: '# Billing', revision: 1, updatedAt: '2026-09-19T00:00:00.000Z' };
     const request = vi.fn(async (method: string) => method === 'mission/artifact/read' ? artifact : snapshot);
     const adopt = vi.fn(value => value);
-    registerMissionIpcHandlers(ipc, () => ({ request }) as unknown as ReturnType<Parameters<typeof registerMissionIpcHandlers>[1]>, adopt);
+    const selectMission = vi.fn();
+    registerMissionIpcHandlers(ipc, () => ({ request }) as unknown as ReturnType<Parameters<typeof registerMissionIpcHandlers>[1]>, adopt, selectMission);
+    expect(handlers.get('mission:select')!({}, mission.id)).toBeUndefined();
+    expect(selectMission).toHaveBeenCalledWith(mission.id);
     const input = { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id };
     await expect(handlers.get('mission:create')!({}, input)).resolves.toBe(snapshot);
     expect(request).toHaveBeenLastCalledWith('mission/create', { input });
