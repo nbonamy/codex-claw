@@ -577,6 +577,7 @@ export type CodexResourceSharingStatus = {
 };
 
 export type AppSnapshot = {
+  missions?: import('./missions').Mission[];
   clientPreferences?: Record<string, import('./client-preferences').ClientPreferences>;
   teams: Team[];
   agents: Agent[];
@@ -639,6 +640,7 @@ export type AppCommand =
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
   | { type: 'debug-approval-request' }
+  | { type: 'debug-user-questions' }
   | { type: 'debug-celebrate'; kind: CelebrationKind }
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-mark-unread' }
@@ -812,6 +814,12 @@ export type CodexClawApi = {
   resumeAgentConversation(agentId: string, target: ConversationResumeTarget): Promise<AppSnapshot>;
   readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]>;
   createAgent(input: CreateAgentInput): Promise<AppSnapshot>;
+  executeMission(input: import('./mission-execution').MissionExecutionInput): Promise<AppSnapshot>;
+  createMission(input: import('./missions').CreateMissionInput): Promise<AppSnapshot>;
+  selectMission(missionId: string | null): Promise<void>;
+  deleteMission(input: import('./missions').DeleteMissionInput): Promise<AppSnapshot>;
+  readMissionArtifact(missionId: string, stage: import('./missions').MissionStage): Promise<import('./mission-execution').MissionArtifactReadResult>;
+  updateMission(input: import('./missions').UpdateMissionInput): Promise<AppSnapshot>;
   createQuickChat(input: CreateQuickChatInput): Promise<AppSnapshot>;
   updateAgent(input: UpdateAgentInput): Promise<AppSnapshot>;
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;

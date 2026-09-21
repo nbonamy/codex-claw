@@ -59,6 +59,8 @@ const callbacks = (): AppMenuCallbacks => ({
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
   injectDebugPlanReview: vi.fn(),
+  getDebugMissionStage: vi.fn(() => 'tickets' as const),
+  setDebugMissionStage: vi.fn(),
   injectDebugCodeReview: vi.fn(),
   isDebugThreadFlagSet: vi.fn(() => false),
   setDebugThreadFlag: vi.fn(),
@@ -242,6 +244,16 @@ describe('app menu', () => {
     expect(sendDebugAgentMessage).toHaveBeenCalledOnce();
   });
 
+  it('dispatches the multi-question fixture from the debug agent menu', () => {
+    const debugCallbacks = callbacks();
+    const menu = buildAppMenuTemplate(debugCallbacks, { debugMode: true }, 'darwin');
+
+    clickNestedItem(menu, 'Debug', 'Agent Fixtures', 'Multi-question Request');
+
+    expect(debugCallbacks.sendAppCommand).toHaveBeenCalledOnce();
+    expect(debugCallbacks.sendAppCommand).toHaveBeenCalledWith({ type: 'debug-user-questions' });
+  });
+
   it('adds reload and developer tools only in debug mode', () => {
     const debugCallbacks = callbacks();
     const debugMenu = buildAppMenuTemplate(debugCallbacks, { debugMode: true }, 'darwin');
@@ -260,6 +272,7 @@ describe('app menu', () => {
     const debugItems = submenu(debugMenu, 'Debug');
     expect(debugItems.map((item) => item.type === 'separator' ? 'separator' : item.label)).toStrictEqual([
       'Agent Fixtures',
+      'Mission Fixtures',
       'Review',
       'Thread Flags',
       'UI Previews',
@@ -270,10 +283,23 @@ describe('app menu', () => {
     expect(submenuLabels(debugMenu, 'Debug', 'Agent Fixtures')).toStrictEqual([
       'Send Message',
       'Approval Request',
+      'Multi-question Request',
       'Mark as Unread',
       'Execution Plan',
       'Plan Review',
     ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'Mission Fixtures')).toStrictEqual([
+      'Requirements',
+      'Tickets',
+      'Implementation',
+      'Review',
+      'Ship',
+    ]);
+    expect(nestedMenuItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets')).toMatchObject({
+      type: 'radio',
+      checked: true,
+      enabled: true,
+    });
     expect(nestedMenuItem(debugMenu, 'Debug', 'Thread Flags', 'Delegate to Worktree')).toMatchObject({
       type: 'checkbox',
       checked: false,
@@ -304,6 +330,7 @@ describe('app menu', () => {
     expect(nestedSubmenu(debugMenu, 'Debug', 'Agent Fixtures').map(menuEntryLabel)).toStrictEqual([
       'Send Message',
       'Approval Request',
+      'Multi-question Request',
       'separator',
       'Mark as Unread',
       'Execution Plan',
@@ -330,6 +357,11 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Mark as Unread');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Execution Plan');
     clickNestedItem(debugMenu, 'Debug', 'Agent Fixtures', 'Plan Review');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Requirements');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Implementation');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Ship');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings While Reviewing');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings Ready for Selection');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Remediation Mix');
@@ -400,6 +432,11 @@ describe('app menu', () => {
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(1, 'requirements');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(2, 'tickets');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(3, 'implementation');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(4, 'review');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(5, 'ship');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(1, 'reviewing');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(2, 'ready');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(3, 'fixing');

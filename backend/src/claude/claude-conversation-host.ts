@@ -98,6 +98,7 @@ type ClaudeBackendDriverOptions = {
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
+  additionalDeveloperInstructions?: (agent: Agent) => string | undefined;
 };
 
 type ClaudeReviewTurnConfiguration = {
@@ -265,6 +266,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         this.driverOptions.pluginSettings?.(),
         {
           celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
+          developerInstructions: this.driverOptions.additionalDeveloperInstructions?.(agent),
         },
       );
       const turnParams: ClaudeTurnParams = review
@@ -652,6 +654,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
           this.driverOptions.pluginSettings?.(),
           {
             celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
+            developerInstructions: this.driverOptions.additionalDeveloperInstructions?.(agent),
           },
         );
         const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;

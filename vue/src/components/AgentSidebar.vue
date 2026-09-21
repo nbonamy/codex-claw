@@ -28,9 +28,72 @@
         <MessageIcon data-icon="message" aria-hidden="true" />
         <span>{{ t('sidebar.quickChat') }}</span>
       </button>
+      <button
+        v-if="!missions?.length"
+        class="agent-sidebar__mission-action"
+        type="button"
+        :aria-busy="missionCreationPending"
+        :disabled="missionCreationPending"
+        @click="emit('create-mission')"
+      >
+        <TargetArrowIcon data-icon="target-arrow" aria-hidden="true" />
+        <span>{{ t('missions.new') }}</span>
+      </button>
+      <p v-if="missionCreationError" class="agent-sidebar__mission-error" role="alert">
+        {{ missionCreationError }}
+      </p>
     </div>
 
     <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
+      <section v-if="missions?.length" class="agent-sidebar__workspace-group" data-group-kind="missions">
+        <header class="agent-sidebar__workspace-header">
+          <TargetArrowIcon class="agent-sidebar__workspace-icon" data-icon="target-arrow" aria-hidden="true" />
+          <button
+            class="agent-sidebar__workspace-label"
+            type="button"
+            :aria-label="t('missions.title')"
+            :aria-expanded="!missionsCollapsed"
+            @click="missionsCollapsed = !missionsCollapsed"
+          >
+            <strong>{{ t('missions.title') }}</strong>
+          </button>
+          <span class="agent-sidebar__workspace-actions agent-sidebar__workspace-actions--persistent">
+            <button
+              type="button"
+              :aria-label="t('missions.new')"
+              :title="t('missions.new')"
+              :disabled="missionCreationPending"
+              @click.stop="emit('create-mission')"
+            >
+              <PlusIcon aria-hidden="true" />
+            </button>
+          </span>
+        </header>
+        <template v-if="!missionsCollapsed">
+          <div v-for="mission in missions" :key="mission.id" class="agent-sidebar__agent-row">
+            <button
+              class="agent-sidebar__agent"
+              :class="{ 'agent-sidebar__agent--active': activeMissionId === mission.id }"
+              type="button"
+              :aria-pressed="activeMissionId === mission.id"
+              @click="emit('select-mission', mission.id)"
+              @contextmenu.prevent="openMissionMenu(mission.id, $event)"
+            >
+              <span class="agent-sidebar__meta">
+                <strong
+                  class="agent-sidebar__session-title"
+                  :class="{ 'agent-sidebar__session-title--active': activeMissionId === mission.id }"
+                >{{ mission.outcome }}</strong>
+              </span>
+              <span
+                class="agent-sidebar__status"
+                :data-status="mission.status === 'completed' ? 'idle' : 'working'"
+                :aria-label="missionProgressLabel(mission)"
+              />
+            </button>
+          </div>
+        </template>
+      </section>
       <section
         v-for="group in workspaceGroups"
         :key="group.id"
@@ -211,6 +274,14 @@
       @close="closeContextMenu"
     />
 
+    <MissionContextMenu
+      v-if="contextMenuMissionId"
+      :x="contextMenuPosition.x"
+      :y="contextMenuPosition.y"
+      @delete="deleteContextMission"
+      @close="closeMissionContextMenu"
+    />
+
     <div
       class="agent-sidebar__resize-handle"
       role="separator"
@@ -231,6 +302,8 @@
 </template>
 
 <script setup lang="ts">
+import type { Mission } from '@codex-claw/core/missions';
+import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@codex-claw/core/contracts';
@@ -242,8 +315,10 @@ import {
   MessageIcon,
   PanelLeftCloseIcon,
   PlusIcon,
+  TargetArrowIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
+import MissionContextMenu from './MissionContextMenu.vue';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
@@ -255,6 +330,8 @@ import { useRepositorySessionMenu } from './use-repository-session-menu';
 
 const props = defineProps<{
   agents: Agent[];
+  missions?: Mission[];
+  activeMissionId?: string | null;
   activeAgentId: string | null;
   unreadAgentIds?: string[];
   forkableAgentIds?: string[];
@@ -267,6 +344,8 @@ const props = defineProps<{
   width?: number;
   minWidth?: number;
   maxWidth?: number;
+  missionCreationError?: string;
+  missionCreationPending?: boolean;
   quickSwitchShortcutsVisible?: boolean;
   repositoryIcons?: Record<string, string>;
   listRepositoryBranches?: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
@@ -297,9 +376,13 @@ const emit = defineEmits<{
   'select-agent': [agentId: string];
   'start-work': [action: 'new' | 'github' | 'local' | 'url'];
   'create-quick-chat': [];
+  'create-mission': [];
+  'delete-mission': [id: string];
+  'select-mission': [id: string];
   'update-repository-icon': [payload: { repositoryKey: string; repositoryRoot: string; icon: string | undefined }];
 }>();
 
+const missionsCollapsed = ref(false);
 const minWidth = computed(() => props.minWidth ?? 72);
 const maxWidth = computed(() => props.maxWidth ?? 420);
 const resizeStep = 16;
@@ -316,6 +399,7 @@ const workspaceGroups = computed(() => projectWorkspaceSidebar({
 }).sort((left, right) => Number(right.kind === 'quickChats') - Number(left.kind === 'quickChats')));
 const quickChatGroup = computed(() => workspaceGroups.value.find((group) => group.kind === 'quickChats') ?? null);
 const contextMenuAgentId = ref<string | null>(null);
+const contextMenuMissionId = ref<string | null>(null);
 const repositorySessionMenu = useRepositorySessionMenu(() => props.listRepositoryBranches, t);
 const repositorySessionMenuId = repositorySessionMenu.visibleGroupId;
 const collapsedRepositoryKeys = computed(() => new Set(props.collapsedRepositoryKeys ?? []));
@@ -473,6 +557,12 @@ function statusLabel(status: Agent['status']['type']): string {
   return t(`status.${status}`);
 }
 
+function missionProgressLabel(mission: Mission): string {
+  if (mission.status === 'completed') return t('missions.completed');
+  const stages = missionWorkflow(mission.workflow.type).stages;
+  return `${stages.indexOf(mission.stage) + 1}/${stages.length} · ${t(`missions.${mission.stage}`)}`;
+}
+
 function isPullRequestFinished(session: WorkspaceSidebarSession): boolean {
   return session.pullRequest?.state === 'merged' || session.pullRequest?.state === 'closed';
 }
@@ -508,11 +598,32 @@ function selectRepositorySessionMenuItem(
 }
 
 function openAgentMenu(agentId: string, event: MouseEvent): void {
+  contextMenuMissionId.value = null;
   contextMenuAgentId.value = agentId;
   contextMenuPosition.value = {
     x: event.clientX,
     y: event.clientY,
   };
+}
+
+function openMissionMenu(missionId: string, event: MouseEvent): void {
+  contextMenuAgentId.value = null;
+  contextMenuMissionId.value = missionId;
+  contextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+}
+
+function deleteContextMission(): void {
+  const missionId = contextMenuMissionId.value;
+  if (!missionId) return;
+  emit('delete-mission', missionId);
+  closeMissionContextMenu();
+}
+
+function closeMissionContextMenu(): void {
+  contextMenuMissionId.value = null;
 }
 
 function emitContextAgentAction(action: AgentContextMenuAction): void {
@@ -732,6 +843,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding-right: 0;
 }
 
+.agent-sidebar__mission-action,
 .agent-sidebar__quick-chat-action {
   min-height: 32px;
   display: flex;
@@ -750,14 +862,28 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__quick-chat-action:hover,
+.agent-sidebar__mission-action:hover,
+.agent-sidebar__mission-action:focus-visible,
 .agent-sidebar__quick-chat-action:focus-visible {
   color: var(--color-text);
   outline: 0;
 }
 
+.agent-sidebar__mission-action svg,
 .agent-sidebar__quick-chat-action svg {
   width: var(--icon-md);
   height: var(--icon-md);
+}
+
+.agent-sidebar__mission-action:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.agent-sidebar__mission-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-12);
 }
 
 .agent-sidebar__workspace-group + .agent-sidebar__workspace-group {
@@ -930,6 +1056,8 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__workspace-group[data-group-kind="quickChats"]
+  .agent-sidebar__agent,
+.agent-sidebar__workspace-group[data-group-kind="missions"]
   .agent-sidebar__agent {
   grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-status-column-width);
   padding-left: calc(

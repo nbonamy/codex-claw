@@ -32,10 +32,17 @@
   <Transition name="agent-sidebar">
     <AgentSidebar
       v-if="showAgentSidebar"
-      :agents="activeTeamAgents"
+      :agents="sidebarAgents"
       :forkable-agent-ids="forkableAgentIds"
       :summary-replacement-agent-ids="summaryReplacementAgentIds"
-      :active-agent-id="currentAgent?.id ?? null"
+      :active-agent-id="activeMissionId ? null : currentAgent?.id ?? null"
+      :missions="snapshot.missions"
+      :active-mission-id="activeMissionId"
+      :mission-creation-error="missionCreationError"
+      :mission-creation-pending="missionCreationPending"
+      @create-mission="$emit('create-mission')"
+      @delete-mission="$emit('delete-mission', $event)"
+      @select-mission="$emit('select-mission', $event)"
       :unread-agent-ids="unreadAgentIds"
       :teams="snapshot.teams"
       :team-id="activeTeam?.id ?? null"
@@ -89,7 +96,7 @@ import type {
   SourceBranch,
   Team,
 } from '@codex-claw/core/contracts';
-import { toRefs } from 'vue';
+import { computed, toRefs } from 'vue';
 import AgentSidebar from './AgentSidebar.vue';
 import TeamRail from './TeamRail.vue';
 
@@ -100,6 +107,9 @@ type RepositorySessionPayload = {
 };
 
 const props = defineProps<{
+  activeMissionId?: string | null;
+  missionCreationError?: string;
+  missionCreationPending?: boolean;
   activeTeam: Team | null;
   activeTeamAgents: Agent[];
   activeTeamName: string;
@@ -133,6 +143,9 @@ const emit = defineEmits<{
   'create-agent-on-branch': [payload: RepositorySessionPayload & { branch: SourceBranch }];
   'create-agent-worktree-in-repository': [payload: RepositorySessionPayload];
   'create-quick-chat': [];
+  'create-mission': [];
+  'delete-mission': [id: string];
+  'select-mission': [id: string];
   'disconnect-team': [teamId: string];
   'duplicate-agent': [agentId: string];
   'edit-agent': [agentId: string];
@@ -167,6 +180,13 @@ const emit = defineEmits<{
     },
   ];
 }>();
+
+const missionAgentIds = computed(() => new Set(
+  (props.snapshot.missions ?? []).flatMap(mission => (
+    mission.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? []
+  )),
+));
+const sidebarAgents = computed(() => props.activeTeamAgents.filter(agent => !missionAgentIds.value.has(agent.id)));
 
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;

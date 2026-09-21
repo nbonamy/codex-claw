@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { AppStatePersistence } from './state-persistence';
@@ -19,6 +19,21 @@ export function backendStateFilePath(): string {
 
 export function backendProviderTokensFilePath(): string {
   return path.join(backendHomeDir(), 'provider-tokens.json');
+}
+
+function backendMissionHomeDir(missionId: string): string {
+  if (!/^mission-[a-zA-Z0-9-]+$/.test(missionId)) throw new Error('Invalid mission ID.');
+  return path.join(backendHomeDir(), 'missions', missionId);
+}
+
+export async function ensureBackendMissionHome(missionId: string): Promise<string> {
+  const home = backendMissionHomeDir(missionId);
+  await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
+  return home;
+}
+
+export async function deleteBackendMissionHome(missionId: string): Promise<void> {
+  await rm(backendMissionHomeDir(missionId), { recursive: true, force: true });
 }
 
 /** Isolated Codex app-server state; never share the user's ~/.codex threads. */

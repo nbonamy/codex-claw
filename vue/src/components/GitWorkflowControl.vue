@@ -355,7 +355,10 @@ const props = defineProps<{
   reportBackAgentName?: string | null;
 }>();
 
-const emit = defineEmits<{ 'open-git-diff': [] }>();
+const emit = defineEmits<{
+  'open-git-diff': [];
+  'delivery-complete': [result: { kind: 'pullRequest'; number: number; url: string } | { kind: 'merge' }];
+}>();
 const root = ref<HTMLElement | null>(null);
 const workflow = ref<AgentGitWorkflow | null>(null);
 const workflowError = ref<string | null>(null);
@@ -813,6 +816,11 @@ async function createPullRequest(): Promise<void> {
       confirmed: true,
     });
     if (props.agent.id === agentId) workflow.value = result;
+    if (result.existingPullRequest) emit('delivery-complete', {
+      kind: 'pullRequest',
+      number: result.existingPullRequest.number,
+      url: result.existingPullRequest.url,
+    });
     pullRequestOperation.value = { status: 'success' };
     if (pullRequestBackgrounded.value) {
       ElMessage.success(translate('surface.gitWorkflowControl.pullRequestCreated'));
@@ -893,6 +901,7 @@ async function merge(pushAfter: boolean): Promise<void> {
       });
       if (props.agent.id === agentId) workflow.value = pushResult;
     }
+    emit('delivery-complete', { kind: 'merge' });
     showMergeSuccess(branch, pushAfter);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -955,6 +964,7 @@ async function retryMergePush(): Promise<void> {
       target: 'mergeTarget',
       ...(closeAgentAfterPush ? { closeAgentAfterPush: true } : {}),
     });
+    emit('delivery-complete', { kind: 'merge' });
     showMergeSuccess(branch, true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

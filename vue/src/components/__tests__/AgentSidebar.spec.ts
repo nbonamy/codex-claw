@@ -292,3 +292,62 @@ describe('AgentSidebar sessions', () => {
     expect(wrapper.emitted('update-collapsed-repositories')).toStrictEqual([[[]]]);
   });
 });
+
+describe('mission navigation', () => {
+  it('uses the native workspace-group and session-row layout for missions', async () => {
+    const { createMission } = await import('@codex-claw/core/missions');
+    const { createInitialSnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const missionSnapshot = createInitialSnapshot();
+    const mission = createMission(missionSnapshot, { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature', teamId: missionSnapshot.teams[0]!.id, orchestratorMemberId: missionSnapshot.agents[0]!.id });
+    const wrapper = mount(AgentSidebar, {
+      props: { agents: [], activeAgentId: null, teamName: 'Team' },
+      global: { components: { ElPopover } },
+    });
+    expect(wrapper.get('.agent-sidebar__start-work').findAll('button')
+      .map(button => button.text())
+      .filter(label => ['Add project', 'Quick chat', 'New mission'].includes(label)))
+      .toStrictEqual(['Add project', 'Quick chat', 'New mission']);
+    expect(wrapper.find('.agent-sidebar__mission-action [data-icon="target-arrow"]').exists()).toBe(true);
+    await wrapper.get('.agent-sidebar__mission-action').trigger('click');
+    expect(wrapper.emitted('create-mission')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ activeMissionId: mission.id, missions: [mission] });
+    const group = wrapper.get('[data-group-kind="missions"]');
+    expect(group.get('.agent-sidebar__workspace-icon').attributes('data-icon')).toBe('target-arrow');
+    expect(group.get('.agent-sidebar__workspace-label').text()).toBe('Missions');
+    const row = group.get('.agent-sidebar__agent');
+    expect(row.get('.agent-sidebar__session-title').text()).toBe('Add team billing');
+    expect(row.get('.agent-sidebar__status').attributes('aria-label')).toBe('1/5 · Requirements');
+    expect(row.attributes('aria-pressed')).toBe('true');
+    await row.trigger('click');
+    expect(wrapper.emitted('select-mission')).toStrictEqual([[mission.id]]);
+    await row.trigger('contextmenu', { clientX: 80, clientY: 120 });
+    const deleteAction = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+      .find(button => button.textContent?.trim() === 'Delete mission');
+    expect(deleteAction).toBeDefined();
+    deleteAction!.click();
+    await flushPromises();
+    expect(wrapper.emitted('delete-mission')).toStrictEqual([[mission.id]]);
+    await group.get('.agent-sidebar__workspace-label').trigger('click');
+    expect(group.find('.agent-sidebar__agent').exists()).toBe(false);
+  });
+
+  it('disables mission creation while pending and surfaces creation failures', () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: [],
+        activeAgentId: null,
+        missionCreationError: 'Backend unavailable',
+        missionCreationPending: true,
+        teamName: 'Team',
+      },
+      global: { components: { ElPopover } },
+    });
+
+    expect(wrapper.get('.agent-sidebar__mission-action').attributes()).toMatchObject({
+      'aria-busy': 'true',
+      disabled: '',
+    });
+    expect(wrapper.get('[role="alert"]').text()).toBe('Backend unavailable');
+  });
+});

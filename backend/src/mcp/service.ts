@@ -34,7 +34,7 @@ import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type MissionToolPort, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -47,6 +47,7 @@ import { AgentCreationService } from '../agents/agent-creation-service';
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
 export type ClawMcpServiceOptions = {
+  missionTools?: MissionToolPort;
   snapshot: AppSnapshot;
   now?: () => Date;
   onEvent?: (event: BackendEvent) => void;
@@ -86,6 +87,7 @@ export class ClawMcpService {
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
+      missionTools: options.missionTools,
       getAgents: () => this.snapshot.agents,
       now: this.now,
       onAgentUpdated: (agent) => this.emit({

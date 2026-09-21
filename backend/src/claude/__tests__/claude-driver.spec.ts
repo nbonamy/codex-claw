@@ -513,6 +513,7 @@ describe('ClaudeBackendDriver', () => {
         github: 'http://127.0.0.1:4321/mcp/providers/github',
       }),
       celebrationsEnabled: () => false,
+      additionalDeveloperInstructions: () => '<context>\nMission contract\n</context>',
     });
 
     const sendResult = driver.sendPrompt(agent, 'coordinate with the team');
@@ -532,6 +533,10 @@ describe('ClaudeBackendDriver', () => {
       'must be your very first action',
     );
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).not.toContain('call celebrate');
+    expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain('<context>\nMission contract\n</context>');
+    const developerInstructions = transport.startTurn.mock.calls[0]![0].appendSystemPrompt!;
+    expect(developerInstructions.indexOf('Use the codex_claw MCP server'))
+      .toBeLessThan(developerInstructions.indexOf('<context>'));
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-mcp' });
     await expect(sendResult).resolves.toMatchObject({
       backendSession: { kind: 'claude', sessionId: 'claude-session-mcp', transport: 'stdio' },

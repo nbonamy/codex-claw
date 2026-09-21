@@ -44,6 +44,101 @@ protocol/process communication and the renderer displays app-owned events.
 
 Codex Claw uses "team" for its top-level agent grouping.
 
+Missions are separate app-owned persisted outcomes in `AppSnapshot.missions`.
+A mission references a versioned workflow type, its current stage, structured
+stage artifacts, optional supporting agent IDs per stage, and an optimistic
+revision. The first workflow is `shapeAndShipFeature` (requirements, tickets,
+implementation, review, ship). Review records findings without delivering code.
+Ship persists one delivery result per affected repository and completes only
+after every repository has either produced a pull request or merged. Core owns
+its pure validation and transition policy;
+`clawd` serializes mission writes and publishes snapshots only after saving.
+Mission navigation is client-local; missions themselves are backend-wide, not
+team members or provider threads. Existing provider conversation panes can be
+opened as secondary stage support, without transferring transcript ownership.
+Mission navigation uses the same compact workspace-group and session-row
+patterns as project and quick-chat navigation. Sidebar creation persists a
+team-scoped placeholder `New mission`, selects it, and immediately starts the
+requirements stage from a Claw-owned mission home without requiring a repository.
+Creation prepares an idle hidden worker but does not submit a provider turn. The
+conversation initially asks “What do you want to build?” and the user's first
+message starts the provider session. The Mission execution contract is appended
+after Claw's normal developer instructions inside a hidden `<context>` block; it
+never appears as a user message or transcript item. During that conversation,
+the assigned worker replaces the placeholder with a concise outcome through
+the mission-scoped title tool.
+Mission rows use the sidebar context-menu pattern for deletion. Deletion removes
+the persisted Mission and its hidden worker agents after interrupting active work
+and archiving their provider conversations. It always removes the Mission-owned
+artifact and skill directory. When the Mission created Git worktrees, the user
+chooses whether to keep them or delete every clean worktree and its local branch;
+unsafe worktrees keep the Mission intact and surface the cleanup error.
+The selected mission has persistent stages on the left, the current or
+previously accepted artifact in the central work surface, and the stage's
+orchestrator conversation on the right. The conversation drives
+ideation and revision; there are no renderer-owned artifact forms. User
+acceptance carries an artifact forward and starts the next stage, while prior
+artifacts remain available for inspection.
+Mission execution is owned by `clawd`: selected team member profiles supply
+provider settings for stage work. Requirements and Tickets keep the same hidden
+orchestrator and provider conversation; `clawd` refreshes its hidden Mission
+context and starts the Tickets turn after approval. Later stage kickoffs are also
+queued automatically after approval. Requirements and tickets run
+from `$CODEX_CLAW_HOME/missions/<mission-id>`. Each accepted ticket names exactly
+one repository represented by the Mission team. When code work begins, `clawd`
+creates a sibling managed Git worktree only for each affected repository. Every
+worktree uses the same human-readable Mission suffix and branch name; the normal
+repository basename still distinguishes its physical path. Claw does not create a
+special multi-repository parent directory or rewrite local dependency paths.
+Canonical Markdown artifacts live under the mission home `artifacts/` directory.
+During Tickets, Mission-scoped upserts assign stable app-owned ticket IDs and
+rewrite `artifacts/tickets.md` after every draft change so the UI and later agents
+observe the backlog as it develops. External tracker identifiers remain optional
+references assigned by the configured tracker.
+The Mission snapshot carries their revisions and sizes rather than exposing file
+access to the renderer or provider.
+Runs persist assignment, Claw-owned Mission skill paths, proposal, status, and feedback.
+`clawd` materializes those stage skills under the Mission home before a run
+starts. Mission workflow behavior therefore stays provider-neutral and does not
+depend on a user's installed skill catalog. Repository instructions still
+provide project and tracker conventions, but they cannot replace Mission stage
+gates or require a separate skill setup flow.
+Implementation dispatches dependency-ready tickets in parallel across different
+repositories and serializes work within each repository worktree. The selected
+execution policy either pauses after every ticket for user review or accepts
+successful ticket evidence automatically until the combined final review. Each
+worktree records a baseline commit for whole-mission diff review; failed or
+cancelled attempts retain their workspace and conversation for inspection.
+Requirements/ticket discussions may span multiple provider turns. Provider hosts
+continue to own all conversation content and turn mechanics.
+
+Mission MCP tools are registered only for the authenticated worker that owns the
+current running or awaiting-review attempt. `set-mission-title` updates the
+persisted Mission. During Tickets, `upsert-mission-ticket` records the affected
+repository and `set-mission-execution-policy` records the user's implementation
+review choice.
+`list-mission-artifacts`, `read-mission-artifact`, and
+`write-mission-artifact` provide the canonical handoff between stage agents;
+writes are limited to the caller's assigned stage and use optimistic artifact
+revisions. Implementation agents submit ticket-scoped code and test evidence;
+`clawd` aggregates it into the canonical implementation artifact. Other stages
+submit or revise proposals only after their stage artifact has been written.
+Only the user can accept an
+artifact and approve advancement. Reports are scoped to
+the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
+for published tickets; mission tickets retain canonical references and record local
+implementation acceptance, not external issue status. Mission ticketing proceeds
+without tracker setup when no tracker is already configured.
+The workflow reuses Claw's diff and explicit commit/push/PR controls; agents do not
+publish or merge automatically. External ticket refresh, cross-repository branch
+integration, and automatic repair of local relative dependencies are not part of
+this execution policy.
+
+Stage approval is one revision-checked `clawd` command. It accepts the proposal,
+advances or completes the workflow when the stage is ready, and queues the next
+run in the same persisted Mission transaction. Renderer components never compute
+intermediate Mission revisions or chain separate accept, advance, and run writes.
+
 Core persisted entities:
 
 ```ts

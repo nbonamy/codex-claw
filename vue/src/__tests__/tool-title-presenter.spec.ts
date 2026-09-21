@@ -5,6 +5,19 @@ import { presentClawToolTitle } from '../tool-title-presenter';
 
 describe('Claw tool title presenter', () => {
   it.each([
+    ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'running', 'Naming mission'],
+    ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'completed', 'Named mission'],
+    ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'error', 'Could not name mission'],
+    ['codex_claw.attach-mission-repository', { repoPath: '/repo' }, 'completed', 'Attached mission repository'],
+    ['codex_claw.list-mission-artifacts', {}, 'completed', 'Checked mission artifacts'],
+    ['codex_claw.read-mission-artifact', { stage: 'requirements' }, 'completed', 'Read mission artifact'],
+    ['codex_claw.write-mission-artifact', { stage: 'requirements' }, 'completed', 'Saved mission artifact'],
+    ['codex_claw.submit-mission-result', {}, 'running', 'Submitting mission artifact'],
+    ['codex_claw.submit-mission-result', {}, 'completed', 'Mission artifact ready for review'],
+    ['codex_claw.submit-mission-result', {}, 'error', 'Could not submit mission artifact'],
+    ['codex_claw.upsert-mission-ticket', { title: 'Add checkout' }, 'running', 'Drafting mission ticket'],
+    ['codex_claw.upsert-mission-ticket', { title: 'Add checkout' }, 'completed', 'Drafted mission ticket'],
+    ['codex_claw.upsert-mission-ticket', { title: 'Add checkout' }, 'error', 'Could not draft mission ticket'],
     ['codex_claw.set-status', { status: 'Reviewing changes' }, 'completed', 'Updated status'],
     ['codex_claw.set-status', { status: '' }, 'completed', 'Cleared status'],
     ['codex_claw.toggle_thread_flag', { id: 'delegate_to_worktree', value: true }, 'completed', 'Updated thread flag'],

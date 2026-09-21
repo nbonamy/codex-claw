@@ -1,3 +1,4 @@
+import * as z from 'zod/v4';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClawMcpAgentCoordinator } from '../agent-coordinator';
 import { McpToolError } from '../agent-coordinator';
@@ -37,6 +38,7 @@ type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 describe('Codex Claw MCP tool registration', () => {
   const handlers = new Map<string, ToolHandler>();
   const coordinator = {
+    missionContext: vi.fn(),
     listAgents: vi.fn(),
     sendMessage: vi.fn(),
     checkMessages: vi.fn(),
@@ -46,6 +48,14 @@ describe('Codex Claw MCP tool registration', () => {
     celebrate: vi.fn(),
     announce: vi.fn(),
     updateWorkItem: vi.fn(),
+    submitMissionResult: vi.fn(),
+    upsertMissionTicket: vi.fn(),
+    setMissionTitle: vi.fn(),
+    setMissionExecutionPolicy: vi.fn(),
+    attachMissionRepository: vi.fn(),
+    listMissionArtifacts: vi.fn(),
+    readMissionArtifact: vi.fn(),
+    writeMissionArtifact: vi.fn(),
     listSourceRepositories: vi.fn(),
     listSourceWorktrees: vi.fn(),
     createSourceWorktree: vi.fn(),
@@ -56,6 +66,7 @@ describe('Codex Claw MCP tool registration', () => {
   beforeEach(() => {
     handlers.clear();
     vi.clearAllMocks();
+    coordinator.missionContext.mockReturnValue(undefined);
     mocks.registerTool.mockImplementation((name: string, _definition: unknown, handler: ToolHandler) => {
       handlers.set(name, handler);
     });
@@ -158,6 +169,50 @@ describe('Codex Claw MCP tool registration', () => {
       tool,
       structuredKeys: ['ok'],
     });
+  });
+
+  it('exposes the mission tool family only to an active mission worker and binds title changes to caller identity', async () => {
+    coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-1', stage: 'requirements' });
+    createServer();
+    expect([...handlers.keys()].slice(0, 7)).toStrictEqual([
+      'set-mission-title', 'set-mission-execution-policy', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result',
+    ]);
+    coordinator.setMissionTitle.mockResolvedValue({ success: true, title: 'Add team billing' });
+    expect(await handlers.get('set-mission-title')!({ title: 'Add team billing' })).toMatchObject({
+      structuredContent: { success: true, title: 'Add team billing' },
+    });
+    expect(coordinator.setMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
+    coordinator.setMissionExecutionPolicy.mockResolvedValue({ success: true, reviewPolicy: 'reviewAfterImplementation' });
+    await handlers.get('set-mission-execution-policy')!({ reviewPolicy: 'reviewAfterImplementation' });
+    expect(coordinator.setMissionExecutionPolicy).toHaveBeenCalledWith('agent-dina', 'reviewAfterImplementation');
+
+    coordinator.listMissionArtifacts.mockReturnValue([{ stage: 'requirements', revision: 1 }]);
+    await handlers.get('list-mission-artifacts')!({});
+    expect(coordinator.listMissionArtifacts).toHaveBeenCalledWith('agent-dina');
+    coordinator.readMissionArtifact.mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 1, updatedAt: 'now' });
+    await handlers.get('read-mission-artifact')!({ stage: 'requirements' });
+    expect(coordinator.readMissionArtifact).toHaveBeenCalledWith('agent-dina', 'requirements');
+    coordinator.writeMissionArtifact.mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 2, updatedAt: 'later' });
+    await handlers.get('write-mission-artifact')!({ stage: 'requirements', content: '# Brief', expectedRevision: 1 });
+    expect(coordinator.writeMissionArtifact).toHaveBeenCalledWith('agent-dina', { stage: 'requirements', content: '# Brief', expectedRevision: 1 });
+
+    coordinator.submitMissionResult.mockResolvedValue({ success: true, status: 'awaitingReview' });
+    const input = { missionId: 'mission-1', runId: 'run-1', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
+    input.artifacts.tickets = [{ title: 'Checkout', repositoryPath: '/repo', done: false, reference: 'https://example.com/issue/1', dependsOn: [] }] as never[];
+    const definition = mocks.registerTool.mock.calls.find(([name]) => name === 'submit-mission-result')![1] as { inputSchema: z.ZodRawShape };
+    expect(z.object(definition.inputSchema).parse(input)).toEqual(input);
+    expect(await handlers.get('submit-mission-result')!(input)).toMatchObject({ structuredContent: { success: true, status: 'awaitingReview' } });
+    expect(coordinator.submitMissionResult).toHaveBeenCalledWith('agent-dina', input);
+
+    handlers.clear();
+    coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-2', stage: 'tickets' });
+    createServer();
+    coordinator.upsertMissionTicket.mockResolvedValue({ success: true, ticketId: 'mission-ticket-1', index: 0, artifactRevision: 1 });
+    const draft = { title: 'Add checkout', body: 'Deliver owner checkout.', repositoryPath: '/repo', blockedByTicketIds: [] };
+    expect(await handlers.get('upsert-mission-ticket')!(draft)).toMatchObject({
+      structuredContent: { success: true, ticketId: 'mission-ticket-1', index: 0, artifactRevision: 1 },
+    });
+    expect(coordinator.upsertMissionTicket).toHaveBeenCalledWith('agent-dina', draft);
   });
 
   it('preserves every optional creation and display field', async () => {

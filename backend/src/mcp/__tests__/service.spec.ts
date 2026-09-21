@@ -327,6 +327,63 @@ describe('ClawMcpService', () => {
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'message.userSubmitted' }));
   });
 
+  it('exposes mission tools only to the active mission worker over HTTP', async () => {
+    const snapshot = createInitialSnapshot();
+    let active = true;
+    const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
+    service = new ClawMcpService({
+      snapshot,
+      missionTools: {
+        contextForAgent: agentId => active && agentId === 'agent-dina'
+          ? { missionId: 'mission-1', runId: 'run-1', stage: 'requirements' }
+          : undefined,
+        submitResult: vi.fn(),
+        upsertTicket: vi.fn(),
+        setTitle: onSetMissionTitle,
+        setExecutionPolicy: vi.fn(),
+        attachRepository: vi.fn(),
+        listArtifacts: vi.fn().mockReturnValue([]),
+        readArtifact: vi.fn(),
+        writeArtifact: vi.fn(),
+      },
+    });
+    const url = await service.start();
+
+    const workerTools = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    const missionTools = ['set-mission-title', 'set-mission-execution-policy', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
+    const workerToolNames = workerTools.result.tools.map((tool: { name: string }) => tool.name);
+    expect(workerToolNames.slice(0, 7)).toStrictEqual(missionTools);
+    expect(workerToolNames).not.toContain('toggle_thread_flag');
+    const blockedToggle = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'toggle_thread_flag', arguments: { id: 'delegate_to_worktree', value: true } },
+    });
+    expect(blockedToggle.result.isError).toBe(true);
+    expect(snapshot.agents[0]!.threadFlags).toBeUndefined();
+    const ordinaryTools = await postJson(agentUrl(url, 'agent-jesse'), {
+      jsonrpc: '2.0', id: 3, method: 'tools/list', params: {},
+    });
+    const ordinaryToolNames = ordinaryTools.result.tools.map((tool: { name: string }) => tool.name);
+    expect(ordinaryToolNames).not.toEqual(expect.arrayContaining(missionTools));
+    expect(ordinaryToolNames).toContain('toggle_thread_flag');
+
+    const renamed = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
+      params: { name: 'set-mission-title', arguments: { title: 'Add team billing' } },
+    });
+    expect(renamed.result.structuredContent).toEqual({ success: true, title: 'Add team billing' });
+    expect(onSetMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
+
+    active = false;
+    const inactiveTools = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 5, method: 'tools/list', params: {},
+    });
+    expect(inactiveTools.result.tools.map((tool: { name: string }) => tool.name))
+      .not.toEqual(expect.arrayContaining(missionTools));
+  });
+
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {
     const snapshot = createInitialSnapshot();
     const sendPrompt = vi.fn().mockResolvedValue({

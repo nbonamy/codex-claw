@@ -26,6 +26,7 @@ export type BackendDriverRegistryOptions = {
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
+  additionalDeveloperInstructions?: (agent: Agent) => string | undefined;
 };
 
 type CodexClawLoadingStrategy = 'eager' | 'lazy';
@@ -45,6 +46,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
       hostedMcpServerUrls: options.hostedMcpServerUrls,
       pluginSettings: options.pluginSettings,
       celebrationsEnabled: options.celebrationsEnabled,
+      additionalDeveloperInstructions: options.additionalDeveloperInstructions,
     })],
   ]);
 }
@@ -74,7 +76,10 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
           options.pluginSettings?.() ?? options.generalSettings?.plugins,
           {
             celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
-            developerInstructions: (await readEngineInstructions('codex')).text,
+            developerInstructions: [
+              (await readEngineInstructions('codex')).text,
+              options.additionalDeveloperInstructions?.(agent),
+            ].map(value => value?.trim()).filter(Boolean).join('\n\n'),
           },
           reviewMcpServerUrl ? {} : options.hostedMcpServerUrls?.() ?? {},
         );
@@ -110,6 +115,13 @@ export class BackendDriverRpc {
     private readonly worktreeManager = new WorktreeManager(),
   ) {
     this.unsubscribeDriverEvents = [...drivers.values()].map((driver) => driver.onEvent((event) => this.emit(event)));
+  }
+
+  async refreshConversationContext(agent: Agent): Promise<void> {
+    const driver = this.requireDriver(agent.backend);
+    if (!agent.backendSession || !driver.releaseConversation || !driver.loadConversation) return;
+    driver.releaseConversation(agent.id);
+    await driver.loadConversation(agent);
   }
 
   async handle(method: string, params: unknown): Promise<unknown> {

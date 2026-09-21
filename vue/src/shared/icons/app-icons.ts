@@ -62,6 +62,7 @@ export {
   IconSparkleHighlight as SparklesIcon,
   IconSquareCheck as SquareCheck,
   IconSwitchHorizontal as SwitchHorizontalIcon,
+  IconTargetArrow as TargetArrowIcon,
   IconTerminal as TerminalIcon,
   IconTextWrap as TextWrapIcon,
   IconTextWrapDisabled as TextWrapDisabledIcon,

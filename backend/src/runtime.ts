@@ -17,7 +17,7 @@ import { ClawMcpService } from './mcp/service';
 import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
-import { backendProviderTokensFilePath, ensureBackendCodexHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendProviderTokensFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -76,6 +76,17 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
   const mcpService = new ClawMcpService({
+    missionTools: {
+      contextForAgent: agentId => server.missionContext(agentId),
+      submitResult: (agentId, input) => server.submitMissionResult(agentId, input),
+      upsertTicket: (agentId, input) => server.upsertMissionTicket(agentId, input),
+      setTitle: (agentId, title) => server.setMissionTitle(agentId, title),
+      setExecutionPolicy: (agentId, reviewPolicy) => server.setMissionExecutionPolicy(agentId, reviewPolicy),
+      attachRepository: (agentId, repoPath) => server.attachMissionRepository(agentId, repoPath),
+      listArtifacts: agentId => server.listMissionArtifacts(agentId),
+      readArtifact: (agentId, stage) => server.readMissionArtifact(agentId, stage),
+      writeArtifact: (agentId, input) => server.writeMissionArtifact(agentId, input),
+    },
     snapshot,
     computerUse: computerUseAvailable ? {
       execute: (input) => options.requestClient(backendMethods.clientComputerUseExecute, input),
@@ -95,15 +106,16 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     agentCreation,
   });
   const mcpServerUrl = await mcpService.start();
+  let server: ClawBackendServer;
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
     hostedMcpServerUrls: () => mcpService.hostedMcpServerUrls(),
     generalSettings: snapshot.general,
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
+    additionalDeveloperInstructions: (agent) => server?.missionDeveloperInstructions(agent.id),
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
-  let server: ClawBackendServer;
   const automationRunner = new AutomationRunner({
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,
@@ -199,6 +211,8 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
+    ensureMissionHome: ensureBackendMissionHome,
+    deleteMissionHome: deleteBackendMissionHome,
     inspectPluginStatus: async () => {
       pluginStatus = await loadPluginStatus();
       return pluginStatus;

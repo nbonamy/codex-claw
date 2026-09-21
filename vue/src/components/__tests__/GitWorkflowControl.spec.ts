@@ -576,7 +576,8 @@ describe('GitWorkflowControl', () => {
   });
 
   it('offers report-back by default for delegated pull requests and merges', async () => {
-    const createPullRequest = vi.fn(async () => workflow);
+    const createdPullRequest = { number: 42, title: 'Complete delegated work', url: 'https://github.com/owner/repo/pull/42', draft: false, headSha: 'a'.repeat(40), state: 'open' as const };
+    const createPullRequest = vi.fn(async () => ({ ...workflow, existingPullRequest: createdPullRequest }));
     const pullRequest = mountControl({ createPullRequest, reportBackAgentName: 'main' });
     await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy());
     await pullRequest.get('.git-workflow-control__trigger').trigger('click');
@@ -591,6 +592,7 @@ describe('GitWorkflowControl', () => {
     expect(createPullRequest).toHaveBeenCalledWith('agent-1', {
       title: 'Complete delegated work', body: '', reportBack: true, confirmed: true,
     });
+    expect(pullRequest.emitted('delivery-complete')).toStrictEqual([[{ kind: 'pullRequest', number: 42, url: createdPullRequest.url }]]);
 
     const mergeBranch = vi.fn(async () => workflow);
     const merge = mountControl({ mergeBranch, reportBackAgentName: 'main' });
@@ -606,6 +608,7 @@ describe('GitWorkflowControl', () => {
     expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
       strategy: 'merge', deleteBranch: false, deleteWorktree: false, reportBack: true, confirmed: true,
     });
+    expect(merge.emitted('delivery-complete')).toStrictEqual([[{ kind: 'merge' }]]);
   });
 
   it('lets pull request and merge operations finish in the background', async () => {

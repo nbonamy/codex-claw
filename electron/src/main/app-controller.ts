@@ -1,3 +1,5 @@
+import { registerMissionIpcHandlers } from './mission-ipc';
+import type { MissionStage } from '@codex-claw/core/missions';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
 import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
@@ -73,6 +75,7 @@ export class AppController {
   private autoUpdateService: DesktopAutoUpdateService | null = null;
   private manualUpdateCheckController: ManualUpdateCheckController | null = null;
   private desktopUpdateStatus: DesktopUpdateStatus = { state: 'idle' };
+  private selectedMissionId: string | null = null;
   private appshotCapturePending = false;
 
   private readonly browserPane = new BrowserPane({
@@ -389,6 +392,12 @@ export class AppController {
       return this.createAgent(input);
     });
 
+    registerMissionIpcHandlers(
+      ipc,
+      () => this.requireBackendClient(),
+      snapshot => this.adoptBackendSnapshot(snapshot),
+      missionId => this.selectMission(missionId),
+    );
     ipc.handle(ipcChannels.createQuickChat, async (_event, input: CreateQuickChatInput) => {
       return this.createQuickChat(input);
     });
@@ -1552,15 +1561,42 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      getDebugMissionStage: () => this.debugMission()?.stage,
+      setDebugMissionStage: (stage) => this.setDebugMissionStage(stage),
       injectDebugCodeReview: (scenario) => this.injectDebugCodeReview(scenario),
       isDebugThreadFlagSet: (id) => this.isDebugThreadFlagSet(id),
       setDebugThreadFlag: (id, value) => this.setDebugThreadFlag(id, value),
     };
+  }
+
+  private debugMission(snapshot = this.snapshot) {
+    if (!this.selectedMissionId) return undefined;
+    return snapshot?.missions?.find(mission => mission.id === this.selectedMissionId);
+  }
+
+  private selectMission(missionId: string | null): void {
+    this.selectedMissionId = missionId && this.snapshot?.missions?.some(mission => mission.id === missionId)
+      ? missionId
+      : null;
+    this.refreshAppMenu();
+  }
+
+  private setDebugMissionStage(stage: MissionStage): void {
+    const mission = this.debugMission();
+    if (!mission || !this.backendClient || app?.isPackaged) return;
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugMissionStageSet, { missionId: mission.id, stage })
+      .then(snapshot => this.adoptBackendSnapshot(snapshot))
+      .then(() => this.refreshAppMenu())
+      .catch((error) => warnMain('debug', 'failed to load mission fixture', {
+        missionId: mission.id,
+        stage,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
   }
 
   private isDebugThreadFlagSet(id: ThreadFlagId, snapshot = this.snapshot): boolean {

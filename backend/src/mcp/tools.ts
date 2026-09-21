@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
+import { featureStages } from '@codex-claw/core/missions';
 import { logMain, warnMain } from '../log';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { McpToolError } from './agent-coordinator';
@@ -22,6 +23,67 @@ export function createCodexClawMcpServer(
     name: 'codex-claw-mcp',
     version: '1.0.0',
   });
+
+  const missionContext = coordinator.missionContext(callerAgentId);
+  if (missionContext) {
+    server.registerTool('set-mission-title', {
+      description: 'Rename the active Mission once its intended outcome is clear. Use a concise outcome-oriented title. The active Mission and run are inferred from your authenticated agent identity.',
+      inputSchema: {
+        title: z.string().trim().min(1).max(200),
+      },
+    }, ({ title }) => toolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
+
+    server.registerTool('set-mission-execution-policy', {
+      description: 'Choose how implementation results are reviewed after discussing it with the user. reviewEachTicket pauses each repository lane for approval. reviewAfterImplementation automatically continues successful tickets and pauses for one combined implementation review.',
+      inputSchema: {
+        reviewPolicy: z.enum(['reviewEachTicket', 'reviewAfterImplementation']),
+      },
+    }, ({ reviewPolicy }) => toolResult('set-mission-execution-policy', { callerAgentId, reviewPolicy }, () => coordinator.setMissionExecutionPolicy(callerAgentId, reviewPolicy)));
+
+    server.registerTool('list-mission-artifacts', {
+      description: 'List canonical artifact files already written for the active Mission. The Mission is inferred from your authenticated agent identity.',
+      inputSchema: {},
+    }, () => toolResult('list-mission-artifacts', { callerAgentId }, () => coordinator.listMissionArtifacts(callerAgentId)));
+
+    server.registerTool('read-mission-artifact', {
+      description: 'Read a canonical artifact file from the active Mission so work can move between agents and workflow stages.',
+      inputSchema: { stage: z.enum(featureStages) },
+    }, ({ stage }) => toolResult('read-mission-artifact', { callerAgentId, stage }, () => coordinator.readMissionArtifact(callerAgentId, stage)));
+
+    server.registerTool('write-mission-artifact', {
+      description: 'Create or revise the canonical Markdown artifact for your assigned Mission stage. Read the current revision before overwriting an existing artifact.',
+      inputSchema: {
+        stage: z.enum(featureStages),
+        content: z.string().trim().min(1).max(500_000),
+        expectedRevision: z.number().int().nonnegative().optional(),
+      },
+    }, input => toolResult('write-mission-artifact', { callerAgentId, stage: input.stage }, () => coordinator.writeMissionArtifact(callerAgentId, input)));
+
+    server.registerTool('upsert-mission-ticket', {
+      description: 'Create or revise one ticket in the active Mission Tickets stage. Assign exactly one represented repository path. Call once per ticket and again after each revision so the user sees the backlog emerge live. Omit ticketId to create; pass the returned Mission ticket ID to revise. Use blockedByTicketIds for dependencies. A tracker issue number is optional and belongs in reference only after publication.',
+      inputSchema: {
+        ticketId: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(),
+        title: z.string().trim().min(1).max(500),
+        body: z.string().trim().min(1).max(100000),
+        repositoryPath: z.string().trim().min(1),
+        reference: z.string().trim().min(1).max(100000).optional(),
+        blockedByTicketIds: z.array(z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/)).max(200).optional(),
+      },
+    }, input => toolResult('upsert-mission-ticket', { callerAgentId, ticketId: input.ticketId }, () => coordinator.upsertMissionTicket(callerAgentId, input)));
+
+    server.registerTool('submit-mission-result', {
+      description: 'Submit the structured result of your assigned Mission stage for user review. Use only with the mission and run IDs from your assignment. This never approves a stage or completes a mission. Include actual verification evidence for implementation work.',
+      inputSchema: {
+        missionId: z.string(), runId: z.string(), summary: z.string().min(1).max(20000),
+        artifacts: z.object({
+          requirements: z.object({ problem: z.string().max(100000), acceptance: z.string().max(100000) }),
+          tickets: z.array(z.object({ id: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(), title: z.string().max(100000), body: z.string().max(100000).optional(), repositoryPath: z.string().trim().min(1).optional(), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),
+          implementation: z.object({ changes: z.string().max(100000), tests: z.string().max(100000) }),
+          review: z.object({ summary: z.string().max(100000), pullRequestUrl: z.string().max(100000) }),
+        }),
+      },
+    }, input => toolResult('submit-mission-result', { callerAgentId }, () => coordinator.submitMissionResult(callerAgentId, input)));
+  }
 
   server.registerTool('list-agents', {
     description: 'List all visible agents with their ID, status, name, and folder.',
@@ -70,19 +132,21 @@ export function createCodexClawMcpServer(
     statusLength: status.length,
   }, () => coordinator.setStatus(callerAgentId, status)));
 
-  server.registerTool('toggle_thread_flag', {
-    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. ready_for_review is a pre-commit affordance: set it only when the intended uncommitted diff is complete, validated, and ready for user review; clear it if work resumes or before commit/push, and skip it for an explicit immediate commit/push request. Clear a flag when it is no longer appropriate. These flags take no payload.',
-    inputSchema: {
-      id: z.enum(['delegate_to_worktree', 'ready_for_review']).describe('Predefined semantic thread flag.'),
-      value: z.boolean().describe('True sets the flag; false clears it.'),
-      payload: z.unknown().optional().describe('Optional kind-specific payload. Current flags do not accept one.'),
-    },
-  }, ({ id, value, payload }) => toolResult('toggle_thread_flag', {
-    agentId: callerAgentId,
-    id,
-    value,
-    hasPayload: payload !== undefined,
-  }, () => coordinator.toggleThreadFlag(callerAgentId, { id, value, payload })));
+  if (!missionContext) {
+    server.registerTool('toggle_thread_flag', {
+      description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. ready_for_review is a pre-commit affordance: set it only when the intended uncommitted diff is complete, validated, and ready for user review; clear it if work resumes or before commit/push, and skip it for an explicit immediate commit/push request. Clear a flag when it is no longer appropriate. These flags take no payload.',
+      inputSchema: {
+        id: z.enum(['delegate_to_worktree', 'ready_for_review']).describe('Predefined semantic thread flag.'),
+        value: z.boolean().describe('True sets the flag; false clears it.'),
+        payload: z.unknown().optional().describe('Optional kind-specific payload. Current flags do not accept one.'),
+      },
+    }, ({ id, value, payload }) => toolResult('toggle_thread_flag', {
+      agentId: callerAgentId,
+      id,
+      value,
+      hasPayload: payload !== undefined,
+    }, () => coordinator.toggleThreadFlag(callerAgentId, { id, value, payload })));
+  }
 
   server.registerTool('celebrate', {
     description: 'Request a transient visual celebration in Codex Claw when celebrations are enabled by the user. Confetti, stars, and shapes fit ordinary wins, while schoolPride marks a major team achievement.',

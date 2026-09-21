@@ -717,3 +717,42 @@ Potential tools are intentionally not exposed yet:
 
 Add them only when Claw has the matching product capability and a tested
 main-process implementation.
+
+### Mission tools
+
+Mission tools are registered only when the authenticated backend agent owns the
+current running Mission attempt. Ordinary agents do not receive them in their
+tool catalog, and backend ownership checks still reject cached or late calls.
+Mission workers do not receive generic thread-flag tools because the Mission
+workflow owns delegation and worktree transitions explicitly.
+
+`set-mission-title` lets the requirements worker replace the initial `New mission`
+label once the outcome is clear. The backend infers the Mission and run from the
+caller identity, trims the title, persists it immediately, and publishes the
+updated snapshot.
+
+`attach-mission-repository` lets the active orchestrator record one repository
+already represented by a Mission team member. The tool validates the path as a
+Git repository and persists it without exposing a setup form; implementation
+creates the isolated worktree later, when code work begins.
+
+`list-mission-artifacts` and `read-mission-artifact` let any active Mission
+worker discover and consume the canonical Markdown created by earlier stages.
+`write-mission-artifact` writes only the caller's assigned stage under the
+Claw-owned Mission home. Existing files use an expected revision so concurrent
+or stale agents cannot silently overwrite each other.
+
+`upsert-mission-ticket` is exposed only to the active Tickets-stage orchestrator.
+It assigns stable Mission ticket IDs, resolves blocking edges against those IDs,
+persists the structured draft, rewrites the canonical Tickets Markdown artifact,
+and publishes the snapshot after every change. Tracker issue numbers are optional
+external references and never serve as the Mission ticket identity.
+
+`submit-mission-result` is an app-owned stage handoff. Only the worker bound to
+the current running mission attempt may report artifacts, and the canonical
+stage artifact must already exist. A report becomes a
+persisted proposal for human review, never an implicit approval. Tickets may carry canonical tracker
+references and zero-based dependency indices; invalid/cyclic dependencies are
+rejected. A completed implementation report updates only its assigned ticket and
+appends verification evidence. Late reports from stopped or accepted attempts
+are rejected.

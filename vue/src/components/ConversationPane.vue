@@ -18,7 +18,7 @@
       <template #empty>
         <div class="conversation-pane__empty">
           <h1>{{ heroHeadline }}</h1>
-          <p>{{ heroSubhead }}</p>
+          <p v-if="heroSubhead">{{ heroSubhead }}</p>
         </div>
       </template>
       <template #message-header="{ message }">
@@ -152,6 +152,8 @@ const props = withDefaults(defineProps<{
   historyLoadFailed?: boolean;
   historyLoading?: boolean;
   hasVisibleMessages?: boolean;
+  emptyHeadline?: string;
+  emptySubhead?: string;
   threadFlagBusy?: boolean;
 }>(), {
   agents: () => [],
@@ -209,6 +211,7 @@ watch(conversationKey, () => {
   transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
 });
 const heroHeadline = computed(() => {
+  if (props.emptyHeadline?.trim()) return props.emptyHeadline.trim();
   if (!props.agent) return translate('surface.conversationPane.selectAnAgent');
   const displayName = agentDisplayName(props.agent);
   if (
@@ -221,6 +224,7 @@ const heroHeadline = computed(() => {
   return `Chat with ${displayName}`;
 });
 const heroSubhead = computed(() => {
+  if (props.emptySubhead !== undefined) return props.emptySubhead;
   if (!props.agent) return translate('surface.conversationPane.chooseAnAgentFromTheLeftToStartANativeBackendSession');
   return props.agent.folder;
 });

@@ -756,6 +756,37 @@ export function useAppState() {
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
+  async function executeMission(input: import('@codex-claw/core/mission-execution').MissionExecutionInput) {
+    if (!codexClawApi) throw new Error('Backend unavailable.');
+    adoptNavigationSnapshot(await codexClawApi.executeMission(input));
+  }
+
+  async function createMission(input: import('@codex-claw/core/missions').CreateMissionInput) {
+    if (!codexClawApi) throw new Error('Backend unavailable.');
+    const previous = new Set(snapshot.value.missions?.map(m => m.id));
+    adoptNavigationSnapshot(await codexClawApi.createMission(input));
+    return snapshot.value.missions!.find(m => !previous.has(m.id))!;
+  }
+
+  async function selectMission(missionId: string | null): Promise<void> {
+    await codexClawApi?.selectMission(missionId);
+  }
+
+  async function deleteMission(input: import('@codex-claw/core/missions').DeleteMissionInput) {
+    if (!codexClawApi) throw new Error('Missions unavailable.');
+    adoptNavigationSnapshot(await codexClawApi.deleteMission(input));
+  }
+
+  async function readMissionArtifact(missionId: string, stage: import('@codex-claw/core/missions').MissionStage) {
+    if (!codexClawApi) throw new Error('Mission artifacts unavailable.');
+    return codexClawApi.readMissionArtifact(missionId, stage);
+  }
+
+  async function updateMission(input: import('@codex-claw/core/missions').UpdateMissionInput) {
+    if (!codexClawApi) throw new Error('Backend unavailable.');
+    adoptNavigationSnapshot(await codexClawApi.updateMission(input));
+  }
+
   async function createQuickChat(input: CreateQuickChatInput): Promise<Agent | null> {
     if (!codexClawApi?.createQuickChat) return null;
 
@@ -1445,6 +1476,12 @@ export function useAppState() {
     loadOpenInApplications,
     openAgentPath,
     createAgent,
+    executeMission,
+    createMission,
+    selectMission,
+    deleteMission,
+    readMissionArtifact,
+    updateMission,
     createQuickChat,
     createTeam,
     updateTeam,

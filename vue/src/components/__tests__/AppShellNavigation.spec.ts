@@ -1,10 +1,10 @@
 import { shallowMount } from '@vue/test-utils';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createMission } from '@codex-claw/core/missions';
 import { describe, expect, it, vi } from 'vitest';
 import AppShellNavigation from '../AppShellNavigation.vue';
 
-function mountNavigation() {
-  const snapshot = createInitialSnapshot();
+function mountNavigation(snapshot = createInitialSnapshot()) {
   const activeTeam = snapshot.teams[0] ?? null;
   return shallowMount(AppShellNavigation, {
     props: {
@@ -55,6 +55,7 @@ describe('AppShellNavigation', () => {
     const sidebar = wrapper.getComponent({ name: 'AgentSidebar' });
 
     sidebar.vm.$emit('select-agent', 'agent-dina');
+    sidebar.vm.$emit('delete-mission', 'mission-1');
     sidebar.vm.$emit('cleanup-pull-request', 'agent-dina');
     sidebar.vm.$emit('open-in', {
       agentId: 'agent-dina',
@@ -62,6 +63,7 @@ describe('AppShellNavigation', () => {
     });
 
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.emitted('delete-mission')).toStrictEqual([['mission-1']]);
     expect(wrapper.emitted('cleanup-pull-request')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('open-in')).toStrictEqual([
       [
@@ -71,5 +73,26 @@ describe('AppShellNavigation', () => {
         },
       ],
     ]);
+  });
+
+  it('keeps mission-owned agents out of the global sidebar', () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    mission.execution = {
+      teamId: snapshot.teams[0]!.id,
+      repoPath: snapshot.agents[0]!.folder!,
+      memberIds: snapshot.agents.map(agent => agent.id),
+      runs: [{
+        id: 'mission-run', stage: 'requirements', memberId: snapshot.agents[0]!.id,
+        workerId: snapshot.agents[1]!.id, status: 'running', skills: [], feedback: '',
+        startedAt: '2026-09-19T00:00:00.000Z',
+      }],
+    };
+
+    const sidebar = mountNavigation(snapshot).getComponent({ name: 'AgentSidebar' });
+
+    expect(sidebar.props('agents').map((agent: { id: string }) => agent.id))
+      .toStrictEqual([snapshot.agents[0]!.id]);
+    expect(sidebar.props('missions')).toStrictEqual([mission]);
   });
 });

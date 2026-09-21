@@ -22,6 +22,11 @@ const defaultRunner: CommandRunner = {
   run: (command, args, options) => execFileAsync(command, args, options),
 };
 
+export async function readWorktreeHead(folder: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: folder });
+  return stdout.trim();
+}
+
 export function suggestedSourceWorktreePath(repoPath: string, branchName: string): string {
   return path.join(
     path.dirname(repoPath),

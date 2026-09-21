@@ -9,12 +9,18 @@ import { readEngineInstructions } from '../engine-instructions';
 vi.mock('../engine-instructions', () => ({ readEngineInstructions: vi.fn().mockResolvedValue({ text: '', path: '/fake/AGENTS.md' }) }));
 
 describe('BackendDriverRpc', () => {
-  it('appends the global Codex instructions via the SDK without replacing Claw instructions', async () => {
+  it('appends global and agent-specific context after the default Claw instructions', async () => {
     vi.mocked(readEngineInstructions).mockResolvedValueOnce({ text: 'Use concise answers.', path: '/fake/AGENTS.md' });
-    const options = codexClawSurfaceOptions({ clawMcpServerUrl: 'http://localhost:4321/mcp' });
+    const options = codexClawSurfaceOptions({
+      clawMcpServerUrl: 'http://localhost:4321/mcp',
+      additionalDeveloperInstructions: () => '<context>\nMission contract\n</context>',
+    });
     const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: createAgent() } as never);
     expect(extension?.developerInstructions).toContain('Use concise answers.');
     expect(extension?.developerInstructions).toContain('Your Codex Claw agent ID');
+    expect(extension?.developerInstructions).toContain('<context>\nMission contract\n</context>');
+    expect(extension!.developerInstructions!.indexOf('Your Codex Claw agent ID'))
+      .toBeLessThan(extension!.developerInstructions!.indexOf('<context>'));
     expect(readEngineInstructions).toHaveBeenCalledWith('codex');
   });
   it('puts Codex app-server state below the Claw home instead of ~/.codex', () => {

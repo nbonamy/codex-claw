@@ -1,3 +1,4 @@
+import { isMission } from '@codex-claw/core/missions';
 import { isThreadFlags } from '@codex-claw/core/thread-flags';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/co
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
 
 type PersistedState = {
+  missions?: AppSnapshot['missions'];
   clientPreferences?: AppSnapshot['clientPreferences'];
   teams: Team[];
   agents: PersistedAgent[];
@@ -133,6 +135,7 @@ export class AppStatePersistence {
 export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedState {
   return {
     ...(snapshot.clientPreferences ? { clientPreferences: structuredClone(snapshot.clientPreferences) } : {}),
+    ...(snapshot.missions ? { missions: structuredClone(snapshot.missions) } : {}),
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
     agents: snapshot.agents.map(persistedAgentFromSnapshot),
     automations: snapshot.automations.map(cloneAutomation),
@@ -211,6 +214,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   const snapshot: AppSnapshot = {
     ...seed,
     ...(value.clientPreferences ? { clientPreferences: sanitizeClientPreferences(value.clientPreferences) } : {}),
+    ...(Array.isArray(value.missions) ? { missions: value.missions.filter(isMission).map(m => structuredClone(m)) } : {}),
     teams: teams.length > 0 ? teams : seed.teams,
     agents,
     automations: persistedAutomations

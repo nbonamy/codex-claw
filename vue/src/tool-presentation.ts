@@ -13,6 +13,7 @@ import {
   IconMessageReport as MessageReportIcon,
   IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
+  IconTargetArrow as TargetArrowIcon,
   IconUsers as UsersIcon,
   IconVolume as VolumeIcon,
 } from '@tabler/icons-vue';
@@ -35,6 +36,7 @@ const icons = {
   celebration: SparklesIcon as unknown as ToolIcon,
   announcement: VolumeIcon as unknown as ToolIcon,
   workItem: SquareCheck as unknown as ToolIcon,
+  mission: TargetArrowIcon as unknown as ToolIcon,
   workspace: GitBranchIcon as unknown as ToolIcon,
 };
 
@@ -74,7 +76,7 @@ const COMPUTER_USE_TOOLS = new Set([
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
 const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding']);
 const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
-const WORKSPACE_TOOLS = new Set(['create-worktree', 'list-repos', 'list-worktrees']);
+const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
 
 export function presentClawTool(
   context: CodexToolPresentationContext,
@@ -109,7 +111,8 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'celebrate') return icons.celebration;
   if (tool === 'announce') return icons.announcement;
-  if (tool === 'display-markdown') return icons.markdown;
-  if (tool === 'update-work-item') return icons.workItem;
+  if (tool === 'display-markdown' || tool === 'list-mission-artifacts' || tool === 'read-mission-artifact') return icons.markdown;
+  if (tool === 'set-mission-title') return icons.mission;
+  if (tool === 'update-work-item' || tool === 'write-mission-artifact' || tool === 'submit-mission-result' || tool === 'upsert-mission-ticket') return icons.workItem;
   return undefined;
 }

@@ -88,6 +88,11 @@
     :open-in-applications="openInApplications"
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
+    :create-mission="createMission"
+    :select-mission="selectMission"
+    :delete-mission="deleteMission"
+    :read-mission-artifact="readMissionArtifact"
+    :execute-mission="executeMission"
     :create-quick-chat="createQuickChat"
     :create-team="createTeam"
     :update-team="updateTeam"
@@ -315,6 +320,11 @@ const {
   openAgentPath,
   createAgent,
   clearAgentCreationProgress,
+  createMission,
+  selectMission,
+  deleteMission,
+  readMissionArtifact,
+  executeMission,
   createQuickChat,
   createTeam,
   updateTeam,

@@ -6,6 +6,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
+import { createMission } from '@codex-claw/core/missions';
 import {
   createTestSnapshot,
 } from './server-test-fixtures';
@@ -413,6 +414,34 @@ describe('ClawBackendServer', () => {
       params: { agentId: 'agent-dina', id: 'ready_for_review', value: false },
     });
     expect((readyCleared as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
+  });
+
+  it('persists a populated Mission stage fixture through the debug protocol', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
+      status: { type: 'idle' }, createdAt: '2026-09-19T00:00:00.000Z', updatedAt: '2026-09-19T00:00:00.000Z',
+    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    const mission = createMission(snapshot, { outcome: 'Debug mission', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: 'agent-dina' });
+    mission.execution!.runs.push({
+      id: 'run-requirements', stage: 'requirements', memberId: 'agent-dina', workerId: 'agent-dina', status: 'running',
+      skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
+    });
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
+
+    const result = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-mission-stage', method: backendMethods.debugMissionStageSet,
+      params: { missionId: mission.id, stage: 'implementation' },
+    });
+
+    expect(result).toMatchObject({ result: { missions: [{ id: mission.id, stage: 'implementation', execution: { debugFixture: true } }] } });
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-mission-invalid', method: backendMethods.debugMissionStageSet,
+      params: { missionId: mission.id, stage: 'unknown' },
+    })).resolves.toMatchObject({ error: { code: -32602 } });
   });
 
   it('routes system permission requests through the backend system port', async () => {

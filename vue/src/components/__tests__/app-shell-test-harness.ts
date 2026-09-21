@@ -12,10 +12,12 @@ import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { CreateMissionInput, DeleteMissionInput, Mission } from '@codex-claw/core/missions';
+import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
-  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'historyLoadFailed', 'historyLoading', 'hasVisibleMessages', 'plan', 'planVisible'],
+  props: ['agent', 'agents', 'attachmentAnnotationCounts', 'controller', 'historyLoadFailed', 'historyLoading', 'hasVisibleMessages', 'plan', 'planVisible', 'emptyHeadline', 'emptySubhead'],
   emits: ['annotate-attachment', 'close-plan', 'retry-history'],
   setup(_props, { expose }) {
     expose({ focusComposer: vi.fn() });
@@ -33,6 +35,10 @@ const AgentSidebarStub = defineComponent({
     'forkableAgentIds',
     'maxWidth',
     'minWidth',
+    'missions',
+    'activeMissionId',
+    'missionCreationError',
+    'missionCreationPending',
     'openInCatalog',
     'quickSwitchShortcutsVisible',
     'repositoryIcons',
@@ -50,6 +56,8 @@ const AgentSidebarStub = defineComponent({
     'create-agent-on-branch',
     'create-agent-worktree-in-repository',
     'create-quick-chat',
+    'create-mission',
+    'delete-mission',
     'duplicate-agent',
     'edit-agent',
     'fork-agent',
@@ -61,6 +69,7 @@ const AgentSidebarStub = defineComponent({
     'restart-agent',
     'resume-session',
     'select-agent',
+    'select-mission',
     'start-work',
     'update-collapsed-repositories',
     'update-repository-icon',
@@ -103,6 +112,11 @@ export function mountShell(overrides: Partial<{
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createMission: (input: CreateMissionInput) => Promise<Mission>;
+  selectMission: (missionId: string | null) => Promise<void>;
+  deleteMission: (input: DeleteMissionInput) => Promise<void>;
+  readMissionArtifact: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
+  executeMission: (input: MissionExecutionInput) => Promise<void>;
   createQuickChat: (input: import('@codex-claw/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
   createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
@@ -129,6 +143,8 @@ export function mountShell(overrides: Partial<{
   loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
   createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  createAgentGitPullRequest: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  mergeAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
@@ -190,6 +206,11 @@ export function mountShell(overrides: Partial<{
       sourceRepositories: overrides.sourceRepositories ?? [],
       listSourceWorktrees: overrides.listSourceWorktrees ?? vi.fn().mockResolvedValue([]),
       createAgent: overrides.createAgent ?? vi.fn().mockResolvedValue(undefined),
+      createMission: overrides.createMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
+      selectMission: overrides.selectMission ?? vi.fn().mockResolvedValue(undefined),
+      deleteMission: overrides.deleteMission ?? vi.fn().mockRejectedValue(new Error('Missions unavailable.')),
+      readMissionArtifact: overrides.readMissionArtifact ?? vi.fn().mockRejectedValue(new Error('Mission artifacts unavailable.')),
+      executeMission: overrides.executeMission ?? vi.fn().mockResolvedValue(undefined),
       createQuickChat: overrides.createQuickChat ?? vi.fn().mockResolvedValue(undefined),
       createTeam: overrides.createTeam ?? vi.fn().mockResolvedValue(undefined),
       updateTeam: overrides.updateTeam ?? vi.fn().mockResolvedValue(undefined),
@@ -211,6 +232,8 @@ export function mountShell(overrides: Partial<{
       loadGlobalWorkItems: overrides.loadGlobalWorkItems ?? vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 }),
       loadWorkItems: overrides.loadWorkItems ?? vi.fn().mockResolvedValue(undefined),
       createAgentGitBranch: overrides.createAgentGitBranch ?? vi.fn().mockResolvedValue({}),
+      createAgentGitPullRequest: overrides.createAgentGitPullRequest ?? vi.fn().mockResolvedValue({}),
+      mergeAgentGitBranch: overrides.mergeAgentGitBranch ?? vi.fn().mockResolvedValue({}),
       duplicateAgentAction: overrides.duplicateAgentAction ?? vi.fn().mockResolvedValue(null),
       assignWorkItemAction: overrides.assignWorkItemAction ?? vi.fn().mockResolvedValue(undefined),
       getAutomationSnapshot: overrides.getAutomationSnapshot ?? vi.fn().mockResolvedValue(createEmptySnapshot()),

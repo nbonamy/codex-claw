@@ -15,6 +15,7 @@ describe('backendRequestTimeoutMs', () => {
     expect(backendRequestTimeoutMs(backendMethods.agentGitMerge, 5_000)).toBe(125_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitUpdateFromBase, 5_000)).toBe(125_000);
     expect(backendRequestTimeoutMs(backendMethods.agentGitPullRequestCreate, 5_000)).toBe(125_000);
+    expect(backendRequestTimeoutMs(backendMethods.missionExecute, 5_000)).toBe(125_000);
     expect(backendRequestTimeoutMs(backendMethods.agentTurnDelete, 5_000)).toBe(125_000);
     expect(backendRequestTimeoutMs(backendMethods.agentTurnEdit, 5_000)).toBe(125_000);
     expect(backendRequestTimeoutMs(backendMethods.agentTurnRetry, 5_000)).toBe(125_000);

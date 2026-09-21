@@ -133,6 +133,35 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `system/permissions/get` | none | `SystemPermissionsStatus` | App-facing permission API owned by `clawd`; desktop status may be delegated to Electron. |
 | `system/permissions/accessibility/open` | none | `SystemPermissionsStatus` | Opens native settings through a client callback, then returns status. |
 
+## Client To `clawd`: Missions
+
+| Method | Params | Result | Notes |
+| --- | --- | --- | --- |
+| `mission/create` | `{ input: CreateMissionInput }` | `AppSnapshot` | Creates a team-scoped outcome and immediately starts its orchestrator from a Claw-owned mission home. No repository is required. |
+| `mission/artifact/read` | `{ missionId, stage }` | `MissionArtifactReadResult` | Reads a canonical stage artifact through the app-owned protocol without exposing its Claw data-folder path. |
+| `mission/delete` | `{ input: DeleteMissionInput }` | `AppSnapshot` | Deletes the current persisted revision, interrupts active Mission workers, archives and releases their provider conversations, removes hidden workers, and deletes Mission-owned artifacts and generated skills. The confirmed input explicitly chooses whether tracked Mission worktrees and local branches are kept or deleted; unsafe worktree cleanup rejects the deletion. |
+| `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Starts stage attempts, accepts proposals or ticket evidence, stops a run, reopens a reached stage, or records a repository delivery. Requirements and tickets run from the Mission home. Accepting Tickets provisions sibling worktrees for affected repositories, then schedules one dependency-ready implementation run per repository. Accepting Review enters the app-owned Ship stage without starting another agent. Ship records a pull request or merge for each affected repository and completes the Mission only after all are delivered. An assigned worker may revise and resubmit while its result awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
+| `mission/update` | `{ input: UpdateMissionInput }` | `AppSnapshot` | Saves structured artifacts and per-stage agent references, optionally approving the current stage. Requires the current revision; rejects stale writes, missing agents, invalid earlier gates, and edits to completed missions. |
+
+Mission writes persist before publishing `snapshot.updated`. Existing snapshots
+without `missions` represent an empty mission collection. Unknown or malformed
+persisted mission records are ignored by the current reader. Workflow selection
+currently accepts only `shapeAndShipFeature`; additional types need their own
+artifact schema and transition policy. Mission selection is ephemeral client UI
+state and never changes another client's navigation.
+
+Canonical Mission artifacts are Markdown files under
+`$CODEX_CLAW_HOME/missions/<mission-id>/artifacts`. Mission workers access them
+through identity-bound MCP tools; clients receive only app-owned artifact
+metadata in snapshots.
+
+Ticket artifacts carry the exact represented repository path. Mission execution
+persists a common human-readable workspace name, one worktree record per affected
+repository, the per-ticket repository assignment, and the user's review policy.
+Independent repositories may run concurrently; a repository has at most one active
+implementation run. In automatic mode, accepted ticket evidence continues the
+repository queue while the final Review stage remains an explicit user gate.
+
 ## Client To `clawd`: Agents
 
 | Method | Params | Result | Notes |

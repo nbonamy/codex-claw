@@ -1,5 +1,15 @@
+import { readWorktreeHead } from './git-worktrees';
+import { MissionExecutionService } from './mission-execution-service';
+import { applyMissionDebugFixture } from './mission-debug-fixtures';
+import { FileMissionSkillStore } from './mission-skill-store';
+import { featureStages, type Mission, type MissionStage } from '@codex-claw/core/missions';
+import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
+import { MissionService } from './mission-service';
+import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
+import os from 'node:os';
+import { mkdir, rm } from 'node:fs/promises';
 import { createEntityId } from '@codex-claw/core/ids';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
@@ -73,6 +83,9 @@ export type ClawBackendServerOptions = {
   agentGitService?: AgentGitService;
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
+  ensureMissionHome?: (missionId: string) => Promise<string>;
+  deleteMissionHome?: (missionId: string) => Promise<void>;
+  missionArtifactStore?: MissionArtifactStorage;
   codeReviewTools?: CodeReviewToolPort;
   agentCreation?: AgentCreationService;
 };
@@ -106,6 +119,9 @@ export class ClawBackendServer {
   private readonly version: string;
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
+  private readonly missions: MissionService;
+  private readonly missionExecution: MissionExecutionService;
+  private readonly missionArtifacts: MissionArtifactStorage;
   private remoteControlStatus: DevicePairingStatus = { status: 'disabled' };
   private remoteControlStatusLoaded = false;
   private readonly driverRpc?: BackendDriverRpc;
@@ -135,6 +151,7 @@ export class ClawBackendServer {
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private readonly codeReviews?: CodeReviewService;
   private readonly agentCreation: AgentCreationService;
+  private readonly deleteMissionHome: (missionId: string) => Promise<void>;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
   private conversationsReconciliation?: Promise<void>;
@@ -143,6 +160,7 @@ export class ClawBackendServer {
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
+    this.missions = new MissionService(this.snapshot, async snapshot => { await options.saveSnapshot?.(snapshot); });
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
@@ -186,6 +204,37 @@ export class ClawBackendServer {
       persistSnapshot: () => this.persistSnapshotOnly(),
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
       onPromptStarting: options.onPromptStarting,
+    });
+    const ensureMissionHome = options.ensureMissionHome ?? (async (missionId: string) => {
+      const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
+      await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
+      return home;
+    });
+    this.deleteMissionHome = options.deleteMissionHome ?? (async (missionId: string) => {
+      await rm(await ensureMissionHome(missionId), { recursive: true, force: true });
+    });
+    this.missionArtifacts = options.missionArtifactStore ?? new FileMissionArtifactStore(ensureMissionHome);
+    const missionSkills = new FileMissionSkillStore(ensureMissionHome);
+    this.missionExecution = new MissionExecutionService({
+      getHead: readWorktreeHead,
+      snapshot: this.snapshot,
+      missions: this.missions,
+      publish: () => this.emitProjectedSnapshot(),
+      ensureMissionHome,
+      readArtifact: (missionId, stage) => this.missionArtifacts.read(missionId, stage),
+      writeArtifact: (missionId, stage, content) => this.missionArtifacts.write(missionId, stage, content),
+      validateRepository: async folder => {
+        const identity = await this.agentGitService.identity(folder);
+        if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
+      },
+      createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
+      ensureStageSkills: (missionId, stage) => missionSkills.ensure(missionId, stage),
+      refreshWorkspace: async agentId => { await this.agentWorkspaces.refreshIdentity(agentId); },
+      refreshConversationContext: async agent => {
+        await this.requireDriverRpc().refreshConversationContext(agent);
+      },
+      continueStage: async (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
+      interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
     });
     this.planReviews = new AgentPlanReviewService({
       submit: (agent, prompt, planMode) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt, { planMode }),
@@ -291,6 +340,46 @@ export class ClawBackendServer {
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
   }
 
+  async submitMissionResult(agentId: string, input: MissionResultInput) {
+    return this.missionExecution.submit(agentId, input);
+  }
+
+  async upsertMissionTicket(agentId: string, input: import('@codex-claw/core/mission-execution').MissionTicketDraftInput) {
+    return this.missionExecution.upsertTicket(agentId, input);
+  }
+
+  listMissionArtifacts(agentId: string) {
+    return this.missionExecution.listArtifacts(agentId);
+  }
+
+  readMissionArtifact(agentId: string, stage: import('@codex-claw/core/missions').MissionStage) {
+    return this.missionExecution.readArtifact(agentId, stage);
+  }
+
+  writeMissionArtifact(agentId: string, input: import('@codex-claw/core/mission-execution').MissionArtifactWriteInput) {
+    return this.missionExecution.writeArtifact(agentId, input);
+  }
+
+  missionContext(agentId: string) {
+    return this.missionExecution.contextForAgent(agentId);
+  }
+
+  missionDeveloperInstructions(agentId: string) {
+    return this.missionExecution.developerInstructionsForAgent(agentId);
+  }
+
+  async setMissionTitle(agentId: string, title: string) {
+    return this.missionExecution.setTitle(agentId, title);
+  }
+
+  async setMissionExecutionPolicy(agentId: string, reviewPolicy: import('@codex-claw/core/mission-execution').MissionReviewPolicy) {
+    return this.missionExecution.setExecutionPolicy(agentId, reviewPolicy);
+  }
+
+  async attachMissionRepository(agentId: string, repoPath: string) {
+    return this.missionExecution.attachRepository(agentId, repoPath);
+  }
+
   private async disposeAndReleaseReviewConversation(agent: Agent): Promise<void> {
     if (agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
       await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }).catch(() => undefined);
@@ -313,6 +402,8 @@ export class ClawBackendServer {
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
+    await this.missionExecution.refreshOwnedSkills();
+    await this.missionExecution.recoverInterruptedRuns();
     for (const agent of this.snapshot.agents) await this.codeReviews?.resumeInterrupted(agent);
   }
 
@@ -507,6 +598,23 @@ export class ClawBackendServer {
         });
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case backendMethods.debugMissionStageSet: {
+        const params = requireRecord(message.params);
+        const missionId = requireString(params.missionId, 'missionId');
+        const stage = params.stage;
+        if (typeof stage !== 'string' || !featureStages.includes(stage as MissionStage)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'stage must be a supported Mission stage');
+        }
+        const mission = this.snapshot.missions?.find(candidate => candidate.id === missionId);
+        for (const workerId of new Set(mission?.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? [])) {
+          const worker = this.snapshot.agents.find(agent => agent.id === workerId);
+          if (worker && (worker.status.type === 'working' || worker.status.type === 'awaitingInput')) {
+            await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
+          }
+        }
+        applyMissionDebugFixture(this.snapshot, missionId, stage as MissionStage);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.debugCodeReviewSet: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -666,6 +774,72 @@ export class ClawBackendServer {
         await this.agentWorkspaces.refreshIdentity(createdAgent.id);
         const snapshot = await this.persistAndEmitSnapshot();
         await this.agentWorkspaces.refreshGitStatus(createdAgent.id);
+        return createClawRpcResult(message.id, snapshot);
+      }
+      case backendMethods.missionExecute: {
+        const input = requireRecord(message.params).input as MissionExecutionInput;
+        await this.missionExecution.execute(input);
+        return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+      }
+      case backendMethods.missionArtifactRead: {
+        const params = requireRecord(message.params);
+        if (typeof params.missionId !== 'string' || typeof params.stage !== 'string') throw new Error('Invalid mission artifact request.');
+        return createClawRpcResult(message.id, await this.missionExecution.readArtifactForMission(
+          params.missionId,
+          params.stage as import('@codex-claw/core/missions').MissionStage,
+        ));
+      }
+      case backendMethods.missionCreate: {
+        const input = requireRecord(message.params).input as import('@codex-claw/core/missions').CreateMissionInput;
+        const previousIds = new Set(this.snapshot.missions?.map(mission => mission.id));
+        await this.missions.mutate('create', input);
+        const mission = this.snapshot.missions?.find(candidate => !previousIds.has(candidate.id));
+        if (!mission) throw new Error('Mission creation did not produce a mission.');
+        await this.missionExecution.execute({
+          id: mission.id,
+          revision: mission.revision,
+          action: 'run',
+          memberId: input.orchestratorMemberId,
+        });
+        const snapshot = await this.remoteTeams.clientSnapshot();
+        this.emitSnapshotUpdated(snapshot);
+        return createClawRpcResult(message.id, snapshot);
+      }
+      case backendMethods.missionUpdate: {
+        const input = isRecord(message.params) ? message.params.input : undefined;
+        await this.missions.mutate('update', input);
+        const snapshot = await this.remoteTeams.clientSnapshot();
+        this.emitSnapshotUpdated(snapshot);
+        return createClawRpcResult(message.id, snapshot);
+      }
+      case backendMethods.missionDelete: {
+        const input = requireRecord(message.params).input as import('@codex-claw/core/missions').DeleteMissionInput;
+        await this.missions.remove(input, async (mission, workers) => {
+          const workspacePaths = missionWorktreePaths(mission);
+          if (input.deleteWorktrees) {
+            const workerIds = new Set(workers.map(worker => worker.id));
+            for (const folder of workspacePaths) {
+              const sharedAgent = this.snapshot.agents.find(agent => !workerIds.has(agent.id) && agent.folder === folder);
+              if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
+              await this.agentGitService.validateLinkedWorktreeDeletion(folder);
+            }
+          }
+          for (const worker of workers) {
+            if (worker.status.type === 'working' || worker.status.type === 'awaitingInput') {
+              await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
+            }
+            if (worker.backendSession) {
+              await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent: worker });
+              await this.driverRpc?.handle(backendMethods.driverConversationRelease, { backend: worker.backend, agentId: worker.id });
+            }
+          }
+          if (input.deleteWorktrees) {
+            for (const folder of workspacePaths) await this.agentGitService.deleteLinkedWorktree(folder);
+          }
+          await this.deleteMissionHome(mission.id);
+        });
+        const snapshot = await this.remoteTeams.clientSnapshot();
+        this.emitSnapshotUpdated(snapshot);
         return createClawRpcResult(message.id, snapshot);
       }
       case backendMethods.agentQuickChatCreate: {
@@ -2221,6 +2395,9 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.delegatedWorkReports.handleEvent(fullEvent);
+    if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
+      void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
+    }
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
@@ -2570,6 +2747,12 @@ function requireAgentCloseRequest(params: unknown): {
       confirmed: true,
     },
   };
+}
+
+function missionWorktreePaths(mission: Mission): string[] {
+  const paths = mission.execution?.workspaces?.map(workspace => workspace.path) ?? [];
+  if (mission.execution?.workspace?.path) paths.push(mission.execution.workspace.path);
+  return [...new Set(paths)];
 }
 
 function requireDuplicateAgentRequest(params: unknown): { agentId: string; options?: DuplicateAgentOptions } {

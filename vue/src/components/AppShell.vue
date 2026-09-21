@@ -25,6 +25,12 @@
       @open-github-authorization="openGitHubAuthorization"
     />
     <AppShellNavigation
+      :active-mission-id="activeSurface === 'mission' ? selectedMissionId : null"
+      :mission-creation-error="missionCreationError"
+      :mission-creation-pending="missionCreationPending"
+      @create-mission="createNewMission"
+      @delete-mission="deleteMissionFromSidebar"
+      @select-mission="selectMission"
       :active-team="activeTeam"
       :active-team-agents="activeTeamAgents"
       :active-team-name="activeTeamName"
@@ -185,6 +191,29 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" @open-conversation="emit('select-agent', $event)">
+        <template #code-review="{ agentId }">
+          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" />
+        </template>
+        <template #ship="{ openConversation }">
+          <MissionShipBoard
+            :agents="snapshot.agents"
+            :mission="selectedMission"
+            :execute-mission="executeMission"
+            :git-statuses="snapshot.agentGitStatuses"
+            :get-workflow="props.getAgentGitWorkflow"
+            :generate-message="props.generateAgentGitMessage"
+            :commit-changes="props.commitAgentGitChanges"
+            :push-branch="props.pushAgentGitBranch"
+            :create-pull-request="props.createAgentGitPullRequest"
+            :merge-branch="props.mergeAgentGitBranch"
+            @open-conversation="openConversation"
+          />
+        </template>
+        <template #conversation="{ agentId }">
+          <ConversationPane v-if="currentAgent?.id === agentId" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory" />
+        </template>
+      </MissionWorkspace>
       <AgentWorkspace
         v-else
         ref="agentWorkspace"
@@ -391,6 +420,14 @@
       :progress="debugAgentCreationProgress"
       @close="closeDebugAgentCreationProgress"
     />
+    <MissionDeleteDialog
+      :visible="missionDeleteTarget !== null"
+      :mission="missionDeleteTarget"
+      :busy="missionDeletePending"
+      :error="missionDeleteError"
+      @close="closeMissionDeleteDialog"
+      @confirm="confirmMissionDeletion"
+    />
     <CodexResourceSharingMigrationDialog
       :blocked="codexResourceSharingBlocked"
       :pending="codexResourceSharingMigrationPending"
@@ -449,6 +486,12 @@ import AppShellNavigation from './AppShellNavigation.vue';
 import BackendConnectionBanner from './BackendConnectionBanner.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
 import AgentWorkspace from './AgentWorkspace.vue';
+import MissionCodeReview from './MissionCodeReview.vue';
+import MissionShipBoard from './MissionShipBoard.vue';
+import MissionWorkspace from './MissionWorkspace.vue';
+import MissionDeleteDialog from './MissionDeleteDialog.vue';
+import ConversationPane from './ConversationPane.vue';
+import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -470,7 +513,7 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
-import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import type { CodexConversationSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
 import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import {
@@ -564,6 +607,11 @@ const props = withDefaults(defineProps<{
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
+  createMission?: (input: CreateMissionInput) => Promise<Mission>;
+  selectMission?: (missionId: string | null) => Promise<void>;
+  deleteMission?: (input: DeleteMissionInput) => Promise<void>;
+  readMissionArtifact?: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
+  executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
@@ -696,6 +744,10 @@ const props = withDefaults(defineProps<{
     throw new Error(translate('surface.appShell.openInIsNotAvailable'));
   },
   createAgent: async () => undefined,
+  createMission: async () => { throw new Error('Missions unavailable.'); },
+  selectMission: async () => undefined,
+  deleteMission: async () => { throw new Error('Missions unavailable.'); },
+  readMissionArtifact: async () => { throw new Error('Mission artifacts unavailable.'); },
   createQuickChat: async () => undefined,
   createTeam: async () => undefined,
   updateTeam: async () => undefined,
@@ -795,7 +847,7 @@ type PendingReviewClarification = {
   finding: import('@codex-claw/core/code-review').CodeReviewFinding;
 };
 
-type AppSurface = 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
+type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
 const activeReviewFindingAttachment = computed(() => {
@@ -814,9 +866,85 @@ const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
+const missionCreationError = ref('');
+const missionCreationPending = ref(false);
+const missionDeleteTargetId = ref<string | null>(null);
+const missionDeletePending = ref(false);
+const missionDeleteError = ref('');
+const selectedMissionId = ref<string | null>(null);
+const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
+const missionDeleteTarget = computed(() => props.snapshot.missions?.find(m => m.id === missionDeleteTargetId.value) ?? null);
+function selectMissionSurface(id: string): void { selectedMissionId.value = id; activeSurface.value = 'mission'; }
+watch(
+  () => activeSurface.value === 'mission' ? selectedMissionId.value : null,
+  missionId => { void props.selectMission(missionId); },
+);
+function missionTeamContext(): { team: Team; orchestrator: Agent } {
+  const team = activeTeam.value;
+  const activeAgent = currentAgent.value;
+  const orchestrator = activeAgent && activeAgent.teamId === team?.id
+    ? activeAgent
+    : activeTeamAgents.value[0];
+  if (!team || !orchestrator) throw new Error(translate('missions.teamContextRequired'));
+  return { team, orchestrator };
+}
+async function selectMission(id: string): Promise<void> {
+  selectMissionSurface(id);
+}
+async function createNewMission() {
+  if (missionCreationPending.value) return;
+  missionCreationPending.value = true;
+  missionCreationError.value = '';
+  try {
+    const { team, orchestrator } = missionTeamContext();
+    const mission = await props.createMission({
+      outcome: translate('missions.new'),
+      workflowType: 'shapeAndShipFeature',
+      teamId: team.id,
+      orchestratorMemberId: orchestrator.id,
+    });
+    selectMissionSurface(mission.id);
+  } catch (error) {
+    missionCreationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    missionCreationPending.value = false;
+  }
+}
+
+function deleteMissionFromSidebar(id: string): void {
+  if (!props.snapshot.missions?.some(candidate => candidate.id === id)) return;
+  missionDeleteTargetId.value = id;
+  missionDeleteError.value = '';
+}
+
+function closeMissionDeleteDialog(): void {
+  if (missionDeletePending.value) return;
+  missionDeleteTargetId.value = null;
+  missionDeleteError.value = '';
+}
+
+async function confirmMissionDeletion(deleteWorktrees: boolean): Promise<void> {
+  const mission = missionDeleteTarget.value;
+  if (!mission || missionDeletePending.value) return;
+  missionDeletePending.value = true;
+  missionDeleteError.value = '';
+  try {
+    await props.deleteMission({ id: mission.id, revision: mission.revision, deleteWorktrees, confirmed: true });
+    if (selectedMissionId.value === mission.id) {
+      selectedMissionId.value = null;
+      activeSurface.value = 'agent';
+    }
+    missionDeleteTargetId.value = null;
+  } catch (error) {
+    missionDeleteError.value = localizedErrorMessage(error, t);
+  } finally {
+    missionDeletePending.value = false;
+  }
+}
 const fileQuickOpenVisible = ref(false);
 const agentQuickOpenVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
+const debugUserQuestions = ref<{ agentId: string; message: SurfaceMessage; requestId: string } | null>(null);
 const debugAgentCreationProgress = ref<AgentCreationProgress | null>(null);
 const debugAgentCreationTimers: Array<ReturnType<typeof setTimeout>> = [];
 const agentWorkspace = ref<{
@@ -1273,7 +1401,12 @@ const providerConversation = computed(() => (
       ? props.claudeConversationSnapshot ?? null
       : null
 ));
-const conversationMessages = computed(() => providerConversation.value?.messages ?? []);
+const conversationMessages = computed(() => {
+  const messages = providerConversation.value?.messages ?? [];
+  const fixture = debugUserQuestions.value;
+  if (!fixture || fixture.agentId !== currentAgent.value?.id) return messages;
+  return [...messages, fixture.message];
+});
 const conversationLatestTurnId = computed(() => providerConversation.value?.turnIds.at(-1) ?? null);
 const conversationHasRunningPlanTool = computed(() => conversationMessages.value.some(
   (message) => message.parts.some(
@@ -1471,7 +1604,11 @@ const conversationPaneState: CodexConversationPaneState = {
     get placeholder() {
       if (!currentAgent.value) return translate('surface.appShell.selectAnAgent');
       const backend = currentAgent.value.backend === 'claude' ? translate('surface.appShell.claude') : translate('surface.appShell.codex');
-      return props.isSending ? `${backend} is working...` : translate('surface.appShell.askForFollowUpChanges');
+      if (props.isSending) return `${backend} is working...`;
+      if (activeSurface.value === 'mission' && selectedMission.value?.stage === 'requirements' && conversationMessages.value.length === 0) {
+        return t('missions.describeWhatYouWantToBuild');
+      }
+      return translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
     get leadingMenuItems() { return permissionModeMenuItems.value; },
@@ -1506,7 +1643,13 @@ const conversationPaneState: CodexConversationPaneState = {
 const conversationPaneActions: CodexConversationPaneActions = {
   cancel: () => emit('interrupt-agent'),
   clearGoal: () => emit('clear-goal'),
-  clientResponse: (response) => emit('client-response', response),
+  clientResponse: (response) => {
+    if (debugUserQuestions.value?.requestId === response.id) {
+      debugUserQuestions.value = null;
+      return;
+    }
+    emit('client-response', response);
+  },
   deleteTurn: (turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
   deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
   editTurn: (payload) => props.editTurnAction?.(payload) ?? emit('edit-turn', payload),
@@ -1637,6 +1780,7 @@ const isModalDialogVisible = computed(() => (
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
+  || missionDeleteTarget.value !== null
   || debugAgentCreationProgress.value !== null
   || fileQuickOpenVisible.value
   || agentQuickOpenVisible.value
@@ -1682,11 +1826,96 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     selectTeam: selectTeamFromRail,
     sendAgentPrompt: (agentId, prompt) => emit('send-agent-prompt', { agentId, prompt }),
     setDebugApproval: (approval) => { debugApproval.value = approval; },
+    showDebugUserQuestions,
     toggleSpokenAnnouncementsMuted,
     updateComposerAttachments: (agentId, attachments) => emit('update:composerAttachments', { agentId, attachments }),
     updateComposerState: (agentId, state) => emit('update:composerState', { agentId, state }),
   },
 });
+
+function showDebugUserQuestions(agentId: string): void {
+  const requestId = 'debug-user-questions';
+  const turnId = 'debug-user-questions-turn';
+  const itemId = 'debug-user-questions-item';
+  debugUserQuestions.value = {
+    agentId,
+    requestId,
+    message: {
+      id: 'debug-user-questions-message',
+      role: 'assistant',
+      status: 'complete',
+      turnId,
+      parts: [
+        {
+          type: 'text',
+          text: 'I need two decisions before continuing.',
+          phase: 'final_answer',
+        },
+        {
+          type: 'question',
+          request: {
+            id: requestId,
+            kind: 'ask_user',
+            conversationId: `debug-${agentId}`,
+            turnId,
+            itemId,
+            payload: {
+              request: {
+                itemId,
+                delivery: 'async',
+                blocking: false,
+                questions: [
+                  {
+                    id: 'debug-user-questions-core-flow',
+                    header: 'Core flow',
+                    question: 'What should the first Linear integration let a Codex Claw user do?',
+                    isOther: true,
+                    isSecret: false,
+                    options: [
+                      {
+                        label: 'Mission ↔ Linear (Recommended)',
+                        description: 'Import a Linear issue into a Mission and sync its status, tickets, and links back.',
+                      },
+                      {
+                        label: 'Import only',
+                        description: 'Use Linear issues as Mission input without writing anything back.',
+                      },
+                      {
+                        label: 'Full workspace sync',
+                        description: 'Keep Missions, issues, comments, and statuses synchronized both ways.',
+                      },
+                    ],
+                  },
+                  {
+                    id: 'debug-user-questions-review-cadence',
+                    header: 'Review cadence',
+                    question: 'When should implementation pause for your review?',
+                    isOther: true,
+                    isSecret: false,
+                    options: [
+                      {
+                        label: 'After each ticket (Recommended)',
+                        description: 'Review each completed ticket before its repository worker continues.',
+                      },
+                      {
+                        label: 'After each repository',
+                        description: 'Let one worker finish its repository queue before review.',
+                      },
+                      {
+                        label: 'After implementation',
+                        description: 'Run every ready ticket and review the combined result once.',
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+  };
+}
 
 function openDebugOperationProgress(
   kind: Extract<AppCommand, { type: 'debug-operation-progress' }>['kind'],
@@ -1748,7 +1977,7 @@ function clearDebugAgentCreationTimers(): void {
 }
 
 onBeforeUnmount(clearDebugAgentCreationTimers);
-const showAgentSidebar = computed(() => isAgentWorkspaceVisible.value && !agentSidebarCollapsed.value && !isAgentEmpty.value);
+const showAgentSidebar = computed(() => (isAgentWorkspaceVisible.value || activeSurface.value === 'mission') && !agentSidebarCollapsed.value && (props.snapshot.teams.length > 0 || !!props.snapshot.missions?.length));
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
