@@ -13,7 +13,7 @@ export default defineConfig({
     environment: 'jsdom',
     css: {
       // Opt in only components with valuable runtime CSS assertions.
-      include: [/SourcePreviewPanel\.vue/, /CodeReviewPanel\.vue/],
+      include: [/SourcePreviewPanel\.vue/, /CodeReviewPanel\.vue/, /MissionShipBoard\.vue/, /MissionImplementationBoard\.css/, /MissionImplementationTicketCard\.vue/, /base\.css/],
     },
     pool: 'vmThreads',
     vmMemoryLimit: '512MB',

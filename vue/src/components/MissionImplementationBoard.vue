@@ -38,7 +38,6 @@
       </div>
       <div class="mission-implementation__summary-meta">
         <span>{{ t("missions.repositoryCount", { count: lanes.length }) }}</span>
-        <span>{{ policyLabel }}</span>
         <button
           v-if="hasImplementationEvidence"
           type="button"
@@ -59,7 +58,7 @@
       >
         <header>
           <FolderIcon aria-hidden="true" />
-          <div>
+          <div class="mission-implementation__repository-copy">
             <strong>{{ repositoryName(lane.repositoryPath) }}</strong>
             <span>{{ laneProgress(lane.tickets) }}</span>
           </div>
@@ -71,6 +70,14 @@
               workspaceBranch(lane.repositoryPath)
             }}
           </span>
+          <MissionWorkspaceOpenIn
+            v-if="laneAgent(lane.repositoryPath) && workspacePath(lane.repositoryPath)"
+            :agent="laneAgent(lane.repositoryPath)!"
+            :available="openInAvailable"
+            :catalog="openInApplications"
+            :workspace-path="workspacePath(lane.repositoryPath)!"
+            @open="emit('open-worktree', $event)"
+          />
         </header>
         <TransitionGroup name="mission-run-card" tag="ol" appear>
           <MissionImplementationTicketCard
@@ -148,16 +155,7 @@
         <div v-if="selected" class="mission-implementation__dialog-footer">
           <span>{{ t(`missions.ticketRunStatus.${ticketStatus(selected)}`) }}</span>
           <button
-            v-if="!readOnly && selected.run?.status === 'awaitingReview' && reviewPolicy === 'reviewEachTicket'"
-            type="button"
-            class="claw-button claw-button--primary"
-            :disabled="busy"
-            @click="emit('approve', selected.run.id)"
-          >
-            <CheckIcon aria-hidden="true" />{{ t("missions.approveTicket") }}
-          </button>
-          <button
-            v-else-if="!readOnly && selected.run && ['preparing', 'running'].includes(selected.run.status)"
+            v-if="!readOnly && selected.run && ['preparing', 'running'].includes(selected.run.status)"
             type="button"
             class="claw-button"
             :disabled="busy"
@@ -183,10 +181,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import type { Agent, OpenInApplicationCatalog } from "@codex-claw/core/contracts";
 import type { Mission } from "@codex-claw/core/missions";
 import type { MissionRun } from "@codex-claw/core/mission-execution";
 import {
-  CheckIcon,
   FileTextIcon,
   FolderIcon,
   GitBranchIcon,
@@ -194,14 +192,25 @@ import {
 } from "../shared/icons/app-icons";
 import MissionImplementationTicketCard from "./MissionImplementationTicketCard.vue";
 import MissionTicketDialog from "./MissionTicketDialog.vue";
+import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from "./MissionWorkspaceOpenIn.vue";
 import { implementationTicketStatus, missionRepositoryName, missionTicketNumber, type MissionImplementationTicketItem } from "./mission-implementation-model";
 
 type TicketItem = MissionImplementationTicketItem;
 
-const props = defineProps<{ mission: Mission; busy?: boolean; readOnly?: boolean }>();
+const props = withDefaults(defineProps<{
+  agents?: Agent[];
+  mission: Mission;
+  busy?: boolean;
+  readOnly?: boolean;
+  openInAvailable?: boolean;
+  openInApplications?: OpenInApplicationCatalog;
+}>(), {
+  agents: () => [],
+  openInApplications: () => ({ defaultApplication: "finder", applications: [] }),
+});
 const emit = defineEmits<{
-  approve: [runId: string];
   "open-conversation": [agentId: string];
+  "open-worktree": [request: MissionWorkspaceOpenRequest];
   retry: [ticketIndex: number];
   stop: [runId: string];
 }>();
@@ -212,12 +221,6 @@ const hasImplementationEvidence = computed(() => Boolean(
   props.mission.artifacts.implementation.changes.trim()
   || props.mission.artifacts.implementation.tests.trim(),
 ));
-const reviewPolicy = computed(
-  () => props.mission.execution?.reviewPolicy ?? "reviewEachTicket",
-);
-const policyLabel = computed(() =>
-  t(`missions.reviewPolicy.${reviewPolicy.value}`),
-);
 const implementationRuns = computed(
   () =>
     props.mission.execution?.runs.filter(
@@ -290,6 +293,19 @@ function workspaceBranch(repositoryPath: string): string {
       ? (props.mission.execution?.workspace?.branch ?? "")
       : "")
   );
+}
+function workspacePath(repositoryPath: string): string | undefined {
+  return props.mission.execution?.workspaces?.find(
+    (workspace) => workspace.repositoryPath === repositoryPath,
+  )?.path ?? (lanes.value.length === 1 ? props.mission.execution?.workspace?.path : undefined);
+}
+function laneAgent(repositoryPath: string): Agent | undefined {
+  const workerId = lanes.value
+    .find((lane) => lane.repositoryPath === repositoryPath)
+    ?.tickets.map((item) => item.run?.workerId)
+    .filter((id): id is string => Boolean(id))
+    .at(-1);
+  return props.agents.find((agent) => agent.id === workerId);
 }
 function ticketNumber(index: number): string {
   return missionTicketNumber(index);

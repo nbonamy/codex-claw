@@ -121,6 +121,8 @@
 }
 
 .mission-implementation__lane {
+  width: 100%;
+  max-width: none;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -142,7 +144,7 @@
   color: var(--color-primary);
 }
 
-.mission-implementation__lane > header div {
+.mission-implementation__repository-copy {
   display: grid;
   gap: var(--space-1);
 }

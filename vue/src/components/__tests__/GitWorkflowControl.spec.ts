@@ -6,6 +6,7 @@ import GitWorkflowControl from '../GitWorkflowControl.vue';
 import type { Agent, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
 import { encodeAppErrorDescriptor } from '@codex-claw/core/app-error';
 import { stubElectronTestWindow } from '../../test/client';
+import '../../styles/base.css';
 
 const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktree', backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'idle' }, createdAt: '', updatedAt: '' } as Agent;
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
@@ -18,6 +19,31 @@ describe('GitWorkflowControl', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+  });
+
+  it('shows the two delivery outcomes as direct labeled actions', async () => {
+    const merge = mountControl({ presentation: 'delivery', mergeBranch: vi.fn() });
+    await vi.waitFor(() => expect(merge.findAll('.git-workflow-control__delivery-action')[0]?.attributes('disabled')).toBeUndefined());
+    const actions = merge.findAll('.git-workflow-control__delivery-action');
+    expect(actions.map(action => action.text())).toStrictEqual(['Merge', 'Create PR']);
+    expect(actions.every(action => action.find('svg').exists())).toBe(true);
+    expect(actions.every(action => action.classes().includes('claw-button--neutral'))).toBe(true);
+    expect(actions.map(action => {
+      return [getComputedStyle(action.element).color, getComputedStyle(action.get('svg').element).color];
+    })).toStrictEqual([
+      ['var(--color-text)', 'var(--color-text)'],
+      ['var(--color-text)', 'var(--color-text)'],
+    ]);
+    expect(merge.find('.git-workflow-control__trigger').exists()).toBe(false);
+
+    await actions[0]!.trigger('click');
+    expect(merge.find('[role="dialog"]').exists()).toBe(true);
+    expect(merge.find('[role="radiogroup"]').exists()).toBe(true);
+
+    const pullRequest = mountControl({ presentation: 'delivery' });
+    await vi.waitFor(() => expect(pullRequest.findAll('.git-workflow-control__delivery-action')[1]?.attributes('disabled')).toBeUndefined());
+    await pullRequest.findAll('.git-workflow-control__delivery-action')[1]!.trigger('click');
+    expect(pullRequest.find('.git-workflow-control__pull-request-form').exists()).toBe(true);
   });
 
   it('opens the commit dialog as the first enabled action', async () => {

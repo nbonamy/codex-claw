@@ -45,11 +45,14 @@
 
           <MissionImplementationBoard
             v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
+            :agents="agents"
             :mission="mission"
             :busy="busy"
             :read-only="debugFixture"
-            @approve="approveImplementationRun"
+            :open-in-available="openInAvailable"
+            :open-in-applications="openInApplications"
             @open-conversation="selectConversation"
+            @open-worktree="emit('open-worktree', $event)"
             @retry="retryImplementationTicket"
             @stop="stopRun"
           />
@@ -127,7 +130,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import type { Mission, MissionArtifacts, MissionStage } from '@codex-claw/core/missions';
 import { missionWorkflow } from '@codex-claw/core/mission-workflows';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
@@ -138,6 +141,7 @@ import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
 import MissionStageRail from './MissionStageRail.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
+import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 
 const props = withDefaults(defineProps<{
   agents?: Agent[];
@@ -146,8 +150,17 @@ const props = withDefaults(defineProps<{
   mission: Mission;
   readMissionArtifact?: (missionId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
   sendMissionPrompt?: (prompt: string) => Promise<void> | void;
-}>(), { agents: () => [] });
-const emit = defineEmits<{ 'open-conversation': [agentId: string]; 'expand-sidebar': [] }>();
+  openInAvailable?: boolean;
+  openInApplications?: OpenInApplicationCatalog;
+}>(), {
+  agents: () => [],
+  openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
+});
+const emit = defineEmits<{
+  'open-conversation': [agentId: string];
+  'expand-sidebar': [];
+  'open-worktree': [request: MissionWorkspaceOpenRequest];
+}>();
 const { t } = useI18n();
 const busy = ref(false);
 const error = ref('');
@@ -255,14 +268,6 @@ async function approveProposal(): Promise<void> {
   busy.value = true; error.value = '';
   try {
     await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId: run.id });
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
-  finally { busy.value = false; }
-}
-async function approveImplementationRun(runId: string): Promise<void> {
-  if (!props.executeMission) return;
-  busy.value = true; error.value = '';
-  try {
-    await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId });
   } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
   finally { busy.value = false; }
 }

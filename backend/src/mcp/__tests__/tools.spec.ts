@@ -51,7 +51,6 @@ describe('Codex Claw MCP tool registration', () => {
     submitMissionResult: vi.fn(),
     upsertMissionTicket: vi.fn(),
     setMissionTitle: vi.fn(),
-    setMissionExecutionPolicy: vi.fn(),
     attachMissionRepository: vi.fn(),
     listMissionArtifacts: vi.fn(),
     readMissionArtifact: vi.fn(),
@@ -174,18 +173,15 @@ describe('Codex Claw MCP tool registration', () => {
   it('exposes the mission tool family only to an active mission worker and binds title changes to caller identity', async () => {
     coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-1', stage: 'requirements' });
     createServer();
-    expect([...handlers.keys()].slice(0, 7)).toStrictEqual([
-      'set-mission-title', 'set-mission-execution-policy', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result',
-    ]);
+    expect([...handlers.keys()]).toEqual(expect.arrayContaining([
+      'set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result',
+    ]));
+    expect([...handlers.keys()]).not.toContain('set-mission-execution-policy');
     coordinator.setMissionTitle.mockResolvedValue({ success: true, title: 'Add team billing' });
     expect(await handlers.get('set-mission-title')!({ title: 'Add team billing' })).toMatchObject({
       structuredContent: { success: true, title: 'Add team billing' },
     });
     expect(coordinator.setMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
-    coordinator.setMissionExecutionPolicy.mockResolvedValue({ success: true, reviewPolicy: 'reviewAfterImplementation' });
-    await handlers.get('set-mission-execution-policy')!({ reviewPolicy: 'reviewAfterImplementation' });
-    expect(coordinator.setMissionExecutionPolicy).toHaveBeenCalledWith('agent-dina', 'reviewAfterImplementation');
-
     coordinator.listMissionArtifacts.mockReturnValue([{ stage: 'requirements', revision: 1 }]);
     await handlers.get('list-mission-artifacts')!({});
     expect(coordinator.listMissionArtifacts).toHaveBeenCalledWith('agent-dina');
@@ -197,10 +193,11 @@ describe('Codex Claw MCP tool registration', () => {
     expect(coordinator.writeMissionArtifact).toHaveBeenCalledWith('agent-dina', { stage: 'requirements', content: '# Brief', expectedRevision: 1 });
 
     coordinator.submitMissionResult.mockResolvedValue({ success: true, status: 'awaitingReview' });
-    const input = { missionId: 'mission-1', runId: 'run-1', summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
+    const input = { summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
     input.artifacts.tickets = [{ title: 'Checkout', repositoryPath: '/repo', done: false, reference: 'https://example.com/issue/1', dependsOn: [] }] as never[];
     const definition = mocks.registerTool.mock.calls.find(([name]) => name === 'submit-mission-result')![1] as { inputSchema: z.ZodRawShape };
     expect(z.object(definition.inputSchema).parse(input)).toEqual(input);
+    expect(z.object(definition.inputSchema).parse({ ...input, missionId: 'stale-mission', runId: 'stale-run' })).toEqual(input);
     expect(await handlers.get('submit-mission-result')!(input)).toMatchObject({ structuredContent: { success: true, status: 'awaitingReview' } });
     expect(coordinator.submitMissionResult).toHaveBeenCalledWith('agent-dina', input);
 

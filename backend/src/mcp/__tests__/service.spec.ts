@@ -340,7 +340,6 @@ describe('ClawMcpService', () => {
         submitResult: vi.fn(),
         upsertTicket: vi.fn(),
         setTitle: onSetMissionTitle,
-        setExecutionPolicy: vi.fn(),
         attachRepository: vi.fn(),
         listArtifacts: vi.fn().mockReturnValue([]),
         readArtifact: vi.fn(),
@@ -352,9 +351,10 @@ describe('ClawMcpService', () => {
     const workerTools = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
     });
-    const missionTools = ['set-mission-title', 'set-mission-execution-policy', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
+    const missionTools = ['set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
     const workerToolNames = workerTools.result.tools.map((tool: { name: string }) => tool.name);
-    expect(workerToolNames.slice(0, 7)).toStrictEqual(missionTools);
+    expect(workerToolNames).toEqual(expect.arrayContaining(missionTools));
+    expect(workerToolNames).not.toContain('set-mission-execution-policy');
     expect(workerToolNames).not.toContain('toggle_thread_flag');
     const blockedToggle = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 2, method: 'tools/call',

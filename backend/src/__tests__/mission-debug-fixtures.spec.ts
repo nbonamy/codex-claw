@@ -32,7 +32,7 @@ describe('Mission debug fixtures', () => {
         expect(currentRun?.proposal?.tickets.every(ticket => !ticket.done)).toBe(true);
       } else if (stage === 'implementation') {
         expect(mission.execution!.workspaces).toHaveLength(2);
-        expect(mission.execution!.runs.filter(run => run.stage === stage).map(run => run.status)).toStrictEqual(['accepted', 'running', 'awaitingReview']);
+        expect(mission.execution!.runs.filter(run => run.stage === stage).map(run => run.status)).toStrictEqual(['accepted', 'running', 'failed']);
         expect(mission.execution!.runs.filter(run => run.stage === stage).every(run => run.workerId === missionWorker.id)).toBe(true);
         expect(mission.execution!.runs.filter(run => run.stage === stage).map(run => run.memberId)).toStrictEqual([
           snapshot.agents[0]!.id,

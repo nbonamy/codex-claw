@@ -47,7 +47,7 @@ export function applyMissionDebugFixture(snapshot: AppSnapshot, missionId: strin
     addRun({ id: `${mission.id}-debug-tickets`, stage, memberId: member(0).id, workerId: worker(0).id, status: 'awaitingReview', proposal, draftTickets: structuredClone(tickets), summary: 'The implementation backlog is ready for review.' });
   } else {
     const implementationStatuses: MissionRun['status'][] = stage === 'implementation'
-      ? ['accepted', 'running', 'awaitingReview']
+      ? ['accepted', 'running', 'failed']
       : tickets.map(() => 'accepted');
     implementationStatuses.forEach((status, index) => {
       const assigned = worker(index);
@@ -59,12 +59,15 @@ export function applyMissionDebugFixture(snapshot: AppSnapshot, missionId: strin
         ticketIndex: index,
         repositoryPath: tickets[index]!.repositoryPath,
         status,
-        ...(status === 'accepted' || status === 'awaitingReview' ? {
+        ...(status === 'accepted' ? {
           implementationResult: {
             changes: `Implemented ${tickets[index]!.title.toLowerCase()} with repository-scoped changes.`,
             tests: `Focused verification for ticket ${index + 1} passes.`,
           },
-          ...(status === 'accepted' ? { finishedAt: now } : {}),
+          finishedAt: now,
+        } : status === 'failed' ? {
+          error: 'Focused verification failed in the debug fixture.',
+          finishedAt: now,
         } : {}),
       });
     });
@@ -109,7 +112,6 @@ export function applyMissionDebugFixture(snapshot: AppSnapshot, missionId: strin
     teamId: mission.teamId,
     debugFixture: true,
     memberIds,
-    reviewPolicy: 'reviewEachTicket',
     workspaceName: `debug-${slug(mission.outcome)}`,
     workspaces,
     runs,

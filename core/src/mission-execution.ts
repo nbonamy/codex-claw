@@ -6,9 +6,7 @@ export type {
   MissionDelivery,
   MissionExecution,
   MissionExecutionInput,
-  MissionExecutionPolicyResult,
   MissionResultInput,
-  MissionReviewPolicy,
   MissionRun,
   MissionTicketDraftInput,
   MissionTicketDraftResult,
@@ -30,7 +28,7 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
   };
   const context = [
     `Mission: ${mission.outcome}`,
-    `Stage: ${run.stage}. Mission ID: ${mission.id}. Run ID: ${run.id}.`,
+    `Stage: ${run.stage}.`,
     `Repositories currently represented in the team: ${repositories.length ? repositories.join(', ') : 'none'}. Repository attachment is optional during shaping.`,
     mission.execution?.workspaces?.length
       ? `Mission workspace ${mission.execution.workspaceName ?? ''}:\n${mission.execution.workspaces.map(workspace => `- ${workspace.repositoryPath} -> ${workspace.path} at ${workspace.baseSha ?? 'unavailable'}`).join('\n')}\nWork only in your assigned isolated worktree. Do not edit source checkouts or other Mission worktrees.`
@@ -45,7 +43,7 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
     `Current accepted artifacts:\n${JSON.stringify(mission.artifacts, null, 2)}`,
     `Canonical artifact files:\n${JSON.stringify(mission.artifactFiles, null, 2)}`,
     'Use codex_claw.list-mission-artifacts and codex_claw.read-mission-artifact to inspect shared mission work. For Requirements and Review, write your stage artifact with codex_claw.write-mission-artifact before submitting it. During Tickets, use only codex_claw.upsert-mission-ticket for ticket content; pass the exact represented repository path for every ticket. During Implementation, submit ticket-scoped changes and verification directly; Claw aggregates the canonical Implementation artifact. These tools are the canonical handoff between mission agents.',
-    'When ready, call codex_claw.submit-mission-result with missionId, runId, summary, and the complete artifacts object using the same schema shown above. Update only artifacts belonging to your assigned stage (and only your assigned implementation ticket). This submits a proposal for user review; it does not approve a stage. Do not merely paste the result into chat. Do not claim a stage was approved or a mission completed.',
+    `When ready, call codex_claw.submit-mission-result with summary and the complete artifacts object using the same schema shown above. The active Mission and run are inferred from your authenticated agent identity; do not supply IDs. Update only artifacts belonging to your assigned stage (and only your assigned implementation ticket). ${run.stage === 'implementation' ? 'Implementation evidence is accepted into the aggregate and continues toward the explicit Review stage.' : 'This submits a proposal for user review; it does not approve a stage.'} Do not merely paste the result into chat. Do not claim a stage was approved or a mission completed.`,
   ].filter(Boolean).join('\n\n');
   return `<context>\n${context}\n</context>`;
 }

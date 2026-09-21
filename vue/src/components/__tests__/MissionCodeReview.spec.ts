@@ -7,9 +7,26 @@ import MissionCodeReview from '../MissionCodeReview.vue';
 describe('MissionCodeReview', () => {
   it('loads actual branch and uncommitted diffs for the mission worker and exposes read errors', async () => {
     const agent = createInitialSnapshot().agents[0]!;
+    agent.openInApplication = 'vscode';
     const getDiff = vi.fn().mockResolvedValue({ diff: 'diff --git a/billing.ts b/billing.ts\n--- a/billing.ts\n+++ b/billing.ts\n@@ -1 +1 @@\n-old\n+new', summary: { addedLines: 1, removedLines: 1, changedFiles: 1 }, sections: [], target: { type: 'branch' } });
-    const wrapper = mount(MissionCodeReview, { props: { agent, getDiff }, global: { plugins: [ElementPlus], stubs: { GitWorkflowControl: true } } });
+    const wrapper = mount(MissionCodeReview, {
+      props: {
+        agent,
+        getDiff,
+        openInAvailable: true,
+        openInApplications: {
+          defaultApplication: 'finder',
+          applications: [{ id: 'vscode', label: 'VS Code' }, { id: 'finder', label: 'Finder' }],
+        },
+        workspacePath: '/src/billing-mission',
+      },
+      global: { plugins: [ElementPlus], stubs: { GitWorkflowControl: true } },
+    });
     await flushPromises();
+    await wrapper.get('[aria-label="Open in VS Code"]').trigger('click');
+    expect(wrapper.emitted('open-worktree')).toStrictEqual([[
+      { agentId: agent.id, application: 'vscode', path: '/src/billing-mission' },
+    ]]);
     expect(getDiff).toHaveBeenLastCalledWith(agent.id, { type: 'branch' });
     expect(wrapper.text()).toContain('billing.ts');
     const select = wrapper.findComponent({ name: 'ElSelect' });

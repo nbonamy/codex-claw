@@ -3,7 +3,7 @@ import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { createEntityId } from '@codex-claw/core/ids';
 import { isMissionArtifacts, missionTicketReady, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
 import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionResultInput, type MissionReviewPolicy, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionResultInput, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { MissionAgentTools } from './mission-agent-tools';
 import { missionAgent, missionTeamRepositories, sameSkills, shouldCompactBeforeRun, stageKickoffPrompt } from './mission-execution-policy';
@@ -48,7 +48,7 @@ export class MissionExecutionService {
         || input.memberIds.some(id => !this.ports.snapshot.agents.some(agent => agent.id === id && agent.teamId === team.id))) throw new Error('Choose a local team and at least one of its agents.');
       await this.change(input, current => {
         if (current.execution?.workspace || current.execution?.runs.length) throw new Error('Mission workspace configuration is locked after the first run.');
-        current.execution = { teamId: team.id, memberIds: [...new Set(input.memberIds)], reviewPolicy: 'reviewEachTicket', workspaces: [], runs: [] };
+        current.execution = { teamId: team.id, memberIds: [...new Set(input.memberIds)], workspaces: [], runs: [] };
       });
       return;
     }
@@ -150,6 +150,16 @@ export class MissionExecutionService {
   }
 
   async recoverInterruptedRuns(): Promise<void> {
+    for (const mission of this.ports.snapshot.missions ?? []) {
+      if (mission.execution?.debugFixture || mission.stage !== 'implementation') continue;
+      const legacyReviews = mission.execution?.runs.filter(run => (
+        run.stage === 'implementation' && run.status === 'awaitingReview' && run.proposal && run.implementationResult
+      )) ?? [];
+      for (const run of legacyReviews) {
+        const current = this.requireMission(mission.id);
+        await this.execute({ id: current.id, revision: current.revision, action: 'accept', runId: run.id });
+      }
+    }
     const interrupted = (this.ports.snapshot.missions ?? []).flatMap(mission => (
       mission.execution?.debugFixture ? [] : mission.execution?.runs
         .filter(run => run.status === 'preparing' || (run.status === 'running' && !this.agent(run.workerId)?.backendSession))
@@ -197,12 +207,14 @@ export class MissionExecutionService {
   }
 
   async submit(agentId: string, input: MissionResultInput): Promise<{ success: true; status: 'awaitingReview' | 'accepted' }> {
-    if (!input || typeof input.missionId !== 'string' || !isMissionArtifacts(input.artifacts) || typeof input.summary !== 'string' || !input.summary.trim() || input.summary.length > 20_000) throw new Error('Invalid mission result.');
+    if (!input || !isMissionArtifacts(input.artifacts) || typeof input.summary !== 'string' || !input.summary.trim() || input.summary.length > 20_000) throw new Error('Invalid mission result.');
+    const context = this.agentTools.contextForAgent(agentId);
+    if (!context) throw new Error('This agent does not own an active run for this mission stage.');
     let status: 'awaitingReview' | 'accepted' = 'awaitingReview';
     let nextRunIds: string[] = [];
-    await this.ports.missions.changeAsync(input.missionId, async mission => {
+    await this.ports.missions.changeAsync(context.missionId, async mission => {
       const workflow = missionWorkflow(mission.workflow.type);
-      const run = mission.execution?.runs.find(run => run.id === input.runId);
+      const run = mission.execution?.runs.find(run => run.id === context.runId);
       if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
       if (run.stage !== 'implementation' && !mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
       const proposal = structuredClone(mission.artifacts);
@@ -227,7 +239,7 @@ export class MissionExecutionService {
       }
       if (!isMissionArtifacts(proposal)) throw new Error('Mission evidence is too large. Submit a concise report with references.');
       run.proposal = proposal; run.summary = input.summary.trim(); run.status = 'awaitingReview'; run.finishedAt = new Date().toISOString();
-      if (run.stage === 'implementation' && mission.execution?.reviewPolicy === 'reviewAfterImplementation') {
+      if (run.stage === 'implementation') {
         this.acceptImplementationResult(mission, run);
         await this.persistImplementationArtifact(mission);
         status = 'accepted';
@@ -236,7 +248,7 @@ export class MissionExecutionService {
       }
     });
     await this.ports.publish();
-    if (nextRunIds.length) this.postTurnLaunches.set(agentId, { missionId: input.missionId, runIds: nextRunIds });
+    if (nextRunIds.length) this.postTurnLaunches.set(agentId, { missionId: context.missionId, runIds: nextRunIds });
     return { success: true, status };
   }
 
@@ -247,7 +259,6 @@ export class MissionExecutionService {
   readArtifactForMission(missionId: string, stage: MissionStage): Promise<MissionArtifactReadResult> { return this.agentTools.readArtifactForMission(missionId, stage); }
   writeArtifact(agentId: string, input: MissionArtifactWriteInput): Promise<MissionArtifactReadResult> { return this.agentTools.writeArtifact(agentId, input); }
   upsertTicket(agentId: string, input: MissionTicketDraftInput): Promise<MissionTicketDraftResult> { return this.agentTools.upsertTicket(agentId, input); }
-  setExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy): Promise<MissionExecutionPolicyResult> { return this.agentTools.setExecutionPolicy(agentId, reviewPolicy); }
   setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> { return this.agentTools.setTitle(agentId, title); }
   attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }> { return this.agentTools.attachRepository(agentId, repoPath); }
 

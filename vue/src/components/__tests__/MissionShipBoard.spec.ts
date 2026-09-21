@@ -3,6 +3,7 @@ import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission } from '@codex-claw/core/missions';
+import type { AgentGitWorkflow, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import MissionShipBoard from '../MissionShipBoard.vue';
 
 describe('MissionShipBoard', () => {
@@ -25,7 +26,7 @@ describe('MissionShipBoard', () => {
           GitWorkflowControl: {
             name: 'GitWorkflowControl',
             emits: ['delivery-complete'],
-            template: '<button class="complete-delivery" @click="$emit(\'delivery-complete\', { kind: \'merge\' })">Deliver</button>',
+            template: '<div class="git-workflow-control"><button class="complete-delivery" @click="$emit(\'delivery-complete\', { kind: \'merge\' })">Deliver</button></div>',
           },
         },
       },
@@ -37,6 +38,13 @@ describe('MissionShipBoard', () => {
     expect(cards[1]!.text()).toContain('Pull request created');
     expect(cards[1]!.get('a').attributes('href')).toBe('https://github.com/acme/repo/pull/42');
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1');
+    expect(getComputedStyle(wrapper.get('.mission-ship').element).display).toBe('flex');
+    const actionsStyle = getComputedStyle(cards[0]!.get('.mission-ship__actions').element);
+    expect({ display: actionsStyle.display, justifyContent: actionsStyle.justifyContent }).toStrictEqual({
+      display: 'flex',
+      justifyContent: 'flex-start',
+    });
+    expect(wrapper.find('h3').exists()).toBe(false);
 
     await cards[0]!.get('.mission-ship__repository').trigger('click');
     expect(wrapper.emitted('open-conversation')).toStrictEqual([[snapshot.agents[0]!.id]]);
@@ -64,5 +72,74 @@ describe('MissionShipBoard', () => {
 
     expect(wrapper.text()).toContain('Debug fixture — delivery actions are disabled.');
     expect(wrapper.findComponent({ name: 'GitWorkflowControl' }).exists()).toBe(false);
+  });
+
+  it('presents merge and pull request as the pending repository delivery choices', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const mission = createMission(snapshot, { outcome: 'Ship billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: agent.id });
+    mission.stage = 'ship';
+    mission.execution!.workspaces = [{ repositoryPath: agent.folder!, path: `${agent.folder}-mission`, branch: 'mission/ship-billing' }];
+    mission.execution!.deliveries = [{ repositoryPath: agent.folder!, agentId: agent.id, status: 'pending' }];
+    const workflow: AgentGitWorkflow = {
+      repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, baseBranch: 'main', branch: 'mission/ship-billing', detached: false,
+      remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/mission/ship-billing', ahead: 1, behind: 0,
+      stagedAddedLines: 0, stagedRemovedLines: 0, unstagedAddedLines: 0, unstagedRemovedLines: 0, untrackedAddedLines: 0, untrackedRemovedLines: 0,
+      files: [], stagedFiles: [], unstagedFiles: [], githubConnected: true,
+    };
+    const wrapper = mount(MissionShipBoard, {
+      props: {
+        mission, agents: snapshot.agents, gitStatuses: {},
+        getWorkflow: vi.fn().mockResolvedValue(workflow),
+        mergeBranch: vi.fn().mockResolvedValue(workflow),
+        createPullRequest: vi.fn().mockResolvedValue(workflow),
+      },
+      global: { plugins: [ElementPlus] },
+    });
+
+    await vi.waitFor(() => expect(wrapper.findAll('.git-workflow-control__delivery-action')[0]?.attributes('disabled')).toBeUndefined());
+    expect(wrapper.findAll('.git-workflow-control__delivery-action').map(button => button.text())).toStrictEqual(['Merge', 'Create PR']);
+    expect(wrapper.find('.git-workflow-control__trigger').exists()).toBe(false);
+  });
+
+  it('opens the Mission worktree before the repository delivery actions', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const repositoryPath = agent.folder!;
+    const worktreePath = `${repositoryPath}-mission`;
+    agent.folder = worktreePath;
+    agent.openInApplication = 'vscode';
+    const mission = createMission(snapshot, { outcome: 'Ship billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: agent.id });
+    mission.stage = 'ship';
+    mission.execution!.workspaces = [{ repositoryPath, path: worktreePath, branch: 'mission/ship-billing' }];
+    mission.execution!.deliveries = [{ repositoryPath, agentId: agent.id, status: 'pending' }];
+    const openInApplications: OpenInApplicationCatalog = {
+      defaultApplication: 'finder',
+      applications: [
+        { id: 'vscode', label: 'VS Code' },
+        { id: 'finder', label: 'Finder' },
+      ],
+    };
+    const wrapper = mount(MissionShipBoard, {
+      props: {
+        mission,
+        agents: snapshot.agents,
+        gitStatuses: {},
+        openInAvailable: true,
+        openInApplications,
+      },
+      global: {
+        plugins: [ElementPlus],
+        stubs: { GitWorkflowControl: { template: '<div class="git-workflow-control" />' } },
+      },
+    });
+
+    const actions = wrapper.get('.mission-ship__actions');
+    expect(actions.element.firstElementChild?.classList).toContain('open-in-control');
+    await actions.get('[aria-label="Open in VS Code"]').trigger('click');
+
+    expect(wrapper.emitted('open-worktree')).toStrictEqual([[
+      { agentId: agent.id, application: 'vscode', path: worktreePath },
+    ]]);
   });
 });

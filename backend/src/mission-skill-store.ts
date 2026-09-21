@@ -48,7 +48,7 @@ Convert the accepted requirements into a small, ordered backlog that Mission age
 2. Draft tracer-bullet vertical slices. Each ticket must deliver independently verifiable behavior, fit one agent context, name exactly one represented repository, and include acceptance criteria plus meaningful verification.
 3. Record real blocking edges only. Use an expand-migrate-contract sequence for a wide mechanical refactor that cannot land as independent vertical slices.
 4. Upsert each draft through \`codex_claw.upsert-mission-ticket\` as soon as it is coherent, then revise it through the same tool as the breakdown improves. Use the stable Mission ticket IDs returned by the tool for dependencies.
-5. Review granularity, dependencies, repository assignment, and execution policy with the user. Record the policy through \`codex_claw.set-mission-execution-policy\`.
+5. Review dependencies and repository assignment with the user. Implementation results flow automatically into the explicit Review stage; do not ask the user to choose another review policy.
 6. When an existing tracker and its repository instructions are already configured, preserve its labels and publish only after review. Otherwise keep Mission tickets as the canonical backlog and continue without tracker setup.
 7. Submit the complete proposal with \`codex_claw.submit-mission-result\`.
 
@@ -73,7 +73,7 @@ Complete only the assigned ticket in the assigned isolated worktree.
 4. Run the repository's meaningful focused checks and inspect the resulting diff and commit history. Before final submission, commit every intended ticket change and verify the working tree is clean. At least one new commit must represent this ticket. Keep commits local: do not push, merge, or open a pull request.
 5. Report blockers in the stage conversation. Report successful changed paths, commit SHAs, and exact verification results through \`codex_claw.submit-mission-result\`.
 
-The ticket is done when its acceptance criteria are met, its intended changes are committed with a clean working tree, and its evidence is submitted for the configured review policy.
+The ticket is done when its acceptance criteria are met, its intended changes are committed with a clean working tree, and its evidence is submitted for the Mission's Review stage.
 `,
   },
   review: {

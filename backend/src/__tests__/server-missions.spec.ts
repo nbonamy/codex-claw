@@ -172,7 +172,17 @@ it('prepares a mission without a provider turn, then starts it from the first us
     const interrupt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
     const releaseConversation = vi.fn();
-    const loadConversation = vi.fn().mockResolvedValue('mission-thread');
+    const refreshedContexts: Array<{
+      context: ReturnType<ClawBackendServer['missionContext']>;
+      instructions: string | undefined;
+    }> = [];
+    const loadConversation = vi.fn(async (agent: Parameters<NonNullable<AgentBackendDriver['loadConversation']>>[0]) => {
+      refreshedContexts.push({
+        context: server!.missionContext(agent.id),
+        instructions: server!.missionDeveloperInstructions(agent.id),
+      });
+      return { kind: 'codex' as const, threadId: 'mission-thread' };
+    });
     const driver: AgentBackendDriver = {
       backend: 'codex', getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }), getCapabilities: () => codexBackendCapabilities,
       sendPrompt, interrupt, archiveAgentConversation, releaseConversation, loadConversation,
@@ -216,7 +226,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
       result: { content: expect.stringContaining('Team billing'), revision: 1 },
     });
     expect(server.listMissionArtifacts(run.workerId!)).toEqual([expect.objectContaining({ stage: 'requirements', revision: 1 })]);
-    await server.submitMissionResult(run.workerId!, { missionId: current().id, runId: run.id, summary: 'Ready', artifacts });
+    await server.submitMissionResult(run.workerId!, { summary: 'Ready', artifacts });
     await call('mission/execution/update', { id: current().id, revision: current().revision, action: 'accept', runId: run.id });
     expect(snapshotFromPersistedState(disk).missions![0]!.artifacts.requirements).toEqual(artifacts.requirements);
     expect(current().stage).toBe('tickets');
@@ -226,9 +236,25 @@ it('prepares a mission without a provider turn, then starts it from the first us
     expect(current().execution!.runs.at(-1)!.workerId).toBe(run.workerId);
     await vi.waitFor(() => expect(releaseConversation).toHaveBeenCalledWith(worker.id));
     expect(loadConversation).toHaveBeenCalledWith(worker);
+    const ticketsRun = current().execution!.runs.at(-1)!;
+    expect(refreshedContexts.at(-1)).toMatchObject({
+      context: { missionId: current().id, runId: ticketsRun.id, stage: 'tickets' },
+      instructions: expect.stringContaining(join(missionHome, 'skills', 'mission-to-tickets', 'SKILL.md')),
+    });
+    expect(refreshedContexts.at(-1)?.instructions).toContain('Owners can pay');
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toEqual([
       expect.objectContaining({ agentId: worker.id, text: expect.stringContaining('assigned Claw Mission skill') }),
     ]));
+    await server.upsertMissionTicket(worker.id, {
+      title: 'Implement billing', body: 'Deliver owner checkout.', repositoryPath: repo,
+    });
+    await expect(server.submitMissionResult(worker.id, {
+      summary: 'Tickets ready', artifacts: structuredClone(current().artifacts),
+    })).resolves.toEqual({ success: true, status: 'awaitingReview' });
+    expect(current().execution!.runs.at(-1)).toMatchObject({
+      id: ticketsRun.id,
+      proposal: { tickets: [expect.objectContaining({ title: 'Implement billing' })] },
+    });
     const missionId = current().id;
     await call('mission/delete', { id: missionId, revision: current().revision, deleteWorktrees: false, confirmed: true });
     expect(snapshot.missions).toStrictEqual([]);

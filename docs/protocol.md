@@ -140,7 +140,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `mission/create` | `{ input: CreateMissionInput }` | `AppSnapshot` | Creates a team-scoped outcome and immediately starts its orchestrator from a Claw-owned mission home. No repository is required. |
 | `mission/artifact/read` | `{ missionId, stage }` | `MissionArtifactReadResult` | Reads a canonical stage artifact through the app-owned protocol without exposing its Claw data-folder path. |
 | `mission/delete` | `{ input: DeleteMissionInput }` | `AppSnapshot` | Deletes the current persisted revision, interrupts active Mission workers, archives and releases their provider conversations, removes hidden workers, and deletes Mission-owned artifacts and generated skills. The confirmed input explicitly chooses whether tracked Mission worktrees and local branches are kept or deleted; unsafe worktree cleanup rejects the deletion. |
-| `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Starts stage attempts, accepts proposals or ticket evidence, stops a run, reopens a reached stage, or records a repository delivery. Requirements and tickets run from the Mission home. Accepting Tickets provisions sibling worktrees for affected repositories, then schedules one dependency-ready implementation run per repository. Accepting Review enters the app-owned Ship stage without starting another agent. Ship records a pull request or merge for each affected repository and completes the Mission only after all are delivered. An assigned worker may revise and resubmit while its result awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
+| `mission/execution/update` | `{ input: MissionExecutionInput }` | `AppSnapshot` | Starts stage attempts, accepts stage proposals, stops a run, reopens a reached stage, or records a repository delivery. Requirements and tickets run from the Mission home. Accepting Tickets provisions sibling worktrees for affected repositories, then schedules one dependency-ready implementation run per repository. Successful implementation evidence is aggregated automatically before the explicit Review stage. Accepting Review enters the app-owned Ship stage without starting another agent. Ship records a pull request or merge for each affected repository and completes the Mission only after all are delivered. An assigned stage orchestrator may revise and resubmit while its proposal awaits review. Uses optimistic revisions; launch continues asynchronously with persisted progress. |
 | `mission/update` | `{ input: UpdateMissionInput }` | `AppSnapshot` | Saves structured artifacts and per-stage agent references, optionally approving the current stage. Requires the current revision; rejects stale writes, missing agents, invalid earlier gates, and edits to completed missions. |
 
 Mission writes persist before publishing `snapshot.updated`. Existing snapshots
@@ -157,10 +157,10 @@ metadata in snapshots.
 
 Ticket artifacts carry the exact represented repository path. Mission execution
 persists a common human-readable workspace name, one worktree record per affected
-repository, the per-ticket repository assignment, and the user's review policy.
+repository, and the per-ticket repository assignment.
 Independent repositories may run concurrently; a repository has at most one active
-implementation run. In automatic mode, accepted ticket evidence continues the
-repository queue while the final Review stage remains an explicit user gate.
+implementation run. Accepted ticket evidence continues the repository queue while
+the explicit Review stage remains the user gate.
 
 ## Client To `clawd`: Agents
 

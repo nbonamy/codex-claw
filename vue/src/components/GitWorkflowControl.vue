@@ -2,35 +2,58 @@
   <div
     ref="root"
     class="git-workflow-control agent-header__git-actions"
+    :class="{ 'git-workflow-control--delivery': presentation === 'delivery' }"
   >
-    <button
-      class="git-workflow-control__primary"
-      type="button"
-      :disabled="busy || !firstEnabledAction"
-      :aria-label="$t('surface.gitWorkflowControl.runGitAction')"
-      :title="$t('surface.gitWorkflowControl.runGitAction')"
-      @click="runFirstEnabled"
-    >
-      <GitHubIcon aria-hidden="true" />
-    </button>
-    <button
-      class="git-workflow-control__trigger"
-      type="button"
-      :disabled="busy"
-      :aria-label="$t('surface.gitWorkflowControl.chooseGitAction')"
-      :title="$t('surface.gitWorkflowControl.chooseGitAction')"
-      :aria-expanded="menuOpen"
-      @click.stop="toggleMenu"
-    >
-      <ChevronDown aria-hidden="true" />
-    </button>
-    <AppMenu
-      v-if="menuOpen"
-      class="git-workflow-control__menu"
-      :ariaLabel="$t('surface.gitWorkflowControl.gitActions')"
-      :items="menuItems"
-      @select="selectAction"
-    />
+    <template v-if="presentation === 'delivery'">
+      <button
+        class="claw-button claw-button--neutral git-workflow-control__delivery-action"
+        type="button"
+        :disabled="busy || !mergeEnabled || mergeUnavailable"
+        @click="selectAction('merge')"
+      >
+        <GitMergeIcon aria-hidden="true" />
+        <span>{{ $t('surface.gitWorkflowControl.merge') }}</span>
+      </button>
+      <button
+        class="claw-button claw-button--neutral git-workflow-control__delivery-action"
+        type="button"
+        :disabled="busy || !prEnabled"
+        @click="selectAction('create-pr')"
+      >
+        <GitForkIcon aria-hidden="true" />
+        <span>{{ $t('surface.gitWorkflowControl.createPR') }}</span>
+      </button>
+    </template>
+    <template v-else>
+      <button
+        class="git-workflow-control__primary"
+        type="button"
+        :disabled="busy || !firstEnabledAction"
+        :aria-label="$t('surface.gitWorkflowControl.runGitAction')"
+        :title="$t('surface.gitWorkflowControl.runGitAction')"
+        @click="runFirstEnabled"
+      >
+        <GitHubIcon aria-hidden="true" />
+      </button>
+      <button
+        class="git-workflow-control__trigger"
+        type="button"
+        :disabled="busy"
+        :aria-label="$t('surface.gitWorkflowControl.chooseGitAction')"
+        :title="$t('surface.gitWorkflowControl.chooseGitAction')"
+        :aria-expanded="menuOpen"
+        @click.stop="toggleMenu"
+      >
+        <ChevronDown aria-hidden="true" />
+      </button>
+      <AppMenu
+        v-if="menuOpen"
+        class="git-workflow-control__menu"
+        :ariaLabel="$t('surface.gitWorkflowControl.gitActions')"
+        :items="menuItems"
+        @select="selectAction"
+      />
+    </template>
   </div>
 
   <el-dialog
@@ -343,8 +366,9 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   agent: Agent;
+  presentation?: 'menu' | 'delivery';
   gitStatus?: AgentGitStatus | null;
   getWorkflow?: (agentId: string) => Promise<AgentGitWorkflow>;
   generateMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
@@ -354,7 +378,7 @@ const props = defineProps<{
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   updateFromBase?: (agentId: string, input: AgentGitUpdateFromBaseInput) => Promise<AgentGitUpdateFromBaseResult>;
   reportBackAgentName?: string | null;
-}>();
+}>(), { presentation: 'menu' });
 
 const emit = defineEmits<{
   'open-git-diff': [];
@@ -1172,7 +1196,15 @@ function handleMainEvent(event: MainToRendererEvent): void {
   -webkit-app-region: no-drag;
 }
 
-.git-workflow-control > button {
+.git-workflow-control--delivery {
+  height: auto;
+  gap: var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.git-workflow-control:not(.git-workflow-control--delivery) > button {
   display: grid;
   place-items: center;
   padding: 0;
@@ -1193,14 +1225,21 @@ function handleMainEvent(event: MainToRendererEvent): void {
   border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0;
 }
 
-.git-workflow-control > button:hover:not(:disabled) {
+.git-workflow-control:not(.git-workflow-control--delivery) > button:hover:not(:disabled) {
   color: var(--color-text);
   background: var(--color-surface-high);
 }
 
-.git-workflow-control > button:disabled {
+.git-workflow-control:not(.git-workflow-control--delivery) > button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.git-workflow-control__delivery-action {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .git-workflow-control svg {

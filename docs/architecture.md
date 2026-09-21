@@ -104,9 +104,8 @@ depend on a user's installed skill catalog. Repository instructions still
 provide project and tracker conventions, but they cannot replace Mission stage
 gates or require a separate skill setup flow.
 Implementation dispatches dependency-ready tickets in parallel across different
-repositories and serializes work within each repository worktree. The selected
-execution policy either pauses after every ticket for user review or accepts
-successful ticket evidence automatically until the combined final review. Each
+repositories and serializes work within each repository worktree. Successful
+ticket evidence is accepted automatically until the explicit Review stage. Each
 worktree records a baseline commit for whole-mission diff review; failed or
 cancelled attempts retain their workspace and conversation for inspection.
 Requirements/ticket discussions may span multiple provider turns. Provider hosts
@@ -115,17 +114,17 @@ continue to own all conversation content and turn mechanics.
 Mission MCP tools are registered only for the authenticated worker that owns the
 current running or awaiting-review attempt. `set-mission-title` updates the
 persisted Mission. During Tickets, `upsert-mission-ticket` records the affected
-repository and `set-mission-execution-policy` records the user's implementation
-review choice.
+repository.
 `list-mission-artifacts`, `read-mission-artifact`, and
 `write-mission-artifact` provide the canonical handoff between stage agents;
 writes are limited to the caller's assigned stage and use optimistic artifact
 revisions. Implementation agents submit ticket-scoped code and test evidence;
 `clawd` aggregates it into the canonical implementation artifact. Other stages
 submit or revise proposals only after their stage artifact has been written.
-Only the user can accept an
-artifact and approve advancement. Reports are scoped to
-the assigned stage/ticket. Configured Pocock tracker instructions remain authoritative
+Only the user can accept Requirements, Tickets, and Review proposals and approve
+advancement through those gates. Implementation evidence is aggregated automatically
+for the explicit Review stage. Reports are scoped to the assigned stage/ticket.
+Configured Pocock tracker instructions remain authoritative
 for published tickets; mission tickets retain canonical references and record local
 implementation acceptance, not external issue status. Mission ticketing proceeds
 without tracker setup when no tracker is already configured.

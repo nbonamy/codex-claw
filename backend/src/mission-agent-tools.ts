@@ -2,7 +2,7 @@ import { createEntityId } from '@codex-claw/core/ids';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { isMissionArtifacts, type Mission, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
 import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionExecutionPolicyResult, type MissionReviewPolicy, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { missionTeamRepositories } from './mission-execution-policy';
 
@@ -142,20 +142,6 @@ export class MissionAgentTools {
     });
     await this.ports.publish();
     return result;
-  }
-
-  async setExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy): Promise<MissionExecutionPolicyResult> {
-    const context = this.requireContext(agentId);
-    if (!['reviewEachTicket', 'reviewAfterImplementation'].includes(reviewPolicy)) throw new Error('Invalid Mission execution policy.');
-    await this.ports.missions.change(context.missionId, mission => {
-      const run = mission.execution?.runs.find(candidate => candidate.id === context.runId);
-      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || mission.stage !== 'tickets') {
-        throw new Error('Execution policy can be changed only by the active Tickets orchestrator.');
-      }
-      mission.execution!.reviewPolicy = reviewPolicy;
-    });
-    await this.ports.publish();
-    return { success: true, reviewPolicy };
   }
 
   async setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> {

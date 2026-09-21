@@ -171,6 +171,17 @@ button {
   background: var(--color-primary-container);
 }
 
+.claw-button--neutral {
+  border-color: var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface-lowest);
+}
+
+.claw-button--neutral:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-high);
+}
+
 .claw-button--tertiary {
   color: var(--color-text-muted);
   background: transparent;

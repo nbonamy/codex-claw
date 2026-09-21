@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission, type Mission } from '@codex-claw/core/missions';
 import type { MissionArtifactReadResult, MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
 import MissionTicketBoard, { type MissionTicketComment } from '../MissionTicketBoard.vue';
 
@@ -37,6 +37,8 @@ function mountWorkspace(mission: Mission, options: {
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   readMissionArtifact?: (missionId: string, stage: MissionArtifactReadResult['stage']) => Promise<MissionArtifactReadResult>;
   sendMissionPrompt?: (prompt: string) => Promise<void>;
+  openInAvailable?: boolean;
+  openInApplications?: OpenInApplicationCatalog;
 } = {}) {
   return mount(MissionWorkspace, {
     props: {
@@ -45,6 +47,8 @@ function mountWorkspace(mission: Mission, options: {
       executeMission: options.executeMission ?? vi.fn().mockResolvedValue(undefined),
       readMissionArtifact: options.readMissionArtifact,
       sendMissionPrompt: options.sendMissionPrompt,
+      openInAvailable: options.openInAvailable,
+      openInApplications: options.openInApplications,
     },
     slots: {
       conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
@@ -195,8 +199,33 @@ describe('MissionWorkspace', () => {
         status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:02:00.000Z',
       },
     );
-    const wrapper = mountWorkspace(mission, { agents: snapshot.agents });
+    const worktreePath = '/src/billing-service-mission';
+    snapshot.agents[1]!.folder = worktreePath;
+    snapshot.agents[1]!.openInApplication = 'vscode';
+    mission.execution!.workspaces = [{
+      repositoryPath: '/src/billing-service',
+      path: worktreePath,
+      branch: 'mission/add-billing',
+    }];
+    const wrapper = mountWorkspace(mission, {
+      agents: snapshot.agents,
+      openInAvailable: true,
+      openInApplications: {
+        defaultApplication: 'finder',
+        applications: [{ id: 'vscode', label: 'VS Code' }, { id: 'finder', label: 'Finder' }],
+      },
+    });
     await flushPromises();
+
+    const implementationLane = wrapper.get('.mission-implementation__lane');
+    expect(getComputedStyle(implementationLane.element)).toMatchObject({ width: '100%', maxWidth: 'none' });
+    expect(getComputedStyle(implementationLane.get('.mission-implementation__ticket-item').element).maxWidth).toBe('320px');
+    expect(getComputedStyle(implementationLane.get('.mission-implementation__ticket').element).height).toBe('196px');
+    expect(implementationLane.get('header').text()).toContain('mission/add-billing');
+    await implementationLane.get('[aria-label="Open in VS Code"]').trigger('click');
+    expect(wrapper.emitted('open-worktree')).toStrictEqual([[
+      { agentId: snapshot.agents[1]!.id, application: 'vscode', path: worktreePath },
+    ]]);
 
     const conversations = wrapper.get('[aria-label="Mission conversations"]');
     const tabs = conversations.findAll('[role="tab"]');
@@ -330,15 +359,14 @@ describe('MissionWorkspace', () => {
     expect(executeMission).toHaveBeenCalledTimes(1);
   });
 
-  it('shows affected repository lanes, switches to a ticket agent, and approves its evidence', async () => {
+  it('shows affected repository lanes, switches to a ticket agent, and opens accepted evidence', async () => {
     const mission = missionWithRun('accepted', true);
     mission.stage = 'implementation';
     mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
     mission.artifacts.tickets = [
-      { title: 'Checkout', body: 'Implement checkout end to end.', repositoryPath: '/src/billing-service', done: false },
+      { title: 'Checkout', body: 'Implement checkout end to end.', repositoryPath: '/src/billing-service', done: true },
       { title: 'Invoice', body: 'Render the paid invoice.', repositoryPath: '/src/invoice-app', done: false },
     ];
-    mission.execution!.reviewPolicy = 'reviewEachTicket';
     mission.execution!.workspaces = [
       { repositoryPath: '/src/billing-service', path: '/src/billing-service-add-team-billing', branch: 'mission/add-team-billing' },
       { repositoryPath: '/src/invoice-app', path: '/src/invoice-app-add-team-billing', branch: 'mission/add-team-billing' },
@@ -346,7 +374,7 @@ describe('MissionWorkspace', () => {
     mission.execution!.runs = [
       {
         id: 'run-checkout', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
-        repositoryPath: '/src/billing-service', status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+        repositoryPath: '/src/billing-service', status: 'accepted', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
         implementationResult: { changes: 'checkout.ts now completes payment.', tests: 'checkout integration test passes' },
       },
       {
@@ -354,8 +382,7 @@ describe('MissionWorkspace', () => {
         repositoryPath: '/src/invoice-app', status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:01:01.000Z',
       },
     ];
-    const executeMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountWorkspace(mission, { executeMission });
+    const wrapper = mountWorkspace(mission);
 
     const board = wrapper.get('[aria-label="Implementation by repository"]');
     expect(board.text()).toContain('2 affected repositories');
@@ -366,13 +393,13 @@ describe('MissionWorkspace', () => {
     ]);
     expect(board.text()).toContain('billing-service');
     expect(board.text()).toContain('invoice-app');
-    expect(board.text()).toContain('Ready for review');
+    expect(board.text()).toContain('Accepted');
     expect(board.text()).toContain('Building');
     expect(board.get('[aria-label="Execution status"]').text()).toContain('1 active');
-    expect(board.get('[aria-label="Execution status"]').text()).toContain('1 to review');
+    expect(board.get('[aria-label="Execution status"]').text()).toContain('1 complete');
     expect(board.get('[role="progressbar"]').attributes()).toMatchObject({
       'aria-valuemax': '2',
-      'aria-valuenow': '0',
+      'aria-valuenow': '1',
     });
     expect(board.findAll('.mission-implementation__agent').map(agent => agent.text())).toStrictEqual(['Builder', 'Builder']);
 
@@ -390,11 +417,7 @@ describe('MissionWorkspace', () => {
     expect(ticketDialog.text()).toContain('Implement checkout end to end.');
     expect(ticketDialog.text()).toContain('checkout integration test passes');
 
-    await wrapper.get('.mission-implementation__dialog-footer .claw-button').trigger('click');
-    await flushPromises();
-
-    expect(executeMission).toHaveBeenNthCalledWith(1, { id: mission.id, revision: mission.revision, action: 'accept', runId: 'run-checkout' });
-    expect(executeMission).toHaveBeenCalledOnce();
+    expect(wrapper.find('.mission-implementation__dialog-footer .claw-button').exists()).toBe(false);
   });
 
   it('keeps aggregate implementation evidence in a review dialog', async () => {

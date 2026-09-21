@@ -14,7 +14,6 @@ export class MissionWorkspaceService {
 
   async provisionImplementationWorkspaces(mission: Mission): Promise<void> {
     const execution = mission.execution!;
-    execution.reviewPolicy ??= 'reviewEachTicket';
     execution.workspaceName ??= missionWorkspaceName(mission);
     execution.workspaces ??= [];
     const branch = `mission/${execution.workspaceName}`;

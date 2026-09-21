@@ -1,4 +1,4 @@
-import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionExecutionPolicyResult, MissionResultInput, MissionReviewPolicy, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/missions';
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
@@ -118,7 +118,6 @@ export type MissionToolPort = {
   submitResult(agentId: string, input: MissionResultInput): Promise<{ success: true; status: 'awaitingReview' | 'accepted' }>;
   upsertTicket(agentId: string, input: MissionTicketDraftInput): Promise<MissionTicketDraftResult>;
   setTitle(agentId: string, title: string): Promise<{ success: true; title: string }>;
-  setExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy): Promise<MissionExecutionPolicyResult>;
   attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }>;
   listArtifacts(agentId: string): Array<{ stage: MissionStage } & MissionArtifactFile>;
   readArtifact(agentId: string, stage: MissionStage): Promise<MissionArtifactReadResult>;
@@ -351,12 +350,6 @@ export class ClawMcpAgentCoordinator {
     this.requireAgent(agentId);
     if (!this.missionTools) throw new McpToolError('Mission title updates are unavailable.');
     return this.missionTools.setTitle(agentId, title);
-  }
-
-  async setMissionExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy) {
-    this.requireAgent(agentId);
-    if (!this.missionTools) throw new McpToolError('Mission execution policy updates are unavailable.');
-    return this.missionTools.setExecutionPolicy(agentId, reviewPolicy);
   }
 
   async attachMissionRepository(agentId: string, repoPath: string) {

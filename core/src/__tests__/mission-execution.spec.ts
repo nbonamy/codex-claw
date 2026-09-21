@@ -7,7 +7,7 @@ import { missionDeveloperInstructions, pendingMissionRun, type MissionRun } from
 it('carries the assigned stage, accepted artifacts, workspace, skills and revision feedback into the provider handoff', () => {
   const snapshot = createInitialSnapshot();
   const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
-  mission.execution = { teamId: 'team', memberIds: ['member'], workspaceName: 'billing-work', reviewPolicy: 'reviewAfterImplementation', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [] };
+  mission.execution = { teamId: 'team', memberIds: ['member'], workspaceName: 'billing-work', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [] };
   mission.artifacts.requirements = { problem: 'Owners pay', acceptance: 'Only owners' };
   for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {
     const run: MissionRun = { id: 'run', stage, memberId: 'member', ticketIndex: 1, status: 'running', skills: [{ name: `mission-${stage}`, path: `/mission/skills/mission-${stage}/SKILL.md` }], feedback: 'Check permissions', startedAt: 'now' };
@@ -16,6 +16,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toMatch(/\n<\/context>$/);
     expect(prompt).toContain('Mission: Billing');
     expect(prompt).toContain(`Stage: ${stage}.`);
+    expect(prompt).not.toContain('Run ID:');
     expect(prompt).toContain('/isolated');
     expect(prompt).toContain('a'.repeat(40));
     expect(prompt).toContain(`/mission/skills/mission-${stage}/SKILL.md`);
@@ -32,7 +33,8 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
       expect(prompt).toContain('coherent local commits');
       expect(prompt).toContain('commit SHAs');
     }
-    expect(prompt).toContain('does not approve a stage');
+    if (stage === 'implementation') expect(prompt).toContain('explicit Review stage');
+    else expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Claw-owned Mission skill');
     expect(prompt).toContain('already visible in the Mission workspace');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('no agent-run skill');
@@ -43,7 +45,7 @@ it('validates persisted execution records and dependency graphs before admitting
   const snapshot = createInitialSnapshot();
   const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
   const run: MissionRun = { id: 'run', stage: 'requirements', memberId: 'member', workerId: 'worker', status: 'running', skills: [{ name: 'grilling', path: '/skill' }], feedback: '', startedAt: 'now', finishedAt: 'later', summary: 'Ready', error: 'old error', proposal: structuredClone(mission.artifacts), ticketIndex: 0 };
-  mission.execution = { teamId: 'team', memberIds: ['member'], reviewPolicy: 'reviewEachTicket', workspaceName: 'billing-work', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [run] };
+  mission.execution = { teamId: 'team', memberIds: ['member'], workspaceName: 'billing-work', workspaces: [{ repositoryPath: '/repo', path: '/isolated', branch: 'mission/billing-work', baseSha: 'a'.repeat(40) }], runs: [run] };
   expect(isMission(mission)).toBe(true);
   expect(pendingMissionRun(mission)).toBe(run);
   expect(() => updateMission(snapshot, { id: mission.id, revision: 0, artifacts: mission.artifacts, stageAgentIds: {}, action: 'save' })).toThrow('current mission run');
@@ -51,7 +53,7 @@ it('validates persisted execution records and dependency graphs before admitting
     expect(isMission({ ...mission, execution: { ...mission.execution, runs: [{ ...run, ...change }] } })).toBe(false);
   }
   expect(isMission({ ...mission, execution: { ...mission.execution, workspace: { path: '/repo', branch: 'x', baseSha: 'bad' } } })).toBe(false);
-  expect(isMission({ ...mission, execution: { ...mission.execution, reviewPolicy: 'unknown' } })).toBe(false);
+  expect(isMission({ ...mission, execution: { ...mission.execution, reviewPolicy: 'reviewEachTicket' } })).toBe(true);
   expect(isMission({ ...mission, execution: { ...mission.execution, workspaces: [{ repositoryPath: '', path: '/repo', branch: 'x' }] } })).toBe(false);
   const delivery = { repositoryPath: '/repo', agentId: 'worker', status: 'pullRequestCreated', pullRequest: { number: 42, url: 'https://github.com/acme/repo/pull/42' } };
   expect(isMission({ ...mission, execution: { ...mission.execution, deliveries: [delivery] } })).toBe(true);

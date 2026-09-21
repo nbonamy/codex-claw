@@ -1,41 +1,50 @@
 <template>
   <section class="mission-ship" :aria-label="t('missions.shipBoard')">
     <header class="mission-ship__summary">
-      <div>
-        <h3>{{ t('missions.shipBoard') }}</h3>
-        <p>{{ t('missions.shipRepositoryCount', { complete: completedCount, total: deliveries.length }) }}</p>
-      </div>
-      <div role="progressbar" :aria-valuenow="completedCount" aria-valuemin="0" :aria-valuemax="deliveries.length">
+      <p>{{ t('missions.shipRepositoryCount', { complete: completedCount, total: deliveries.length }) }}</p>
+      <div role="progressbar" :aria-label="t('missions.shipRepositoryCount', { complete: completedCount, total: deliveries.length })" :aria-valuenow="completedCount" aria-valuemin="0" :aria-valuemax="deliveries.length">
         <span :style="{ width: `${progressPercent}%` }" />
       </div>
     </header>
 
     <div class="mission-ship__grid">
       <article v-for="delivery in deliveries" :key="delivery.repositoryPath" class="mission-ship__card" :data-status="delivery.status">
-        <button class="mission-ship__repository" type="button" :aria-label="t('missions.shipOpenConversation', { repository: repositoryName(delivery.repositoryPath) })" @click="emit('open-conversation', delivery.agentId)">
-          <GitForkIcon aria-hidden="true" />
-          <span><strong>{{ repositoryName(delivery.repositoryPath) }}</strong><small>{{ workspaceBranch(delivery.repositoryPath) }}</small></span>
-          <ArrowRightIcon aria-hidden="true" />
-        </button>
-        <div class="mission-ship__status" :data-status="delivery.status">
-          <CheckIcon v-if="delivery.status !== 'pending'" aria-hidden="true" />
-          {{ statusLabel(delivery.status) }}
-        </div>
+        <header class="mission-ship__card-header">
+          <button class="mission-ship__repository" type="button" :aria-label="t('missions.shipOpenConversation', { repository: repositoryName(delivery.repositoryPath) })" @click="emit('open-conversation', delivery.agentId)">
+            <GitForkIcon aria-hidden="true" />
+            <span><strong>{{ repositoryName(delivery.repositoryPath) }}</strong><small>{{ workspaceBranch(delivery.repositoryPath) }}</small></span>
+            <ArrowRightIcon aria-hidden="true" />
+          </button>
+          <div class="mission-ship__status" :data-status="delivery.status">
+            <CheckIcon v-if="delivery.status !== 'pending'" aria-hidden="true" />
+            {{ statusLabel(delivery.status) }}
+          </div>
+        </header>
         <template v-if="delivery.status === 'pending'">
           <p>{{ t('missions.shipActionsHint') }}</p>
           <p v-if="mission.execution?.debugFixture" class="mission-ship__debug">{{ t('missions.shipDebugFixture') }}</p>
-          <GitWorkflowControl
-            v-else-if="agent(delivery.agentId)"
-            :agent="agent(delivery.agentId)!"
-            :git-status="gitStatuses[delivery.agentId]"
-            :get-workflow="getWorkflow"
-            :generate-message="generateMessage"
-            :commit-changes="commitChanges"
-            :push-branch="pushBranch"
-            :create-pull-request="createPullRequest"
-            :merge-branch="mergeBranch"
-            @delivery-complete="recordDelivery(delivery.repositoryPath, $event)"
-          />
+          <div v-else-if="agent(delivery.agentId)" class="mission-ship__actions">
+            <MissionWorkspaceOpenIn
+              v-if="openInApplications && workspacePath(delivery.repositoryPath)"
+              :agent="agent(delivery.agentId)!"
+              :available="openInAvailable"
+              :catalog="openInApplications"
+              :workspace-path="workspacePath(delivery.repositoryPath)!"
+              @open="emit('open-worktree', $event)"
+            />
+            <GitWorkflowControl
+              :agent="agent(delivery.agentId)!"
+              presentation="delivery"
+              :git-status="gitStatuses[delivery.agentId]"
+              :get-workflow="getWorkflow"
+              :generate-message="generateMessage"
+              :commit-changes="commitChanges"
+              :push-branch="pushBranch"
+              :create-pull-request="createPullRequest"
+              :merge-branch="mergeBranch"
+              @delivery-complete="recordDelivery(delivery.repositoryPath, $event)"
+            />
+          </div>
           <p v-else class="mission-ship__error" role="alert">{{ t('missions.shipAgentUnavailable') }}</p>
           <p v-if="errors[delivery.repositoryPath]" class="mission-ship__error" role="alert">{{ errors[delivery.repositoryPath] }}</p>
         </template>
@@ -50,11 +59,12 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import type { Mission } from '@codex-claw/core/missions';
 import type { MissionDelivery, MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, GitForkIcon } from '../shared/icons/app-icons';
 import GitWorkflowControl from './GitWorkflowControl.vue';
+import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 
 const props = defineProps<{
   agents: Agent[];
@@ -67,8 +77,13 @@ const props = defineProps<{
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
+  openInAvailable?: boolean;
+  openInApplications?: OpenInApplicationCatalog;
 }>();
-const emit = defineEmits<{ 'open-conversation': [agentId: string] }>();
+const emit = defineEmits<{
+  'open-conversation': [agentId: string];
+  'open-worktree': [request: MissionWorkspaceOpenRequest];
+}>();
 const { t } = useI18n();
 const errors = reactive<Record<string, string>>({});
 const deliveries = computed(() => props.mission.execution?.deliveries ?? []);
@@ -77,6 +92,7 @@ const progressPercent = computed(() => deliveries.value.length ? Math.round(comp
 
 function agent(agentId: string): Agent | undefined { return props.agents.find(candidate => candidate.id === agentId); }
 function repositoryName(path: string): string { return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path; }
+function workspacePath(repositoryPath: string): string | undefined { return props.mission.execution?.workspaces?.find(workspace => workspace.repositoryPath === repositoryPath)?.path; }
 function workspaceBranch(repositoryPath: string): string { return props.mission.execution?.workspaces?.find(workspace => workspace.repositoryPath === repositoryPath)?.branch ?? repositoryPath; }
 function statusLabel(status: MissionDelivery['status']): string {
   if (status === 'pullRequestCreated') return t('missions.shipPullRequestCreated');
@@ -98,17 +114,15 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 .mission-ship {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-6);
 }
 
 .mission-ship__summary {
-  display: grid;
-  grid-template-columns: 1fr minmax(120px, 220px);
+  display: flex;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-4);
 }
 
-.mission-ship__summary h3,
 .mission-ship__summary p,
 .mission-ship__card p {
   margin: 0;
@@ -122,7 +136,9 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 }
 
 .mission-ship__summary [role="progressbar"] {
+  width: 140px;
   height: 4px;
+  flex: 0 1 140px;
   overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--color-surface-high);
@@ -144,10 +160,8 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 
 .mission-ship__card {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  min-height: 190px;
-  gap: var(--space-6);
-  padding: var(--space-8);
+  gap: var(--space-4);
+  padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface-lowest);
@@ -158,12 +172,20 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
   border-color: var(--color-success);
 }
 
+.mission-ship__card-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-6);
+}
+
 .mission-ship__repository {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--space-4);
   min-width: 0;
+  flex: 1;
   padding: 0;
   border: 0;
   color: inherit;
@@ -195,6 +217,7 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 .mission-ship__status {
   display: inline-flex;
   width: fit-content;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
@@ -213,6 +236,13 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 .mission-ship__status svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
+}
+
+.mission-ship__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: flex-start;
 }
 
 .mission-ship__pull-request {

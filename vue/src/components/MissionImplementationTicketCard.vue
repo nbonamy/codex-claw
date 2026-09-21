@@ -65,12 +65,14 @@ const preview = computed(() => missionTicketPreview(props.item.ticket, t('missio
 <style scoped>
 .mission-implementation__ticket-item {
   position: relative;
+  width: 100%;
+  max-width: 320px;
 }
 
 .mission-implementation__ticket {
   display: grid;
   width: 100%;
-  min-height: 164px;
+  height: 196px;
   grid-template-rows: auto auto 1fr auto;
   gap: var(--space-3);
   padding: var(--space-6);

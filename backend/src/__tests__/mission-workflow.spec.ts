@@ -47,9 +47,16 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     const submit = async (artifacts: MissionArtifacts) => {
       const run = current().execution!.runs.at(-1)!;
       if (run.stage !== 'tickets' && run.stage !== 'implementation') await service.writeArtifact(run.workerId!, { stage: run.stage, content: `# ${run.stage}\nMission artifact.` });
-      await service.submit(run.workerId!, { missionId: mission.id, runId: run.id, summary: `${run.stage} ready`, artifacts });
-      expect(current().execution!.runs.at(-1)!.status).toBe('awaitingReview');
-      await command({ action: 'accept', runId: run.id });
+      const result = await service.submit(run.workerId!, { summary: `${run.stage} ready`, artifacts });
+      if (run.stage === 'implementation') {
+        expect(result.status).toBe('accepted');
+        expect(current().execution!.runs.find(candidate => candidate.id === run.id)!.status).toBe('accepted');
+        await service.agentFinished(run.workerId!);
+      } else {
+        expect(result.status).toBe('awaitingReview');
+        expect(current().execution!.runs.find(candidate => candidate.id === run.id)!.status).toBe('awaitingReview');
+        await command({ action: 'accept', runId: run.id });
+      }
     };
     await command({ action: 'run' });
     for (const stage of ['requirements', 'tickets', 'implementation', 'review'] as const) {

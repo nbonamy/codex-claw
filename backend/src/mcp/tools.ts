@@ -33,13 +33,6 @@ export function createCodexClawMcpServer(
       },
     }, ({ title }) => toolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
 
-    server.registerTool('set-mission-execution-policy', {
-      description: 'Choose how implementation results are reviewed after discussing it with the user. reviewEachTicket pauses each repository lane for approval. reviewAfterImplementation automatically continues successful tickets and pauses for one combined implementation review.',
-      inputSchema: {
-        reviewPolicy: z.enum(['reviewEachTicket', 'reviewAfterImplementation']),
-      },
-    }, ({ reviewPolicy }) => toolResult('set-mission-execution-policy', { callerAgentId, reviewPolicy }, () => coordinator.setMissionExecutionPolicy(callerAgentId, reviewPolicy)));
-
     server.registerTool('list-mission-artifacts', {
       description: 'List canonical artifact files already written for the active Mission. The Mission is inferred from your authenticated agent identity.',
       inputSchema: {},
@@ -72,9 +65,9 @@ export function createCodexClawMcpServer(
     }, input => toolResult('upsert-mission-ticket', { callerAgentId, ticketId: input.ticketId }, () => coordinator.upsertMissionTicket(callerAgentId, input)));
 
     server.registerTool('submit-mission-result', {
-      description: 'Submit the structured result of your assigned Mission stage for user review. Use only with the mission and run IDs from your assignment. This never approves a stage or completes a mission. Include actual verification evidence for implementation work.',
+      description: 'Submit the structured result of your active Mission stage. The Mission and run are inferred from your authenticated agent identity. This never approves a user-reviewed stage or completes a mission. Include actual verification evidence for implementation work.',
       inputSchema: {
-        missionId: z.string(), runId: z.string(), summary: z.string().min(1).max(20000),
+        summary: z.string().min(1).max(20000),
         artifacts: z.object({
           requirements: z.object({ problem: z.string().max(100000), acceptance: z.string().max(100000) }),
           tickets: z.array(z.object({ id: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(), title: z.string().max(100000), body: z.string().max(100000).optional(), repositoryPath: z.string().trim().min(1).optional(), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),

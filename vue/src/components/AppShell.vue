@@ -191,9 +191,9 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" @open-conversation="emit('select-agent', $event)">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
         <template #code-review="{ agentId }">
-          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" />
+          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" :workspace-path="missionWorkspacePathForAgent(agentId)" @open-worktree="openMissionWorktree" />
         </template>
         <template #ship="{ openConversation }">
           <MissionShipBoard
@@ -207,7 +207,10 @@
             :push-branch="props.pushAgentGitBranch"
             :create-pull-request="props.createAgentGitPullRequest"
             :merge-branch="props.mergeAgentGitBranch"
+            :open-in-available="missionOpenInAvailable"
+            :open-in-applications="openInApplications"
             @open-conversation="openConversation"
+            @open-worktree="openMissionWorktree"
           />
         </template>
         <template #conversation="{ agentId }">
@@ -490,6 +493,7 @@ import MissionCodeReview from './MissionCodeReview.vue';
 import MissionShipBoard from './MissionShipBoard.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
 import MissionDeleteDialog from './MissionDeleteDialog.vue';
+import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 import ConversationPane from './ConversationPane.vue';
 import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
@@ -873,6 +877,20 @@ const missionDeletePending = ref(false);
 const missionDeleteError = ref('');
 const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
+const missionOpenInAvailable = computed(() => {
+  const mission = selectedMission.value;
+  if (!mission || props.openInApplications.applications.length === 0) return false;
+  const team = props.snapshot.teams.find(candidate => candidate.id === mission.teamId);
+  return !!team && !team.remoteConnectionId;
+});
+function missionWorkspacePathForAgent(agentId: string): string | undefined {
+  const folder = props.snapshot.agents.find(agent => agent.id === agentId)?.folder;
+  return selectedMission.value?.execution?.workspaces?.find(workspace => workspace.path === folder)?.path
+    ?? selectedMission.value?.execution?.workspace?.path;
+}
+function openMissionWorktree(request: MissionWorkspaceOpenRequest): void {
+  void openAgentIn(request.agentId, request.application, request.path);
+}
 const missionDeleteTarget = computed(() => props.snapshot.missions?.find(m => m.id === missionDeleteTargetId.value) ?? null);
 function selectMissionSurface(id: string): void { selectedMissionId.value = id; activeSurface.value = 'mission'; }
 watch(

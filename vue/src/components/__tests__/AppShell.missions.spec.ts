@@ -173,13 +173,26 @@ describe('AppShell missions', () => {
 
   it('wires repository delivery controls into the Ship stage', async () => {
     const snapshot = createInitialSnapshot();
+    const repositoryPath = snapshot.agents[0]!.folder!;
+    const worktreePath = '/tmp/billing-mission';
     const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     mission.stage = 'ship';
-    mission.execution!.workspaces = [{ repositoryPath: snapshot.agents[0]!.folder!, path: '/tmp/billing-mission', branch: 'mission/add-billing' }];
-    mission.execution!.deliveries = [{ repositoryPath: snapshot.agents[0]!.folder!, agentId: snapshot.agents[0]!.id, status: 'pending' }];
+    mission.execution!.workspaces = [{ repositoryPath, path: worktreePath, branch: 'mission/add-billing' }];
+    mission.execution!.deliveries = [{ repositoryPath, agentId: snapshot.agents[0]!.id, status: 'pending' }];
+    snapshot.agents[0]!.folder = worktreePath;
     const mergeAgentGitBranch = vi.fn();
     const createAgentGitPullRequest = vi.fn();
-    const wrapper = mountShell({ snapshot, mergeAgentGitBranch, createAgentGitPullRequest });
+    const openAgentPath = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      mergeAgentGitBranch,
+      createAgentGitPullRequest,
+      openAgentPath,
+      openInApplications: {
+        defaultApplication: 'vscode',
+        applications: [{ id: 'vscode', label: 'VS Code' }],
+      },
+    });
 
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
 
@@ -187,5 +200,11 @@ describe('AppShell missions', () => {
     expect(board.props('mission')).toMatchObject({ id: mission.id, stage: 'ship' });
     expect(board.props('mergeBranch')).toBe(mergeAgentGitBranch);
     expect(board.props('createPullRequest')).toBe(createAgentGitPullRequest);
+    await board.get('[aria-label="Open in VS Code"]').trigger('click');
+    expect(openAgentPath).toHaveBeenCalledExactlyOnceWith(
+      snapshot.agents[0]!.id,
+      'vscode',
+      worktreePath,
+    );
   });
 });

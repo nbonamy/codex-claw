@@ -39,7 +39,6 @@ export type MissionRun = {
   draftTickets?: MissionTicket[];
   implementationResult?: { changes: string; tests: string };
 };
-export type MissionReviewPolicy = 'reviewEachTicket' | 'reviewAfterImplementation';
 export type MissionWorkspace = { repositoryPath: string; path: string; branch: string; baseSha?: string };
 export type MissionDelivery = {
   repositoryPath: string;
@@ -56,7 +55,6 @@ export type MissionExecution = {
   workspaceName?: string;
   workspaces?: MissionWorkspace[];
   deliveries?: MissionDelivery[];
-  reviewPolicy?: MissionReviewPolicy;
   runs: MissionRun[];
 };
 export type Mission = {
@@ -97,10 +95,9 @@ export type MissionExecutionInput = { id: string; revision: number } & (
   | { action: 'recordDelivery'; repositoryPath: string; result: { kind: 'pullRequest'; number: number; url: string } | { kind: 'merge' } }
   | { action: 'reopen'; stage: MissionStage }
 );
-export type MissionResultInput = { missionId: string; runId: string; artifacts: MissionArtifacts; summary: string };
+export type MissionResultInput = { artifacts: MissionArtifacts; summary: string };
 export type MissionToolContext = { missionId: string; runId: string; stage: MissionStage };
 export type MissionArtifactWriteInput = { stage: MissionStage; content: string; expectedRevision?: number };
 export type MissionArtifactReadResult = { stage: MissionStage; content: string; revision: number; updatedAt: string };
 export type MissionTicketDraftInput = { ticketId?: string; title: string; body: string; repositoryPath: string; reference?: string; blockedByTicketIds?: string[] };
 export type MissionTicketDraftResult = { success: true; ticketId: string; index: number; artifactRevision: number };
-export type MissionExecutionPolicyResult = { success: true; reviewPolicy: MissionReviewPolicy };

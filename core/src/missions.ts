@@ -68,7 +68,7 @@ export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
     artifacts: workflow.createArtifacts(),
     artifactFiles: {},
     stageAgentIds: {},
-    execution: { teamId: team.id, memberIds: [...team.agentIds], reviewPolicy: 'reviewEachTicket', workspaces: [], runs: [] },
+    execution: { teamId: team.id, memberIds: [...team.agentIds], workspaces: [], runs: [] },
   };
   (snapshot.missions ??= []).push(mission);
   return mission;
@@ -107,7 +107,6 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
 function isMissionExecution(v: unknown): v is MissionExecution {
   return record(v) && text(v.teamId) && (v.repoPath === undefined || text(v.repoPath)) && Array.isArray(v.memberIds) && v.memberIds.every(text)
     && (v.debugFixture === undefined || v.debugFixture === true)
-    && (v.reviewPolicy === undefined || ['reviewEachTicket', 'reviewAfterImplementation'].includes(v.reviewPolicy as string))
     && (v.workspaceName === undefined || (text(v.workspaceName) && !!v.workspaceName.trim()))
     && (v.workspaces === undefined || (Array.isArray(v.workspaces) && v.workspaces.every(workspace => record(workspace)
       && text(workspace.repositoryPath) && !!workspace.repositoryPath.trim()
