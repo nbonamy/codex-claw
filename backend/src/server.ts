@@ -1267,7 +1267,8 @@ export class ClawBackendServer {
           try {
             const result = await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }) as BackendSendResult;
             agent.backendSession = result.backendSession;
-            await this.persistSnapshotOnly();
+            const reviewChanged = await this.codeReviews?.handleTurnInterrupted(agent) ?? false;
+            if (!reviewChanged) await this.persistSnapshotOnly();
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.applyAndEmitBackendEvent({

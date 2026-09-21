@@ -259,6 +259,32 @@ export class CodeReviewService {
     void this.executeFixes(agent, session, round);
   }
 
+  async handleTurnInterrupted(agent: Agent): Promise<boolean> {
+    const session = agent.codeReview;
+    if (!session) return false;
+    const round = activeCodeReviewRound(session);
+    const interruptedRemediation = session.status === 'fixing'
+      || (
+        session.status === 'failed'
+        && round.status === 'failed'
+        && round.findings.some((finding) => finding.remediation.state === 'fixing')
+      );
+    if (!interruptedRemediation) return false;
+
+    const interruptedAt = this.timestamp();
+    for (const finding of round.findings) {
+      finding.remediation = { state: 'notStarted' };
+      finding.updatedAt = interruptedAt;
+    }
+    round.status = 'ready';
+    delete round.completedAt;
+    delete round.error;
+    session.status = 'ready';
+    session.updatedAt = interruptedAt;
+    await this.options.changed();
+    return true;
+  }
+
   private async executeRound(
     agent: Agent,
     session: CodeReviewSession,
@@ -345,7 +371,7 @@ export class CodeReviewService {
           context.url,
           requiredReviewerSession(round),
         );
-        if (agent.codeReview !== session) return;
+        if (agent.codeReview !== session || session.status !== 'fixing') return;
         agent.backendSession = result.reviewerSession;
         round.reviewerSession = result.reviewerSession;
         const incomplete = findings.filter((finding) => (
@@ -361,6 +387,7 @@ export class CodeReviewService {
       session.status = 'readyToFinish';
       session.updatedAt = completedAt;
     } catch (error) {
+      if (session.status !== 'fixing') return;
       round.status = 'failed';
       round.error = error instanceof Error ? error.message : String(error);
       session.status = 'failed';

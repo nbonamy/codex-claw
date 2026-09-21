@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
 import type { Agent } from '@codex-claw/core/contracts';
 import { BackendDriverRpc } from '../driver-rpc';
 import { ClawBackendServer } from '../server';
@@ -162,6 +162,90 @@ describe('ClawBackendServer code review workflow', () => {
     expect(disposeCodeReview).toHaveBeenCalledTimes(2);
     expect(finished.activeAgentId).toBe(owner.id);
 
+    await server.close();
+  });
+
+  it('returns interrupted remediation to finding selection without an error', async () => {
+    const snapshot = createTestSnapshot();
+    const owner: Agent = {
+      id: 'agent-owner', teamId: snapshot.teams[0]!.id, name: 'Owner', folder: '/repo',
+      backend: 'codex', status: { type: 'idle' },
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
+    };
+    snapshot.agents.push(owner);
+    snapshot.teams[0]!.agentIds.push(owner.id);
+    let activeHandlers: ReviewToolHandlers | null = null;
+    let findingId = '';
+    let rejectFix: ((error: Error) => void) | undefined;
+    const interruptedFix = new Promise<BackendCodeReviewResult>((_resolve, reject) => {
+      rejectFix = reject;
+    });
+    const runCodeReview = vi.fn(async (_agent: Agent, input: Parameters<NonNullable<AgentBackendDriver['runCodeReview']>>[1]) => {
+      if (!activeHandlers) throw new Error('Missing review tool context.');
+      if (!findingId) {
+        findingId = (await activeHandlers.reportFinding({
+          priority: 'p1', title: 'Authorize before writing',
+          body: 'The public mutation writes before checking ownership.',
+        })).id;
+        return {
+          text: '',
+          reviewerSession: { kind: 'codex' as const, threadId: 'review-thread' },
+        };
+      }
+      return interruptedFix;
+    });
+    const interrupt = vi.fn(async (agent: Agent) => {
+      rejectFix?.(new Error('Turn interrupted.'));
+      return {
+        backendSession: agent.backendSession ?? { kind: 'codex' as const, threadId: 'review-thread' },
+      };
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      runCodeReview,
+      sendPrompt: vi.fn(),
+      interrupt,
+      respondToAgentRequest: vi.fn(),
+      onEvent: () => () => undefined,
+      close: vi.fn(),
+    };
+    const server = new ClawBackendServer({
+      version: 'test', snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+      codeReviewTools: {
+        createReviewToolContext: (_agentId, handlers) => {
+          activeHandlers = handlers;
+          return { id: 'review-context', url: 'http://review.test/mcp?reviewContextId=review-context' };
+        },
+        closeReviewToolContext: vi.fn(),
+      },
+    });
+
+    await request(server, backendMethods.agentCodeReviewStart, {
+      agentId: owner.id,
+      input: { scope: { type: 'uncommitted' }, threadMode: 'independent' },
+    });
+    const reviewer = snapshot.agents.find((candidate) => candidate.id !== owner.id)!;
+    await vi.waitFor(() => expect(reviewer.codeReview?.status).toBe('ready'));
+    const session = reviewer.codeReview!;
+    const round = session.rounds[0]!;
+    await request(server, backendMethods.agentCodeReviewRoundSubmit, {
+      agentId: reviewer.id,
+      sessionId: session.id,
+    });
+    await vi.waitFor(() => expect(round.findings[0]?.remediation.state).toBe('fixing'));
+
+    await request(server, backendMethods.agentInterrupt, { agentId: reviewer.id });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+
+    expect(interrupt).toHaveBeenCalledWith(reviewer);
+    expect(round).toMatchObject({ status: 'ready' });
+    expect(round).not.toHaveProperty('error');
+    expect(round.findings[0]?.decision.state).toBe('selected');
+    expect(round.findings[0]?.remediation).toStrictEqual({ state: 'notStarted' });
     await server.close();
   });
 });
