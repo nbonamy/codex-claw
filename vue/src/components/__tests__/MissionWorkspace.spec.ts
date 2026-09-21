@@ -397,6 +397,8 @@ describe('MissionWorkspace', () => {
     await wrapper.setProps({ mission: structuredClone(mission) });
     expect(wrapper.get('.mission-implementation__ticket').text()).toContain('Building');
     expect(wrapper.get('.mission-implementation__ticket').attributes('aria-current')).toBe('true');
+    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Building tickets');
+    expect(wrapper.find('.mission-workspace__run-status button').exists()).toBe(false);
     await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-checkout',

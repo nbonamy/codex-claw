@@ -210,14 +210,13 @@ const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
-const activeStageRun = computed(() => (
-  viewedStage.value === props.mission.stage
-  && !['implementation', 'ship'].includes(viewedStage.value)
-  && activeRun.value
-  && !activeRun.value.proposal
-    ? activeRun.value
-    : undefined
-));
+const activeStageRun = computed(() => {
+  if (viewedStage.value !== props.mission.stage) return undefined;
+  return props.mission.execution?.runs.slice().reverse().find(run => (
+    run.stage === viewedStage.value
+    && ['preparing', 'running'].includes(run.status)
+  ));
+});
 const activeStageStatus = computed(() => {
   const run = activeStageRun.value;
   if (!run) return '';
