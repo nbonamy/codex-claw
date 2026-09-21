@@ -458,7 +458,10 @@ describe('MissionWorkspace', () => {
     ];
     mission.artifacts.implementation = { changes: 'billing.ts changed', tests: 'billing integration passes' };
     mission.artifacts.review = { summary: 'Acceptance verified', pullRequestUrl: 'https://example.com/pull/2' };
-    mission.execution!.runs = [];
+    mission.execution!.runs = [{
+      id: 'run-implementation', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
+      repositoryPath: '/src/billing-service', status: 'accepted', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+    }];
     const wrapper = mountWorkspace(mission);
 
     mission.stage = 'tickets';
@@ -473,11 +476,13 @@ describe('MissionWorkspace', () => {
     mission.stage = 'implementation';
     await wrapper.setProps({ mission: structuredClone(mission) });
     expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('billing integration passes');
+    expect(wrapper.find('.code-review-slot').exists()).toBe(false);
 
     mission.stage = 'review';
     mission.status = 'completed';
     await wrapper.setProps({ mission: structuredClone(mission) });
     expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Acceptance verified');
+    expect(wrapper.get('.code-review-slot').text()).toContain('agent-dina');
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100');
   });
 

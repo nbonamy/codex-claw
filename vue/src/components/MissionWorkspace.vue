@@ -142,7 +142,7 @@
             </button>
           </section>
 
-          <slot v-if="codeAgentId && ['implementation', 'review'].includes(viewedStage) && !debugFixture" name="code-review" :agent-id="codeAgentId" />
+          <slot v-if="codeAgentId && viewedStage === 'review' && !debugFixture" name="code-review" :agent-id="codeAgentId" />
         </div>
       </main>
 
