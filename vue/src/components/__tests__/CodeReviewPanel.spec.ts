@@ -398,7 +398,11 @@ describe('CodeReviewPanel', () => {
   it('offers the exact finish and repeat actions after fixes complete', async () => {
     const { wrapper, actions } = mountPanel(session([], 'readyToFinish'));
     const buttons = wrapper.findAll('.code-review-panel__footer button');
+    const clearCopy = wrapper.get('.code-review-panel__clear');
 
+    expect(clearCopy.text()).toContain('No findings in this round');
+    expect(clearCopy.findAll('strong, span').map((node) => getComputedStyle(node.element).gridColumn))
+      .toEqual(['2', '2']);
     expect(buttons.map((button) => button.text())).toEqual(['Finish review', 'Review again']);
     await buttons[0]!.trigger('click');
     await buttons[1]!.trigger('click');

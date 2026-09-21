@@ -923,6 +923,11 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   display: block;
 }
 
+.code-review-panel__clear strong,
+.code-review-panel__clear span {
+  grid-column: 2;
+}
+
 .code-review-panel__clear svg {
   color: var(--color-success);
 }

@@ -191,8 +191,9 @@ typed thread state rather than presentation. The payload-free flags are:
 
 - `delegate_to_worktree`, which submits a fixed delegation prompt through the
   normal app-owned prompt path when the user accepts it;
-- `ready_for_review`, which tells clients that the repository is ready to enter
-  Claw's code review workflow.
+- `ready_for_review`, a final-handoff marker set only after implementation,
+  verification, documentation decisions, and diff/worktree cleanup are complete;
+  it tells clients that the repository is ready to enter Claw's code review workflow.
 
 Claw clears a flag after its accepted action succeeds, on manual dismissal, or
 when the agent calls `toggle_thread_flag` with `value: false`. Failed actions

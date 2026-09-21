@@ -49,7 +49,7 @@ import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import { isCodeReviewStartInput, type CodeReviewDecisionInput, type CodeReviewDiscussionInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
+import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
 
@@ -826,6 +826,7 @@ export class ClawBackendServer {
               finishedPullRequest?.headSha,
             );
           }
+          this.codeReviews?.closeForAgentRemoval(existingAgent);
           const agent = closeAgentInSnapshot(this.snapshot, agentId);
           this.agentRequests.clearAgent(agentId);
           if (!agent) {
@@ -877,7 +878,10 @@ export class ClawBackendServer {
       }
       case backendMethods.agentCodeReviewFindingDecide: {
         const agentId = requireStringParam(message.params, 'agentId');
-        const input = requireRecordParam(message.params, 'input') as CodeReviewDecisionInput;
+        const input = requireRecordParam(message.params, 'input');
+        if (!isCodeReviewDecisionInput(input)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review decision input.');
+        }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
           this.requireCodeReviews().decide(agent, input);
           return this.persistAndEmitSnapshot();
@@ -885,7 +889,10 @@ export class ClawBackendServer {
       }
       case backendMethods.agentCodeReviewFindingDiscuss: {
         const agentId = requireStringParam(message.params, 'agentId');
-        const input = requireRecordParam(message.params, 'input') as CodeReviewDiscussionInput;
+        const input = requireRecordParam(message.params, 'input');
+        if (!isCodeReviewDiscussionInput(input)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review discussion input.');
+        }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
           this.requireCodeReviews().discuss(agent, input);
           return this.persistAndEmitSnapshot();
@@ -2722,10 +2729,10 @@ function locationRemoteConnectionId(params: unknown, label: string): string | nu
   return requireString(locationRecord.remoteConnectionId, 'remoteConnectionId');
 }
 
-type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing';
+type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing' | 'readyToFinish';
 
 function debugCodeReviewScenario(value: unknown): DebugCodeReviewScenario {
-  if (value === 'reviewing' || value === 'ready' || value === 'fixing') return value;
+  if (value === 'reviewing' || value === 'ready' || value === 'fixing' || value === 'readyToFinish') return value;
   throw new Error('Invalid code review debug scenario.');
 }
 
@@ -2744,15 +2751,22 @@ function createDebugCodeReviewSession(agent: Agent, scenario: DebugCodeReviewSce
     reviewerAgentId: agent.id,
     scope: { type: 'uncommitted' },
     threadMode: 'current',
-    status: scenario === 'reviewing' ? 'reviewing' : scenario === 'ready' ? 'ready' : 'fixing',
+    status: scenario,
     activeRoundId: roundId,
     rounds: [{
       id: roundId,
       number: 1,
-      status: scenario === 'reviewing' ? 'reviewing' : scenario === 'ready' ? 'ready' : 'submitted',
+      status: scenario === 'reviewing'
+        ? 'reviewing'
+        : scenario === 'ready'
+          ? 'ready'
+          : scenario === 'fixing'
+            ? 'submitted'
+            : 'completed',
       ...(agent.backendSession ? { reviewerSession: structuredClone(agent.backendSession) } : {}),
       findings,
       startedAt: now,
+      ...(scenario === 'readyToFinish' ? { completedAt: now } : {}),
     }],
     createdAt: now,
     updatedAt: now,
@@ -2764,6 +2778,7 @@ function debugCodeReviewFindings(
   scenario: DebugCodeReviewScenario,
   now: string,
 ): CodeReviewFinding[] {
+  if (scenario === 'readyToFinish') return [];
   const fixtures: Array<Pick<CodeReviewFinding, 'id' | 'priority' | 'title' | 'body' | 'location'>> = [
     {
       id: 'debug-review-restoration',

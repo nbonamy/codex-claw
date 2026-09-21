@@ -445,6 +445,104 @@ describe('CodeReviewService', () => {
     expect(test.turns).toHaveLength(2);
   });
 
+  it('rejects new findings after the review turn has entered remediation', async () => {
+    let findingId = '';
+    let acceptedDuringFix = false;
+    const test = harness([
+      async (tools) => {
+        findingId = (await tools.reportFinding({
+          priority: 'p1', title: 'Fix the original finding',
+          body: 'The review identified one concrete defect.',
+        })).id;
+        return { text: '' };
+      },
+      async (tools) => {
+        try {
+          await tools.reportFinding({
+            priority: 'p2', title: 'Late finding',
+            body: 'This must not be added while fixes are running.',
+          });
+          acceptedDuringFix = true;
+        } catch {
+          // Expected: reporting findings is limited to the review turn.
+        }
+        await tools.updateFinding({ findingId, status: 'fixed' });
+        return { text: '' };
+      },
+    ]);
+
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
+
+    test.service.submit(visibleReviewer, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
+
+    expect(acceptedDuringFix).toBe(false);
+    expect(activeCodeReviewRound(session).findings).toHaveLength(1);
+  });
+
+  it('preserves completed fixes when remediation is interrupted and only retries unfinished findings', async () => {
+    const ids: string[] = [];
+    let signalFirstFixed: (() => void) | undefined;
+    let releaseInterruptedTurn: (() => void) | undefined;
+    let signalInterruptedTurnFinished: (() => void) | undefined;
+    const firstFixed = new Promise<void>((resolve) => { signalFirstFixed = resolve; });
+    const interruptedTurnCanFinish = new Promise<void>((resolve) => { releaseInterruptedTurn = resolve; });
+    const interruptedTurnFinished = new Promise<void>((resolve) => { signalInterruptedTurnFinished = resolve; });
+    const test = harness([
+      async (tools) => {
+        for (const title of ['Already fixed', 'Still pending']) {
+          ids.push((await tools.reportFinding({
+            priority: 'p1', title, body: `${title} body.`,
+          })).id);
+        }
+        return { text: '' };
+      },
+      async (tools) => {
+        await tools.updateFinding({
+          findingId: ids[0]!, status: 'fixed', evidence: 'The first regression passes.',
+        });
+        signalFirstFixed?.();
+        await interruptedTurnCanFinish;
+        signalInterruptedTurnFinished?.();
+        return { text: '' };
+      },
+      async (tools) => {
+        await tools.updateFinding({ findingId: ids[1]!, status: 'fixed' });
+        return { text: '' };
+      },
+    ]);
+
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
+    const round = activeCodeReviewRound(session);
+
+    test.service.submit(visibleReviewer, session.id);
+    await firstFixed;
+    await test.service.handleTurnInterrupted(visibleReviewer);
+
+    expect(round.findings[0]?.remediation).toMatchObject({
+      state: 'fixed', evidence: 'The first regression passes.',
+    });
+    expect(round.findings[1]?.remediation).toStrictEqual({ state: 'notStarted' });
+
+    releaseInterruptedTurn?.();
+    await interruptedTurnFinished;
+    await new Promise<void>((resolve) => { setImmediate(resolve); });
+    test.service.submit(visibleReviewer, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
+
+    expect(test.turns[2]?.prompt).not.toContain(`${ids[0]}: Already fixed`);
+    expect(test.turns[2]?.prompt).toContain(`${ids[1]}: Still pending`);
+    expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixed', 'fixed']);
+  });
+
   it('restores an interrupted fixing round and resumes it in the persisted reviewer thread', async () => {
     let findingId = '';
     const original = harness([async (tools) => {

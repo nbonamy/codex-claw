@@ -71,7 +71,7 @@ export function createCodexClawMcpServer(
   }, () => coordinator.setStatus(callerAgentId, status)));
 
   server.registerTool('toggle_thread_flag', {
-    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. Set ready_for_review when repository work is complete enough for the user to start Claw\'s code review workflow. Clear a flag when it is no longer appropriate. These flags take no payload.',
+    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. Set ready_for_review only at final handoff, after implementation, verification, documentation decisions, and diff/worktree cleanup are complete; make it one of the last actions before the final response. Clear a flag when it is no longer appropriate. These flags take no payload.',
     inputSchema: {
       id: z.enum(['delegate_to_worktree', 'ready_for_review']).describe('Predefined semantic thread flag.'),
       value: z.boolean().describe('True sets the flag; false clears it.'),

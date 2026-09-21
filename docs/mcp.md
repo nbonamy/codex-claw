@@ -413,6 +413,11 @@ setup after the backend accepts and clears the flag. A failed action leaves its
 flag available for retry. The user can also dismiss either flag, and the agent
 can clear one by calling `toggle_thread_flag` with `value: false`.
 
+Developer instructions reserve `ready_for_review` for final handoff. Agents set
+it as one of their last actions only after implementation, verification,
+documentation decisions, and diff/worktree cleanup are complete, and clear it
+if repository work resumes.
+
 Flags are persisted app state and are cleared with the agent's conversation
 runtime when that conversation is restarted or replaced. Clients may present,
 ignore, or programmatically respond to them without interpreting provider

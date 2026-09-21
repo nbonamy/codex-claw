@@ -366,7 +366,15 @@ describe('ClawBackendServer', () => {
       state: 'rejected',
       reason: 'The existing behavior is intentional for this workflow.',
     });
-    expect(saveSnapshot).toHaveBeenCalledTimes(3);
+
+    const completed = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-ready-to-finish', method: backendMethods.debugCodeReviewSet,
+      params: { agentId: 'agent-dina', scenario: 'readyToFinish' },
+    });
+    const completedSession = (completed as { result: AppSnapshot }).result.agents[0]!.codeReview!;
+    expect(completedSession.status).toBe('readyToFinish');
+    expect(completedSession.rounds[0]).toMatchObject({ status: 'completed', findings: [] });
+    expect(saveSnapshot).toHaveBeenCalledTimes(4);
   });
 
   it('sets and clears both thread flags through the debug protocol', async () => {
