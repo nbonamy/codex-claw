@@ -221,12 +221,13 @@ describe('AgentHeader', () => {
       lastTurnGitDiff: { agentId: agent.id, turnId: 'turn-1', addedLines: 2, removedLines: 1, diff: 'turn diff', updatedAt: '2026-06-05T00:00:01.000Z' },
     });
 
-    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Changes vs main');
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Uncommitted');
     expect(wrapper.find('.git-diff-control__icon').exists()).toBe(false);
     await wrapper.get('[aria-label="Choose repository diff"]').trigger('click');
     const menu = wrapper.getComponent({ name: 'AppMenu' });
     expect(menu.props('items')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'branch', label: 'Branch', checked: true }),
+      expect.objectContaining({ id: 'branch', label: 'Branch', checked: false }),
+      expect.objectContaining({ id: 'uncommitted', label: 'Uncommitted', checked: true }),
       expect.objectContaining({ id: 'turn', label: 'Last turn' }),
       expect.objectContaining({ id: 'commits', type: 'submenu' }),
     ]));
@@ -239,7 +240,7 @@ describe('AgentHeader', () => {
 
     await wrapper.setProps({ agent: { ...agent, id: 'agent-jesse' } });
     await wrapper.vm.$nextTick();
-    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Changes vs main');
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Uncommitted');
 
     await wrapper.get('[aria-label="Choose repository diff"]').trigger('click');
     wrapper.getComponent({ name: 'AppMenu' }).vm.$emit('select', 'unstaged');

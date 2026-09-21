@@ -133,7 +133,7 @@ watch(() => props.gitStatus.diffCatalog, (catalog) => {
       : false;
   if (!hasUserSelection.value || selectionUnavailable) {
     hasUserSelection.value = false;
-    selectedTarget.value = { ...catalog.defaultTarget };
+    selectedTarget.value = defaultTarget();
   }
 });
 
@@ -141,7 +141,7 @@ onMounted(() => document.addEventListener('click', closeMenuOnOutsideClick));
 onBeforeUnmount(() => document.removeEventListener('click', closeMenuOnOutsideClick));
 
 function defaultTarget(): AgentGitDiffTarget {
-  return { ...(props.gitStatus.diffCatalog?.defaultTarget ?? { type: 'uncommitted' }) };
+  return { type: 'uncommitted' };
 }
 
 function selectedTargetForAgent(): AgentGitDiffTarget {
