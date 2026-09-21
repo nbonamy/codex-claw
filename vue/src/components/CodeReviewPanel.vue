@@ -523,14 +523,16 @@ function setFindingSelected(
 ): void {
   const round = selectedRound.value;
   if (!session.value || !round) return;
-  void run(() =>
-    props.decideFinding(props.agent.id, {
-      sessionId: session.value!.id,
-      roundId: round.id,
-      findingId: finding.id,
-      decision: value === true ? "select" : "reject",
-    }),
-  );
+  error.value = null;
+  void props.decideFinding(props.agent.id, {
+    sessionId: session.value!.id,
+    roundId: round.id,
+    findingId: finding.id,
+    decision: value === true ? "select" : "reject",
+  })
+    .catch((caught) => {
+      error.value = caught instanceof Error ? caught.message : String(caught);
+    });
 }
 
 function clarifyFinding(finding: CodeReviewFinding): void {
@@ -867,7 +869,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--color-border);
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
 }
@@ -1029,15 +1030,24 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 .review-finding__priority {
   padding: 2px 6px;
   border-radius: var(--radius-sm);
-  background: var(--color-error-container);
+  background-color: var(--color-error-container);
   color: var(--color-error);
   font-weight: 700;
   font-size: var(--font-size-11);
 }
 
-.review-finding[data-priority="p2"] .review-finding__priority,
+.review-finding[data-priority="p0"] .review-finding__priority {
+  background-color: var(--color-error);
+  color: var(--color-on-error);
+}
+
+.review-finding[data-priority="p2"] .review-finding__priority {
+  background-color: var(--color-warning-container);
+  color: var(--color-warning);
+}
+
 .review-finding[data-priority="p3"] .review-finding__priority {
-  background: var(--color-surface-high);
+  background-color: var(--color-surface-high);
   color: var(--color-text-muted);
 }
 

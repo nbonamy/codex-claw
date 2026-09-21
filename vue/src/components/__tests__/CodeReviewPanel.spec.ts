@@ -297,6 +297,29 @@ describe('CodeReviewPanel', () => {
     }));
   });
 
+  it('keeps the review controls stable while a finding decision is saved', async () => {
+    let resolveDecision!: (snapshot: AppSnapshot) => void;
+    const pendingDecision = new Promise<AppSnapshot>((resolve) => {
+      resolveDecision = resolve;
+    });
+    const { wrapper } = mountPanel(session([
+      finding({ id: 'finding-critical', priority: 'p0' }),
+      finding({ id: 'finding-secondary', priority: 'p2' }),
+    ]));
+    await wrapper.setProps({ decideFinding: vi.fn().mockReturnValue(pendingDecision) });
+
+    const findingCards = wrapper.findAll('.review-finding');
+    const footerAction = wrapper.get('.code-review-panel__footer .claw-button--primary');
+    const secondaryClarify = findingCards[1]!.get('.review-finding__quick-action');
+    await findingCards[0]!.get('.review-finding__selection').trigger('click');
+
+    expect(footerAction.attributes('disabled')).toBeUndefined();
+    expect(secondaryClarify.attributes('disabled')).toBeUndefined();
+
+    resolveDecision({} as AppSnapshot);
+    await flushPromises();
+  });
+
   it('hands clarification to the owning conversation without rendering a local composer or history', async () => {
     const selected = finding({
       decision: { state: 'selected', decidedAt: 'now' },
@@ -352,6 +375,24 @@ describe('CodeReviewPanel', () => {
       ['var(--color-success)', 'var(--color-success-container)'],
     ]);
     expect(wrapper.find('.code-review-panel__footer').exists()).toBe(false);
+  });
+
+  it('colors priority labels by severity', () => {
+    const { wrapper } = mountPanel(session([
+      finding({ id: 'p3', priority: 'p3' }),
+      finding({ id: 'p1', priority: 'p1' }),
+      finding({ id: 'p0', priority: 'p0' }),
+      finding({ id: 'p2', priority: 'p2' }),
+    ]));
+
+    const badges = wrapper.findAll('.review-finding__priority')
+      .map((badge) => getComputedStyle(badge.element));
+    expect(badges.map((badge) => [badge.color, badge.backgroundColor])).toEqual([
+      ['var(--color-on-error)', 'var(--color-error)'],
+      ['var(--color-error)', 'var(--color-error-container)'],
+      ['var(--color-warning)', 'var(--color-warning-container)'],
+      ['var(--color-text-muted)', 'var(--color-surface-high)'],
+    ]);
   });
 
   it('offers the exact finish and repeat actions after fixes complete', async () => {
