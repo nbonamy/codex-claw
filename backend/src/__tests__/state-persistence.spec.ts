@@ -71,6 +71,18 @@ describe('AppStatePersistence', () => {
     expect(snapshotFromPersistedState(persisted).agents[0].openInApplication).toBeUndefined();
   });
 
+  it('round-trips valid per-agent Git diff targets and drops invalid values', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].gitDiffTarget = { type: 'staged' };
+    const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
+      agents: Array<Record<string, unknown>>;
+    };
+
+    expect(snapshotFromPersistedState(persisted).agents[0].gitDiffTarget).toStrictEqual({ type: 'staged' });
+    persisted.agents[0].gitDiffTarget = { type: 'commit' };
+    expect(snapshotFromPersistedState(persisted).agents[0].gitDiffTarget).toBeUndefined();
+  });
+
   it('round-trips durable quick-chat identity', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].sessionKind = 'quickChat';

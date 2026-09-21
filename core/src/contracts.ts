@@ -349,6 +349,7 @@ export type Agent = {
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   openInApplication?: OpenInApplication;
+  gitDiffTarget?: AgentGitDiffTarget;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('./plan-review').PlanReview;
@@ -690,7 +691,8 @@ export type ReorderTeamsInput = {
 
 export type UpdateAgentInput = {
   id: string;
-  name: string | null;
+  name?: string | null;
+  gitDiffTarget?: AgentGitDiffTarget | null;
 };
 
 export type DuplicateAgentOptions = {

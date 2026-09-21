@@ -60,9 +60,17 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   if (!agent) {
     return null;
   }
-  agent.name = normalizedOptionalString(input.name) ?? null;
-  agent.updatedAt = updatedAt;
-
+  if (input.name !== undefined) {
+    agent.name = normalizedOptionalString(input.name) ?? null;
+    agent.updatedAt = updatedAt;
+  }
+  if (input.gitDiffTarget !== undefined) {
+    if (input.gitDiffTarget) {
+      agent.gitDiffTarget = { ...input.gitDiffTarget };
+    } else {
+      delete agent.gitDiffTarget;
+    }
+  }
   return agent;
 }
 

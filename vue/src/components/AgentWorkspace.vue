@@ -29,6 +29,7 @@
     @toggle-execution-plan="toggleExecutionPlan"
     @toggle-workspace="toggleRightWorkspace"
     @open-git-diff="openAgentGitDiffPreview(currentAgent.id, $event)"
+    @select-git-diff-target="persistGitDiffTarget(currentAgent.id, $event)"
     @open-in="openAgentIn(currentAgent.id, $event)"
     @select-subagent="openSubagent(currentAgent.id, $event)"
     @install-update="emit('install-update')"
@@ -224,6 +225,7 @@ const props = defineProps<{
   latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   updateAgentGitBranchFromBase: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
+  updateAgent: (input: import('@codex-claw/core/contracts').UpdateAgentInput) => Promise<void>;
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;
@@ -410,6 +412,10 @@ const lastTurnGitDiff = computed(() => {
 
 function openAgentGitDiffPreview(agentId?: string, target?: AgentGitDiffTarget): Promise<void> {
   return props.openAgentGitDiffPreview(agentId, target);
+}
+
+function persistGitDiffTarget(agentId: string, target: AgentGitDiffTarget): void {
+  void props.updateAgent({ id: agentId, gitDiffTarget: { ...target } }).catch(() => undefined);
 }
 
 function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {

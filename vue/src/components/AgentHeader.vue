@@ -59,7 +59,9 @@
         :agent-id="agent.id"
         :git-status="gitStatus"
         :last-turn-git-diff="lastTurnGitDiff"
+        :selected-target="agent.gitDiffTarget"
         @open="emit('open-git-diff', $event)"
+        @select="emit('select-git-diff-target', $event)"
       />
       <GitWorkflowControl
         v-if="gitReviewAvailable && agent"
@@ -164,6 +166,7 @@ const emit = defineEmits<{
   'toggle-workspace': [];
   'toggle-execution-plan': [];
   'open-git-diff': [target: AgentGitDiffTarget];
+  'select-git-diff-target': [target: AgentGitDiffTarget];
   'install-update': [];
   'open-in': [application: OpenInApplication];
   'select-subagent': [conversationId: string];

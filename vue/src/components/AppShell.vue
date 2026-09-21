@@ -221,6 +221,7 @@
         :load-work-items="props.loadWorkItems"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
         :update-agent-git-branch-from-base="props.updateAgentGitBranchFromBase"
+        :update-agent="props.updateAgent"
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
         :open-attachment-image-annotation="openAttachmentImageAnnotation"
