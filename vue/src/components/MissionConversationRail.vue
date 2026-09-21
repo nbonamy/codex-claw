@@ -103,24 +103,154 @@ function conversationKey(run: Conversation['run']): string {
 </script>
 
 <style scoped>
-.mission-conversation-rail { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-left: 1px solid var(--color-border); background: var(--color-surface-lowest); }
-.mission-conversation-rail__navigation { flex: 0 0 auto; border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
-.mission-conversation-rail__navigation > header { display: flex; min-height: 56px; align-items: center; gap: var(--space-4); padding: var(--space-6) var(--space-8); }
-.mission-conversation-rail__heading { display: grid; min-width: 0; flex: 1; gap: var(--space-1); }
-.mission-conversation-rail__heading h2 { overflow: hidden; margin: 0; font-size: var(--font-size-14); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
-.mission-conversation-rail__heading p { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); margin: 0; color: var(--color-text-muted); font-size: var(--font-size-12); line-height: var(--line-height-18); }
-.mission-conversation-rail__heading p strong { flex: 0 0 auto; color: var(--color-text); font-weight: var(--font-weight-medium); }
-.mission-conversation-rail__heading p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mission-conversation-rail__heading p span::before { margin-right: var(--space-2); content: '·'; }
-.mission-conversation-rail__mark { display: grid; width: var(--space-12); height: var(--space-12); flex: 0 0 var(--space-12); place-items: center; border-radius: var(--radius-full); color: var(--color-primary); background: var(--color-primary-container); }
-.mission-conversation-rail__mark svg { width: var(--icon-md); height: var(--icon-md); }
-.mission-conversation-rail__switcher { display: flex; gap: var(--space-8); padding: 0 var(--space-8); overflow-x: auto; }
-.mission-conversation-rail__switcher button { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; padding: var(--space-3) 0 var(--space-4); border: 0; border-bottom: 2px solid transparent; color: var(--color-text-muted); background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.mission-conversation-rail__switcher button:hover, .mission-conversation-rail__switcher button:focus-visible { color: var(--color-text); }
-.mission-conversation-rail__switcher button[aria-selected='true'] { border-bottom-color: var(--color-primary); color: var(--color-text); }
-.mission-conversation-rail__switcher strong { overflow: hidden; font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
-.mission-conversation-rail :deep(.conversation-pane) { flex: 1; min-height: 0; }
-.mission-conversation-rail__empty { display: grid; flex: 1; place-items: center; align-content: center; gap: var(--space-4); padding: var(--space-10); color: var(--color-text-muted); text-align: center; }
-.mission-conversation-rail__empty svg { width: var(--icon-xl); height: var(--icon-xl); color: var(--color-primary); }
-@container (max-width: 980px) { .mission-conversation-rail { display: none; } }
+.mission-conversation-rail {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface-lowest);
+}
+
+.mission-conversation-rail__navigation {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-lowest);
+}
+
+.mission-conversation-rail__navigation > header {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-8);
+}
+
+.mission-conversation-rail__heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--space-1);
+}
+
+.mission-conversation-rail__heading h2 {
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-conversation-rail__heading p {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-18);
+}
+
+.mission-conversation-rail__heading p strong {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.mission-conversation-rail__heading p span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-conversation-rail__heading p span::before {
+  margin-right: var(--space-2);
+  content: "·";
+}
+
+.mission-conversation-rail__mark {
+  display: grid;
+  width: var(--space-12);
+  height: var(--space-12);
+  flex: 0 0 var(--space-12);
+  place-items: center;
+  border-radius: var(--radius-full);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.mission-conversation-rail__mark svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.mission-conversation-rail__switcher {
+  display: flex;
+  gap: var(--space-8);
+  padding: 0 var(--space-8);
+  overflow-x: auto;
+}
+
+.mission-conversation-rail__switcher button {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: var(--space-3) 0 var(--space-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mission-conversation-rail__switcher button:hover,
+.mission-conversation-rail__switcher button:focus-visible {
+  color: var(--color-text);
+}
+
+.mission-conversation-rail__switcher button[aria-selected="true"] {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.mission-conversation-rail__switcher strong {
+  overflow: hidden;
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-conversation-rail :deep(.conversation-pane) {
+  flex: 1;
+  min-height: 0;
+}
+
+.mission-conversation-rail__empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  padding: var(--space-10);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.mission-conversation-rail__empty svg {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  color: var(--color-primary);
+}
+
+@container (max-width: 980px) {
+  .mission-conversation-rail {
+    display: none;
+  }
+}
 </style>

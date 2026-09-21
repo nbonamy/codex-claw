@@ -497,7 +497,9 @@ function laneProgress(tickets: TicketItem[]): string {
   overflow: hidden;
 }
 
-:global(.mission-implementation__evidence-dialog.el-dialog > .el-dialog__header) {
+:global(
+  .mission-implementation__evidence-dialog.el-dialog > .el-dialog__header
+) {
   margin: 0;
   padding: 0;
 }
