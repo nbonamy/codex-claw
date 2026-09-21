@@ -175,25 +175,36 @@ describe('MissionWorkspace', () => {
     });
   });
 
-  it('switches among mission-owned agent conversations inside the mission workspace', async () => {
+  it('groups sequential ticket work under its repository conversation', async () => {
     const snapshot = createInitialSnapshot();
     const mission = missionWithRun('accepted', true);
-    mission.stage = 'tickets';
-    mission.execution!.runs.push({
-      id: 'run-tickets', stage: 'tickets', memberId: snapshot.agents[1]!.id,
-      workerId: snapshot.agents[1]!.id, status: 'running', skills: [], feedback: '',
-      startedAt: '2026-09-19T00:01:00.000Z',
-    });
+    mission.stage = 'implementation';
+    mission.artifacts.tickets = [
+      { title: 'Provider contracts', repositoryPath: '/src/billing-service', done: true },
+      { title: 'OAuth connection', repositoryPath: '/src/billing-service', done: false },
+    ];
+    mission.execution!.runs.push(
+      {
+        id: 'run-ticket-1', stage: 'implementation', memberId: snapshot.agents[1]!.id,
+        workerId: snapshot.agents[1]!.id, ticketIndex: 0, repositoryPath: '/src/billing-service',
+        status: 'accepted', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+      },
+      {
+        id: 'run-ticket-2', stage: 'implementation', memberId: snapshot.agents[1]!.id,
+        workerId: snapshot.agents[1]!.id, ticketIndex: 1, repositoryPath: '/src/billing-service',
+        status: 'running', skills: [], feedback: '', startedAt: '2026-09-19T00:02:00.000Z',
+      },
+    );
     const wrapper = mountWorkspace(mission, { agents: snapshot.agents });
     await flushPromises();
 
     const conversations = wrapper.get('[aria-label="Mission conversations"]');
     const tabs = conversations.findAll('[role="tab"]');
     expect(tabs).toHaveLength(2);
-    expect(tabs.map(tab => tab.attributes('aria-label'))).toStrictEqual(['Mission lead · Requirements', 'Mission lead · Tickets']);
-    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['Mission lead·Requirements', 'Mission lead·Tickets']);
+    expect(tabs.map(tab => tab.attributes('aria-label'))).toStrictEqual(['Mission lead', 'billing-service']);
+    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['Mission lead', 'billing-service']);
     expect(tabs[1]!.attributes('aria-selected')).toBe('true');
-    expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('Mission leadTicketsShaping tickets');
+    expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('billing-serviceBuilderOAuth connection');
     expect(wrapper.get('.conversation-slot').text()).toContain(snapshot.agents[1]!.id);
 
     await tabs[0]!.trigger('click');
@@ -367,7 +378,7 @@ describe('MissionWorkspace', () => {
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
-    expect(wrapper.get('.mission-workspace__conversation-heading h2').text()).toBe('Ticket 01');
+    expect(wrapper.get('.mission-workspace__conversation-heading h2').text()).toBe('billing-service');
     expect(wrapper.get('.mission-workspace__conversation-heading p').text()).toBe('BuilderCheckout');
     expect(wrapper.findComponent({ name: 'ElDialog' }).props('modelValue')).toBe(false);
 

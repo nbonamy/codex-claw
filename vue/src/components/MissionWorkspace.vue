@@ -165,17 +165,15 @@
           >
             <button
               v-for="conversation in missionConversations"
-              :key="conversation.agentId"
+              :key="conversation.key"
               type="button"
               role="tab"
               :aria-label="conversationLabel(conversation)"
-              :aria-selected="conversation.agentId === conversationAgentId"
-              @click="selectedConversationAgentId = conversation.agentId"
+              :aria-selected="conversation.key === selectedConversation?.key"
+              @click="selectedConversationKey = conversation.key"
             >
               <span class="mission-workspace__conversation-tab-copy">
                 <strong>{{ conversationTabTitle(conversation) }}</strong>
-                <span aria-hidden="true">·</span>
-                <small>{{ conversationTabDetail(conversation) }}</small>
               </span>
             </button>
           </div>
@@ -250,19 +248,24 @@ const preferredConversationAgentId = computed(() => activeRun.value?.workerId
   ?? props.mission.stageAgentIds[props.mission.stage]
   ?? '');
 const missionConversations = computed(() => {
-  const conversations = new Map<string, { agentId: string; run: NonNullable<Mission['execution']>['runs'][number] }>();
+  const conversations = new Map<string, { key: string; agentId: string; run: NonNullable<Mission['execution']>['runs'][number] }>();
   for (const run of props.mission.execution?.runs ?? []) {
-    if (run.workerId) conversations.set(run.workerId, { agentId: run.workerId, run });
+    if (!run.workerId) continue;
+    const key = conversationKey(run);
+    conversations.set(key, { key, agentId: run.workerId, run });
   }
   return [...conversations.values()];
 });
-const selectedConversationAgentId = ref('');
-const conversationAgentId = computed(() => (
-  missionConversations.value.some(conversation => conversation.agentId === selectedConversationAgentId.value)
-    ? selectedConversationAgentId.value
-    : preferredConversationAgentId.value
-));
-const selectedConversation = computed(() => missionConversations.value.find(conversation => conversation.agentId === conversationAgentId.value));
+const preferredConversationKey = computed(() => {
+  const run = activeRun.value
+    ?? props.mission.execution?.runs.slice().reverse().find(candidate => candidate.stage === props.mission.stage && candidate.workerId);
+  if (run?.workerId) return conversationKey(run);
+  return missionConversations.value.find(conversation => conversation.agentId === preferredConversationAgentId.value)?.key ?? '';
+});
+const selectedConversationKey = ref('');
+const selectedConversation = computed(() => missionConversations.value.find(conversation => conversation.key === selectedConversationKey.value)
+  ?? missionConversations.value.find(conversation => conversation.key === preferredConversationKey.value));
+const conversationAgentId = computed(() => selectedConversation.value?.agentId ?? preferredConversationAgentId.value);
 const conversationHeaderTitle = computed(() => {
   const conversation = selectedConversation.value;
   return conversation ? conversationTabTitle(conversation) : t('missions.missionLead');
@@ -281,12 +284,12 @@ const conversationHeaderHint = computed(() => {
   return run ? t(`missions.stageActivity.${run.stage}`) : t('missions.missionLeadHint');
 });
 
-watch(preferredConversationAgentId, (id, previous) => {
-  if (!selectedConversationAgentId.value || selectedConversationAgentId.value === previous) selectedConversationAgentId.value = id;
+watch(preferredConversationKey, (key, previous) => {
+  if (!selectedConversationKey.value || selectedConversationKey.value === previous) selectedConversationKey.value = key;
 }, { immediate: true });
 watch(() => props.mission.stage, stage => {
   viewedStage.value = stage;
-  selectedConversationAgentId.value = preferredConversationAgentId.value;
+  selectedConversationKey.value = preferredConversationKey.value;
 });
 watch(conversationAgentId, id => { if (id) emit('open-conversation', id); }, { immediate: true });
 watch(
@@ -307,19 +310,27 @@ watch(
 );
 
 function conversationLabel(conversation: (typeof missionConversations.value)[number]): string {
-  return `${conversationTabTitle(conversation)} · ${conversationTabDetail(conversation)}`;
+  return conversationTabTitle(conversation);
 }
 function conversationTabTitle(conversation: (typeof missionConversations.value)[number]): string {
-  if (conversation.run.stage === 'implementation' && conversation.run.ticketIndex !== undefined) {
-    return t('missions.ticketLabel', { number: String(conversation.run.ticketIndex + 1).padStart(2, '0') });
+  if (conversation.run.stage === 'implementation') {
+    const repositoryPath = conversation.run.repositoryPath
+      ?? props.mission.artifacts.tickets[conversation.run.ticketIndex ?? -1]?.repositoryPath;
+    return repositoryPath?.split(/[\\/]/u).filter(Boolean).at(-1) ?? t('missions.builder');
   }
   return t('missions.missionLead');
 }
-function conversationTabDetail(conversation: (typeof missionConversations.value)[number]): string {
-  if (conversation.run.stage === 'implementation') return t('missions.builder');
-  return t(`missions.${conversation.run.stage}`);
+function conversationKey(run: NonNullable<Mission['execution']>['runs'][number]): string {
+  if (run.stage !== 'implementation') return 'mission-lead';
+  const repositoryPath = run.repositoryPath
+    ?? props.mission.artifacts.tickets[run.ticketIndex ?? -1]?.repositoryPath
+    ?? run.workerId;
+  return `repository:${repositoryPath}`;
 }
-function selectConversation(agentId: string): void { selectedConversationAgentId.value = agentId; }
+function selectConversation(agentId: string): void {
+  const matching = missionConversations.value.find(conversation => conversation.agentId === agentId);
+  if (matching) selectedConversationKey.value = matching.key;
+}
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
   const index = featureStages.indexOf(stage);
@@ -504,11 +515,8 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__conversation-switcher button { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; padding: var(--space-3) 0 var(--space-4); border: 0; border-bottom: 2px solid transparent; color: var(--color-text-muted); background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .mission-workspace__conversation-switcher button:hover, .mission-workspace__conversation-switcher button:focus-visible { color: var(--color-text); }
 .mission-workspace__conversation-switcher button[aria-selected='true'] { border-bottom-color: var(--color-primary); color: var(--color-text); }
-.mission-workspace__conversation-tab-copy { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); white-space: nowrap; }
-.mission-workspace__conversation-tab-copy strong, .mission-workspace__conversation-tab-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mission-workspace__conversation-tab-copy > span { color: var(--color-text-muted); }
-.mission-workspace__conversation-tab-copy strong { font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); }
-.mission-workspace__conversation-tab-copy small { color: var(--color-text-muted); font-size: var(--font-size-11); }
+.mission-workspace__conversation-tab-copy { min-width: 0; white-space: nowrap; }
+.mission-workspace__conversation-tab-copy strong { overflow: hidden; font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
 .mission-workspace__conversation :deep(.conversation-pane) { flex: 1; min-height: 0; }
 .mission-workspace__conversation-empty { display: grid; flex: 1; place-items: center; align-content: center; gap: var(--space-4); padding: var(--space-10); color: var(--color-text-muted); text-align: center; }
 .mission-workspace__conversation-empty svg { width: var(--icon-xl); height: var(--icon-xl); color: var(--color-primary); }
