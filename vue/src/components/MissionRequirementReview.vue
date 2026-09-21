@@ -208,7 +208,7 @@ function oneLine(value: string): string {
 }
 
 .mission-requirement-review__document :deep(.markdown-panel) {
-  padding: var(--space-10);
+  padding: var(--space-10) 0;
 }
 
 .mission-requirement-review__footer {
