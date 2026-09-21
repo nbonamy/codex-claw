@@ -467,6 +467,7 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__callout-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: var(--radius-lg); color: var(--color-primary); background: var(--color-primary-container); }
 .mission-workspace__callout-icon svg { width: var(--icon-lg); height: var(--icon-lg); }
 .mission-workspace__artifact { max-width: 800px; margin: 0 auto; }
+.mission-workspace__artifact > :deep(.markdown-panel) { padding: 0 0 var(--space-8); }
 .mission-workspace__review-hint { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-10); padding: var(--space-6); border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--font-size-13); }
 .mission-workspace__review-hint svg { width: var(--icon-md); height: var(--icon-md); }
 .mission-workspace__conversation { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-left: 1px solid var(--color-border); background: var(--color-surface-lowest); }

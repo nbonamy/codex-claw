@@ -369,7 +369,7 @@ function ticketPreview(ticket: MissionTicket): string {
   display: grid;
   max-width: 860px;
   gap: var(--space-8);
-  margin: var(--space-10) auto 0;
+  margin: 0 auto;
 }
 
 .mission-implementation__summary {
