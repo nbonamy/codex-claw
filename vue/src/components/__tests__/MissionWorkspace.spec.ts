@@ -61,7 +61,7 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission);
     await flushPromises();
 
-    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(5);
+    expect(wrapper.get('[aria-label="Workflow progress"]').findAll('button')).toHaveLength(5);
     expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
     expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping requirements');
     expect(wrapper.get('.mission-workspace__run-status').attributes()).toMatchObject({
@@ -202,9 +202,9 @@ describe('MissionWorkspace', () => {
     const tabs = conversations.findAll('[role="tab"]');
     expect(tabs).toHaveLength(2);
     expect(tabs.map(tab => tab.attributes('aria-label'))).toStrictEqual(['Mission lead', 'billing-service']);
-    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['Mission lead', 'billing-service']);
+    expect(tabs.map(tab => tab.text())).toStrictEqual(['Mission lead', 'billing-service']);
     expect(tabs[1]!.attributes('aria-selected')).toBe('true');
-    expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('billing-serviceBuilderOAuth connection');
+    expect(wrapper.get('[aria-label="Stage conversation"]').get('header').text()).toContain('billing-serviceBuilderOAuth connection');
     expect(wrapper.get('.conversation-slot').text()).toContain(snapshot.agents[1]!.id);
 
     await tabs[0]!.trigger('click');
@@ -224,7 +224,7 @@ describe('MissionWorkspace', () => {
     });
     const wrapper = mountWorkspace(mission);
 
-    const [requirements, tickets, implementation] = wrapper.findAll('.mission-workspace__stages button');
+    const [requirements, tickets, implementation] = wrapper.get('[aria-label="Workflow progress"]').findAll('button');
     expect(tickets!.attributes('aria-current')).toBe('step');
     expect(implementation!.attributes('disabled')).toBeDefined();
     await requirements!.trigger('click');
@@ -232,7 +232,7 @@ describe('MissionWorkspace', () => {
     expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Teams need one bill');
     expect(wrapper.get('.mission-workspace__stage-header h2').text()).toBe('Mission brief');
     expect(wrapper.get('.mission-workspace__accepted-status').text()).toBe('Accepted');
-    expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('Mission lead');
+    expect(wrapper.get('[aria-label="Stage conversation"]').get('header').text()).toContain('Mission lead');
   });
 
   it('shows ticket drafts as the orchestrator creates them without waiting for stage review', async () => {
@@ -378,8 +378,8 @@ describe('MissionWorkspace', () => {
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
-    expect(wrapper.get('.mission-workspace__conversation-heading h2').text()).toBe('billing-service');
-    expect(wrapper.get('.mission-workspace__conversation-heading p').text()).toBe('BuilderCheckout');
+    expect(wrapper.get('[aria-label="Stage conversation"]').get('h2').text()).toBe('billing-service');
+    expect(wrapper.get('[aria-label="Stage conversation"]').get('header p').text()).toBe('BuilderCheckout');
     expect(wrapper.findComponent({ name: 'ElDialog' }).props('modelValue')).toBe(false);
 
     await board.findAll('.mission-implementation__ticket-details')[0]!.trigger('click');
@@ -546,7 +546,7 @@ describe('MissionWorkspace', () => {
     await flushPromises();
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Worker unavailable');
-    expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(5);
+    expect(wrapper.get('[aria-label="Workflow progress"]').findAll('button')).toHaveLength(5);
     expect(wrapper.find('.conversation-slot').exists()).toBe(true);
   });
 });

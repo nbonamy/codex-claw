@@ -73,62 +73,16 @@
           </span>
         </header>
         <TransitionGroup name="mission-run-card" tag="ol" appear>
-          <li v-for="item in lane.tickets" :key="item.ticket.id ?? item.index" class="mission-implementation__ticket-item">
-            <button
-              type="button"
-              class="mission-implementation__ticket"
-              :class="{
-                'mission-implementation__ticket--selected':
-                  selectedIndex === item.index,
-              }"
-              :aria-label="t('missions.openTicketThread', { title: item.ticket.title })"
-              :disabled="!item.run?.workerId"
-              @click="openConversation(item.run?.workerId)"
-            >
-              <span class="mission-implementation__ticket-heading">
-                <small>{{ ticketNumber(item.index) }}</small>
-                <span :data-status="ticketStatus(item)">{{
-                  t(`missions.ticketRunStatus.${ticketStatus(item)}`)
-                }}</span>
-              </span>
-              <strong class="mission-implementation__ticket-title">{{
-                item.ticket.title
-              }}</strong>
-              <span class="mission-implementation__ticket-preview">{{
-                ticketPreview(item.ticket)
-              }}</span>
-              <span class="mission-implementation__ticket-footer">
-                <span
-                  v-if="item.ticket.dependsOn?.length"
-                  class="mission-implementation__dependencies"
-                >
-                  {{
-                    t("missions.blockedByShort", {
-                      tickets: item.ticket.dependsOn
-                        .map(ticketNumber)
-                        .join(", "),
-                    })
-                  }}
-                </span>
-                <span v-else class="mission-implementation__repository">{{
-                  repositoryName(lane.repositoryPath)
-                }}</span>
-                <span v-if="item.run?.workerId" class="mission-implementation__agent">
-                  <MessageCircleIcon aria-hidden="true" />{{ t("missions.builder") }}
-                </span>
-              </span>
-            </button>
-            <button
-              type="button"
-              class="mission-implementation__ticket-details"
-              :aria-label="t('missions.openTicketDetails', { title: item.ticket.title })"
-              :aria-expanded="selectedIndex === item.index"
-              aria-controls="mission-ticket-details"
-              @click="selectedIndex = item.index"
-            >
-              <FileTextIcon aria-hidden="true" />
-            </button>
-          </li>
+          <MissionImplementationTicketCard
+            v-for="item in lane.tickets"
+            :key="item.ticket.id ?? item.index"
+            :all-tickets="mission.artifacts.tickets"
+            :item="item"
+            :repository-path="lane.repositoryPath"
+            :selected="selectedIndex === item.index"
+            @open-conversation="openConversation"
+            @open-details="selectedIndex = item.index"
+          />
         </TransitionGroup>
       </section>
     </div>
@@ -229,19 +183,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { Mission, MissionTicket } from "@codex-claw/core/missions";
+import type { Mission } from "@codex-claw/core/missions";
 import type { MissionRun } from "@codex-claw/core/mission-execution";
 import {
   CheckIcon,
   FileTextIcon,
   FolderIcon,
   GitBranchIcon,
-  MessageCircleIcon,
   X,
 } from "../shared/icons/app-icons";
+import MissionImplementationTicketCard from "./MissionImplementationTicketCard.vue";
 import MissionTicketDialog from "./MissionTicketDialog.vue";
+import { implementationTicketStatus, missionRepositoryName, missionTicketNumber, type MissionImplementationTicketItem } from "./mission-implementation-model";
 
-type TicketItem = { ticket: MissionTicket; index: number; run?: MissionRun };
+type TicketItem = MissionImplementationTicketItem;
 
 const props = defineProps<{ mission: Mission; busy?: boolean; readOnly?: boolean }>();
 const emit = defineEmits<{
@@ -324,9 +279,7 @@ function openConversation(workerId?: string): void {
   if (workerId) emit("open-conversation", workerId);
 }
 function repositoryName(repositoryPath: string): string {
-  return (
-    repositoryPath.split(/[\\/]/u).filter(Boolean).at(-1) ?? repositoryPath
-  );
+  return missionRepositoryName(repositoryPath);
 }
 function workspaceBranch(repositoryPath: string): string {
   return (
@@ -339,33 +292,18 @@ function workspaceBranch(repositoryPath: string): string {
   );
 }
 function ticketNumber(index: number): string {
-  return String(index + 1).padStart(2, "0");
+  return missionTicketNumber(index);
 }
 function ticketStatus(
   item: TicketItem,
 ): "queued" | "blocked" | MissionRun["status"] {
-  if (item.ticket.done) return "accepted";
-  if (item.run) return item.run.status;
-  return (item.ticket.dependsOn ?? []).every(
-    (index) => props.mission.artifacts.tickets[index]?.done,
-  )
-    ? "queued"
-    : "blocked";
+  return implementationTicketStatus(item, props.mission.artifacts.tickets);
 }
 function laneProgress(tickets: TicketItem[]): string {
   return t("missions.repositoryProgress", {
     complete: tickets.filter((item) => item.ticket.done).length,
     total: tickets.length,
   });
-}
-function ticketPreview(ticket: MissionTicket): string {
-  return (
-    ticket.body
-      ?.replace(/```[\s\S]*?```/gu, " ")
-      .replace(/[*_~`>|#]/gu, "")
-      .replace(/\s+/gu, " ")
-      .trim() || t("missions.noTicketDescription")
-  );
 }
 </script>
 
@@ -552,169 +490,6 @@ function ticketPreview(ticket: MissionTicket): string {
   list-style: none;
 }
 
-.mission-implementation__ticket-item {
-  position: relative;
-}
-
-.mission-implementation__ticket {
-  display: grid;
-  width: 100%;
-  min-height: 164px;
-  grid-template-rows: auto auto 1fr auto;
-  gap: var(--space-3);
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-text);
-  background: var(--color-surface-lowest);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease;
-}
-
-.mission-implementation__ticket:hover:not(:disabled),
-.mission-implementation__ticket:focus-visible {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-low);
-}
-
-.mission-implementation__ticket:disabled {
-  cursor: default;
-}
-
-.mission-implementation__ticket--selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-container);
-}
-
-.mission-implementation__ticket-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.mission-implementation__ticket-heading small {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-  font-weight: var(--font-weight-semibold);
-}
-
-.mission-implementation__ticket-title {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.mission-implementation__ticket-heading > span {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  color: var(--color-text-muted);
-  background: var(--color-surface-high);
-  font-size: var(--font-size-11);
-  white-space: nowrap;
-}
-
-.mission-implementation__ticket-heading > span[data-status="running"],
-.mission-implementation__ticket-heading > span[data-status="preparing"] {
-  color: var(--color-on-primary-container);
-  background: var(--color-primary-container);
-}
-
-.mission-implementation__ticket-heading > span[data-status="awaitingReview"] {
-  color: var(--color-on-warning-container);
-  background: var(--color-warning-container);
-}
-
-.mission-implementation__ticket-heading > span[data-status="accepted"] {
-  color: var(--color-on-success-container);
-  background: var(--color-success-container);
-}
-
-.mission-implementation__ticket-heading > span[data-status="failed"],
-.mission-implementation__ticket-heading > span[data-status="cancelled"] {
-  color: var(--color-on-error-container);
-  background: var(--color-error-container);
-}
-
-.mission-implementation__ticket-preview {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  line-height: var(--line-height-18);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.mission-implementation__ticket-footer {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  padding-right: 34px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-}
-
-.mission-implementation__ticket-footer > span:first-child {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mission-implementation__agent svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-}
-
-.mission-implementation__agent {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-2);
-  overflow: hidden;
-  color: var(--color-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mission-implementation__ticket-details {
-  position: absolute;
-  right: var(--space-6);
-  bottom: var(--space-4);
-  z-index: 1;
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.mission-implementation__ticket-details:hover,
-.mission-implementation__ticket-details:focus-visible {
-  color: var(--color-primary);
-  background: var(--color-primary-container);
-}
-
-.mission-implementation__ticket-details svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
 :global(.mission-implementation__evidence-dialog.el-dialog) {
   display: grid;
   max-height: min(82vh, 780px);
@@ -870,7 +645,6 @@ function ticketPreview(ticket: MissionTicket): string {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mission-implementation__ticket,
   .mission-implementation__progress span,
   .mission-run-card-enter-active,
   .mission-run-card-leave-active {

@@ -12,39 +12,7 @@
     </header>
 
     <div class="mission-workspace__body">
-      <aside class="mission-workspace__process" :aria-label="t('missions.progress')">
-        <div class="mission-workspace__process-heading">
-          <TargetArrowIcon aria-hidden="true" />
-          <div><strong>{{ t('missions.process') }}</strong></div>
-        </div>
-        <ol class="mission-workspace__stages">
-          <li v-for="(stage, index) in featureStages" :key="stage">
-            <button
-              type="button"
-              :class="{ 'mission-workspace__stage--viewed': viewedStage === stage }"
-              :disabled="index > currentIndex"
-              :aria-current="stage === mission.stage ? 'step' : undefined"
-              @click="viewedStage = stage"
-            >
-              <span class="mission-workspace__stage-marker" :data-state="stageState(stage)">
-                <CheckIcon v-if="stageState(stage) === 'complete'" aria-hidden="true" />
-                <span v-else>{{ index + 1 }}</span>
-              </span>
-              <span class="mission-workspace__stage-copy">
-                <strong>{{ t(`missions.${stage}`) }}</strong>
-                <small>{{ stageStatus(stage) }}</small>
-              </span>
-            </button>
-          </li>
-        </ol>
-        <div class="mission-workspace__progress-summary">
-          <span>{{ t('missions.stageCount', { current: completedStageCount, total: featureStages.length }) }}</span>
-          <strong>{{ progressPercent }}%</strong>
-          <div role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100">
-            <span :style="{ width: `${progressPercent}%` }" />
-          </div>
-        </div>
-      </aside>
+      <MissionStageRail :mission="mission" :viewed-stage="viewedStage" @view-stage="viewedStage = $event" />
 
       <main class="mission-workspace__workbench">
         <header class="mission-workspace__stage-header">
@@ -145,45 +113,13 @@
         </div>
       </main>
 
-      <aside class="mission-workspace__conversation" :aria-label="t('missions.support')">
-        <div class="mission-workspace__conversation-navigation">
-          <header>
-            <span class="mission-workspace__conversation-mark">
-              <CodeIcon v-if="selectedConversation?.run.stage === 'implementation'" aria-hidden="true" />
-              <TargetArrowIcon v-else aria-hidden="true" />
-            </span>
-            <div class="mission-workspace__conversation-heading">
-              <h2>{{ conversationHeaderTitle }}</h2>
-              <p><strong>{{ conversationHeaderRole }}</strong><span>{{ conversationHeaderHint }}</span></p>
-            </div>
-          </header>
-          <div
-            v-if="missionConversations.length > 1"
-            class="mission-workspace__conversation-switcher"
-            role="tablist"
-            :aria-label="t('missions.conversations')"
-          >
-            <button
-              v-for="conversation in missionConversations"
-              :key="conversation.key"
-              type="button"
-              role="tab"
-              :aria-label="conversationLabel(conversation)"
-              :aria-selected="conversation.key === selectedConversation?.key"
-              @click="selectedConversationKey = conversation.key"
-            >
-              <span class="mission-workspace__conversation-tab-copy">
-                <strong>{{ conversationTabTitle(conversation) }}</strong>
-              </span>
-            </button>
-          </div>
-        </div>
-        <slot v-if="conversationAgentId" name="conversation" :agent-id="conversationAgentId" />
-        <div v-else class="mission-workspace__conversation-empty">
-          <SparklesIcon aria-hidden="true" />
-          <p>{{ t(mission.stage === 'ship' ? 'missions.shipConversationHint' : 'missions.missionLeadStarting') }}</p>
-        </div>
-      </aside>
+      <MissionConversationRail
+        v-model:selected-agent-id="conversationAgentId"
+        :mission="mission"
+        @open-conversation="emit('open-conversation', $event)"
+      >
+        <template #conversation="{ agentId }"><slot name="conversation" :agent-id="agentId" /></template>
+      </MissionConversationRail>
     </div>
   </section>
 </template>
@@ -194,10 +130,12 @@ import { useI18n } from 'vue-i18n';
 import type { Agent } from '@codex-claw/core/contracts';
 import { featureStages, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
-import { ArrowRightIcon, CheckIcon, CodeIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
+import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
+import MissionConversationRail from './MissionConversationRail.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
+import MissionStageRail from './MissionStageRail.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
 
 const props = withDefaults(defineProps<{
@@ -240,58 +178,11 @@ const stageHeadingTitle = computed(() => (
     : t(`missions.artifactTitle.${viewedStage.value}`)
 ));
 const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
-const completedStageCount = computed(() => props.mission.status === 'completed' ? featureStages.length : currentIndex.value);
-const progressPercent = computed(() => Math.round((completedStageCount.value / featureStages.length) * 100));
 const codeAgentId = computed(() => props.mission.execution?.runs.slice().reverse().find(run => run.workerId)?.workerId);
-const preferredConversationAgentId = computed(() => activeRun.value?.workerId
-  ?? props.mission.execution?.runs.slice().reverse().find(run => run.stage === props.mission.stage && run.workerId)?.workerId
-  ?? props.mission.stageAgentIds[props.mission.stage]
-  ?? '');
-const missionConversations = computed(() => {
-  const conversations = new Map<string, { key: string; agentId: string; run: NonNullable<Mission['execution']>['runs'][number] }>();
-  for (const run of props.mission.execution?.runs ?? []) {
-    if (!run.workerId) continue;
-    const key = conversationKey(run);
-    conversations.set(key, { key, agentId: run.workerId, run });
-  }
-  return [...conversations.values()];
-});
-const preferredConversationKey = computed(() => {
-  const run = activeRun.value
-    ?? props.mission.execution?.runs.slice().reverse().find(candidate => candidate.stage === props.mission.stage && candidate.workerId);
-  if (run?.workerId) return conversationKey(run);
-  return missionConversations.value.find(conversation => conversation.agentId === preferredConversationAgentId.value)?.key ?? '';
-});
-const selectedConversationKey = ref('');
-const selectedConversation = computed(() => missionConversations.value.find(conversation => conversation.key === selectedConversationKey.value)
-  ?? missionConversations.value.find(conversation => conversation.key === preferredConversationKey.value));
-const conversationAgentId = computed(() => selectedConversation.value?.agentId ?? preferredConversationAgentId.value);
-const conversationHeaderTitle = computed(() => {
-  const conversation = selectedConversation.value;
-  return conversation ? conversationTabTitle(conversation) : t('missions.missionLead');
-});
-const conversationHeaderRole = computed(() => {
-  const conversation = selectedConversation.value;
-  return conversation?.run.stage === 'implementation'
-    ? t('missions.builder')
-    : t(`missions.${conversation?.run.stage ?? props.mission.stage}`);
-});
-const conversationHeaderHint = computed(() => {
-  const run = selectedConversation.value?.run;
-  if (run?.stage === 'implementation' && run.ticketIndex !== undefined) {
-    return props.mission.artifacts.tickets[run.ticketIndex]?.title ?? t('missions.implementationAgentHint');
-  }
-  return run ? t(`missions.stageActivity.${run.stage}`) : t('missions.missionLeadHint');
-});
-
-watch(preferredConversationKey, (key, previous) => {
-  if (!selectedConversationKey.value || selectedConversationKey.value === previous) selectedConversationKey.value = key;
-}, { immediate: true });
+const conversationAgentId = ref('');
 watch(() => props.mission.stage, stage => {
   viewedStage.value = stage;
-  selectedConversationKey.value = preferredConversationKey.value;
 });
-watch(conversationAgentId, id => { if (id) emit('open-conversation', id); }, { immediate: true });
 watch(
   () => [props.mission.id, viewedStage.value, props.mission.artifactFiles?.[viewedStage.value]?.revision] as const,
   async ([missionId, stage, revision]) => {
@@ -309,45 +200,14 @@ watch(
   { immediate: true },
 );
 
-function conversationLabel(conversation: (typeof missionConversations.value)[number]): string {
-  return conversationTabTitle(conversation);
-}
-function conversationTabTitle(conversation: (typeof missionConversations.value)[number]): string {
-  if (conversation.run.stage === 'implementation') {
-    const repositoryPath = conversation.run.repositoryPath
-      ?? props.mission.artifacts.tickets[conversation.run.ticketIndex ?? -1]?.repositoryPath;
-    return repositoryPath?.split(/[\\/]/u).filter(Boolean).at(-1) ?? t('missions.builder');
-  }
-  return t('missions.missionLead');
-}
-function conversationKey(run: NonNullable<Mission['execution']>['runs'][number]): string {
-  if (run.stage !== 'implementation') return 'mission-lead';
-  const repositoryPath = run.repositoryPath
-    ?? props.mission.artifacts.tickets[run.ticketIndex ?? -1]?.repositoryPath
-    ?? run.workerId;
-  return `repository:${repositoryPath}`;
-}
 function selectConversation(agentId: string): void {
-  const matching = missionConversations.value.find(conversation => conversation.agentId === agentId);
-  if (matching) selectedConversationKey.value = matching.key;
+  conversationAgentId.value = agentId;
 }
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
   const index = featureStages.indexOf(stage);
   if (index < currentIndex.value || props.mission.status === 'completed') return 'complete';
   return stage === props.mission.stage ? 'current' : 'upcoming';
-}
-function stageStatus(stage: MissionStage): string {
-  const state = stageState(stage);
-  if (state === 'complete') return t('missions.stageComplete');
-  if (state === 'upcoming') return t('missions.notStarted');
-  if (activeRun.value?.proposal) return t('missions.readyForReview');
-  if (activeRun.value) return t(`missions.runStatus.${activeRun.value.status}`);
-  if (stage === 'ship') {
-    const deliveries = props.mission.execution?.deliveries ?? [];
-    return t('missions.shipRepositoryCount', { complete: deliveries.filter(delivery => delivery.status !== 'pending').length, total: deliveries.length });
-  }
-  return t('missions.readyToStart');
 }
 const artifactMarkdown = computed(() => canonicalArtifact.value || stageMarkdown(
   viewedStage.value,
@@ -464,22 +324,6 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__mission-status[data-status='completed'], .mission-workspace__accepted-status { color: var(--color-on-success-container); background: var(--color-success-container); }
 .mission-workspace__accepted-status svg { width: var(--icon-sm); height: var(--icon-sm); }
 .mission-workspace__body { display: grid; grid-template-columns: minmax(210px, 238px) minmax(360px, 1fr) minmax(300px, 36%); flex: 1; min-height: 0; }
-.mission-workspace__process { display: flex; min-height: 0; flex-direction: column; padding: var(--space-10) var(--space-8); border-right: 1px solid var(--color-border); border-left: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-surface), var(--color-shell-main) 80%); }
-.mission-workspace__process-heading { display: flex; align-items: center; gap: var(--space-6); padding: 0 var(--space-4) var(--space-10); }
-.mission-workspace__process-heading > svg { width: var(--icon-lg); height: var(--icon-lg); color: var(--color-primary); }
-.mission-workspace__process-heading div, .mission-workspace__stage-copy { display: grid; min-width: 0; gap: var(--space-1); }
-.mission-workspace__process-heading span, .mission-workspace__stage-copy small { overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-12); text-overflow: ellipsis; white-space: nowrap; }
-.mission-workspace__stages { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-.mission-workspace__stages button { display: flex; width: 100%; align-items: center; gap: var(--space-6); padding: var(--space-6); border: 0; border-radius: var(--radius-lg); color: var(--color-text); background: transparent; text-align: left; cursor: pointer; }
-.mission-workspace__stages button:disabled { color: var(--color-text-muted); cursor: default; }
-.mission-workspace__stages .mission-workspace__stage--viewed { background: var(--color-primary-container); }
-.mission-workspace__stage-marker { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border: 2px solid var(--color-border-strong); border-radius: var(--radius-full); background: var(--color-surface-lowest); font-size: var(--font-size-12); }
-.mission-workspace__stage-marker[data-state='current'] { border-color: var(--color-primary); color: var(--color-primary); }
-.mission-workspace__stage-marker[data-state='complete'] { border-color: var(--color-success); color: var(--color-on-success); background: var(--color-success); }
-.mission-workspace__stage-marker svg { width: var(--icon-sm); height: var(--icon-sm); }
-.mission-workspace__progress-summary { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); margin-top: auto; padding: var(--space-8) var(--space-4) 0; border-top: 1px solid var(--color-border); font-size: var(--font-size-12); }
-.mission-workspace__progress-summary [role='progressbar'] { height: 6px; grid-column: 1 / -1; overflow: hidden; border-radius: var(--radius-full); background: var(--color-surface-high); }
-.mission-workspace__progress-summary [role='progressbar'] span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
 .mission-workspace__workbench { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
 .mission-workspace__stage-header { z-index: 3; display: flex; min-height: 38px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--space-10); padding: var(--space-6) var(--space-12); border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
 .mission-workspace__workbench-scroll { min-height: 0; flex: 1; padding: var(--space-8) var(--space-12) var(--space-12); overflow: auto; }
@@ -500,28 +344,8 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__artifact > :deep(.markdown-panel) { padding: 0 0 var(--space-8); }
 .mission-workspace__review-hint { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-10); padding: var(--space-6); border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--font-size-13); }
 .mission-workspace__review-hint svg { width: var(--icon-md); height: var(--icon-md); }
-.mission-workspace__conversation { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-left: 1px solid var(--color-border); background: var(--color-surface-lowest); }
-.mission-workspace__conversation-navigation { flex: 0 0 auto; border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
-.mission-workspace__conversation-navigation > header { display: flex; min-height: 56px; align-items: center; gap: var(--space-4); padding: var(--space-6) var(--space-8); }
-.mission-workspace__conversation-heading { display: grid; min-width: 0; flex: 1; gap: var(--space-1); }
-.mission-workspace__conversation-heading h2 { overflow: hidden; font-size: var(--font-size-14); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
-.mission-workspace__conversation-heading p { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-12); line-height: var(--line-height-18); }
-.mission-workspace__conversation-heading p strong { flex: 0 0 auto; color: var(--color-text); font-weight: var(--font-weight-medium); }
-.mission-workspace__conversation-heading p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mission-workspace__conversation-heading p span::before { margin-right: var(--space-2); content: '·'; }
-.mission-workspace__conversation-mark { display: grid; width: var(--space-12); height: var(--space-12); flex: 0 0 var(--space-12); place-items: center; border-radius: var(--radius-full); color: var(--color-primary); background: var(--color-primary-container); }
-.mission-workspace__conversation-mark svg { width: var(--icon-md); height: var(--icon-md); }
-.mission-workspace__conversation-switcher { display: flex; gap: var(--space-8); padding: 0 var(--space-8); overflow-x: auto; }
-.mission-workspace__conversation-switcher button { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; padding: var(--space-3) 0 var(--space-4); border: 0; border-bottom: 2px solid transparent; color: var(--color-text-muted); background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.mission-workspace__conversation-switcher button:hover, .mission-workspace__conversation-switcher button:focus-visible { color: var(--color-text); }
-.mission-workspace__conversation-switcher button[aria-selected='true'] { border-bottom-color: var(--color-primary); color: var(--color-text); }
-.mission-workspace__conversation-tab-copy { min-width: 0; white-space: nowrap; }
-.mission-workspace__conversation-tab-copy strong { overflow: hidden; font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
-.mission-workspace__conversation :deep(.conversation-pane) { flex: 1; min-height: 0; }
-.mission-workspace__conversation-empty { display: grid; flex: 1; place-items: center; align-content: center; gap: var(--space-4); padding: var(--space-10); color: var(--color-text-muted); text-align: center; }
-.mission-workspace__conversation-empty svg { width: var(--icon-xl); height: var(--icon-xl); color: var(--color-primary); }
 @keyframes mission-workspace-activity-spin { to { transform: rotate(1turn); } }
 @media (prefers-reduced-motion: reduce) { .mission-workspace__activity-indicator { animation: none; } }
-@container (max-width: 980px) { .mission-workspace__body { grid-template-columns: 200px minmax(360px, 1fr); } .mission-workspace__conversation { display: none; } }
-@container (max-width: 680px) { .mission-workspace__body { display: flex; overflow: auto; flex-direction: column; } .mission-workspace__process { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); border-left: 0; } .mission-workspace__stages { grid-template-columns: repeat(4, minmax(120px, 1fr)); overflow-x: auto; } .mission-workspace__progress-summary { margin-top: var(--space-8); } .mission-workspace__workbench { min-height: auto; overflow: visible; } .mission-workspace__workbench-scroll { overflow: visible; } .mission-workspace__stage-header { position: sticky; top: 0; align-items: flex-start; flex-direction: column; } .mission-workspace__stage-heading { flex-wrap: wrap; } }
+@container (max-width: 980px) { .mission-workspace__body { grid-template-columns: 200px minmax(360px, 1fr); } }
+@container (max-width: 680px) { .mission-workspace__body { display: flex; overflow: auto; flex-direction: column; } .mission-workspace__workbench { min-height: auto; overflow: visible; } .mission-workspace__workbench-scroll { overflow: visible; } .mission-workspace__stage-header { position: sticky; top: 0; align-items: flex-start; flex-direction: column; } .mission-workspace__stage-heading { flex-wrap: wrap; } }
 </style>
