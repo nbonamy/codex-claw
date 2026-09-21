@@ -457,7 +457,7 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__workbench-scroll { min-height: 0; flex: 1; padding: var(--space-4) var(--space-12) var(--space-12); overflow: auto; }
 .mission-workspace__stage-heading { display: flex; min-width: 0; align-items: baseline; gap: var(--space-4); }
 .mission-workspace__stage-heading > span { color: var(--color-text-muted); font-size: var(--font-size-12); white-space: nowrap; }
-.mission-workspace__stage-header h2 { overflow: hidden; font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+.mission-workspace__stage-header h2 { overflow: hidden; font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); line-height: var(--line-height-32); text-overflow: ellipsis; white-space: nowrap; }
 .mission-workspace__empty-artifact p { color: var(--color-text-muted); line-height: var(--line-height-20); }
 .mission-workspace__stage-header button, .mission-workspace__empty-artifact button { display: inline-flex; align-items: center; gap: var(--space-3); white-space: nowrap; }
 .mission-workspace__stage-header button svg, .mission-workspace__empty-artifact button svg { width: var(--icon-sm); height: var(--icon-sm); }
