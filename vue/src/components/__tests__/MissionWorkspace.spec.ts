@@ -63,7 +63,7 @@ describe('MissionWorkspace', () => {
 
     expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(5);
     expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
-    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping requirementsStop');
+    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping requirements');
     expect(wrapper.get('.mission-workspace__run-status').attributes()).toMatchObject({
       role: 'status',
       'aria-live': 'polite',
@@ -246,7 +246,7 @@ describe('MissionWorkspace', () => {
     expect(ticketCards[0]!.text()).toContain('Create billing account');
     expect(ticketCards[0]!.text()).toContain('Deliver the account with integration coverage.');
     expect(ticketCards[1]!.text()).toContain('After 01');
-    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping ticketsStop');
+    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping tickets');
 
     await ticketCards[1]!.trigger('click');
     await flushPromises();
@@ -423,13 +423,10 @@ describe('MissionWorkspace', () => {
     expect(wrapper.find('.code-review-slot').exists()).toBe(false);
   });
 
-  it('stops active work and can retry a retained failed stage', async () => {
+  it('can retry a retained failed stage', async () => {
     const mission = missionWithRun('running');
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
-
-    await wrapper.get('.mission-workspace__run-status button').trigger('click');
-    expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-requirements' });
 
     mission.execution!.runs[0]!.status = 'failed';
     mission.execution!.runs[0]!.error = 'Provider offline';
@@ -438,16 +435,10 @@ describe('MissionWorkspace', () => {
     expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'run' });
   });
 
-  it('keeps start and stop failures visible beside the mission stage', async () => {
+  it('keeps restart failures visible beside the mission stage', async () => {
     const mission = missionWithRun('running');
-    const executeMission = vi.fn()
-      .mockRejectedValueOnce(new Error('Could not stop the worker'))
-      .mockRejectedValueOnce('Could not restart the worker');
+    const executeMission = vi.fn().mockRejectedValueOnce('Could not restart the worker');
     const wrapper = mountWorkspace(mission, { executeMission });
-
-    await wrapper.get('.mission-workspace__run-status button').trigger('click');
-    await flushPromises();
-    expect(wrapper.get('[role="alert"]').text()).toBe('Could not stop the worker');
 
     mission.execution!.runs[0]!.status = 'failed';
     await wrapper.setProps({ mission: structuredClone(mission) });

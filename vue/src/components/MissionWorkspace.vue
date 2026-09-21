@@ -56,7 +56,6 @@
             <div v-if="activeStageRun" class="mission-workspace__run-status" role="status" aria-live="polite">
               <span class="mission-workspace__activity-dot" aria-hidden="true" />
               <span>{{ activeStageStatus }}</span>
-              <button type="button" :disabled="busy" @click="stopRun(activeStageRun.id)">{{ t('missions.stopRun') }}</button>
             </div>
             <button
               v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal && !debugFixture"
@@ -464,9 +463,6 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__stage-actions { display: flex; min-height: 34px; align-items: center; }
 .mission-workspace__run-status { display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--font-size-13); white-space: nowrap; }
 .mission-workspace__activity-dot { width: var(--space-4); height: var(--space-4); border-radius: var(--radius-full); background: var(--color-primary); animation: mission-workspace-activity-pulse 1.4s ease-in-out infinite; }
-.mission-workspace__run-status button { padding: var(--space-2) var(--space-3); border: 0; color: var(--color-text-muted); background: transparent; font: inherit; cursor: pointer; }
-.mission-workspace__run-status button:hover:not(:disabled), .mission-workspace__run-status button:focus-visible { color: var(--color-text); }
-.mission-workspace__run-status button:disabled { cursor: default; opacity: 0.5; }
 .mission-workspace__error { margin-top: var(--space-8) !important; padding: var(--space-6); border-radius: var(--radius-md); color: var(--color-on-error-container); background: var(--color-error-container); }
 .mission-workspace__empty-artifact { display: flex; max-width: 700px; align-items: center; flex-direction: column; gap: var(--space-8); margin: var(--space-16) auto; padding: var(--space-10); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-low); text-align: center; }
 .mission-workspace__callout-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: var(--radius-lg); color: var(--color-primary); background: var(--color-primary-container); }
