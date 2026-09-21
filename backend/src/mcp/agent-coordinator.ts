@@ -113,16 +113,20 @@ export type McpCreateAgentResponse = {
   message: string;
 };
 
+export type MissionToolPort = {
+  contextForAgent(agentId: string): MissionToolContext | undefined;
+  submitResult(agentId: string, input: MissionResultInput): Promise<{ success: true; status: 'awaitingReview' | 'accepted' }>;
+  upsertTicket(agentId: string, input: MissionTicketDraftInput): Promise<MissionTicketDraftResult>;
+  setTitle(agentId: string, title: string): Promise<{ success: true; title: string }>;
+  setExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy): Promise<MissionExecutionPolicyResult>;
+  attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }>;
+  listArtifacts(agentId: string): Array<{ stage: MissionStage } & MissionArtifactFile>;
+  readArtifact(agentId: string, stage: MissionStage): Promise<MissionArtifactReadResult>;
+  writeArtifact(agentId: string, input: MissionArtifactWriteInput): Promise<MissionArtifactReadResult>;
+};
+
 export type ClawMcpAgentCoordinatorOptions = {
-  getMissionContext?: (agentId: string) => MissionToolContext | undefined;
-  onMissionResult?: (agentId: string, input: MissionResultInput) => Promise<{ success: true; status: 'awaitingReview' | 'accepted' }>;
-  onUpsertMissionTicket?: (agentId: string, input: MissionTicketDraftInput) => Promise<MissionTicketDraftResult>;
-  onSetMissionTitle?: (agentId: string, title: string) => Promise<{ success: true; title: string }>;
-  onSetMissionExecutionPolicy?: (agentId: string, reviewPolicy: MissionReviewPolicy) => Promise<MissionExecutionPolicyResult>;
-  onAttachMissionRepository?: (agentId: string, repoPath: string) => Promise<{ success: true; repoPath: string }>;
-  onListMissionArtifacts?: (agentId: string) => Array<{ stage: MissionStage } & MissionArtifactFile>;
-  onReadMissionArtifact?: (agentId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
-  onWriteMissionArtifact?: (agentId: string, input: MissionArtifactWriteInput) => Promise<MissionArtifactReadResult>;
+  missionTools?: MissionToolPort;
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
@@ -146,15 +150,7 @@ export class McpToolError extends Error {
 }
 
 export class ClawMcpAgentCoordinator {
-  private readonly getMissionContext?: ClawMcpAgentCoordinatorOptions['getMissionContext'];
-  private readonly onMissionResult?: ClawMcpAgentCoordinatorOptions['onMissionResult'];
-  private readonly onUpsertMissionTicket?: ClawMcpAgentCoordinatorOptions['onUpsertMissionTicket'];
-  private readonly onSetMissionTitle?: ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
-  private readonly onSetMissionExecutionPolicy?: ClawMcpAgentCoordinatorOptions['onSetMissionExecutionPolicy'];
-  private readonly onAttachMissionRepository?: ClawMcpAgentCoordinatorOptions['onAttachMissionRepository'];
-  private readonly onListMissionArtifacts?: ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
-  private readonly onReadMissionArtifact?: ClawMcpAgentCoordinatorOptions['onReadMissionArtifact'];
-  private readonly onWriteMissionArtifact?: ClawMcpAgentCoordinatorOptions['onWriteMissionArtifact'];
+  private readonly missionTools?: MissionToolPort;
   private readonly messages: McpMessage[] = [];
   private readonly getAgents: () => Agent[];
   private readonly onAgentUpdated?: (agent: Agent) => void;
@@ -171,15 +167,7 @@ export class ClawMcpAgentCoordinator {
   private readonly now: () => Date;
 
   constructor(options: ClawMcpAgentCoordinatorOptions) {
-    this.getMissionContext = options.getMissionContext;
-    this.onMissionResult = options.onMissionResult;
-    this.onUpsertMissionTicket = options.onUpsertMissionTicket;
-    this.onSetMissionTitle = options.onSetMissionTitle;
-    this.onSetMissionExecutionPolicy = options.onSetMissionExecutionPolicy;
-    this.onAttachMissionRepository = options.onAttachMissionRepository;
-    this.onListMissionArtifacts = options.onListMissionArtifacts;
-    this.onReadMissionArtifact = options.onReadMissionArtifact;
-    this.onWriteMissionArtifact = options.onWriteMissionArtifact;
+    this.missionTools = options.missionTools;
     this.getAgents = options.getAgents;
     this.onAgentUpdated = options.onAgentUpdated;
     this.onInboxMessage = options.onInboxMessage;
@@ -335,55 +323,55 @@ export class ClawMcpAgentCoordinator {
 
   async submitMissionResult(agentId: string, input: MissionResultInput) {
     this.requireAgent(agentId);
-    if (!this.onMissionResult) throw new McpToolError('Mission result submission is unavailable.');
-    return this.onMissionResult(agentId, input);
+    if (!this.missionTools) throw new McpToolError('Mission result submission is unavailable.');
+    return this.missionTools.submitResult(agentId, input);
   }
 
   async upsertMissionTicket(agentId: string, input: MissionTicketDraftInput) {
     this.requireAgent(agentId);
-    if (!this.onUpsertMissionTicket) throw new McpToolError('Mission ticket drafting is unavailable.');
-    return this.onUpsertMissionTicket(agentId, input);
+    if (!this.missionTools) throw new McpToolError('Mission ticket drafting is unavailable.');
+    return this.missionTools.upsertTicket(agentId, input);
   }
 
   missionContext(agentId: string): MissionToolContext | undefined {
     this.requireAgent(agentId);
-    return this.getMissionContext?.(agentId);
+    return this.missionTools?.contextForAgent(agentId);
   }
 
   async setMissionTitle(agentId: string, title: string) {
     this.requireAgent(agentId);
-    if (!this.onSetMissionTitle) throw new McpToolError('Mission title updates are unavailable.');
-    return this.onSetMissionTitle(agentId, title);
+    if (!this.missionTools) throw new McpToolError('Mission title updates are unavailable.');
+    return this.missionTools.setTitle(agentId, title);
   }
 
   async setMissionExecutionPolicy(agentId: string, reviewPolicy: MissionReviewPolicy) {
     this.requireAgent(agentId);
-    if (!this.onSetMissionExecutionPolicy) throw new McpToolError('Mission execution policy updates are unavailable.');
-    return this.onSetMissionExecutionPolicy(agentId, reviewPolicy);
+    if (!this.missionTools) throw new McpToolError('Mission execution policy updates are unavailable.');
+    return this.missionTools.setExecutionPolicy(agentId, reviewPolicy);
   }
 
   async attachMissionRepository(agentId: string, repoPath: string) {
     this.requireAgent(agentId);
-    if (!this.onAttachMissionRepository) throw new McpToolError('Mission repository attachment is unavailable.');
-    return this.onAttachMissionRepository(agentId, repoPath);
+    if (!this.missionTools) throw new McpToolError('Mission repository attachment is unavailable.');
+    return this.missionTools.attachRepository(agentId, repoPath);
   }
 
   listMissionArtifacts(agentId: string) {
     this.requireAgent(agentId);
-    if (!this.onListMissionArtifacts) throw new McpToolError('Mission artifact listing is unavailable.');
-    return this.onListMissionArtifacts(agentId);
+    if (!this.missionTools) throw new McpToolError('Mission artifact listing is unavailable.');
+    return this.missionTools.listArtifacts(agentId);
   }
 
   async readMissionArtifact(agentId: string, stage: MissionStage) {
     this.requireAgent(agentId);
-    if (!this.onReadMissionArtifact) throw new McpToolError('Mission artifact reading is unavailable.');
-    return this.onReadMissionArtifact(agentId, stage);
+    if (!this.missionTools) throw new McpToolError('Mission artifact reading is unavailable.');
+    return this.missionTools.readArtifact(agentId, stage);
   }
 
   async writeMissionArtifact(agentId: string, input: MissionArtifactWriteInput) {
     this.requireAgent(agentId);
-    if (!this.onWriteMissionArtifact) throw new McpToolError('Mission artifact writing is unavailable.');
-    return this.onWriteMissionArtifact(agentId, input);
+    if (!this.missionTools) throw new McpToolError('Mission artifact writing is unavailable.');
+    return this.missionTools.writeArtifact(agentId, input);
   }
 
   async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {

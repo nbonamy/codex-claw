@@ -295,11 +295,19 @@ describe('ClawMcpService', () => {
     const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
     service = new ClawMcpService({
       snapshot,
-      getMissionContext: agentId => active && agentId === 'agent-dina'
-        ? { missionId: 'mission-1', runId: 'run-1', stage: 'requirements' }
-        : undefined,
-      onMissionResult: vi.fn(),
-      onSetMissionTitle,
+      missionTools: {
+        contextForAgent: agentId => active && agentId === 'agent-dina'
+          ? { missionId: 'mission-1', runId: 'run-1', stage: 'requirements' }
+          : undefined,
+        submitResult: vi.fn(),
+        upsertTicket: vi.fn(),
+        setTitle: onSetMissionTitle,
+        setExecutionPolicy: vi.fn(),
+        attachRepository: vi.fn(),
+        listArtifacts: vi.fn().mockReturnValue([]),
+        readArtifact: vi.fn(),
+        writeArtifact: vi.fn(),
+      },
     });
     const url = await service.start();
 

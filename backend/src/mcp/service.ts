@@ -33,7 +33,7 @@ import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type UpdateWorkItemResponse } from './agent-coordinator';
+import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type MissionToolPort, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
 import { ClawMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
@@ -46,15 +46,7 @@ import { AgentCreationService } from '../agents/agent-creation-service';
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
 export type ClawMcpServiceOptions = {
-  getMissionContext?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['getMissionContext'];
-  onMissionResult?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onMissionResult'];
-  onUpsertMissionTicket?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onUpsertMissionTicket'];
-  onSetMissionTitle?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onSetMissionTitle'];
-  onSetMissionExecutionPolicy?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onSetMissionExecutionPolicy'];
-  onAttachMissionRepository?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onAttachMissionRepository'];
-  onListMissionArtifacts?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onListMissionArtifacts'];
-  onReadMissionArtifact?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onReadMissionArtifact'];
-  onWriteMissionArtifact?: import('./agent-coordinator').ClawMcpAgentCoordinatorOptions['onWriteMissionArtifact'];
+  missionTools?: MissionToolPort;
   snapshot: AppSnapshot;
   now?: () => Date;
   onEvent?: (event: BackendEvent) => void;
@@ -94,15 +86,7 @@ export class ClawMcpService {
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.eventSink = options.onEvent ?? null;
     this.coordinator = new ClawMcpAgentCoordinator({
-      getMissionContext: options.getMissionContext,
-      onMissionResult: options.onMissionResult,
-      onUpsertMissionTicket: options.onUpsertMissionTicket,
-      onSetMissionTitle: options.onSetMissionTitle,
-      onSetMissionExecutionPolicy: options.onSetMissionExecutionPolicy,
-      onAttachMissionRepository: options.onAttachMissionRepository,
-      onListMissionArtifacts: options.onListMissionArtifacts,
-      onReadMissionArtifact: options.onReadMissionArtifact,
-      onWriteMissionArtifact: options.onWriteMissionArtifact,
+      missionTools: options.missionTools,
       getAgents: () => this.snapshot.agents,
       now: this.now,
       onAgentUpdated: (agent) => this.emit({

@@ -26,7 +26,17 @@ describe('ClawMcpAgentCoordinator', () => {
     const onListMissionArtifacts = vi.fn().mockReturnValue([{ stage: 'requirements', revision: 1, size: 10, updatedAt: 'now' }]);
     const onReadMissionArtifact = vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 1, updatedAt: 'now' });
     const onWriteMissionArtifact = vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Brief', revision: 2, updatedAt: 'later' });
-    const enabled = fixture({ getMissionContext: missionContext, onMissionResult, onUpsertMissionTicket, onSetMissionTitle, onSetMissionExecutionPolicy, onAttachMissionRepository, onListMissionArtifacts, onReadMissionArtifact, onWriteMissionArtifact }).coordinator;
+    const enabled = fixture({ missionTools: {
+      contextForAgent: missionContext,
+      submitResult: onMissionResult,
+      upsertTicket: onUpsertMissionTicket,
+      setTitle: onSetMissionTitle,
+      setExecutionPolicy: onSetMissionExecutionPolicy,
+      attachRepository: onAttachMissionRepository,
+      listArtifacts: onListMissionArtifacts,
+      readArtifact: onReadMissionArtifact,
+      writeArtifact: onWriteMissionArtifact,
+    } }).coordinator;
     expect(() => enabled.missionContext('missing')).toThrow();
     await expect(enabled.submitMissionResult('missing', input)).rejects.toThrow();
     expect(onMissionResult).not.toHaveBeenCalled();

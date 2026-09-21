@@ -76,15 +76,17 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
   const mcpService = new ClawMcpService({
-    getMissionContext: (agentId) => server.missionContext(agentId),
-    onMissionResult: (agentId, input) => server.submitMissionResult(agentId, input),
-    onUpsertMissionTicket: (agentId, input) => server.upsertMissionTicket(agentId, input),
-    onSetMissionTitle: (agentId, title) => server.setMissionTitle(agentId, title),
-    onSetMissionExecutionPolicy: (agentId, reviewPolicy) => server.setMissionExecutionPolicy(agentId, reviewPolicy),
-    onAttachMissionRepository: (agentId, repoPath) => server.attachMissionRepository(agentId, repoPath),
-    onListMissionArtifacts: (agentId) => server.listMissionArtifacts(agentId),
-    onReadMissionArtifact: (agentId, stage) => server.readMissionArtifact(agentId, stage),
-    onWriteMissionArtifact: (agentId, input) => server.writeMissionArtifact(agentId, input),
+    missionTools: {
+      contextForAgent: agentId => server.missionContext(agentId),
+      submitResult: (agentId, input) => server.submitMissionResult(agentId, input),
+      upsertTicket: (agentId, input) => server.upsertMissionTicket(agentId, input),
+      setTitle: (agentId, title) => server.setMissionTitle(agentId, title),
+      setExecutionPolicy: (agentId, reviewPolicy) => server.setMissionExecutionPolicy(agentId, reviewPolicy),
+      attachRepository: (agentId, repoPath) => server.attachMissionRepository(agentId, repoPath),
+      listArtifacts: agentId => server.listMissionArtifacts(agentId),
+      readArtifact: (agentId, stage) => server.readMissionArtifact(agentId, stage),
+      writeArtifact: (agentId, input) => server.writeMissionArtifact(agentId, input),
+    },
     snapshot,
     computerUse: computerUseAvailable ? {
       execute: (input) => options.requestClient(backendMethods.clientComputerUseExecute, input),
