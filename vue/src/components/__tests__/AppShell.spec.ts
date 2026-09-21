@@ -686,6 +686,163 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
   });
 
+  it('intercepts /review and opens the app-owned review workflow without sending a provider prompt', async () => {
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ realConversationPane: true, sendPromptAction });
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = '/review';
+    await editor.trigger('input');
+    await nextTick();
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+  });
+
+  it('moves the Review pane from the source thread to an independent reviewer', async () => {
+    const snapshot = createInitialSnapshot();
+    const source = snapshot.agents[0]!;
+    const reviewer = {
+      ...source,
+      id: 'agent-reviewer',
+      name: 'Review',
+      backendSession: { kind: 'codex' as const, threadId: 'review-thread' },
+    };
+    const next = structuredClone(snapshot);
+    next.agents.push(reviewer);
+    next.teams[0]!.agentIds.push(reviewer.id);
+    next.activeAgentId = reviewer.id;
+    const startCodeReview = vi.fn().mockResolvedValue(next);
+    const wrapper = mountShell({ snapshot, startCodeReview });
+
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'codeReview');
+    await nextTick();
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+
+    await wrapper.getComponent({ name: 'AgentWorkspace' }).props('startCodeReview')(
+      source.id,
+      { scope: { type: 'uncommitted' }, threadMode: 'independent' },
+    );
+    await wrapper.setProps({ snapshot: next, activeAgent: reviewer });
+    await nextTick();
+
+    const reviewerPanel = wrapper.findAllComponents({ name: 'RightWorkspacePanel' })
+      .find((panel) => panel.props('agent').id === reviewer.id)!;
+    expect(reviewerPanel.isVisible()).toBe(true);
+    expect(reviewerPanel.props('tabs')).toContain('codeReview');
+
+    const returned = { ...next, activeAgentId: source.id };
+    await wrapper.setProps({ snapshot: returned, activeAgent: source });
+    await nextTick();
+
+    const sourcePanel = wrapper.findAllComponents({ name: 'RightWorkspacePanel' })
+      .find((panel) => panel.props('agent').id === source.id)!;
+    expect(sourcePanel.props('tabs')).not.toContain('codeReview');
+    expect(sourcePanel.props('activeTab')).toBeNull();
+  });
+
+  it('does not override an independent reviewer with renderer-local model selection', async () => {
+    const snapshot = createInitialSnapshot();
+    const source = snapshot.agents[0]!;
+    source.backendDefaults = {
+      kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'medium',
+    };
+    const reviewer = {
+      ...source,
+      id: 'agent-reviewer',
+      name: 'Review',
+      backendSession: { kind: 'codex' as const, threadId: 'review-thread' },
+    };
+    const next = structuredClone(snapshot);
+    next.agents.push(reviewer);
+    next.teams[0]!.agentIds.push(reviewer.id);
+    next.activeAgentId = reviewer.id;
+    const startCodeReview = vi.fn().mockResolvedValue(next);
+    const wrapper = mountShell({
+      snapshot,
+      startCodeReview,
+      backendModels: [{
+        id: 'astra-option',
+        model: 'gpt-6-astra',
+        displayName: 'GPT-6 Astra',
+      }],
+      selectedModelId: 'astra-option',
+      selectedReasoningEffort: 'medium',
+    });
+
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'codeReview');
+    await nextTick();
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
+    await flushPromises();
+
+    expect(startCodeReview).toHaveBeenCalledExactlyOnceWith(source.id, {
+      scope: { type: 'uncommitted' },
+      threadMode: 'independent',
+    });
+  });
+
+  it('attaches a finding to the real composer and submits the user question through its stable link', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'review-thread' };
+    const finding = {
+      id: 'finding-1', roundId: 'round-1', priority: 'p1' as const,
+      title: 'Authorize before writing',
+      body: 'The public mutation writes before checking ownership.',
+      location: { file: 'src/auth.ts', line: 42, endLine: 44 },
+      decision: { state: 'selected' as const, decidedAt: '2026-09-19T10:00:30.000Z' },
+      discussion: [], remediation: { state: 'notStarted' as const },
+      createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
+    };
+    agent.codeReview = {
+      id: 'review-1', targetAgentId: agent.id, reviewerAgentId: agent.id,
+      scope: { type: 'uncommitted' }, threadMode: 'current', status: 'ready', activeRoundId: 'round-1',
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:01:00.000Z',
+      rounds: [{
+        id: 'round-1', number: 1, status: 'ready', reviewerSession: agent.backendSession,
+        startedAt: '2026-09-19T10:00:00.000Z', completedAt: '2026-09-19T10:01:00.000Z', findings: [finding],
+      }],
+    };
+    const discussCodeReviewFinding = vi.fn().mockResolvedValue(snapshot);
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      discussCodeReviewFinding,
+      sendPromptAction,
+    });
+
+    wrapper.getComponent({ name: 'AgentWorkspace' }).vm.$emit('clarifyCodeReviewFinding', {
+      agentId: agent.id,
+      sessionId: 'review-1',
+      roundId: 'round-1',
+      finding,
+    });
+    await nextTick();
+
+    expect(wrapper.emitted('update:composerState')).toBeUndefined();
+    const attachment = wrapper.get('.composer-context-cards__card');
+    expect(attachment.text()).toContain('P1');
+    expect(attachment.text()).toContain('Authorize before writing');
+    expect(attachment.text()).not.toContain('The public mutation writes before checking ownership.');
+
+    const question = 'Could this race with another request?';
+    await wrapper.setProps({
+      composerState: { text: question, selectionStart: question.length, selectionEnd: question.length },
+    });
+    await nextTick();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(discussCodeReviewFinding).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', question,
+    });
+    expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.find('.composer-context-cards__card').exists()).toBe(false);
+  });
+
   it('keeps the first submitted prompt visible while its Codex conversation is created', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

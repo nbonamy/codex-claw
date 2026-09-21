@@ -112,8 +112,18 @@ describe('agent prompts', () => {
     const instructions = codexClawDeveloperInstructions(agent());
 
     expect(instructions).toContain('Proactively call toggle_thread_flag with id delegate_to_worktree and value true');
+    expect(instructions).toContain('toggle_thread_flag with id ready_for_review and value true');
     expect(instructions).toContain('explicit implementation or delegation language from the user is not required');
     expect(instructions).toContain('Clear it with value false when delegation is no longer appropriate');
+  });
+
+  it('keeps delegated co-agents focused on their assigned work', () => {
+    const delegatedAgent = agent();
+    delegatedAgent.delegatedByAgentId = 'agent-parent';
+    const instructions = codexClawDeveloperInstructions(delegatedAgent);
+
+    expect(instructions).toContain('This agent is already a delegated co-agent');
+    expect(instructions).not.toContain('Proactively call toggle_thread_flag');
   });
 
   it('describes workspace-free Quick chats without inventing a folder', () => {

@@ -27,6 +27,7 @@ import { loadPluginStatus } from './plugin-status';
 import { AgentGitService } from './git/agent-git-service';
 import { PullRequestMonitor } from './git/pull-request-monitor';
 import { WorktreeManager } from './worktrees/worktree-manager';
+import { AgentCreationService } from './agents/agent-creation-service';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -65,6 +66,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     undefined,
     async (input) => (await worktreeManager.create(input)).worktree,
   );
+  const agentCreation = new AgentCreationService(snapshot);
   const workIntegrations = new WorkIntegrationManager({
     drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],
     getSnapshot: () => snapshot,
@@ -99,6 +101,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     queueSpokenAnnouncement: (input) => options.requestClient(backendMethods.clientSpokenAnnouncementQueue, input),
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
     worktreeManager,
+    agentCreation,
   });
   const mcpServerUrl = await mcpService.start();
   let server: ClawBackendServer;
@@ -201,6 +204,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     version: options.version,
     snapshot,
     agentGitService,
+    agentCreation,
     driverRpc,
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),
@@ -214,6 +218,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onPromptStarting: (agentId, promptOptions) => {
       mcpService.recordPromptInputMethod(agentId, promptOptions?.inputMethod);
     },
+    codeReviewTools: mcpService,
     workIntegrations,
     automationRunner,
     remoteClients: new RemoteClawdClientManager({

@@ -24,9 +24,21 @@ describe('Codex SDK → Claw session policy', () => {
 
   it('reconciles only unowned top-level sessions and restores attached archived sessions', async () => {
     const { driver, surface } = setup();
-    surface.listConversations.mockResolvedValueOnce([sdkSummary('conversation-a'), sdkSummary('orphan'), sdkSummary('child', { parentConversationId: 'conversation-a' })])
-      .mockResolvedValueOnce([sdkSummary('attached-archived'), sdkSummary('other-archive')]);
-    await driver.reconcileConversations([sdkAgent(), sdkAgent('b', 'attached-archived')]);
+    const reviewAgent = sdkAgent('review-owner', 'review-thread');
+    reviewAgent.codeReview = {
+      id: 'review', targetAgentId: 'agent-a', reviewerAgentId: reviewAgent.id,
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+      status: 'ready', activeRoundId: 'round', createdAt: metadata.occurredAt, updatedAt: metadata.occurredAt,
+      rounds: [{
+        id: 'round', number: 1, status: 'ready', findings: [], startedAt: metadata.occurredAt,
+        reviewerSession: { kind: 'codex', threadId: 'review-thread' },
+      }],
+    };
+    surface.listConversations.mockResolvedValueOnce([
+      sdkSummary('conversation-a'), sdkSummary('review-thread'), sdkSummary('orphan'),
+      sdkSummary('child', { parentConversationId: 'conversation-a' }),
+    ]).mockResolvedValueOnce([sdkSummary('attached-archived'), sdkSummary('other-archive')]);
+    await driver.reconcileConversations([sdkAgent(), sdkAgent('b', 'attached-archived'), reviewAgent]);
     expect(surface.archiveConversation).toHaveBeenCalledExactlyOnceWith('orphan');
     expect(surface.unarchiveConversation).toHaveBeenCalledExactlyOnceWith('attached-archived');
   });

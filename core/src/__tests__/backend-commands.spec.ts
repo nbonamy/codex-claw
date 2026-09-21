@@ -25,6 +25,15 @@ describe('backend command catalog', () => {
         submitOnSelect: true,
       },
       {
+        id: 'claw.review',
+        backend: 'claude',
+        name: 'review',
+        displayName: 'Review',
+        description: 'Open Claw\'s code review workflow.',
+        slashName: 'review',
+        submitOnSelect: true,
+      },
+      {
         id: 'claude.plan',
         backend: 'claude',
         name: 'plan',

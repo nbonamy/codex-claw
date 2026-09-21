@@ -349,9 +349,12 @@ export type Agent = {
   backendSession?: BackendSession;
   backendDefaults?: BackendDefaults;
   openInApplication?: OpenInApplication;
+  gitDiffTarget?: AgentGitDiffTarget;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('./plan-review').PlanReview;
+  /** Durable only while a review workflow is active; removed when the user finishes it. */
+  codeReview?: import('./code-review').CodeReviewSession;
   threadFlags?: import('./thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   isRegistered?: boolean;
@@ -640,6 +643,7 @@ export type AppCommand =
   | { type: 'debug-celebrate'; kind: CelebrationKind }
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-mark-unread' }
+  | { type: 'debug-open-code-review' }
   | { type: 'debug-open-markdown' }
   | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
@@ -691,7 +695,8 @@ export type ReorderTeamsInput = {
 
 export type UpdateAgentInput = {
   id: string;
-  name: string | null;
+  name?: string | null;
+  gitDiffTarget?: AgentGitDiffTarget | null;
 };
 
 export type DuplicateAgentOptions = {
@@ -731,6 +736,13 @@ export type DesktopUpdateStatus = {
 };
 
 export type CodexClawApi = {
+  startCodeReview(agentId: string, input: import('./code-review').CodeReviewStartInput): Promise<AppSnapshot>;
+  decideCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDecisionInput): Promise<AppSnapshot>;
+  discussCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDiscussionInput): Promise<AppSnapshot>;
+  submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot>;
   respondToThreadFlag(agentId: string, response: import('./thread-flags').ThreadFlagResponse): Promise<AppSnapshot>;
   respondToPlanReview(agentId: string, response: import('./plan-review').PlanReviewResponse): Promise<AppSnapshot>;
   getSnapshot(): Promise<AppSnapshot>;

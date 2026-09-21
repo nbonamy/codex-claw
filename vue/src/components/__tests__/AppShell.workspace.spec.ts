@@ -291,12 +291,12 @@ describe('AppShell workspace and plans', () => {
 
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
 
-    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'branch', baseRef: 'origin/main' });
-    expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Review');
+    expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina', { type: 'uncommitted' });
+    expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Changes');
     expect(wrapper.get('.git-diff-preview-panel').attributes('aria-busy')).toBe('true');
 
     resolveDiff({
-        target: { type: 'branch', baseRef: 'origin/main' },
+        target: { type: 'uncommitted' },
         summary: { addedLines: 45, removedLines: 23, changedFiles: 1 },
         sections: [],
         diff: [
@@ -697,7 +697,7 @@ describe('AppShell workspace and plans', () => {
     await flushPromises();
 
     expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina');
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Review');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Changes');
   });
 
   it('does not open agent workspaces from background file activity', async () => {

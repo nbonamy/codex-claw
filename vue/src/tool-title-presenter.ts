@@ -53,11 +53,14 @@ const TOOL_KEYS: Record<string, string> = {
   'write-mission-artifact': 'writeMissionArtifact',
   'submit-mission-result': 'submitMissionResult',
   'upsert-mission-ticket': 'upsertMissionTicket',
+  'mark-finding-complete': 'markFindingComplete',
+  'report-finding': 'reportFinding',
   'update-work-item': 'updateWorkItem',
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',
   'set-status': 'setStatus',
   'toggle-thread-flag': 'toggleThreadFlag',
+  'update-finding': 'updateFinding',
 };
 
 export function presentClawToolTitle({

@@ -29,6 +29,7 @@
     @toggle-execution-plan="toggleExecutionPlan"
     @toggle-workspace="toggleRightWorkspace"
     @open-git-diff="openAgentGitDiffPreview(currentAgent.id, $event)"
+    @select-git-diff-target="persistGitDiffTarget(currentAgent.id, $event)"
     @open-in="openAgentIn(currentAgent.id, $event)"
     @select-subagent="openSubagent(currentAgent.id, $event)"
     @install-update="emit('install-update')"
@@ -43,6 +44,7 @@
       :agents="snapshot.agents"
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
       :text-annotations="chatTextAnnotations"
+      :review-finding="reviewFindingAttachment"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
       :history-load-failed="historyLoadFailed"
@@ -55,6 +57,7 @@
       @retry-history="retryConversationHistory"
       @thread-flag="respondToThreadFlag($event)"
       @remove-text-annotation="removeChatTextAnnotation"
+      @remove-review-finding="emit('removeReviewFindingAttachment')"
     />
     <RightWorkspacePanel
       v-for="agent in snapshot.agents"
@@ -99,7 +102,12 @@
       :close-repository-work-agent="(agentId) => $emit('close-agent', agentId)"
       :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
       :show-repository-work-agent="selectAgentFromShell"
-      @close-tab="closeRightWorkspaceTab(agent.id, $event)"
+      :start-code-review="startCodeReview"
+      :decide-code-review-finding="decideCodeReviewFinding"
+      :submit-code-review-round="submitCodeReviewRound"
+      :finish-code-review="finishCodeReview"
+      :review-code-again="reviewCodeAgain"
+      @close-tab="closeWorkspaceTab(agent, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
       @confirm-plan="confirmPlan"
@@ -111,6 +119,7 @@
       @open-link="openConversationLink"
       @refresh-git-diff="openAgentGitDiffPreview(agent.id, $event)"
       @refresh-backlog="loadRepositoryBacklog(agent.id)"
+      @clarify-finding="emit('clarifyCodeReviewFinding', { agentId: agent.id, ...$event })"
       @select-tab="selectRightWorkspaceTab(agent.id, $event)"
       @send-prompt="forwardPrompt"
     />
@@ -174,6 +183,7 @@ import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
+import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { fileBasename } from './use-workspace-previews';
 import {
   isRightWorkspaceSubagentTab,
@@ -192,11 +202,12 @@ const props = defineProps<{
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
-  respondToThreadFlag: (action: 'execute' | 'dismiss') => Promise<void>;
+  respondToThreadFlag: (response: ThreadFlagResponse) => Promise<void>;
   threadFlagBusy: boolean;
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];
+  reviewFindingAttachment?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
@@ -224,6 +235,7 @@ const props = defineProps<{
   latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   updateAgentGitBranchFromBase: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
+  updateAgent: (input: import('@codex-claw/core/contracts').UpdateAgentInput) => Promise<void>;
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;
@@ -253,6 +265,12 @@ const props = defineProps<{
   updateStatus?: DesktopUpdateStatus;
   commitAgentGitChanges: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
+  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>();
 
 const agentHeader = ref<{
@@ -264,6 +282,13 @@ const emit = defineEmits<{
   'expand-sidebar': [];
   'install-update': [];
   'remove-work-item-assignment': [item: WorkItem];
+  clarifyCodeReviewFinding: [payload: {
+    agentId: string;
+    sessionId: string;
+    roundId: string;
+    finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+  }];
+  removeReviewFindingAttachment: [];
   sendPrompt: [prompt: string];
   'update:planMode': [enabled: boolean];
 }>();
@@ -303,6 +328,12 @@ const {
   selectRightWorkspaceTab,
   snapshot,
   startRepositoryWork,
+  startCodeReview,
+  decideCodeReviewFinding,
+  submitCodeReviewRound,
+  finishCodeReview,
+  discardCodeReview,
+  reviewCodeAgain,
   startRightWorkspaceResize,
   toggleFileExplorer,
   toggleRightWorkspace,
@@ -401,6 +432,13 @@ function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
   return props.rightWorkspaceFor(agentId);
 }
 
+async function closeWorkspaceTab(agent: Agent, tab: RightWorkspaceTab): Promise<void> {
+  if (tab === 'codeReview' && agent.codeReview && props.discardCodeReview) {
+    await props.discardCodeReview(agent.id, agent.codeReview.id);
+  }
+  props.closeRightWorkspaceTab(agent.id, tab);
+}
+
 const lastTurnGitDiff = computed(() => {
   const turnId = props.latestConversationTurnId;
   const diff = turnId ? props.snapshot.turnGitDiffs[turnId] : null;
@@ -410,6 +448,10 @@ const lastTurnGitDiff = computed(() => {
 
 function openAgentGitDiffPreview(agentId?: string, target?: AgentGitDiffTarget): Promise<void> {
   return props.openAgentGitDiffPreview(agentId, target);
+}
+
+function persistGitDiffTarget(agentId: string, target: AgentGitDiffTarget): void {
+  void props.updateAgent({ id: agentId, gitDiffTarget: { ...target } }).catch(() => undefined);
 }
 
 function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {

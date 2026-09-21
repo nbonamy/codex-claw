@@ -155,9 +155,18 @@ export function mountShell(overrides: Partial<{
   isConversationLoadFailed: boolean;
   retryAgentHistory: () => Promise<void>;
   sendPromptAction: (prompt: string, options?: import('@codex-claw/core/contracts').RendererSendPromptOptions) => Promise<void>;
+  respondToThreadFlagAction: (response: import('@codex-claw/core/thread-flags').ThreadFlagResponse) => Promise<void>;
   deleteTurnAction: (turnId: string) => Promise<void>;
   editTurnAction: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction: (turnId: string) => Promise<void>;
+  startCodeReview: (
+    agentId: string,
+    input: import('@codex-claw/core/code-review').CodeReviewStartInput,
+  ) => Promise<AppSnapshot>;
+  discussCodeReviewFinding: (
+    agentId: string,
+    input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput,
+  ) => Promise<AppSnapshot>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
   return mount(AppShell, {
@@ -176,9 +185,12 @@ export function mountShell(overrides: Partial<{
       isConversationLoadFailed: overrides.isConversationLoadFailed ?? false,
       retryAgentHistory: overrides.retryAgentHistory ?? vi.fn().mockResolvedValue(undefined),
       sendPromptAction: overrides.sendPromptAction,
+      respondToThreadFlagAction: overrides.respondToThreadFlagAction,
       deleteTurnAction: overrides.deleteTurnAction,
       editTurnAction: overrides.editTurnAction,
       retryTurnAction: overrides.retryTurnAction,
+      startCodeReview: overrides.startCodeReview,
+      discussCodeReviewFinding: overrides.discussCodeReviewFinding,
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],
       composerState: overrides.composerState ?? { text: '', selectionStart: 0, selectionEnd: 0 },

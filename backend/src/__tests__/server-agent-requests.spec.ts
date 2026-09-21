@@ -65,6 +65,16 @@ describe('ClawBackendServer', () => {
       });
       await expect(server.handleMessage({
         jsonrpc: '2.0',
+        id: 'update-agent-git-diff-target',
+        method: 'agent/update',
+        params: { input: { id: agentId, gitDiffTarget: { type: 'staged' } } },
+      })).resolves.toMatchObject({
+        result: {
+          agents: [{ id: agentId, name: 'Dina Backend', gitDiffTarget: { type: 'staged' } }],
+        },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
         id: 'set-open-in-application',
         method: 'client/agentExternalApplication/update',
         params: { agentId, application: 'xcode' },

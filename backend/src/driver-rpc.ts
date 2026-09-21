@@ -2,7 +2,7 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, BackendSession, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -66,23 +66,24 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
       ),
     },
     extensions: [{
-        configureConversation: async ({ extensionContext }) => (
-          isAgent(extensionContext)
-          ? buildCodexClawThreadConfig(
-            extensionContext,
-            options.clawMcpServerUrl ?? null,
-            options.pluginSettings?.() ?? options.generalSettings?.plugins,
-            {
-              celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
-              developerInstructions: [
-                (await readEngineInstructions('codex')).text,
-                options.additionalDeveloperInstructions?.(extensionContext),
-              ].map(value => value?.trim()).filter(Boolean).join('\n\n'),
-            },
-            options.hostedMcpServerUrls?.() ?? {},
-          )
-          : {}
-      ),
+      configureConversation: async ({ extensionContext }) => {
+        const agent = reviewExtensionAgent(extensionContext) ?? (isAgent(extensionContext) ? extensionContext : null);
+        if (!agent) return {};
+        const reviewMcpServerUrl = reviewExtensionMcpUrl(extensionContext);
+        return buildCodexClawThreadConfig(
+          agent,
+          reviewMcpServerUrl ?? options.clawMcpServerUrl ?? null,
+          options.pluginSettings?.() ?? options.generalSettings?.plugins,
+          {
+            celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
+            developerInstructions: [
+              (await readEngineInstructions('codex')).text,
+              options.additionalDeveloperInstructions?.(agent),
+            ].map(value => value?.trim()).filter(Boolean).join('\n\n'),
+          },
+          reviewMcpServerUrl ? {} : options.hostedMcpServerUrls?.() ?? {},
+        );
+      },
     }],
   };
 }
@@ -91,6 +92,18 @@ function isAgent(value: unknown): value is Agent {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return record.backend === 'codex' && typeof record.id === 'string' && typeof record.folder === 'string';
+}
+
+function reviewExtensionAgent(value: unknown): Agent | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const agent = (value as Record<string, unknown>).agent;
+  return isAgent(agent) ? agent : null;
+}
+
+function reviewExtensionMcpUrl(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const url = (value as Record<string, unknown>).reviewMcpServerUrl;
+  return typeof url === 'string' ? url : null;
 }
 
 export class BackendDriverRpc {
@@ -177,6 +190,28 @@ export class BackendDriverRpc {
           ...(typeof record.developerInstructions === 'string' ? { developerInstructions: record.developerInstructions } : {}),
           ...(record.outputSchema !== undefined ? { outputSchema: record.outputSchema as never } : {}),
         });
+      }
+      case backendMethods.driverCodeReviewRun: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.runCodeReview || !driver.getCapabilities(agent).codeReview) {
+          throw unsupportedBackendFeature(agent, 'code review');
+        }
+        return driver.runCodeReview(agent, {
+          prompt: requireString(record.prompt, 'prompt'),
+          cwd: requireString(record.cwd, 'cwd'),
+          reviewMcpServerUrl: requireString(record.reviewMcpServerUrl, 'reviewMcpServerUrl'),
+          ...(record.reviewerSession ? { reviewerSession: record.reviewerSession as BackendSession } : {}),
+        });
+      }
+      case backendMethods.driverCodeReviewDispose: {
+        const { agent } = requireAgentParams(params);
+        const record = requireRecord(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.disposeCodeReview) throw unsupportedBackendFeature(agent, 'code review cleanup');
+        await driver.disposeCodeReview(agent, record.reviewerSession as BackendSession);
+        return null;
       }
       case backendMethods.driverPromptCommandHandle: {
         const { agent } = requireAgentParams(params);

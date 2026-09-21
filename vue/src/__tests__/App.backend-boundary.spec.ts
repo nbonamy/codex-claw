@@ -57,6 +57,26 @@ describe('Unified backend → mounted application', () => {
     expect(wrapper.find('.thread-flag-affordance').exists()).toBe(false);
   });
 
+  it('opens review after accepting the app-owned ready-for-review flag', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.threadFlags = { ready_for_review: true };
+    const { api } = installBackendFixture(snapshot);
+    const cleared = structuredClone(snapshot);
+    delete cleared.agents[0]!.threadFlags;
+    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    await wrapper.get('[aria-label="Open code review"]').trigger('click');
+    await flushPromises();
+
+    expect(api.respondToThreadFlag).toHaveBeenCalledWith(agent.id, {
+      id: 'ready_for_review', action: 'execute',
+    });
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+  });
+
   it('shows, updates and clears execution progress without opening a review', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
@@ -219,5 +239,79 @@ describe('Unified backend → mounted application', () => {
     expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
     expect(api.respondToPlanReview).not.toHaveBeenCalled();
     expect(api.sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it('adopts durable review findings and decisions through the unified client seam', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const { api } = installBackendFixture(snapshot);
+    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    await flushPromises();
+
+    await wrapper.findAll('.right-workspace-panel__launcher button')
+      .find((button) => button.text().includes('Review'))!
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.get('.code-review-panel').text()).toContain('Start a review');
+
+    const ready = structuredClone(snapshot);
+    const reviewer = {
+      ...structuredClone(ready.agents[0]!),
+      id: 'agent-review',
+      name: 'Review',
+      backendSession: { kind: 'codex' as const, threadId: 'reviewer-1' },
+    };
+    reviewer.codeReview = {
+      id: 'review-1', targetAgentId: agent.id, reviewerAgentId: reviewer.id,
+      scope: { type: 'uncommitted' }, threadMode: 'independent', status: 'ready', activeRoundId: 'round-1',
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:01:00.000Z',
+      rounds: [{
+        id: 'round-1', number: 1, status: 'ready', reviewerSession: { kind: 'codex', threadId: 'reviewer-1' },
+        startedAt: '2026-09-19T10:00:00.000Z', completedAt: '2026-09-19T10:01:00.000Z',
+        findings: [{
+          id: 'finding-1', roundId: 'round-1', priority: 'p1',
+          title: 'Authorize before writing', body: 'The public mutation writes before checking ownership.',
+          location: { file: 'src/auth.ts', line: 42 },
+          decision: { state: 'selected', decidedAt: '2026-09-19T10:00:30.000Z' }, discussion: [], remediation: { state: 'notStarted' },
+          createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
+        }],
+      }],
+    };
+    ready.agents.push(reviewer);
+    ready.teams[0]!.agentIds.push(reviewer.id);
+    ready.teams[0]!.activeAgentId = reviewer.id;
+    ready.activeAgentId = reviewer.id;
+    api.startCodeReview.mockResolvedValueOnce(ready);
+    await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
+    await flushPromises();
+
+    expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      scope: { type: 'uncommitted' },
+      threadMode: 'independent',
+    });
+    const reviewerPanel = wrapper.findAllComponents({ name: 'CodeReviewPanel' })
+      .find((panel) => (panel.props('agent') as { id: string }).id === reviewer.id);
+    expect(reviewerPanel?.props('agent')).toMatchObject({
+      id: reviewer.id,
+      name: 'Review',
+    });
+    expect(reviewerPanel!.get('.review-finding').text()).toContain('Authorize before writing');
+    expect(reviewerPanel!.get('.review-finding__toggle').text()).not.toContain('src/auth.ts');
+    await reviewerPanel!.get('.review-finding__toggle').trigger('click');
+    expect(reviewerPanel!.get('.review-finding').text()).toContain('src/auth.ts:42');
+
+    const excluded = structuredClone(ready);
+    excluded.agents.find((candidate) => candidate.id === reviewer.id)!.codeReview!.rounds[0]!.findings[0]!.decision = {
+      state: 'rejected', decidedAt: '2026-09-19T10:02:00.000Z',
+    };
+    api.decideCodeReviewFinding.mockResolvedValueOnce(excluded);
+    await reviewerPanel!.get('.review-finding__selection').trigger('click');
+    await flushPromises();
+
+    expect(api.decideCodeReviewFinding).toHaveBeenCalledWith(reviewer.id, {
+      sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', decision: 'reject',
+    });
+    expect(reviewerPanel!.get('.review-finding').attributes('data-decision')).toBe('rejected');
+    expect(reviewerPanel!.get('.review-finding__selection input').attributes('aria-checked')).toBe('false');
   });
 });

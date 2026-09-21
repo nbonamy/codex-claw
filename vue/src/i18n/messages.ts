@@ -533,9 +533,16 @@ export const messages = {
     chat: {
       quickChatHeadline: 'What can I help with?',
       threadFlags: {
-        prompt: 'Start implementation in a worktree?',
-        accept: 'Start implementation in a worktree',
-        dismiss: 'Dismiss worktree delegation',
+        delegateToWorktree: {
+          prompt: 'Start implementation in a worktree?',
+          accept: 'Start implementation in a worktree',
+          dismiss: 'Dismiss worktree delegation',
+        },
+        readyForReview: {
+          prompt: 'Ready to review these changes?',
+          accept: 'Open code review',
+          dismiss: 'Dismiss review readiness',
+        },
       },
       subagents: {
         label: 'Subagents',
@@ -575,6 +582,10 @@ export const messages = {
         contextLabel: 'Chat annotations',
         remove: 'Remove chat annotation',
         save: 'Add annotation',
+      },
+      composerContext: {
+        label: 'Composer context',
+        removeReviewFinding: 'Remove review finding',
       },
       collaboration: {
         messageFrom: 'Message from {name}',
@@ -909,6 +920,16 @@ export const messages = {
             writeMissionArtifact: { running: 'Saving mission artifact', completed: 'Saved mission artifact', failed: 'Could not save mission artifact' },
             submitMissionResult: { running: 'Submitting mission artifact', completed: 'Mission artifact ready for review', failed: 'Could not submit mission artifact' },
             upsertMissionTicket: { running: 'Drafting mission ticket', completed: 'Drafted mission ticket', failed: 'Could not draft mission ticket' },
+            markFindingComplete: {
+              completed: 'Verified finding fix',
+              failed: 'Failed verifying finding fix',
+              running: 'Verifying finding fix',
+            },
+            reportFinding: {
+              completed: 'Reported finding',
+              failed: 'Failed reporting finding',
+              running: 'Reporting finding',
+            },
             updateWorkItem: {
               completed: 'Updated work item',
               failed: 'Failed updating work item',
@@ -934,6 +955,11 @@ export const messages = {
               completed: 'Updated thread flag',
               failed: 'Failed updating thread flag',
               running: 'Updating thread flag',
+            },
+            updateFinding: {
+              completed: 'Updated finding',
+              failed: 'Failed updating finding',
+              running: 'Updating finding',
             },
           },
         },

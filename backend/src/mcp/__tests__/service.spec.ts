@@ -70,6 +70,83 @@ describe('ClawMcpService', () => {
     }));
   });
 
+  it('adds only model-owned finding actions to a scoped review context', async () => {
+    const snapshot = createInitialSnapshot();
+    service = new ClawMcpService({ snapshot });
+    const ordinaryUrl = await service.start();
+    const reportFinding = vi.fn().mockResolvedValue({ id: 'finding-1' });
+    const updateFinding = vi.fn().mockResolvedValue({ id: 'finding-1', status: 'fixed' });
+    const review = service.createReviewToolContext('agent-dina', {
+      reportFinding,
+      updateFinding,
+    });
+
+    const ordinary = await postJson(agentUrl(ordinaryUrl, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    const scoped = await postJson(review.url, {
+      jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
+    });
+    const ordinaryNames = ordinary.result.tools.map((tool: { name: string }) => tool.name);
+    const scopedNames = scoped.result.tools.map((tool: { name: string }) => tool.name);
+
+    expect(ordinaryNames).not.toEqual(expect.arrayContaining([
+      'report_finding', 'update_finding',
+    ]));
+    expect(scopedNames).toEqual(expect.arrayContaining([
+      'report_finding', 'update_finding',
+    ]));
+    expect(scopedNames).not.toContain('mark_finding_complete');
+    expect(scopedNames).not.toEqual(expect.arrayContaining([
+      'verify_finding', 'respond_to_finding', 'complete_review',
+    ]));
+    const reportTool = scoped.result.tools.find((tool: { name: string }) => tool.name === 'report_finding');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P0: drop everything');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P1: urgent');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P2: normal');
+    expect(reportTool.inputSchema.properties.priority.description).toContain('P3: low');
+    const updateTool = scoped.result.tools.find((tool: { name: string }) => tool.name === 'update_finding');
+    expect(updateTool.inputSchema.properties.status.const).toBe('fixed');
+
+    const called = await postJson(review.url, {
+      jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
+        name: 'report_finding',
+        arguments: {
+          priority: 'p1', title: 'Authorize before writing',
+          body: 'The mutation writes before checking ownership.',
+        },
+      },
+    });
+    expect(called.result.isError).toBe(false);
+    expect(reportFinding).toHaveBeenCalledOnce();
+
+    const verbose = await postJson(review.url, {
+      jsonrpc: '2.0', id: 4, method: 'tools/call', params: {
+        name: 'report_finding',
+        arguments: {
+          priority: 'p2', title: 'x'.repeat(81), body: 'This title is too long.',
+        },
+      },
+    });
+    expect(verbose.result.isError).toBe(true);
+    expect(reportFinding).toHaveBeenCalledOnce();
+
+    const updated = await postJson(review.url, {
+      jsonrpc: '2.0', id: 5, method: 'tools/call', params: {
+        name: 'update_finding',
+        arguments: {
+          findingId: 'finding-1', status: 'fixed', evidence: 'Focused test passes.',
+        },
+      },
+    });
+    expect(updated.result.isError).toBe(false);
+    expect(updateFinding).toHaveBeenCalledWith({
+      findingId: 'finding-1', status: 'fixed', evidence: 'Focused test passes.',
+    });
+
+    service.closeReviewToolContext(review.id);
+  });
+
   it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
     service = new ClawMcpService({ snapshot: createInitialSnapshot() });
     const mcpUrl = await service.start();
@@ -716,7 +793,6 @@ describe('ClawMcpService', () => {
     expect(disabled.result.structuredContent).toStrictEqual({
       success: true,
       phase: 'start',
-      outcome: 'skipped',
     });
     expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
 
@@ -727,7 +803,6 @@ describe('ClawMcpService', () => {
     expect(selected.result.structuredContent).toStrictEqual({
       success: true,
       phase: 'start',
-      outcome: 'queued',
     });
     expect(queueSpokenAnnouncement).toHaveBeenCalledWith({
       agentId: 'agent-dina',
@@ -736,12 +811,12 @@ describe('ClawMcpService', () => {
     });
 
     const background = await callTool(url, 'agent-jesse', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'queued' });
+    expect(background.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
 
     snapshot.general.spokenAnnouncementsMuted = true;
     const muted = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
-    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'queued' });
+    expect(muted.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(3);
 
     snapshot.general.spokenAnnouncementsMuted = false;
@@ -765,15 +840,15 @@ describe('ClawMcpService', () => {
 
     service.recordPromptInputMethod('agent-dina', 'typed');
     const typed = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
-    expect(typed.result.structuredContent).toStrictEqual({ success: true, phase: 'start', outcome: 'skipped' });
+    expect(typed.result.structuredContent).toStrictEqual({ success: true, phase: 'start' });
     expect(queueSpokenAnnouncement).not.toHaveBeenCalled();
 
     service.recordPromptInputMethod('agent-dina', 'dictated');
     const dictatedStart = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
     const dictatedFinish = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
 
-    expect(dictatedStart.result.structuredContent).toStrictEqual({ success: true, phase: 'start', outcome: 'queued' });
-    expect(dictatedFinish.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'queued' });
+    expect(dictatedStart.result.structuredContent).toStrictEqual({ success: true, phase: 'start' });
+    expect(dictatedFinish.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
 
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
   });
@@ -789,14 +864,14 @@ describe('ClawMcpService', () => {
 
     const failed = await callTool(url, 'agent-dina', 'announce', { phase: 'finish', text: 'Done.' });
     expect(failed.result.isError).toBe(false);
-    expect(failed.result.structuredContent).toStrictEqual({ success: true, phase: 'finish', outcome: 'skipped' });
+    expect(failed.result.structuredContent).toStrictEqual({ success: true, phase: 'finish' });
 
     const invalid = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'x'.repeat(161) });
     expect(invalid.result.isError).toBe(true);
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(1);
   });
 
-  it('reports client-side playback suppression as skipped without exposing its reason', async () => {
+  it('keeps client-side playback suppression private from the model', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.spokenAnnouncementsEnabled = true;
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
@@ -810,7 +885,7 @@ describe('ClawMcpService', () => {
 
     const response = await callTool(url, 'agent-dina', 'announce', { phase: 'start', text: 'On it.' });
 
-    expect(response.result.structuredContent).toStrictEqual({ success: true, phase: 'start', outcome: 'skipped' });
+    expect(response.result.structuredContent).toStrictEqual({ success: true, phase: 'start' });
   });
 
   it('keeps celebrations enabled when a migrated live snapshot omits the setting', async () => {

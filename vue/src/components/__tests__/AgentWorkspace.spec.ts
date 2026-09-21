@@ -37,11 +37,14 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
   configureSnapshot?.(snapshot);
   const currentAgent = snapshot.agents[0] as Agent;
   const workspace = createWorkspaceState();
+  const closeRightWorkspaceTab = vi.fn();
+  const discardCodeReview = vi.fn().mockResolvedValue(snapshot);
   const openRightWorkspaceTab = vi.fn((tab: RightWorkspaceTab) => {
     workspace.activeTab = tab;
     workspace.tabs = workspace.tabs.includes(tab) ? workspace.tabs : [...workspace.tabs, tab];
     workspace.open = true;
   });
+  const updateAgent = vi.fn().mockResolvedValue(undefined);
   const wrapper = shallowMount(AgentWorkspace, {
     props: {
       activeAttachmentAnnotationCounts: {},
@@ -49,7 +52,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       agentFiles: [],
       agentSidebarCollapsed: false,
       chatTextAnnotations: [],
-      closeRightWorkspaceTab: vi.fn(),
+      closeRightWorkspaceTab,
       commitAgentGitChanges: vi.fn(),
       confirmPlan: vi.fn(),
       threadFlagBusy: false,
@@ -76,6 +79,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       loadWorkItems: vi.fn(),
       mergeAgentGitBranch: vi.fn(),
       updateAgentGitBranchFromBase: vi.fn(),
+      updateAgent,
       openAgentGitDiffPreview: vi.fn(),
       openAgentIn: vi.fn(),
       openAttachmentImageAnnotation: vi.fn(),
@@ -98,13 +102,54 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       startRightWorkspaceResize: vi.fn(),
       toggleFileExplorer: vi.fn(),
       toggleRightWorkspace: vi.fn(),
+      discardCodeReview,
     },
     global: { plugins: [i18n] },
   });
-  return { currentAgent, openRightWorkspaceTab, workspace, wrapper };
+  return {
+    closeRightWorkspaceTab,
+    currentAgent,
+    discardCodeReview,
+    openRightWorkspaceTab,
+    updateAgent,
+    workspace,
+    wrapper,
+  };
 }
 
 describe('AgentWorkspace', () => {
+  it('persists the selected Git diff target on the active agent', async () => {
+    const { currentAgent, updateAgent, wrapper } = mountWorkspace();
+
+    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('select-git-diff-target', { type: 'staged' });
+    await wrapper.vm.$nextTick();
+
+    expect(updateAgent).toHaveBeenCalledWith({
+      id: currentAgent.id,
+      gitDiffTarget: { type: 'staged' },
+    });
+  });
+
+  it('discards review state before closing its workspace tab', async () => {
+    const { closeRightWorkspaceTab, currentAgent, discardCodeReview, wrapper } = mountWorkspace((snapshot) => {
+      snapshot.agents[0]!.codeReview = {
+        id: 'review-1', targetAgentId: snapshot.agents[0]!.id, reviewerAgentId: snapshot.agents[0]!.id,
+        scope: { type: 'uncommitted' }, threadMode: 'current', status: 'failed', activeRoundId: 'round-1',
+        rounds: [{ id: 'round-1', number: 1, status: 'failed', findings: [], startedAt: 'now' }],
+        createdAt: 'now', updatedAt: 'now',
+      };
+    });
+
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('close-tab', 'codeReview');
+    await wrapper.vm.$nextTick();
+
+    expect(discardCodeReview).toHaveBeenCalledWith(currentAgent.id, 'review-1');
+    await vi.waitFor(() => expect(closeRightWorkspaceTab).toHaveBeenCalledWith(currentAgent.id, 'codeReview'));
+    expect(discardCodeReview.mock.invocationCallOrder[0]).toBeLessThan(
+      closeRightWorkspaceTab.mock.invocationCallOrder[0]!,
+    );
+  });
+
   it('resolves the delegating agent name for Git workflow report-back', () => {
     const { wrapper } = mountWorkspace((snapshot) => {
       const worker = snapshot.agents[0] as Agent;

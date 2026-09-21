@@ -117,7 +117,14 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `client/state/get` | none | `ClientState` | Backend-derived client hints only. |
 | `agent/request/respond` | `{ response: AgentRequestResponse }` | `AppSnapshot` | Answers a pending normalized approval/question/confirmation using a typed outcome. Include `agentId`; an untargeted response is accepted only when its request ID is unambiguous. |
 | `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
-| `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt and clears only after acceptance. |
+| `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt; `ready_for_review` clears readiness so the requesting client can enter review. |
+| `agent/codeReview/start` | `{ agentId, input: { scope, threadMode } }` | `AppSnapshot` | Starts a review for either uncommitted work or the current branch against an explicit base. `threadMode` is `independent` (a normal visible reviewer agent, selected on creation) or `current` (the target agent's attached conversation). The independent reviewer inherits the target agent's backend configuration through normal agent creation. The reviewer owns the active durable ledger, which identifies both target and reviewer agents. |
+| `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Includes or excludes a stable finding from remediation. Findings start selected; decisions are not remediation statuses. |
+| `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the visible reviewer conversation for its response while retaining the exchange in the structured ledger. |
+| `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Maps deselected findings to `skipped` and selected findings to `pending`, then sends every selected finding in one remediation turn in the same reviewer conversation. Each finding becomes `fixed` when the reviewer calls `update_finding` after its remediation. |
+| `agent/codeReview/again` | `{ agentId, sessionId }` | `AppSnapshot` | Reuses the same provider conversation for `current` reviews. For `independent` reviews, resets the visible reviewer agent's provider conversation while keeping its sidebar identity and ledger. Both carry cumulative deselected exclusions, fixed regression checks, and behavior decisions from every prior round inside the reviewer prompt's `<context>` block. |
+| `agent/codeReview/finish` | `{ agentId, sessionId }` | `AppSnapshot` | Finishes the workflow and removes the active review ledger. It leaves a current-thread agent intact; an independent review removes its visible review-owned agent and returns selection to the target. |
+| `agent/codeReview/discard` | `{ agentId, sessionId }` | `AppSnapshot` | Closes the product workflow from any state and removes its review ledger. An independent review removes its visible review-owned agent; a user-owned current conversation is never disposed. |
 
 ## Client To `clawd`: System
 
@@ -336,12 +343,13 @@ These methods are implemented by `BackendDriverRpc` and may currently be
 reachable through the server fallback. Treat them as backend-internal
 implementation messages, not the preferred app protocol for clients.
 
-| Method | Params | Result |
-| --- | --- | --- |
+| Method | Params | Result | Notes |
+| --- | --- | --- | --- |
 | `workspace/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
 | `workspace/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
 | `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
+| `driver/codeReview/run` | `{ agent, prompt, cwd, reviewMcpServerUrl, reviewerSession? }` | `BackendCodeReviewResult` | Creates a fresh provider conversation when `reviewerSession` is absent; otherwise continues that opaque provider session. |
 | `driver/prompt/send` | `{ agent, prompt, options? }` | `BackendSendResult` |
 | `driver/conversation/replaceWithSummary` | `{ agent }` | `BackendSessionCompressionResult` |
 | `driver/conversation/title/update` | `{ agent, title }` | `null` |

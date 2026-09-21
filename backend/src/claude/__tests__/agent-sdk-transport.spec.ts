@@ -22,6 +22,15 @@ vi.mock('@codex-claw/core/runtime-discovery', () => ({
 }));
 
 describe('ClaudeAgentSdkTransport', () => {
+  it('deletes a review-owned SDK session from the workspace store', async () => {
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const transport = new ClaudeAgentSdkTransport({ deleteSession });
+
+    await transport.deleteSession('review-session', '/tmp/project');
+
+    expect(deleteSession).toHaveBeenCalledExactlyOnceWith('review-session', { dir: '/tmp/project' });
+  });
+
   it('routes identical SDK request IDs through the driver without resolving another agent session', async () => {
     const harnesses = [createQueryHarness(), createQueryHarness()];
     let index = 0;

@@ -1,6 +1,7 @@
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import { featureStages, type MissionStage } from '@codex-claw/core/missions';
+import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';
@@ -11,6 +12,8 @@ export type AppMenuOptions = {
   updateStatus?: DesktopUpdateStatus;
 };
 
+export type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing';
+
 export type AppMenuCallbacks = {
   checkForUpdates?: () => void;
   installUpdate?: () => void;
@@ -19,14 +22,15 @@ export type AppMenuCallbacks = {
   injectDebugPlanReview?: () => void;
   getDebugMissionStage?: () => MissionStage | undefined;
   setDebugMissionStage?: (stage: MissionStage) => void;
-  isDebugThreadFlagSet?: () => boolean;
-  setDebugThreadFlag?: (value: boolean) => void;
+  injectDebugCodeReview?: (scenario: DebugCodeReviewScenario) => void;
+  isDebugThreadFlagSet?: (id: ThreadFlagId) => boolean;
+  setDebugThreadFlag?: (id: ThreadFlagId, value: boolean) => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -41,6 +45,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     injectDebugPlanReview: options.injectDebugPlanReview,
     getDebugMissionStage: options.getDebugMissionStage,
     setDebugMissionStage: options.setDebugMissionStage,
+    injectDebugCodeReview: options.injectDebugCodeReview,
     isDebugThreadFlagSet: options.isDebugThreadFlagSet,
     setDebugThreadFlag: options.setDebugThreadFlag,
   };
@@ -90,14 +95,25 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         submenu: buildDebugMissionFixtures(callbacks),
       },
       {
+        label: 'Review',
+        submenu: buildDebugCodeReviewFixtures(callbacks),
+      },
+      {
         label: 'Thread Flags',
         submenu: [
           {
             label: 'Delegate to Worktree',
             type: 'checkbox',
-            checked: callbacks.isDebugThreadFlagSet?.() ?? false,
+            checked: callbacks.isDebugThreadFlagSet?.('delegate_to_worktree') ?? false,
             enabled: Boolean(callbacks.setDebugThreadFlag),
-            click: (item) => callbacks.setDebugThreadFlag?.(item.checked),
+            click: (item) => callbacks.setDebugThreadFlag?.('delegate_to_worktree', item.checked),
+          },
+          {
+            label: 'Ready for Review',
+            type: 'checkbox',
+            checked: callbacks.isDebugThreadFlagSet?.('ready_for_review') ?? false,
+            enabled: Boolean(callbacks.setDebugThreadFlag),
+            click: (item) => callbacks.setDebugThreadFlag?.('ready_for_review', item.checked),
           },
         ],
       },
@@ -136,6 +152,26 @@ function buildDebugMissionFixtures(callbacks: AppMenuCallbacks): MenuItemConstru
     enabled: Boolean(callbacks.setDebugMissionStage && callbacks.getDebugMissionStage?.()),
     click: () => callbacks.setDebugMissionStage?.(stage),
   }));
+}
+
+function buildDebugCodeReviewFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Findings While Reviewing',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('reviewing'),
+    },
+    {
+      label: 'Findings Ready for Selection',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('ready'),
+    },
+    {
+      label: 'Remediation Mix',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('fixing'),
+    },
+  ];
 }
 
 function buildDebugAgentFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {

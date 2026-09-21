@@ -9,6 +9,7 @@ import type {
   BackendModelOption,
   BackendPluginSummary,
   BackendRuntimeStatus,
+  BackendSession,
   BackendSkillSummary,
   ClientRequestResponse,
   ConversationListInput,
@@ -26,7 +27,7 @@ import type {
   SubagentOperationChange,
   SubagentStatusChange
 } from '@codex-claw/core/contracts';
-import type { BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
+import type { BackendCodeReviewInput, BackendCodeReviewResult, BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -62,6 +63,7 @@ const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
 const SESSION_HANDOFF_TARGET_CHARACTERS = 4_000;
 const SESSION_HANDOFF_MAX_CHARACTERS = 6_000;
 const SESSION_HANDOFF_TIMEOUT_MS = 8 * 60 * 1_000;
+const REVIEW_TIMEOUT_MS = 30 * 60 * 1_000;
 const SESSION_HANDOFF_MODEL = 'gpt-5.6-luna';
 const SESSION_HANDOFF_REASONING_EFFORT = 'low';
 const SESSION_HANDOFF_PROMPT = `Prepare a handoff for a fresh continuation of this coding session.
@@ -254,6 +256,61 @@ export class CodexSurfaceAgentAdapter {
       ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),
       ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     });
+  }
+
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult> {
+    await this.start();
+    if (input.reviewerSession && input.reviewerSession.kind !== 'codex') {
+      throw new Error('Codex cannot continue a non-Codex review conversation.');
+    }
+    const requestedAgent = input.reviewerSession
+      ? { ...agent, backendSession: input.reviewerSession }
+      : agent;
+    const reviewExtensionContext = { agent, reviewMcpServerUrl: input.reviewMcpServerUrl };
+    const session = await this.ensureSession(requestedAgent, reviewExtensionContext);
+    session.agent = agent;
+    const conversationId = session.handle.id;
+    const conversation = session.handle;
+    await conversation.load({ extensionContext: reviewExtensionContext });
+    let targetTurnId: string | null = null;
+    const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
+    let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
+    const completion = new Promise<CodexSurfaceTurnStatus>((resolve) => { resolveCompletion = resolve; });
+    const unsubscribe = conversation.onEvent((event) => {
+      if (event.type !== 'turn.completed') return;
+      if (event.turnId === targetTurnId) resolveCompletion?.(event.payload.status);
+      else completedBeforeTarget.set(event.turnId, event.payload.status);
+    });
+    try {
+      const beforeTurnIds = conversation.getSnapshot().turnIds;
+      const reviewOptions = codeReviewPromptOptions(agent);
+      const started = reviewOptions
+        ? await conversation.sendMessage(input.prompt, reviewOptions)
+        : await conversation.sendMessage(input.prompt);
+      targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
+      if (!targetTurnId) throw new Error('Codex did not start the review round.');
+      const immediate = completedBeforeTarget.get(targetTurnId)
+        ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
+      const status = immediate ?? await reviewCompletion(completion);
+      const snapshot = conversation.getSnapshot();
+      const completedFinalAnswer = sessionFinalAnswerText(snapshot.messages, targetTurnId);
+      if (status !== 'completed' && !(status === 'interrupted' && completedFinalAnswer)) {
+        throw new Error(`Code review was ${status}.`);
+      }
+      return {
+        text: sessionHandoffText(snapshot.messages, targetTurnId),
+        reviewerSession: { kind: 'codex', threadId: conversationId },
+      };
+    } finally {
+      unsubscribe();
+      await conversation.load({ ...agentCwd(agent), extensionContext: agent });
+    }
+  }
+
+  async disposeCodeReview(reviewerSession: BackendSession): Promise<void> {
+    if (reviewerSession.kind !== 'codex') throw new Error('Codex cannot dispose a non-Codex review conversation.');
+    await this.surface.archiveConversation(reviewerSession.threadId);
+    this.surface.forgetConversation(reviewerSession.threadId);
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}) {
@@ -526,7 +583,11 @@ export class CodexSurfaceAgentAdapter {
   async reconcileConversations(agents: Agent[]): Promise<void> {
     const retainedThreadIds = new Set(agents.flatMap((agent) => {
       const threadId = codexThreadId(agent);
-      return threadId ? [threadId] : [];
+      const reviewRound = agent.codeReview?.rounds.find((round) => round.id === agent.codeReview?.activeRoundId);
+      const reviewThreadId = reviewRound?.reviewerSession?.kind === 'codex'
+        ? reviewRound.reviewerSession.threadId
+        : undefined;
+      return [threadId, reviewThreadId].filter((id): id is string => Boolean(id));
     }));
     const [active, archived] = await Promise.all([
       this.surface.listConversations(),
@@ -651,7 +712,10 @@ export class CodexSurfaceAgentAdapter {
     await this.closeSurface();
   }
 
-  private async ensureSession(agent: Agent): Promise<AgentConversation> {
+  private async ensureSession(
+    agent: Agent,
+    extensionContext: unknown = agent,
+  ): Promise<AgentConversation> {
     const existing = this.sessionsByAgentId.get(agent.id);
     const requestedThreadId = codexThreadId(agent);
     if (existing && (!requestedThreadId || existing.handle.id === requestedThreadId)) {
@@ -662,13 +726,19 @@ export class CodexSurfaceAgentAdapter {
     if (requestedThreadId) return this.bindAndLoad(agent, requestedThreadId);
 
     await this.start();
-    const requestedPreset = codexApprovalPresetFromDefaults(agent.backendDefaults);
+    const defaults = agent.backendDefaults?.kind === 'codex'
+      ? { ...agent.backendDefaults }
+      : undefined;
+    const requestedPreset = codexApprovalPresetFromDefaults(defaults);
     const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
     const snapshot = await this.surface.createConversation({
       ...agentCwd(agent),
       threadSource: 'user',
       ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
-    }, { extensionContext: agent });
+      ...(defaults?.model ? { model: defaults.model } : {}),
+      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
+      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
+    }, { extensionContext });
     const threadId = snapshot.activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation.');
     const session = this.bindRuntime(agent, threadId, true, false);
@@ -1366,12 +1436,18 @@ function sessionHandoffText(messages: readonly SurfaceMessage[], turnId: string)
   const assistantMessages = messages.filter((message) => (
     message.role === 'assistant' && message.turnId === turnId
   ));
-  const finalText = assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
-    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
-  ))).join('\n').trim();
+  const finalText = sessionFinalAnswerText(messages, turnId);
   if (finalText) return finalText;
   return assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
     part.type === 'text' ? [part.text] : []
+  ))).join('\n').trim();
+}
+
+function sessionFinalAnswerText(messages: readonly SurfaceMessage[], turnId: string): string {
+  return messages.filter((message) => (
+    message.role === 'assistant' && message.turnId === turnId && message.status === 'complete'
+  )).flatMap((message) => message.parts.flatMap((part) => (
+    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
   ))).join('\n').trim();
 }
 
@@ -1397,6 +1473,15 @@ function sessionHandoffCompletion(
       },
     );
   });
+}
+
+function reviewCompletion(completion: Promise<CodexSurfaceTurnStatus>): Promise<CodexSurfaceTurnStatus> {
+  return Promise.race([
+    completion,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Code review timed out.')), REVIEW_TIMEOUT_MS);
+    }),
+  ]);
 }
 
 function subagentStatusFromTurn(
@@ -1458,6 +1543,15 @@ function surfacePromptOptions(options: SendPromptOptions = {}): SendCodexMessage
     ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
       ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }
       : {}),
+  };
+}
+
+function codeReviewPromptOptions(agent: Agent): SendCodexMessageOptions | undefined {
+  const defaults = agent.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
+  if (!defaults?.model && !defaults?.reasoningEffort) return undefined;
+  return {
+    ...(defaults.model ? { model: defaults.model } : {}),
+    ...(defaults.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
   };
 }
 

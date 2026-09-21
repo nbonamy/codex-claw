@@ -135,10 +135,34 @@ describe('ConversationPane', () => {
     };
     await wrapper.setProps({ textAnnotations: [annotation] });
     expect(sdkPane.props('hasComposerContext')).toBe(true);
-    expect(wrapper.get('.chat-text-annotation-cards__card').text()).toBe('Annotation');
+    expect(wrapper.get('.composer-context-cards__card').text()).toBe('Annotation');
     expect(wrapper.text()).not.toContain('Explain what you found.');
     await wrapper.get('[aria-label="Remove chat annotation"]').trigger('click');
     expect(wrapper.emitted('remove-text-annotation')).toStrictEqual([['annotation-1']]);
+  });
+
+  it('renders a review finding as removable composer context without exposing its body', async () => {
+    const reviewFinding = {
+      id: 'finding-1', roundId: 'round-1', priority: 'p1' as const,
+      title: 'Authorize before writing',
+      body: 'The public mutation writes before checking ownership.',
+      location: { file: 'src/auth.ts', line: 42, endLine: 44 },
+      decision: { state: 'selected' as const, decidedAt: '2026-09-19T10:00:30.000Z' },
+      discussion: [], remediation: { state: 'notStarted' as const },
+      createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
+    };
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent,
+      reviewFinding,
+    });
+
+    expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('hasComposerContext')).toBe(false);
+    expect(wrapper.get('.composer-context-cards__card').text()).toContain('P1');
+    expect(wrapper.get('.composer-context-cards__card').text()).toContain('Authorize before writing');
+    expect(wrapper.text()).not.toContain(reviewFinding.body);
+    await wrapper.get('[aria-label="Remove review finding"]').trigger('click');
+    expect(wrapper.emitted('remove-review-finding')).toStrictEqual([[]]);
   });
 
   it('renders delegate_to_worktree in the composer shelf and emits its actions', async () => {
@@ -158,12 +182,29 @@ describe('ConversationPane', () => {
       .toBe('Start implementation in a worktree');
     await wrapper.get('.thread-flag-affordance__action').trigger('click');
     await wrapper.get('.thread-flag-affordance__dismiss').trigger('click');
-    expect(wrapper.emitted('thread-flag')).toStrictEqual([['execute'], ['dismiss']]);
+    expect(wrapper.emitted('thread-flag')).toStrictEqual([
+      [{ id: 'delegate_to_worktree', action: 'execute' }],
+      [{ id: 'delegate_to_worktree', action: 'dismiss' }],
+    ]);
 
     await wrapper.setProps({ threadFlagBusy: true });
     expect(wrapper.get('.thread-flag-affordance__action').attributes('disabled')).toBeDefined();
     expect(wrapper.get('.thread-flag-affordance__dismiss').attributes('aria-label'))
       .toBe('Dismiss worktree delegation');
+  });
+
+  it('renders review readiness through the same composer-shelf flag contract', async () => {
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent: { ...agent, threadFlags: { ready_for_review: true } },
+    });
+
+    expect(wrapper.get('.thread-flag-affordance').text()).toContain('Ready to review these changes?');
+    await wrapper.get('[aria-label="Open code review"]').trigger('click');
+
+    expect(wrapper.emitted('thread-flag')).toStrictEqual([
+      [{ id: 'ready_for_review', action: 'execute' }],
+    ]);
   });
 
   it('replaces only an empty transcript with the history load recovery state', async () => {
@@ -411,6 +452,32 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.tabler-icon-users').exists()).toBe(true);
   });
 
+  it('renders review tool activity as finding actions instead of raw MCP names', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([{
+        id: 'message-review-tool',
+        agentId: agent.id,
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{
+          type: 'tool',
+          id: 'call-report-finding',
+          kind: 'mcp',
+          title: 'codex_claw.report_finding',
+          status: 'completed',
+          input: { title: 'Keep tool copy product-facing' },
+          metadata: { server: 'codex_claw', tool: 'report_finding' },
+        }],
+      }]),
+      agent,
+    });
+
+    expect(wrapper.text()).toContain('Reported finding');
+    expect(wrapper.text()).not.toContain('codex_claw.report_finding');
+    expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
+  });
+
   it('preserves structured attachment parts supplied by the controller', () => {
     const wrapper = mountPane({
       controller: controllerFor([{
@@ -490,6 +557,7 @@ function mountPane(props: {
   agent: Agent | null;
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   textAnnotations?: readonly ChatTextAnnotation[];
+  reviewFinding?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
   historyLoadFailed?: boolean;

@@ -61,6 +61,7 @@ const callbacks = (): AppMenuCallbacks => ({
   injectDebugPlanReview: vi.fn(),
   getDebugMissionStage: vi.fn(() => 'tickets' as const),
   setDebugMissionStage: vi.fn(),
+  injectDebugCodeReview: vi.fn(),
   isDebugThreadFlagSet: vi.fn(() => false),
   setDebugThreadFlag: vi.fn(),
 });
@@ -262,6 +263,7 @@ describe('app menu', () => {
     expect(debugItems.map((item) => item.type === 'separator' ? 'separator' : item.label)).toStrictEqual([
       'Agent Fixtures',
       'Mission Fixtures',
+      'Review',
       'Thread Flags',
       'UI Previews',
       'Effects',
@@ -291,6 +293,15 @@ describe('app menu', () => {
       type: 'checkbox',
       checked: false,
     });
+    expect(submenuLabels(debugMenu, 'Debug', 'Review')).toStrictEqual([
+      'Findings While Reviewing',
+      'Findings Ready for Selection',
+      'Remediation Mix',
+    ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'Thread Flags')).toStrictEqual([
+      'Delegate to Worktree',
+      'Ready for Review',
+    ]);
     expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
       'Markdown',
       'Image Annotation',
@@ -338,8 +349,13 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Implementation');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Ship');
-    clickThreadFlagItem(debugMenu, true);
-    clickThreadFlagItem(debugMenu, false);
+    clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings While Reviewing');
+    clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings Ready for Selection');
+    clickNestedItem(debugMenu, 'Debug', 'Review', 'Remediation Mix');
+    clickThreadFlagItem(debugMenu, 'Delegate to Worktree', true);
+    clickThreadFlagItem(debugMenu, 'Delegate to Worktree', false);
+    clickThreadFlagItem(debugMenu, 'Ready for Review', true);
+    clickThreadFlagItem(debugMenu, 'Ready for Review', false);
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Markdown');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Image Annotation');
     clickNestedItem(debugMenu, 'Debug', 'UI Previews', 'Worktree Initialization');
@@ -407,20 +423,29 @@ describe('app menu', () => {
     expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(3, 'implementation');
     expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(4, 'review');
     expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(5, 'ship');
-    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(1, true);
-    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(2, false);
+    expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(1, 'reviewing');
+    expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(2, 'ready');
+    expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(3, 'fixing');
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(1, 'delegate_to_worktree', true);
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(2, 'delegate_to_worktree', false);
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(3, 'ready_for_review', true);
+    expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(4, 'ready_for_review', false);
     expect(JSON.stringify(releaseMenu)).not.toMatch(/reload|forceReload|developer tools|toggleDevTools/i);
   });
 
   it('reflects an active worktree delegation flag in the native checkbox', () => {
     const nextCallbacks = callbacks();
-    nextCallbacks.isDebugThreadFlagSet = vi.fn(() => true);
+    nextCallbacks.isDebugThreadFlagSet = vi.fn((id) => id === 'delegate_to_worktree');
 
     const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: true }, 'darwin');
 
     expect(nestedMenuItem(menu, 'Debug', 'Thread Flags', 'Delegate to Worktree')).toMatchObject({
       type: 'checkbox',
       checked: true,
+    });
+    expect(nestedMenuItem(menu, 'Debug', 'Thread Flags', 'Ready for Review')).toMatchObject({
+      type: 'checkbox',
+      checked: false,
     });
   });
 
@@ -539,9 +564,9 @@ function clickNestedItem(
   item.click({ checked: true } as never, undefined as never, undefined as never);
 }
 
-function clickThreadFlagItem(template: MenuItemConstructorOptions[], checked: boolean): void {
-  const item = nestedMenuItem(template, 'Debug', 'Thread Flags', 'Delegate to Worktree');
-  if (!item?.click) throw new Error('Delegate to Worktree menu item not found');
+function clickThreadFlagItem(template: MenuItemConstructorOptions[], label: string, checked: boolean): void {
+  const item = nestedMenuItem(template, 'Debug', 'Thread Flags', label);
+  if (!item?.click) throw new Error(`${label} menu item not found`);
   item.click({ checked } as never, undefined as never, undefined as never);
 }
 
