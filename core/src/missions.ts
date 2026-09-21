@@ -1,58 +1,11 @@
-import { pendingMissionRun, type MissionExecution } from './mission-execution';
+import { pendingMissionRun } from './mission-execution';
 import type { AppSnapshot } from './contracts';
 import { createEntityId } from './ids';
+import type { Mission, MissionArtifacts, MissionExecution, MissionStage, MissionTicket } from './mission-types';
+import { featureStages, findMissionWorkflow, missionWorkflow } from './mission-workflows';
 
-export const featureStages = ['requirements', 'tickets', 'implementation', 'review', 'ship'] as const;
-export type MissionStage = typeof featureStages[number];
-export type MissionTicket = {
-  id?: string;
-  title: string;
-  body?: string;
-  repositoryPath?: string;
-  done: boolean;
-  reference?: string;
-  dependsOn?: number[];
-};
-export type MissionArtifacts = {
-  requirements: { problem: string; acceptance: string };
-  tickets: MissionTicket[];
-  implementation: { changes: string; tests: string };
-  review: { summary: string; pullRequestUrl: string };
-};
-export type MissionArtifactFile = {
-  revision: number;
-  size: number;
-  updatedAt: string;
-};
-export type Mission = {
-  id: string;
-  teamId: string;
-  outcome: string;
-  workflow: { type: 'shapeAndShipFeature'; version: 1 };
-  stage: MissionStage;
-  status: 'active' | 'completed';
-  artifacts: MissionArtifacts;
-  artifactFiles?: Partial<Record<MissionStage, MissionArtifactFile>>;
-  stageAgentIds: Partial<Record<MissionStage, string>>;
-  execution?: MissionExecution;
-  revision: number;
-  createdAt: string;
-  updatedAt: string;
-};
-export type CreateMissionInput = {
-  outcome: string;
-  workflowType: Mission['workflow']['type'];
-  teamId: string;
-  orchestratorMemberId: string;
-};
-export type DeleteMissionInput = { id: string; revision: number; deleteWorktrees: boolean; confirmed: true };
-export type UpdateMissionInput = {
-  id: string;
-  revision: number;
-  artifacts: MissionArtifacts;
-  stageAgentIds: Mission['stageAgentIds'];
-  action: 'save' | 'advance';
-};
+export { featureStages } from './mission-workflows';
+export type { CreateMissionInput, DeleteMissionInput, Mission, MissionArtifactFile, MissionArtifacts, MissionStage, MissionTicket, UpdateMissionInput } from './mission-types';
 
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 100_000;
@@ -88,34 +41,31 @@ function isArtifactFiles(v: unknown): v is Mission['artifactFiles'] {
     && Number.isInteger(file.size) && (file.size as number) >= 0 && text(file.updatedAt));
 }
 export function isMission(v: unknown): v is Mission {
+  const workflowValue = record(v) && record(v.workflow) ? v.workflow : undefined;
+  const workflow = findMissionWorkflow(workflowValue?.type);
   return record(v) && text(v.id) && text(v.teamId) && text(v.outcome) && !!v.outcome.trim() && v.outcome.length <= 200
-    && record(v.workflow) && v.workflow.type === 'shapeAndShipFeature' && v.workflow.version === 1
-    && featureStages.includes(v.stage as MissionStage) && ['active', 'completed'].includes(v.status as string)
+    && !!workflow && workflowValue?.version === workflow.version
+    && workflow.stages.includes(v.stage as MissionStage) && ['active', 'completed'].includes(v.status as string)
     && (v.status !== 'completed' || v.stage === 'review' || v.stage === 'ship') && isMissionArtifacts(v.artifacts)
     && (v.artifactFiles === undefined || isArtifactFiles(v.artifactFiles)) && isStageAgents(v.stageAgentIds)
     && (v.execution === undefined || isMissionExecution(v.execution))
     && Number.isInteger(v.revision) && (v.revision as number) >= 0 && text(v.createdAt) && text(v.updatedAt);
 }
 export function missionStageReady(stage: MissionStage, a: MissionArtifacts): boolean {
-  switch (stage) {
-    case 'requirements': return !!a.requirements.problem.trim() && !!a.requirements.acceptance.trim();
-    case 'tickets': return a.tickets.length > 0 && a.tickets.every(t => !!t.title.trim() && !!t.repositoryPath?.trim());
-    case 'implementation': return a.tickets.length > 0 && a.tickets.every(t => t.done) && !!a.implementation.changes.trim() && !!a.implementation.tests.trim();
-    case 'review': return !!a.review.summary.trim();
-    case 'ship': return false;
-  }
+  return missionWorkflow('shapeAndShipFeature').stageReady(stage, a);
 }
 export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
-  if (!record(input) || typeof input.outcome !== 'string' || !input.outcome.trim() || input.outcome.trim().length > 200 || input.workflowType !== 'shapeAndShipFeature'
+  if (!record(input) || typeof input.outcome !== 'string' || !input.outcome.trim() || input.outcome.trim().length > 200 || !findMissionWorkflow(input.workflowType)
     || typeof input.teamId !== 'string' || typeof input.orchestratorMemberId !== 'string') throw new Error('Invalid mission outcome or workflow.');
   const team = snapshot.teams.find(team => team.id === input.teamId && !team.remoteConnectionId);
   const orchestrator = snapshot.agents.find(agent => agent.id === input.orchestratorMemberId && agent.teamId === team?.id);
   if (!team || !orchestrator) throw new Error('Choose a local team and one of its agents to orchestrate the mission.');
   const now = new Date().toISOString();
+  const workflow = findMissionWorkflow(input.workflowType)!;
   const mission: Mission = {
-    id: createEntityId('mission'), teamId: team.id, outcome: input.outcome.trim(), workflow: { type: 'shapeAndShipFeature', version: 1 },
-    stage: 'requirements', status: 'active', revision: 0, createdAt: now, updatedAt: now,
-    artifacts: { requirements: { problem: '', acceptance: '' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } },
+    id: createEntityId('mission'), teamId: team.id, outcome: input.outcome.trim(), workflow: { type: workflow.type, version: workflow.version },
+    stage: workflow.stages[0]!, status: 'active', revision: 0, createdAt: now, updatedAt: now,
+    artifacts: workflow.createArtifacts(),
     artifactFiles: {},
     stageAgentIds: {},
     execution: { teamId: team.id, memberIds: [...team.agentIds], reviewPolicy: 'reviewEachTicket', workspaces: [], runs: [] },
@@ -142,12 +92,13 @@ export function updateMission(snapshot: AppSnapshot, input: unknown): Mission {
   if (Object.values(input.stageAgentIds).some(id => !snapshot.agents.some(a => a.id === id))) throw new Error('Supporting agent not found.');
   if (input.action === 'advance' && mission.stage === 'ship') throw new Error('Complete delivery from the Ship stage.');
   // Earlier gates remain true even when revising their artifacts in later stages.
-  const stageIndex = featureStages.indexOf(mission.stage);
-  const requiredStages = featureStages.slice(0, stageIndex + (input.action === 'advance' ? 1 : 0));
-  if (requiredStages.some(stage => !missionStageReady(stage, input.artifacts as MissionArtifacts))) throw new Error('Complete the required stage artifacts before continuing.');
+  const workflow = missionWorkflow(mission.workflow.type);
+  const stageIndex = workflow.stages.indexOf(mission.stage);
+  const requiredStages = workflow.stages.slice(0, stageIndex + (input.action === 'advance' ? 1 : 0));
+  if (requiredStages.some(stage => !workflow.stageReady(stage, input.artifacts as MissionArtifacts))) throw new Error('Complete the required stage artifacts before continuing.');
   const updated = { ...mission, artifacts: structuredClone(input.artifacts), stageAgentIds: { ...input.stageAgentIds }, revision: mission.revision + 1, updatedAt: new Date().toISOString() };
   if (input.action === 'advance') {
-    updated.stage = featureStages[stageIndex + 1]!;
+    updated.stage = workflow.stages[stageIndex + 1]!;
   }
   Object.assign(mission, updated);
   return mission;

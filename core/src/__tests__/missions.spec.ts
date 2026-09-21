@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, deleteMission, updateMission, isMission, type UpdateMissionInput } from '../missions';
 import { decodeAppSnapshot } from '../snapshot-guards';
+import { findMissionWorkflow } from '../mission-workflows';
 
 describe('missions', () => {
   const createInput = (snapshot: ReturnType<typeof createInitialSnapshot>, outcome: string) => ({
@@ -35,6 +36,17 @@ describe('missions', () => {
     expect(mission.status).toBe('active');
     expect(() => update('advance')).toThrow('Complete delivery');
     expect(decodeAppSnapshot(snapshot)?.value.missions).toStrictEqual([mission]);
+  });
+
+  it('derives new Mission state and stage order from its workflow definition', () => {
+    const snapshot = createInitialSnapshot();
+    const workflow = findMissionWorkflow('shapeAndShipFeature')!;
+    const mission = createMission(snapshot, createInput(snapshot, 'Billing'));
+
+    expect(mission.workflow).toStrictEqual({ type: workflow.type, version: workflow.version });
+    expect(mission.stage).toBe(workflow.stages[0]);
+    expect(mission.artifacts).toStrictEqual(workflow.createArtifacts());
+    expect(findMissionWorkflow('unknown')).toBeUndefined();
   });
   it('rejects malformed input, stale writers, dangling agents, and invalidated earlier gates without mutation', () => {
     const snapshot = createInitialSnapshot();
