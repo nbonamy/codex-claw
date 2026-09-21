@@ -39,6 +39,15 @@
       <div class="mission-implementation__summary-meta">
         <span>{{ t("missions.repositoryCount", { count: lanes.length }) }}</span>
         <span>{{ policyLabel }}</span>
+        <button
+          v-if="hasImplementationEvidence"
+          type="button"
+          class="mission-implementation__view-evidence"
+          :aria-label="t('missions.viewImplementationEvidence')"
+          @click="evidenceOpen = true"
+        >
+          <FileTextIcon aria-hidden="true" />{{ t("missions.viewEvidence") }}
+        </button>
       </div>
     </header>
 
@@ -104,13 +113,8 @@
                 <span v-else class="mission-implementation__repository">{{
                   repositoryName(lane.repositoryPath)
                 }}</span>
-                <span
-                  v-if="assignedAgent(item)"
-                  class="mission-implementation__agent"
-                >
-                  <MessageCircleIcon aria-hidden="true" />{{
-                    assignedAgent(item)
-                  }}
+                <span v-if="item.run?.workerId" class="mission-implementation__agent">
+                  <MessageCircleIcon aria-hidden="true" />{{ t("missions.builder") }}
                 </span>
               </span>
             </button>
@@ -129,21 +133,42 @@
       </section>
     </div>
 
-    <article
-      v-if="mission.artifacts.implementation.changes.trim()"
-      class="mission-implementation__aggregate"
-      :aria-label="t('missions.acceptedArtifact')"
+    <el-dialog
+      v-if="hasImplementationEvidence"
+      class="claw-dialog mission-implementation__evidence-dialog"
+      :model-value="evidenceOpen"
+      :show-close="false"
+      destroy-on-close
+      width="min(720px, calc(100vw - 48px))"
+      @update:model-value="evidenceOpen = $event"
     >
-      <h3>{{ t("missions.artifactTitle.implementation") }}</h3>
-      <div>
-        <strong>{{ t("missions.changes") }}</strong>
-        <p>{{ mission.artifacts.implementation.changes }}</p>
-      </div>
-      <div>
-        <strong>{{ t("missions.tests") }}</strong>
-        <p>{{ mission.artifacts.implementation.tests }}</p>
-      </div>
-    </article>
+      <template #header>
+        <div class="mission-implementation__evidence-header">
+          <span><FileTextIcon aria-hidden="true" /></span>
+          <div>
+            <small>{{ t("missions.implementation") }}</small>
+            <h3>{{ t("missions.artifactTitle.implementation") }}</h3>
+          </div>
+          <button
+            type="button"
+            :aria-label="t('common.close')"
+            @click="evidenceOpen = false"
+          >
+            <X aria-hidden="true" />
+          </button>
+        </div>
+      </template>
+      <article class="mission-implementation__aggregate" :aria-label="t('missions.acceptedArtifact')">
+        <div>
+          <strong>{{ t("missions.changes") }}</strong>
+          <p>{{ mission.artifacts.implementation.changes }}</p>
+        </div>
+        <div>
+          <strong>{{ t("missions.tests") }}</strong>
+          <p>{{ mission.artifacts.implementation.tests }}</p>
+        </div>
+      </article>
+    </el-dialog>
 
     <MissionTicketDialog
       :model-value="Boolean(selected)"
@@ -204,8 +229,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { agentDisplayName } from "@codex-claw/core/agent-display";
-import type { Agent } from "@codex-claw/core/contracts";
 import type { Mission, MissionTicket } from "@codex-claw/core/missions";
 import type { MissionRun } from "@codex-claw/core/mission-execution";
 import {
@@ -214,15 +237,13 @@ import {
   FolderIcon,
   GitBranchIcon,
   MessageCircleIcon,
+  X,
 } from "../shared/icons/app-icons";
 import MissionTicketDialog from "./MissionTicketDialog.vue";
 
 type TicketItem = { ticket: MissionTicket; index: number; run?: MissionRun };
 
-const props = withDefaults(
-  defineProps<{ agents?: Agent[]; mission: Mission; busy?: boolean; readOnly?: boolean }>(),
-  { agents: () => [] },
-);
+const props = defineProps<{ mission: Mission; busy?: boolean; readOnly?: boolean }>();
 const emit = defineEmits<{
   approve: [runId: string];
   "open-conversation": [agentId: string];
@@ -231,6 +252,11 @@ const emit = defineEmits<{
 }>();
 const { t } = useI18n();
 const selectedIndex = ref(-1);
+const evidenceOpen = ref(false);
+const hasImplementationEvidence = computed(() => Boolean(
+  props.mission.artifacts.implementation.changes.trim()
+  || props.mission.artifacts.implementation.tests.trim(),
+));
 const reviewPolicy = computed(
   () => props.mission.execution?.reviewPolicy ?? "reviewEachTicket",
 );
@@ -314,12 +340,6 @@ function workspaceBranch(repositoryPath: string): string {
 }
 function ticketNumber(index: number): string {
   return String(index + 1).padStart(2, "0");
-}
-function assignedAgent(item: TicketItem): string {
-  const agent =
-    props.agents.find((agent) => agent.id === item.run?.workerId) ??
-    props.agents.find((agent) => agent.id === item.run?.memberId);
-  return agent ? agentDisplayName(agent) : "";
 }
 function ticketStatus(
   item: TicketItem,
@@ -439,7 +459,32 @@ function ticketPreview(ticket: MissionTicket): string {
   display: flex;
   grid-column: 1 / -1;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-6);
+}
+
+.mission-implementation__view-evidence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-12);
+  cursor: pointer;
+}
+
+.mission-implementation__view-evidence:hover,
+.mission-implementation__view-evidence:focus-visible {
+  color: var(--color-text);
+}
+
+.mission-implementation__view-evidence svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .mission-implementation__lanes {
@@ -670,22 +715,96 @@ function ticketPreview(ticket: MissionTicket): string {
   height: var(--icon-md);
 }
 
-.mission-implementation__aggregate {
+:global(.mission-implementation__evidence-dialog.el-dialog) {
   display: grid;
-  gap: var(--space-6);
-  padding: var(--space-8);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
+  max-height: min(82vh, 780px);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
-.mission-implementation__aggregate h3,
+:global(.mission-implementation__evidence-dialog.el-dialog > .el-dialog__header) {
+  margin: 0;
+  padding: 0;
+}
+
+:global(.mission-implementation__evidence-dialog.el-dialog > .el-dialog__body) {
+  min-height: 0;
+  padding: 0;
+  overflow: auto;
+}
+
+.mission-implementation__evidence-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-low);
+}
+
+.mission-implementation__evidence-header > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-on-primary-container);
+  background: var(--color-primary-container);
+}
+
+.mission-implementation__evidence-header > span svg,
+.mission-implementation__evidence-header > button svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.mission-implementation__evidence-header > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.mission-implementation__evidence-header h3,
+.mission-implementation__evidence-header small,
 .mission-implementation__aggregate p {
   margin: 0;
 }
 
-.mission-implementation__aggregate h3 {
-  font-size: var(--font-size-16);
+.mission-implementation__evidence-header h3 {
+  font-size: var(--font-size-18);
+  line-height: var(--line-height-24);
+}
+
+.mission-implementation__evidence-header small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mission-implementation__evidence-header > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.mission-implementation__evidence-header > button:hover,
+.mission-implementation__evidence-header > button:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface-high);
+}
+
+.mission-implementation__aggregate {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-10);
 }
 
 .mission-implementation__aggregate div {

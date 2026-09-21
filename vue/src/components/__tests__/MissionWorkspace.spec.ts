@@ -363,7 +363,7 @@ describe('MissionWorkspace', () => {
       'aria-valuemax': '2',
       'aria-valuenow': '0',
     });
-    expect(board.findAll('.mission-implementation__agent').map(agent => agent.text())).toStrictEqual(['Dina', 'Jesse']);
+    expect(board.findAll('.mission-implementation__agent').map(agent => agent.text())).toStrictEqual(['Builder', 'Builder']);
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
@@ -384,6 +384,29 @@ describe('MissionWorkspace', () => {
 
     expect(executeMission).toHaveBeenNthCalledWith(1, { id: mission.id, revision: mission.revision, action: 'accept', runId: 'run-checkout' });
     expect(executeMission).toHaveBeenCalledOnce();
+  });
+
+  it('keeps aggregate implementation evidence in a review dialog', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'implementation';
+    mission.artifacts.tickets = [{ title: 'Checkout', repositoryPath: '/src/billing-service', done: true }];
+    mission.artifacts.implementation = {
+      changes: 'Checkout now completes payment in the isolated worktree.',
+      tests: 'Checkout integration tests pass.',
+    };
+    mission.execution!.runs = [];
+    const wrapper = mountWorkspace(mission);
+
+    const evidenceDialog = wrapper.findAllComponents({ name: 'ElDialog' })[0]!;
+    expect(evidenceDialog.props('modelValue')).toBe(false);
+    expect(wrapper.find('.mission-implementation__aggregate').exists()).toBe(false);
+
+    await wrapper.get('[aria-label="View implementation evidence"]').trigger('click');
+    await flushPromises();
+
+    expect(evidenceDialog.props('modelValue')).toBe(true);
+    expect(evidenceDialog.text()).toContain('Checkout now completes payment in the isolated worktree.');
+    expect(evidenceDialog.text()).toContain('Checkout integration tests pass.');
   });
 
   it('keeps failed and running implementation tickets recoverable from their repository lane', async () => {
@@ -490,7 +513,10 @@ describe('MissionWorkspace', () => {
 
     mission.stage = 'implementation';
     await wrapper.setProps({ mission: structuredClone(mission) });
-    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('billing integration passes');
+    expect(wrapper.find('[aria-label="Accepted artifact"]').exists()).toBe(false);
+    await wrapper.get('[aria-label="View implementation evidence"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAllComponents({ name: 'ElDialog' })[0]!.text()).toContain('billing integration passes');
     expect(wrapper.find('.code-review-slot').exists()).toBe(false);
 
     mission.stage = 'review';

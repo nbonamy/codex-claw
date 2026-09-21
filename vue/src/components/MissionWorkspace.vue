@@ -77,7 +77,6 @@
 
           <MissionImplementationBoard
             v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
-            :agents="agents"
             :mission="mission"
             :busy="busy"
             :read-only="debugFixture"

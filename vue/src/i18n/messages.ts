@@ -42,6 +42,7 @@ export const messages = {
       keepWorkingInConversation: 'Continue with your mission lead to create this stage’s artifact.', continueMission: 'Continue mission',
       missionLead: 'Mission lead', missionLeadHint: 'Guiding the mission with you.', missionLeadStarting: 'Starting your mission lead…', conversations: 'Mission conversations',
       builder: 'Builder', implementationAgentHint: 'Working on this ticket.', ticketLabel: 'Ticket {number}',
+      viewEvidence: 'View evidence', viewImplementationEvidence: 'View implementation evidence',
       requirementReview: 'Requirements review', requirementCommentHelp: 'Select text to leave an inline comment.', requirementComments: 'Requirement comments',
       requirementCommentLabel: 'Requirement comment', requirementCommentPlaceholder: 'What should change?', saveRequirementComment: 'Save requirement comment',
       editRequirementComment: 'Edit requirement comment', removeRequirementComment: 'Remove requirement comment', sendRequirementComments: 'Send {count} requirement comment | Send {count} requirement comments',
