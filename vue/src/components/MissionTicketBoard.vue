@@ -502,9 +502,9 @@ function oneLine(value: string): string {
   overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
-  line-height: var(--line-height-20);
+  line-height: var(--line-height-18);
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 .mission-ticket-board__card-footer {
