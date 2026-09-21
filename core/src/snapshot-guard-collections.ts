@@ -159,7 +159,7 @@ function isAgentGitDiffCatalog(value: unknown): boolean {
     ));
 }
 
-function isAgentGitDiffTarget(value: unknown): value is AgentGitDiffTarget {
+export function isAgentGitDiffTarget(value: unknown): value is AgentGitDiffTarget {
   if (!isRecord(value) || typeof value.type !== 'string') return false;
   if (value.type === 'branch') return optional(value, 'baseRef', isString);
   if (value.type === 'uncommitted' || value.type === 'unstaged' || value.type === 'staged') return true;

@@ -26,6 +26,7 @@ import {
 } from './snapshot-guard-primitives';
 import {
   isAccountRateLimits,
+  isAgentGitDiffTarget,
   isAgentGitStatus,
   isQueuedPrompt,
   isTurnGitDiff,
@@ -107,6 +108,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'backendSession', isBackendSession) &&
     optional(value, 'backendDefaults', isBackendDefaults) &&
     optional(value, 'openInApplication', isOpenInApplication) &&
+    optional(value, 'gitDiffTarget', isAgentGitDiffTarget) &&
     optional(value, 'contextUsage', isAgentContextUsage) &&
     optional(value, 'plan', isThreadPlan) &&
     optional(value, 'planReview', isPlanReview) &&

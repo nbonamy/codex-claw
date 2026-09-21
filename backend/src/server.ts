@@ -5,8 +5,9 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, BackendConversationRef, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, BackendPublishedEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitDiffTarget, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, BackendConversationRef, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, BackendPublishedEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
+import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendConversationReplacementResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
@@ -2415,10 +2416,26 @@ function requireQuickChatCreateInput(params: unknown): CreateQuickChatInput {
 function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
   const record = requireRecord(params);
   const input = requireRecord(record.input);
-  return {
+  const result: UpdateAgentInput = {
     id: requireString(input.id, 'agent id'),
-    name: input.name === null ? null : requireString(input.name, 'agent name'),
   };
+  if ('name' in input) {
+    result.name = input.name === null ? null : requireString(input.name, 'agent name');
+  }
+  if ('gitDiffTarget' in input) {
+    result.gitDiffTarget = input.gitDiffTarget === null
+      ? null
+      : requireAgentGitDiffTarget(input.gitDiffTarget);
+  }
+  if (result.name === undefined && result.gitDiffTarget === undefined) {
+    throw new Error('Agent update must include a name or Git diff target.');
+  }
+  return result;
+}
+
+function requireAgentGitDiffTarget(value: unknown): AgentGitDiffTarget {
+  if (!isAgentGitDiffTarget(value)) throw new Error('Invalid Git diff target.');
+  return { ...value };
 }
 
 function requireAgentOpenInApplicationUpdate(params: unknown): {

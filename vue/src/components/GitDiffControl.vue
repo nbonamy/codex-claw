@@ -57,16 +57,18 @@ const props = defineProps<{
   agentId: string;
   gitStatus: AgentGitStatus;
   lastTurnGitDiff?: TurnGitDiff | null;
+  selectedTarget?: AgentGitDiffTarget | null;
 }>();
 
 const emit = defineEmits<{
   open: [target: AgentGitDiffTarget];
+  select: [target: AgentGitDiffTarget];
 }>();
 
 const root = ref<HTMLElement | null>(null);
 const menuOpen = ref(false);
-const hasUserSelection = ref(false);
-const selectedTarget = shallowRef<AgentGitDiffTarget>(defaultTarget());
+const hasUserSelection = ref(Boolean(props.selectedTarget));
+const selectedTarget = shallowRef<AgentGitDiffTarget>(selectedTargetForAgent());
 const fallbackSummary = computed<AgentGitDiffSummary>(() => ({
   addedLines: props.gitStatus.addedLines,
   removedLines: props.gitStatus.removedLines,
@@ -115,11 +117,11 @@ const menuItems = computed<AppMenuItem[]>(() => {
   return items;
 });
 
-watch(() => props.agentId, () => {
-  hasUserSelection.value = false;
-  selectedTarget.value = defaultTarget();
+watch([() => props.agentId, () => props.selectedTarget], ([, target]) => {
+  hasUserSelection.value = Boolean(target);
+  selectedTarget.value = target ? { ...target } : defaultTarget();
   menuOpen.value = false;
-});
+}, { deep: true });
 
 watch(() => props.gitStatus.diffCatalog, (catalog) => {
   if (!catalog) return;
@@ -142,12 +144,17 @@ function defaultTarget(): AgentGitDiffTarget {
   return { ...(props.gitStatus.diffCatalog?.defaultTarget ?? { type: 'uncommitted' }) };
 }
 
+function selectedTargetForAgent(): AgentGitDiffTarget {
+  return props.selectedTarget ? { ...props.selectedTarget } : defaultTarget();
+}
+
 function selectTarget(itemId: string): void {
   const target = targetFromId(itemId);
   if (!target) return;
   hasUserSelection.value = true;
   selectedTarget.value = target;
   menuOpen.value = false;
+  emit('select', { ...target });
 }
 
 function targetFromId(id: string): AgentGitDiffTarget | null {

@@ -44,6 +44,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
     workspace.tabs = workspace.tabs.includes(tab) ? workspace.tabs : [...workspace.tabs, tab];
     workspace.open = true;
   });
+  const updateAgent = vi.fn().mockResolvedValue(undefined);
   const wrapper = shallowMount(AgentWorkspace, {
     props: {
       activeAttachmentAnnotationCounts: {},
@@ -78,6 +79,7 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       loadWorkItems: vi.fn(),
       mergeAgentGitBranch: vi.fn(),
       updateAgentGitBranchFromBase: vi.fn(),
+      updateAgent,
       openAgentGitDiffPreview: vi.fn(),
       openAgentIn: vi.fn(),
       openAttachmentImageAnnotation: vi.fn(),
@@ -104,10 +106,30 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
     },
     global: { plugins: [i18n] },
   });
-  return { closeRightWorkspaceTab, currentAgent, discardCodeReview, openRightWorkspaceTab, workspace, wrapper };
+  return {
+    closeRightWorkspaceTab,
+    currentAgent,
+    discardCodeReview,
+    openRightWorkspaceTab,
+    updateAgent,
+    workspace,
+    wrapper,
+  };
 }
 
 describe('AgentWorkspace', () => {
+  it('persists the selected Git diff target on the active agent', async () => {
+    const { currentAgent, updateAgent, wrapper } = mountWorkspace();
+
+    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('select-git-diff-target', { type: 'staged' });
+    await wrapper.vm.$nextTick();
+
+    expect(updateAgent).toHaveBeenCalledWith({
+      id: currentAgent.id,
+      gitDiffTarget: { type: 'staged' },
+    });
+  });
+
   it('opens code review from the agent header in the current workspace', async () => {
     const { currentAgent, openRightWorkspaceTab, wrapper } = mountWorkspace();
 

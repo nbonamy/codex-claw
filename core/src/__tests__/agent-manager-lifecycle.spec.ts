@@ -387,6 +387,22 @@ describe('agent-manager lifecycle', () => {
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-existing' });
   });
 
+  it('updates the Git diff target without changing the agent name', () => {
+    const snapshot = createInitialSnapshot();
+    const previousUpdatedAt = snapshot.agents[0].updatedAt;
+
+    updateAgentFromInput(snapshot, {
+      id: 'agent-dina',
+      gitDiffTarget: { type: 'staged' },
+    }, '2026-06-05T10:11:12.000Z');
+
+    expect(snapshot.agents[0]).toMatchObject({
+      name: 'Dina',
+      gitDiffTarget: { type: 'staged' },
+      updatedAt: previousUpdatedAt,
+    });
+  });
+
   it('returns null when updating a missing agent', () => {
     const snapshot = createInitialSnapshot();
 

@@ -196,7 +196,7 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('open-git-diff')).toStrictEqual([[{ type: 'uncommitted' }]]);
   });
 
-  it('switches among repository and provider turn diff targets', async () => {
+  it('switches among diff targets and remembers the selection per agent', async () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
       folder: '/Users/nbonamy/src/id8',
       branch: 'feature',
@@ -235,6 +235,31 @@ describe('AgentHeader', () => {
 
     expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Staged');
     expect(wrapper.emitted('open-git-diff')).toBeUndefined();
+    expect(wrapper.emitted('select-git-diff-target')).toStrictEqual([[{ type: 'staged' }]]);
+
+    await wrapper.setProps({ agent: { ...agent, id: 'agent-jesse' } });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Changes vs main');
+
+    await wrapper.get('[aria-label="Choose repository diff"]').trigger('click');
+    wrapper.getComponent({ name: 'AppMenu' }).vm.$emit('select', 'unstaged');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Unstaged');
+    expect(wrapper.emitted('select-git-diff-target')).toStrictEqual([
+      [{ type: 'staged' }],
+      [{ type: 'unstaged' }],
+    ]);
+
+    await wrapper.setProps({ agent: { ...agent, gitDiffTarget: { type: 'staged' } } });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Staged');
+
+    await wrapper.setProps({ agent: { ...agent, id: 'agent-jesse', gitDiffTarget: { type: 'unstaged' } } });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.git-diff-control__open').attributes('title')).toBe('Unstaged');
+
+    await wrapper.setProps({ agent: { ...agent, gitDiffTarget: { type: 'staged' } } });
+    await wrapper.vm.$nextTick();
 
     await wrapper.get('.git-diff-control__open').trigger('click');
 
