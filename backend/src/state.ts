@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { AppStatePersistence } from './state-persistence';
@@ -30,6 +30,10 @@ export async function ensureBackendMissionHome(missionId: string): Promise<strin
   const home = backendMissionHomeDir(missionId);
   await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
   return home;
+}
+
+export async function deleteBackendMissionHome(missionId: string): Promise<void> {
+  await rm(backendMissionHomeDir(missionId), { recursive: true, force: true });
 }
 
 /** Isolated Codex app-server state; never share the user's ~/.codex threads. */

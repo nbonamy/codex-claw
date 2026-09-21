@@ -1,5 +1,4 @@
 import { flushPromises } from '@vue/test-utils';
-import { ElMessageBox } from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createMission } from '@codex-claw/core/missions';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
@@ -90,11 +89,18 @@ describe('AppShell missions', () => {
     expect(conversationControllerState(wrapper).composer?.placeholder).toBe('Describe what you want to build…');
   });
 
-  it('confirms mission deletion, removes its persisted revision, and leaves the mission surface', async () => {
+  it.each([
+    { action: 'Keep worktrees', deleteWorktrees: false },
+    { action: 'Delete mission and worktrees', deleteWorktrees: true },
+  ])('lists Mission worktrees and maps $action to the explicit cleanup choice', async ({ action, deleteWorktrees }) => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    mission.execution!.workspaces = [{
+      repositoryPath: '/src/payments',
+      path: '/src/payments-add-billing',
+      branch: 'mission/add-billing',
+    }];
     const deleteMission = vi.fn().mockResolvedValue(undefined);
-    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const wrapper = mountShell({ snapshot, deleteMission });
     const navigation = wrapper.findComponent({ name: 'AppShellNavigation' });
 
@@ -102,14 +108,39 @@ describe('AppShell missions', () => {
     await navigation.vm.$emit('delete-mission', mission.id);
     await flushPromises();
 
-    expect(confirm).toHaveBeenCalledWith(
-      'The mission and its agent conversations will be removed from Codex Claw. Its worktree and files will remain.',
-      'Delete Add billing?',
-      { cancelButtonText: 'Cancel', confirmButtonText: 'Delete mission', type: 'warning' },
-    );
-    expect(deleteMission).toHaveBeenCalledWith({ id: mission.id, revision: mission.revision });
+    const dialog = wrapper.getComponent({ name: 'MissionDeleteDialog' });
+    expect(dialog.text()).toContain('payments');
+    expect(dialog.text()).toContain('mission/add-billing');
+    expect(dialog.text()).toContain('/src/payments-add-billing');
+    const button = dialog.findAll('button').find(candidate => candidate.text().trim() === action);
+    expect(button).toBeDefined();
+    await button!.trigger('click');
+    await flushPromises();
+
+    expect(deleteMission).toHaveBeenCalledWith({
+      id: mission.id,
+      revision: mission.revision,
+      deleteWorktrees,
+      confirmed: true,
+    });
     expect(wrapper.find('.mission-workspace').exists()).toBe(false);
     expect(wrapper.findComponent({ name: 'AgentWorkspace' }).exists()).toBe(true);
+  });
+
+  it('deletes a Mission with no worktrees without presenting a worktree choice', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Add billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    const deleteMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, deleteMission });
+
+    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('delete-mission', mission.id);
+    await flushPromises();
+
+    const dialog = wrapper.getComponent({ name: 'MissionDeleteDialog' });
+    expect(dialog.text()).not.toContain('Keep worktrees');
+    await dialog.get('button.mission-delete-dialog__delete').trigger('click');
+    await flushPromises();
+    expect(deleteMission).toHaveBeenCalledWith(expect.objectContaining({ deleteWorktrees: false, confirmed: true }));
   });
 
   it('mounts the mission worker conversation when the orchestrator becomes available', async () => {

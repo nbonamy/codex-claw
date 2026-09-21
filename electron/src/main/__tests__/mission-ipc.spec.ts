@@ -24,7 +24,7 @@ describe('mission IPC', () => {
     expect(request).toHaveBeenLastCalledWith('mission/execution/update', { input: execution });
     await expect(handlers.get('mission:artifact:read')!({}, mission.id, 'requirements')).resolves.toBe(artifact);
     expect(request).toHaveBeenLastCalledWith('mission/artifact/read', { missionId: mission.id, stage: 'requirements' });
-    const deletion = { id: mission.id, revision: 0 };
+    const deletion = { id: mission.id, revision: 0, deleteWorktrees: true, confirmed: true as const };
     await expect(handlers.get('mission:delete')!({}, deletion)).resolves.toBe(snapshot);
     expect(request).toHaveBeenLastCalledWith('mission/delete', { input: deletion });
     expect(adopt).toHaveBeenCalledTimes(4);

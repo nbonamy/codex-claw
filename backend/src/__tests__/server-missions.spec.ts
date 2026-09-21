@@ -3,6 +3,7 @@ import { ClawBackendServer } from '../server';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
+import { AgentGitService } from '../git/agent-git-service';
 
 describe('mission backend boundary', () => {
   it('creates, broadcasts, updates and reloads a team-scoped mission without a repository', async () => {
@@ -32,16 +33,119 @@ describe('mission backend boundary', () => {
       expect(onEvent.mock.calls.at(-1)?.[0]).toMatchObject({ type: 'snapshot.updated', payload: { missions: restored.missions } });
       await expect(call('mission/update', { id: mission.id, revision: 0, artifacts, stageAgentIds: {}, action: 'save' })).rejects.toThrow('changed');
       expect(snapshotFromPersistedState(disk).missions).toStrictEqual(restored.missions);
-      await call('mission/delete', { id: mission.id, revision: snapshot.missions![0]!.revision });
+      await call('mission/delete', { id: mission.id, revision: snapshot.missions![0]!.revision, deleteWorktrees: false, confirmed: true });
       expect(snapshotFromPersistedState(disk).missions).toStrictEqual([]);
       expect(snapshotFromPersistedState({ ...disk as object, missions: [{}] }).missions).toStrictEqual([]);
       expect(snapshotFromPersistedState({ teams: [] }).missions).toBeUndefined();
     } finally { await server.close(); }
   });
+
+  it('deletes every tracked Mission worktree and the Mission data directory when requested', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, {
+      outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
+      teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+    });
+    mission.execution!.workspaces = [
+      { repositoryPath: '/src/api', path: '/src/api-add-billing', branch: 'mission/add-billing' },
+      { repositoryPath: '/src/web', path: '/src/web-add-billing', branch: 'mission/add-billing' },
+    ];
+    const validateLinkedWorktreeDeletion = vi.fn().mockResolvedValue(undefined);
+    const deleteLinkedWorktree = vi.fn().mockResolvedValue(undefined);
+    const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test', snapshot,
+      agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
+      deleteMissionHome,
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+    });
+
+    try {
+      await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'mission/delete', params: {
+        input: { id: mission.id, revision: mission.revision, deleteWorktrees: true, confirmed: true },
+      } });
+
+      expect(validateLinkedWorktreeDeletion.mock.calls).toEqual([
+        ['/src/api-add-billing'],
+        ['/src/web-add-billing'],
+      ]);
+      expect(deleteLinkedWorktree.mock.calls).toEqual([
+        ['/src/api-add-billing'],
+        ['/src/web-add-billing'],
+      ]);
+      expect(deleteMissionHome).toHaveBeenCalledWith(mission.id);
+      expect(snapshot.missions).toStrictEqual([]);
+    } finally { await server.close(); }
+  });
+
+  it('keeps tracked worktrees while still deleting Mission data', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, {
+      outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
+      teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+    });
+    mission.execution!.workspaces = [{ repositoryPath: '/src/api', path: '/src/api-add-billing', branch: 'mission/add-billing' }];
+    const validateLinkedWorktreeDeletion = vi.fn();
+    const deleteLinkedWorktree = vi.fn();
+    const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test', snapshot,
+      agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
+      deleteMissionHome,
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+    });
+
+    try {
+      await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'mission/delete', params: {
+        input: { id: mission.id, revision: mission.revision, deleteWorktrees: false, confirmed: true },
+      } });
+
+      expect(validateLinkedWorktreeDeletion).not.toHaveBeenCalled();
+      expect(deleteLinkedWorktree).not.toHaveBeenCalled();
+      expect(deleteMissionHome).toHaveBeenCalledWith(mission.id);
+      expect(snapshot.missions).toStrictEqual([]);
+    } finally { await server.close(); }
+  });
+
+  it('keeps the Mission and its data when a tracked worktree is unsafe to delete', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, {
+      outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
+      teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+    });
+    mission.execution!.workspaces = [
+      { repositoryPath: '/src/api', path: '/src/api-add-billing', branch: 'mission/add-billing' },
+      { repositoryPath: '/src/web', path: '/src/web-add-billing', branch: 'mission/add-billing' },
+    ];
+    const deleteMissionHome = vi.fn();
+    const deleteLinkedWorktree = vi.fn();
+    const validateLinkedWorktreeDeletion = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Commit or discard the worktree changes before deleting it.'));
+    const server = new ClawBackendServer({
+      version: 'test', snapshot,
+      agentGitService: {
+        validateLinkedWorktreeDeletion,
+        deleteLinkedWorktree,
+      } as unknown as AgentGitService,
+      deleteMissionHome,
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+    });
+
+    try {
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'mission/delete', params: {
+        input: { id: mission.id, revision: mission.revision, deleteWorktrees: true, confirmed: true },
+      } })).rejects.toThrow('Commit or discard');
+      expect(validateLinkedWorktreeDeletion).toHaveBeenCalledTimes(2);
+      expect(deleteLinkedWorktree).not.toHaveBeenCalled();
+      expect(snapshot.missions).toStrictEqual([mission]);
+      expect(deleteMissionHome).not.toHaveBeenCalled();
+    } finally { await server.close(); }
+  });
 });
 
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -126,13 +230,14 @@ it('prepares a mission without a provider turn, then starts it from the first us
       expect.objectContaining({ agentId: worker.id, text: expect.stringContaining('assigned Claw Mission skill') }),
     ]));
     const missionId = current().id;
-    await call('mission/delete', { id: missionId, revision: current().revision });
+    await call('mission/delete', { id: missionId, revision: current().revision, deleteWorktrees: false, confirmed: true });
     expect(snapshot.missions).toStrictEqual([]);
     expect(snapshot.agents.some(agent => agent.id === worker.id)).toBe(false);
     expect(snapshot.teams[0]!.agentIds).not.toContain(worker.id);
     expect(interrupt).toHaveBeenCalledWith(expect.objectContaining({ id: worker.id }));
     expect(archiveAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ id: worker.id }));
     expect(releaseConversation).toHaveBeenCalledWith(worker.id);
+    await expect(access(missionHome)).rejects.toThrow();
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
 });
 

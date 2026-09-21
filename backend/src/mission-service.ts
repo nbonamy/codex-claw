@@ -29,7 +29,7 @@ export class MissionService {
     });
   }
 
-  remove(input: DeleteMissionInput, cleanup: (agents: Agent[]) => Promise<void>): Promise<void> {
+  remove(input: DeleteMissionInput, cleanup: (mission: Mission, agents: Agent[]) => Promise<void>): Promise<void> {
     return this.transaction(async candidate => {
       const mission = deleteMission(candidate, input);
       const workerIds = new Set(mission.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? []);
@@ -37,7 +37,7 @@ export class MissionService {
         other.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? []
       )));
       const workers = candidate.agents.filter(agent => workerIds.has(agent.id) && !retainedWorkerIds.has(agent.id));
-      await cleanup(workers);
+      await cleanup(mission, workers);
       for (const worker of workers) closeAgentInSnapshot(candidate, worker.id);
     }, true);
   }

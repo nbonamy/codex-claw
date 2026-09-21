@@ -17,7 +17,7 @@ import { ClawMcpService } from './mcp/service';
 import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
-import { backendProviderTokensFilePath, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendProviderTokensFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -210,6 +210,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
     ensureMissionHome: ensureBackendMissionHome,
+    deleteMissionHome: deleteBackendMissionHome,
     inspectPluginStatus: async () => {
       pluginStatus = await loadPluginStatus();
       return pluginStatus;

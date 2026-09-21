@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   loadBackendSnapshot: vi.fn(),
   ensureBackendCodexHome: vi.fn(),
   ensureBackendMissionHome: vi.fn(),
+  deleteBackendMissionHome: vi.fn(),
   initializeCodexResourceSharing: vi.fn(),
   loadPluginStatus: vi.fn(),
   saveBackendSnapshot: vi.fn(),
@@ -71,6 +72,7 @@ vi.mock('../state', () => ({
   loadBackendSnapshot: mocks.loadBackendSnapshot,
   ensureBackendCodexHome: mocks.ensureBackendCodexHome,
   ensureBackendMissionHome: mocks.ensureBackendMissionHome,
+  deleteBackendMissionHome: mocks.deleteBackendMissionHome,
   saveBackendSnapshot: mocks.saveBackendSnapshot,
   backendProviderTokensFilePath: mocks.backendProviderTokensFilePath,
 }));

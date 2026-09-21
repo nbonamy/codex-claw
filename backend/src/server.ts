@@ -2,14 +2,14 @@ import { readWorktreeHead } from './git-worktrees';
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
 import { FileMissionSkillStore } from './mission-skill-store';
-import { featureStages, type MissionStage } from '@codex-claw/core/missions';
+import { featureStages, type Mission, type MissionStage } from '@codex-claw/core/missions';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
 import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import path from 'node:path';
 import os from 'node:os';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { createEntityId } from '@codex-claw/core/ids';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
@@ -84,6 +84,7 @@ export type ClawBackendServerOptions = {
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
   ensureMissionHome?: (missionId: string) => Promise<string>;
+  deleteMissionHome?: (missionId: string) => Promise<void>;
   missionArtifactStore?: MissionArtifactStorage;
   codeReviewTools?: CodeReviewToolPort;
   agentCreation?: AgentCreationService;
@@ -150,6 +151,7 @@ export class ClawBackendServer {
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private readonly codeReviews?: CodeReviewService;
   private readonly agentCreation: AgentCreationService;
+  private readonly deleteMissionHome: (missionId: string) => Promise<void>;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
   private conversationsReconciliation?: Promise<void>;
@@ -207,6 +209,9 @@ export class ClawBackendServer {
       const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
       await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
       return home;
+    });
+    this.deleteMissionHome = options.deleteMissionHome ?? (async (missionId: string) => {
+      await rm(await ensureMissionHome(missionId), { recursive: true, force: true });
     });
     this.missionArtifacts = options.missionArtifactStore ?? new FileMissionArtifactStore(ensureMissionHome);
     const missionSkills = new FileMissionSkillStore(ensureMissionHome);
@@ -809,7 +814,16 @@ export class ClawBackendServer {
       }
       case backendMethods.missionDelete: {
         const input = requireRecord(message.params).input as import('@codex-claw/core/missions').DeleteMissionInput;
-        await this.missions.remove(input, async workers => {
+        await this.missions.remove(input, async (mission, workers) => {
+          const workspacePaths = missionWorktreePaths(mission);
+          if (input.deleteWorktrees) {
+            const workerIds = new Set(workers.map(worker => worker.id));
+            for (const folder of workspacePaths) {
+              const sharedAgent = this.snapshot.agents.find(agent => !workerIds.has(agent.id) && agent.folder === folder);
+              if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
+              await this.agentGitService.validateLinkedWorktreeDeletion(folder);
+            }
+          }
           for (const worker of workers) {
             if (worker.status.type === 'working' || worker.status.type === 'awaitingInput') {
               await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
@@ -819,6 +833,10 @@ export class ClawBackendServer {
               await this.driverRpc?.handle(backendMethods.driverConversationRelease, { backend: worker.backend, agentId: worker.id });
             }
           }
+          if (input.deleteWorktrees) {
+            for (const folder of workspacePaths) await this.agentGitService.deleteLinkedWorktree(folder);
+          }
+          await this.deleteMissionHome(mission.id);
         });
         const snapshot = await this.remoteTeams.clientSnapshot();
         this.emitSnapshotUpdated(snapshot);
@@ -2722,6 +2740,12 @@ function requireAgentCloseRequest(params: unknown): {
       confirmed: true,
     },
   };
+}
+
+function missionWorktreePaths(mission: Mission): string[] {
+  const paths = mission.execution?.workspaces?.map(workspace => workspace.path) ?? [];
+  if (mission.execution?.workspace?.path) paths.push(mission.execution.workspace.path);
+  return [...new Set(paths)];
 }
 
 function requireDuplicateAgentRequest(params: unknown): { agentId: string; options?: DuplicateAgentOptions } {

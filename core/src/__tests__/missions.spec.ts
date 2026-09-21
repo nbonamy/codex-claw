@@ -60,9 +60,10 @@ describe('missions', () => {
     const first = createMission(snapshot, createInput(snapshot, 'Billing'));
     const second = createMission(snapshot, createInput(snapshot, 'Invitations'));
 
-    expect(() => deleteMission(snapshot, { id: first.id, revision: 1 })).toThrow('changed');
-    expect(() => deleteMission(snapshot, { id: 'missing', revision: 0 })).toThrow('not found');
-    expect(deleteMission(snapshot, { id: first.id, revision: 0 })).toBe(first);
+    expect(() => deleteMission(snapshot, { id: first.id, revision: 1, deleteWorktrees: false, confirmed: true })).toThrow('changed');
+    expect(() => deleteMission(snapshot, { id: 'missing', revision: 0, deleteWorktrees: false, confirmed: true })).toThrow('not found');
+    expect(() => deleteMission(snapshot, { id: first.id, revision: 0, deleteWorktrees: false })).toThrow('Invalid');
+    expect(deleteMission(snapshot, { id: first.id, revision: 0, deleteWorktrees: false, confirmed: true })).toBe(first);
     expect(snapshot.missions).toStrictEqual([second]);
   });
 });

@@ -45,7 +45,7 @@ export type CreateMissionInput = {
   teamId: string;
   orchestratorMemberId: string;
 };
-export type DeleteMissionInput = { id: string; revision: number };
+export type DeleteMissionInput = { id: string; revision: number; deleteWorktrees: boolean; confirmed: true };
 export type UpdateMissionInput = {
   id: string;
   revision: number;
@@ -124,7 +124,8 @@ export function createMission(snapshot: AppSnapshot, input: unknown): Mission {
   return mission;
 }
 export function deleteMission(snapshot: AppSnapshot, input: unknown): Mission {
-  if (!record(input) || typeof input.id !== 'string' || !Number.isInteger(input.revision)) throw new Error('Invalid mission deletion.');
+  if (!record(input) || typeof input.id !== 'string' || !Number.isInteger(input.revision)
+    || typeof input.deleteWorktrees !== 'boolean' || input.confirmed !== true) throw new Error('Invalid mission deletion.');
   const mission = snapshot.missions?.find(mission => mission.id === input.id);
   if (!mission) throw new Error('Mission not found.');
   if (mission.revision !== input.revision) throw new Error('This mission changed. Reload before deleting it.');

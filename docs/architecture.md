@@ -69,7 +69,10 @@ the assigned worker replaces the placeholder with a concise outcome through
 the mission-scoped title tool.
 Mission rows use the sidebar context-menu pattern for deletion. Deletion removes
 the persisted Mission and its hidden worker agents after interrupting active work
-and archiving their provider conversations; the mission worktree remains on disk.
+and archiving their provider conversations. It always removes the Mission-owned
+artifact and skill directory. When the Mission created Git worktrees, the user
+chooses whether to keep them or delete every clean worktree and its local branch;
+unsafe worktrees keep the Mission intact and surface the cleanup error.
 The selected mission has persistent stages on the left, the current or
 previously accepted artifact in the central work surface, and the stage's
 orchestrator conversation on the right. The conversation drives

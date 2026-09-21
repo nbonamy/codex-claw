@@ -38,9 +38,12 @@ describe('MissionService', () => {
     const cleanup = vi.fn().mockResolvedValue(undefined);
     const service = new MissionService(snapshot, persist);
 
-    await service.remove({ id: mission.id, revision: mission.revision }, cleanup);
+    await service.remove({ id: mission.id, revision: mission.revision, deleteWorktrees: false, confirmed: true }, cleanup);
 
-    expect(cleanup).toHaveBeenCalledWith([expect.objectContaining({ id: 'worker-1' })]);
+    expect(cleanup).toHaveBeenCalledWith(
+      expect.objectContaining({ id: mission.id }),
+      [expect.objectContaining({ id: 'worker-1' })],
+    );
     expect(snapshot.missions).toStrictEqual([]);
     expect(snapshot.agents).toStrictEqual([]);
     expect(snapshot.teams[0]!.agentIds).toStrictEqual([]);

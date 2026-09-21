@@ -420,6 +420,14 @@
       :progress="debugAgentCreationProgress"
       @close="closeDebugAgentCreationProgress"
     />
+    <MissionDeleteDialog
+      :visible="missionDeleteTarget !== null"
+      :mission="missionDeleteTarget"
+      :busy="missionDeletePending"
+      :error="missionDeleteError"
+      @close="closeMissionDeleteDialog"
+      @confirm="confirmMissionDeletion"
+    />
     <CodexResourceSharingMigrationDialog
       :blocked="codexResourceSharingBlocked"
       :pending="codexResourceSharingMigrationPending"
@@ -481,6 +489,7 @@ import AgentWorkspace from './AgentWorkspace.vue';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionShipBoard from './MissionShipBoard.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
+import MissionDeleteDialog from './MissionDeleteDialog.vue';
 import ConversationPane from './ConversationPane.vue';
 import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
 import SettingsView from './SettingsView.vue';
@@ -857,8 +866,12 @@ const agentSidebarWidth = ref(260);
 const activeSurface = ref<AppSurface>('agent');
 const missionCreationError = ref('');
 const missionCreationPending = ref(false);
+const missionDeleteTargetId = ref<string | null>(null);
+const missionDeletePending = ref(false);
+const missionDeleteError = ref('');
 const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
+const missionDeleteTarget = computed(() => props.snapshot.missions?.find(m => m.id === missionDeleteTargetId.value) ?? null);
 function selectMissionSurface(id: string): void { selectedMissionId.value = id; activeSurface.value = 'mission'; }
 function missionTeamContext(): { team: Team; orchestrator: Agent } {
   const team = activeTeam.value;
@@ -892,32 +905,34 @@ async function createNewMission() {
   }
 }
 
-async function deleteMissionFromSidebar(id: string): Promise<void> {
-  const mission = props.snapshot.missions?.find(candidate => candidate.id === id);
-  if (!mission) return;
+function deleteMissionFromSidebar(id: string): void {
+  if (!props.snapshot.missions?.some(candidate => candidate.id === id)) return;
+  missionDeleteTargetId.value = id;
+  missionDeleteError.value = '';
+}
 
-  try {
-    await ElMessageBox.confirm(
-      translate('missions.deleteDescription'),
-      translate('missions.deleteTitle', { mission: mission.outcome }),
-      {
-        cancelButtonText: translate('common.cancel'),
-        confirmButtonText: translate('missions.deleteAction'),
-        type: 'warning',
-      },
-    );
-  } catch {
-    return;
-  }
+function closeMissionDeleteDialog(): void {
+  if (missionDeletePending.value) return;
+  missionDeleteTargetId.value = null;
+  missionDeleteError.value = '';
+}
 
+async function confirmMissionDeletion(deleteWorktrees: boolean): Promise<void> {
+  const mission = missionDeleteTarget.value;
+  if (!mission || missionDeletePending.value) return;
+  missionDeletePending.value = true;
+  missionDeleteError.value = '';
   try {
-    await props.deleteMission({ id: mission.id, revision: mission.revision });
+    await props.deleteMission({ id: mission.id, revision: mission.revision, deleteWorktrees, confirmed: true });
     if (selectedMissionId.value === mission.id) {
       selectedMissionId.value = null;
       activeSurface.value = 'agent';
     }
+    missionDeleteTargetId.value = null;
   } catch (error) {
-    ElMessage.error(localizedErrorMessage(error, t));
+    missionDeleteError.value = localizedErrorMessage(error, t);
+  } finally {
+    missionDeletePending.value = false;
   }
 }
 const fileQuickOpenVisible = ref(false);
@@ -1759,6 +1774,7 @@ const isModalDialogVisible = computed(() => (
   || teamDialogVisible.value
   || whatsNewVisible.value
   || imageAnnotationVisible.value
+  || missionDeleteTarget.value !== null
   || debugAgentCreationProgress.value !== null
   || fileQuickOpenVisible.value
   || agentQuickOpenVisible.value
