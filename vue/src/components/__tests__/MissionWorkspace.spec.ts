@@ -191,7 +191,7 @@ describe('MissionWorkspace', () => {
     const tabs = conversations.findAll('[role="tab"]');
     expect(tabs).toHaveLength(2);
     expect(tabs.map(tab => tab.attributes('aria-label'))).toStrictEqual(['Mission lead · Requirements', 'Mission lead · Tickets']);
-    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['Mission leadRequirements', 'Mission leadTickets']);
+    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['Mission lead·Requirements', 'Mission lead·Tickets']);
     expect(tabs[1]!.attributes('aria-selected')).toBe('true');
     expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('Mission leadTicketsShaping tickets');
     expect(wrapper.get('.conversation-slot').text()).toContain(snapshot.agents[1]!.id);

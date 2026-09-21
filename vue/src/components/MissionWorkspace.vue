@@ -174,6 +174,7 @@
             >
               <span class="mission-workspace__conversation-tab-copy">
                 <strong>{{ conversationTabTitle(conversation) }}</strong>
+                <span aria-hidden="true">·</span>
                 <small>{{ conversationTabDetail(conversation) }}</small>
               </span>
             </button>
@@ -503,8 +504,9 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__conversation-switcher button { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; padding: var(--space-3) 0 var(--space-4); border: 0; border-bottom: 2px solid transparent; color: var(--color-text-muted); background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .mission-workspace__conversation-switcher button:hover, .mission-workspace__conversation-switcher button:focus-visible { color: var(--color-text); }
 .mission-workspace__conversation-switcher button[aria-selected='true'] { border-bottom-color: var(--color-primary); color: var(--color-text); }
-.mission-workspace__conversation-tab-copy { display: grid; min-width: 0; gap: var(--space-1); }
+.mission-workspace__conversation-tab-copy { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); white-space: nowrap; }
 .mission-workspace__conversation-tab-copy strong, .mission-workspace__conversation-tab-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-workspace__conversation-tab-copy > span { color: var(--color-text-muted); }
 .mission-workspace__conversation-tab-copy strong { font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); }
 .mission-workspace__conversation-tab-copy small { color: var(--color-text-muted); font-size: var(--font-size-11); }
 .mission-workspace__conversation :deep(.conversation-pane) { flex: 1; min-height: 0; }
