@@ -73,76 +73,78 @@
           </div>
         </header>
 
-        <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
+        <div class="mission-workspace__workbench-scroll">
+          <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
 
-        <MissionImplementationBoard
-          v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
-          :agents="agents"
-          :mission="mission"
-          :busy="busy"
-          :read-only="debugFixture"
-          @approve="approveImplementationRun"
-          @open-conversation="selectConversation"
-          @retry="retryImplementationTicket"
-          @stop="stopRun"
-        />
-
-        <slot v-else-if="viewedStage === 'ship'" name="ship" :open-conversation="selectConversation" />
-
-        <section v-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
-          <MissionTicketBoard
-            :tickets="visibleTickets"
-            annotatable
-            :disabled="feedbackBusy || debugFixture"
-            :reset-key="feedbackReset"
-            @send-comments="sendTicketComments"
+          <MissionImplementationBoard
+            v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
+            :agents="agents"
+            :mission="mission"
+            :busy="busy"
+            :read-only="debugFixture"
+            @approve="approveImplementationRun"
+            @open-conversation="selectConversation"
+            @retry="retryImplementationTicket"
+            @stop="stopRun"
           />
-        </section>
 
-        <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
-          <MissionTicketBoard
-            v-if="viewedStage === 'tickets' && visibleTickets.length"
-            :tickets="visibleTickets"
-            annotatable
-            :disabled="feedbackBusy || debugFixture"
-            :reset-key="feedbackReset"
-            @send-comments="sendTicketComments"
-          />
-          <MissionRequirementReview
-            v-else-if="viewedStage === 'requirements'"
-            :content="artifactMarkdown"
-            :disabled="feedbackBusy || debugFixture"
-            :reset-key="feedbackReset"
-            @send-comments="sendRequirementComments"
-          />
-          <MarkdownPanel v-else :content="artifactMarkdown" />
-          <footer v-if="viewedStage !== 'requirements'" class="mission-workspace__review-hint">
-            <MessageCircleIcon aria-hidden="true" />
-            <span>{{ t('missions.reviewInConversation') }}</span>
-          </footer>
-        </section>
+          <slot v-else-if="viewedStage === 'ship'" name="ship" :open-conversation="selectConversation" />
 
-        <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
-          <MissionTicketBoard v-if="viewedStage === 'tickets' && visibleTickets.length" :tickets="visibleTickets" />
-          <MarkdownPanel v-else :content="artifactMarkdown" />
-        </section>
+          <section v-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
+            <MissionTicketBoard
+              :tickets="visibleTickets"
+              annotatable
+              :disabled="feedbackBusy || debugFixture"
+              :reset-key="feedbackReset"
+              @send-comments="sendTicketComments"
+            />
+          </section>
 
-        <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && !activeStageRun" class="mission-workspace__empty-artifact">
-          <span class="mission-workspace__callout-icon"><FileTextIcon aria-hidden="true" /></span>
-          <h3>{{ t('missions.noArtifactYet') }}</h3>
-          <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.orchestratorStarting') }}</p>
-          <button
-            v-if="mission.execution && !activeRun && mission.status !== 'completed'"
-            class="claw-button claw-button--primary"
-            type="button"
-            :disabled="busy || !executeMission"
-            @click="continueMission"
-          >
-            <PlayerPlayIcon aria-hidden="true" />{{ t('missions.continueMission') }}
-          </button>
-        </section>
+          <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && viewedStage === mission.stage && activeRun?.proposal" class="mission-workspace__artifact" :aria-label="t('missions.proposal')">
+            <MissionTicketBoard
+              v-if="viewedStage === 'tickets' && visibleTickets.length"
+              :tickets="visibleTickets"
+              annotatable
+              :disabled="feedbackBusy || debugFixture"
+              :reset-key="feedbackReset"
+              @send-comments="sendTicketComments"
+            />
+            <MissionRequirementReview
+              v-else-if="viewedStage === 'requirements'"
+              :content="artifactMarkdown"
+              :disabled="feedbackBusy || debugFixture"
+              :reset-key="feedbackReset"
+              @send-comments="sendRequirementComments"
+            />
+            <MarkdownPanel v-else :content="artifactMarkdown" />
+            <footer v-if="viewedStage !== 'requirements'" class="mission-workspace__review-hint">
+              <MessageCircleIcon aria-hidden="true" />
+              <span>{{ t('missions.reviewInConversation') }}</span>
+            </footer>
+          </section>
 
-        <slot v-if="codeAgentId && ['implementation', 'review'].includes(viewedStage) && !debugFixture" name="code-review" :agent-id="codeAgentId" />
+          <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
+            <MissionTicketBoard v-if="viewedStage === 'tickets' && visibleTickets.length" :tickets="visibleTickets" />
+            <MarkdownPanel v-else :content="artifactMarkdown" />
+          </section>
+
+          <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && !activeStageRun" class="mission-workspace__empty-artifact">
+            <span class="mission-workspace__callout-icon"><FileTextIcon aria-hidden="true" /></span>
+            <h3>{{ t('missions.noArtifactYet') }}</h3>
+            <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.orchestratorStarting') }}</p>
+            <button
+              v-if="mission.execution && !activeRun && mission.status !== 'completed'"
+              class="claw-button claw-button--primary"
+              type="button"
+              :disabled="busy || !executeMission"
+              @click="continueMission"
+            >
+              <PlayerPlayIcon aria-hidden="true" />{{ t('missions.continueMission') }}
+            </button>
+          </section>
+
+          <slot v-if="codeAgentId && ['implementation', 'review'].includes(viewedStage) && !debugFixture" name="code-review" :agent-id="codeAgentId" />
+        </div>
       </main>
 
       <aside class="mission-workspace__conversation" :aria-label="t('missions.support')">
@@ -450,8 +452,9 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__progress-summary { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); margin-top: auto; padding: var(--space-8) var(--space-4) 0; border-top: 1px solid var(--color-border); font-size: var(--font-size-12); }
 .mission-workspace__progress-summary [role='progressbar'] { height: 6px; grid-column: 1 / -1; overflow: hidden; border-radius: var(--radius-full); background: var(--color-surface-high); }
 .mission-workspace__progress-summary [role='progressbar'] span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
-.mission-workspace__workbench { min-width: 0; padding: var(--space-12); overflow: auto; }
-.mission-workspace__stage-header { position: sticky; top: 0; z-index: 3; display: flex; min-height: 38px; align-items: center; justify-content: space-between; gap: var(--space-10); margin-top: calc(-1 * var(--space-12)); padding-top: var(--space-12); padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
+.mission-workspace__workbench { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
+.mission-workspace__stage-header { z-index: 3; display: flex; min-height: 38px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--space-10); padding: var(--space-6) var(--space-12) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
+.mission-workspace__workbench-scroll { min-height: 0; flex: 1; padding: var(--space-4) var(--space-12) var(--space-12); overflow: auto; }
 .mission-workspace__stage-heading { display: flex; min-width: 0; align-items: baseline; gap: var(--space-4); }
 .mission-workspace__stage-heading > span { color: var(--color-text-muted); font-size: var(--font-size-12); white-space: nowrap; }
 .mission-workspace__stage-header h2 { overflow: hidden; font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
@@ -468,7 +471,7 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__empty-artifact { display: flex; max-width: 700px; align-items: center; flex-direction: column; gap: var(--space-8); margin: var(--space-16) auto; padding: var(--space-10); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-low); text-align: center; }
 .mission-workspace__callout-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: var(--radius-lg); color: var(--color-primary); background: var(--color-primary-container); }
 .mission-workspace__callout-icon svg { width: var(--icon-lg); height: var(--icon-lg); }
-.mission-workspace__artifact { max-width: 800px; margin: var(--space-8) auto 0; }
+.mission-workspace__artifact { max-width: 800px; margin: 0 auto; }
 .mission-workspace__review-hint { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-10); padding: var(--space-6); border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--font-size-13); }
 .mission-workspace__review-hint svg { width: var(--icon-md); height: var(--icon-md); }
 .mission-workspace__conversation { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-left: 1px solid var(--color-border); background: var(--color-surface-lowest); }
@@ -487,5 +490,5 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 @keyframes mission-workspace-activity-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .mission-workspace__activity-dot { animation: none; } }
 @container (max-width: 980px) { .mission-workspace__body { grid-template-columns: 200px minmax(360px, 1fr); } .mission-workspace__conversation { display: none; } }
-@container (max-width: 680px) { .mission-workspace__body { display: flex; overflow: auto; flex-direction: column; } .mission-workspace__process { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); } .mission-workspace__stages { grid-template-columns: repeat(4, minmax(120px, 1fr)); overflow-x: auto; } .mission-workspace__progress-summary { margin-top: var(--space-8); } .mission-workspace__workbench { overflow: visible; } .mission-workspace__stage-header { align-items: flex-start; flex-direction: column; } .mission-workspace__stage-heading { flex-wrap: wrap; } }
+@container (max-width: 680px) { .mission-workspace__body { display: flex; overflow: auto; flex-direction: column; } .mission-workspace__process { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); } .mission-workspace__stages { grid-template-columns: repeat(4, minmax(120px, 1fr)); overflow-x: auto; } .mission-workspace__progress-summary { margin-top: var(--space-8); } .mission-workspace__workbench { min-height: auto; overflow: visible; } .mission-workspace__workbench-scroll { overflow: visible; } .mission-workspace__stage-header { position: sticky; top: 0; align-items: flex-start; flex-direction: column; } .mission-workspace__stage-heading { flex-wrap: wrap; } }
 </style>

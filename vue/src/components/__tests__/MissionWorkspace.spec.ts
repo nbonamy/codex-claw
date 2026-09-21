@@ -77,6 +77,9 @@ describe('MissionWorkspace', () => {
     expect(wrapper.find('input').exists()).toBe(false);
     expect(wrapper.find('textarea').exists()).toBe(false);
     expect(wrapper.find('select').exists()).toBe(false);
+    const stageHeader = wrapper.get('.mission-workspace__stage-header');
+    const scrollingContent = wrapper.get('.mission-workspace__workbench-scroll');
+    expect(scrollingContent.element.contains(stageHeader.element)).toBe(false);
 
     await wrapper.setProps({ sidebarCollapsed: true });
     await wrapper.get('.mission-workspace__navigation-button').trigger('click');
