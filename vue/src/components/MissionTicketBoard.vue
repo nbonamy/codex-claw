@@ -56,6 +56,10 @@
                   : "missions.ticketReady",
               )
             }}</small>
+            <span
+              v-if="ticketCommentCount(ticketKey(ticket, index))"
+              class="mission-ticket-board__comment-count"
+            >{{ t('missions.ticketCommentCount', { count: ticketCommentCount(ticketKey(ticket, index)) }) }}</span>
             <span v-if="ticket.repositoryPath" class="mission-ticket-board__repository">{{ repositoryName(ticket.repositoryPath) }}</span>
             <ChevronRightIcon aria-hidden="true" />
           </span>
@@ -63,15 +67,28 @@
       </li>
     </TransitionGroup>
 
-    <Transition name="mission-ticket-details" mode="out-in">
-      <article
-        v-if="selectedTicket"
-        id="mission-ticket-details"
-        :key="selectedKey"
-        class="mission-ticket-board__details"
-        :aria-label="t('missions.ticketDetails')"
-      >
-        <header>
+    <footer v-if="comments.length" class="mission-ticket-board__review-bar">
+      <span>{{ ticketCommentSummary }}</span>
+      <AnnotationSendButton
+        :count="comments.length"
+        :disabled="disabled"
+        :label="t('missions.sendTicketComments', comments.length)"
+        @click="emit('sendComments', comments)"
+      />
+    </footer>
+
+    <el-dialog
+      class="claw-dialog mission-ticket-dialog"
+      :model-value="Boolean(selectedTicket)"
+      :show-close="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!activeTarget"
+      destroy-on-close
+      width="min(720px, calc(100vw - 48px))"
+      @update:model-value="onDialogVisibilityChanged"
+    >
+      <template #header>
+        <div v-if="selectedTicket" class="mission-ticket-dialog__header">
           <span class="mission-ticket-board__number">{{
             ticketNumber(selectedTicket.index)
           }}</span>
@@ -87,44 +104,78 @@
           >
             <X aria-hidden="true" />
           </button>
-        </header>
-        <MarkdownPanel
-          :content="
-            selectedTicket.ticket.body?.trim() ||
-            t('missions.noTicketDescription')
-          "
-        />
-        <footer
-          v-if="
-            selectedTicket.ticket.repositoryPath ||
-            selectedTicket.ticket.dependsOn?.length ||
-            selectedTicket.ticket.reference
-          "
+        </div>
+      </template>
+
+      <article
+        v-if="selectedTicket"
+        id="mission-ticket-details"
+        class="mission-ticket-dialog__body"
+        :aria-label="t('missions.ticketDetails')"
+      >
+        <div class="mission-ticket-dialog__document" @mouseup="captureSelection">
+          <MarkdownPanel
+            :content="selectedTicket.ticket.body?.trim() || t('missions.noTicketDescription')"
+          />
+          <AnnotationPopup
+            v-if="activeTarget"
+            :anchor="activeTarget.anchor"
+            :description="activeTarget.quote"
+            :initial-value="activeTarget.initialValue"
+            :label="t('missions.ticketCommentLabel')"
+            :placement="activeTarget.placement"
+            :placeholder="t('missions.ticketCommentPlaceholder')"
+            strategy="fixed"
+            :submit-label="t('missions.saveTicketComment')"
+            :width="activeTarget.width"
+            @cancel="cancelComment"
+            @submit="saveComment"
+          />
+        </div>
+
+        <div
+          v-if="selectedTicket.ticket.repositoryPath || selectedTicket.ticket.dependsOn?.length || selectedTicket.ticket.reference"
+          class="mission-ticket-dialog__metadata"
         >
           <span v-if="selectedTicket.ticket.repositoryPath">
-            {{ t("missions.repository") }}:
-            {{ selectedTicket.ticket.repositoryPath }}
+            {{ t("missions.repository") }}: {{ selectedTicket.ticket.repositoryPath }}
           </span>
           <span v-if="selectedTicket.ticket.dependsOn?.length">
             {{ t("missions.blockedBy") }}:
-            {{
-              selectedTicket.ticket.dependsOn
-                .map((dependency) => ticketNumber(dependency))
-                .join(", ")
-            }}
+            {{ selectedTicket.ticket.dependsOn.map((dependency) => ticketNumber(dependency)).join(", ") }}
           </span>
-          <a
-            v-if="selectedTicket.ticket.reference"
-            :href="selectedTicket.ticket.reference"
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a v-if="selectedTicket.ticket.reference" :href="selectedTicket.ticket.reference" target="_blank" rel="noreferrer">
             {{ t("missions.canonicalReference") }}
             <ExternalLinkIcon aria-hidden="true" />
           </a>
-        </footer>
+        </div>
+
+        <section v-if="selectedTicketComments.length" class="mission-ticket-dialog__comments" :aria-label="t('missions.ticketComments')">
+          <article v-for="comment in selectedTicketComments" :key="comment.id" class="mission-ticket-dialog__comment">
+            <button type="button" :aria-label="t('missions.editTicketComment')" :disabled="disabled" @click="editComment(comment)">
+              <span>{{ oneLine(comment.quote) }}</span>
+              <small>{{ oneLine(comment.body) }}</small>
+            </button>
+            <button type="button" class="mission-ticket-dialog__comment-remove" :aria-label="t('missions.removeTicketComment')" :disabled="disabled" @click="removeComment(comment.id)">
+              <Trash2Icon aria-hidden="true" />
+            </button>
+          </article>
+        </section>
       </article>
-    </Transition>
+
+      <template v-if="annotatable || comments.length" #footer>
+        <div class="mission-ticket-dialog__footer">
+          <span>{{ annotatable ? (comments.length ? ticketCommentSummary : t('missions.ticketCommentHelp')) : '' }}</span>
+          <AnnotationSendButton
+            v-if="comments.length"
+            :count="comments.length"
+            :disabled="disabled"
+            :label="t('missions.sendTicketComments', comments.length)"
+            @click="emit('sendComments', comments)"
+          />
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -141,14 +192,45 @@ import type { MissionTicket } from "@codex-claw/core/missions";
 import {
   ChevronRightIcon,
   ExternalLinkIcon,
+  Trash2Icon,
   X,
 } from "../shared/icons/app-icons";
+import AnnotationPopup, { type AnnotationPopupAnchor } from "./AnnotationPopup.vue";
+import AnnotationSendButton from "./AnnotationSendButton.vue";
 import MarkdownPanel from "./MarkdownPanel.vue";
 
-const props = defineProps<{ tickets: readonly MissionTicket[] }>();
+export type MissionTicketComment = {
+  body: string;
+  id: string;
+  quote: string;
+  ticketKey: string;
+  ticketNumber: string;
+  ticketTitle: string;
+};
+
+const props = withDefaults(defineProps<{
+  annotatable?: boolean;
+  disabled?: boolean;
+  resetKey?: number;
+  tickets: readonly MissionTicket[];
+}>(), { annotatable: false, disabled: false, resetKey: 0 });
+const emit = defineEmits<{ sendComments: [comments: MissionTicketComment[]] }>();
 const { t } = useI18n();
 const selectedKey = ref("");
 const cardRefs = new Map<string, HTMLButtonElement>();
+const comments = ref<MissionTicketComment[]>([]);
+const activeTarget = ref<{
+  anchor: AnnotationPopupAnchor;
+  initialValue: string;
+  placement: "above" | "below";
+  quote: string;
+  ticketKey: string;
+  ticketNumber: string;
+  ticketTitle: string;
+  width?: number;
+} | null>(null);
+const editingId = ref<string | null>(null);
+let commentId = 0;
 const selectedTicket = computed(() => {
   const index = props.tickets.findIndex(
     (ticket, ticketIndex) =>
@@ -156,14 +238,27 @@ const selectedTicket = computed(() => {
   );
   return index < 0 ? undefined : { ticket: props.tickets[index]!, index };
 });
+const selectedTicketComments = computed(() => comments.value.filter(comment => comment.ticketKey === selectedKey.value));
+const ticketCommentSummary = computed(() => {
+  const ticketCount = new Set(comments.value.map(comment => comment.ticketKey)).size;
+  return ticketCount === 1
+    ? t('missions.ticketCommentSummarySingle', comments.value.length)
+    : t('missions.ticketCommentSummary', { comments: comments.value.length, tickets: ticketCount });
+});
 
 watch(
   () => props.tickets,
   () => {
     if (selectedKey.value && !selectedTicket.value) selectedKey.value = "";
+    const validKeys = new Set(props.tickets.map(ticketKey));
+    comments.value = comments.value.filter(comment => validKeys.has(comment.ticketKey));
   },
   { deep: true },
 );
+watch(() => props.resetKey, () => {
+  comments.value = [];
+  cancelComment();
+});
 
 function ticketKey(ticket: MissionTicket, index: number): string {
   return ticket.id ?? `ticket-${index}-${ticket.title}`;
@@ -201,14 +296,102 @@ function setCardRef(
 }
 
 function selectTicket(key: string): void {
+  cancelComment();
   selectedKey.value = key;
 }
 
 async function closeDetails(): Promise<void> {
   const key = selectedKey.value;
+  cancelComment();
   selectedKey.value = "";
   await nextTick();
   cardRefs.get(key)?.focus();
+}
+
+function onDialogVisibilityChanged(visible: boolean): void {
+  if (!visible) void closeDetails();
+}
+
+function ticketCommentCount(key: string): number {
+  return comments.value.filter(comment => comment.ticketKey === key).length;
+}
+
+function captureSelection(event: MouseEvent): void {
+  if (!props.annotatable || props.disabled || !selectedTicket.value) return;
+  const selection = window.getSelection?.();
+  const quote = selection?.toString().trim() ?? "";
+  if (!selection || !quote || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  const documentElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (!documentElement?.contains(range.commonAncestorContainer)) return;
+  const rangeRect = range.getBoundingClientRect();
+  activeTarget.value = {
+    quote: quote.length > 180 ? `${quote.slice(0, 177)}...` : quote,
+    initialValue: "",
+    placement: "below",
+    ticketKey: selectedKey.value,
+    ticketNumber: ticketNumber(selectedTicket.value.index),
+    ticketTitle: selectedTicket.value.ticket.title,
+    anchor: {
+      x: Math.min(Math.max(12, rangeRect.left), Math.max(12, window.innerWidth - 332)),
+      y: Math.max(12, rangeRect.top),
+      width: rangeRect.width,
+      height: rangeRect.height,
+    },
+  };
+}
+
+function saveComment(body: string): void {
+  const target = activeTarget.value;
+  if (!target) return;
+  commentId += 1;
+  const next: MissionTicketComment = {
+    id: editingId.value ?? `ticket-comment-${commentId}`,
+    body,
+    quote: target.quote,
+    ticketKey: target.ticketKey,
+    ticketNumber: target.ticketNumber,
+    ticketTitle: target.ticketTitle,
+  };
+  comments.value = editingId.value
+    ? comments.value.map(comment => comment.id === editingId.value ? next : comment)
+    : [...comments.value, next];
+  cancelComment();
+  window.getSelection?.()?.removeAllRanges();
+}
+
+function editComment(comment: MissionTicketComment): void {
+  if (props.disabled) return;
+  const dialog = document.querySelector<HTMLElement>(".mission-ticket-dialog .el-dialog__footer");
+  const dialogRect = dialog?.getBoundingClientRect();
+  editingId.value = comment.id;
+  activeTarget.value = {
+    ...comment,
+    initialValue: comment.body,
+    placement: "above",
+    ...(dialogRect && dialogRect.width > 24 ? { width: dialogRect.width - 24 } : {}),
+    anchor: {
+      x: (dialogRect?.left ?? 0) + 12,
+      y: dialogRect?.top ?? 72,
+      width: 0,
+      height: 0,
+    },
+  };
+}
+
+function removeComment(id: string): void {
+  if (props.disabled) return;
+  comments.value = comments.value.filter(comment => comment.id !== id);
+  if (editingId.value === id) cancelComment();
+}
+
+function cancelComment(): void {
+  activeTarget.value = null;
+  editingId.value = null;
+}
+
+function oneLine(value: string): string {
+  return value.replace(/\s+/gu, " ").trim();
 }
 </script>
 
@@ -355,6 +538,16 @@ async function closeDetails(): Promise<void> {
   white-space: nowrap;
 }
 
+.mission-ticket-board__comment-count {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  color: var(--color-on-warning-container);
+  background: var(--color-warning-container);
+  font-size: var(--font-size-11);
+  white-space: nowrap;
+}
+
 .mission-ticket-board__card-footer svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
@@ -367,15 +560,53 @@ async function closeDetails(): Promise<void> {
   transform: translateX(3px);
 }
 
-.mission-ticket-board__details {
-  overflow: hidden;
+.mission-ticket-board__review-bar,
+.mission-ticket-dialog__footer {
+  --annotation-send-button-height: var(--space-16);
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.mission-ticket-board__review-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--color-surface-lowest);
   box-shadow: var(--shadow-md);
 }
 
-.mission-ticket-board__details > header {
+:global(.mission-ticket-dialog.el-dialog) {
+  display: grid;
+  max-height: min(82vh, 780px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+:global(.mission-ticket-dialog.el-dialog > .el-dialog__header) {
+  margin: 0;
+  padding: 0;
+}
+
+:global(.mission-ticket-dialog.el-dialog > .el-dialog__body) {
+  min-height: 0;
+  padding: 0;
+  overflow: auto;
+}
+
+:global(.mission-ticket-dialog.el-dialog > .el-dialog__footer) {
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.mission-ticket-dialog__header {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: start;
@@ -385,31 +616,35 @@ async function closeDetails(): Promise<void> {
   background: var(--color-surface-low);
 }
 
-.mission-ticket-board__details header > div {
+.mission-ticket-dialog__header > div {
   display: grid;
   gap: var(--space-1);
 }
 
-.mission-ticket-board__details h3 {
+.mission-ticket-dialog__header h3 {
   margin: 0;
   font-size: var(--font-size-18);
   line-height: var(--line-height-24);
 }
 
-.mission-ticket-board__details header small {
+.mission-ticket-dialog__header small {
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
-.mission-ticket-board__details :deep(.markdown-panel) {
+.mission-ticket-dialog__body {
+  min-height: 0;
+}
+
+.mission-ticket-dialog__document :deep(.markdown-panel) {
   max-height: none;
   padding: var(--space-10);
   overflow: visible;
 }
 
-.mission-ticket-board__details > footer {
+.mission-ticket-dialog__metadata {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -421,7 +656,7 @@ async function closeDetails(): Promise<void> {
   font-size: var(--font-size-12);
 }
 
-.mission-ticket-board__details > footer a {
+.mission-ticket-dialog__metadata a {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -429,13 +664,83 @@ async function closeDetails(): Promise<void> {
   text-decoration: none;
 }
 
-.mission-ticket-board__details > footer a:hover {
+.mission-ticket-dialog__metadata a:hover {
   text-decoration: underline;
 }
 
-.mission-ticket-board__details > footer svg {
+.mission-ticket-dialog__metadata svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
+}
+
+.mission-ticket-dialog__comments {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-8);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-low);
+}
+
+.mission-ticket-dialog__comment {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: var(--color-surface-lowest);
+}
+
+.mission-ticket-dialog__comment > button:first-child {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+  padding: var(--space-3) var(--space-4);
+  overflow: hidden;
+  border: 0;
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mission-ticket-dialog__comment span,
+.mission-ticket-dialog__comment small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-ticket-dialog__comment span {
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mission-ticket-dialog__comment small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+}
+
+.mission-ticket-dialog__comment-remove {
+  display: grid;
+  width: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.mission-ticket-dialog__comment-remove svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.mission-ticket-dialog__comment button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .mission-ticket-board__close {
@@ -484,19 +789,6 @@ async function closeDetails(): Promise<void> {
   transform: translateY(10px) scale(0.98);
 }
 
-.mission-ticket-details-enter-active,
-.mission-ticket-details-leave-active {
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease;
-}
-
-.mission-ticket-details-enter-from,
-.mission-ticket-details-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
-
 @media (max-width: 700px) {
   .mission-ticket-board__list {
     grid-template-columns: 1fr;
@@ -508,9 +800,7 @@ async function closeDetails(): Promise<void> {
   .mission-ticket-board__card-footer svg,
   .mission-ticket-card-enter-active,
   .mission-ticket-card-leave-active,
-  .mission-ticket-card-move,
-  .mission-ticket-details-enter-active,
-  .mission-ticket-details-leave-active {
+  .mission-ticket-card-move {
     transition-duration: 1ms;
     transition-delay: 0ms;
   }

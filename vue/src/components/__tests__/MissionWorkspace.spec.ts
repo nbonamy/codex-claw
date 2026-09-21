@@ -6,6 +6,7 @@ import { createMission, type Mission } from '@codex-claw/core/missions';
 import type { MissionArtifactReadResult, MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
 import type { Agent } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
+import MissionTicketBoard, { type MissionTicketComment } from '../MissionTicketBoard.vue';
 
 function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
   const snapshot = createInitialSnapshot();
@@ -108,6 +109,9 @@ describe('MissionWorkspace', () => {
     const sendMissionPrompt = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { sendMissionPrompt });
     const markdown = wrapper.get('.mission-requirement-review .markdown-panel');
+    vi.spyOn(wrapper.get('.mission-requirement-review').element, 'getBoundingClientRect').mockReturnValue({
+      left: 0, top: -600, width: 800, height: 900,
+    } as DOMRect);
     vi.spyOn(window, 'getSelection').mockReturnValue({
       rangeCount: 1,
       toString: () => 'Teams need one bill',
@@ -119,8 +123,16 @@ describe('MissionWorkspace', () => {
     } as unknown as Selection);
 
     await markdown.trigger('mouseup');
-    await wrapper.get('.annotation-popup__input').setValue('Clarify which team roles can pay.');
-    await wrapper.get('form.annotation-popup').trigger('submit');
+    const popup = document.querySelector<HTMLFormElement>('form.annotation-popup');
+    if (!popup) throw new Error('Expected requirement annotation popup');
+    expect(popup.style.position).toBe('fixed');
+    expect(popup.style.top).toBe('88px');
+    const input = popup.querySelector<HTMLInputElement>('.annotation-popup__input');
+    if (!input) throw new Error('Expected requirement annotation input');
+    input.value = 'Clarify which team roles can pay.';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    popup.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushPromises();
     await wrapper.get('[aria-label="Send 1 requirement comment"]').trigger('click');
     await flushPromises();
 
@@ -128,6 +140,7 @@ describe('MissionWorkspace', () => {
     expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Teams need one bill');
     expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Clarify which team roles can pay.');
     expect(wrapper.find('.mission-requirement-review__comment').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it('does not synthesize follow-up revisions when the accepted snapshot arrives during approval', async () => {
@@ -210,7 +223,8 @@ describe('MissionWorkspace', () => {
         { id: 'mission-ticket-checkout', title: 'Add owner checkout', body: 'Let an owner buy seats.', done: false, dependsOn: [0] },
       ],
     });
-    const wrapper = mountWorkspace(mission);
+    const sendMissionPrompt = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { sendMissionPrompt });
 
     const drafts = wrapper.get('[aria-label="Draft tickets"]');
     expect(drafts.text()).toContain('2 drafts');
@@ -222,11 +236,31 @@ describe('MissionWorkspace', () => {
     expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping ticketsStop');
 
     await ticketCards[1]!.trigger('click');
+    await flushPromises();
 
-    expect(drafts.get('[aria-label="Ticket details"]').text()).toContain('Let an owner buy seats.');
+    expect(wrapper.findComponent({ name: 'ElDialog' }).props('modelValue')).toBe(true);
+    expect(wrapper.findComponent({ name: 'ElDialog' }).text()).toContain('Let an owner buy seats.');
     expect(wrapper.text()).not.toContain('to-tickets');
     expect(wrapper.find('[aria-label="Artifact ready for review"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Mission conversations"]').exists()).toBe(false);
+
+    wrapper.findComponent(MissionTicketBoard).vm.$emit('sendComments', [
+      {
+        id: 'comment-1', ticketKey: 'mission-ticket-foundation', ticketNumber: '01',
+        ticketTitle: 'Create billing account', quote: 'integration coverage', body: 'Name the integration boundary.',
+      },
+      {
+        id: 'comment-2', ticketKey: 'mission-ticket-checkout', ticketNumber: '02',
+        ticketTitle: 'Add owner checkout', quote: 'buy seats', body: 'Include the cancellation path.',
+      },
+    ] satisfies MissionTicketComment[]);
+    await flushPromises();
+
+    expect(sendMissionPrompt).toHaveBeenCalledOnce();
+    expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Ticket 01 — Create billing account');
+    expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Ticket 02 — Add owner checkout');
+    expect(sendMissionPrompt.mock.calls[0]![0]).toContain('Include the cancellation path.');
+    wrapper.unmount();
   });
 
   it('renders the canonical persisted artifact instead of the structured handoff projection', async () => {

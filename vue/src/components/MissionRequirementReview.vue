@@ -14,6 +14,7 @@
         :label="t('missions.requirementCommentLabel')"
         :placement="activeTarget.placement"
         :placeholder="t('missions.requirementCommentPlaceholder')"
+        strategy="fixed"
         :submit-label="t('missions.saveRequirementComment')"
         :width="activeTarget.width"
         @cancel="cancelComment"
@@ -128,17 +129,16 @@ function captureSelection(event: MouseEvent): void {
       : null;
   if (!panel || !panel.contains(range.commonAncestorContainer)) return;
   const rangeRect = range.getBoundingClientRect();
-  const panelRect = panel.getBoundingClientRect();
   activeTarget.value = {
     quote: quote.length > 180 ? `${quote.slice(0, 177)}...` : quote,
     initialValue: "",
     placement: "below",
     anchor: {
       x: Math.min(
-        Math.max(12, rangeRect.left - panelRect.left),
-        Math.max(12, panelRect.width - 332),
+        Math.max(12, rangeRect.left),
+        Math.max(12, window.innerWidth - 332),
       ),
-      y: Math.max(48, rangeRect.top - panelRect.top),
+      y: Math.max(12, rangeRect.top),
       width: rangeRect.width,
       height: rangeRect.height,
     },
@@ -178,8 +178,8 @@ function editComment(comment: MissionRequirementComment): void {
     placement: "above",
     ...(width > 24 ? { width: width - 24 } : {}),
     anchor: {
-      x: 12,
-      y: panelRect && footerRect ? footerRect.top - panelRect.top : 72,
+      x: (panelRect?.left ?? 0) + 12,
+      y: footerRect?.top ?? 72,
       width: 0,
       height: 0,
     },
