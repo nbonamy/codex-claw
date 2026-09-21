@@ -445,7 +445,10 @@ export class MissionExecutionService {
       if (currentRun.status !== 'cancelled') currentRun.skills = skills;
     });
     await this.ports.publish();
-    if (reusedWorker && worker.backendSession) await this.ports.refreshConversationContext(worker);
+    if (reusedWorker && worker.backendSession) {
+      await this.ports.refreshConversationContext(worker);
+      if (shouldCompactBeforeRun(mission, run, worker.id)) await this.ports.continueStage(worker.id, '/compact');
+    }
     if (run.stage !== 'requirements') await this.ports.continueStage(worker.id, stageKickoffPrompt(run));
   }
 
@@ -651,6 +654,17 @@ function stageKickoffPrompt(run: MissionRun): string {
   if (run.stage === 'tickets') return 'The requirements are approved. Continue this Mission in the Tickets stage now: follow the assigned Claw Mission skill, then work with the user to shape and publish the backlog.';
   if (run.stage === 'implementation') return `The tickets are approved. Begin implementation of assigned ticket ${(run.ticketIndex ?? 0) + 1} now and report progress in this Mission conversation.`;
   return 'The implementation is approved. Begin the Mission review now and prepare the delivery decision for the user.';
+}
+
+function shouldCompactBeforeRun(mission: Mission, run: MissionRun, workerId: string): boolean {
+  return run.stage === 'implementation' && mission.execution!.runs.some(previous => (
+    previous.id !== run.id
+    && previous.stage === 'implementation'
+    && previous.workerId === workerId
+    && previous.repositoryPath === run.repositoryPath
+    && previous.ticketIndex !== run.ticketIndex
+    && previous.status === 'accepted'
+  ));
 }
 
 function sameSkills(left: MissionRun['skills'], right: MissionRun['skills']): boolean {

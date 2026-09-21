@@ -261,6 +261,10 @@ describe('mission execution', () => {
     const firstRun = h.current().execution!.runs.find(run => run.stage === 'implementation')!;
     const implementationWorkerId = firstRun.workerId;
     expect(implementationWorkerId).not.toBe(ticketsRun.workerId);
+    h.snapshot.agents.find(agent => agent.id === implementationWorkerId)!.backendSession = {
+      kind: 'codex',
+      threadId: 'thread-implementation',
+    };
     const firstResult = structuredClone(h.current().artifacts);
     firstResult.tickets[0]!.done = true;
     firstResult.implementation = { changes: 'Built the foundation.', tests: 'Foundation tests passed.' };
@@ -274,6 +278,10 @@ describe('mission execution', () => {
     expect(implementationRuns[0]).toMatchObject({ status: 'accepted', ticketIndex: 0 });
     expect(implementationRuns[1]).toMatchObject({ status: 'running', ticketIndex: 1 });
     expect(implementationRuns[1]!.workerId).toBe(implementationWorkerId);
+    expect(h.ports.continueStage.mock.calls.slice(-2)).toStrictEqual([
+      [implementationWorkerId, '/compact'],
+      [implementationWorkerId, expect.stringContaining('ticket 2')],
+    ]);
 
     const secondResult = structuredClone(h.current().artifacts);
     secondResult.tickets[1]!.done = true;
