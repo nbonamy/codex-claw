@@ -212,6 +212,8 @@ describe('mission execution', () => {
     expect(implementationRuns).toHaveLength(2);
     expect(implementationRuns.map(run => run.status)).toStrictEqual(['running', 'running']);
     expect(implementationRuns.map(run => run.repositoryPath)).toStrictEqual(repositoryPaths);
+    expect(new Set(implementationRuns.map(run => run.workerId)).size).toBe(2);
+    expect(implementationRuns.every(run => run.workerId !== ticketsRun.workerId)).toBe(true);
 
     for (const [index, run] of implementationRuns.entries()) {
       const artifacts: MissionArtifacts = structuredClone(h.current().artifacts);
@@ -257,6 +259,8 @@ describe('mission execution', () => {
     await h.service.waitForLaunches();
 
     const firstRun = h.current().execution!.runs.find(run => run.stage === 'implementation')!;
+    const implementationWorkerId = firstRun.workerId;
+    expect(implementationWorkerId).not.toBe(ticketsRun.workerId);
     const firstResult = structuredClone(h.current().artifacts);
     firstResult.tickets[0]!.done = true;
     firstResult.implementation = { changes: 'Built the foundation.', tests: 'Foundation tests passed.' };
@@ -269,6 +273,7 @@ describe('mission execution', () => {
     expect(implementationRuns).toHaveLength(2);
     expect(implementationRuns[0]).toMatchObject({ status: 'accepted', ticketIndex: 0 });
     expect(implementationRuns[1]).toMatchObject({ status: 'running', ticketIndex: 1 });
+    expect(implementationRuns[1]!.workerId).toBe(implementationWorkerId);
 
     const secondResult = structuredClone(h.current().artifacts);
     secondResult.tickets[1]!.done = true;

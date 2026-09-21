@@ -20,6 +20,7 @@ const longRunningRequestMethods = new Set<string>([
   backendMethods.agentGitMerge,
   backendMethods.agentGitUpdateFromBase,
   backendMethods.agentGitPullRequestCreate,
+  backendMethods.missionExecute,
   backendMethods.agentConversationLoad,
   backendMethods.agentConversationHistoryLoadOlder,
   backendMethods.clientNavigationSelectAgent,

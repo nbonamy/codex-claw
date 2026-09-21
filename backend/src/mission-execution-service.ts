@@ -504,7 +504,10 @@ export class MissionExecutionService {
     input: { memberId?: string; feedback?: string },
   ): string {
     const execution = mission.execution!;
-    const memberId = input.memberId ?? execution.memberIds[ticketIndex % execution.memberIds.length]!;
+    const repositoryWorker = execution.runs.slice().reverse().find(run => (
+      run.stage === 'implementation' && run.repositoryPath === repositoryPath && run.workerId
+    ));
+    const memberId = input.memberId ?? repositoryWorker?.memberId ?? execution.memberIds[ticketIndex % execution.memberIds.length]!;
     const member = this.agent(memberId);
     if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
     if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
@@ -513,6 +516,7 @@ export class MissionExecutionService {
       id: runId,
       stage: 'implementation',
       memberId,
+      ...(repositoryWorker?.workerId ? { workerId: repositoryWorker.workerId } : {}),
       ticketIndex,
       repositoryPath,
       status: 'preparing',

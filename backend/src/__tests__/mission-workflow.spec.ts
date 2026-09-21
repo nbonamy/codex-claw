@@ -14,7 +14,7 @@ import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
 
-it('keeps one orchestrator through shaping, isolates code sessions, respects ticket dependencies, and restores accepted evidence', async () => {
+it('keeps one orchestrator through shaping, reuses repository workers, respects ticket dependencies, and restores accepted evidence', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'claw-mission-workflow-'));
   const repo = join(folder, 'repo');
   await exec('git', ['init', repo]);
@@ -85,7 +85,9 @@ it('keeps one orchestrator through shaping, isolates code sessions, respects tic
     expect(current().status).toBe('completed');
     expect(current().execution!.workspaces![0]!.baseSha).toBe(baseline);
     expect(current().execution!.runs[0]!.workerId).toBe(current().execution!.runs[1]!.workerId);
-    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(4);
+    expect(current().execution!.runs[2]!.workerId).toBe(current().execution!.runs[3]!.workerId);
+    expect(current().execution!.runs[2]!.workerId).not.toBe(current().execution!.runs[1]!.workerId);
+    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(3);
     expect(await readWorktreeHead(repo)).toBe(baseline);
     expect(await readFile(join(repo, 'billing.txt'), 'utf8')).toBe('original\n');
     expect((await git(repo, ['status', '--porcelain'])).stdout).toBe('');
