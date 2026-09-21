@@ -149,13 +149,10 @@
       <aside class="mission-workspace__conversation" :aria-label="t('missions.support')">
         <div class="mission-workspace__conversation-navigation">
           <header>
-            <AgentAvatar
-              v-if="conversationHeaderAgent"
-              :avatar="conversationHeaderAgent.avatar"
-              :name="conversationHeaderTitle"
-              size="sm"
-            />
-            <span v-else class="mission-workspace__conversation-mark"><TargetArrowIcon aria-hidden="true" /></span>
+            <span class="mission-workspace__conversation-mark">
+              <CodeIcon v-if="selectedConversation?.run.stage === 'implementation'" aria-hidden="true" />
+              <TargetArrowIcon v-else aria-hidden="true" />
+            </span>
             <div class="mission-workspace__conversation-heading">
               <h2>{{ conversationHeaderTitle }}</h2>
               <p><strong>{{ conversationHeaderRole }}</strong><span>{{ conversationHeaderHint }}</span></p>
@@ -176,15 +173,9 @@
               :aria-selected="conversation.agentId === conversationAgentId"
               @click="selectedConversationAgentId = conversation.agentId"
             >
-              <AgentAvatar
-                v-if="conversationAgent(conversation)"
-                :avatar="conversationAgent(conversation)?.avatar"
-                :name="conversationAgentName(conversation)"
-                size="xs"
-              />
               <span class="mission-workspace__conversation-tab-copy">
-                <strong>{{ conversationAgentName(conversation) }}</strong>
-                <small>{{ conversationScope(conversation) }}</small>
+                <strong>{{ conversationTabTitle(conversation) }}</strong>
+                <small>{{ conversationTabDetail(conversation) }}</small>
               </span>
             </button>
           </div>
@@ -202,13 +193,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { Agent } from '@codex-claw/core/contracts';
 import { featureStages, type Mission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
-import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
+import { ArrowRightIcon, CheckIcon, CodeIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
-import AgentAvatar from './AgentAvatar.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
@@ -274,22 +263,20 @@ const conversationAgentId = computed(() => (
     : preferredConversationAgentId.value
 ));
 const selectedConversation = computed(() => missionConversations.value.find(conversation => conversation.agentId === conversationAgentId.value));
-const conversationHeaderAgent = computed(() => selectedConversation.value ? conversationAgent(selectedConversation.value) : undefined);
 const conversationHeaderTitle = computed(() => {
   const conversation = selectedConversation.value;
-  if (!conversation) return t('missions.missionLead');
-  return conversationAgentName(conversation);
+  return conversation ? conversationTabTitle(conversation) : t('missions.missionLead');
 });
 const conversationHeaderRole = computed(() => {
   const conversation = selectedConversation.value;
   return conversation?.run.stage === 'implementation'
     ? t('missions.builder')
-    : t('missions.missionLead');
+    : t(`missions.${conversation?.run.stage ?? props.mission.stage}`);
 });
 const conversationHeaderHint = computed(() => {
   const run = selectedConversation.value?.run;
   if (run?.stage === 'implementation' && run.ticketIndex !== undefined) {
-    return `${conversationScope(selectedConversation.value!)} · ${props.mission.artifacts.tickets[run.ticketIndex]?.title ?? t('missions.implementationAgentHint')}`;
+    return props.mission.artifacts.tickets[run.ticketIndex]?.title ?? t('missions.implementationAgentHint');
   }
   return run ? t(`missions.stageActivity.${run.stage}`) : t('missions.missionLeadHint');
 });
@@ -320,21 +307,16 @@ watch(
 );
 
 function conversationLabel(conversation: (typeof missionConversations.value)[number]): string {
-  return `${conversationAgentName(conversation)} · ${conversationScope(conversation)}`;
+  return `${conversationTabTitle(conversation)} · ${conversationTabDetail(conversation)}`;
 }
-function conversationAgent(conversation: (typeof missionConversations.value)[number]): Agent | undefined {
-  return props.agents.find(agent => agent.id === conversation.agentId)
-    ?? props.agents.find(agent => agent.id === conversation.run.memberId);
-}
-function conversationAgentName(conversation: (typeof missionConversations.value)[number]): string {
-  const agent = conversationAgent(conversation);
-  if (agent) return agentDisplayName(agent);
-  return conversation.run.stage === 'implementation' ? t('missions.builder') : t('missions.missionLead');
-}
-function conversationScope(conversation: (typeof missionConversations.value)[number]): string {
+function conversationTabTitle(conversation: (typeof missionConversations.value)[number]): string {
   if (conversation.run.stage === 'implementation' && conversation.run.ticketIndex !== undefined) {
     return t('missions.ticketLabel', { number: String(conversation.run.ticketIndex + 1).padStart(2, '0') });
   }
+  return t('missions.missionLead');
+}
+function conversationTabDetail(conversation: (typeof missionConversations.value)[number]): string {
+  if (conversation.run.stage === 'implementation') return t('missions.builder');
   return t(`missions.${conversation.run.stage}`);
 }
 function selectConversation(agentId: string): void { selectedConversationAgentId.value = agentId; }
@@ -508,8 +490,8 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__review-hint { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-10); padding: var(--space-6); border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--font-size-13); }
 .mission-workspace__review-hint svg { width: var(--icon-md); height: var(--icon-md); }
 .mission-workspace__conversation { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-left: 1px solid var(--color-border); background: var(--color-surface-lowest); }
-.mission-workspace__conversation-navigation { flex: 0 0 auto; border-bottom: 1px solid var(--color-border); background: var(--color-surface-low); }
-.mission-workspace__conversation-navigation > header { display: flex; min-height: 60px; align-items: center; gap: var(--space-4); padding: var(--space-6) var(--space-8); }
+.mission-workspace__conversation-navigation { flex: 0 0 auto; border-bottom: 1px solid var(--color-border); background: var(--color-surface-lowest); }
+.mission-workspace__conversation-navigation > header { display: flex; min-height: 56px; align-items: center; gap: var(--space-4); padding: var(--space-6) var(--space-8); }
 .mission-workspace__conversation-heading { display: grid; min-width: 0; flex: 1; gap: var(--space-1); }
 .mission-workspace__conversation-heading h2 { overflow: hidden; font-size: var(--font-size-14); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
 .mission-workspace__conversation-heading p { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-12); line-height: var(--line-height-18); }
@@ -518,10 +500,10 @@ async function sendTicketComments(comments: MissionTicketComment[]): Promise<voi
 .mission-workspace__conversation-heading p span::before { margin-right: var(--space-2); content: '·'; }
 .mission-workspace__conversation-mark { display: grid; width: var(--space-12); height: var(--space-12); flex: 0 0 var(--space-12); place-items: center; border-radius: var(--radius-full); color: var(--color-primary); background: var(--color-primary-container); }
 .mission-workspace__conversation-mark svg { width: var(--icon-md); height: var(--icon-md); }
-.mission-workspace__conversation-switcher { display: flex; gap: var(--space-2); padding: 0 var(--space-4) var(--space-4); overflow-x: auto; }
-.mission-workspace__conversation-switcher button { display: flex; min-width: 132px; flex: 1 0 132px; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid transparent; border-radius: var(--radius-lg); color: var(--color-text-muted); background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.mission-workspace__conversation-switcher button:hover, .mission-workspace__conversation-switcher button:focus-visible { border-color: var(--color-border); color: var(--color-text); background: var(--color-surface-high); }
-.mission-workspace__conversation-switcher button[aria-selected='true'] { border-color: var(--color-border-strong); color: var(--color-text); background: var(--color-surface-lowest); box-shadow: var(--shadow-sm); }
+.mission-workspace__conversation-switcher { display: flex; gap: var(--space-8); padding: 0 var(--space-8); overflow-x: auto; }
+.mission-workspace__conversation-switcher button { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; padding: var(--space-3) 0 var(--space-4); border: 0; border-bottom: 2px solid transparent; color: var(--color-text-muted); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.mission-workspace__conversation-switcher button:hover, .mission-workspace__conversation-switcher button:focus-visible { color: var(--color-text); }
+.mission-workspace__conversation-switcher button[aria-selected='true'] { border-bottom-color: var(--color-primary); color: var(--color-text); }
 .mission-workspace__conversation-tab-copy { display: grid; min-width: 0; gap: var(--space-1); }
 .mission-workspace__conversation-tab-copy strong, .mission-workspace__conversation-tab-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mission-workspace__conversation-tab-copy strong { font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); }

@@ -190,10 +190,10 @@ describe('MissionWorkspace', () => {
     const conversations = wrapper.get('[aria-label="Mission conversations"]');
     const tabs = conversations.findAll('[role="tab"]');
     expect(tabs).toHaveLength(2);
-    expect(tabs.map(tab => tab.attributes('aria-label'))).toStrictEqual(['Dina · Requirements', 'Jesse · Tickets']);
-    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['DinaRequirements', 'JesseTickets']);
+    expect(tabs.map(tab => tab.attributes('aria-label'))).toStrictEqual(['Mission lead · Requirements', 'Mission lead · Tickets']);
+    expect(tabs.map(tab => tab.get('.mission-workspace__conversation-tab-copy').text())).toStrictEqual(['Mission leadRequirements', 'Mission leadTickets']);
     expect(tabs[1]!.attributes('aria-selected')).toBe('true');
-    expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('JesseMission leadShaping tickets');
+    expect(wrapper.get('.mission-workspace__conversation-heading').text()).toContain('Mission leadTicketsShaping tickets');
     expect(wrapper.get('.conversation-slot').text()).toContain(snapshot.agents[1]!.id);
 
     await tabs[0]!.trigger('click');
@@ -367,8 +367,8 @@ describe('MissionWorkspace', () => {
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
-    expect(wrapper.get('.mission-workspace__conversation-heading h2').text()).toBe('Dina');
-    expect(wrapper.get('.mission-workspace__conversation-heading p').text()).toBe('BuilderTicket 01 · Checkout');
+    expect(wrapper.get('.mission-workspace__conversation-heading h2').text()).toBe('Ticket 01');
+    expect(wrapper.get('.mission-workspace__conversation-heading p').text()).toBe('BuilderCheckout');
     expect(wrapper.findComponent({ name: 'ElDialog' }).props('modelValue')).toBe(false);
 
     await board.findAll('.mission-implementation__ticket-details')[0]!.trigger('click');
