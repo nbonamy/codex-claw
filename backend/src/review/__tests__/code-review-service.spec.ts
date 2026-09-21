@@ -300,12 +300,16 @@ describe('CodeReviewService', () => {
 
     test.service.discuss(visibleReviewer, {
       sessionId: session.id, roundId: firstRound.id, findingId: selectedId,
-      question: 'Finding: Authorize before writing\n\nQuestion: Is this reachable outside admin routes?',
+      question: 'Is this reachable outside admin routes?',
     });
     await vi.waitFor(() => expect(firstRound.findings[0]?.discussion).toHaveLength(2));
-    expect(test.turns[1]?.prompt).toBe(
-      'Finding: Authorize before writing\n\nQuestion: Is this reachable outside admin routes?',
-    );
+    expect(firstRound.findings[0]?.discussion[0]?.body).toBe('Is this reachable outside admin routes?');
+    expect(test.turns[1]?.prompt).toContain(`Review: ${session.id}`);
+    expect(test.turns[1]?.prompt).toContain(`Round: ${firstRound.id}`);
+    expect(test.turns[1]?.prompt).toContain(`"id": "${selectedId}"`);
+    expect(test.turns[1]?.prompt).toContain('"priority": "p0"');
+    expect(test.turns[1]?.prompt).toContain('"title": "Authorize before writing"');
+    expect(test.turns[1]?.prompt).toContain('Is this reachable outside admin routes?');
 
     test.service.decide(visibleReviewer, {
       sessionId: session.id, roundId: firstRound.id, findingId: rejectedId,

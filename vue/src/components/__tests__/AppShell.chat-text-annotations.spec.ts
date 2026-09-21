@@ -24,16 +24,16 @@ describe('AppShell chat text annotations', () => {
     const wrapper = mountShell({ snapshot, realConversationPane: true, sendPromptAction });
 
     await saveSelectionComment(wrapper, selection, 'Add a bounded retry.');
-    expect(wrapper.get('.chat-text-annotation-cards__card').text()).toBe('Annotation');
+    expect(wrapper.get('.composer-context-cards__card').text()).toBe('Annotation');
     expect(wrapper.text()).not.toContain('Add a bounded retry.');
 
     await wrapper.setProps({ activeAgent: snapshot.agents[1] } as Record<string, unknown>);
     expect(wrapper.getComponent({ name: 'AgentWorkspace' }).props('currentAgent')).toMatchObject({
       id: snapshot.agents[1]!.id,
     });
-    expect(wrapper.find('.chat-text-annotation-cards').exists()).toBe(false);
+    expect(wrapper.find('.composer-context-cards').exists()).toBe(false);
     await wrapper.setProps({ activeAgent: snapshot.agents[0] } as Record<string, unknown>);
-    expect(wrapper.get('.chat-text-annotation-cards__card').text()).toBe('Annotation');
+    expect(wrapper.get('.composer-context-cards__card').text()).toBe('Annotation');
 
     await conversationControllerActions(wrapper).submit?.('', undefined);
     expect(sendPromptAction).toHaveBeenCalledExactlyOnceWith([
@@ -47,7 +47,7 @@ describe('AppShell chat text annotations', () => {
       '</context>',
       '1 annotation',
     ].join('\n'), undefined);
-    expect(wrapper.find('.chat-text-annotation-cards').exists()).toBe(false);
+    expect(wrapper.find('.composer-context-cards').exists()).toBe(false);
   });
 
   it('keeps the annotation when prompt submission fails', async () => {
@@ -57,7 +57,7 @@ describe('AppShell chat text annotations', () => {
 
     await expect(conversationControllerActions(wrapper).submit?.('Please update this.', undefined))
       .rejects.toThrow('offline');
-    expect(wrapper.get('.chat-text-annotation-cards__card').text()).toBe('Annotation');
+    expect(wrapper.get('.composer-context-cards__card').text()).toBe('Annotation');
   });
 });
 

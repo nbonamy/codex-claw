@@ -783,7 +783,7 @@ describe('AppShell authentication and conversation', () => {
     });
   });
 
-  it('prefills the real composer for a finding clarification and submits through its stable link', async () => {
+  it('attaches a finding to the real composer and submits the user question through its stable link', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.backendSession = { kind: 'codex', threadId: 'review-thread' };
@@ -822,16 +822,13 @@ describe('AppShell authentication and conversation', () => {
     });
     await nextTick();
 
-    const composerUpdate = wrapper.emitted('update:composerState')?.at(-1)?.[0] as {
-      agentId: string;
-      state: { text: string; selectionStart: number; selectionEnd: number };
-    };
-    expect(composerUpdate.agentId).toBe(agent.id);
-    expect(composerUpdate.state.text).toContain('Review review-1 · Round round-1 · Finding finding-1');
-    expect(composerUpdate.state.text).toContain('Location: src/auth.ts:42–44');
-    expect(composerUpdate.state.text).toContain('Question: ');
+    expect(wrapper.emitted('update:composerState')).toBeUndefined();
+    const attachment = wrapper.get('.composer-context-cards__card');
+    expect(attachment.text()).toContain('P1');
+    expect(attachment.text()).toContain('Authorize before writing');
+    expect(attachment.text()).not.toContain('The public mutation writes before checking ownership.');
 
-    const question = `${composerUpdate.state.text}Could this race with another request?`;
+    const question = 'Could this race with another request?';
     await wrapper.setProps({
       composerState: { text: question, selectionStart: question.length, selectionEnd: question.length },
     });
@@ -843,6 +840,7 @@ describe('AppShell authentication and conversation', () => {
       sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', question,
     });
     expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.find('.composer-context-cards__card').exists()).toBe(false);
   });
 
   it('keeps the first submitted prompt visible while its Codex conversation is created', async () => {

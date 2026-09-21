@@ -135,10 +135,34 @@ describe('ConversationPane', () => {
     };
     await wrapper.setProps({ textAnnotations: [annotation] });
     expect(sdkPane.props('hasComposerContext')).toBe(true);
-    expect(wrapper.get('.chat-text-annotation-cards__card').text()).toBe('Annotation');
+    expect(wrapper.get('.composer-context-cards__card').text()).toBe('Annotation');
     expect(wrapper.text()).not.toContain('Explain what you found.');
     await wrapper.get('[aria-label="Remove chat annotation"]').trigger('click');
     expect(wrapper.emitted('remove-text-annotation')).toStrictEqual([['annotation-1']]);
+  });
+
+  it('renders a review finding as removable composer context without exposing its body', async () => {
+    const reviewFinding = {
+      id: 'finding-1', roundId: 'round-1', priority: 'p1' as const,
+      title: 'Authorize before writing',
+      body: 'The public mutation writes before checking ownership.',
+      location: { file: 'src/auth.ts', line: 42, endLine: 44 },
+      decision: { state: 'selected' as const, decidedAt: '2026-09-19T10:00:30.000Z' },
+      discussion: [], remediation: { state: 'notStarted' as const },
+      createdAt: '2026-09-19T10:00:30.000Z', updatedAt: '2026-09-19T10:00:30.000Z',
+    };
+    const wrapper = mountPane({
+      controller: controllerFor(messages),
+      agent,
+      reviewFinding,
+    });
+
+    expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('hasComposerContext')).toBe(false);
+    expect(wrapper.get('.composer-context-cards__card').text()).toContain('P1');
+    expect(wrapper.get('.composer-context-cards__card').text()).toContain('Authorize before writing');
+    expect(wrapper.text()).not.toContain(reviewFinding.body);
+    await wrapper.get('[aria-label="Remove review finding"]').trigger('click');
+    expect(wrapper.emitted('remove-review-finding')).toStrictEqual([[]]);
   });
 
   it('renders delegate_to_worktree in the composer shelf and emits its actions', async () => {
@@ -520,6 +544,7 @@ function mountPane(props: {
   agent: Agent | null;
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   textAnnotations?: readonly ChatTextAnnotation[];
+  reviewFinding?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
   historyLoadFailed?: boolean;

@@ -44,6 +44,7 @@
       :agents="snapshot.agents"
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
       :text-annotations="chatTextAnnotations"
+      :review-finding="reviewFindingAttachment"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
       :history-load-failed="historyLoadFailed"
@@ -56,6 +57,7 @@
       @retry-history="retryConversationHistory"
       @thread-flag="respondToThreadFlag($event)"
       @remove-text-annotation="removeChatTextAnnotation"
+      @remove-review-finding="emit('removeReviewFindingAttachment')"
     />
     <RightWorkspacePanel
       v-for="agent in snapshot.agents"
@@ -205,6 +207,7 @@ const props = defineProps<{
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];
+  reviewFindingAttachment?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
@@ -285,6 +288,7 @@ const emit = defineEmits<{
     roundId: string;
     finding: import('@codex-claw/core/code-review').CodeReviewFinding;
   }];
+  removeReviewFindingAttachment: [];
   sendPrompt: [prompt: string];
   'update:planMode': [enabled: boolean];
 }>();

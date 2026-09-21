@@ -534,6 +534,10 @@ export const messages = {
         remove: 'Remove chat annotation',
         save: 'Add annotation',
       },
+      composerContext: {
+        label: 'Composer context',
+        removeReviewFinding: 'Remove review finding',
+      },
       collaboration: {
         messageFrom: 'Message from {name}',
         messagesFrom: 'Messages from {names}',

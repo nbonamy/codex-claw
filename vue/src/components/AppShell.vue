@@ -201,6 +201,7 @@
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
         :chat-text-annotations="activeChatTextAnnotations"
+        :review-finding-attachment="activeReviewFindingAttachment"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
         :current-agent-git-status="currentAgentGitStatus"
@@ -256,6 +257,7 @@
         @expand-sidebar="agentSidebarCollapsed = false"
         @install-update="emit('install-update')"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
+        @remove-review-finding-attachment="pendingReviewClarification = null"
         @send-prompt="emit('sendPrompt', $event)"
         @update:plan-mode="emit('update:planMode', $event)"
       />
@@ -790,11 +792,18 @@ type PendingReviewClarification = {
   sessionId: string;
   roundId: string;
   findingId: string;
+  finding: import('@codex-claw/core/code-review').CodeReviewFinding;
 };
 
 type AppSurface = 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
+const activeReviewFindingAttachment = computed(() => {
+  const clarification = pendingReviewClarification.value;
+  return clarification && clarification.agentId === currentAgent.value?.id
+    ? clarification.finding
+    : null;
+});
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
 const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((agent) => (
@@ -2065,35 +2074,15 @@ function clarifyCodeReviewFinding(payload: {
   finding: import('@codex-claw/core/code-review').CodeReviewFinding;
 }): void {
   const { finding } = payload;
-  const location = finding.location
-    ? `\nLocation: ${formatReviewLocation(finding.location)}`
-    : '';
-  const text = [
-    `<context>Review ${payload.sessionId} · Round ${payload.roundId} · Finding ${finding.id}`,
-    `${finding.priority.toUpperCase()} · ${finding.title}${location}`,
-    '',
-    finding.body,
-    '</context>',
-    '',
-    'Question: ',
-  ].join('\n');
   pendingReviewClarification.value = {
     agentId: payload.agentId,
     sessionId: payload.sessionId,
     roundId: payload.roundId,
     findingId: finding.id,
+    finding,
   };
   selectAgentFromShell(payload.agentId);
-  emit('update:composerState', {
-    agentId: payload.agentId,
-    state: { text, selectionStart: text.length, selectionEnd: text.length },
-  });
   void nextTick(() => agentWorkspace.value?.focusComposer());
-}
-
-function formatReviewLocation(location: import('@codex-claw/core/code-review').CodeReviewLocation): string {
-  if (!location.line) return location.file;
-  return `${location.file}:${location.line}${location.endLine && location.endLine !== location.line ? `–${location.endLine}` : ''}`;
 }
 
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {

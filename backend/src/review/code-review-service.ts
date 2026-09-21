@@ -330,7 +330,7 @@ export class CodeReviewService {
     try {
       const result = await this.options.runReview(
         agent,
-        question,
+        discussionPrompt(session, round, finding, question),
         context.url,
         requiredReviewerSession(round),
       );
@@ -601,6 +601,31 @@ ${findingContext}
 
 Keep the changes focused and add or update behavior-level tests when appropriate. Immediately after each individual finding is fixed and verified, call update_finding with its id and status "fixed" before moving to the next finding. Do not wait until all findings are fixed to update their statuses. Include concise verification evidence when useful.
 </context>`;
+}
+
+function discussionPrompt(
+  session: CodeReviewSession,
+  round: CodeReviewRound,
+  finding: CodeReviewFinding,
+  question: string,
+): string {
+  const findingContext = {
+    id: finding.id,
+    priority: finding.priority,
+    title: finding.title,
+    body: finding.body,
+    ...(finding.location ? { location: finding.location } : {}),
+    ...(finding.discussion.length > 1 ? { priorDiscussion: finding.discussion.slice(0, -1) } : {}),
+  };
+  return `<context>
+Review: ${session.id}
+Round: ${round.id}
+Finding: ${JSON.stringify(findingContext, null, 2)}
+
+Answer the user's question about this specific finding. If the clarification materially changes the finding, call update_finding before answering.
+</context>
+
+${question}`;
 }
 
 function requiredReviewerSession(round: CodeReviewRound): BackendSession {
