@@ -121,7 +121,7 @@ describe('AppShell dialogs and commands', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, cancelable: true }));
     await flushPromises();
     expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina');
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Changes', 'Browser']);
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', metaKey: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '`', code: 'Backquote', metaKey: true, cancelable: true }));
@@ -333,6 +333,7 @@ describe('AppShell dialogs and commands', () => {
     listener({ type: 'duplicate-active-agent' });
     listener({ type: 'restart-active-agent' });
     listener({ type: 'open-review' });
+    listener({ type: 'debug-open-code-review' });
     listener({ type: 'open-browser' });
     listener({ type: 'edit-active-agent' });
     await nextTick();
@@ -355,7 +356,7 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
     expect(getAgentGitDiff).toHaveBeenCalledWith('agent-dina');
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Review', 'Browser']);
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Changes', 'Review', 'Browser']);
     expect(wrapper.text()).toContain('Edit agent');
 
     wrapper.unmount();

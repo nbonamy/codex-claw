@@ -538,6 +538,63 @@ describe('ClaudeBackendDriver', () => {
     });
   });
 
+  it('runs review in a fresh context with only review-domain MCP tools added', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const reviewerAgent: Agent = {
+      ...agent,
+      backendDefaults: { kind: 'claude', model: 'opus', reasoningEffort: 'xhigh' },
+    };
+    const events: Array<{ type?: string; turnId?: string; payload?: unknown }> = [];
+    driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
+
+    const review = driver.runCodeReview(reviewerAgent, {
+      cwd: '/Users/nbonamy/src/codex-claw',
+      prompt: 'Review the current diff.',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
+    });
+
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Review the current diff.',
+      mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
+      allowedTools: [
+        'mcp__codex_claw__report_finding',
+        'mcp__codex_claw__update_finding',
+      ],
+      model: 'opus',
+      effort: 'xhigh',
+    }), expect.any(Function), expect.any(Function), expect.any(Function));
+    expect(transport.startTurn.mock.calls[0]?.[0].sessionId).toBeUndefined();
+    transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'The finding is reachable.' }] } });
+    transport.resolveDone();
+    const result = await review;
+    expect(result).toEqual({
+      text: 'The finding is reachable.',
+      reviewerSession: { kind: 'claude', sessionId: 'review-session-1', transport: 'stdio' },
+    });
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'turn.started' }),
+      expect.objectContaining({ type: 'message.userSubmitted' }),
+      expect.objectContaining({ type: 'message.delta' }),
+      expect.objectContaining({ type: 'turn.completed' }),
+    ]));
+
+    const clarification = driver.runCodeReview(reviewerAgent, {
+      cwd: '/Users/nbonamy/src/codex-claw',
+      prompt: 'Clarify this finding.',
+      reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-2',
+      reviewerSession: result.reviewerSession,
+    });
+    expect(transport.startTurn.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      prompt: 'Clarify this finding.',
+      sessionId: 'review-session-1',
+    }));
+    transport.emit({ type: 'assistant', session_id: 'review-session-1', message: { content: [{ type: 'text', text: 'Clarified.' }] } });
+    await expect(clarification).resolves.toMatchObject({ text: 'Clarified.', reviewerSession: result.reviewerSession });
+
+    expect(transport.deleteSession).not.toHaveBeenCalled();
+  });
+
   it('maps Agent SDK permission requests through the app-owned approval contract', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
@@ -1262,6 +1319,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
   startTurn: ReturnType<typeof vi.fn<(params: ClaudeTurnParams, onMessage: (message: ClaudeSdkMessage) => void) => ClaudeTurnHandle>>;
   respondToPermissionRequest: ReturnType<typeof vi.fn>;
   closeSession: ReturnType<typeof vi.fn>;
+  deleteSession: ReturnType<typeof vi.fn>;
   discoverModels: ReturnType<typeof vi.fn>;
   listModels: ReturnType<typeof vi.fn>;
   getContextUsage: ReturnType<typeof vi.fn>;
@@ -1303,6 +1361,7 @@ function createFakeTransport(): ClaudeTurnTransport & {
     },
     respondToPermissionRequest: vi.fn().mockRejectedValue(new Error("Claude permission request 'request-1' is no longer pending.")),
     closeSession: vi.fn().mockResolvedValue(undefined),
+    deleteSession: vi.fn().mockResolvedValue(undefined),
     discoverModels: vi.fn().mockResolvedValue(null),
     listModels: vi.fn().mockResolvedValue(null),
     getContextUsage: vi.fn().mockResolvedValue(null),

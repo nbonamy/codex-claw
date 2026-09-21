@@ -21,7 +21,7 @@ import {
   type ClaudeConversationReplica,
 } from '@codex-claw/core/claude-conversation-replica';
 import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
-import { type AgentBackendDriver, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
+import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
@@ -100,6 +100,11 @@ type ClaudeBackendDriverOptions = {
   celebrationsEnabled?: () => boolean;
 };
 
+type ClaudeReviewTurnConfiguration = {
+  mcpServerUrl: string;
+  allowedTools: string[];
+};
+
 export class ClaudeConversationHost implements AgentBackendDriver {
   readonly backend = 'claude' as const;
 
@@ -142,6 +147,83 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return this.catalog.listSkills(agent);
   }
 
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult> {
+    if (input.reviewerSession && input.reviewerSession.kind !== 'claude') {
+      throw new Error('Claude cannot continue a non-Claude review conversation.');
+    }
+    const reviewer = input.reviewerSession
+      ? { ...agent, backendSession: input.reviewerSession }
+      : agent;
+    let targetTurnId: string | null = null;
+    const completedBeforeTarget = new Map<string, Error | null>();
+    let resolveCompletion: (() => void) | null = null;
+    let rejectCompletion: ((error: Error) => void) | null = null;
+    const completion = new Promise<void>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
+    const errorsByTurnId = new Map<string, string>();
+    const unsubscribe = this.onEvent((event) => {
+      if (event.agentId !== agent.id || event.type !== 'claude.conversationEventReceived') return;
+      const providerEvent = event.payload.event;
+      if (providerEvent.type === 'error') {
+        if (providerEvent.turnId) errorsByTurnId.set(providerEvent.turnId, providerEvent.payload.message);
+        return;
+      }
+      if (providerEvent.type !== 'turn.completed') return;
+      const error = errorsByTurnId.get(providerEvent.turnId);
+      const result = error ? new Error(error) : null;
+      if (providerEvent.turnId === targetTurnId) {
+        if (result) rejectCompletion?.(result);
+        else resolveCompletion?.();
+      } else {
+        completedBeforeTarget.set(providerEvent.turnId, result);
+      }
+    });
+    try {
+      const started = await this.sendPromptWithConfiguration(reviewer, input.prompt, {}, {
+      mcpServerUrl: input.reviewMcpServerUrl,
+      allowedTools: [
+        'mcp__codex_claw__report_finding',
+        'mcp__codex_claw__update_finding',
+      ],
+      });
+      targetTurnId = started.turnId ?? null;
+      if (!targetTurnId) throw new Error('Claude did not start the review turn.');
+      if (completedBeforeTarget.has(targetTurnId)) {
+        const error = completedBeforeTarget.get(targetTurnId);
+        if (error) throw error;
+      } else {
+        await completion;
+      }
+      const sessionId = started.backendSession.kind === 'claude'
+        ? started.backendSession.sessionId
+        : null;
+      if (!sessionId) throw new Error('Claude did not create a review conversation.');
+      const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
+      const text = snapshot?.messages
+        .filter((message) => message.turnId === targetTurnId && message.role === 'assistant')
+        .flatMap((message) => message.parts.flatMap((part) => part.type === 'text' ? [part.text] : []))
+        .join('\n')
+        .trim() ?? '';
+      return {
+        text,
+        reviewerSession: { kind: 'claude', sessionId, transport: 'stdio' },
+      };
+    } finally {
+      unsubscribe();
+    }
+  }
+
+  async disposeCodeReview(agent: Agent, reviewerSession: BackendSession): Promise<void> {
+    if (reviewerSession.kind !== 'claude') throw new Error('Claude cannot dispose a non-Claude review conversation.');
+    if (this.transport.deleteSession) {
+      await this.transport.deleteSession(reviewerSession.sessionId, requireAgentFolder(agent));
+    } else {
+      await this.transport.closeSession?.(reviewerSession.sessionId);
+    }
+  }
+
   async setPermissionMode(agent: Agent, mode: string): Promise<BackendPermissionModeResult> {
     return this.catalog.setPermissionMode(agent, mode);
   }
@@ -151,6 +233,15 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
+    return this.sendPromptWithConfiguration(agent, prompt, options);
+  }
+
+  private async sendPromptWithConfiguration(
+    agent: Agent,
+    prompt: string,
+    options: SendPromptOptions,
+    review?: ClaudeReviewTurnConfiguration,
+  ): Promise<BackendSendResult> {
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
     }
@@ -164,7 +255,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }
     let activeTurn: ActiveClaudeTurn | null = null;
     const started = new Promise<BackendSendResult>((resolve, reject) => {
-      const turnParams = claudeTurnParams(
+      const defaults = claudeTurnParams(
         agent,
         prompt,
         options,
@@ -176,6 +267,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
           celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
         },
       );
+      const turnParams: ClaudeTurnParams = review
+        ? { ...defaults, mcpServerUrl: review.mcpServerUrl, allowedTools: review.allowedTools }
+        : defaults;
       const handle = this.transport.startTurn(
         turnParams,
         (message) => {

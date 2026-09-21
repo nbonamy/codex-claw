@@ -201,6 +201,7 @@
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
         :chat-text-annotations="activeChatTextAnnotations"
+        :review-finding-attachment="activeReviewFindingAttachment"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
         :current-agent-git-status="currentAgentGitStatus"
@@ -245,10 +246,18 @@
         :toggle-file-explorer="toggleFileExplorer"
         :toggle-right-workspace="toggleRightWorkspace"
         :update-status="updateStatus"
+        :start-code-review="startCodeReviewFromShell"
+        :decide-code-review-finding="props.decideCodeReviewFinding"
+        :submit-code-review-round="props.submitCodeReviewRound"
+        :finish-code-review="props.finishCodeReview"
+        :discard-code-review="props.discardCodeReview"
+        :review-code-again="props.reviewCodeAgain"
         @close-agent="$emit('close-agent', $event)"
+        @clarify-code-review-finding="clarifyCodeReviewFinding"
         @expand-sidebar="agentSidebarCollapsed = false"
         @install-update="emit('install-update')"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
+        @remove-review-finding-attachment="pendingReviewClarification = null"
         @send-prompt="emit('sendPrompt', $event)"
         @update:plan-mode="emit('update:planMode', $event)"
       />
@@ -462,6 +471,7 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import {
   copyModelFavorite,
@@ -600,11 +610,18 @@ const props = withDefaults(defineProps<{
   retryAgentHistory?: () => Promise<void>;
   sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
-  respondToThreadFlagAction?: (action: 'execute' | 'dismiss') => Promise<void>;
+  respondToThreadFlagAction?: (response: ThreadFlagResponse) => Promise<void>;
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
   quit?: () => Promise<void>;
+  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
+  submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   approvals: () => [],
@@ -637,6 +654,13 @@ const props = withDefaults(defineProps<{
   assignedWorkItemsByProvider: () => ({}),
   workBacklogStatus: 'notLoaded',
   workBacklogError: null,
+  startCodeReview: async () => { throw new Error('Code review is not available.'); },
+  decideCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
+  discussCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
+  submitCodeReviewRound: async () => { throw new Error('Code review is not available.'); },
+  finishCodeReview: async () => { throw new Error('Code review is not available.'); },
+  discardCodeReview: async () => { throw new Error('Code review is not available.'); },
+  reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
   daemonStatus: null,
   daemonStatusError: null,
   codexResourceSharingMigrationRequired: false,
@@ -763,8 +787,23 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+type PendingReviewClarification = {
+  agentId: string;
+  sessionId: string;
+  roundId: string;
+  findingId: string;
+  finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+};
+
 type AppSurface = 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
+const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
+const activeReviewFindingAttachment = computed(() => {
+  const clarification = pendingReviewClarification.value;
+  return clarification && clarification.agentId === currentAgent.value?.id
+    ? clarification.finding
+    : null;
+});
 const codexResourceSharingMigrationPending = ref(false);
 const agentListCompact = computed(() => props.snapshot.general.agentListCompact);
 const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((agent) => (
@@ -1077,6 +1116,11 @@ const currentAgent = computed(() => {
   }
 
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
+});
+watch(() => currentAgent.value?.id, (agentId) => {
+  if (pendingReviewClarification.value && pendingReviewClarification.value.agentId !== agentId) {
+    pendingReviewClarification.value = null;
+  }
 });
 const rightWorkspaceState = useRightWorkspaceState({
   currentAgentId: () => currentAgent.value?.id,
@@ -1974,11 +2018,14 @@ async function respondToPlanReview(resolution: 'accept' | 'revise' | 'cancel', f
 }
 
 const threadFlagBusy = ref(false);
-async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+async function respondToThreadFlag(response: ThreadFlagResponse): Promise<void> {
   if (!props.respondToThreadFlagAction || threadFlagBusy.value) return;
   threadFlagBusy.value = true;
   try {
-    await props.respondToThreadFlagAction(action);
+    await props.respondToThreadFlagAction(response);
+    if (response.id === 'ready_for_review' && response.action === 'execute') {
+      openRightWorkspaceTab('codeReview');
+    }
   } catch (error) {
     ElMessage.error(localizedErrorMessage(error, t));
   } finally {
@@ -2002,7 +2049,64 @@ function forwardApprovalResolution(
   emit('resolve-approval', approvalId, decision, scope);
 }
 
+async function startCodeReviewFromShell(
+  agentId: string,
+  input: import('@codex-claw/core/code-review').CodeReviewStartInput,
+): Promise<AppSnapshot> {
+  const next = await props.startCodeReview(agentId, input);
+  const reviewerAgentId = input.threadMode === 'independent'
+    ? next.activeAgentId
+    : agentId;
+  if (reviewerAgentId) {
+    if (input.threadMode === 'independent' && reviewerAgentId !== agentId) {
+      closeRightWorkspaceTab(agentId, 'codeReview');
+    }
+    selectAgentFromShell(reviewerAgentId);
+    openRightWorkspaceTab('codeReview', reviewerAgentId);
+  }
+  return next;
+}
+
+function clarifyCodeReviewFinding(payload: {
+  agentId: string;
+  sessionId: string;
+  roundId: string;
+  finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+}): void {
+  const { finding } = payload;
+  pendingReviewClarification.value = {
+    agentId: payload.agentId,
+    sessionId: payload.sessionId,
+    roundId: payload.roundId,
+    findingId: finding.id,
+    finding,
+  };
+  selectAgentFromShell(payload.agentId);
+  void nextTick(() => agentWorkspace.value?.focusComposer());
+}
+
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
+  if (prompt.trim() === '/review' && !options?.attachments?.length) {
+    openRightWorkspaceTab('codeReview');
+    return Promise.resolve();
+  }
+  const clarification = pendingReviewClarification.value;
+  if (
+    clarification
+    && clarification.agentId === currentAgent.value?.id
+    && !options?.attachments?.length
+  ) {
+    return props.discussCodeReviewFinding(clarification.agentId, {
+      sessionId: clarification.sessionId,
+      roundId: clarification.roundId,
+      findingId: clarification.findingId,
+      question: prompt,
+    }).then(() => {
+      if (pendingReviewClarification.value === clarification) {
+        pendingReviewClarification.value = null;
+      }
+    });
+  }
   if (props.sendPromptAction) return props.sendPromptAction(prompt, options);
   if (options) {
     emit('sendPrompt', prompt, options);

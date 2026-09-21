@@ -206,6 +206,21 @@ detaching the agent. On startup, `clawd` reconciles the isolated Claw
 archived through the SDK, while an attached conversation found in the archived
 catalog is restored after an interrupted lifecycle transaction. Claw never
 scans or moves rollout files itself.
+
+Code review defaults to a separate visible reviewer agent in the same workspace,
+but the user may choose the owning agent's current conversation. Either path
+uses the review-session finding tools; finding clarification and batched
+remediation continue through the normal Codex conversation replica. An
+independent reviewer starts without the source conversation history but inherits
+its selected model and reasoning effort. `Review again` archives the independent
+reviewer's conversation and binds a fresh one to the same sidebar agent, while
+current-thread reviews keep the user-owned conversation for the whole workflow.
+Finishing removes an independent reviewer agent and its conversation but leaves
+a current-thread conversation intact.
+Claw persists the selected Git scope, reviewer identity, opaque conversation
+reference, and app-owned finding ledger without creating a second transcript
+model.
+
 `thread/settings/updated`
 confirms the active thread settings and should update the app-owned
 agent/session mapping so the id is saved in backend-owned state and reused
@@ -387,10 +402,11 @@ intercepts the bare slash form before normal prompt submission so the warning
 and blocking transition are always applied. `/compact <text>` remains a normal
 prompt.
 
-`review` is a backend prompt command. The Codex driver intercepts recognized
-review forms before appending a visible user message or calling `turn/start`:
+Bare `/review` is a Claw app command. The renderer intercepts it and opens the
+app-owned review setup without appending a visible user message or starting a
+provider turn. The same command is present for Codex and Claude agents. The
+Codex driver continues to own custom provider review prompts:
 
-- bare `/review` calls `review/start` with `target.type = "uncommittedChanges"`;
 - `/review <instructions>` calls `review/start` with a custom review target.
 
 `plan` is handled earlier in the renderer/app prompt path because Codex CLI
@@ -453,6 +469,14 @@ as the Claw agent ID/name/folder and guidance to use the MCP server without
 passing its own caller ID to each tool.
 
 This keeps normal Codex config and normal Codex data untouched.
+
+Independent product review rounds create a fresh SDK conversation; a first round
+configured for the current thread loads that conversation instead. Both replace
+the normal Claw MCP URL with a review-session URL. That stable URL adds only the
+two finding actions documented in `docs/mcp.md`; normal repository tools remain
+owned by the Codex harness. After the turn completes, Claw reads the normal
+assistant response for finding discussion, archives the temporary conversation,
+and forgets it. Findings themselves live in Claw's active review ledger.
 
 ## Notifications And Server Requests
 

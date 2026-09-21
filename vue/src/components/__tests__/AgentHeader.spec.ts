@@ -313,6 +313,23 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
+  it('does not render a code review action in the header', () => {
+    const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
+      folder: '/Users/nbonamy/src/id8',
+      branch: 'feature',
+      ahead: 1,
+      behind: 0,
+      changedFiles: 1,
+      addedLines: 4,
+      removedLines: 2,
+      hasUntracked: false,
+      state: 'dirty',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    });
+
+    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
+  });
+
   it('opens the agent folder in its remembered application from the header', async () => {
     const wrapper = mount(AgentHeader, {
       props: {
@@ -356,6 +373,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('Untitled conversation');
     expect(wrapper.find('.agent-header__folder').exists()).toBe(false);
     expect(wrapper.find('.open-in-control').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
   });
 
   it('shows the execution-plan toggle only when a plan is available', async () => {

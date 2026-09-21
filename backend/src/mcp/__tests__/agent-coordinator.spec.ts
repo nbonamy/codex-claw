@@ -40,10 +40,19 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(coordinator.toggleThreadFlag('agent-dina', { id: 'delegate_to_worktree', value: true }))
       .toStrictEqual({ success: true, id: 'delegate_to_worktree', value: true });
     expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
+    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'ready_for_review', value: true }))
+      .toStrictEqual({ success: true, id: 'ready_for_review', value: true });
+    expect(agents[0]!.threadFlags).toStrictEqual({
+      delegate_to_worktree: true,
+      ready_for_review: true,
+    });
     expect(coordinator.toggleThreadFlag('agent-dina', { id: 'delegate_to_worktree', value: false }))
       .toStrictEqual({ success: true, id: 'delegate_to_worktree', value: false });
+    expect(agents[0]!.threadFlags).toStrictEqual({ ready_for_review: true });
+    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'ready_for_review', value: false }))
+      .toStrictEqual({ success: true, id: 'ready_for_review', value: false });
     expect(agents[0]!.threadFlags).toBeUndefined();
-    expect(onAgentUpdated).toHaveBeenCalledTimes(2);
+    expect(onAgentUpdated).toHaveBeenCalledTimes(4);
     expect(() => coordinator.toggleThreadFlag('agent-dina', {
       id: 'delegate_to_worktree', value: true, payload: {},
     })).toThrow('does not accept a payload');

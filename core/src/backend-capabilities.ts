@@ -1,6 +1,7 @@
 import type { AgentBackend, BackendCapabilities } from './contracts';
 
 export const codexBackendCapabilities: BackendCapabilities = {
+  codeReview: true,
   planReview: true,
   questions: true,
   plugins: true,
@@ -28,6 +29,7 @@ export const codexBackendCapabilities: BackendCapabilities = {
 };
 
 export const claudeBackendCapabilities: BackendCapabilities = {
+  codeReview: true,
   planReview: true,
   questions: true,
   plugins: false,

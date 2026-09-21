@@ -188,15 +188,62 @@ export function useAppState() {
     }));
   }
 
-  async function respondToThreadFlag(action: 'execute' | 'dismiss'): Promise<void> {
+  async function respondToThreadFlag(response: import('@codex-claw/core/thread-flags').ThreadFlagResponse): Promise<void> {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
-    if (agent?.threadFlags?.delegate_to_worktree !== true || !codexClawApi) {
-      throw new Error('No active delegate_to_worktree flag.');
+    if (!agent || agent.threadFlags?.[response.id] !== true || !codexClawApi) {
+      throw new Error('No active thread flag.');
     }
-    adoptBackgroundSnapshot(await codexClawApi.respondToThreadFlag(agent.id, {
-      id: 'delegate_to_worktree',
-      action,
-    }));
+    adoptBackgroundSnapshot(await codexClawApi.respondToThreadFlag(agent.id, response));
+  }
+
+  async function startCodeReview(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.startCodeReview(agentId, input);
+    if (input.threadMode === 'independent') adoptNavigationSnapshot(next);
+    else adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function decideCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.decideCodeReviewFinding(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function discussCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.discussCodeReviewFinding(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.submitCodeReviewRound(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.finishCodeReview(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.discardCodeReview(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.reviewCodeAgain(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
   }
   const activeAgent = computed(() => {
     return snapshot.value.agents.find((agent) => agent.id === snapshot.value.activeAgentId) ?? null;
@@ -1379,6 +1426,13 @@ export function useAppState() {
     getAgentGitDiff,
     respondToPlanReview,
     respondToThreadFlag,
+    startCodeReview,
+    decideCodeReviewFinding,
+    discussCodeReviewFinding,
+    submitCodeReviewRound,
+    finishCodeReview,
+    discardCodeReview,
+    reviewCodeAgain,
     getAgentGitWorkflow,
     generateAgentGitMessage,
     stageAgentGitFiles,

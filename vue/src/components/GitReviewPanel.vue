@@ -1,5 +1,5 @@
 <template>
-  <section class="git-review-panel" :aria-label="$t('surface.gitReviewPanel.gitHubReview')">
+  <section class="git-review-panel" :aria-label="$t('surface.rightWorkspacePanel.changes')">
     <header class="git-review-panel__toolbar">
       <div class="git-review-panel__summary">
         <div class="git-review-panel__repository">

@@ -8,12 +8,15 @@ import { CHECK_INBOX_PROMPT } from './agent-prompts';
 import { errorToolResult, structuredToolResult } from './tool-result';
 import { registerComputerUseTools, type ComputerUseClient } from './computer-use-tools';
 import { registerInAppBrowserTools, type InAppBrowserClient } from './browser-tools';
+import { registerReviewTools } from './review-tools';
+import type { ReviewToolContext } from '../review/review-tool-registry';
 
 export function createCodexClawMcpServer(
   coordinator: ClawMcpAgentCoordinator,
   callerAgentId: string,
   computerUse?: ComputerUseClient,
   browser?: InAppBrowserClient,
+  reviewContext?: ReviewToolContext,
 ): McpServer {
   const server = new McpServer({
     name: 'codex-claw-mcp',
@@ -68,11 +71,11 @@ export function createCodexClawMcpServer(
   }, () => coordinator.setStatus(callerAgentId, status)));
 
   server.registerTool('toggle_thread_flag', {
-    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent; clear it when that is no longer appropriate. This flag takes no payload.',
+    description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. Set ready_for_review when repository work is complete enough for the user to start Claw\'s code review workflow. Clear a flag when it is no longer appropriate. These flags take no payload.',
     inputSchema: {
-      id: z.enum(['delegate_to_worktree']).describe('Predefined semantic thread flag.'),
+      id: z.enum(['delegate_to_worktree', 'ready_for_review']).describe('Predefined semantic thread flag.'),
       value: z.boolean().describe('True sets the flag; false clears it.'),
-      payload: z.unknown().optional().describe('Optional kind-specific payload. delegate_to_worktree does not accept one.'),
+      payload: z.unknown().optional().describe('Optional kind-specific payload. Current flags do not accept one.'),
     },
   }, ({ id, value, payload }) => toolResult('toggle_thread_flag', {
     agentId: callerAgentId,
@@ -193,6 +196,7 @@ export function createCodexClawMcpServer(
     registerComputerUseTools(server, computerUse);
   }
   if (browser) registerInAppBrowserTools(server, callerAgentId, browser);
+  if (reviewContext) registerReviewTools(server, reviewContext);
 
   return server;
 }

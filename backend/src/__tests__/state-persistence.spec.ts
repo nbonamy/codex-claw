@@ -108,15 +108,57 @@ describe('AppStatePersistence', () => {
     expect(restored.agents[0].delegatedByAgentId).toBe('agent-main');
   });
 
+  it('restores the review ledger without losing arbitration or round history', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].codeReview = {
+      id: 'review-1',
+      targetAgentId: snapshot.agents[0].id,
+      reviewerAgentId: snapshot.agents[0].id,
+      scope: { type: 'uncommitted' },
+      threadMode: 'current',
+      status: 'readyToFinish',
+      activeRoundId: 'round-1',
+      createdAt: '2026-09-19T10:00:00.000Z',
+      updatedAt: '2026-09-19T10:20:00.000Z',
+      rounds: [{
+        id: 'round-1',
+        number: 1,
+        status: 'completed',
+        reviewerSession: { kind: 'codex', threadId: 'reviewer-1' },
+        startedAt: '2026-09-19T10:00:00.000Z',
+        completedAt: '2026-09-19T10:20:00.000Z',
+        findings: [{
+          id: 'finding-1',
+          roundId: 'round-1',
+          priority: 'p1',
+          title: 'Authorize before writing',
+          body: 'The public path writes before checking ownership.',
+          decision: { state: 'rejected', decidedAt: '2026-09-19T10:10:00.000Z', reason: 'Admin-only by contract.' },
+          discussion: [{ id: 'message-1', author: 'user', body: 'This route is admin-only.', createdAt: '2026-09-19T10:09:00.000Z' }],
+          remediation: { state: 'skipped', startedAt: '2026-09-19T10:10:00.000Z' },
+          createdAt: '2026-09-19T10:05:00.000Z',
+          updatedAt: '2026-09-19T10:10:00.000Z',
+        }],
+      }],
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.agents[0].codeReview).toStrictEqual(snapshot.agents[0].codeReview);
+  });
+
   it('round-trips valid thread flags and drops invalid persisted values', () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].threadFlags = { delegate_to_worktree: true };
+    snapshot.agents[0].threadFlags = {
+      delegate_to_worktree: true,
+      ready_for_review: true,
+    };
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
       agents: Array<Record<string, unknown>>;
     };
 
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags)
-      .toStrictEqual({ delegate_to_worktree: true });
+      .toStrictEqual({ delegate_to_worktree: true, ready_for_review: true });
     persisted.agents[0].threadFlags = { delegate_to_worktree: false };
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags).toBeUndefined();
   });

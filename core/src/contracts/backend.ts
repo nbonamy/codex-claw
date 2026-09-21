@@ -77,6 +77,7 @@ export type AccountRateLimits = {
 export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
 
 export type BackendCapabilities = {
+  codeReview?: boolean;
   planReview?: boolean;
   questions?: boolean;
   plugins?: boolean;

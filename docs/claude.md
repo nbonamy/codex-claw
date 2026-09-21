@@ -91,6 +91,17 @@ agent-identity, instruction, MCP, or permission-safety change restarts and
 resumes the query so stale configuration cannot leak into later turns. The
 transport configures:
 
+Code review defaults to a separate visible reviewer agent in the same workspace.
+The user may instead use the current agent and session. Review turns use the
+normal Claude conversation replica while adding only the review-session finding
+tools; clarification and batched remediation resume that same session id. An
+independent reviewer starts without the source conversation history but inherits
+its selected model and reasoning effort. For an independent reviewer, `Review
+again` deletes the old Claude session and starts a fresh one on the same sidebar
+agent. Current-thread reviews preserve the user-owned session for every round
+and after finish; an independent reviewer's agent and session are removed when
+the review finishes.
+
 - the Claude Code system-prompt and tool presets;
 - user, project, and local setting sources;
 - the active Claw agent's working directory, model, and permission mode;
@@ -727,6 +738,13 @@ Claude's control schema includes MCP status, dynamic MCP message forwarding, and
 server replacement. That is promising, but the first implementation should
 prefer startup/session-local config because it mirrors our Codex approach and
 avoids mutating global user state.
+
+Code review uses that session-local shape today: Claw starts or resumes an Agent
+SDK turn according to the initial thread choice, using the review-session MCP URL
+and allowing only `report_finding` and `update_finding` from that MCP server.
+Repository inspection continues through Claude's ordinary harness tools.
+Provider output is returned through the unified review driver result, while
+durable findings and workflow decisions remain app-owned.
 
 ### Models, Thinking, Skills
 

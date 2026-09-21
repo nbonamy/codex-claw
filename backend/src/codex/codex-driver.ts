@@ -20,7 +20,7 @@ import type {
   PairedDevice
 } from '@codex-claw/core/contracts';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendConversationReplacementResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendCodeReviewInput, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendConversationReplacementResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
 type CodexPromptCommand = { type: 'review'; prompt: string };
@@ -62,6 +62,14 @@ export class CodexBackendDriver implements AgentBackendDriver {
 
   async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult> {
     return this.sessionManager.generateText(agent, input);
+  }
+
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput) {
+    return this.sessionManager.runCodeReview(agent, input);
+  }
+
+  async disposeCodeReview(_agent: Agent, reviewerSession: BackendSession): Promise<void> {
+    await this.sessionManager.disposeCodeReview(reviewerSession);
   }
 
   async replaceConversationWithSummary(agent: Agent): Promise<BackendConversationReplacementResult> {

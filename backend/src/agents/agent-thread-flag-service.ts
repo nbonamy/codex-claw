@@ -15,7 +15,7 @@ export class AgentThreadFlagService {
   }) {}
 
   async respond(agent: Agent, response: ThreadFlagResponse): Promise<void> {
-    if (response.id !== 'delegate_to_worktree' || agent.threadFlags?.[response.id] !== true) {
+    if (agent.threadFlags?.[response.id] !== true) {
       throw new Error('This thread flag is no longer active.');
     }
     if (!['execute', 'dismiss'].includes(response.action)) {
@@ -26,7 +26,7 @@ export class AgentThreadFlagService {
 
     this.inFlight.add(key);
     try {
-      if (response.action === 'execute') {
+      if (response.action === 'execute' && response.id === 'delegate_to_worktree') {
         await this.options.submit(agent, WORKTREE_DELEGATION_PROMPT);
       }
       if (agent.threadFlags?.[response.id] !== true) {

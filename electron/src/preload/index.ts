@@ -6,6 +6,13 @@ import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/e
 const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
 
 const api: CodexClawApi = {
+  startCodeReview: (agentId, input) => ipc.invoke(ipcChannels.startCodeReview, agentId, input),
+  decideCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.decideCodeReviewFinding, agentId, input),
+  discussCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.discussCodeReviewFinding, agentId, input),
+  submitCodeReviewRound: (agentId, sessionId) => ipc.invoke(ipcChannels.submitCodeReviewRound, agentId, sessionId),
+  finishCodeReview: (agentId, sessionId) => ipc.invoke(ipcChannels.finishCodeReview, agentId, sessionId),
+  discardCodeReview: (agentId, sessionId) => ipc.invoke(ipcChannels.discardCodeReview, agentId, sessionId),
+  reviewCodeAgain: (agentId, sessionId) => ipc.invoke(ipcChannels.reviewCodeAgain, agentId, sessionId),
   respondToThreadFlag: (agentId, response) => ipc.invoke(ipcChannels.respondToThreadFlag, agentId, response),
   getSnapshot: () => ipc.invoke(ipcChannels.getSnapshot),
   getSnapshotState: () => ipc.invoke(ipcChannels.getSnapshotState),

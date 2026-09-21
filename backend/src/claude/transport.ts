@@ -81,5 +81,6 @@ export type ClaudeTurnTransport = {
   getContextUsage?(sessionId: string): Promise<ClaudeContextUsage | null>;
   readContextUsage?(params: ClaudeContextUsageParams): Promise<ClaudeContextUsage | null>;
   closeSession?(sessionId: string): void | Promise<void>;
+  deleteSession?(sessionId: string, cwd: string): Promise<void>;
   close(): Promise<void>;
 };

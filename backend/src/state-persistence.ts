@@ -12,6 +12,7 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { appText } from '@codex-claw/core/app-text';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
+import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/code-review';
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
 
 type PersistedState = {
@@ -45,6 +46,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
   planReview?: import('@codex-claw/core/plan-review').PlanReview;
+  codeReview?: import('@codex-claw/core/code-review').CodeReviewSession;
   threadFlags?: import('@codex-claw/core/thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   statusText?: string;
@@ -173,6 +175,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
     ...(agent.threadFlags ? { threadFlags: structuredClone(agent.threadFlags) } : {}),
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
+    ...(agent.codeReview ? { codeReview: cloneCodeReviewSession(agent.codeReview) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
@@ -399,6 +402,9 @@ function sanitizeAgent(value: unknown): Agent | null {
     ...(plan ? { plan } : {}),
     ...(isThreadFlags(value.threadFlags) ? { threadFlags: structuredClone(value.threadFlags) } : {}),
     ...(isPlanReview(value.planReview) ? { planReview: { ...value.planReview } } : {}),
+    ...(isCodeReviewSession(value.codeReview)
+      ? { codeReview: cloneCodeReviewSession(value.codeReview) }
+      : {}),
     ...(goal ? { goal } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },

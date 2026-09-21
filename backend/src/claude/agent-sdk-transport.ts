@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  deleteSession as deleteClaudeSession,
   query,
   type CanUseTool,
   type Options as ClaudeQueryOptions,
@@ -34,6 +35,7 @@ export type ClaudeAgentSdkTransportOptions = {
   runtimeDiscovery?: RuntimeDiscoveryDependencies;
   createQuery?: ClaudeQueryFactory;
   createSessionId?: () => string;
+  deleteSession?: typeof deleteClaudeSession;
 };
 
 export type ClaudeQueryRuntime = AsyncIterable<SDKMessage> & Pick<Query,
@@ -96,11 +98,13 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
   private readonly pendingPermissions = new Map<string, PendingPermission>();
   private readonly createQuery: ClaudeQueryFactory;
   private readonly createSessionId: () => string;
+  private readonly deleteStoredSession: typeof deleteClaudeSession;
   private closing = false;
 
   constructor(private readonly options: ClaudeAgentSdkTransportOptions = {}) {
     this.createQuery = options.createQuery ?? ((input) => query(input));
     this.createSessionId = options.createSessionId ?? randomUUID;
+    this.deleteStoredSession = options.deleteSession ?? deleteClaudeSession;
   }
 
   startTurn(
@@ -172,6 +176,11 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     this.closeSessionRecord(session, 'Claude session released.');
+  }
+
+  async deleteSession(sessionId: string, cwd: string): Promise<void> {
+    await this.closeSession(sessionId);
+    await this.deleteStoredSession(sessionId, { dir: cwd });
   }
 
   async listModels(): Promise<ClaudeAvailableModel[] | null> {

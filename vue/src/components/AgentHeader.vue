@@ -251,7 +251,6 @@ const gitReviewAvailable = computed(() => {
   const gitStatus = props.gitStatus;
   return Boolean(gitStatus && gitStatus.state !== 'unknown');
 });
-
 </script>
 
 <style scoped>

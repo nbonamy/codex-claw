@@ -61,19 +61,24 @@
         </el-tooltip>
       </template>
       <template #composer-shelf-actions="{ disabled }">
-        <ThreadFlagAffordance
-          v-if="delegateToWorktree"
-          :busy="threadFlagBusy || disabled"
-          @execute="emit('thread-flag', 'execute')"
-          @dismiss="emit('thread-flag', 'dismiss')"
-        />
+        <div v-if="activeThreadFlags.length > 0" class="conversation-pane__thread-flags">
+          <ThreadFlagAffordance
+            v-for="flag in activeThreadFlags"
+            :id="flag"
+            :key="flag"
+            :busy="threadFlagBusy || disabled"
+            @execute="emit('thread-flag', { id: flag, action: 'execute' })"
+            @dismiss="emit('thread-flag', { id: flag, action: 'dismiss' })"
+          />
+        </div>
       </template>
       <template #composer-context="{ disabled }">
-        <ChatTextAnnotationCards
-          v-if="textAnnotations.length > 0"
-          :annotations="textAnnotations"
+        <ComposerContextCards
+          v-if="composerContextCards.length > 0"
+          :context-label="t('chat.composerContext.label')"
+          :items="composerContextCards"
           :disabled="disabled"
-          @remove="emit('remove-text-annotation', $event)"
+          @remove="removeComposerContextCard"
         />
       </template>
     </CodexConversationPane>
@@ -111,14 +116,16 @@ import type {
   RendererMessage,
   ThreadPlan,
 } from '@codex-claw/core/contracts';
+import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import ConversationLoadError from './ConversationLoadError.vue';
 import AgentMention from './AgentMention.vue';
-import ChatTextAnnotationCards from './ChatTextAnnotationCards.vue';
+import ComposerContextCards, { type ComposerContextCard } from './ComposerContextCards.vue';
 import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
 import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
+import type { CodeReviewFinding } from '@codex-claw/core/code-review';
 import {
   presentCollaborationMessage,
   presentRendererCollaborationMessage,
@@ -139,6 +146,7 @@ const props = withDefaults(defineProps<{
   agents?: readonly Agent[];
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   textAnnotations?: readonly ChatTextAnnotation[];
+  reviewFinding?: CodeReviewFinding | null;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
   historyLoadFailed?: boolean;
@@ -149,6 +157,7 @@ const props = withDefaults(defineProps<{
   agents: () => [],
   attachmentAnnotationCounts: () => ({}),
   textAnnotations: () => [],
+  reviewFinding: null,
   planVisible: true,
   historyLoadFailed: false,
   historyLoading: false,
@@ -168,12 +177,29 @@ const emit = defineEmits<{
   'annotate-attachment': [attachment: CodexNativeAttachment];
   'close-plan': [];
   'remove-text-annotation': [annotationId: string];
+  'remove-review-finding': [];
   'retry-history': [];
-  'thread-flag': [action: 'execute' | 'dismiss'];
+  'thread-flag': [response: ThreadFlagResponse];
 }>();
 
 const conversationKey = computed(() => props.agent?.id ?? 'no-agent');
-const delegateToWorktree = computed(() => props.agent?.threadFlags?.delegate_to_worktree === true);
+const composerContextCards = computed<ComposerContextCard[]>(() => [
+  ...props.textAnnotations.map((annotation) => ({
+    id: `annotation:${annotation.id}`,
+    label: t('chat.textAnnotations.annotation'),
+    removeLabel: t('chat.textAnnotations.remove'),
+  })),
+  ...(props.reviewFinding ? [{
+    id: 'review-finding',
+    label: props.reviewFinding.priority.toUpperCase(),
+    detail: props.reviewFinding.title,
+    removeLabel: t('chat.composerContext.removeReviewFinding'),
+  }] : []),
+]);
+const activeThreadFlags = computed<ThreadFlagId[]>(() => (
+  (['ready_for_review', 'delegate_to_worktree'] as const)
+    .filter((id) => props.agent?.threadFlags?.[id] === true)
+));
 const messageTextSelection = ref<CodexMessageTextSelection | null>(null);
 const collaborationMessagePresentations = new Map<string, CollaborationMessagePresentation>();
 let transformedMessageCache = new WeakMap<object, CodexChatMessage | SurfaceMessage>();
@@ -210,6 +236,16 @@ function collaborationMessageLabel(messageId: string | undefined): string | null
 
 function requestAttachmentAnnotation(attachment: CodexNativeAttachment | undefined): void {
   if (attachment?.type === 'image') emit('annotate-attachment', attachment);
+}
+
+function removeComposerContextCard(itemId: string): void {
+  if (itemId === 'review-finding') {
+    emit('remove-review-finding');
+    return;
+  }
+  if (itemId.startsWith('annotation:')) {
+    emit('remove-text-annotation', itemId.slice('annotation:'.length));
+  }
 }
 
 function annotationCount(attachment: CodexNativeAttachment | undefined): number {
@@ -263,6 +299,12 @@ defineExpose({ focusComposer });
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+
+.conversation-pane__thread-flags {
+  width: 100%;
+  display: grid;
+  gap: var(--space-4);
 }
 
 .conversation-pane__empty {

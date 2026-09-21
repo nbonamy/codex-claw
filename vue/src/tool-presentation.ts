@@ -10,6 +10,7 @@ import {
   IconGitBranch as GitBranchIcon,
   IconMarkdown as MarkdownIcon,
   IconMessage as MessageIcon,
+  IconMessageReport as MessageReportIcon,
   IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
   IconUsers as UsersIcon,
@@ -30,6 +31,7 @@ const icons = {
   computerUse: DeviceDesktopIcon as unknown as ToolIcon,
   markdown: MarkdownIcon as unknown as ToolIcon,
   messages: MessageIcon as unknown as ToolIcon,
+  review: MessageReportIcon as unknown as ToolIcon,
   celebration: SparklesIcon as unknown as ToolIcon,
   announcement: VolumeIcon as unknown as ToolIcon,
   workItem: SquareCheck as unknown as ToolIcon,
@@ -70,6 +72,7 @@ const COMPUTER_USE_TOOLS = new Set([
   'computer-use-type-text',
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
+const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding']);
 const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
 const WORKSPACE_TOOLS = new Set(['create-worktree', 'list-repos', 'list-worktrees']);
 
@@ -101,6 +104,7 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (BROWSER_TOOLS.has(tool)) return icons.browser;
   if (COMPUTER_USE_TOOLS.has(tool)) return icons.computerUse;
   if (MESSAGE_TOOLS.has(tool)) return icons.messages;
+  if (REVIEW_TOOLS.has(tool)) return icons.review;
   if (AGENT_TOOLS.has(tool)) return icons.agents;
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'celebrate') return icons.celebration;

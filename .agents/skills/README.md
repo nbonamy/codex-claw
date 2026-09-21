@@ -10,5 +10,7 @@ should stay concise, procedural, and specific to this repository.
   work complete.
 - `codex-claw-frontend-dev`: Vue, Element Plus, app shell, chat rendering,
   artifact panes, design tokens, themes, and frontend tests.
+- `codex-claw-live-preview`: Isolated, parallel-safe, branch-faithful web
+  previews for interactively dogfooding any Claw feature.
 - `codex-claw-testing-coverage`: Vitest, component isolation, IPC contracts,
   fake Codex transports, coverage triage, and verification gates.

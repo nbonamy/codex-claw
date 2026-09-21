@@ -8,6 +8,7 @@ import { createCodexClawMcpServer } from './tools';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway, HostedMcpServerId } from './hosted-mcp-gateway';
+import type { ReviewToolRegistry } from '../review/review-tool-registry';
 
 const maxBodyBytes = 1024 * 1024;
 
@@ -17,6 +18,7 @@ export type ClawMcpHttpServerOptions = {
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
   hostedMcpGateway?: HostedMcpGateway;
+  reviewTools?: ReviewToolRegistry;
   host?: string;
   port?: number;
 };
@@ -27,6 +29,7 @@ export class ClawMcpHttpServer {
   private readonly computerUseEnabled: () => boolean;
   private readonly browser: InAppBrowserClient | undefined;
   private readonly hostedMcpGateway: HostedMcpGateway | undefined;
+  private readonly reviewTools: ReviewToolRegistry | undefined;
   private readonly host: string;
   private readonly port: number;
   private server: http.Server | null = null;
@@ -38,6 +41,7 @@ export class ClawMcpHttpServer {
     this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
     this.browser = options.browser;
     this.hostedMcpGateway = options.hostedMcpGateway;
+    this.reviewTools = options.reviewTools;
     this.host = options.host ?? '127.0.0.1';
     this.port = options.port ?? 0;
   }
@@ -88,6 +92,14 @@ export class ClawMcpHttpServer {
   hostedMcpServerUrls(): Record<string, string> {
     if (!this.url || !this.hostedMcpGateway) return {};
     return this.hostedMcpGateway.enabledServerUrls(this.url);
+  }
+
+  reviewMcpServerUrl(agentId: string, reviewContextId: string): string {
+    if (!this.url) throw new Error('MCP server has not started.');
+    const url = new URL(this.url);
+    url.searchParams.set('agentId', agentId);
+    url.searchParams.set('reviewContextId', reviewContextId);
+    return url.toString();
   }
 
   private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -158,6 +170,7 @@ export class ClawMcpHttpServer {
       agentId,
       this.computerUseEnabled() ? this.computerUse : undefined,
       this.browser,
+      this.reviewTools?.resolve(agentId, url.searchParams.get('reviewContextId')) ?? undefined,
     );
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,

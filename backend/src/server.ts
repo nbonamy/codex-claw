@@ -11,7 +11,7 @@ import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collection
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendConversationReplacementResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, restartAgentConversation, resumeAgentConversationInSnapshot, updateAgentFromInput } from '@codex-claw/core/agent-manager';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, restartAgentConversation, resumeAgentConversationInSnapshot, updateAgentFromInput } from '@codex-claw/core/agent-manager';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
 import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { readEngineInstructions, saveEngineInstructions } from './engine-instructions';
@@ -39,7 +39,7 @@ import { AgentPromptManager } from './agents/agent-prompt-manager';
 import { AgentPlanReviewService } from './agents/agent-plan-review-service';
 import { AgentThreadFlagService } from './agents/agent-thread-flag-service';
 import type { PlanReviewResponse } from '@codex-claw/core/plan-review';
-import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { agentConversationId, planReviewFromEvent } from '@codex-claw/core/plan-review';
 import { isAgentRequestResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import { AgentWorkspaceService } from './agents/agent-workspace-service';
@@ -49,6 +49,9 @@ import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
+import { isCodeReviewStartInput, type CodeReviewDecisionInput, type CodeReviewDiscussionInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
+import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
+import { AgentCreationService } from './agents/agent-creation-service';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -70,6 +73,8 @@ export type ClawBackendServerOptions = {
   agentGitService?: AgentGitService;
   delegatedWorkReports?: DelegatedWorkReportPort;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
+  codeReviewTools?: CodeReviewToolPort;
+  agentCreation?: AgentCreationService;
 };
 
 export type SystemPermissionsPort = {
@@ -128,6 +133,8 @@ export class ClawBackendServer {
   private readonly subagentIdentities: SubagentIdentityService;
   private readonly agentGitService: AgentGitService;
   private readonly agentGitWorkflows: AgentGitWorkflowService;
+  private readonly codeReviews?: CodeReviewService;
+  private readonly agentCreation: AgentCreationService;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
   private conversationsReconciliation?: Promise<void>;
@@ -136,6 +143,7 @@ export class ClawBackendServer {
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
+    this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
     this.onBackendEventApplied = options.onBackendEventApplied;
@@ -252,7 +260,51 @@ export class ClawBackendServer {
       refreshWorkspaceIdentity: (agentId) => this.agentWorkspaces.refreshIdentity(agentId),
       sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
     });
+    if (options.codeReviewTools) {
+      this.codeReviews = new CodeReviewService({
+        snapshot: this.snapshot,
+        createAgent: (input, creationOptions) => this.agentCreation.create(input, creationOptions),
+        tools: options.codeReviewTools,
+        runReview: async (agent, prompt, reviewMcpServerUrl, reviewerSession) => {
+          return await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewRun, {
+            agent,
+            prompt,
+            cwd: requireAgentFolder(agent),
+            reviewMcpServerUrl,
+            ...(reviewerSession ? { reviewerSession } : {}),
+          }) as import('@codex-claw/core/backend-driver').BackendCodeReviewResult;
+        },
+        resetReviewer: async (agent) => {
+          await this.disposeAndReleaseReviewConversation(agent);
+          restartAgentConversation(this.snapshot, agent.id);
+          this.agentRequests.clearAgent(agent.id);
+        },
+        deleteReviewer: async (agent) => {
+          await this.disposeAndReleaseReviewConversation(agent);
+          closeAgentInSnapshot(this.snapshot, agent.id);
+          delete this.snapshot.agentGitStatuses[agent.id];
+          this.agentRequests.clearAgent(agent.id);
+        },
+        changed: async () => { await this.persistAndEmitSnapshot(); },
+      });
+    }
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
+  }
+
+  private async disposeAndReleaseReviewConversation(agent: Agent): Promise<void> {
+    if (agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
+      await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }).catch(() => undefined);
+    }
+    if (agent.backendSession) {
+      await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewDispose, {
+        agent,
+        reviewerSession: agent.backendSession,
+      }).catch(() => undefined);
+    }
+    await this.driverRpc?.handle(backendMethods.driverConversationRelease, {
+      backend: agent.backend,
+      agentId: agent.id,
+    });
   }
 
   async initialize(): Promise<void> {
@@ -261,6 +313,7 @@ export class ClawBackendServer {
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
+    for (const agent of this.snapshot.agents) await this.codeReviews?.resumeInterrupted(agent);
   }
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
@@ -275,9 +328,18 @@ export class ClawBackendServer {
       try { return createClawRpcResult(message.id, await preferences.update(clientId, message.method, params ?? {})); }
       catch (error) { return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error)); }
     }
-    const createsAgent = [backendMethods.agentCreate, backendMethods.agentQuickChatCreate, backendMethods.agentDuplicate, backendMethods.agentFork].some((method) => method === message.method);
+    const startsIndependentReview = message.method === backendMethods.agentCodeReviewStart
+      && isRecord(params?.input)
+      && params.input.threadMode === 'independent';
+    const completesReview = message.method === backendMethods.agentCodeReviewFinish
+      || message.method === backendMethods.agentCodeReviewDiscard;
+    const createsAgent = startsIndependentReview
+      || [backendMethods.agentCreate, backendMethods.agentQuickChatCreate, backendMethods.agentDuplicate, backendMethods.agentFork].some((method) => method === message.method);
     const createsTeam = message.method === backendMethods.teamCreate || message.method === backendMethods.teamConnect;
-    const before = createsAgent || createsTeam ? await this.remoteTeams.clientSnapshot() : undefined;
+    const before = createsAgent || createsTeam || completesReview ? await this.remoteTeams.clientSnapshot() : undefined;
+    const reviewTargetAgentId = completesReview && before && typeof params?.agentId === 'string'
+      ? projectClientSnapshot(before, clientId).agents.find((agent) => agent.id === params.agentId)?.codeReview?.targetAgentId
+      : undefined;
     if (before && (message.method === backendMethods.agentCreate || message.method === backendMethods.agentQuickChatCreate)) {
       const input = isRecord(params?.input) ? params.input : {};
       const teamId = input.teamId ?? projectClientSnapshot(before, clientId).activeTeamId;
@@ -300,6 +362,9 @@ export class ClawBackendServer {
         if (created && shouldSelect) return { ...response, result: await preferences.update(clientId,
           createsAgent ? backendMethods.clientNavigationSelectAgent : backendMethods.clientNavigationSelectTeam,
           createsAgent ? { agentId: created.id } : { teamId: created.id }) };
+      }
+      if (isAppSnapshot(response.result) && reviewTargetAgentId && response.result.agents.some((agent) => agent.id === reviewTargetAgentId)) {
+        return { ...response, result: await preferences.update(clientId, backendMethods.clientNavigationSelectAgent, { agentId: reviewTargetAgentId }) };
       }
       if (isAppSnapshot(response.result)) return { ...response, result: projectClientSnapshot(response.result, clientId) };
       if (isClawSnapshotGetResult(response.result)) return { ...response, result: { ...response.result, snapshot: projectClientSnapshot(response.result.snapshot, clientId) } };
@@ -442,9 +507,21 @@ export class ClawBackendServer {
         });
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case backendMethods.debugCodeReviewSet: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const scenario = debugCodeReviewScenario(params.scenario);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        agent.codeReview = createDebugCodeReviewSession(agent, scenario);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.debugThreadFlagSet: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
+        const id = debugThreadFlagId(params.id);
         const value = params.value;
         if (typeof value !== 'boolean') {
           return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'value must be a boolean');
@@ -454,8 +531,8 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
         const threadFlags = { ...agent.threadFlags };
-        if (value) threadFlags.delegate_to_worktree = true;
-        else delete threadFlags.delegate_to_worktree;
+        if (value) threadFlags[id] = true;
+        else delete threadFlags[id];
         agent.threadFlags = Object.keys(threadFlags).length > 0 ? threadFlags : undefined;
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
@@ -583,17 +660,12 @@ export class ClawBackendServer {
           return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.validateAgentInput(input, null);
-        const createdAgentId = createEntityId('agent');
-        createAgentInSnapshot(this.snapshot, input, undefined, createdAgentId, { select: false });
-        onCreated(createdAgentId);
+        const createdAgent = this.agentCreation.create(input, { select: false });
+        onCreated(createdAgent.id);
         this.addRecentSourceRepository(input.sourceRepositoryName);
-        if (createdAgentId) {
-          await this.agentWorkspaces.refreshIdentity(createdAgentId);
-        }
+        await this.agentWorkspaces.refreshIdentity(createdAgent.id);
         const snapshot = await this.persistAndEmitSnapshot();
-        if (createdAgentId) {
-          await this.agentWorkspaces.refreshGitStatus(createdAgentId);
-        }
+        await this.agentWorkspaces.refreshGitStatus(createdAgent.id);
         return createClawRpcResult(message.id, snapshot);
       }
       case backendMethods.agentQuickChatCreate: {
@@ -790,6 +862,66 @@ export class ClawBackendServer {
       case backendMethods.agentSkillsList: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentSkillsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverSkillsList, { agent }));
+      }
+      case backendMethods.agentCodeReviewStart: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        if (!isCodeReviewStartInput(input)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review start input.');
+        }
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          const session = this.requireCodeReviews().start(agent, input);
+          if (session.threadMode === 'independent') onCreated(session.reviewerAgentId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFindingDecide: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input') as CodeReviewDecisionInput;
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          this.requireCodeReviews().decide(agent, input);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFindingDiscuss: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input') as CodeReviewDiscussionInput;
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
+          this.requireCodeReviews().discuss(agent, input);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewRoundSubmit: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          this.requireCodeReviews().submit(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewFinish: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          await this.requireCodeReviews().finish(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewDiscard: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          await this.requireCodeReviews().discard(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentCodeReviewAgain: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          await this.requireCodeReviews().reviewAgain(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
       }
       case backendMethods.agentConversationsList: {
         const params = requireRecord(message.params);
@@ -1147,7 +1279,8 @@ export class ClawBackendServer {
           try {
             const result = await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }) as BackendSendResult;
             agent.backendSession = result.backendSession;
-            await this.persistSnapshotOnly();
+            const reviewChanged = await this.codeReviews?.handleTurnInterrupted(agent) ?? false;
+            if (!reviewChanged) await this.persistSnapshotOnly();
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.applyAndEmitBackendEvent({
@@ -1766,6 +1899,11 @@ export class ClawBackendServer {
       throw new Error('Backend driver RPC is not configured.');
     }
     return this.driverRpc;
+  }
+
+  private requireCodeReviews(): CodeReviewService {
+    if (!this.codeReviews) throw new Error('Code review is not configured.');
+    return this.codeReviews;
   }
 
   private async handleAgentDriverRequest(agent: Agent, method: string, params: unknown): Promise<unknown> {
@@ -2584,6 +2722,101 @@ function locationRemoteConnectionId(params: unknown, label: string): string | nu
   return requireString(locationRecord.remoteConnectionId, 'remoteConnectionId');
 }
 
+type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing';
+
+function debugCodeReviewScenario(value: unknown): DebugCodeReviewScenario {
+  if (value === 'reviewing' || value === 'ready' || value === 'fixing') return value;
+  throw new Error('Invalid code review debug scenario.');
+}
+
+function debugThreadFlagId(value: unknown): ThreadFlagId {
+  if (value === 'delegate_to_worktree' || value === 'ready_for_review') return value;
+  throw new Error('Invalid thread flag id.');
+}
+
+function createDebugCodeReviewSession(agent: Agent, scenario: DebugCodeReviewScenario): CodeReviewSession {
+  const now = new Date().toISOString();
+  const roundId = 'debug-review-round-1';
+  const findings = debugCodeReviewFindings(roundId, scenario, now);
+  return {
+    id: 'debug-review',
+    targetAgentId: agent.id,
+    reviewerAgentId: agent.id,
+    scope: { type: 'uncommitted' },
+    threadMode: 'current',
+    status: scenario === 'reviewing' ? 'reviewing' : scenario === 'ready' ? 'ready' : 'fixing',
+    activeRoundId: roundId,
+    rounds: [{
+      id: roundId,
+      number: 1,
+      status: scenario === 'reviewing' ? 'reviewing' : scenario === 'ready' ? 'ready' : 'submitted',
+      ...(agent.backendSession ? { reviewerSession: structuredClone(agent.backendSession) } : {}),
+      findings,
+      startedAt: now,
+    }],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function debugCodeReviewFindings(
+  roundId: string,
+  scenario: DebugCodeReviewScenario,
+  now: string,
+): CodeReviewFinding[] {
+  const fixtures: Array<Pick<CodeReviewFinding, 'id' | 'priority' | 'title' | 'body' | 'location'>> = [
+    {
+      id: 'debug-review-restoration',
+      priority: 'p0',
+      title: 'Preserve the review across reloads',
+      body: 'A renderer reload must restore the active round and every finding before the user continues arbitration.',
+      location: { file: 'backend/src/state-persistence.ts', line: 133, endLine: 178 },
+    },
+    {
+      id: 'debug-provider-boundary',
+      priority: 'p1',
+      title: 'Keep review state provider-independent',
+      body: 'Route review state through the unified backend contract so every provider exposes the same workflow.',
+      location: { file: 'backend/src/review/code-review-service.ts', line: 40, endLine: 58 },
+    },
+    {
+      id: 'debug-stable-context',
+      priority: 'p2',
+      title: 'Keep clarification linked to its finding',
+      body: 'The clarification prompt should retain the finding and round identifiers when it returns to the reviewer thread.',
+    },
+    {
+      id: 'debug-compact-finding',
+      priority: 'p3',
+      title: 'Keep finding rows compact',
+      body: 'Collapsed findings should remain scannable while expanded findings show the complete evidence without nested cards.',
+      location: { file: 'vue/src/components/CodeReviewPanel.vue', line: 182, endLine: 251 },
+    },
+  ];
+
+  return fixtures.map((fixture) => {
+    const remediation = scenario !== 'fixing'
+      ? { state: 'notStarted' as const }
+      : fixture.priority === 'p1'
+        ? { state: 'skipped' as const, startedAt: now }
+        : fixture.priority === 'p2'
+          ? { state: 'fixing' as const, startedAt: now }
+          : { state: 'fixed' as const, completedAt: now, evidence: 'Focused review checks passed.' };
+    const decision = scenario === 'fixing' && fixture.priority === 'p1'
+      ? { state: 'rejected' as const, decidedAt: now, reason: 'The existing behavior is intentional for this workflow.' }
+      : { state: 'selected' as const, decidedAt: now };
+    return {
+      ...fixture,
+      roundId,
+      decision,
+      discussion: [],
+      remediation,
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+}
+
 function requireSourceFolderListInput(params: unknown): { path?: string; remoteConnectionId?: string } {
   if (params === undefined) {
     return {};
@@ -2686,6 +2919,18 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     candidate.folder.trim().length > 0 &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
+}
+
+function requireStringParam(params: unknown, key: string): string {
+  if (!isRecord(params) || typeof params[key] !== 'string' || !params[key].trim()) {
+    throw new Error(`Invalid ${key}.`);
+  }
+  return params[key];
+}
+
+function requireRecordParam(params: unknown, key: string): Record<string, unknown> {
+  if (!isRecord(params) || !isRecord(params[key])) throw new Error(`Invalid ${key}.`);
+  return params[key];
 }
 
 function conversationListInput(value: unknown): ConversationListInput | undefined {

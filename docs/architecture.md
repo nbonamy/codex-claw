@@ -65,7 +65,7 @@ type Agent = {
   backend: "codex" | "claude"
   backendSession?: BackendSession
   backendDefaults?: BackendDefaults
-  threadFlags?: { delegate_to_worktree?: true }
+  threadFlags?: { delegate_to_worktree?: true; ready_for_review?: true }
   status: AgentStatus
   createdAt: string
   updatedAt: string
@@ -783,6 +783,36 @@ working folder, so switching agents does not repeat backend RPCs. A catalog
 change event or explicit refresh may invalidate the relevant cache. Snapshot
 writes are coalesced so bursts of backend metadata events write only the latest
 durable projection.
+
+An in-progress code review is app-owned state, not provider transcript state.
+The visible reviewer agent carries one active review ledger containing rounds, structured
+findings, user decisions, linked discussion, remediation progress, the selected
+Git scope, the target agent, and the reviewer agent. The Git scope is either
+uncommitted work or the current branch against its resolved base. The first
+round may use the target agent's current provider conversation, or create a
+normal visible agent with an independent provider conversation; independent is
+the default. The independent reviewer appears in the repository sidebar and its
+ordinary provider transcript, approvals, status, and composer remain available
+while the Review pane presents the structured findings. Before
+submission, new findings are selected by default and may be deselected; this
+choice is not workflow status. Submission starts remediation: deselected
+findings become `skipped`; selected findings become `pending`, then enter
+`fixing` together in one reviewer turn. The reviewer calls `update_finding`
+after fixing and verifying each item, moving it to `fixed` in the durable ledger.
+Clarification and remediation continue the same provider-owned reviewer session;
+current-thread reviews keep that user-owned conversation intact for every round
+and after completion. Independent reviews reset the visible reviewer's
+conversation between rounds to reduce anchoring while keeping the reviewer agent
+and structured ledger. Finishing or discarding removes that review-owned agent;
+the target agent and its conversation remain intact. Every new round receives
+the cumulative ledger inside a `<context>`
+block. Its exclusions therefore include every finding skipped by the user
+across the review, not only exclusions from the immediately preceding round.
+`clawd` persists the ledger and opaque reviewer session reference in `state.json`
+so reloads and agent switches do not lose unfinished arbitration while the Review
+pane remains open. Finishing the review or closing its pane removes the ledger;
+reopening Review starts from zero, and completed findings are not permanent project
+history.
 
 ## Work Backlog Integrations
 

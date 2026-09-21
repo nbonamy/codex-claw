@@ -319,7 +319,57 @@ describe('ClawBackendServer', () => {
     ]));
   });
 
-  it('sets and clears delegate_to_worktree through the debug protocol', async () => {
+  it('injects observable code review states through the debug protocol', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
+      status: { type: 'idle' }, createdAt: '2026-09-19T00:00:00.000Z', updatedAt: '2026-09-19T00:00:00.000Z',
+    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.activeAgentId = 'agent-dina';
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
+
+    const reviewing = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-reviewing', method: backendMethods.debugCodeReviewSet,
+      params: { agentId: 'agent-dina', scenario: 'reviewing' },
+    });
+    const reviewingSession = (reviewing as { result: AppSnapshot }).result.agents[0]!.codeReview!;
+    expect(reviewingSession).toMatchObject({
+      targetAgentId: 'agent-dina', reviewerAgentId: 'agent-dina', threadMode: 'current', status: 'reviewing',
+      rounds: [{ status: 'reviewing' }],
+    });
+    expect(reviewingSession.rounds[0]!.findings.map((finding) => finding.priority))
+      .toStrictEqual(['p0', 'p1', 'p2', 'p3']);
+    expect(reviewingSession.rounds[0]!.findings[2]!.location).toBeUndefined();
+
+    const ready = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-ready', method: backendMethods.debugCodeReviewSet,
+      params: { agentId: 'agent-dina', scenario: 'ready' },
+    });
+    const readySession = (ready as { result: AppSnapshot }).result.agents[0]!.codeReview!;
+    expect(readySession.status).toBe('ready');
+    expect(readySession.rounds[0]!.status).toBe('ready');
+    expect(readySession.rounds[0]!.findings.map((finding) => finding.decision.state))
+      .toStrictEqual(['selected', 'selected', 'selected', 'selected']);
+
+    const fixing = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-fixing', method: backendMethods.debugCodeReviewSet,
+      params: { agentId: 'agent-dina', scenario: 'fixing' },
+    });
+    const fixingSession = (fixing as { result: AppSnapshot }).result.agents[0]!.codeReview!;
+    expect(fixingSession.status).toBe('fixing');
+    expect(fixingSession.rounds[0]!.status).toBe('submitted');
+    expect(fixingSession.rounds[0]!.findings.map((finding) => finding.remediation.state))
+      .toStrictEqual(['fixed', 'skipped', 'fixing', 'fixed']);
+    expect(fixingSession.rounds[0]!.findings[1]!.decision).toMatchObject({
+      state: 'rejected',
+      reason: 'The existing behavior is intentional for this workflow.',
+    });
+    expect(saveSnapshot).toHaveBeenCalledTimes(3);
+  });
+
+  it('sets and clears both thread flags through the debug protocol', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{
       id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
@@ -331,16 +381,30 @@ describe('ClawBackendServer', () => {
 
     const set = await server.handleMessage({
       jsonrpc: '2.0', id: 'debug-thread-flag-set', method: backendMethods.debugThreadFlagSet,
-      params: { agentId: 'agent-dina', value: true },
+      params: { agentId: 'agent-dina', id: 'delegate_to_worktree', value: true },
     });
     expect((set as { result: AppSnapshot }).result.agents[0]?.threadFlags)
       .toStrictEqual({ delegate_to_worktree: true });
 
+    const ready = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-ready-flag-set', method: backendMethods.debugThreadFlagSet,
+      params: { agentId: 'agent-dina', id: 'ready_for_review', value: true },
+    });
+    expect((ready as { result: AppSnapshot }).result.agents[0]?.threadFlags)
+      .toStrictEqual({ delegate_to_worktree: true, ready_for_review: true });
+
     const cleared = await server.handleMessage({
       jsonrpc: '2.0', id: 'debug-thread-flag-clear', method: backendMethods.debugThreadFlagSet,
-      params: { agentId: 'agent-dina', value: false },
+      params: { agentId: 'agent-dina', id: 'delegate_to_worktree', value: false },
     });
-    expect((cleared as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
+    expect((cleared as { result: AppSnapshot }).result.agents[0]?.threadFlags)
+      .toStrictEqual({ ready_for_review: true });
+
+    const readyCleared = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-ready-flag-clear', method: backendMethods.debugThreadFlagSet,
+      params: { agentId: 'agent-dina', id: 'ready_for_review', value: false },
+    });
+    expect((readyCleared as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
   });
 
   it('routes system permission requests through the backend system port', async () => {
