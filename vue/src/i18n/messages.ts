@@ -10,7 +10,7 @@ export const messages = {
       openTicketDetails: 'View details for {title}', closeTicketDetails: 'Close ticket details', ticketDetails: 'Ticket details',
       ticketReady: 'Ready to build', ticketComplete: 'Complete', noTicketDescription: 'Description is still being drafted.',
       repository: 'Repository', repositoryUnassigned: 'Repository not assigned', repositoryCount: '{count} affected repository | {count} affected repositories',
-      repositoryProgress: '{complete} of {total} tickets complete', implementationBoard: 'Implementation by repository', implementationTicketDetails: 'Implementation ticket details',
+      repositoryProgress: '{complete} of {total} tickets complete', implementationBoard: 'Implementation by repository',
       executionBoard: 'Execution', executionProgress: '{complete} of {total} complete', executionStatusSummary: 'Execution status',
       activeTicketCount: '{count} active', reviewTicketCount: '{count} to review', completeTicketCount: '{count} complete', openTicketThread: 'Open {title} and its agent conversation',
       reviewPolicy: { reviewEachTicket: 'Review every ticket', reviewAfterImplementation: 'Automatic until final review' },

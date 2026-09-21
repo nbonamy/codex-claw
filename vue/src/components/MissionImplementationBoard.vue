@@ -59,7 +59,7 @@
           </div>
         </header>
         <TransitionGroup name="mission-run-card" tag="ol" appear>
-          <li v-for="item in lane.tickets" :key="item.ticket.id ?? item.index">
+          <li v-for="item in lane.tickets" :key="item.ticket.id ?? item.index" class="mission-implementation__ticket-item">
             <button
               type="button"
               class="mission-implementation__ticket"
@@ -67,20 +67,9 @@
                 'mission-implementation__ticket--selected':
                   selectedIndex === item.index,
               }"
-              :aria-expanded="selectedIndex === item.index"
-              :aria-current="
-                selectedIndex === item.index ? 'true' : undefined
-              "
-              :aria-label="
-                item.run?.workerId
-                  ? t('missions.openTicketThread', {
-                      title: item.ticket.title,
-                    })
-                  : t('missions.openTicketDetails', {
-                      title: item.ticket.title,
-                    })
-              "
-              @click="selectTicket(item.index, item.run?.workerId)"
+              :aria-label="t('missions.openTicketThread', { title: item.ticket.title })"
+              :disabled="!item.run?.workerId"
+              @click="openConversation(item.run?.workerId)"
             >
               <span class="mission-implementation__ticket-heading">
                 <small>{{ ticketNumber(item.index) }}</small>
@@ -118,8 +107,17 @@
                     assignedAgent(item)
                   }}
                 </span>
-                <ChevronRightIcon aria-hidden="true" />
               </span>
+            </button>
+            <button
+              type="button"
+              class="mission-implementation__ticket-details"
+              :aria-label="t('missions.openTicketDetails', { title: item.ticket.title })"
+              :aria-expanded="selectedIndex === item.index"
+              aria-controls="mission-ticket-details"
+              @click="selectedIndex = item.index"
+            >
+              <FileTextIcon aria-hidden="true" />
             </button>
           </li>
         </TransitionGroup>
@@ -127,7 +125,7 @@
     </div>
 
     <article
-      v-if="!selected && mission.artifacts.implementation.changes.trim()"
+      v-if="mission.artifacts.implementation.changes.trim()"
       class="mission-implementation__aggregate"
       :aria-label="t('missions.acceptedArtifact')"
     >
@@ -142,34 +140,15 @@
       </div>
     </article>
 
-    <article
-      v-if="selected"
-      class="mission-implementation__details"
-      :aria-label="t('missions.implementationTicketDetails')"
+    <MissionTicketDialog
+      :model-value="Boolean(selected)"
+      :ticket="selected?.ticket"
+      :ticket-key="selected?.ticket.id ?? ''"
+      :ticket-number="selected ? ticketNumber(selected.index) : ''"
+      @close="selectedIndex = -1"
     >
-      <header>
-        <div>
-          <small
-            >{{ repositoryName(selected.ticket.repositoryPath ?? "") }} ·
-            {{ ticketNumber(selected.index) }}</small
-          >
-          <h3>{{ selected.ticket.title }}</h3>
-        </div>
-        <button
-          type="button"
-          :aria-label="t('missions.closeTicketDetails')"
-          @click="selectedIndex = -1"
-        >
-          <X aria-hidden="true" />
-        </button>
-      </header>
-      <MarkdownPanel
-        :content="
-          selected.ticket.body?.trim() || t('missions.noTicketDescription')
-        "
-      />
       <section
-        v-if="selected.run?.implementationResult"
+        v-if="selected?.run?.implementationResult"
         class="mission-implementation__evidence"
       >
         <div>
@@ -181,43 +160,39 @@
           <p>{{ selected.run.implementationResult.tests }}</p>
         </div>
       </section>
-      <footer>
-        <span>{{
-          t(`missions.ticketRunStatus.${ticketStatus(selected)}`)
-        }}</span>
-        <button
-          v-if="
-            !readOnly &&
-            selected.run?.status === 'awaitingReview' &&
-            reviewPolicy === 'reviewEachTicket'
-          "
-          type="button"
-          class="claw-button claw-button--primary"
-          :disabled="busy"
-          @click="emit('approve', selected.run.id)"
-        >
-          <CheckIcon aria-hidden="true" />{{ t("missions.approveTicket") }}
-        </button>
-        <button
-          v-else-if="!readOnly && selected.run && ['preparing', 'running'].includes(selected.run.status)"
-          type="button"
-          class="claw-button"
-          :disabled="busy"
-          @click="emit('stop', selected.run.id)"
-        >
-          {{ t("missions.stopTicket") }}
-        </button>
-        <button
-          v-else-if="!readOnly && selected.run && ['failed', 'cancelled'].includes(selected.run.status)"
-          type="button"
-          class="claw-button claw-button--primary"
-          :disabled="busy"
-          @click="emit('retry', selected.index)"
-        >
-          {{ t("missions.retryTicket") }}
-        </button>
-      </footer>
-    </article>
+      <template #footer>
+        <div v-if="selected" class="mission-implementation__dialog-footer">
+          <span>{{ t(`missions.ticketRunStatus.${ticketStatus(selected)}`) }}</span>
+          <button
+            v-if="!readOnly && selected.run?.status === 'awaitingReview' && reviewPolicy === 'reviewEachTicket'"
+            type="button"
+            class="claw-button claw-button--primary"
+            :disabled="busy"
+            @click="emit('approve', selected.run.id)"
+          >
+            <CheckIcon aria-hidden="true" />{{ t("missions.approveTicket") }}
+          </button>
+          <button
+            v-else-if="!readOnly && selected.run && ['preparing', 'running'].includes(selected.run.status)"
+            type="button"
+            class="claw-button"
+            :disabled="busy"
+            @click="emit('stop', selected.run.id)"
+          >
+            {{ t("missions.stopTicket") }}
+          </button>
+          <button
+            v-else-if="!readOnly && selected.run && ['failed', 'cancelled'].includes(selected.run.status)"
+            type="button"
+            class="claw-button claw-button--primary"
+            :disabled="busy"
+            @click="emit('retry', selected.index)"
+          >
+            {{ t("missions.retryTicket") }}
+          </button>
+        </div>
+      </template>
+    </MissionTicketDialog>
   </section>
 </template>
 
@@ -230,13 +205,12 @@ import type { Mission, MissionTicket } from "@codex-claw/core/missions";
 import type { MissionRun } from "@codex-claw/core/mission-execution";
 import {
   CheckIcon,
-  ChevronRightIcon,
+  FileTextIcon,
   FolderIcon,
   GitBranchIcon,
   MessageCircleIcon,
-  X,
 } from "../shared/icons/app-icons";
-import MarkdownPanel from "./MarkdownPanel.vue";
+import MissionTicketDialog from "./MissionTicketDialog.vue";
 
 type TicketItem = { ticket: MissionTicket; index: number; run?: MissionRun };
 
@@ -318,8 +292,7 @@ watch(ticketItems, () => {
   if (selectedIndex.value >= 0 && !selected.value) selectedIndex.value = -1;
 });
 
-function selectTicket(index: number, workerId?: string): void {
-  selectedIndex.value = index;
+function openConversation(workerId?: string): void {
   if (workerId) emit("open-conversation", workerId);
 }
 function repositoryName(repositoryPath: string): string {
@@ -503,6 +476,10 @@ function ticketPreview(ticket: MissionTicket): string {
   list-style: none;
 }
 
+.mission-implementation__ticket-item {
+  position: relative;
+}
+
 .mission-implementation__ticket {
   display: grid;
   width: 100%;
@@ -510,7 +487,7 @@ function ticketPreview(ticket: MissionTicket): string {
   grid-template-rows: auto auto 1fr auto;
   gap: var(--space-3);
   padding: var(--space-6);
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   color: var(--color-text);
   background: var(--color-surface-lowest);
@@ -518,15 +495,17 @@ function ticketPreview(ticket: MissionTicket): string {
   cursor: pointer;
   transition:
     border-color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+    background 160ms ease;
 }
 
-.mission-implementation__ticket:hover,
+.mission-implementation__ticket:hover:not(:disabled),
 .mission-implementation__ticket:focus-visible {
   border-color: var(--color-border-strong);
   background: var(--color-surface-low);
-  transform: translateY(-1px);
+}
+
+.mission-implementation__ticket:disabled {
+  cursor: default;
 }
 
 .mission-implementation__ticket--selected {
@@ -603,6 +582,7 @@ function ticketPreview(ticket: MissionTicket): string {
   align-items: center;
   gap: var(--space-3);
   padding-top: var(--space-3);
+  padding-right: 34px;
   border-top: 1px solid var(--color-border);
   color: var(--color-text-muted);
   font-size: var(--font-size-11);
@@ -616,7 +596,6 @@ function ticketPreview(ticket: MissionTicket): string {
   white-space: nowrap;
 }
 
-.mission-implementation__ticket-footer > svg,
 .mission-implementation__agent svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
@@ -633,12 +612,31 @@ function ticketPreview(ticket: MissionTicket): string {
   white-space: nowrap;
 }
 
-.mission-implementation__details {
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
-  box-shadow: var(--shadow-md);
+.mission-implementation__ticket-details {
+  position: absolute;
+  right: var(--space-6);
+  bottom: var(--space-4);
+  z-index: 1;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.mission-implementation__ticket-details:hover,
+.mission-implementation__ticket-details:focus-visible {
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.mission-implementation__ticket-details svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .mission-implementation__aggregate {
@@ -670,62 +668,6 @@ function ticketPreview(ticket: MissionTicket): string {
   white-space: pre-wrap;
 }
 
-.mission-implementation__details > header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-6);
-  padding: var(--space-8);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-low);
-}
-
-.mission-implementation__details > header div {
-  display: grid;
-  flex: 1;
-  gap: var(--space-1);
-}
-
-.mission-implementation__details h3,
-.mission-implementation__details p {
-  margin: 0;
-}
-
-.mission-implementation__details h3 {
-  font-size: var(--font-size-18);
-}
-
-.mission-implementation__details header small {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-11);
-}
-
-.mission-implementation__details header button {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.mission-implementation__details header button:hover {
-  background: var(--color-surface-high);
-}
-
-.mission-implementation__details header svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-}
-
-.mission-implementation__details :deep(.markdown-panel) {
-  max-height: none;
-  padding: var(--space-8);
-  overflow: visible;
-}
-
 .mission-implementation__evidence {
   display: grid;
   gap: var(--space-6);
@@ -744,24 +686,22 @@ function ticketPreview(ticket: MissionTicket): string {
   white-space: pre-wrap;
 }
 
-.mission-implementation__details > footer {
+.mission-implementation__dialog-footer {
   display: flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
-  padding: var(--space-6) var(--space-8);
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
 }
 
-.mission-implementation__details > footer button {
+.mission-implementation__dialog-footer button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.mission-implementation__details > footer svg {
+.mission-implementation__dialog-footer svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
 }

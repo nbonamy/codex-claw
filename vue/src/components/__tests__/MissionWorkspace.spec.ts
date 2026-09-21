@@ -360,13 +360,20 @@ describe('MissionWorkspace', () => {
     expect(board.findAll('.mission-implementation__agent').map(agent => agent.text())).toStrictEqual(['Dina', 'Jesse']);
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
-    expect(board.findAll('.mission-implementation__ticket')[0]!.attributes('aria-current')).toBe('true');
-    expect(board.get('[aria-label="Implementation ticket details"]').text()).toContain('checkout integration test passes');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
     expect(wrapper.get('.mission-workspace__conversation > header h2').text()).toBe('Dina');
     expect(wrapper.get('.mission-workspace__conversation > header p').text()).toBe('Checkout');
+    expect(wrapper.findComponent({ name: 'ElDialog' }).props('modelValue')).toBe(false);
 
-    await board.get('.mission-implementation__details .claw-button').trigger('click');
+    await board.findAll('.mission-implementation__ticket-details')[0]!.trigger('click');
+    await flushPromises();
+
+    const ticketDialog = wrapper.findComponent({ name: 'ElDialog' });
+    expect(ticketDialog.props('modelValue')).toBe(true);
+    expect(ticketDialog.text()).toContain('Implement checkout end to end.');
+    expect(ticketDialog.text()).toContain('checkout integration test passes');
+
+    await wrapper.get('.mission-implementation__dialog-footer .claw-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenNthCalledWith(1, { id: mission.id, revision: mission.revision, action: 'accept', runId: 'run-checkout' });
@@ -385,9 +392,10 @@ describe('MissionWorkspace', () => {
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-implementation__ticket').trigger('click');
+    await wrapper.get('.mission-implementation__ticket-details').trigger('click');
+    await flushPromises();
     expect(wrapper.get('.mission-implementation__ticket').text()).toContain('Failed');
-    await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
+    await wrapper.get('.mission-implementation__dialog-footer .claw-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'run', ticketIndex: 0,
     });
@@ -396,10 +404,10 @@ describe('MissionWorkspace', () => {
     mission.execution!.runs[0]!.status = 'running';
     await wrapper.setProps({ mission: structuredClone(mission) });
     expect(wrapper.get('.mission-implementation__ticket').text()).toContain('Building');
-    expect(wrapper.get('.mission-implementation__ticket').attributes('aria-current')).toBe('true');
+    expect(wrapper.get('.mission-implementation__ticket-details').attributes('aria-expanded')).toBe('true');
     expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Building tickets');
     expect(wrapper.find('.mission-workspace__run-status button').exists()).toBe(false);
-    await wrapper.get('.mission-implementation__details .claw-button').trigger('click');
+    await wrapper.get('.mission-implementation__dialog-footer .claw-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-checkout',
     });
@@ -418,10 +426,11 @@ describe('MissionWorkspace', () => {
     }];
     const wrapper = mountWorkspace(mission);
 
-    await wrapper.get('.mission-implementation__ticket').trigger('click');
+    await wrapper.get('.mission-implementation__ticket-details').trigger('click');
+    await flushPromises();
 
-    expect(wrapper.get('[aria-label="Implementation ticket details"]').text()).toContain('Rendered the execution board.');
-    expect(wrapper.find('.mission-implementation__details footer .claw-button').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'ElDialog' }).text()).toContain('Rendered the execution board.');
+    expect(wrapper.find('.mission-implementation__dialog-footer .claw-button').exists()).toBe(false);
     expect(wrapper.find('.code-review-slot').exists()).toBe(false);
   });
 
