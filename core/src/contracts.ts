@@ -640,6 +640,7 @@ export type AppCommand =
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
   | { type: 'debug-approval-request' }
+  | { type: 'debug-user-questions' }
   | { type: 'debug-celebrate'; kind: CelebrationKind }
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-mark-unread' }

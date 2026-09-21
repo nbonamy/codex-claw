@@ -504,7 +504,7 @@ import {
   type CodexQueuedPromptData as QueuedChatPrompt,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
-import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import type { CodexConversationSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
 import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import {
@@ -923,6 +923,7 @@ async function deleteMissionFromSidebar(id: string): Promise<void> {
 const fileQuickOpenVisible = ref(false);
 const agentQuickOpenVisible = ref(false);
 const debugApproval = ref<{ agentId: string; request: BackendApprovalRequest } | null>(null);
+const debugUserQuestions = ref<{ agentId: string; message: SurfaceMessage; requestId: string } | null>(null);
 const debugAgentCreationProgress = ref<AgentCreationProgress | null>(null);
 const debugAgentCreationTimers: Array<ReturnType<typeof setTimeout>> = [];
 const agentWorkspace = ref<{
@@ -1379,7 +1380,12 @@ const providerConversation = computed(() => (
       ? props.claudeConversationSnapshot ?? null
       : null
 ));
-const conversationMessages = computed(() => providerConversation.value?.messages ?? []);
+const conversationMessages = computed(() => {
+  const messages = providerConversation.value?.messages ?? [];
+  const fixture = debugUserQuestions.value;
+  if (!fixture || fixture.agentId !== currentAgent.value?.id) return messages;
+  return [...messages, fixture.message];
+});
 const conversationLatestTurnId = computed(() => providerConversation.value?.turnIds.at(-1) ?? null);
 const conversationHasRunningPlanTool = computed(() => conversationMessages.value.some(
   (message) => message.parts.some(
@@ -1616,7 +1622,13 @@ const conversationPaneState: CodexConversationPaneState = {
 const conversationPaneActions: CodexConversationPaneActions = {
   cancel: () => emit('interrupt-agent'),
   clearGoal: () => emit('clear-goal'),
-  clientResponse: (response) => emit('client-response', response),
+  clientResponse: (response) => {
+    if (debugUserQuestions.value?.requestId === response.id) {
+      debugUserQuestions.value = null;
+      return;
+    }
+    emit('client-response', response);
+  },
   deleteTurn: (turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
   deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
   editTurn: (payload) => props.editTurnAction?.(payload) ?? emit('edit-turn', payload),
@@ -1792,11 +1804,96 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     selectTeam: selectTeamFromRail,
     sendAgentPrompt: (agentId, prompt) => emit('send-agent-prompt', { agentId, prompt }),
     setDebugApproval: (approval) => { debugApproval.value = approval; },
+    showDebugUserQuestions,
     toggleSpokenAnnouncementsMuted,
     updateComposerAttachments: (agentId, attachments) => emit('update:composerAttachments', { agentId, attachments }),
     updateComposerState: (agentId, state) => emit('update:composerState', { agentId, state }),
   },
 });
+
+function showDebugUserQuestions(agentId: string): void {
+  const requestId = 'debug-user-questions';
+  const turnId = 'debug-user-questions-turn';
+  const itemId = 'debug-user-questions-item';
+  debugUserQuestions.value = {
+    agentId,
+    requestId,
+    message: {
+      id: 'debug-user-questions-message',
+      role: 'assistant',
+      status: 'complete',
+      turnId,
+      parts: [
+        {
+          type: 'text',
+          text: 'I need two decisions before continuing.',
+          phase: 'final_answer',
+        },
+        {
+          type: 'question',
+          request: {
+            id: requestId,
+            kind: 'ask_user',
+            conversationId: `debug-${agentId}`,
+            turnId,
+            itemId,
+            payload: {
+              request: {
+                itemId,
+                delivery: 'async',
+                blocking: false,
+                questions: [
+                  {
+                    id: 'debug-user-questions-core-flow',
+                    header: 'Core flow',
+                    question: 'What should the first Linear integration let a Codex Claw user do?',
+                    isOther: true,
+                    isSecret: false,
+                    options: [
+                      {
+                        label: 'Mission ↔ Linear (Recommended)',
+                        description: 'Import a Linear issue into a Mission and sync its status, tickets, and links back.',
+                      },
+                      {
+                        label: 'Import only',
+                        description: 'Use Linear issues as Mission input without writing anything back.',
+                      },
+                      {
+                        label: 'Full workspace sync',
+                        description: 'Keep Missions, issues, comments, and statuses synchronized both ways.',
+                      },
+                    ],
+                  },
+                  {
+                    id: 'debug-user-questions-review-cadence',
+                    header: 'Review cadence',
+                    question: 'When should implementation pause for your review?',
+                    isOther: true,
+                    isSecret: false,
+                    options: [
+                      {
+                        label: 'After each ticket (Recommended)',
+                        description: 'Review each completed ticket before its repository worker continues.',
+                      },
+                      {
+                        label: 'After each repository',
+                        description: 'Let one worker finish its repository queue before review.',
+                      },
+                      {
+                        label: 'After implementation',
+                        description: 'Run every ready ticket and review the combined result once.',
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+  };
+}
 
 function openDebugOperationProgress(
   kind: Extract<AppCommand, { type: 'debug-operation-progress' }>['kind'],

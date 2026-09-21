@@ -410,7 +410,7 @@ describe('AppShell dialogs and commands', () => {
     });
   });
 
-  it('opens deterministic Markdown and approval fixtures from Debug commands', async () => {
+  it('opens deterministic Markdown, approval, and multi-question fixtures from Debug commands', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect() {}
@@ -475,6 +475,38 @@ describe('AppShell dialogs and commands', () => {
 
     expect(conversationControllerState(wrapper).thread?.approvals).toStrictEqual([]);
     expect(wrapper.emitted('resolve-approval')).toBeUndefined();
+
+    listener({ type: 'debug-user-questions' });
+    await nextTick();
+    const questionMessage = conversationControllerState(wrapper).identity.messages.at(-1);
+    expect(questionMessage).toMatchObject({ role: 'assistant' });
+    expect(questionMessage?.parts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: 'I need two decisions before continuing.' }),
+      expect.objectContaining({
+        type: 'question',
+        request: expect.objectContaining({ id: 'debug-user-questions' }),
+      }),
+    ]));
+    expect(questionMessage?.parts?.find((part) => part.type === 'question')).toMatchObject({
+      request: {
+        payload: {
+          request: {
+            questions: [
+              expect.objectContaining({ header: 'Core flow', options: expect.any(Array) }),
+              expect.objectContaining({ header: 'Review cadence', options: expect.any(Array) }),
+            ],
+          },
+        },
+      },
+    });
+
+    await conversationControllerActions(wrapper).clientResponse?.({
+      id: 'debug-user-questions',
+      payload: { cancelled: true },
+    });
+    await nextTick();
+    expect(conversationControllerState(wrapper).identity.messages).not.toContain(questionMessage);
+    expect(wrapper.emitted('client-response')).toBeUndefined();
 
     listener({ type: 'debug-mark-unread' });
     await nextTick();

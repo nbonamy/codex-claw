@@ -244,6 +244,16 @@ describe('app menu', () => {
     expect(sendDebugAgentMessage).toHaveBeenCalledOnce();
   });
 
+  it('dispatches the multi-question fixture from the debug agent menu', () => {
+    const debugCallbacks = callbacks();
+    const menu = buildAppMenuTemplate(debugCallbacks, { debugMode: true }, 'darwin');
+
+    clickNestedItem(menu, 'Debug', 'Agent Fixtures', 'Multi-question Request');
+
+    expect(debugCallbacks.sendAppCommand).toHaveBeenCalledOnce();
+    expect(debugCallbacks.sendAppCommand).toHaveBeenCalledWith({ type: 'debug-user-questions' });
+  });
+
   it('adds reload and developer tools only in debug mode', () => {
     const debugCallbacks = callbacks();
     const debugMenu = buildAppMenuTemplate(debugCallbacks, { debugMode: true }, 'darwin');
@@ -273,6 +283,7 @@ describe('app menu', () => {
     expect(submenuLabels(debugMenu, 'Debug', 'Agent Fixtures')).toStrictEqual([
       'Send Message',
       'Approval Request',
+      'Multi-question Request',
       'Mark as Unread',
       'Execution Plan',
       'Plan Review',
@@ -318,6 +329,7 @@ describe('app menu', () => {
     expect(nestedSubmenu(debugMenu, 'Debug', 'Agent Fixtures').map(menuEntryLabel)).toStrictEqual([
       'Send Message',
       'Approval Request',
+      'Multi-question Request',
       'separator',
       'Mark as Unread',
       'Execution Plan',

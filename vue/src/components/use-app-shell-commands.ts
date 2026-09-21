@@ -63,6 +63,7 @@ type AppShellCommandOptions = {
     selectTeam: (teamId: string) => void;
     sendAgentPrompt: (agentId: string, prompt: string) => void;
     setDebugApproval: (approval: DebugApproval | null) => void;
+    showDebugUserQuestions: (agentId: string) => void;
     toggleSpokenAnnouncementsMuted: () => void;
     updateComposerAttachments: (agentId: string, attachments: readonly CodexNativeAttachment[]) => void;
     updateComposerState: (agentId: string, state: CodexComposerState) => void;
@@ -357,6 +358,14 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
           canDeny: true,
         },
       });
+      return;
+    }
+
+    if (command.type === 'debug-user-questions') {
+      const agent = currentAgent.value;
+      if (!agent) return;
+      options.actions.openAgentSurface();
+      options.actions.showDebugUserQuestions(agent.id);
       return;
     }
 

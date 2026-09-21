@@ -185,6 +185,10 @@ function buildDebugAgentFixtures(callbacks: AppMenuCallbacks): MenuItemConstruct
       label: 'Approval Request',
       click: () => callbacks.sendAppCommand({ type: 'debug-approval-request' }),
     },
+    {
+      label: 'Multi-question Request',
+      click: () => callbacks.sendAppCommand({ type: 'debug-user-questions' }),
+    },
     { type: 'separator' },
     {
       label: 'Mark as Unread',
