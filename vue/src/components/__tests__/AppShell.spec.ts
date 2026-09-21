@@ -717,7 +717,7 @@ describe('AppShell authentication and conversation', () => {
     const startCodeReview = vi.fn().mockResolvedValue(next);
     const wrapper = mountShell({ snapshot, startCodeReview });
 
-    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('open-code-review');
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'codeReview');
     await nextTick();
     expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
 
@@ -772,7 +772,7 @@ describe('AppShell authentication and conversation', () => {
       selectedReasoningEffort: 'medium',
     });
 
-    wrapper.getComponent({ name: 'AgentHeader' }).vm.$emit('open-code-review');
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'codeReview');
     await nextTick();
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
     await flushPromises();

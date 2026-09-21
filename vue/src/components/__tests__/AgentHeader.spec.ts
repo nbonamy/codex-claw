@@ -312,7 +312,7 @@ describe('AgentHeader', () => {
     expect(wrapper.emitted('toggle-workspace')).toStrictEqual([[]]);
   });
 
-  it('opens code review from the toolbar for a Git workspace', async () => {
+  it('does not render a code review action in the header', () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
       folder: '/Users/nbonamy/src/id8',
       branch: 'feature',
@@ -326,36 +326,7 @@ describe('AgentHeader', () => {
       updatedAt: '2026-06-05T00:00:00.000Z',
     });
 
-    await wrapper.get('[aria-label="Open code review"]').trigger('click');
-
-    expect(wrapper.emitted('open-code-review')).toStrictEqual([[]]);
-  });
-
-  it('keeps code review available from persisted Git identity before status refresh', () => {
-    const wrapper = mount(AgentHeader, {
-      props: {
-        agent: {
-          ...agent,
-          workspace: {
-            kind: 'git',
-            folder: '/Users/nbonamy/src/id8',
-            repositoryName: 'id8',
-            repositoryRoot: '/Users/nbonamy/src/id8',
-            branch: 'feature',
-            isLinkedWorktree: false,
-            primaryWorktreeRoot: '/Users/nbonamy/src/id8',
-            updatedAt: '2026-06-05T00:00:00.000Z',
-          },
-        },
-        backendRuntime: { backend: 'codex', status: 'running' },
-        gitStatus: null,
-        isLoading: false,
-        sidebarCollapsed: false,
-      },
-      global: { plugins: [ElementPlus, i18n] },
-    });
-
-    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
   });
 
   it('opens the agent folder in its remembered application from the header', async () => {
@@ -679,7 +650,6 @@ describe('AgentHeader', () => {
       'open-in-control',
       'subagent-control',
       'agent-header__execution-plan',
-      'agent-header__review',
       'agent-header__workspace',
       'update-available-badge',
     ]);
