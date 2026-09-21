@@ -482,6 +482,7 @@ function ticketPreview(ticket: MissionTicket): string {
 .mission-implementation__lane > header .mission-implementation__workspace {
   display: inline-flex;
   min-width: 0;
+  align-self: flex-start;
   align-items: center;
   gap: var(--space-2);
   margin-left: auto;
