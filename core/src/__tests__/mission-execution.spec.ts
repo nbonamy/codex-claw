@@ -28,6 +28,10 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     if (stage === 'tickets') {
       expect(prompt).toContain('Continue as the same Mission orchestrator');
     }
+    if (stage === 'implementation') {
+      expect(prompt).toContain('coherent local commits');
+      expect(prompt).toContain('commit SHAs');
+    }
     expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Claw-owned Mission skill');
     expect(prompt).toContain('already visible in the Mission workspace');

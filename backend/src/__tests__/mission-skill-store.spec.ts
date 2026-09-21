@@ -26,6 +26,11 @@ describe('Mission skill store', () => {
       expect(ticketSkill).toContain('without tracker setup');
       expect(ticketSkill).not.toContain('/setup-matt-pocock-skills');
       expect(tickets[0]!.path).toBe(path.join(root, 'mission-test', 'skills', 'mission-to-tickets', 'SKILL.md'));
+      const implementationSkill = await readFile(implementation[0]!.path, 'utf8');
+      expect(implementationSkill).toContain('Commit at coherent, reviewable milestones');
+      expect(implementationSkill).toContain('At least one new commit must represent this ticket');
+      expect(implementationSkill).toContain('verify the working tree is clean');
+      expect(implementationSkill).toContain('do not push, merge, or open a pull request');
     } finally {
       await rm(root, { recursive: true, force: true });
     }
