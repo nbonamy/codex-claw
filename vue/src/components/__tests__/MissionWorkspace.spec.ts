@@ -89,6 +89,12 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission, { executeMission });
 
     expect(wrapper.get('[aria-label="Artifact ready for review"]').text()).toContain('Teams need one bill');
+    const stageHeader = wrapper.get('.mission-workspace__stage-header');
+    expect(stageHeader.get('h2').text()).toBe('Mission brief');
+    expect(stageHeader.text()).not.toContain('Define the outcome');
+    expect(stageHeader.find('.mission-workspace__review-status').exists()).toBe(false);
+    expect(stageHeader.get('.claw-button').text()).toContain('Approve and continue');
+    expect(wrapper.find('.mission-workspace__artifact-toolbar').exists()).toBe(false);
     expect(wrapper.get('.mission-requirement-review__footer').text()).toContain('Select text to leave an inline comment.');
     expect(wrapper.find('.conversation-slot').exists()).toBe(true);
 
@@ -208,6 +214,8 @@ describe('MissionWorkspace', () => {
     await requirements!.trigger('click');
 
     expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Teams need one bill');
+    expect(wrapper.get('.mission-workspace__stage-header h2').text()).toBe('Mission brief');
+    expect(wrapper.get('.mission-workspace__accepted-status').text()).toBe('Accepted');
     expect(wrapper.get('.mission-workspace__conversation').text()).toContain('Orchestrator');
   });
 
@@ -227,7 +235,9 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission, { sendMissionPrompt });
 
     const drafts = wrapper.get('[aria-label="Draft tickets"]');
-    expect(drafts.text()).toContain('2 drafts');
+    expect(wrapper.get('.mission-workspace__stage-header h2').text()).toBe('Implementation backlog');
+    expect(wrapper.get('.mission-workspace__stage-heading > span').text()).toBe('2 drafts');
+    expect(wrapper.find('.mission-workspace__artifact-toolbar').exists()).toBe(false);
     const ticketCards = drafts.findAll('.mission-ticket-board__card');
     expect(ticketCards).toHaveLength(2);
     expect(ticketCards[0]!.text()).toContain('Create billing account');

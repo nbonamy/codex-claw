@@ -205,11 +205,6 @@ function oneLine(value: string): string {
 <style scoped>
 .mission-requirement-review {
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
-  box-shadow: var(--shadow-sm);
 }
 
 .mission-requirement-review__document :deep(.markdown-panel) {
