@@ -62,7 +62,14 @@ describe('MissionWorkspace', () => {
 
     expect(wrapper.findAll('.mission-workspace__stages button')).toHaveLength(5);
     expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
-    expect(wrapper.get('[aria-label="Skills in use"]').text()).toContain('grilling');
+    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping requirementsStop');
+    expect(wrapper.get('.mission-workspace__run-status').attributes()).toMatchObject({
+      role: 'status',
+      'aria-live': 'polite',
+    });
+    expect(wrapper.find('.mission-workspace__working').exists()).toBe(false);
+    expect(wrapper.find('.mission-workspace__empty-artifact').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('grilling');
     expect(wrapper.get('.conversation-slot').text()).toContain(mission.execution!.runs[0]!.workerId);
     expect(wrapper.emitted('open-conversation')).toStrictEqual([[mission.execution!.runs[0]!.workerId]]);
     expect(wrapper.find('form').exists()).toBe(false);
@@ -212,11 +219,12 @@ describe('MissionWorkspace', () => {
     expect(ticketCards[0]!.text()).toContain('Create billing account');
     expect(ticketCards[0]!.text()).toContain('Deliver the account with integration coverage.');
     expect(ticketCards[1]!.text()).toContain('After 01');
+    expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping ticketsStop');
 
     await ticketCards[1]!.trigger('click');
 
     expect(drafts.get('[aria-label="Ticket details"]').text()).toContain('Let an owner buy seats.');
-    expect(wrapper.get('[aria-label="Skills in use"]').text()).toContain('to-tickets');
+    expect(wrapper.text()).not.toContain('to-tickets');
     expect(wrapper.find('[aria-label="Artifact ready for review"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Mission conversations"]').exists()).toBe(false);
   });
@@ -373,7 +381,7 @@ describe('MissionWorkspace', () => {
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__working .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__run-status button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-requirements' });
 
     mission.execution!.runs[0]!.status = 'failed';
@@ -390,7 +398,7 @@ describe('MissionWorkspace', () => {
       .mockRejectedValueOnce('Could not restart the worker');
     const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__working .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__run-status button').trigger('click');
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toBe('Could not stop the worker');
 

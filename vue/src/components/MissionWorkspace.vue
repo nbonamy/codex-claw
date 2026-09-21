@@ -48,20 +48,27 @@
 
       <main class="mission-workspace__workbench">
         <header class="mission-workspace__stage-header">
-          <div>
+          <div class="mission-workspace__stage-heading">
             <h2>{{ t(`missions.${viewedStage}`) }}</h2>
             <p>{{ t(`missions.stageDescription.${viewedStage}`) }}</p>
           </div>
-          <button
-            v-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal && !debugFixture"
-            class="claw-button claw-button--primary"
-            type="button"
-            :disabled="busy"
-            @click="approveProposal"
-          >
-            {{ t('missions.approveAndContinue') }}
-            <ArrowRightIcon aria-hidden="true" />
-          </button>
+          <div class="mission-workspace__stage-actions">
+            <div v-if="activeStageRun" class="mission-workspace__run-status" role="status" aria-live="polite">
+              <span class="mission-workspace__activity-dot" aria-hidden="true" />
+              <span>{{ activeStageStatus }}</span>
+              <button type="button" :disabled="busy" @click="stopRun(activeStageRun.id)">{{ t('missions.stopRun') }}</button>
+            </div>
+            <button
+              v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal && !debugFixture"
+              class="claw-button claw-button--primary"
+              type="button"
+              :disabled="busy"
+              @click="approveProposal"
+            >
+              {{ t('missions.approveAndContinue') }}
+              <ArrowRightIcon aria-hidden="true" />
+            </button>
+          </div>
         </header>
 
         <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
@@ -79,19 +86,6 @@
         />
 
         <slot v-else-if="viewedStage === 'ship'" name="ship" :open-conversation="selectConversation" />
-
-        <section v-else-if="viewedStage === mission.stage && activeRun && !activeRun.proposal" class="mission-workspace__working" aria-live="polite">
-          <span class="mission-workspace__callout-icon"><SparklesIcon aria-hidden="true" /></span>
-          <div>
-            <small>{{ t(`missions.runStatus.${activeRun.status}`) }}</small>
-            <h3>{{ t('missions.stageInProgress', { stage: t(`missions.${mission.stage}`) }) }}</h3>
-            <p>{{ t('missions.conversationDrivesStage') }}</p>
-            <div v-if="activeRun.skills.length" class="mission-workspace__skills" :aria-label="t('missions.skillsInUse')">
-              <span v-for="skill in activeRun.skills" :key="skill.path">{{ skill.name }}</span>
-            </div>
-          </div>
-          <button class="claw-button" type="button" :disabled="busy" @click="stopRun(activeRun.id)">{{ t('missions.stopRun') }}</button>
-        </section>
 
         <section v-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
           <header class="mission-workspace__artifact-toolbar">
@@ -135,7 +129,7 @@
           <MarkdownPanel v-else :content="artifactMarkdown" />
         </section>
 
-        <section v-else-if="!['implementation', 'ship'].includes(viewedStage)" class="mission-workspace__empty-artifact">
+        <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && !activeStageRun" class="mission-workspace__empty-artifact">
           <span class="mission-workspace__callout-icon"><FileTextIcon aria-hidden="true" /></span>
           <h3>{{ t('missions.noArtifactYet') }}</h3>
           <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.orchestratorStarting') }}</p>
@@ -217,6 +211,21 @@ const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
+const activeStageRun = computed(() => (
+  viewedStage.value === props.mission.stage
+  && !['implementation', 'ship'].includes(viewedStage.value)
+  && activeRun.value
+  && !activeRun.value.proposal
+    ? activeRun.value
+    : undefined
+));
+const activeStageStatus = computed(() => {
+  const run = activeStageRun.value;
+  if (!run) return '';
+  return run.status === 'running'
+    ? t(`missions.stageActivity.${run.stage}`)
+    : t(`missions.runStatus.${run.status}`);
+});
 const debugFixture = computed(() => props.mission.execution?.debugFixture === true);
 const currentIndex = computed(() => featureStages.indexOf(props.mission.stage));
 const completedStageCount = computed(() => props.mission.status === 'completed' ? featureStages.length : currentIndex.value);
@@ -390,7 +399,7 @@ async function sendRequirementComments(comments: MissionRequirementComment[]): P
 .mission-workspace__header { display: flex; min-height: 64px; align-items: center; gap: var(--space-8); padding: 0 var(--space-10); border-bottom: 1px solid var(--color-border); }
 .mission-workspace__navigation-button { border: 0; color: var(--color-primary); background: transparent; cursor: pointer; }
 .mission-workspace__identity { min-width: 0; flex: 1; }
-.mission-workspace__identity > span, .mission-workspace__stage-header small, .mission-workspace__working small { color: var(--color-text-muted); font-size: var(--font-size-12); }
+.mission-workspace__identity > span, .mission-workspace__stage-header small { color: var(--color-text-muted); font-size: var(--font-size-12); }
 .mission-workspace h1, .mission-workspace h2, .mission-workspace h3, .mission-workspace p { margin: 0; }
 .mission-workspace h1 { overflow: hidden; margin-top: var(--space-1); font-size: var(--font-size-18); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
 .mission-workspace__mission-status, .mission-workspace__review-status, .mission-workspace__accepted-status { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-6); border-radius: var(--radius-full); color: var(--color-on-primary-container); background: var(--color-primary-container); font-size: var(--font-size-12); white-space: nowrap; }
@@ -415,19 +424,21 @@ async function sendRequirementComments(comments: MissionRequirementComment[]): P
 .mission-workspace__progress-summary [role='progressbar'] span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
 .mission-workspace__workbench { min-width: 0; padding: var(--space-12); overflow: auto; }
 .mission-workspace__stage-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-10); padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border); }
-.mission-workspace__stage-header > div { display: grid; gap: var(--space-2); }
+.mission-workspace__stage-heading { display: grid; gap: var(--space-2); }
 .mission-workspace__stage-header h2 { font-size: var(--font-size-24); font-weight: var(--font-weight-semibold); }
-.mission-workspace__stage-header p, .mission-workspace__working p, .mission-workspace__empty-artifact p { color: var(--color-text-muted); line-height: var(--line-height-20); }
+.mission-workspace__stage-header p, .mission-workspace__empty-artifact p { color: var(--color-text-muted); line-height: var(--line-height-20); }
 .mission-workspace__stage-header button, .mission-workspace__empty-artifact button { display: inline-flex; align-items: center; gap: var(--space-3); white-space: nowrap; }
 .mission-workspace__stage-header button svg, .mission-workspace__empty-artifact button svg { width: var(--icon-sm); height: var(--icon-sm); }
+.mission-workspace__stage-actions { display: flex; min-height: 34px; align-items: center; }
+.mission-workspace__run-status { display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--font-size-13); white-space: nowrap; }
+.mission-workspace__activity-dot { width: var(--space-4); height: var(--space-4); border-radius: var(--radius-full); background: var(--color-primary); animation: mission-workspace-activity-pulse 1.4s ease-in-out infinite; }
+.mission-workspace__run-status button { padding: var(--space-2) var(--space-3); border: 0; color: var(--color-text-muted); background: transparent; font: inherit; cursor: pointer; }
+.mission-workspace__run-status button:hover:not(:disabled), .mission-workspace__run-status button:focus-visible { color: var(--color-text); }
+.mission-workspace__run-status button:disabled { cursor: default; opacity: 0.5; }
 .mission-workspace__error { margin-top: var(--space-8) !important; padding: var(--space-6); border-radius: var(--radius-md); color: var(--color-on-error-container); background: var(--color-error-container); }
-.mission-workspace__working, .mission-workspace__empty-artifact { display: flex; max-width: 700px; align-items: flex-start; gap: var(--space-8); margin: var(--space-16) auto; padding: var(--space-10); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-low); }
-.mission-workspace__working > div { display: grid; flex: 1; gap: var(--space-3); }
+.mission-workspace__empty-artifact { display: flex; max-width: 700px; align-items: center; flex-direction: column; gap: var(--space-8); margin: var(--space-16) auto; padding: var(--space-10); border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-low); text-align: center; }
 .mission-workspace__callout-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: var(--radius-lg); color: var(--color-primary); background: var(--color-primary-container); }
 .mission-workspace__callout-icon svg { width: var(--icon-lg); height: var(--icon-lg); }
-.mission-workspace__skills { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
-.mission-workspace__skills span { padding: var(--space-2) var(--space-4); border-radius: var(--radius-full); color: var(--color-on-primary-container); background: var(--color-primary-container); font-size: var(--font-size-11); }
-.mission-workspace__empty-artifact { align-items: center; flex-direction: column; text-align: center; }
 .mission-workspace__artifact { max-width: 800px; margin: var(--space-8) auto 0; }
 .mission-workspace__artifact-toolbar { display: flex; min-height: 42px; align-items: center; gap: var(--space-4); margin-bottom: var(--space-6); color: var(--color-text-muted); }
 .mission-workspace__artifact-toolbar > svg { width: var(--icon-md); height: var(--icon-md); }
@@ -449,6 +460,8 @@ async function sendRequirementComments(comments: MissionRequirementComment[]): P
 .mission-workspace__conversation :deep(.conversation-pane) { flex: 1; min-height: 0; }
 .mission-workspace__conversation-empty { display: grid; flex: 1; place-items: center; align-content: center; gap: var(--space-4); padding: var(--space-10); color: var(--color-text-muted); text-align: center; }
 .mission-workspace__conversation-empty svg { width: var(--icon-xl); height: var(--icon-xl); color: var(--color-primary); }
+@keyframes mission-workspace-activity-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mission-workspace__activity-dot { animation: none; } }
 @container (max-width: 980px) { .mission-workspace__body { grid-template-columns: 200px minmax(360px, 1fr); } .mission-workspace__conversation { display: none; } }
 @container (max-width: 680px) { .mission-workspace__body { display: flex; overflow: auto; flex-direction: column; } .mission-workspace__process { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); } .mission-workspace__stages { grid-template-columns: repeat(4, minmax(120px, 1fr)); overflow-x: auto; } .mission-workspace__progress-summary { margin-top: var(--space-8); } .mission-workspace__workbench { overflow: visible; } }
 </style>
