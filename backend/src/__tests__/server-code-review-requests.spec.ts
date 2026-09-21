@@ -9,6 +9,42 @@ import { createTestSnapshot } from './server-test-fixtures';
 import type { ReviewToolHandlers } from '../review/review-tool-registry';
 
 describe('ClawBackendServer code review workflow', () => {
+  it('rejects malformed finding decisions at the backend protocol boundary', async () => {
+    const server = new ClawBackendServer({
+      version: 'test', snapshot: createTestSnapshot(),
+      codeReviewTools: {
+        createReviewToolContext: () => ({ id: 'unused', url: 'http://review.test/mcp' }),
+        closeReviewToolContext: vi.fn(),
+      },
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: '2.0', id: 'invalid-decision',
+      method: backendMethods.agentCodeReviewFindingDecide,
+      params: {
+        agentId: 'agent-owner',
+        input: { sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', decision: 'ignore' },
+      },
+    });
+
+    expect(response).toMatchObject({
+      error: { code: -32602, message: 'Invalid code review decision input.' },
+    });
+
+    const emptyDiscussion = await server.handleMessage({
+      jsonrpc: '2.0', id: 'invalid-discussion',
+      method: backendMethods.agentCodeReviewFindingDiscuss,
+      params: {
+        agentId: 'agent-owner',
+        input: { sessionId: 'review-1', roundId: 'round-1', findingId: 'finding-1', question: ' ' },
+      },
+    });
+    expect(emptyDiscussion).toMatchObject({
+      error: { code: -32602, message: 'Invalid code review discussion input.' },
+    });
+    await server.close();
+  });
+
   it('discards a review session through the app-owned request', async () => {
     const snapshot = createTestSnapshot();
     const owner: Agent = {
@@ -246,6 +282,58 @@ describe('ClawBackendServer code review workflow', () => {
     expect(round).not.toHaveProperty('error');
     expect(round.findings[0]?.decision.state).toBe('selected');
     expect(round.findings[0]?.remediation).toStrictEqual({ state: 'notStarted' });
+    await server.close();
+  });
+
+  it('closes the review tool context when its visible reviewer is deleted normally', async () => {
+    const snapshot = createTestSnapshot();
+    const owner: Agent = {
+      id: 'agent-owner', teamId: snapshot.teams[0]!.id, name: 'Owner', folder: '/repo',
+      backend: 'codex', status: { type: 'idle' },
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
+    };
+    snapshot.agents.push(owner);
+    snapshot.teams[0]!.agentIds.push(owner.id);
+    const releaseConversation = vi.fn();
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      runCodeReview: vi.fn(async (_agent, input) => ({
+        text: '',
+        reviewerSession: input.reviewerSession ?? { kind: 'codex', threadId: 'review-thread' },
+      })),
+      archiveAgentConversation: vi.fn().mockResolvedValue(undefined),
+      releaseConversation,
+      sendPrompt: vi.fn(),
+      interrupt: vi.fn(),
+      respondToAgentRequest: vi.fn(),
+      onEvent: () => () => undefined,
+      close: vi.fn(),
+    };
+    const closeReviewToolContext = vi.fn();
+    const server = new ClawBackendServer({
+      version: 'test', snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+      codeReviewTools: {
+        createReviewToolContext: () => ({ id: 'review-context', url: 'http://review.test/mcp' }),
+        closeReviewToolContext,
+      },
+    });
+
+    await request(server, backendMethods.agentCodeReviewStart, {
+      agentId: owner.id,
+      input: { scope: { type: 'uncommitted' }, threadMode: 'independent' },
+    });
+    const reviewer = snapshot.agents.find((candidate) => candidate.id !== owner.id)!;
+    await vi.waitFor(() => expect(reviewer.codeReview?.status).toBe('ready'));
+
+    await request(server, backendMethods.agentDelete, { agentId: reviewer.id });
+
+    expect(closeReviewToolContext).toHaveBeenCalledExactlyOnceWith('review-context');
+    expect(snapshot.agents).toStrictEqual([owner]);
+    expect(releaseConversation).toHaveBeenCalledWith(reviewer.id);
     await server.close();
   });
 });

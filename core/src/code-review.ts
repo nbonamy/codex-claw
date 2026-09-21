@@ -203,6 +203,19 @@ export function isCodeReviewStartInput(value: unknown): value is CodeReviewStart
   return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode);
 }
 
+export function isCodeReviewDecisionInput(value: unknown): value is CodeReviewDecisionInput {
+  if (!isCodeReviewFindingRef(value)) return false;
+  if (value.decision === 'select') return true;
+  return value.decision === 'reject'
+    && (value.reason === undefined || typeof value.reason === 'string');
+}
+
+export function isCodeReviewDiscussionInput(value: unknown): value is CodeReviewDiscussionInput {
+  return isCodeReviewFindingRef(value)
+    && typeof value.question === 'string'
+    && value.question.trim().length > 0;
+}
+
 export function isCodeReviewSession(value: unknown): value is CodeReviewSession {
   if (!isRecord(value) || typeof value.id !== 'string') return false;
   if (typeof value.targetAgentId !== 'string' || typeof value.reviewerAgentId !== 'string') return false;
@@ -216,6 +229,16 @@ function isCodeReviewScope(value: unknown): value is CodeReviewScope {
   if (!isRecord(value)) return false;
   if (value.type === 'uncommitted') return true;
   return value.type === 'branch' && typeof value.baseRef === 'string' && value.baseRef.trim().length > 0;
+}
+
+function isCodeReviewFindingRef(value: unknown): value is CodeReviewFindingRef & Record<string, unknown> {
+  return isRecord(value)
+    && typeof value.sessionId === 'string'
+    && value.sessionId.trim().length > 0
+    && typeof value.roundId === 'string'
+    && value.roundId.trim().length > 0
+    && typeof value.findingId === 'string'
+    && value.findingId.trim().length > 0;
 }
 
 function isCodeReviewThreadMode(value: unknown): value is CodeReviewThreadMode {

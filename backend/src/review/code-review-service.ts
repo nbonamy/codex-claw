@@ -167,14 +167,18 @@ export class CodeReviewService {
       }
     }
     round.status = 'submitted';
-    session.status = round.findings.some((finding) => finding.decision.state === 'selected')
+    session.status = round.findings.some((finding) => (
+      finding.decision.state === 'selected' && finding.remediation.state !== 'fixed'
+    ))
       ? 'fixing'
       : 'readyToFinish';
     session.updatedAt = submittedAt;
     for (const finding of round.findings) {
-      finding.remediation = finding.decision.state === 'selected'
-        ? { state: 'pending', queuedAt: submittedAt }
-        : { state: 'skipped', startedAt: submittedAt };
+      if (finding.remediation.state !== 'fixed') {
+        finding.remediation = finding.decision.state === 'selected'
+          ? { state: 'pending', queuedAt: submittedAt }
+          : { state: 'skipped', startedAt: submittedAt };
+      }
       finding.updatedAt = submittedAt;
     }
     if (session.status === 'readyToFinish') round.status = 'completed';
@@ -208,6 +212,10 @@ export class CodeReviewService {
     this.closeReviewToolContext(session);
     delete agent.codeReview;
     await this.options.changed();
+  }
+
+  closeForAgentRemoval(agent: Agent): void {
+    if (agent.codeReview) this.closeReviewToolContext(agent.codeReview);
   }
 
   async reviewAgain(agent: Agent, sessionId: string): Promise<CodeReviewRound> {
@@ -273,6 +281,7 @@ export class CodeReviewService {
 
     const interruptedAt = this.timestamp();
     for (const finding of round.findings) {
+      if (finding.remediation.state !== 'pending' && finding.remediation.state !== 'fixing') continue;
       finding.remediation = { state: 'notStarted' };
       finding.updatedAt = interruptedAt;
     }
@@ -425,6 +434,13 @@ export class CodeReviewService {
     round: CodeReviewRound,
     input: CodeReviewFindingInput,
   ): Promise<CodeReviewFinding> {
+    if (
+      session.status !== 'reviewing'
+      || round.status !== 'reviewing'
+      || !this.activeRoundTurns.has(round.id)
+    ) {
+      throw new Error('Findings can only be reported during an active review turn.');
+    }
     const now = this.timestamp();
     const prior = input.priorFindingId
       ? this.findFindingInSession(session, input.priorFindingId)

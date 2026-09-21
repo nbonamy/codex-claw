@@ -308,6 +308,7 @@ describe('app menu', () => {
       'Findings While Reviewing',
       'Findings Ready for Selection',
       'Remediation Mix',
+      'Completed Without Findings',
     ]);
     expect(submenuLabels(debugMenu, 'Debug', 'Thread Flags')).toStrictEqual([
       'Delegate to Worktree',
@@ -364,6 +365,7 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings While Reviewing');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings Ready for Selection');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Remediation Mix');
+    clickNestedItem(debugMenu, 'Debug', 'Review', 'Completed Without Findings');
     clickThreadFlagItem(debugMenu, 'Delegate to Worktree', true);
     clickThreadFlagItem(debugMenu, 'Delegate to Worktree', false);
     clickThreadFlagItem(debugMenu, 'Ready for Review', true);
@@ -438,6 +440,7 @@ describe('app menu', () => {
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(1, 'reviewing');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(2, 'ready');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(3, 'fixing');
+    expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(4, 'readyToFinish');
     expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(1, 'delegate_to_worktree', true);
     expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(2, 'delegate_to_worktree', false);
     expect(debugCallbacks.setDebugThreadFlag).toHaveBeenNthCalledWith(3, 'ready_for_review', true);

@@ -12,7 +12,7 @@ export type AppMenuOptions = {
   updateStatus?: DesktopUpdateStatus;
 };
 
-export type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing';
+export type DebugCodeReviewScenario = 'reviewing' | 'ready' | 'fixing' | 'readyToFinish';
 
 export type AppMenuCallbacks = {
   checkForUpdates?: () => void;
@@ -170,6 +170,11 @@ function buildDebugCodeReviewFixtures(callbacks: AppMenuCallbacks): MenuItemCons
       label: 'Remediation Mix',
       enabled: Boolean(callbacks.injectDebugCodeReview),
       click: () => callbacks.injectDebugCodeReview?.('fixing'),
+    },
+    {
+      label: 'Completed Without Findings',
+      enabled: Boolean(callbacks.injectDebugCodeReview),
+      click: () => callbacks.injectDebugCodeReview?.('readyToFinish'),
     },
   ];
 }
