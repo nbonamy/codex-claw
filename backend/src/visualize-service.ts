@@ -15,6 +15,7 @@ import { createEntityId } from '@codex-claw/core/ids';
 const MAX_VISUALIZATION_SOURCE_BYTES = 250_000;
 const MAX_GENERATED_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VISUALIZATIONS = 50;
+const SUPPORTED_MERMAID_GUIDANCE = 'For Mermaid, use only flowchart, state, sequence, class, ER, or XY diagrams; use SVG for other visualization types.';
 
 export type VisualizationSuggestionInput = {
   title: string;
@@ -31,7 +32,6 @@ export type VisualizationInput = {
 
 export type ReplaceVisualizationInput = VisualizationInput & {
   visualizationId: string;
-  expectedRevision: number;
 };
 
 export type VisualizeServiceOptions = {
@@ -63,16 +63,14 @@ export class VisualizeService {
     return agent.visualize;
   }
 
-  developerInstructionsForAgent(agentId: string): string | undefined {
-    const visualize = this.contextForAgent(agentId);
-    if (!visualize) return undefined;
-    const selected = visualize.visualizations.find(visualization => visualization.id === visualize.selectedVisualizationId);
+  developerInstructions(): string {
     return [
-      'Codex Claw Visualize mode is active. Diagrams and suggestions must be published through the Visualize MCP tools; keep chat secondary.',
+      'Codex Claw may expose contextual Visualize MCP tools for the current conversation.',
+      'When those tools are available, Visualize mode is active: publish diagrams and suggestions through them and keep chat secondary.',
+      'Use list-visualizations to discover the current selection and get-visualization before replacing an existing visualization. Use add-visualization when the user asks for a new one.',
+      SUPPORTED_MERMAID_GUIDANCE,
       'Use the current conversation and existing visualizations as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research unless the user explicitly asks for outside evidence.',
-      selected
-        ? `The user currently has visualization "${selected.title}" (${selected.id}, revision ${selected.revision}) selected. Interpret edit requests as targeting it: read it first, then replace it with optimistic revision checking.`
-        : 'No visualization is selected yet. Use add-visualization when the user asks for a new visualization.',
+      'When the Visualize tools are unavailable, handle the conversation normally and do not claim that Visualize mode is active.',
     ].join(' ');
   }
 
@@ -128,8 +126,8 @@ export class VisualizeService {
     this.bindConversation(agentId, visualize);
     visualize.suggestions = suggestions.map(suggestion => ({
       id: this.createId('visualize-suggestion'),
-      title: boundedText(compactText(suggestion.title), 'Suggestion title', visualizationSuggestionLimits.title),
-      description: boundedText(compactText(suggestion.description), 'Suggestion description', visualizationSuggestionLimits.description),
+      title: boundedCharacters(compactText(suggestion.title), 'Suggestion title', visualizationSuggestionLimits.title),
+      description: boundedCharacters(compactText(suggestion.description), 'Suggestion description', visualizationSuggestionLimits.description),
     }));
     visualize.updatedAt = this.now().toISOString();
     await this.commit();
@@ -139,7 +137,6 @@ export class VisualizeService {
   async add(agentId: string, input: VisualizationInput): Promise<{
     success: true;
     visualizationId: string;
-    revision: number;
     title: string;
   }> {
     const { visualize } = this.requireContext(agentId);
@@ -153,12 +150,14 @@ export class VisualizeService {
     if (input.suggestionId && !suggestion) {
       throw new Error(`Visualize suggestion not found: ${input.suggestionId}`);
     }
+    if (suggestion?.visualizationId) {
+      throw new Error(`Visualize suggestion already generated: ${input.suggestionId}`);
+    }
     const timestamp = this.now().toISOString();
     const visualization: Visualization = {
       id: this.createId('visualization'),
       title: boundedText(input.title, 'Visualization title', 200),
       content: await this.visualizationContent(input.content),
-      revision: 1,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -169,7 +168,7 @@ export class VisualizeService {
     }
     visualize.updatedAt = timestamp;
     await this.commit();
-    return { success: true, visualizationId: visualization.id, revision: visualization.revision, title: visualization.title };
+    return { success: true, visualizationId: visualization.id, title: visualization.title };
   }
 
   get(agentId: string, visualizationId: string): { success: true; visualization: Visualization } {
@@ -179,7 +178,7 @@ export class VisualizeService {
 
   list(agentId: string): {
     success: true;
-    visualizations: Array<Pick<Visualization, 'id' | 'title' | 'revision'> & { kind: Visualization['content']['kind']; selected: boolean }>;
+    visualizations: Array<Pick<Visualization, 'id' | 'title'> & { kind: Visualization['content']['kind']; selected: boolean }>;
   } {
     const { visualize } = this.requireContext(agentId);
     return {
@@ -188,7 +187,6 @@ export class VisualizeService {
         id: visualization.id,
         title: visualization.title,
         kind: visualization.content.kind,
-        revision: visualization.revision,
         selected: visualization.id === visualize.selectedVisualizationId,
       })),
     };
@@ -217,7 +215,6 @@ export class VisualizeService {
   async replace(agentId: string, input: ReplaceVisualizationInput): Promise<{
     success: true;
     visualizationId: string;
-    revision: number;
     title: string;
   }> {
     const { visualize } = this.requireContext(agentId);
@@ -225,22 +222,22 @@ export class VisualizeService {
     const index = visualize.visualizations.findIndex(candidate => candidate.id === input.visualizationId);
     const current = visualize.visualizations[index];
     if (!current) throw new Error(`Visualization not found: ${input.visualizationId}`);
-    if (current.revision !== input.expectedRevision) {
-      throw new Error(`Visualization changed. Read revision ${current.revision} before replacing it.`);
+    const suggestion = input.suggestionId
+      ? visualize.suggestions.find(candidate => candidate.id === input.suggestionId)
+      : undefined;
+    if (input.suggestionId && !suggestion) {
+      throw new Error(`Visualize suggestion not found: ${input.suggestionId}`);
     }
     const timestamp = this.now().toISOString();
     const replacement: Visualization = {
       ...current,
       title: boundedText(input.title, 'Visualization title', 200),
       content: await this.visualizationContent(input.content),
-      revision: current.revision + 1,
       updatedAt: timestamp,
     };
     visualize.visualizations[index] = replacement;
     visualize.selectedVisualizationId = replacement.id;
-    if (input.suggestionId) {
-      const suggestion = visualize.suggestions.find(candidate => candidate.id === input.suggestionId);
-      if (!suggestion) throw new Error(`Visualize suggestion not found: ${input.suggestionId}`);
+    if (suggestion) {
       suggestion.visualizationId = replacement.id;
     }
     visualize.updatedAt = timestamp;
@@ -248,7 +245,6 @@ export class VisualizeService {
     return {
       success: true,
       visualizationId: replacement.id,
-      revision: replacement.revision,
       title: replacement.title,
     };
   }
@@ -314,6 +310,7 @@ export class VisualizeService {
 
   private async visualizationContent(input: VisualizationInput['content']): Promise<VisualizationContent> {
     if ('source' in input) {
+      if (input.kind === 'mermaid') assertSupportedMermaid(input.source);
       return {
         kind: input.kind,
         source: boundedText(input.source, 'Visualization source', MAX_VISUALIZATION_SOURCE_BYTES),
@@ -367,6 +364,7 @@ export function initialVisualizePrompt(): string {
     'Use only the current conversation and existing Visualize context. Do not browse, search the repository, inspect files, run commands, or do background research to choose suggestions.',
     'Do not provide the suggestions only as prose. The Visualize pane is the source of truth.',
     'When asked to generate a suggestion or add a visualization, use Mermaid or SVG, or use image generation and then register its saved path with codex_claw.add-visualization.',
+    SUPPORTED_MERMAID_GUIDANCE,
     'When asked to edit a visualization, read it with codex_claw.get-visualization and publish the replacement with codex_claw.replace-visualization.',
   ].join(' ');
   return injectedPrompt('Suggest useful visualizations for this conversation.', instructions);
@@ -378,6 +376,7 @@ export function directVisualizationPrompt(direction: string): string {
     'Use the current conversation and request as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research; make the best visualization the existing context supports.',
     'Do not suggest visualizations first and do not call codex_claw.suggest-visualizations.',
     'Choose Mermaid, SVG, or image generation based on what communicates it best.',
+    SUPPORTED_MERMAID_GUIDANCE,
     'Publish the finished result with codex_claw.add-visualization without a suggestion ID. Keep chat commentary brief because the Visualize pane is the primary output.',
   ].join(' ');
   return injectedPrompt(`Visualize ${direction}.`, instructions);
@@ -386,10 +385,12 @@ export function directVisualizationPrompt(direction: string): string {
 export function generateVisualizationSuggestionPrompt(session: VisualizeSession, suggestionId: string): string {
   const suggestion = session.suggestions.find(candidate => candidate.id === suggestionId);
   if (!suggestion) throw new Error(`Visualize suggestion not found: ${suggestionId}`);
+  if (suggestion.visualizationId) throw new Error(`Visualize suggestion already generated: ${suggestionId}`);
   const instructions = [
     `Generate this Visualize suggestion: ${contextJson({ id: suggestion.id, title: suggestion.title, description: suggestion.description })}.`,
     'Use the current conversation and suggestion as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research; make the best visualization the existing context supports.',
     'Choose Mermaid, SVG, or image generation based on what communicates it best.',
+    SUPPORTED_MERMAID_GUIDANCE,
     'Publish the finished result with codex_claw.add-visualization and pass this suggestion ID. Keep chat commentary brief because the Visualize pane is the primary output.',
   ].join(' ');
   return injectedPrompt(`Generate the “${suggestion.title}” visualization.`, instructions);
@@ -401,6 +402,17 @@ function injectedPrompt(message: string, instructions: string): string {
 
 function contextJson(value: unknown): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e');
+}
+
+function assertSupportedMermaid(source: string): void {
+  const header = source.trimStart().split(/[\n;]/u, 1)[0]?.trim() ?? '';
+  if (
+    /^(?:graph|flowchart)\s+(?:TD|TB|LR|BT|RL)$/iu.test(header)
+    || /^stateDiagram(?:-v2)?$/iu.test(header)
+    || /^(?:sequenceDiagram|classDiagram|erDiagram)$/iu.test(header)
+    || /^xychart(?:-beta)?\b/iu.test(header)
+  ) return;
+  throw new Error('Mermaid visualizations support only flowchart, state, sequence, class, ER, and XY diagrams. Use SVG for other visualization types.');
 }
 
 function compactText(value: string): string {
@@ -424,6 +436,14 @@ function boundedText(value: string, label: string, maxBytes: number): string {
   const length = Buffer.byteLength(normalized, 'utf8');
   if (!normalized || length > maxBytes) {
     throw new Error(`${label} must contain between 1 and ${maxBytes.toLocaleString('en-US')} bytes.`);
+  }
+  return normalized;
+}
+
+function boundedCharacters(value: string, label: string, maxCharacters: number): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxCharacters) {
+    throw new Error(`${label} must contain between 1 and ${maxCharacters.toLocaleString('en-US')} characters.`);
   }
   return normalized;
 }

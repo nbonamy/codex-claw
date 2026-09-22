@@ -701,11 +701,38 @@ Potential tools are intentionally not exposed yet:
 - repo/worktree operations;
 - create/close agent;
 - markdown or artifact panel display;
-- mermaid rendering;
 - file or git actions.
 
 Add them only when Claw has the matching product capability and a tested
 main-process implementation.
+
+### Visualize tools
+
+The Visualize module is registered only while the authenticated agent owns an
+open Visualize session for its current provider conversation. Stable developer
+instructions tell every backend how to use the family when it is present;
+live selection and content are discovered through the tools instead of being
+captured in session-start instructions.
+
+`suggest-visualizations` replaces the pane's suggestions with one to four
+bounded title/description pairs. `add-visualization` publishes and selects a
+complete Mermaid, SVG, or generated-image result, optionally satisfying one
+suggestion. `list-visualizations` exposes compact IDs, kinds, and selection,
+while `get-visualization` returns the complete current source needed for an
+edit. `replace-visualization` uses last-write-wins semantics for the single
+agent writer. `delete-visualization` removes an item and repairs selection and
+suggestion links.
+
+Mermaid content is limited to the diagram families rendered by
+`beautiful-mermaid`: flowchart, state, sequence, class, ER, and XY. Agents use
+SVG for other visualization types, and unsupported Mermaid input is rejected
+before it can enter durable state.
+
+Generated-image inputs must resolve inside Claw's generated-images root and
+are capped at 10 MiB. The app snapshot stores only the relative asset path,
+MIME type, and alt text; clients load bytes through
+`agent/visualize/asset/get`. Renderer SVG sanitization and generated-image
+path validation remain mandatory boundaries.
 
 ### Mission tools
 

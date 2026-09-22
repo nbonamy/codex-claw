@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import type { VisualizeSession } from '@codex-claw/core/visualize';
+import type { VisualizationAsset, VisualizeSession } from '@codex-claw/core/visualize';
 import VisualizePanel from '../VisualizePanel.vue';
 
 function visualizeSession(): VisualizeSession {
@@ -42,14 +42,12 @@ describe('VisualizePanel', () => {
         id: 'visualization-svg',
         title: 'System map',
         content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20"/></svg>' },
-        revision: 1,
         createdAt: visualize.createdAt,
         updatedAt: visualize.updatedAt,
       }, {
         id: 'visualization-image',
         title: 'Concept image',
         content: { kind: 'image', assetPath: 'concept.png', mimeType: 'image/png', alt: 'Concept visualization' },
-        revision: 1,
         createdAt: visualize.createdAt,
         updatedAt: visualize.updatedAt,
       }],
@@ -79,6 +77,88 @@ describe('VisualizePanel', () => {
     expect(rendered.attributes('title')).toBe(description);
   });
 
+  it('keeps the newest image when an older asset request resolves last', async () => {
+    const visualize = visualizeSession();
+    visualize.visualizations = [{
+      id: 'visualization-image',
+      title: 'Concept image',
+      content: { kind: 'image', assetPath: 'concept.png', mimeType: 'image/png', alt: 'Concept visualization' },
+      createdAt: visualize.createdAt,
+      updatedAt: '2026-09-21T12:00:01.000Z',
+    }];
+    visualize.selectedVisualizationId = 'visualization-image';
+    let resolveOld!: (asset: VisualizationAsset) => void;
+    let resolveNew!: (asset: VisualizationAsset) => void;
+    const oldAsset = new Promise<VisualizationAsset>(resolve => { resolveOld = resolve; });
+    const newAsset = new Promise<VisualizationAsset>(resolve => { resolveNew = resolve; });
+    const readAsset = vi.fn()
+      .mockReturnValueOnce(oldAsset)
+      .mockReturnValueOnce(newAsset);
+    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset } });
+
+    await wrapper.setProps({
+      visualize: {
+        ...visualize,
+        visualizations: [{
+          ...visualize.visualizations[0],
+          content: { kind: 'image', assetPath: 'concept-new.png', mimeType: 'image/png', alt: 'Updated concept' },
+        }],
+      },
+    });
+    resolveNew({ visualizationId: 'visualization-image', mimeType: 'image/png', dataUrl: 'data:image/png;base64,new' });
+    await flushPromises();
+    expect(wrapper.get('.visualize-panel__diagram img').attributes('src')).toBe('data:image/png;base64,new');
+
+    resolveOld({ visualizationId: 'visualization-image', mimeType: 'image/png', dataUrl: 'data:image/png;base64,old' });
+    await flushPromises();
+    expect(wrapper.get('.visualize-panel__diagram img').attributes('src')).toBe('data:image/png;base64,new');
+  });
+
+  it('drops a deleted image from the cache before the same id is added again', async () => {
+    const visualize = visualizeSession();
+    const image = {
+      id: 'visualization-image',
+      title: 'Concept image',
+      content: { kind: 'image' as const, assetPath: 'concept.png', mimeType: 'image/png' as const, alt: 'Concept visualization' },
+      createdAt: visualize.createdAt,
+      updatedAt: visualize.updatedAt,
+    };
+    visualize.visualizations = [image];
+    visualize.selectedVisualizationId = image.id;
+    const readAsset = vi.fn()
+      .mockResolvedValueOnce({ visualizationId: image.id, mimeType: 'image/png', dataUrl: 'data:image/png;base64,old' })
+      .mockResolvedValueOnce({ visualizationId: image.id, mimeType: 'image/png', dataUrl: 'data:image/png;base64,new' });
+    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset } });
+    await flushPromises();
+
+    await wrapper.setProps({ visualize: { ...visualize, visualizations: [], selectedVisualizationId: null } });
+    await wrapper.setProps({ visualize: { ...visualize, visualizations: [{ ...image, content: { ...image.content, assetPath: 'concept-new.png' } }] } });
+    await flushPromises();
+
+    expect(readAsset).toHaveBeenCalledTimes(2);
+    expect(wrapper.get('.visualize-panel__diagram img').attributes('src')).toBe('data:image/png;base64,new');
+  });
+
+  it('shows an error when a generated image asset cannot be read', async () => {
+    const visualize = visualizeSession();
+    visualize.visualizations = [{
+      id: 'visualization-image',
+      title: 'Missing image',
+      content: { kind: 'image', assetPath: 'missing.png', mimeType: 'image/png', alt: 'Missing visualization' },
+      createdAt: visualize.createdAt,
+      updatedAt: visualize.updatedAt,
+    }];
+    visualize.selectedVisualizationId = 'visualization-image';
+    const wrapper = mount(VisualizePanel, {
+      props: { visualize, readAsset: vi.fn().mockRejectedValue(new Error('missing')) },
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('.visualize-panel__diagram [role="alert"]').text()).toBe('Could not load this image.');
+    expect(wrapper.get('.visualize-panel__diagram').text()).not.toContain('Loading');
+  });
+
   it('sanitizes unsafe SVG before displaying it as an image', () => {
     const visualize = visualizeSession();
     visualize.visualizations = [{
@@ -86,9 +166,16 @@ describe('VisualizePanel', () => {
       title: 'Untrusted SVG',
       content: {
         kind: 'svg',
-        source: '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><a href="https://example.com"><rect onload="alert(2)" width="20" height="20"/></a></svg>',
+        source: [
+          '<svg xmlns="http://www.w3.org/2000/svg">',
+          '<style>.safe{fill:url(#gradient)}.unsafe{fill:url(https://example.com/pattern)}</style>',
+          '<defs><linearGradient id="gradient"/><marker id="arrowhead"/></defs>',
+          '<script>alert(1)</script>',
+          '<a href="https://example.com"><rect onload="alert(2)" width="20" height="20"/></a>',
+          '<path class="safe" marker-end="url(#arrowhead)" d="M0 0L20 20"/>',
+          '</svg>',
+        ].join(''),
       },
-      revision: 1,
       createdAt: visualize.createdAt,
       updatedAt: visualize.updatedAt,
     }];
@@ -101,6 +188,8 @@ describe('VisualizePanel', () => {
     expect(source).not.toContain('<script');
     expect(source).not.toContain('onload');
     expect(source).not.toContain('https://example.com');
+    expect(source).toContain('fill:url(#gradient)');
+    expect(source).toContain('marker-end="url(#arrowhead)"');
   });
 
   it('zooms, pans, and resets the selected visualization while leaving thumbnails static', async () => {
@@ -109,7 +198,6 @@ describe('VisualizePanel', () => {
       id: 'visualization-svg',
       title: 'Interactive visualization',
       content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20"/></svg>' },
-      revision: 1,
       createdAt: visualize.createdAt,
       updatedAt: visualize.updatedAt,
     }];
@@ -145,6 +233,17 @@ describe('VisualizePanel', () => {
     }));
     await flushPromises();
     expect(wrapper.get('button[aria-label="Reset view"]').text()).toBe('106%');
+
+    await wrapper.setProps({
+      visualize: {
+        ...visualize,
+        visualizations: [{
+          ...visualize.visualizations[0],
+          content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>' },
+        }],
+      },
+    });
+    expect(wrapper.get('button[aria-label="Reset view"]').text()).toBe('100%');
   });
 
   it('confirms thumbnail deletion before emitting the visualization id', async () => {
@@ -153,7 +252,6 @@ describe('VisualizePanel', () => {
       id: 'visualization-system',
       title: 'System map',
       content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
-      revision: 1,
       createdAt: visualize.createdAt,
       updatedAt: visualize.updatedAt,
     }];

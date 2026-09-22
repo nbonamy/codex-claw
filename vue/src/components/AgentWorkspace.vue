@@ -175,10 +175,12 @@ import type {
   CodexNativeAttachment,
   CodexMessageTextSelection,
 } from '@codex-app-sdk/vue';
+import { ElMessage } from 'element-plus';
 import { computed, reactive, ref, toRefs, watch } from 'vue';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { translate } from '../i18n';
+import { localizedErrorMessage } from '../i18n/errors';
 import { clawHostCapabilities } from '../platform-api';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
@@ -649,7 +651,10 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
   openRightWorkspaceTab(tab, agentId);
   const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
   if (tab === 'visualize' && visualize && !visualize.isOpen) {
-    void props.setVisualizeOpen(agentId, { open: true });
+    void props.setVisualizeOpen(agentId, { open: true }).catch(error => {
+      props.closeRightWorkspaceTab(agentId, 'visualize');
+      ElMessage.error(localizedErrorMessage(error, translate));
+    });
   }
 }
 

@@ -37,7 +37,7 @@ describe('VisualizeService', () => {
     expect(entered.created).toBe(true);
     expect(entered.visualize.isOpen).toBe(true);
     expect(entered.visualize.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-visualize' });
-    expect(service.developerInstructionsForAgent(agent.id)).toMatch(/Do not browse,[\s\S]*background research/u);
+    expect(service.developerInstructions()).toMatch(/When those tools are available,[\s\S]*list-visualizations/u);
 
     const suggested = await service.suggest(agent.id, [
       { title: 'System map', description: 'Show services and data movement.' },
@@ -56,15 +56,13 @@ describe('VisualizeService', () => {
     await service.select(agent.id, added.visualizationId);
     const replaced = await service.replace(agent.id, {
       visualizationId: added.visualizationId,
-      expectedRevision: 1,
       title: 'System map, revised',
       content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>' },
     });
 
-    expect(replaced.revision).toBe(2);
+    expect(replaced.title).toBe('System map, revised');
     expect(service.get(agent.id, added.visualizationId).visualization).toMatchObject({
       title: 'System map, revised',
-      revision: 2,
       content: { kind: 'svg' },
     });
     expect(agent.visualize?.suggestions[0].visualizationId).toBe(added.visualizationId);
@@ -101,8 +99,8 @@ describe('VisualizeService', () => {
     });
 
     expect(service.list(agentId).visualizations).toStrictEqual([
-      { id: first.visualizationId, title: 'System', kind: 'mermaid', revision: 1, selected: false },
-      { id: second.visualizationId, title: 'Sequence', kind: 'svg', revision: 1, selected: true },
+      { id: first.visualizationId, title: 'System', kind: 'mermaid', selected: false },
+      { id: second.visualizationId, title: 'Sequence', kind: 'svg', selected: true },
     ]);
     await expect(service.delete(agentId, second.visualizationId)).resolves.toMatchObject({
       selectedVisualizationId: first.visualizationId,
@@ -116,7 +114,7 @@ describe('VisualizeService', () => {
 
     await service.setOpen(agentId, false);
     expect(service.contextForAgent(agentId)).toBeUndefined();
-    expect(service.developerInstructionsForAgent(agentId)).toBeUndefined();
+    expect(service.developerInstructions()).toMatch(/When the Visualize tools are unavailable/u);
 
     const reopened = await service.enter(agentId);
     expect(reopened).toMatchObject({ created: true, visualize: { isOpen: true, suggestions: [] } });
@@ -141,6 +139,12 @@ describe('VisualizeService', () => {
     expect(result.suggestions[0]).toMatchObject({
       title: 'System map',
       description: 'Services, boundaries, and data flow.',
+    });
+    await expect(service.suggest(snapshot.agents[0].id, [{
+      title: '界'.repeat(80),
+      description: '图'.repeat(120),
+    }])).resolves.toMatchObject({
+      suggestions: [{ title: '界'.repeat(80), description: '图'.repeat(120) }],
     });
     await expect(service.suggest(snapshot.agents[0].id, [{
       title: 'System map',
@@ -170,7 +174,7 @@ describe('VisualizeService', () => {
     expect(prompt).toMatch(/<context>[\s\S]*<\/context>$/u);
   });
 
-  it('rejects stale replacement revisions and generated images outside the owned folder', async () => {
+  it('rejects invalid replacement suggestions and generated images outside the owned folder', async () => {
     const snapshot = createInitialSnapshot();
     temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
@@ -189,16 +193,64 @@ describe('VisualizeService', () => {
       content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
     });
 
+    const beforeInvalidSuggestion = service.get(snapshot.agents[0].id, added.visualizationId).visualization;
     await expect(service.replace(snapshot.agents[0].id, {
       visualizationId: added.visualizationId,
-      expectedRevision: 9,
-      title: 'Stale',
-      content: { kind: 'mermaid', source: 'flowchart LR\n A --> C' },
-    })).rejects.toThrow('revision 1');
+      suggestionId: 'missing-suggestion',
+      title: 'Rejected replacement',
+      content: { kind: 'mermaid', source: 'flowchart LR\n A --> D' },
+    })).rejects.toThrow('Visualize suggestion not found');
+    expect(service.get(snapshot.agents[0].id, added.visualizationId).visualization).toStrictEqual(beforeInvalidSuggestion);
     await expect(service.add(snapshot.agents[0].id, {
       title: 'Outside',
       content: { kind: 'image', generatedImagePath: outside, alt: 'Outside image' },
     })).rejects.toThrow('inside the Codex Claw generated-images folder');
+  });
+
+  it('rejects Mermaid diagram families the renderer cannot display', async () => {
+    const snapshot = createInitialSnapshot();
+    const service = new VisualizeService({
+      snapshot,
+      generatedImagesRoot: os.tmpdir(),
+      persist: () => Promise.resolve(),
+      publish: () => undefined,
+    });
+    const agentId = snapshot.agents[0].id;
+    await service.enter(agentId);
+
+    await expect(service.add(agentId, {
+      title: 'Release schedule',
+      content: { kind: 'mermaid', source: 'gantt\n title Release schedule' },
+    })).rejects.toThrow('support only flowchart, state, sequence, class, ER, and XY diagrams');
+    expect(snapshot.agents[0].visualize?.visualizations).toStrictEqual([]);
+  });
+
+  it('rejects repeated generation of the same suggestion', async () => {
+    const snapshot = createInitialSnapshot();
+    const service = new VisualizeService({
+      snapshot,
+      generatedImagesRoot: os.tmpdir(),
+      persist: () => Promise.resolve(),
+      publish: () => undefined,
+    });
+    const agentId = snapshot.agents[0].id;
+    await service.enter(agentId);
+    const suggested = await service.suggest(agentId, [{ title: 'System', description: 'Show the system.' }]);
+    const suggestionId = suggested.suggestions[0].id;
+    await service.add(agentId, {
+      title: 'System',
+      suggestionId,
+      content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
+    });
+    const session = snapshot.agents[0].visualize!;
+
+    expect(() => generateVisualizationSuggestionPrompt(session, suggestionId)).toThrow('already generated');
+    await expect(service.add(agentId, {
+      title: 'Duplicate system',
+      suggestionId,
+      content: { kind: 'mermaid', source: 'flowchart LR\n A --> C' },
+    })).rejects.toThrow('already generated');
+    expect(session.visualizations).toHaveLength(1);
   });
 
   it('does not expose a Visualize session after its owning conversation is released', async () => {

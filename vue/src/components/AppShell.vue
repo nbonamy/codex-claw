@@ -1312,6 +1312,7 @@ function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
   if (tab === 'visualize' && visualize?.isOpen) {
     void props.setVisualizeOpen(agentId, { open: false }).catch(error => {
+      openRightWorkspaceTabLocal('visualize', agentId);
       ElMessage.error(localizedErrorMessage(error, t));
     });
   }

@@ -110,7 +110,6 @@ describe('AppStatePersistence', () => {
         id: 'visualization-1',
         title: 'System map',
         content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
-        revision: 1,
         createdAt: '2026-09-21T12:00:00.000Z',
         updatedAt: '2026-09-21T12:00:00.000Z',
       }],
@@ -150,6 +149,7 @@ describe('AppStatePersistence', () => {
       suggestions: [{ visualizationId: 'diagram-1' }],
       visualizations: [{ id: 'diagram-1' }],
     });
+    expect(restored.agents[0].visualize?.visualizations[0]).not.toHaveProperty('revision');
     expect(persistedStateFromSnapshot(restored).agents[0]).not.toHaveProperty('design');
   });
 

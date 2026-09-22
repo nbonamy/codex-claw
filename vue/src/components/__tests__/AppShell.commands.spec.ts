@@ -118,6 +118,29 @@ describe('AppShell dialogs and commands', () => {
     wrapper.unmount();
   });
 
+  it('restores the Visualize tab when closing it fails', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.visualize = {
+      id: 'visualize-open',
+      conversationRef: null,
+      isOpen: true,
+      suggestions: [],
+      visualizations: [],
+      selectedVisualizationId: null,
+      createdAt: '2026-09-21T12:00:00.000Z',
+      updatedAt: '2026-09-21T12:00:00.000Z',
+    };
+    const setVisualizeOpen = vi.fn().mockRejectedValue(new Error('Cannot close Visualize'));
+    const wrapper = mountShell({ snapshot, setVisualizeOpen });
+
+    await wrapper.get('button[aria-label="Close Visualize tab"]').trigger('click');
+    await flushPromises();
+
+    expect(setVisualizeOpen).toHaveBeenCalledExactlyOnceWith('agent-dina', { open: false });
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Visualize');
+    wrapper.unmount();
+  });
+
   it('loads existing remote teams for the Team dialog from the selected connection backend', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.remoteConnections.connections = [{

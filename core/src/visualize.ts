@@ -37,7 +37,6 @@ export type Visualization = {
   id: string;
   title: string;
   content: VisualizationContent;
-  revision: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -102,8 +101,11 @@ export function cloneVisualizeSession(session: VisualizeSession): VisualizeSessi
     conversationRef: session.conversationRef ? { ...session.conversationRef } : null,
     suggestions: session.suggestions.map(suggestion => ({ ...suggestion })),
     visualizations: session.visualizations.map(visualization => ({
-      ...visualization,
+      id: visualization.id,
+      title: visualization.title,
       content: { ...visualization.content },
+      createdAt: visualization.createdAt,
+      updatedAt: visualization.updatedAt,
     })),
   };
 }
@@ -121,8 +123,6 @@ function isVisualization(value: unknown): value is Visualization {
     && typeof value.id === 'string'
     && typeof value.title === 'string'
     && isVisualizationContent(value.content)
-    && Number.isInteger(value.revision)
-    && (value.revision as number) > 0
     && typeof value.createdAt === 'string'
     && typeof value.updatedAt === 'string';
 }

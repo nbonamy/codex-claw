@@ -7,11 +7,11 @@ describe('Visualize MCP tool module', () => {
     const service = {
       contextForAgent: vi.fn((agentId: string) => agentId === 'agent-visualize' ? { id: 'visualize-1' } : undefined),
       suggest: vi.fn().mockResolvedValue({ success: true, suggestions: [] }),
-      add: vi.fn().mockResolvedValue({ success: true, visualizationId: 'visualization-1', revision: 1, title: 'System' }),
+      add: vi.fn().mockResolvedValue({ success: true, visualizationId: 'visualization-1', title: 'System' }),
       get: vi.fn().mockReturnValue({ success: true, visualization: { id: 'visualization-1' } }),
       list: vi.fn().mockReturnValue({ success: true, visualizations: [] }),
       delete: vi.fn().mockResolvedValue({ success: true, visualizationId: 'visualization-1', selectedVisualizationId: null }),
-      replace: vi.fn().mockResolvedValue({ success: true, visualizationId: 'visualization-1', revision: 2, title: 'System' }),
+      replace: vi.fn().mockResolvedValue({ success: true, visualizationId: 'visualization-1', title: 'System' }),
     } as unknown as VisualizeService;
     const provider = createVisualizeToolModuleProvider(service);
 
@@ -42,7 +42,7 @@ describe('Visualize MCP tool module', () => {
     await handlers.get('list-visualizations')!({} as never);
     await handlers.get('delete-visualization')!({ visualizationId: 'visualization-1' } as never);
     await handlers.get('replace-visualization')!({
-      visualizationId: 'visualization-1', expectedRevision: 1, title: 'System', content: { kind: 'svg', source: '<svg />' },
+      visualizationId: 'visualization-1', title: 'System', content: { kind: 'svg', source: '<svg />' },
     } as never);
 
     expect(service.suggest).toHaveBeenCalledWith('agent-visualize', [{ title: 'System', description: 'Architecture' }]);
@@ -50,6 +50,6 @@ describe('Visualize MCP tool module', () => {
     expect(service.get).toHaveBeenCalledWith('agent-visualize', 'visualization-1');
     expect(service.list).toHaveBeenCalledWith('agent-visualize');
     expect(service.delete).toHaveBeenCalledWith('agent-visualize', 'visualization-1');
-    expect(service.replace).toHaveBeenCalledWith('agent-visualize', expect.objectContaining({ expectedRevision: 1 }));
+    expect(service.replace).toHaveBeenCalledWith('agent-visualize', expect.objectContaining({ visualizationId: 'visualization-1' }));
   });
 });

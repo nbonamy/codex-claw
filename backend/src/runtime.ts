@@ -124,7 +124,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
     additionalDeveloperInstructions: (agent) => [
       server?.missionDeveloperInstructions(agent.id),
-      visualizeService.developerInstructionsForAgent(agent.id),
+      visualizeService.developerInstructions(),
     ].filter(Boolean).join('\n\n') || undefined,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);

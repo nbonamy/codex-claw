@@ -79,12 +79,12 @@ export const messages = {
     },
     visualize: {
       visualizations: 'Visualizations',
-      revision: '{kind} · revision {revision}',
       mode: 'Visualize',
       chooseDiagram: 'Choose a visualization to generate',
       findingDiagrams: 'Looking for useful visualizations…',
       suggestedFromConversation: 'The agent suggested these from your conversation.',
       suggestionsWillAppear: 'Suggestions will appear here as the agent publishes them.',
+      imageLoadFailed: 'Could not load this image.',
       generated: 'Generated',
       generateDiagram: 'Generate visualization',
       showDiagram: 'Show {title}',

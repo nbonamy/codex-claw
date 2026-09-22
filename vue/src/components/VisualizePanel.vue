@@ -4,13 +4,14 @@
       <div class="visualize-panel__heading">
         <div>
           <h2>{{ selectedVisualization.title }}</h2>
-          <span>{{ translate('visualize.revision', { kind: kindLabel(selectedVisualization), revision: selectedVisualization.revision }) }}</span>
+          <span>{{ kindLabel(selectedVisualization) }}</span>
         </div>
       </div>
       <VisualizationView
         class="visualize-panel__diagram"
         :visualization="selectedVisualization"
         :image-source="imageSources[selectedVisualization.id]"
+        :load-error="imageErrors[selectedVisualization.id]"
       />
     </div>
 
@@ -50,7 +51,12 @@
           :aria-pressed="visualization.id === visualize.selectedVisualizationId"
           @click="emit('select', visualization.id)"
         >
-          <VisualizationView compact :visualization="visualization" :image-source="imageSources[visualization.id]" />
+          <VisualizationView
+            compact
+            :visualization="visualization"
+            :image-source="imageSources[visualization.id]"
+            :load-error="imageErrors[visualization.id]"
+          />
           <span>{{ visualization.title }}</span>
         </button>
         <button
@@ -74,6 +80,7 @@ import { IconX as XIcon } from '@tabler/icons-vue';
 import type { Visualization, VisualizationAsset, VisualizeSession } from '@codex-claw/core/visualize';
 import { translate } from '../i18n';
 import VisualizationView from './VisualizationView.vue';
+import { visualizationRenderKey } from './visualization-render-key';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
@@ -88,26 +95,51 @@ const emit = defineEmits<{
 }>();
 
 const imageSources = reactive<Record<string, string>>({});
-const imageRevisions = reactive<Record<string, number>>({});
+const imageVersions = reactive<Record<string, string>>({});
+const imageErrors = reactive<Record<string, string>>({});
+const imageRequestIds = new Map<string, number>();
+let nextImageRequestId = 0;
 const selectedVisualization = computed(() => props.visualize.visualizations.find(
   visualization => visualization.id === props.visualize.selectedVisualizationId,
 ) ?? props.visualize.visualizations.at(-1) ?? null);
 
 watch(
-  () => props.visualize.visualizations.map(visualization => `${visualization.id}:${visualization.revision}:${visualization.content.kind}`).join('|'),
+  () => props.visualize.visualizations.map(visualizationRenderKey),
   () => {
+    const currentIds = new Set(props.visualize.visualizations.map(visualization => visualization.id));
+    for (const visualizationId of Object.keys(imageSources)) {
+      if (!currentIds.has(visualizationId)) delete imageSources[visualizationId];
+    }
+    for (const visualizationId of Object.keys(imageVersions)) {
+      if (!currentIds.has(visualizationId)) delete imageVersions[visualizationId];
+    }
+    for (const visualizationId of Object.keys(imageErrors)) {
+      if (!currentIds.has(visualizationId)) delete imageErrors[visualizationId];
+    }
+    for (const visualizationId of imageRequestIds.keys()) {
+      if (!currentIds.has(visualizationId)) imageRequestIds.delete(visualizationId);
+    }
     for (const visualization of props.visualize.visualizations) {
       if (visualization.content.kind !== 'image') {
         delete imageSources[visualization.id];
-        delete imageRevisions[visualization.id];
+        delete imageVersions[visualization.id];
+        delete imageErrors[visualization.id];
         continue;
       }
-      if (imageRevisions[visualization.id] === visualization.revision) continue;
-      imageRevisions[visualization.id] = visualization.revision;
+      const version = visualizationRenderKey(visualization);
+      if (imageVersions[visualization.id] === version) continue;
+      imageVersions[visualization.id] = version;
+      const requestId = ++nextImageRequestId;
+      imageRequestIds.set(visualization.id, requestId);
+      delete imageErrors[visualization.id];
       void props.readAsset(visualization.id).then(asset => {
+        if (imageRequestIds.get(visualization.id) !== requestId || imageVersions[visualization.id] !== version) return;
         imageSources[visualization.id] = asset.dataUrl;
+        delete imageErrors[visualization.id];
       }).catch(() => {
-        imageSources[visualization.id] = '';
+        if (imageRequestIds.get(visualization.id) !== requestId || imageVersions[visualization.id] !== version) return;
+        delete imageSources[visualization.id];
+        imageErrors[visualization.id] = translate('visualize.imageLoadFailed');
       });
     }
   },

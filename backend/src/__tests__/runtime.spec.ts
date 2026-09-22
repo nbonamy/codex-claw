@@ -332,7 +332,9 @@ describe('clawd runtime', () => {
     expect(driverOptions.hostedMcpServerUrls()).toStrictEqual({
       github: 'http://127.0.0.1:4242/mcp/providers/github',
     });
-    expect(driverOptions.additionalDeveloperInstructions(mocks.snapshot.agents[0]!)).toBe('<context>\nMission contract\n</context>');
+    expect(driverOptions.additionalDeveloperInstructions(mocks.snapshot.agents[0]!)).toMatch(
+      /<context>\nMission contract\n<\/context>[\s\S]*contextual Visualize MCP tools/u,
+    );
     expect(mocks.missionDeveloperInstructions).toHaveBeenCalledWith('agent-dina');
 
     const server = mocks.serverOptions[0] as ServerOptions;

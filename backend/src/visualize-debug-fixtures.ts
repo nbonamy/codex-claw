@@ -15,7 +15,7 @@ export function createVisualizeDebugFixture(
       {
         id: 'debug-suggestion-system',
         title: 'Visualize workflow',
-        description: 'Show how suggestions become generated visualizations and later revisions.',
+        description: 'Show how suggestions become generated visualizations and later edits.',
         visualizationId: 'debug-visualization-workflow',
       },
       {
@@ -32,7 +32,7 @@ export function createVisualizeDebugFixture(
       {
         id: 'debug-suggestion-edit',
         title: 'Visualization edit loop',
-        description: 'Illustrate select, inspect, request an edit, and replace with revision checking.',
+        description: 'Illustrate select, inspect, request an edit, and replace the visualization.',
       },
     ],
     visualizations: [
@@ -49,7 +49,6 @@ export function createVisualizeDebugFixture(
             '  D --> C',
           ].join('\n'),
         },
-        revision: 2,
         createdAt: now,
         updatedAt: now,
       },
@@ -77,7 +76,6 @@ export function createVisualizeDebugFixture(
             '</svg>',
           ].join(''),
         },
-        revision: 1,
         createdAt: now,
         updatedAt: now,
       },

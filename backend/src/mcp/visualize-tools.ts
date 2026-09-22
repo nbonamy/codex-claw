@@ -55,7 +55,7 @@ function registerVisualizeTools(server: McpServer, visualize: VisualizeService, 
   ));
 
   server.registerTool('get-visualization', {
-    description: 'Read the complete current source and revision of one visualization before replacing it.',
+    description: 'Read the complete current source of one visualization before replacing it.',
     inputSchema: {
       visualizationId: z.string().trim().min(1),
     },
@@ -66,7 +66,7 @@ function registerVisualizeTools(server: McpServer, visualize: VisualizeService, 
   ));
 
   server.registerTool('list-visualizations', {
-    description: 'List the visualizations currently available in the open Visualize pane, including their IDs, kinds, revisions, and selection state.',
+    description: 'List the visualizations currently available in the open Visualize pane, including their IDs, kinds, and selection state.',
   }, () => loggedToolResult(
     'list-visualizations',
     { agentId },
@@ -85,10 +85,9 @@ function registerVisualizeTools(server: McpServer, visualize: VisualizeService, 
   ));
 
   server.registerTool('replace-visualization', {
-    description: 'Replace one existing visualization with a complete revised Mermaid, SVG, or generated-image visualization. Supply the revision returned by get-visualization.',
+    description: 'Replace one existing visualization with a complete revised Mermaid, SVG, or generated-image visualization.',
     inputSchema: {
       visualizationId: z.string().trim().min(1),
-      expectedRevision: z.number().int().positive(),
       title: z.string().trim().min(1).max(200),
       suggestionId: z.string().trim().min(1).optional(),
       content: visualizationContent,

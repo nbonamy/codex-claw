@@ -37,14 +37,17 @@ import { computed, ref, watch } from 'vue';
 import { renderMermaidSVG } from 'beautiful-mermaid';
 import type { Visualization } from '@codex-claw/core/visualize';
 import { translate } from '../i18n';
+import { visualizationRenderKey } from './visualization-render-key';
 
 const props = withDefaults(defineProps<{
   compact?: boolean;
   visualization: Visualization;
   imageSource?: string;
+  loadError?: string;
 }>(), {
   compact: false,
   imageSource: '',
+  loadError: '',
 });
 
 const rendering = computed(() => {
@@ -61,7 +64,7 @@ const rendering = computed(() => {
 });
 
 const source = computed(() => rendering.value.source);
-const error = computed(() => rendering.value.error);
+const error = computed(() => props.loadError || rendering.value.error);
 const minScale = 0.5;
 const maxScale = 4;
 const zoomStep = 0.25;
@@ -75,7 +78,7 @@ const imageTransform = computed(() => ({
   transform: `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`,
 }));
 
-watch(() => `${props.visualization.id}:${props.visualization.revision}`, resetView);
+watch(() => visualizationRenderKey(props.visualization), resetView);
 
 function zoomBy(delta: number): void {
   if (props.compact) return;
@@ -151,8 +154,7 @@ function sanitizeSvg(source: string): string {
   }
   document.querySelectorAll('script, foreignObject, iframe, object, embed').forEach(element => element.remove());
   document.querySelectorAll('style').forEach(element => {
-    element.textContent = (element.textContent ?? '')
-      .replace(/url\([^)]*\)/giu, 'none')
+    element.textContent = sanitizeCssUrlReferences(element.textContent ?? '')
       .replace(/@import\s+[^;]+;?/giu, '');
   });
   for (const element of document.querySelectorAll('*')) {
@@ -162,7 +164,7 @@ function sanitizeSvg(source: string): string {
       if (
         name.startsWith('on')
         || value.includes('javascript:')
-        || value.includes('url(')
+        || hasUnsafeCssUrlReference(value)
         || ((name === 'href' || name === 'xlink:href') && !value.startsWith('#'))
       ) {
         element.removeAttribute(attribute.name);
@@ -170,6 +172,32 @@ function sanitizeSvg(source: string): string {
     }
   }
   return new XMLSerializer().serializeToString(document.documentElement);
+}
+
+function sanitizeCssUrlReferences(value: string): string {
+  return value.replace(/url\(\s*([^)]*)\)/giu, (match, target: string) => (
+    isLocalFragmentReference(target) ? match : 'none'
+  ));
+}
+
+function hasUnsafeCssUrlReference(value: string): boolean {
+  let foundReference = false;
+  let unsafeReference = false;
+  const remainder = value.replace(/url\(\s*([^)]*)\)/giu, (_match, target: string) => {
+    foundReference = true;
+    if (!isLocalFragmentReference(target)) unsafeReference = true;
+    return '';
+  });
+  return unsafeReference || (value.includes('url(') && (!foundReference || remainder.includes('url(')));
+}
+
+function isLocalFragmentReference(value: string): boolean {
+  const trimmed = value.trim();
+  const unquoted = (
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) ? trimmed.slice(1, -1).trim() : trimmed;
+  return /^#[A-Za-z_][A-Za-z0-9_.:-]*$/u.test(unquoted);
 }
 </script>
 
