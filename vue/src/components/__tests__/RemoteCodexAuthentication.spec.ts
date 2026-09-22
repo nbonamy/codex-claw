@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexAuthentication, RemoteConnection } from '@codex-claw/core/contracts';
 import RemoteCodexAuthentication from '../RemoteCodexAuthentication.vue';
@@ -16,7 +15,7 @@ function api() {
   };
 }
 function render(client = api()) {
-  return { client, wrapper: mount(RemoteCodexAuthentication, { props: { connection, api: client }, global: { plugins: [ElementPlus] } }) };
+  return { client, wrapper: mount(RemoteCodexAuthentication, { props: { connection, api: client } }) };
 }
 afterEach(() => vi.useRealTimers());
 
@@ -149,7 +148,7 @@ describe('RemoteCodexAuthentication', () => {
   it('uses the platform client and does not query an offline connection', async () => {
     const client = api();
     configureElectronTestClient(client);
-    const wrapper = mount(RemoteCodexAuthentication, { props: { connection: { ...connection, status: 'error' } }, global: { plugins: [ElementPlus] } });
+    const wrapper = mount(RemoteCodexAuthentication, { props: { connection: { ...connection, status: 'error' } } });
     await flushPromises();
     expect(client.getCodexAuthentication).not.toHaveBeenCalled();
     await wrapper.setProps({ connection });

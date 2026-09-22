@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import type { WorkItem } from '@codex-claw/core/contracts';
 import WorkItemAssignmentPicker from '../WorkItemAssignmentPicker.vue';
@@ -28,7 +27,6 @@ describe('WorkItemAssignmentPicker', () => {
         branchName: 'fix/gh-24',
         sessions: [{ agentId: 'agent-main', label: 'main · main' }],
       },
-      global: { plugins: [ElementPlus] },
     });
 
     const destinationButtons = wrapper.findAll('.work-item-assignment-picker__target-options button');
@@ -56,7 +54,6 @@ describe('WorkItemAssignmentPicker', () => {
         branchName: 'fix/gh-24',
         sessions: [{ agentId: 'agent-main', label: 'main · main' }],
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await wrapper.findAll('.work-item-assignment-picker__target-options button')[1]!.trigger('click');
@@ -76,7 +73,6 @@ describe('WorkItemAssignmentPicker', () => {
   it('disables existing-session assignment when the repository has no session', () => {
     const wrapper = mount(WorkItemAssignmentPicker, {
       props: { item: issue, branchName: 'fix/gh-24' },
-      global: { plugins: [ElementPlus] },
     });
 
     const existingButton = wrapper.findAll('.work-item-assignment-picker__target-options button')[1]!;
@@ -91,7 +87,6 @@ describe('WorkItemAssignmentPicker', () => {
         branchName: 'fix/gh-24',
         existingWorktreePath: '/Users/nbonamy/src/codex-claw-fix-gh-24',
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await wrapper.get('.claw-button--primary').trigger('click');

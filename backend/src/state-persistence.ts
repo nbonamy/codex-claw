@@ -15,6 +15,7 @@ import { appText } from '@codex-claw/core/app-text';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
 import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/code-review';
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
+import { cloneVisualizeSession, isVisualizeSession } from '@codex-claw/core/visualize';
 
 type PersistedState = {
   missions?: AppSnapshot['missions'];
@@ -51,6 +52,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   codeReview?: import('@codex-claw/core/code-review').CodeReviewSession;
   threadFlags?: import('@codex-claw/core/thread-flags').ThreadFlags;
   goal?: ThreadGoal;
+  visualize?: import('@codex-claw/core/visualize').VisualizeSession;
   statusText?: string;
   lastActivityAt?: string;
   teamId?: string;
@@ -180,6 +182,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.codeReview ? { codeReview: cloneCodeReviewSession(agent.codeReview) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
+    ...(agent.visualize ? { visualize: cloneVisualizeSession(agent.visualize) } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
     ...(agent.lastActivityAt ? { lastActivityAt: agent.lastActivityAt } : {}),
@@ -382,6 +385,7 @@ function sanitizeAgent(value: unknown): Agent | null {
   const gitDiffTarget = isAgentGitDiffTarget(value.gitDiffTarget) ? { ...value.gitDiffTarget } : undefined;
   const workspace = sanitizeAgentWorkspace(value.workspace);
   const pullRequest = sanitizeAgentPullRequest(value.pullRequest);
+  const visualize = sanitizeVisualizeSession(value.visualize ?? value.design);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
@@ -410,12 +414,34 @@ function sanitizeAgent(value: unknown): Agent | null {
       ? { codeReview: cloneCodeReviewSession(value.codeReview) }
       : {}),
     ...(goal ? { goal } : {}),
+    ...(visualize ? { visualize } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,
     lastActivityAt,
     updatedAt,
   };
+}
+
+function sanitizeVisualizeSession(value: unknown): import('@codex-claw/core/visualize').VisualizeSession | undefined {
+  if (isVisualizeSession(value)) return cloneVisualizeSession(value);
+  if (!isRecord(value)) return undefined;
+
+  const migrated = {
+    ...value,
+    isOpen: typeof value.isOpen === 'boolean' ? value.isOpen : true,
+    visualizations: value.visualizations ?? value.diagrams,
+    selectedVisualizationId: value.selectedVisualizationId ?? value.selectedDiagramId,
+    suggestions: Array.isArray(value.suggestions)
+      ? value.suggestions.map(suggestion => isRecord(suggestion)
+        ? {
+            ...suggestion,
+            visualizationId: suggestion.visualizationId ?? suggestion.diagramId,
+          }
+        : suggestion)
+      : value.suggestions,
+  };
+  return isVisualizeSession(migrated) ? cloneVisualizeSession(migrated) : undefined;
 }
 
 function sanitizeAgentPullRequest(value: unknown): Agent['pullRequest'] | undefined {

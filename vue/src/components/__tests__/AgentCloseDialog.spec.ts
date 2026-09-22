@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentCloseDialog from '../AgentCloseDialog.vue';
 
@@ -57,7 +56,6 @@ function mountDialog() {
   return mount(AgentCloseDialog, {
     props: { visible: true, agent, workflow },
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElDialog: {
           props: ['modelValue'],

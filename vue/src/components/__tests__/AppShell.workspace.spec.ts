@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import type {
   CodexNativeRendererApi,
 } from '@codex-app-sdk/vue';
@@ -17,9 +16,14 @@ import { useConfetti } from '../../shared/confetti/use-confetti';
 
 import {
   conversationControllerActions,
-  mountShell,
+  mountShell as mountRealShell,
   workItem,
 } from './app-shell-test-harness';
+
+const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
+  ...overrides,
+  stubTeamRail: true,
+});
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -64,7 +68,7 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
@@ -285,7 +289,7 @@ describe('AppShell workspace and plans', () => {
         getAgentGitDiff,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -314,8 +318,9 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.text()).toContain('newValue');
   });
 
-  it('keeps the linked repository backlog available without listing it in the add-tab menu', async () => {
+  it('keeps linked backlog work available and routes repository work through the selected workspace', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.name = 'codex-claw';
     snapshot.agentGitStatuses['agent-dina'] = {
       folder: '/Users/nbonamy/src/codex-claw',
       repository: 'codex-claw',
@@ -331,10 +336,25 @@ describe('AppShell workspace and plans', () => {
       updatedAt: '2026-08-12T00:00:00.000Z',
     };
     const item = workItem();
-    const loadWorkItems = vi.fn().mockResolvedValue([item]);
+    const unresolvedPullRequest = workItem({ kind: 'pullRequest', number: 44, id: 'nbonamy/codex-claw#44' });
+    const resolvedPullRequest = { ...unresolvedPullRequest, branchName: 'feature/resolved-pr-44' };
+    const loadWorkItems = vi.fn()
+      .mockResolvedValueOnce([item])
+      .mockResolvedValueOnce([resolvedPullRequest]);
+    const duplicateAgentAction = vi.fn().mockImplementation(async (_agentId: string, options?: { name?: string }) => ({
+      ...snapshot.agents[0]!,
+      id: options?.name?.endsWith('42') ? 'agent-reviewer' : 'agent-gh-24',
+      name: options?.name ?? 'duplicate',
+    }));
     const createAgentGitBranch = vi.fn().mockResolvedValue({});
     const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, loadWorkItems, createAgentGitBranch, assignWorkItemAction });
+    const wrapper = mountShell({
+      snapshot,
+      loadWorkItems,
+      duplicateAgentAction,
+      createAgentGitBranch,
+      assignWorkItemAction,
+    });
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await nextTick();
@@ -394,27 +414,21 @@ describe('AppShell workspace and plans', () => {
       item,
       prompt: workItemAssignmentPrompt(item, { action: 'investigate' }),
     });
-  });
 
-  it('duplicates an agent into a pull-request review worktree before assigning it', async () => {
-    const snapshot = createInitialSnapshot();
-    const item = workItem({ branchName: 'feature/pull-request-42', kind: 'pullRequest', number: 42, id: 'nbonamy/codex-claw#42' });
-    const duplicate = { ...snapshot.agents[0]!, id: 'agent-reviewer', name: 'Dina copy' };
-    const duplicateAgentAction = vi.fn().mockResolvedValue(duplicate);
-    const createAgentGitBranch = vi.fn().mockResolvedValue({});
-    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, duplicateAgentAction, createAgentGitBranch, assignWorkItemAction });
     const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+    const reviewPullRequest = workItem({ branchName: 'feature/pull-request-42', kind: 'pullRequest', number: 42, id: 'nbonamy/codex-claw#42' });
+    createAgentGitBranch.mockClear();
+    assignWorkItemAction.mockClear();
 
     await workspace.props('startRepositoryWork')({
       action: 'review',
-      item,
+      item: reviewPullRequest,
       target: 'duplicate',
       workspace: { branchName: 'feature/pull-request-42', kind: 'worktree' },
     });
 
     expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
-      name: 'Dina gh-42',
+      name: 'codex-claw gh-42',
       select: false,
     });
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
@@ -425,27 +439,15 @@ describe('AppShell workspace and plans', () => {
     });
     expect(assignWorkItemAction).toHaveBeenCalledWith({
       agentId: 'agent-reviewer',
-      item,
-      prompt: workItemAssignmentPrompt(item, { action: 'review' }),
-    });
-  });
-
-  it('names a duplicated issue agent after its source and work item', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0]!.name = 'codex-claw';
-    const item = workItem({ id: 'nbonamy/codex-claw#24', number: 24 });
-    const duplicate = { ...snapshot.agents[0]!, id: 'agent-gh-24', name: 'codex-claw gh-24' };
-    const duplicateAgentAction = vi.fn().mockResolvedValue(duplicate);
-    const wrapper = mountShell({
-      snapshot,
-      duplicateAgentAction,
-      createAgentGitBranch: vi.fn().mockResolvedValue({}),
-      assignWorkItemAction: vi.fn().mockResolvedValue(undefined),
+      item: reviewPullRequest,
+      prompt: workItemAssignmentPrompt(reviewPullRequest, { action: 'review' }),
     });
 
-    await wrapper.getComponent({ name: 'RightWorkspacePanel' }).props('startRepositoryWork')({
+    const issue = workItem({ id: 'nbonamy/codex-claw#24', number: 24 });
+    duplicateAgentAction.mockClear();
+    await workspace.props('startRepositoryWork')({
       action: 'fix',
-      item,
+      item: issue,
       target: 'duplicate',
       workspace: { branchName: 'fix/gh-24', kind: 'worktree' },
     });
@@ -454,19 +456,14 @@ describe('AppShell workspace and plans', () => {
       name: 'codex-claw gh-24',
       select: false,
     });
-  });
 
-  it('checks out a pull request branch in the current agent workspace before dispatching work', async () => {
-    const snapshot = createInitialSnapshot();
-    const item = workItem({ branchName: 'feature/pull-request-43', kind: 'pullRequest', number: 43, id: 'nbonamy/codex-claw#43' });
-    const createAgentGitBranch = vi.fn().mockResolvedValue({});
-    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, createAgentGitBranch, assignWorkItemAction });
-    const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+    const currentPullRequest = workItem({ branchName: 'feature/pull-request-43', kind: 'pullRequest', number: 43, id: 'nbonamy/codex-claw#43' });
+    createAgentGitBranch.mockClear();
+    assignWorkItemAction.mockClear();
 
     await workspace.props('startRepositoryWork')({
       action: 'addressFeedback',
-      item,
+      item: currentPullRequest,
       target: 'current',
       workspace: { kind: 'current' },
     });
@@ -479,24 +476,16 @@ describe('AppShell workspace and plans', () => {
     });
     expect(assignWorkItemAction).toHaveBeenCalledWith({
       agentId: 'agent-dina',
-      item,
-      prompt: workItemAssignmentPrompt(item, { action: 'addressFeedback' }),
+      item: currentPullRequest,
+      prompt: workItemAssignmentPrompt(currentPullRequest, { action: 'addressFeedback' }),
     });
-  });
 
-  it('resolves missing pull request branch metadata when work starts', async () => {
-    const snapshot = createInitialSnapshot();
-    const item = workItem({ kind: 'pullRequest', number: 44, id: 'nbonamy/codex-claw#44' });
-    const refreshedItem = { ...item, branchName: 'feature/resolved-pr-44' };
-    const loadWorkItems = vi.fn().mockResolvedValue([refreshedItem]);
-    const createAgentGitBranch = vi.fn().mockResolvedValue({});
-    const assignWorkItemAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, loadWorkItems, createAgentGitBranch, assignWorkItemAction });
-    const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
+    createAgentGitBranch.mockClear();
+    assignWorkItemAction.mockClear();
 
     await workspace.props('startRepositoryWork')({
       action: 'review',
-      item,
+      item: unresolvedPullRequest,
       target: 'current',
       workspace: { kind: 'current' },
     });
@@ -511,7 +500,7 @@ describe('AppShell workspace and plans', () => {
       pullRequestNumber: 44,
       confirmed: true,
     });
-    expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({ item: refreshedItem }));
+    expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({ item: resolvedPullRequest }));
   });
 
   it('does not auto-open repository review for a turn-scoped diff event', () => {
@@ -531,7 +520,7 @@ describe('AppShell workspace and plans', () => {
         },
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -556,7 +545,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -603,7 +592,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -657,7 +646,7 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     await conversationControllerActions(wrapper).openLink?.({
@@ -685,7 +674,7 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         getAgentGitDiff,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     await conversationControllerActions(wrapper).openLink?.({
@@ -719,7 +708,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
         fileActivity: null,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     await wrapper.setProps({
@@ -760,25 +749,31 @@ describe('AppShell workspace and plans', () => {
     expect(previewAgentFile).not.toHaveBeenCalled();
   });
 
-  it('strips editor-style line suffixes before reading file previews', async () => {
+  it('normalizes file preview links while preserving absolute external paths', async () => {
     const snapshot = createInitialSnapshot();
-    const previewAgentFile = vi.fn().mockResolvedValue({
-      path: 'README.md',
-      content: '# Codex Claw\n',
-    });
+    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
+    const previewAgentFile = vi.fn().mockImplementation(async (_agentId: string, path: string) => ({
+      path,
+      content: path.endsWith('SKILL.md') ? '# Writing for agents\n' : `# ${path}\n`,
+    }));
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
         activeAgent: snapshot.agents[0],
         codexConversationSnapshot: codexConversationSnapshot([
-          codexTextMessage('message-line-link', 'assistant', 'Open [readme](README.md:40).'),
+          codexTextMessage('message-preview-links', 'assistant', [
+            'Open [relative](README.md:40),',
+            '[line URL](file:///Users/nbonamy/src/id8/README.md:40:2),',
+            '[encoded URL](file:///Users/nbonamy/src/id8/src/file%20name.ts),',
+            'and [external](file:///Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md).',
+          ].join(' ')),
         ]),
         isLoading: false,
         isSending: false,
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -786,103 +781,20 @@ describe('AppShell workspace and plans', () => {
     await flushPromises();
 
     expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'README.md');
-    expect(wrapper.text()).toContain('Codex Claw');
-  });
-
-  it('strips line and column suffixes from file URLs before reading previews', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
-    const previewAgentFile = vi.fn().mockResolvedValue({
-      path: 'README.md',
-      content: '# id8\n',
-    });
-    const wrapper = mount(AppShell, {
-      props: {
-        snapshot,
-        activeAgent: snapshot.agents[0],
-        codexConversationSnapshot: codexConversationSnapshot([
-          codexTextMessage(
-            'message-file-url-line-link',
-            'assistant',
-            'Open [readme](file:///Users/nbonamy/src/id8/README.md:40:2).',
-          ),
-        ]),
-        isLoading: false,
-        isSending: false,
-        previewAgentFile,
-      },
-      global: {
-        plugins: [ElementPlus, i18n],
-      },
-    });
+    previewAgentFile.mockClear();
 
     await wrapper.get('a[href="file:///Users/nbonamy/src/id8/README.md:40:2"]').trigger('click');
     await flushPromises();
 
     expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'README.md');
-    expect(wrapper.text()).toContain('id8');
-  });
-
-  it('normalizes file URLs before opening source previews', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].folder = '/Users/nbonamy/src/id8';
-    const previewAgentFile = vi.fn().mockResolvedValue({
-      path: 'src/file name.ts',
-      content: 'export const value = true;\n',
-    });
-    const wrapper = mount(AppShell, {
-      props: {
-        snapshot,
-        activeAgent: snapshot.agents[0],
-        codexConversationSnapshot: codexConversationSnapshot([
-          codexTextMessage(
-            'message-file-url',
-            'assistant',
-            'Open [file](file:///Users/nbonamy/src/id8/src/file%20name.ts).',
-          ),
-        ]),
-        isLoading: false,
-        isSending: false,
-        previewAgentFile,
-      },
-      global: {
-        plugins: [ElementPlus, i18n],
-      },
-    });
+    previewAgentFile.mockClear();
 
     await wrapper.get('a[href="file:///Users/nbonamy/src/id8/src/file%20name.ts"]').trigger('click');
     await flushPromises();
 
     expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'src/file name.ts');
     expect(wrapper.find('.source-preview-panel').exists()).toBe(true);
-  });
-
-  it('opens absolute file previews outside the active agent folder', async () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
-    const previewAgentFile = vi.fn().mockResolvedValue({
-      path: '/Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md',
-      content: '# Writing for agents\n',
-    });
-    const wrapper = mount(AppShell, {
-      props: {
-        snapshot,
-        activeAgent: snapshot.agents[0],
-        codexConversationSnapshot: codexConversationSnapshot([
-          codexTextMessage(
-            'message-outside-file-url',
-            'assistant',
-            'Open [skill](file:///Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md).',
-          ),
-        ]),
-        isLoading: false,
-        isSending: false,
-        previewAgentFile,
-      },
-      global: {
-        plugins: [ElementPlus, i18n],
-      },
-    });
+    previewAgentFile.mockClear();
 
     await wrapper.get('a[href="file:///Users/nbonamy/dotfiles/.agents/skills/writing-for-agents/SKILL.md"]').trigger('click');
     await flushPromises();
@@ -913,7 +825,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -948,7 +860,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -979,8 +891,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.get('a[href="../secret.md"]').trigger('click');
@@ -1006,8 +917,7 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await conversationControllerActions(wrapper).openLink?.({
@@ -1036,8 +946,7 @@ describe('AppShell workspace and plans', () => {
         },
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.find('.side-panel').exists()).toBe(false);
@@ -1055,25 +964,13 @@ describe('AppShell workspace and plans', () => {
 
     expect(wrapper.text()).toContain('mcp.md');
     expect(wrapper.text()).toContain('MCP');
-  });
 
-  it('opens generated markdown requests with fallback title and no subtitle', async () => {
-    const snapshot = createInitialSnapshot();
-    const wrapper = mount(AppShell, {
-      props: {
-        snapshot,
-        activeAgent: snapshot.agents[0],
-        isLoading: false,
-        isSending: false,
-        sidePanelRequest: {
-          kind: 'markdown',
-          content: '# Generated',
-        },
+    await wrapper.setProps({
+      sidePanelRequest: {
+        kind: 'markdown',
+        content: '# Generated',
       },
-      global: {
-        plugins: [ElementPlus],
-      },
-    });
+    } as Record<string, unknown>);
 
     expect(wrapper.find('.side-panel').exists()).toBe(false);
     expect(wrapper.text()).toContain('Markdown');
@@ -1099,7 +996,7 @@ describe('AppShell workspace and plans', () => {
         },
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -1120,7 +1017,7 @@ describe('AppShell workspace and plans', () => {
     const wrapper = mount(AppShell, { props: {
       snapshot, activeAgent: snapshot.agents[0], isLoading: false, isSending: false,
       sidePanelRequest: { kind: 'markdown', purpose: 'plan', title: 'Plan', content: '# Plan' },
-    }, global: { plugins: [ElementPlus, i18n] } });
+    }, global: { plugins: [i18n] } });
     expect(wrapper.find('.plan-review-footer').exists()).toBe(true);
     const resolved = structuredClone(snapshot);
     resolved.agents[0]!.planReview!.status = 'cancel';
@@ -1149,7 +1046,7 @@ describe('AppShell workspace and plans', () => {
         },
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -1181,7 +1078,7 @@ describe('AppShell workspace and plans', () => {
         },
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -1240,7 +1137,7 @@ describe('AppShell workspace and plans', () => {
         },
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 

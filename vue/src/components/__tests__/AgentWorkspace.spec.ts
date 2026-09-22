@@ -1,7 +1,7 @@
 import type { Agent, AppCommand } from '@codex-claw/core/contracts';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { CodexConversationPaneController, CodexMessageImage, CodexMessageImageContext } from '@codex-app-sdk/vue';
-import { shallowMount } from '@vue/test-utils';
+import { flushPromises, shallowMount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '../../i18n';
 import AgentWorkspace from '../AgentWorkspace.vue';
@@ -65,6 +65,8 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       currentBackendRuntime: { backend: 'codex', status: 'running' },
       forwardPrompt: vi.fn(),
       generateAgentGitMessage: vi.fn(),
+      generateVisualizationSuggestion: vi.fn(),
+      setVisualizeOpen: vi.fn(),
       getAgentGitWorkflow: vi.fn(),
       handleStartWorkAction: vi.fn(),
       isAgentEmpty: false,
@@ -91,11 +93,14 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       prefillWorkItemForAgent: vi.fn(),
       pushAgentGitBranch: vi.fn(),
       readConversationMessages: vi.fn(),
+      readVisualizationAsset: vi.fn(),
       retryConversationHistory: vi.fn(),
       rightWorkspaceFor: () => workspace,
       rightWorkspaces: { [currentAgent.id]: workspace },
       rightWorkspaceVisible: false,
       selectAgentFromShell: vi.fn(),
+      selectVisualization: vi.fn(),
+      deleteVisualization: vi.fn(),
       selectRightWorkspaceTab: vi.fn(),
       snapshot,
       startRepositoryWork: vi.fn(),
@@ -148,6 +153,29 @@ describe('AgentWorkspace', () => {
     expect(discardCodeReview.mock.invocationCallOrder[0]).toBeLessThan(
       closeRightWorkspaceTab.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it('closes the local Visualize tab when reopening it fails', async () => {
+    const { closeRightWorkspaceTab, currentAgent, wrapper } = mountWorkspace((snapshot) => {
+      snapshot.agents[0]!.visualize = {
+        id: 'visualize-closed',
+        conversationRef: null,
+        isOpen: false,
+        suggestions: [],
+        visualizations: [],
+        selectedVisualizationId: null,
+        createdAt: '2026-09-21T12:00:00.000Z',
+        updatedAt: '2026-09-21T12:00:00.000Z',
+      };
+    });
+    const setVisualizeOpen = vi.fn().mockRejectedValue(new Error('Cannot open Visualize'));
+    await wrapper.setProps({ setVisualizeOpen });
+
+    wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('open-tab', 'visualize');
+    await flushPromises();
+
+    expect(setVisualizeOpen).toHaveBeenCalledExactlyOnceWith(currentAgent.id, { open: true });
+    expect(closeRightWorkspaceTab).toHaveBeenCalledWith(currentAgent.id, 'visualize');
   });
 
   it('resolves the delegating agent name for Git workflow report-back', () => {

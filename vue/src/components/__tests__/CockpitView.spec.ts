@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import AppMenu from '../../shared/menu/AppMenu.vue';
@@ -11,7 +10,6 @@ describe('CockpitView', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(CockpitView, {
       props: { agents: snapshot.agents, teams: snapshot.teams, viewMode: 'teams' },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.get('h1').text()).toBe('Agents');
@@ -23,7 +21,6 @@ describe('CockpitView', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(CockpitView, {
       props: { agents: snapshot.agents, teams: snapshot.teams, viewMode: 'teams' },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.get('.agent-cockpit__mode-trigger').text()).toContain('Teams');

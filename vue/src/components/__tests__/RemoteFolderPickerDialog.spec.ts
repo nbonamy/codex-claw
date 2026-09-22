@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import RemoteFolderPickerDialog from '../RemoteFolderPickerDialog.vue';
 
@@ -18,7 +17,6 @@ describe('RemoteFolderPickerDialog', () => {
         visible: false,
       },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             props: ['modelValue'],

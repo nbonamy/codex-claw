@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessage } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import GitWorkflowControl from '../GitWorkflowControl.vue';
@@ -12,7 +12,7 @@ const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktr
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
 const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, baseBranch: 'main', branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
 function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
-  return mount(GitWorkflowControl, { props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides }, global: { plugins: [ElementPlus] } });
+  return mount(GitWorkflowControl, { props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides } });
 }
 
 describe('GitWorkflowControl', () => {
@@ -23,7 +23,8 @@ describe('GitWorkflowControl', () => {
 
   it('shows the two delivery outcomes as direct labeled actions', async () => {
     const merge = mountControl({ presentation: 'delivery', mergeBranch: vi.fn() });
-    await vi.waitFor(() => expect(merge.findAll('.git-workflow-control__delivery-action')[0]?.attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(merge.findAll('.git-workflow-control__delivery-action')[0]?.attributes('disabled')).toBeUndefined();
     const actions = merge.findAll('.git-workflow-control__delivery-action');
     expect(actions.map(action => action.text())).toStrictEqual(['Merge', 'Create PR']);
     expect(actions.every(action => action.find('svg').exists())).toBe(true);
@@ -41,7 +42,8 @@ describe('GitWorkflowControl', () => {
     expect(merge.find('[role="radiogroup"]').exists()).toBe(true);
 
     const pullRequest = mountControl({ presentation: 'delivery' });
-    await vi.waitFor(() => expect(pullRequest.findAll('.git-workflow-control__delivery-action')[1]?.attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(pullRequest.findAll('.git-workflow-control__delivery-action')[1]?.attributes('disabled')).toBeUndefined();
     await pullRequest.findAll('.git-workflow-control__delivery-action')[1]!.trigger('click');
     expect(pullRequest.find('.git-workflow-control__pull-request-form').exists()).toBe(true);
   });
@@ -49,7 +51,8 @@ describe('GitWorkflowControl', () => {
   it('opens the commit dialog as the first enabled action', async () => {
     const commitChanges = vi.fn(async () => workflow);
     const wrapper = mountControl({ commitChanges });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     expect(wrapper.find('[role="dialog"]').attributes('aria-labelledby')).toBeDefined();
     expect(wrapper.text()).toContain('Commit and push');
@@ -88,7 +91,8 @@ describe('GitWorkflowControl', () => {
     const pendingCommit = deferred<AgentGitWorkflow>();
     const commitChanges = vi.fn(() => pendingCommit.promise);
     const wrapper = mountControl({ commitChanges });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     await wrapper.get('textarea').setValue('test: commit selected changes');
     await submitButton(wrapper, 'Commit').trigger('click');
@@ -113,7 +117,8 @@ describe('GitWorkflowControl', () => {
     const pendingGeneration = deferred<{ kind: 'commit'; message: string }>();
     const generateMessage = vi.fn(() => pendingGeneration.promise);
     const wrapper = mountControl({ generateMessage });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(false);
     await wrapper.findAllComponents({ name: 'ElSwitch' })[1]!.setValue(true);
@@ -140,7 +145,8 @@ describe('GitWorkflowControl', () => {
       .mockRejectedValueOnce(new Error('Remote rejected the push.'))
       .mockResolvedValueOnce({ ...workflow, files: [], stagedFiles: [], unstagedFiles: [], ahead: 0 });
     const wrapper = mountControl({ commitChanges, pushBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     await wrapper.get('textarea').setValue('test: commit before push');
     await submitButton(wrapper, 'Commit and push').trigger('click');
@@ -163,7 +169,8 @@ describe('GitWorkflowControl', () => {
     const pendingPush = deferred<AgentGitWorkflow>();
     const pushBranch = vi.fn(() => pendingPush.promise);
     const wrapper = mountControl({ pushBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Push'))?.trigger('click');
 
@@ -194,7 +201,8 @@ describe('GitWorkflowControl', () => {
       .mockRejectedValueOnce(new Error('Remote rejected the push.'))
       .mockResolvedValueOnce({ ...workflow, files: [], stagedFiles: [], unstagedFiles: [], ahead: 0 });
     const wrapper = mountControl({ pushBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Push'))?.trigger('click');
     await submitButton(wrapper, 'Push').trigger('click');
@@ -214,7 +222,8 @@ describe('GitWorkflowControl', () => {
   it('disables the untracked scope when the worktree has no untracked files', async () => {
     const cleanWorkflow = { ...workflow, files: workflow.files.filter((file) => file.indexStatus !== '?'), untrackedAddedLines: 0, untrackedRemovedLines: 0 };
     const wrapper = mountControl({ getWorkflow: async () => cleanWorkflow });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__primary').trigger('click');
 
     const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
@@ -224,7 +233,8 @@ describe('GitWorkflowControl', () => {
 
   it('shows icon-only action menu entries without descriptions', async () => {
     const wrapper = mountControl();
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
       'Commit',
@@ -238,7 +248,8 @@ describe('GitWorkflowControl', () => {
   it('offers updating a linked worktree from its base branch and recommends committing dirty work first', async () => {
     const updateFromBase = vi.fn();
     const wrapper = mountControl({ updateFromBase, commitChanges: vi.fn() });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
 
@@ -259,7 +270,8 @@ describe('GitWorkflowControl', () => {
       conflicts: ['src/app.ts'],
     });
     const wrapper = mountControl({ updateFromBase });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
     await submitButton(wrapper, 'Update anyway').trigger('click');
@@ -275,7 +287,8 @@ describe('GitWorkflowControl', () => {
     const pendingUpdate = deferred<{ workflow: AgentGitWorkflow; baseBranch: string; branch: string; conflicts: string[] }>();
     const updateFromBase = vi.fn(() => pendingUpdate.promise);
     const wrapper = mountControl({ getWorkflow: async () => cleanWorkflow, updateFromBase });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
 
@@ -338,7 +351,8 @@ describe('GitWorkflowControl', () => {
       getWorkflow: async () => ({ ...workflow, baseWorktreeDirty: true }),
       mergeBranch,
     });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
 
@@ -353,7 +367,8 @@ describe('GitWorkflowControl', () => {
       getWorkflow: async () => ({ ...workflow, isLinkedWorktree: false, baseBranch: undefined }),
       updateFromBase: vi.fn(),
     });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
 
     expect(wrapper.findAll('[role="menuitem"]').some((item) => item.text().includes('Update from'))).toBe(false);
@@ -364,10 +379,13 @@ describe('GitWorkflowControl', () => {
     const secondWorkflow = { ...workflow, folder: secondAgent.folder, files: [], unstagedFiles: [], ahead: 3 };
     const getWorkflow = vi.fn(async (agentId: string) => agentId === agent.id ? workflow : secondWorkflow);
     const wrapper = mountControl({ getWorkflow });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.setProps({ agent: secondAgent });
-    await vi.waitFor(() => expect(getWorkflow).toHaveBeenLastCalledWith('agent-2'));
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(getWorkflow).toHaveBeenLastCalledWith('agent-2');
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     const labels = wrapper.findAll('.app-menu__label').map((item) => item.text());
     expect(labels).toContain('Push');
@@ -376,7 +394,8 @@ describe('GitWorkflowControl', () => {
   it('uses the header git status as a push fallback while workflow data refreshes', async () => {
     const staleWorkflow = { ...workflow, ahead: undefined } as unknown as AgentGitWorkflow;
     const wrapper = mountControl({ getWorkflow: async () => staleWorkflow });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     const push = wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Push'));
     expect(push?.attributes('disabled')).toBeUndefined();
@@ -384,7 +403,8 @@ describe('GitWorkflowControl', () => {
 
   it('does not offer merge for the integration branch', async () => {
     const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, branch: 'main' }) });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     const merge = wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'));
     expect(merge?.attributes('disabled')).toBeDefined();
@@ -393,7 +413,8 @@ describe('GitWorkflowControl', () => {
   it('uses distinct icon-led strategy choices and secondary switch controls in the merge dialog', async () => {
     const mergeBranch = vi.fn(async () => workflow);
     const wrapper = mountControl({ mergeBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
 
@@ -433,7 +454,8 @@ describe('GitWorkflowControl', () => {
       getWorkflow: async () => primaryWorkflow,
       mergeBranch: async () => primaryWorkflow,
     });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
 
@@ -446,7 +468,8 @@ describe('GitWorkflowControl', () => {
     const pendingMerge = deferred<AgentGitWorkflow>();
     const mergeBranch = vi.fn(() => pendingMerge.promise);
     const wrapper = mountControl({ mergeBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await submitButton(wrapper, 'Merge').trigger('click');
@@ -475,7 +498,8 @@ describe('GitWorkflowControl', () => {
       warning: { type: 'worktreeFolderRetained' as const, folder: '/repo-feature' },
     }));
     const wrapper = mountControl({ mergeBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
@@ -495,7 +519,8 @@ describe('GitWorkflowControl', () => {
     const mergeBranch = vi.fn(async () => baseWorkflow);
     const pushBranch = vi.fn(() => pendingPush.promise);
     const wrapper = mountControl({ mergeBranch, pushBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
@@ -528,7 +553,8 @@ describe('GitWorkflowControl', () => {
       .mockRejectedValueOnce(new Error('Remote rejected the base branch.'))
       .mockResolvedValueOnce({ ...baseWorkflow, ahead: 0 });
     const wrapper = mountControl({ mergeBranch, pushBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
@@ -557,7 +583,8 @@ describe('GitWorkflowControl', () => {
   it('keeps a failed merge open with its error and a retry action', async () => {
     const mergeBranch = vi.fn().mockRejectedValue(new Error('The linked worktree could not be removed.'));
     const wrapper = mountControl({ mergeBranch });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await submitButton(wrapper, 'Merge').trigger('click');
@@ -572,13 +599,15 @@ describe('GitWorkflowControl', () => {
   it('requires a feature branch for a PR even when main has uncommitted changes', async () => {
     const dirtyMain = { ...workflow, branch: 'main' };
     const mainWrapper = mountControl({ getWorkflow: async () => dirtyMain });
-    await vi.waitFor(() => expect(mainWrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(mainWrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await mainWrapper.get('.git-workflow-control__trigger').trigger('click');
     const mainPr = mainWrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'));
     expect(mainPr?.attributes('disabled')).toBeDefined();
 
     const featureWrapper = mountControl({ getWorkflow: async () => ({ ...workflow, branch: 'feature/clean', files: [], unstagedFiles: [] }) });
-    await vi.waitFor(() => expect(featureWrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(featureWrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await featureWrapper.get('.git-workflow-control__trigger').trigger('click');
     const featurePr = featureWrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'));
     expect(featurePr?.attributes('disabled')).toBeUndefined();
@@ -588,7 +617,8 @@ describe('GitWorkflowControl', () => {
     const wrapper = mountControl({
       getWorkflow: async () => ({ ...workflow, branch: 'feature/dialog' }),
     });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
 
@@ -600,7 +630,8 @@ describe('GitWorkflowControl', () => {
 
   it('warns when pull request or merge actions would leave uncommitted changes behind', async () => {
     const pullRequest = mountControl();
-    await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(pullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await pullRequest.get('.git-workflow-control__trigger').trigger('click');
     await pullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     expect(pullRequest.get('.git-workflow-control__uncommitted-warning').text()).toBe(
@@ -608,7 +639,8 @@ describe('GitWorkflowControl', () => {
     );
 
     const merge = mountControl({ mergeBranch: vi.fn() });
-    await vi.waitFor(() => expect(merge.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(merge.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     expect(merge.get('.git-workflow-control__uncommitted-warning').text()).toBe(
@@ -618,7 +650,8 @@ describe('GitWorkflowControl', () => {
     const cleanPullRequest = mountControl({
       getWorkflow: async () => ({ ...workflow, files: [], stagedFiles: [], unstagedFiles: [] }),
     });
-    await vi.waitFor(() => expect(cleanPullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(cleanPullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await cleanPullRequest.get('.git-workflow-control__trigger').trigger('click');
     await cleanPullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     expect(cleanPullRequest.find('.git-workflow-control__uncommitted-warning').exists()).toBe(false);
@@ -628,7 +661,8 @@ describe('GitWorkflowControl', () => {
     const createdPullRequest = { number: 42, title: 'Complete delegated work', url: 'https://github.com/owner/repo/pull/42', draft: false, headSha: 'a'.repeat(40), state: 'open' as const };
     const createPullRequest = vi.fn(async () => ({ ...workflow, existingPullRequest: createdPullRequest }));
     const pullRequest = mountControl({ createPullRequest, reportBackAgentName: 'main' });
-    await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy();
     await pullRequest.get('.git-workflow-control__trigger').trigger('click');
     await pullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
 
@@ -645,7 +679,8 @@ describe('GitWorkflowControl', () => {
 
     const mergeBranch = vi.fn(async () => workflow);
     const merge = mountControl({ mergeBranch, reportBackAgentName: 'main' });
-    await vi.waitFor(() => expect(merge.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
 
@@ -668,7 +703,8 @@ describe('GitWorkflowControl', () => {
       createPullRequest: () => pendingPullRequest.promise,
       reportBackAgentName: 'main',
     });
-    await vi.waitFor(() => expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(pullRequest.get('.git-workflow-control__trigger')).toBeTruthy();
     await pullRequest.get('.git-workflow-control__trigger').trigger('click');
     await pullRequest.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await pullRequest.get('.git-workflow-control__pull-request-form input').setValue('Background report');
@@ -686,7 +722,8 @@ describe('GitWorkflowControl', () => {
 
     const pendingMerge = deferred<AgentGitWorkflow>();
     const merge = mountControl({ mergeBranch: () => pendingMerge.promise, reportBackAgentName: 'main' });
-    await vi.waitFor(() => expect(merge.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await submitButton(merge, 'Merge').trigger('click');
@@ -714,7 +751,8 @@ describe('GitWorkflowControl', () => {
       createPullRequest: () => pendingPullRequest.promise,
       reportBackAgentName: 'main',
     });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Handoff progress');
@@ -740,7 +778,8 @@ describe('GitWorkflowControl', () => {
       mergeBranch: () => pendingMerge.promise,
       reportBackAgentName: 'main',
     });
-    await vi.waitFor(() => expect(merge.get('.git-workflow-control__trigger')).toBeTruthy());
+    await flushPromises();
+    expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await submitButton(merge, 'Merge').trigger('click');
@@ -799,7 +838,8 @@ describe('GitWorkflowControl', () => {
       body: '## Summary\n- Add ephemeral generation',
     });
     const wrapper = mountControl({ generateMessage });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await wrapper.get('[aria-label="Generate pull request draft with Codex"]').trigger('click');
@@ -819,7 +859,8 @@ describe('GitWorkflowControl', () => {
       `Error invoking remote method 'agent:git-workflow:message:generate': Error: ${descriptor}`,
     ));
     const wrapper = mountControl({ generateMessage });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await wrapper.get('[aria-label="Generate pull request draft with Codex"]').trigger('click');
@@ -840,7 +881,8 @@ describe('GitWorkflowControl', () => {
       `Error invoking remote method 'agent:git-workflow:pull-request:create': Error: ${descriptor}`,
     ));
     const wrapper = mountControl({ createPullRequest });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Fix issue 7');
@@ -858,7 +900,8 @@ describe('GitWorkflowControl', () => {
       agent: { ...agent, backend: 'claude', backendDefaults: { kind: 'claude' } },
       generateMessage: vi.fn(),
     });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     expect(wrapper.find('.git-workflow-control__generate').exists()).toBe(false);
   });
@@ -867,7 +910,8 @@ describe('GitWorkflowControl', () => {
     const pendingPullRequest = deferred<AgentGitWorkflow>();
     const createPullRequest = vi.fn(() => pendingPullRequest.promise);
     const wrapper = mountControl({ createPullRequest });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Improve Git workflow');
@@ -894,7 +938,8 @@ describe('GitWorkflowControl', () => {
       .mockRejectedValueOnce(new Error('GitHub API rate limit exceeded.'))
       .mockResolvedValueOnce(workflow);
     const wrapper = mountControl({ createPullRequest });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Create PR'))?.trigger('click');
     await wrapper.get('.git-workflow-control__pull-request-form input').setValue('Improve Git workflow');
@@ -915,7 +960,8 @@ describe('GitWorkflowControl', () => {
   it('does not reload workflow state when the menu opens', async () => {
     const getWorkflow = vi.fn(async () => workflow);
     const wrapper = mountControl({ getWorkflow });
-    await vi.waitFor(() => expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined());
+    await flushPromises();
+    expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await flushPromises();
 
@@ -925,7 +971,8 @@ describe('GitWorkflowControl', () => {
   it('reloads workflow state once when git status changes', async () => {
     const getWorkflow = vi.fn(async () => workflow);
     const wrapper = mountControl({ getWorkflow });
-    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledOnce());
+    await flushPromises();
+    expect(getWorkflow).toHaveBeenCalledOnce();
 
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     expect(wrapper.get('.git-workflow-control__trigger').attributes('aria-expanded')).toBe('true');
@@ -942,7 +989,8 @@ describe('GitWorkflowControl', () => {
     const pendingWorkflow = deferred<AgentGitWorkflow>();
     const getWorkflow = vi.fn(() => pendingWorkflow.promise);
     const wrapper = mountControl({ getWorkflow });
-    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledOnce());
+    await flushPromises();
+    expect(getWorkflow).toHaveBeenCalledOnce();
 
     await wrapper.setProps({ gitStatus: { ...status, updatedAt: '2026-08-11T20:00:00.000Z' } });
     await flushPromises();
@@ -955,7 +1003,8 @@ describe('GitWorkflowControl', () => {
   it('keeps the last known action availability when the menu opens', async () => {
     const getWorkflow = vi.fn().mockResolvedValueOnce(workflow);
     const wrapper = mountControl({ getWorkflow });
-    await vi.waitFor(() => expect(getWorkflow).toHaveBeenCalledOnce());
+    await flushPromises();
+    expect(getWorkflow).toHaveBeenCalledOnce();
     await flushPromises();
 
     await wrapper.get('.git-workflow-control__trigger').trigger('click');

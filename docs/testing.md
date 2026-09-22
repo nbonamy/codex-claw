@@ -163,10 +163,15 @@ Rules:
 - Give each component its own same-named spec file. Do not accumulate unrelated
   Vue components in a catch-all component suite.
 - Test user-visible rendering and emitted actions.
-- Use the real Element Plus plugin for controls.
-- Narrow stubs are OK for brittle container primitives such as dialogs,
-  popovers, or teleports when the product component contract is the unit.
-- Do not mock Element Plus wholesale.
+- The shared setup provides lightweight Element Plus controls that preserve
+  the rendered and emitted contracts parent components consume. This keeps
+  isolated product-component tests fast without replacing product behavior.
+- Mount the specific real Element Plus control when its own interaction,
+  validation, focus, teleport, or accessibility behavior is part of the
+  behavior under test. Do not reinstall the full plugin for one control.
+- Keep shared control substitutes contract-faithful: render the relevant DOM,
+  classes, aria state, slots, and model events. A shallow placeholder that only
+  makes a test mount is not acceptable.
 - Avoid product-component stubs unless the child component is covered
   elsewhere and the parent contract is the unit.
 - Test routers/stores with realistic route/state setup when a component

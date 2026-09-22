@@ -1,11 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox, ElSelect } from 'element-plus';
+import { ElMessageBox, ElSelect } from 'element-plus';
 import { afterEach, expect, it, vi } from 'vitest';
 import SettingsPersonalizationPanel from '../SettingsPersonalizationPanel.vue';
 afterEach(() => vi.useRealTimers());
 function render() {
   const api = { readEngineInstructions: vi.fn().mockImplementation(async engine => ({ text: engine + ' rules', path: '/' + engine })), saveEngineInstructions: vi.fn().mockResolvedValue(undefined) };
-  return { api, wrapper: mount(SettingsPersonalizationPanel, { props: { api }, global: { plugins: [ElementPlus] } }) };
+  return { api, wrapper: mount(SettingsPersonalizationPanel, { props: { api } }) };
 }
 it('autosaves and flushes the original engine before switching', async () => {
   vi.useFakeTimers();

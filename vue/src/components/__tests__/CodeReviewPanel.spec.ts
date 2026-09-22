@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, AgentGitStatus, AppSnapshot } from '@codex-claw/core/contracts';
 import type { CodeReviewFinding, CodeReviewSession } from '@codex-claw/core/code-review';
@@ -64,7 +63,7 @@ function mountPanel(
     actions,
     wrapper: mount(CodeReviewPanel, {
       props: { agent: owner, gitStatus, ...actions },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     }),
   };
 }

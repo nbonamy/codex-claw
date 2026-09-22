@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
+import { ElPopover } from 'element-plus';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import IdentityPicker from '../IdentityPicker.vue';
 
@@ -28,7 +28,7 @@ describe('IdentityPicker', () => {
   it('uses catalog copy for the shared defaults', async () => {
     const wrapper = mount(IdentityPicker, {
       props: { name: 'Dina' },
-      global: { plugins: [ElementPlus], stubs: { teleport: true, AgentAvatarCropDialog: true } },
+      global: { stubs: { teleport: true, AgentAvatarCropDialog: true } },
     });
 
     expect(wrapper.get('.agent-avatar-picker__trigger').attributes('aria-label')).toBe('Change identity');
@@ -194,7 +194,7 @@ function mountPicker(props: Partial<{
       ...props,
     },
     global: {
-      plugins: [ElementPlus],
+      components: { ElPopover },
       stubs: {
         teleport: true,
         AgentAvatarCropDialog: {

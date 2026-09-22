@@ -204,6 +204,46 @@ export function useAppState() {
     return next;
   }
 
+  async function startVisualize(agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.startVisualize(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function setVisualizeOpen(agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.setVisualizeOpen(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function generateVisualizationSuggestion(agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.generateVisualizationSuggestion(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function selectVisualization(agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.selectVisualization(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function deleteVisualization(agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.deleteVisualization(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function readVisualizationAsset(agentId: string, visualizationId: string): Promise<import('@codex-claw/core/visualize').VisualizationAsset> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    return codexClawApi.readVisualizationAsset(agentId, visualizationId);
+  }
+
   async function decideCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
     const next = await codexClawApi.decideCodeReviewFinding(agentId, input);
@@ -1458,6 +1498,12 @@ export function useAppState() {
     respondToPlanReview,
     respondToThreadFlag,
     startCodeReview,
+    startVisualize,
+    setVisualizeOpen,
+    generateVisualizationSuggestion,
+    selectVisualization,
+    deleteVisualization,
+    readVisualizationAsset,
     decideCodeReviewFinding,
     discussCodeReviewFinding,
     submitCodeReviewRound,

@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { expect, it } from 'vitest';
 import SettingsTextareaField from '../SettingsTextareaField.vue';
 
@@ -11,7 +10,6 @@ it('renders the shared textarea setting and emits edits', async () => {
       description: 'Added to commit message generation prompts',
       placeholder: 'Add commit message guidance…',
     },
-    global: { plugins: [ElementPlus] },
   });
 
   expect(wrapper.get('.settings-textarea-field__title').text()).toBe('Commit instructions');

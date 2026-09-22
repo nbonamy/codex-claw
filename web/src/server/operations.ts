@@ -12,6 +12,12 @@ export type ClawBackendPort = {
 type ParamsFactory = (args: unknown[]) => unknown;
 
 const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?]>> = {
+  startVisualize: [backendMethods.agentVisualizeStart, namedOptional('agentId', 'input')],
+  setVisualizeOpen: [backendMethods.agentVisualizeOpenSet, named('agentId', 'input')],
+  generateVisualizationSuggestion: [backendMethods.agentVisualizationSuggestionGenerate, named('agentId', 'input')],
+  selectVisualization: [backendMethods.agentVisualizationSelect, named('agentId', 'input')],
+  deleteVisualization: [backendMethods.agentVisualizationDelete, named('agentId', 'input')],
+  readVisualizationAsset: [backendMethods.agentVisualizationAssetGet, named('agentId', 'visualizationId')],
   startCodeReview: [backendMethods.agentCodeReviewStart, named('agentId', 'input')],
   decideCodeReviewFinding: [backendMethods.agentCodeReviewFindingDecide, named('agentId', 'input')],
   discussCodeReviewFinding: [backendMethods.agentCodeReviewFindingDiscuss, named('agentId', 'input')],

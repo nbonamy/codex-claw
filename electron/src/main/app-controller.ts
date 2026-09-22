@@ -523,6 +523,24 @@ export class AppController {
     ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
     });
+    ipc.handle(ipcChannels.startVisualize, async (_event, agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizeStart, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.setVisualizeOpen, async (_event, agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizeOpenSet, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.generateVisualizationSuggestion, async (_event, agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationSuggestionGenerate, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.selectVisualization, async (_event, agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationSelect, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.deleteVisualization, async (_event, agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationDelete, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.readVisualizationAsset, (_event, agentId: string, visualizationId: string) => (
+      this.requireBackendClient().request(backendMethods.agentVisualizationAssetGet, { agentId, visualizationId })
+    ));
     ipc.handle(ipcChannels.startCodeReview, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewStart, { agentId, input }))
     ));
@@ -1561,11 +1579,12 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      populateDebugVisualize: (scenario) => this.populateDebugVisualize(scenario),
       getDebugMissionStage: () => this.debugMission()?.stage,
       setDebugMissionStage: (stage) => this.setDebugMissionStage(stage),
       injectDebugCodeReview: (scenario) => this.injectDebugCodeReview(scenario),
@@ -1665,6 +1684,24 @@ export class AppController {
         }
       })
       .catch((error) => warnMain('debug', 'failed to inject code review fixture', {
+        agentId,
+        scenario,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+  }
+
+  private populateDebugVisualize(scenario: import('@codex-claw/core/visualize').VisualizeDebugScenario): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app?.isPackaged) return;
+
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugVisualizePopulate, { agentId, scenario })
+      .then(async (snapshot) => {
+        await this.adoptBackendSnapshot(snapshot);
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          sendAppCommand(this.mainWindow.webContents, { type: 'debug-open-visualize' });
+        }
+      })
+      .catch((error) => warnMain('debug', 'failed to populate Visualize fixture', {
         agentId,
         scenario,
         detail: error instanceof Error ? error.message : String(error),

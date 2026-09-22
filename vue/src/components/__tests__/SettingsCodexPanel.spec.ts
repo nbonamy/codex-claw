@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
@@ -122,7 +122,6 @@ function mountPanel(props: Record<string, unknown> = {}) {
       settings: defaultGeneralSettings,
       ...props,
     },
-    global: { plugins: [ElementPlus] },
   });
 }
 

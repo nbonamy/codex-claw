@@ -74,6 +74,27 @@ describe('AppController', () => {
     ));
   });
 
+  it('populates Visualize through clawd and opens the real Visualize pane', async () => {
+    const snapshot = createInitialSnapshot();
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const send = vi.fn();
+    setMainWindowSend(controller, send);
+    const options = (controller as unknown as {
+      debugMenuOptions(): { populateDebugVisualize(scenario: 'complete' | 'suggestions'): void };
+    }).debugMenuOptions();
+
+    options.populateDebugVisualize('suggestions');
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+      backendMethods.debugVisualizePopulate,
+      { agentId: 'agent-dina', scenario: 'suggestions' },
+    ));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith('app:command', {
+      type: 'debug-open-visualize',
+    }));
+  });
+
   it('queues valid deep links until the renderer is ready, then focuses and dispatches them', () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();

@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import path from 'node:path';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
@@ -17,7 +18,7 @@ import { ClawMcpService } from './mcp/service';
 import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
-import { backendProviderTokensFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendCodexHomeDir, backendProviderTokensFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -28,6 +29,8 @@ import { AgentGitService } from './git/agent-git-service';
 import { PullRequestMonitor } from './git/pull-request-monitor';
 import { WorktreeManager } from './worktrees/worktree-manager';
 import { AgentCreationService } from './agents/agent-creation-service';
+import { VisualizeService } from './visualize-service';
+import { createVisualizeToolModuleProvider } from './mcp/visualize-tools';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -75,6 +78,13 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   });
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
+  let server!: ClawBackendServer;
+  const visualizeService = new VisualizeService({
+    snapshot,
+    generatedImagesRoot: path.join(backendCodexHomeDir(), 'generated_images'),
+    persist: () => saveBackendSnapshot(snapshot),
+    publish: () => server?.emitEvent({ type: 'snapshot.updated', payload: snapshot }),
+  });
   const mcpService = new ClawMcpService({
     missionTools: {
       contextForAgent: agentId => server.missionContext(agentId),
@@ -105,16 +115,19 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
     worktreeManager,
     agentCreation,
+    toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService)],
   });
   const mcpServerUrl = await mcpService.start();
-  let server: ClawBackendServer;
   const backendDrivers = createDefaultBackendDrivers({
     clawMcpServerUrl: mcpServerUrl,
     hostedMcpServerUrls: () => mcpService.hostedMcpServerUrls(),
     generalSettings: snapshot.general,
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
-    additionalDeveloperInstructions: (agent) => server?.missionDeveloperInstructions(agent.id),
+    additionalDeveloperInstructions: (agent) => [
+      server?.missionDeveloperInstructions(agent.id),
+      visualizeService.developerInstructions(),
+    ].filter(Boolean).join('\n\n') || undefined,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
   const automationRunner = new AutomationRunner({
@@ -208,6 +221,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     snapshot,
     agentGitService,
     agentCreation,
+    visualizeService,
     driverRpc,
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),

@@ -42,11 +42,11 @@ request. `backend/src/mcp/tools.ts` only creates the server and composes the
 modules returned by the configured providers. Core collaboration, Missions,
 Review, Browser, and Computer Use each own their registration module.
 
-Add a tool to the module that owns its product behavior. For a new contextual
-family such as Design, create one `ClawMcpToolModuleProvider` whose `resolve`
+Add a tool to the module that owns its product behavior. For a contextual
+family such as Visualize, create one `ClawMcpToolModuleProvider` whose `resolve`
 method returns a module only for an agent in that context, then attach the
 provider through `ClawMcpServiceOptions.toolModuleProviders`. Do not add a
-Design branch to the server composer or to unrelated tool modules.
+Visualize branch to the server composer or to unrelated tool modules.
 
 Providers and resolved modules have stable unique IDs. Composition rejects
 duplicate IDs so two independently configured families cannot silently shadow
@@ -57,11 +57,11 @@ example, Mission owns proposed actions, so the collaboration module exposes a
 the tools for its family:
 
 ```ts
-const designTools: ClawMcpToolModuleProvider = {
-  id: 'design',
-  resolve: ({ agentId }) => designs.contextForAgent(agentId) ? {
-    id: 'design',
-    register: server => registerDesignTools(server, designs, agentId),
+const visualizeTools: ClawMcpToolModuleProvider = {
+  id: 'visualize',
+  resolve: ({ agentId }) => visualize.contextForAgent(agentId) ? {
+    id: 'visualize',
+    register: server => registerVisualizeTools(server, visualize, agentId),
   } : undefined,
 };
 ```

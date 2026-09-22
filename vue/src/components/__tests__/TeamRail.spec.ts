@@ -1,10 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamRail from '../TeamRail.vue';
 import type { AccountRateLimits, Team } from '@codex-claw/core/contracts';
+import { setElectronTestClient } from '../../test/client';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
@@ -292,6 +292,7 @@ describe('TeamRail', () => {
   });
 
   it('shows rate limits and emits settings menu actions', async () => {
+    setElectronTestClient({});
     const wrapper = mountRail({
       teams,
       activeTeamId: 'team-sk',
@@ -505,7 +506,6 @@ function mountRail(props: {
     attachTo: document.body,
     props,
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElPopover: {
           template: '<div><slot name="reference" /><slot /></div>',

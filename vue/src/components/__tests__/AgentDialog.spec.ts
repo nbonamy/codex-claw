@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
@@ -645,7 +644,6 @@ function mountDialog(overrides: Partial<{
       ...overrides,
     },
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElDialog: {
           name: 'ElDialog',

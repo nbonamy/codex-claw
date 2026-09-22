@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission } from '@codex-claw/core/missions';
@@ -21,7 +20,6 @@ describe('MissionShipBoard', () => {
     const wrapper = mount(MissionShipBoard, {
       props: { mission, agents: snapshot.agents, gitStatuses: {}, executeMission },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           GitWorkflowControl: {
             name: 'GitWorkflowControl',
@@ -67,7 +65,7 @@ describe('MissionShipBoard', () => {
     mission.execution!.deliveries = [{ repositoryPath: '/repo/api', agentId: snapshot.agents[0]!.id, status: 'pending' }];
     const wrapper = mount(MissionShipBoard, {
       props: { mission, agents: snapshot.agents, gitStatuses: {} },
-      global: { plugins: [ElementPlus], stubs: { GitWorkflowControl: true } },
+      global: { stubs: { GitWorkflowControl: true } },
     });
 
     expect(wrapper.text()).toContain('Debug fixture — delivery actions are disabled.');
@@ -94,7 +92,6 @@ describe('MissionShipBoard', () => {
         mergeBranch: vi.fn().mockResolvedValue(workflow),
         createPullRequest: vi.fn().mockResolvedValue(workflow),
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await vi.waitFor(() => expect(wrapper.findAll('.git-workflow-control__delivery-action')[0]?.attributes('disabled')).toBeUndefined());
@@ -129,7 +126,6 @@ describe('MissionShipBoard', () => {
         openInApplications,
       },
       global: {
-        plugins: [ElementPlus],
         stubs: { GitWorkflowControl: { template: '<div class="git-workflow-control" />' } },
       },
     });

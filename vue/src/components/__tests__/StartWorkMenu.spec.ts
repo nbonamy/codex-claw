@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it } from 'vitest';
 import StartWorkMenu from '../StartWorkMenu.vue';
 
@@ -11,7 +10,6 @@ describe('StartWorkMenu', () => {
   it('offers project acquisition from a prominent new-session trigger', async () => {
     const wrapper = mount(StartWorkMenu, {
       attachTo: document.body,
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.getComponent({ name: 'ElPopover' }).props('width')).toBe(240);

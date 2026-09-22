@@ -1,6 +1,5 @@
 import { nextTick } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
@@ -38,7 +37,6 @@ describe('RepositorySessionSourceDialog', () => {
         repositoryName: 'codex-claw',
         branches,
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -63,7 +61,6 @@ describe('RepositorySessionSourceDialog', () => {
         repositoryName: 'codex-claw',
         branches,
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -86,7 +83,6 @@ describe('RepositorySessionSourceDialog', () => {
         workItems: [issue],
         sessions: [{ agentId: 'agent-main', label: 'main · main' }],
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -115,7 +111,6 @@ describe('RepositorySessionSourceDialog', () => {
         branches,
         workItems: [issue],
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
     await wrapper.findAll('[role="tab"]')[2]!.trigger('click');

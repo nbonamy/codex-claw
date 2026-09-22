@@ -1,6 +1,12 @@
 import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  startVisualize: 'agent:visualize:start',
+  setVisualizeOpen: 'agent:visualize:open:set',
+  generateVisualizationSuggestion: 'agent:visualize:suggestion:generate',
+  selectVisualization: 'agent:visualize:visualization:select',
+  deleteVisualization: 'agent:visualize:visualization:delete',
+  readVisualizationAsset: 'agent:visualize:asset:read',
   startCodeReview: 'agent:code-review:start',
   decideCodeReviewFinding: 'agent:code-review:finding:decide',
   discussCodeReviewFinding: 'agent:code-review:finding:discuss',
