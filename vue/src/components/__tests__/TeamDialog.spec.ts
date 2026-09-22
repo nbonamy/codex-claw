@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import TeamDialog from '../TeamDialog.vue';
 import { teamColors } from '@codex-claw/core/team-colors';
@@ -206,7 +205,6 @@ function mountDialog(overrides: Partial<{
       ...overrides,
     },
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElDialog: {
           props: ['modelValue'],

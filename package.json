@@ -71,7 +71,7 @@
     "test:coverage:web": "npm run test:coverage -w @codex-claw/web",
     "test:electron": "npm run test -w @codex-claw/electron",
     "test:integration": "npm test -w @codex-claw/backend -- sdk-boundary driver-capability-boundary server-conversation-requests server-client-isolation-regressions && npm test -w @codex-claw/vue -- backend-boundary",
-    "test:scripts": "node --test scripts/*.test.mjs",
+    "test:scripts": "node --test scripts/*.test.mjs vue/scripts/*.test.mjs",
     "test:watch:electron": "npm run test:watch -w @codex-claw/electron",
     "test:web": "npm run test -w @codex-claw/web",
     "test:website": "node --test website/site.test.mjs",

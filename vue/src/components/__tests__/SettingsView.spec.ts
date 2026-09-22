@@ -1,10 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsView from '../SettingsView.vue';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings, defaultThemeSettings } from '@codex-claw/core/settings';
 import { configureClawClient } from '../../platform-api';
+import { setElectronTestClient } from '../../test/client';
 
 describe('SettingsView', () => {
   afterEach(() => {
@@ -13,14 +14,14 @@ describe('SettingsView', () => {
   });
 
   it('opens on General by default, preserves the settings order, and emits tab selections', async () => {
+    setElectronTestClient({});
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Accessibility');
@@ -51,13 +52,13 @@ describe('SettingsView', () => {
   });
 
   it('routes Codex and Claude Code controls to separate provider panels', async () => {
+    setElectronTestClient({});
     const wrapper = mount(SettingsView, {
       props: {
         activeTab: 'codex',
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.text()).toContain('Launch ChatGPT');
@@ -82,8 +83,7 @@ describe('SettingsView', () => {
         updateSettings,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'dark');
@@ -96,6 +96,7 @@ describe('SettingsView', () => {
   });
 
   it('keeps the general permissions tab reachable', async () => {
+    setElectronTestClient({});
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -103,8 +104,7 @@ describe('SettingsView', () => {
         activeTab: 'appearance',
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'General')?.trigger('click');
@@ -127,7 +127,6 @@ describe('SettingsView', () => {
         activeTab: 'plugins',
         updateSettings,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.text()).toContain('Computer Use');
@@ -176,8 +175,7 @@ describe('SettingsView', () => {
         removeRemoteConnection,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Remote Codex Claw agents');
@@ -204,7 +202,6 @@ describe('SettingsView', () => {
         generalSettings: defaultGeneralSettings,
         activeTab: 'general',
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).not.toContain('Appshots');

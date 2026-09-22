@@ -1,12 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, expect, it, vi } from 'vitest';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import SettingsInstructionsPanel from '../SettingsInstructionsPanel.vue';
 afterEach(() => vi.useRealTimers());
 it('updates the worktree initialization policy', async () => {
   const updateSettings = vi.fn().mockResolvedValue(undefined);
-  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings }, global: { plugins: [ElementPlus] } });
+  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings } });
   await flushPromises();
   const section = wrapper.findAllComponents({ name: 'SettingsSection' })
     .find((candidate) => candidate.text().includes('Worktrees'));
@@ -30,7 +29,7 @@ it('keeps autosave quiet while a write is pending', async () => {
   vi.useFakeTimers();
   let finish!: () => void;
   const updateSettings = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
-  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings }, global: { plugins: [ElementPlus] } });
+  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings } });
   await wrapper.get('textarea').setValue('Guidance');
   await vi.advanceTimersByTimeAsync(600);
   expect(updateSettings).toHaveBeenCalledTimes(1);
@@ -40,7 +39,7 @@ it('keeps autosave quiet while a write is pending', async () => {
 it('debounces both fields and flushes edits on exit', async () => {
   vi.useFakeTimers();
   const updateSettings = vi.fn().mockResolvedValue(undefined);
-  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings }, global: { plugins: [ElementPlus] } });
+  const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings } });
   expect(wrapper.find('button').exists()).toBe(false);
   expect(wrapper.get('textarea').attributes('rows')).toBe('6');
   expect(wrapper.text()).toContain('Added to commit message generation prompts');

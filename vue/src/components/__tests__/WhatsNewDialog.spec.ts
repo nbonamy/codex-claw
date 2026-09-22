@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import WhatsNewDialog from '../WhatsNewDialog.vue';
 
@@ -29,7 +28,6 @@ describe('WhatsNewDialog', () => {
     const wrapper = mount(WhatsNewDialog, {
       props: { visible: true },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             name: 'ElDialog',

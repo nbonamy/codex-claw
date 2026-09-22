@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import type {
   CodexNativeRendererApi,
 } from '@codex-app-sdk/vue';
@@ -11,10 +11,15 @@ import type { Agent, WorkRepository } from '@codex-claw/core/contracts';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 
 import {
-  mountShell,
+  mountShell as mountRealShell,
   pointerEvent,
   workItem,
 } from './app-shell-test-harness';
+
+const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
+  ...overrides,
+  stubAgentWorkspace: true,
+});
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -48,8 +53,7 @@ describe('AppShell navigation and teams', () => {
         isSending: true,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.get('.chat-composer__send').trigger('click');
@@ -67,8 +71,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.findAll('.agent-sidebar__agent')[1]?.trigger('click');
@@ -86,8 +89,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.get('.team-rail').classes()).toContain('team-rail--agent-sidebar-expanded');
@@ -109,8 +111,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     const sidebar = () => wrapper.get('.agent-sidebar');
@@ -139,8 +140,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
@@ -170,8 +170,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('true');
@@ -194,8 +193,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
@@ -211,8 +209,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
@@ -232,8 +229,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Welcome to Codex Claw');
@@ -251,8 +247,7 @@ describe('AppShell navigation and teams', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Dina');
@@ -270,7 +265,7 @@ describe('AppShell navigation and teams', () => {
     });
     snapshot.activeTeamId = 'team-empty';
     snapshot.activeAgentId = null;
-    const wrapper = mountShell({ snapshot });
+    const wrapper = mountRealShell({ snapshot });
 
     expect(wrapper.get('[aria-label="Empty Team"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('.agent-sidebar').exists()).toBe(true);

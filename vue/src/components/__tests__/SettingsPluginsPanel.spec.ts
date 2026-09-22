@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import SettingsPluginsPanel from '../SettingsPluginsPanel.vue';
@@ -22,7 +21,6 @@ describe('SettingsPluginsPanel', () => {
 
   it('separates Claw capabilities from Codex plugins', () => {
     const wrapper = mount(SettingsPluginsPanel, {
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual([
@@ -42,7 +40,6 @@ describe('SettingsPluginsPanel', () => {
     const getPluginStatus = vi.fn().mockResolvedValue({ chromeEnabled: false });
     const wrapper = mount(SettingsPluginsPanel, {
       props: { updateSettings, getPluginStatus },
-      global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
 
@@ -62,7 +59,6 @@ describe('SettingsPluginsPanel', () => {
         updateSettings,
         getPluginStatus: vi.fn().mockResolvedValue({ chromeEnabled: true }),
       },
-      global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
 
@@ -80,7 +76,6 @@ describe('SettingsPluginsPanel', () => {
         settings: { computerUseEnabled: true, chromeEnabled: false },
         updateSettings,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await wrapper.get('[aria-label="Enable Computer Use"]').trigger('click');
@@ -97,7 +92,6 @@ describe('SettingsPluginsPanel', () => {
         settings: { computerUseEnabled: false, chromeEnabled: false },
         updateSettings,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await wrapper.get('[aria-label="Enable Computer Use"]').trigger('click');
@@ -110,7 +104,6 @@ describe('SettingsPluginsPanel', () => {
   it('does not offer Computer Use when the host does not provide it', () => {
     configureClawClient(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.find('[aria-label="Enable Computer Use"]').exists()).toBe(false);
@@ -121,7 +114,6 @@ describe('SettingsPluginsPanel', () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
       props: { updateSettings },
-      global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
 
@@ -134,7 +126,6 @@ describe('SettingsPluginsPanel', () => {
   it('shows plugin manager failures inline', async () => {
     builtInLaunchChatGpt.mockRejectedValueOnce(new Error('ChatGPT is unavailable.'));
     const wrapper = mount(SettingsPluginsPanel, {
-      global: { plugins: [ElementPlus] },
       attachTo: document.body,
     });
 

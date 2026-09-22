@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { createI18n } from 'vue-i18n';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { messages } from '../../i18n/messages';
@@ -11,7 +10,6 @@ function mountLanding(props: Partial<InstanceType<typeof OnboardingCompleteLandi
     props,
     global: {
       plugins: [
-        ElementPlus,
         createI18n({ legacy: false, locale: 'en', messages }),
       ],
     },

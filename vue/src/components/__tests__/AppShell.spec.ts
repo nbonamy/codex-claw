@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import type {
   CodexComposerMenuSelectableItem,
   CodexNativeAttachment,
@@ -21,8 +20,15 @@ import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtu
 import {
   conversationControllerActions,
   conversationControllerState,
-  mountShell,
+  mountShell as mountRealShell,
 } from './app-shell-test-harness';
+
+const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
+  ...overrides,
+  stubAgentWorkspace: overrides.stubAgentWorkspace ?? true,
+  stubRightWorkspacePanel: true,
+  stubTeamRail: true,
+});
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -76,6 +82,7 @@ describe('AppShell authentication and conversation', () => {
 
     const wrapper = mountShell({
       snapshot,
+      stubAgentWorkspace: false,
       codexConversationSnapshot: providerSnapshot,
     });
     const state = conversationControllerState(wrapper);
@@ -128,6 +135,7 @@ describe('AppShell authentication and conversation', () => {
     ];
     const wrapper = mountShell({
       snapshot,
+      stubAgentWorkspace: false,
       realConversationPane: true,
       codexConversationSnapshot: codexConversationSnapshot(providerMessages, {
         activeConversationId: 'thread-edit',
@@ -155,6 +163,7 @@ describe('AppShell authentication and conversation', () => {
     const editTurnAction = vi.fn().mockRejectedValue(new Error('Codex rollback timed out'));
     const wrapper = mountShell({
       snapshot,
+      stubAgentWorkspace: false,
       realConversationPane: true,
       editTurnAction,
       codexConversationSnapshot: codexConversationSnapshot([
@@ -346,7 +355,7 @@ describe('AppShell authentication and conversation', () => {
         isSending: false,
         connectionState: { status: 'reconnecting', detail: 'socket closed' },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('.app-shell__connection-status').text()).toContain('Agents keep working in the background.');
@@ -414,7 +423,7 @@ describe('AppShell authentication and conversation', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -462,7 +471,7 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: true,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(plan);
@@ -500,7 +509,7 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: true,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual({
@@ -543,7 +552,7 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: false,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(activeAgent.plan);
@@ -572,7 +581,7 @@ describe('AppShell authentication and conversation', () => {
         isConversationLoading: true,
         isSending: false,
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
@@ -601,6 +610,7 @@ describe('AppShell authentication and conversation', () => {
     const wrapper = mountShell({
       isConversationLoadFailed: true,
       retryAgentHistory,
+      stubAgentWorkspace: false,
     });
 
     expect(conversationControllerState(wrapper).identity.disabled).toBe(true);
@@ -614,6 +624,7 @@ describe('AppShell authentication and conversation', () => {
     const withMessages = mountShell({
       snapshot,
       isConversationLoadFailed: true,
+      stubAgentWorkspace: false,
       codexConversationSnapshot: codexConversationSnapshot([
         codexTextMessage('message-existing', 'assistant', 'Keep me visible.'),
       ]),
@@ -632,7 +643,7 @@ describe('AppShell authentication and conversation', () => {
         isSending: false,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -654,7 +665,7 @@ describe('AppShell authentication and conversation', () => {
       createdAt: '2026-09-08T00:00:00.000Z',
     }];
 
-    const wrapper = mountShell({ snapshot, realConversationPane: true });
+    const wrapper = mountShell({ snapshot, realConversationPane: true, stubAgentWorkspace: false });
 
     expect(wrapper.get('[aria-label="Queued prompt"]').text()).toContain('Run the focused tests next');
   });
@@ -671,7 +682,7 @@ describe('AppShell authentication and conversation', () => {
         sendPromptAction,
       },
       global: {
-        plugins: [ElementPlus, i18n],
+        plugins: [i18n],
       },
     });
 
@@ -688,7 +699,7 @@ describe('AppShell authentication and conversation', () => {
 
   it('intercepts /review and opens the app-owned review workflow without sending a provider prompt', async () => {
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ realConversationPane: true, sendPromptAction });
+    const wrapper = mountRealShell({ realConversationPane: true, sendPromptAction });
     const editor = wrapper.get('[role="textbox"][contenteditable]');
     editor.element.textContent = '/review';
     await editor.trigger('input');
@@ -715,7 +726,7 @@ describe('AppShell authentication and conversation', () => {
     next.teams[0]!.agentIds.push(reviewer.id);
     next.activeAgentId = reviewer.id;
     const startCodeReview = vi.fn().mockResolvedValue(next);
-    const wrapper = mountShell({ snapshot, startCodeReview });
+    const wrapper = mountRealShell({ snapshot, startCodeReview });
 
     wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'codeReview');
     await nextTick();
@@ -760,7 +771,7 @@ describe('AppShell authentication and conversation', () => {
     next.teams[0]!.agentIds.push(reviewer.id);
     next.activeAgentId = reviewer.id;
     const startCodeReview = vi.fn().mockResolvedValue(next);
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       snapshot,
       startCodeReview,
       backendModels: [{
@@ -810,6 +821,7 @@ describe('AppShell authentication and conversation', () => {
     const wrapper = mountShell({
       snapshot,
       realConversationPane: true,
+      stubAgentWorkspace: false,
       discussCodeReviewFinding,
       sendPromptAction,
     });
@@ -851,6 +863,7 @@ describe('AppShell authentication and conversation', () => {
     const wrapper = mountShell({
       snapshot,
       realConversationPane: true,
+      stubAgentWorkspace: false,
       sendPromptAction,
     });
 
@@ -934,7 +947,7 @@ describe('AppShell authentication and conversation', () => {
         }],
         composerState: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     const state = conversationControllerState(wrapper);
@@ -1130,6 +1143,7 @@ describe('AppShell authentication and conversation', () => {
       snapshot,
       backendModels,
       realConversationPane: true,
+      stubAgentWorkspace: false,
       selectedModelId: 'terra',
       selectedReasoningEffort: 'medium',
       selectedServiceTier: 'priority',
@@ -1231,6 +1245,7 @@ describe('AppShell authentication and conversation', () => {
         isDefault: true,
       }],
       realConversationPane: true,
+      stubAgentWorkspace: false,
       selectedModelId: 'terra',
       selectedReasoningEffort: 'high',
       selectedServiceTier: 'default',
@@ -1258,7 +1273,7 @@ describe('AppShell authentication and conversation', () => {
         backendCapabilities: claudeBackendCapabilities,
         permissionMode: 'acceptEdits',
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(conversationControllerState(wrapper).capabilities?.approvalPresets).toStrictEqual([]);
@@ -1349,6 +1364,7 @@ describe('AppShell authentication and conversation', () => {
     const wrapper = mountShell({
       composerAttachments: [firstImage, secondImage, unannotatedImage, contextFile],
       realConversationPane: true,
+      stubAgentWorkspace: false,
     });
 
     await wrapper.get('[aria-label="Annotate first.png"]').trigger('click');
@@ -1471,7 +1487,7 @@ describe('AppShell authentication and conversation', () => {
       browserClose: vi.fn().mockResolvedValue(undefined),
       onEvent: vi.fn(() => vi.fn()),
     });
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       composerAttachments: [{
         id: 'image-to-annotate',
         type: 'image',

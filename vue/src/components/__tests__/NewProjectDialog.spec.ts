@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it } from 'vitest';
 import NewProjectDialog from '../NewProjectDialog.vue';
 
@@ -12,7 +11,7 @@ describe('NewProjectDialog', () => {
     const wrapper = mount(NewProjectDialog, {
       attachTo: document.body,
       props: { visible: true },
-      global: { plugins: [ElementPlus], stubs: { ElDialog: dialogStub } },
+      global: { stubs: { ElDialog: dialogStub } },
     });
 
     await wrapper.get('#new-project-name').setValue('  fresh-project  ');
@@ -25,7 +24,7 @@ describe('NewProjectDialog', () => {
     const wrapper = mount(NewProjectDialog, {
       attachTo: document.body,
       props: { visible: true },
-      global: { plugins: [ElementPlus], stubs: { ElDialog: dialogStub } },
+      global: { stubs: { ElDialog: dialogStub } },
     });
 
     await wrapper.get('#new-project-name').setValue('../fresh-project');

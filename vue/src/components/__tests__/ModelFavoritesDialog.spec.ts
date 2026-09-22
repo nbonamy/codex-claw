@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import type { BackendModelOption, ModelFavorite } from '@codex-claw/core/contracts';
 import ModelFavoritesDialog from '../ModelFavoritesDialog.vue';
@@ -83,7 +82,6 @@ function mountDialog() {
   return mount(ModelFavoritesDialog, {
     props: { favorites, models, visible: true },
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElDialog: {
           props: ['modelValue'],

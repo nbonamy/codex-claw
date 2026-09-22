@@ -14,8 +14,13 @@ import {
   clickPortaledMenuItem,
   conversationControllerActions,
   conversationControllerState,
-  mountShell,
+  mountShell as mountRealShell,
 } from './app-shell-test-harness';
+
+const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
+  ...overrides,
+  stubAgentWorkspace: true,
+});
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -112,7 +117,7 @@ describe('AppShell dialogs and commands', () => {
       agentIds: [],
     });
     const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, getAgentGitDiff });
+    const wrapper = mountRealShell({ snapshot, getAgentGitDiff });
     await flushPromises();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
@@ -140,7 +145,7 @@ describe('AppShell dialogs and commands', () => {
     const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'src/main.ts', size: 12, kind: 'text', content: 'export {}',
     });
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       agentFiles: [{ name: 'main.ts', path: 'src/main.ts' }],
       previewAgentFile,
     });
@@ -305,7 +310,7 @@ describe('AppShell dialogs and commands', () => {
     });
     const quit = vi.fn().mockResolvedValue(undefined);
     const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit, getAgentGitDiff });
+    const wrapper = mountRealShell({ snapshot, quit, getAgentGitDiff });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
@@ -423,7 +428,7 @@ describe('AppShell dialogs and commands', () => {
       }),
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
-    const wrapper = mountShell();
+    const wrapper = mountRealShell();
 
     useConfetti().clear();
     listener({ type: 'debug-celebrate', kind: 'stars' });
@@ -528,8 +533,10 @@ describe('AppShell dialogs and commands', () => {
     listener({ type: 'debug-operation-progress', kind: 'worktreeInitialization' });
     await nextTick();
 
-    const dialog = wrapper.getComponent({ name: 'AgentCreationProgressDialog' });
-    expect(dialog.props('progress')).toMatchObject({
+    const dialog = wrapper.findAllComponents({ name: 'AgentCreationProgressDialog' })
+      .find((candidate) => candidate.props('progress') !== null);
+    expect(dialog).toBeDefined();
+    expect(dialog!.props('progress')).toMatchObject({
       state: 'running',
       createWorktree: true,
       phase: 'creatingWorktree',
@@ -538,13 +545,13 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.text()).toContain('Building an isolated home in codex-claw');
 
     await vi.advanceTimersByTimeAsync(1_200);
-    expect(dialog.props('progress')).toMatchObject({
+    expect(dialog!.props('progress')).toMatchObject({
       phase: 'initializingWorktree',
       initializationDetail: 'Repository instructions · npm install',
     });
 
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(dialog.props('progress')).toMatchObject({
+    expect(dialog!.props('progress')).toMatchObject({
       state: 'success',
       agentName: 'debug/worktree-preview',
     });
@@ -575,7 +582,7 @@ describe('AppShell dialogs and commands', () => {
       state: 'clean',
       updatedAt: '2026-09-03T00:00:00.000Z',
     };
-    const wrapper = mountShell({ snapshot });
+    const wrapper = mountRealShell({ snapshot });
 
     listener({ type: 'debug-operation-progress', kind: 'pullRequest' });
     await flushPromises();
@@ -768,7 +775,7 @@ describe('AppShell dialogs and commands', () => {
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const snapshot = createInitialSnapshot();
-    const wrapper = mountShell({ snapshot });
+    const wrapper = mountRealShell({ snapshot });
 
     listener({
       type: 'open-browser',

@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { defaultAppshotSettings } from '@codex-claw/core/settings';
 import SettingsAppshotsPanel from '../SettingsAppshotsPanel.vue';
@@ -9,7 +8,6 @@ describe('SettingsAppshotsPanel', () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsAppshotsPanel, {
       props: { settings: defaultAppshotSettings, updateSettings },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.text()).toContain('Take an Appshot to show Codex your frontmost window');

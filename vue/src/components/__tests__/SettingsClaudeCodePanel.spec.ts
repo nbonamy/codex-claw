@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import SettingsClaudeCodePanel from '../SettingsClaudeCodePanel.vue';
@@ -12,7 +11,6 @@ describe('SettingsClaudeCodePanel', () => {
         settings: defaultGeneralSettings,
         updateSettings,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.text()).toContain('Enable Claude Code (experimental)');

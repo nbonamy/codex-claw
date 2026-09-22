@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import SessionCompressionDialog from '../SessionCompressionDialog.vue';
 
@@ -32,7 +31,6 @@ function mountDialog(props: { busy?: boolean; error?: string | null } = {}) {
   return mount(SessionCompressionDialog, {
     props: { visible: true, ...props },
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElDialog: {
           props: ['modelValue'],

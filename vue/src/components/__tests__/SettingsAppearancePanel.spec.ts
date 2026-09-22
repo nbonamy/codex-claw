@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsAppearancePanel from '../SettingsAppearancePanel.vue';
 import { defaultThemeSettings } from '@codex-claw/core/settings';
@@ -13,8 +12,7 @@ describe('SettingsAppearancePanel', () => {
         updateSettings,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).not.toContain('UI font size');
@@ -50,8 +48,7 @@ describe('SettingsAppearancePanel', () => {
         updateSettings,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'system');
@@ -69,8 +66,7 @@ describe('SettingsAppearancePanel', () => {
         updateSettings,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'neon');

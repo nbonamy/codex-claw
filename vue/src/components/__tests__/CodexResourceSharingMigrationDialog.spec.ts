@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import CodexResourceSharingMigrationDialog from '../CodexResourceSharingMigrationDialog.vue';
 
@@ -53,6 +52,5 @@ function mountDialog(overrides: Partial<{ blocked: boolean; pending: boolean; vi
       ...overrides,
     },
     attachTo: document.body,
-    global: { plugins: [ElementPlus] },
   });
 }

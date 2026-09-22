@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
+import { ElPopover } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import RepositoryIconPicker from '../RepositoryIconPicker.vue';
 
@@ -94,7 +94,7 @@ function mountPicker(props: Partial<{ expanded: boolean; modelValue?: string }> 
       ...props,
     },
     global: {
-      plugins: [ElementPlus],
+      components: { ElPopover },
       stubs: {
         teleport: true,
         AgentAvatarCropDialog: {

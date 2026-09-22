@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import type { WorkRepository } from '@codex-claw/core/contracts';
 import RepositoryAcquireDialog from '../RepositoryAcquireDialog.vue';
@@ -35,7 +34,6 @@ describe('RepositoryAcquireDialog', () => {
         repositories,
         localRepositoryIdentities: ['github.com/nbonamy/codex-claw'],
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -77,7 +75,6 @@ describe('RepositoryAcquireDialog', () => {
         repositories: [{ ...repositories[0]!, id: 'openai/codex-claw', owner: 'openai', fullName: 'openai/codex-claw', url: 'https://github.com/openai/codex-claw' }],
         localRepositoryIdentities: ['github.com/nbonamy/codex-claw'],
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -92,7 +89,6 @@ describe('RepositoryAcquireDialog', () => {
         mode: 'github',
         connection: { provider: 'github', status: 'disconnected' },
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -130,7 +126,6 @@ describe('RepositoryAcquireDialog', () => {
   it('validates and submits an explicit repository URL', async () => {
     const wrapper = mount(RepositoryAcquireDialog, {
       props: { visible: true, mode: 'url' },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 

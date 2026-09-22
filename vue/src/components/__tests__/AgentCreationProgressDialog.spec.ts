@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import AgentCreationProgressDialog from '../AgentCreationProgressDialog.vue';
@@ -22,7 +21,6 @@ describe('AgentCreationProgressDialog', () => {
           phase: 'creatingWorktree',
         },
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 

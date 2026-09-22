@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import {
   createCodexConversationPaneController,
   type CodexConversationPaneController,
@@ -569,7 +568,7 @@ function mountPane(props: {
 }) {
   return mount(ConversationPane, {
     props,
-    global: { plugins: [ElementPlus, i18n] },
+    global: { plugins: [i18n] },
   });
 }
 

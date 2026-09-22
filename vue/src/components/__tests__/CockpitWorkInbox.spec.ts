@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
@@ -139,6 +138,7 @@ describe('CockpitWorkInbox', () => {
 
     expect(wrapper.text()).toContain('repo-one #21');
     expect(wrapper.text()).toContain('repo-two #22');
+    await wrapper.get('.cockpit-inbox__filter-button').trigger('click');
     const selects = wrapper.findAllComponents({ name: 'ElSelect' });
     await selects[0]?.vm.$emit('update:modelValue', 'repo-two');
     await selects[1]?.vm.$emit('update:modelValue', 'bug');
@@ -234,7 +234,6 @@ function mountInbox(
       startWorkAction,
       ...filters,
     },
-    global: { plugins: [ElementPlus] },
   });
 }
 

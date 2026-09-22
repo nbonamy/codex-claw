@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import FormDialog from '../FormDialog.vue';
 import FormDialogField from '../FormDialogField.vue';
@@ -18,7 +17,6 @@ describe('FormDialog', () => {
         footer: '<button>Cancel</button><button>Create</button>',
       },
       global: {
-        plugins: [ElementPlus],
         stubs: { ElDialog: dialogStub() },
       },
     });
@@ -40,7 +38,6 @@ describe('FormDialog', () => {
         title: 'Edit agent',
       },
       global: {
-        plugins: [ElementPlus],
         stubs: { ElDialog: dialogStub() },
       },
     });

@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import type { WorkItem } from '@codex-claw/core/contracts';
@@ -62,7 +61,6 @@ function mountTile(props: { draggedWorkItem?: WorkItem | null } = {}) {
       teamId: 'team-codex-claw',
       ...props,
     },
-    global: { plugins: [ElementPlus] },
   });
 }
 

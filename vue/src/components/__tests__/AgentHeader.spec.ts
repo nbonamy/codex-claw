@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/core/contracts';
@@ -28,8 +27,7 @@ function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false, gi
       sidebarCollapsed: false,
     },
     global: {
-      plugins: [ElementPlus],
-    },
+      },
   });
 }
 
@@ -55,7 +53,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: false,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.get('.agent-header__avatar').text()).toBe('🦞');
@@ -140,7 +137,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: false,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.get('.agent-header__agent-line strong').text()).toBe('chore/codebase-hardening-review');
@@ -170,7 +166,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: false,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.get('.agent-header__agent-line strong').text()).toBe('main');
@@ -295,7 +290,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: false,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.find('[aria-label="Open repository backlog"]').exists()).toBe(false);
@@ -346,7 +340,7 @@ describe('AgentHeader', () => {
           ],
         },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     await wrapper.get('[aria-label="Open in Xcode"]').trigger('click');
@@ -367,7 +361,7 @@ describe('AgentHeader', () => {
           applications: [{ id: 'vscode', label: 'VS Code' }],
         },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.text()).toContain('Untitled conversation');
@@ -386,7 +380,6 @@ describe('AgentHeader', () => {
         executionPlanAvailable: true,
         executionPlanOpen: true,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     const planAction = wrapper.get('[aria-label="Toggle execution plan"]');
@@ -402,7 +395,6 @@ describe('AgentHeader', () => {
         sidebarCollapsed: false,
         executionPlanAvailable: false,
       },
-      global: { plugins: [ElementPlus] },
     });
     expect(hiddenWrapper.find('[aria-label="Toggle execution plan"]').exists()).toBe(false);
   });
@@ -416,7 +408,6 @@ describe('AgentHeader', () => {
         sidebarCollapsed: false,
         updateStatus: { state: 'downloaded', version: '0.4.0' },
       },
-      global: { plugins: [ElementPlus] },
     });
 
     const badge = wrapper.get('.update-available-badge');
@@ -438,8 +429,7 @@ describe('AgentHeader', () => {
         sidebarCollapsed: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Running tests');
@@ -465,8 +455,7 @@ describe('AgentHeader', () => {
         sidebarCollapsed: false,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
@@ -482,8 +471,7 @@ describe('AgentHeader', () => {
         sidebarCollapsed: true,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('No agent');
@@ -512,8 +500,7 @@ describe('AgentHeader', () => {
         sidebarCollapsed: true,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Dina');
@@ -584,7 +571,7 @@ describe('AgentHeader', () => {
           activities: {},
         },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     const gitStats = wrapper.get('.agent-header__git-status');
@@ -641,7 +628,7 @@ describe('AgentHeader', () => {
         workspaceOpen: false,
         updateStatus: { state: 'downloaded', version: '0.4.0' },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     const activity = wrapper.get('.agent-header__activity');
@@ -679,7 +666,7 @@ describe('AgentHeader', () => {
           activities: {},
         },
       },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [i18n] },
     });
 
     expect(wrapper.find('.subagent-control').exists()).toBe(false);

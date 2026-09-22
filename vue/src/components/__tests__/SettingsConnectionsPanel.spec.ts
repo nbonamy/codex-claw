@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceFolderListInput } from '@codex-claw/core/contracts';
 import { codexPairingUrl } from '../../device-pairing';
@@ -30,8 +30,7 @@ describe('SettingsConnectionsPanel', () => {
         getRemoteControlStatus: async () => ({ status: 'connected' }),
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
     await flushPromises();
 
@@ -51,8 +50,7 @@ describe('SettingsConnectionsPanel', () => {
         getRemoteControlStatus: async () => ({ status: 'disabled' }),
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
     await flushPromises();
 
@@ -106,8 +104,7 @@ describe('SettingsConnectionsPanel', () => {
         removeRemoteConnection,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('devbox');
@@ -185,8 +182,7 @@ describe('SettingsConnectionsPanel', () => {
         checkRemoteConnection,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     const upgrade = wrapper.get('.settings-connections-panel__upgrade');
@@ -218,8 +214,7 @@ describe('SettingsConnectionsPanel', () => {
         addSshConnection,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     await wrapper.findAll('button').find((button) => button.text() === 'Add remote')?.trigger('click');
@@ -279,7 +274,6 @@ describe('SettingsConnectionsPanel', () => {
         listPairedDevices,
         revokePairedDevice,
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 
@@ -314,7 +308,6 @@ describe('SettingsConnectionsPanel', () => {
         enableRemoteControl,
         disableRemoteControl,
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 

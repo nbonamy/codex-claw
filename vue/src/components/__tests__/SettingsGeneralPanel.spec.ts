@@ -1,12 +1,14 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ElMessageBox } from 'element-plus';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import { setElectronTestClient } from '../../test/client';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
+  beforeEach(() => { setElectronTestClient({}); });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -442,8 +444,7 @@ function mountPanel(props: Record<string, unknown>) {
       ...props,
     },
     global: {
-      plugins: [ElementPlus],
-    },
+      },
   });
 }
 
