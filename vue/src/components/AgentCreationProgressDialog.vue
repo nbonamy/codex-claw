@@ -19,6 +19,7 @@
       :title="runningTitle"
       :complete-title="t('agentCreationProgress.ready', { agent: progress.agentName ?? progress.branchName ?? progress.repositoryName })"
       :error-title="t('agentCreationProgress.failed')"
+      :error-detail="progress.error"
       :steps="steps"
       @complete="emit('close', progress.id)"
     />

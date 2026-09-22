@@ -1,26 +1,11 @@
 <template>
   <FormDialog
-    :class="[
-      'new-source-worktree-dialog',
-      { 'new-source-worktree-dialog--progress': creationState },
-      { 'new-source-worktree-dialog--error': creationState === 'error' },
-    ]"
-    :model-value="visible"
+    class="new-source-worktree-dialog"
+    :model-value="visible && !creationState"
     :title="$t('surface.newSourceWorktreeDialog.newWorktree')"
     @update:model-value="onVisibilityChanged"
   >
-    <StagedOperationProgress
-      v-if="creationState"
-      :state="creationState"
-      :eyebrow="$t('surface.newSourceWorktreeDialog.progressEyebrow')"
-      :title="$t('surface.newSourceWorktreeDialog.progressTitle', { repository: repo?.name ?? '' })"
-      :complete-title="$t('surface.newSourceWorktreeDialog.progressComplete', { branch: pendingBranchName })"
-      :error-title="$t('surface.newSourceWorktreeDialog.progressFailed')"
-      :minimum-duration-ms="800"
-      :steps="creationSteps"
-      @complete="completeCreation"
-    />
-    <form v-else class="claw-form-dialog" @submit.prevent="create()">
+    <form class="claw-form-dialog" @submit.prevent="create()">
       <WorktreeReusePrompt
         v-if="existingWorktree"
         :branch="existingWorktree.name"
@@ -98,19 +83,10 @@
     </form>
 
     <template #footer>
-      <button
-        v-if="creationState === 'error'"
-        class="claw-button claw-button--tertiary"
-        type="button"
-        @click="close"
-      >
-        {{ $t('common.close') }}
-      </button>
-      <button v-else class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
+      <button class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
         {{ existingWorktree ? $t('common.back') : $t('surface.newSourceWorktreeDialog.cancel') }}
       </button>
       <button
-        v-if="!creationState"
         class="claw-button claw-button--primary"
         type="button"
         :aria-busy="creating"
@@ -119,16 +95,19 @@
       > {{ existingWorktree ? $t('worktreeReuse.action') : $t('surface.newSourceWorktreeDialog.create') }} </button>
     </template>
   </FormDialog>
+  <AgentCreationProgressDialog
+    :progress="creationProgress"
+    @close="completeCreation"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import type { CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
+import type { AgentCreationProgress, CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
-import StagedOperationProgress, { type StagedOperationStep } from './StagedOperationProgress.vue';
+import AgentCreationProgressDialog from './AgentCreationProgressDialog.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 
 const props = withDefaults(defineProps<{
@@ -151,8 +130,6 @@ const emit = defineEmits<{
   close: [];
   created: [worktree: SourceWorktree];
 }>();
-const { t } = useI18n();
-
 const branchName = ref('');
 const baseBranch = ref('');
 const customDestinationPath = ref('');
@@ -161,6 +138,7 @@ const creating = ref(false);
 const creationState = ref<'running' | 'success' | 'error' | null>(null);
 const createdWorktree = ref<SourceWorktree | null>(null);
 const pendingBranchName = ref('');
+const creationError = ref('');
 const existingWorktree = ref<SourceWorktree | null>(null);
 let suggestionRequestId = 0;
 
@@ -175,10 +153,19 @@ const canCreate = computed(() => Boolean(
   && !creating.value,
 ));
 const destinationPath = computed(() => customDestinationPath.value || suggestedDestinationPath.value);
-const creationSteps = computed<StagedOperationStep[]>(() => [{
-  title: t('surface.newSourceWorktreeDialog.progressStep'),
-  detail: pendingBranchName.value,
-}]);
+const creationProgress = computed<AgentCreationProgress | null>(() => {
+  if (!props.visible || !creationState.value || !props.repo) return null;
+  return {
+    id: 'manual-worktree-creation',
+    state: creationState.value,
+    backend: 'codex',
+    repositoryName: props.repo.name,
+    createWorktree: true,
+    branchName: pendingBranchName.value,
+    hasPrompt: false,
+    ...(creationError.value ? { error: creationError.value } : {}),
+  };
+});
 
 watch(() => props.visible, (visible) => {
   if (visible) {
@@ -189,6 +176,7 @@ watch(() => props.visible, (visible) => {
     creationState.value = null;
     createdWorktree.value = null;
     pendingBranchName.value = '';
+    creationError.value = '';
     existingWorktree.value = null;
     creating.value = false;
   }
@@ -261,7 +249,7 @@ async function create(reuseExisting = false): Promise<void> {
     }
   } catch (error) {
     creationState.value = 'error';
-    pendingBranchName.value = error instanceof Error ? error.message : String(error);
+    creationError.value = error instanceof Error ? error.message : String(error);
   } finally {
     creating.value = false;
   }
@@ -274,8 +262,7 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 function completeCreation(): void {
-  if (!createdWorktree.value) return;
-  emit('created', createdWorktree.value);
+  if (createdWorktree.value) emit('created', createdWorktree.value);
   close();
 }
 
@@ -316,14 +303,6 @@ async function refreshSuggestedDestinationPath(): Promise<void> {
 </script>
 
 <style scoped>
-:global(.new-source-worktree-dialog--progress .el-dialog__header) {
-  display: none;
-}
-
-:global(.new-source-worktree-dialog--progress:not(.new-source-worktree-dialog--error) .el-dialog__footer) {
-  display: none;
-}
-
 .new-source-worktree-dialog__base-select {
   width: 100%;
 }

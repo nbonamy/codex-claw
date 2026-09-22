@@ -95,13 +95,22 @@ describe('NewSourceWorktreeDialog', () => {
     await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
 
     expect(wrapper.find('.new-source-worktree-dialog__branch-input').exists()).toBe(false);
+    expect(wrapper.getComponent({ name: 'AgentCreationProgressDialog' }).props('progress')).toMatchObject({
+      state: 'running',
+      repositoryName: 'codex-claw',
+      createWorktree: true,
+      branchName: 'feature/progress',
+    });
     const progress = wrapper.getComponent({ name: 'StagedOperationProgress' });
     expect(progress.props()).toMatchObject({
       state: 'running',
-      title: 'Creating a worktree in codex-claw…',
+      title: 'Building an isolated home in codex-claw…',
     });
     expect(progress.text()).toContain('Creating isolated worktree');
     expect(progress.text()).toContain('feature/progress');
+    expect(progress.text()).toContain('Initializing worktree');
+    expect(progress.text()).toContain('Starting agent session');
+    expect(progress.text()).toContain('Finishing agent setup');
 
     resolveCreation({ name: 'feature/progress', path: '/tmp/codex-claw-feature-progress' });
     await flushPromises();

@@ -610,12 +610,7 @@ export const surfaceMessages = {
     "enterABranchName": "Enter a branch name",
     "chooseWorktreeFolder": "Choose worktree folder",
     "cancel": "Cancel",
-    "create": "Create",
-    "progressEyebrow": "New worktree",
-    "progressTitle": "Creating a worktree in {repository}…",
-    "progressComplete": "{branch} is ready",
-    "progressFailed": "Couldn’t create the worktree",
-    "progressStep": "Creating isolated worktree"
+    "create": "Create"
   },
   "planReviewFooter": {
     "planComments": "Plan comments"

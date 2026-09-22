@@ -11,6 +11,9 @@
         <strong>{{ displayTitle }}</strong>
       </div>
     </header>
+    <p v-if="state === 'error' && errorDetail" class="staged-operation-progress__error-detail">
+      {{ errorDetail }}
+    </p>
     <ol>
       <li v-for="(step, index) in steps" :key="`${step.title}-${index}`" :class="stepClass(index)">
         <span class="staged-operation-progress__step-marker">
@@ -47,6 +50,7 @@ const props = defineProps<{
   activeStep?: number;
   completeTitle: string;
   eyebrow: string;
+  errorDetail?: string;
   errorTitle?: string;
   minimumDurationMs?: number;
   state: 'running' | 'success' | 'error';
@@ -158,6 +162,13 @@ function clearTimers(): void {
 .staged-operation-progress__icon svg {
   width: var(--icon-lg);
   height: var(--icon-lg);
+}
+
+.staged-operation-progress__error-detail {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-18);
 }
 
 .staged-operation-progress[data-state="success"]
