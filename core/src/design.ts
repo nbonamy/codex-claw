@@ -7,6 +7,9 @@ export const designSuggestionLimits = {
   description: 120,
 } as const;
 
+export const designDebugScenarios = ['complete', 'suggestions'] as const;
+export type DesignDebugScenario = typeof designDebugScenarios[number];
+
 export type DesignDiagramKind = typeof designDiagramKinds[number];
 
 export type DesignSuggestion = {

@@ -23,5 +23,11 @@ describe('Design debug fixture', () => {
     expect(design.suggestions.filter(suggestion => suggestion.diagramId)).toHaveLength(2);
     expect(design.diagrams.map(diagram => diagram.content.kind)).toStrictEqual(['mermaid', 'svg']);
     expect(design.selectedDiagramId).toBe(design.diagrams[0]?.id);
+
+    const suggestions = createDesignDebugFixture(agent, '2026-09-21T13:00:00.000Z', 'suggestions');
+    expect(suggestions.suggestions).toHaveLength(4);
+    expect(suggestions.suggestions.every(suggestion => !suggestion.diagramId)).toBe(true);
+    expect(suggestions.diagrams).toStrictEqual([]);
+    expect(suggestions.selectedDiagramId).toBeNull();
   });
 });

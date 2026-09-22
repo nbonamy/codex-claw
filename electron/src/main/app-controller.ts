@@ -1578,7 +1578,7 @@ export class AppController {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
-      populateDebugDesign: () => this.populateDebugDesign(),
+      populateDebugDesign: (scenario) => this.populateDebugDesign(scenario),
       getDebugMissionStage: () => this.debugMission()?.stage,
       setDebugMissionStage: (stage) => this.setDebugMissionStage(stage),
       injectDebugCodeReview: (scenario) => this.injectDebugCodeReview(scenario),
@@ -1684,11 +1684,11 @@ export class AppController {
       }));
   }
 
-  private populateDebugDesign(): void {
+  private populateDebugDesign(scenario: import('@codex-claw/core/design').DesignDebugScenario): void {
     const agentId = this.snapshot?.activeAgentId;
     if (!agentId || !this.backendClient || app?.isPackaged) return;
 
-    void this.backendClient.request<AppSnapshot>(backendMethods.debugDesignPopulate, { agentId })
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugDesignPopulate, { agentId, scenario })
       .then(async (snapshot) => {
         await this.adoptBackendSnapshot(snapshot);
         if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -1697,6 +1697,7 @@ export class AppController {
       })
       .catch((error) => warnMain('debug', 'failed to populate Design fixture', {
         agentId,
+        scenario,
         detail: error instanceof Error ? error.message : String(error),
       }));
   }

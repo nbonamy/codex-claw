@@ -1,12 +1,13 @@
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import type { Agent } from '@codex-claw/core/contracts';
-import type { DesignSession } from '@codex-claw/core/design';
+import type { DesignDebugScenario, DesignSession } from '@codex-claw/core/design';
 
 export function createDesignDebugFixture(
   agent: Agent,
   now = new Date().toISOString(),
+  scenario: DesignDebugScenario = 'complete',
 ): DesignSession {
-  return {
+  const fixture: DesignSession = {
     id: 'debug-design-session',
     conversationRef: conversationRefFromAgent(agent),
     suggestions: [
@@ -84,4 +85,14 @@ export function createDesignDebugFixture(
     createdAt: now,
     updatedAt: now,
   };
+  if (scenario === 'suggestions') {
+    fixture.suggestions = fixture.suggestions.map(suggestion => ({
+      id: suggestion.id,
+      title: suggestion.title,
+      description: suggestion.description,
+    }));
+    fixture.diagrams = [];
+    fixture.selectedDiagramId = null;
+  }
+  return fixture;
 }

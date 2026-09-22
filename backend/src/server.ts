@@ -64,6 +64,7 @@ import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewSta
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
 import { DesignService, generateDesignSuggestionPrompt, initialDesignPrompt } from './design-service';
+import { designDebugScenarios, type DesignDebugScenario } from '@codex-claw/core/design';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -633,12 +634,17 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugDesignPopulate: {
-        const agentId = requireAgentId(message.params);
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const scenario = params.scenario ?? 'complete';
+        if (typeof scenario !== 'string' || !designDebugScenarios.includes(scenario as DesignDebugScenario)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'scenario must be a supported Design debug scenario');
+        }
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
-        agent.design = createDesignDebugFixture(agent);
+        agent.design = createDesignDebugFixture(agent, new Date().toISOString(), scenario as DesignDebugScenario);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugThreadFlagSet: {

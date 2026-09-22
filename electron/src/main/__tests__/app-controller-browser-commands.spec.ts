@@ -81,14 +81,14 @@ describe('AppController', () => {
     const send = vi.fn();
     setMainWindowSend(controller, send);
     const options = (controller as unknown as {
-      debugMenuOptions(): { populateDebugDesign(): void };
+      debugMenuOptions(): { populateDebugDesign(scenario: 'complete' | 'suggestions'): void };
     }).debugMenuOptions();
 
-    options.populateDebugDesign();
+    options.populateDebugDesign('suggestions');
 
     await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
       backendMethods.debugDesignPopulate,
-      { agentId: 'agent-dina' },
+      { agentId: 'agent-dina', scenario: 'suggestions' },
     ));
     await vi.waitFor(() => expect(send).toHaveBeenCalledWith('app:command', {
       type: 'debug-open-design',

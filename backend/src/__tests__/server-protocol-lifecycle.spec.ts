@@ -440,7 +440,16 @@ describe('ClawBackendServer', () => {
     expect(design.suggestions.map(suggestion => suggestion.id)).toContain('debug-suggestion-state');
     expect(design.suggestions.find(suggestion => suggestion.id === 'debug-suggestion-state'))
       .not.toHaveProperty('diagramId');
-    expect(saveSnapshot).toHaveBeenCalledOnce();
+
+    const suggestionsResult = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-design-suggestions', method: backendMethods.debugDesignPopulate,
+      params: { agentId: 'agent-dina', scenario: 'suggestions' },
+    });
+    const suggestions = (suggestionsResult as { result: AppSnapshot }).result.agents[0]!.design!;
+    expect(suggestions.suggestions).toHaveLength(4);
+    expect(suggestions.diagrams).toStrictEqual([]);
+    expect(suggestions.selectedDiagramId).toBeNull();
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
   });
 
   it('persists a populated Mission stage fixture through the debug protocol', async () => {

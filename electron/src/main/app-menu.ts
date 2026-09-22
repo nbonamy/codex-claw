@@ -1,5 +1,6 @@
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { DesignDebugScenario } from '@codex-claw/core/design';
 import { featureStages, type MissionStage } from '@codex-claw/core/missions';
 import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
 import { cycleTeamsAccelerator } from './app-shortcuts';
@@ -20,7 +21,7 @@ export type AppMenuCallbacks = {
   sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
-  populateDebugDesign?: () => void;
+  populateDebugDesign?: (scenario: DesignDebugScenario) => void;
   getDebugMissionStage?: () => MissionStage | undefined;
   setDebugMissionStage?: (stage: MissionStage) => void;
   injectDebugCodeReview?: (scenario: DebugCodeReviewScenario) => void;
@@ -102,7 +103,12 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
           {
             label: 'Populate Design Pane',
             enabled: Boolean(callbacks.populateDebugDesign),
-            click: () => callbacks.populateDebugDesign?.(),
+            click: () => callbacks.populateDebugDesign?.('complete'),
+          },
+          {
+            label: 'Populate Suggestions',
+            enabled: Boolean(callbacks.populateDebugDesign),
+            click: () => callbacks.populateDebugDesign?.('suggestions'),
           },
         ],
       },
