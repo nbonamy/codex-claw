@@ -53,7 +53,7 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(onUpsertMissionTicket).toHaveBeenCalledWith('agent-dina', { title: 'Ticket', body: 'Body', repositoryPath: '/repo' });
   });
 
-  it('connects agents, reports statuses, and updates trimmed status text', () => {
+  it('connects agents, reports statuses, and updates trimmed status text', async () => {
     const { agents, coordinator, onAgentUpdated } = fixture();
     agents[0]!.status = { type: 'working', detail: 'Running tests' };
     agents[1]!.status = { type: 'error', message: 'Disconnected' };
@@ -71,53 +71,49 @@ describe('ClawMcpAgentCoordinator', () => {
       ],
     });
 
-    expect(coordinator.setStatus('agent-dina', '  Reviewing coverage  ')).toBe('Status updated');
+    await expect(coordinator.setStatus('agent-dina', '  Reviewing coverage  ')).resolves.toStrictEqual({
+      success: true,
+      status: 'Reviewing coverage',
+    });
     expect(agents[0]!.statusText).toBe('Reviewing coverage');
     expect(coordinator.debugAgents()[0]?.status).toBe('Running tests: Reviewing coverage');
-    coordinator.setStatus('agent-dina', '   ');
+    agents[0]!.threadFlags = { delegate_to_worktree: true };
+    await coordinator.setStatus('agent-dina', '   ');
     expect(agents[0]!.statusText).toBeUndefined();
+    expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
     expect(onAgentUpdated).toHaveBeenCalledTimes(3);
   });
 
-  it('sets and clears predefined thread flags through the agent update seam', () => {
+  it('finishes a turn by clearing status and replacing the proposed action atomically', async () => {
     const { agents, coordinator, onAgentUpdated } = fixture();
+    await coordinator.setStatus('agent-dina', 'Reviewing changes');
 
-    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'delegate_to_worktree', value: true }))
-      .toStrictEqual({ success: true, id: 'delegate_to_worktree', value: true });
+    expect(coordinator.finishTurn('agent-dina', 'delegate_to_worktree'))
+      .toStrictEqual({ success: true, status: null, flag: 'delegate_to_worktree' });
+    expect(agents[0]!.statusText).toBeUndefined();
     expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
-    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'ready_for_review', value: true }))
-      .toStrictEqual({ success: true, id: 'ready_for_review', value: true });
-    expect(agents[0]!.threadFlags).toStrictEqual({
-      delegate_to_worktree: true,
-      ready_for_review: true,
-    });
-    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'delegate_to_worktree', value: false }))
-      .toStrictEqual({ success: true, id: 'delegate_to_worktree', value: false });
+    expect(coordinator.finishTurn('agent-dina', 'ready_for_review'))
+      .toStrictEqual({ success: true, status: null, flag: 'ready_for_review' });
     expect(agents[0]!.threadFlags).toStrictEqual({ ready_for_review: true });
-    expect(coordinator.toggleThreadFlag('agent-dina', { id: 'ready_for_review', value: false }))
-      .toStrictEqual({ success: true, id: 'ready_for_review', value: false });
-    expect(agents[0]!.threadFlags).toBeUndefined();
+    expect(coordinator.finishTurn('agent-dina'))
+      .toStrictEqual({ success: true, status: null });
+    expect(agents[0]!.threadFlags).toStrictEqual({ ready_for_review: true });
     expect(onAgentUpdated).toHaveBeenCalledTimes(4);
-    expect(() => coordinator.toggleThreadFlag('agent-dina', {
-      id: 'delegate_to_worktree', value: true, payload: {},
-    })).toThrow('does not accept a payload');
   });
 
   it('rejects recursive worktree delegation suggestions from delegated co-agents', () => {
     const { agents, coordinator, onAgentUpdated } = fixture();
     agents[0]!.delegatedByAgentId = 'agent-parent';
 
-    expect(() => coordinator.toggleThreadFlag('agent-dina', {
-      id: 'delegate_to_worktree', value: true,
-    })).toThrow('already a delegated co-agent');
+    expect(() => coordinator.finishTurn('agent-dina', 'delegate_to_worktree'))
+      .toThrow('already a delegated co-agent');
     expect(agents[0]!.threadFlags).toBeUndefined();
     expect(onAgentUpdated).not.toHaveBeenCalled();
 
     agents[0]!.threadFlags = { delegate_to_worktree: true };
-    expect(coordinator.toggleThreadFlag('agent-dina', {
-      id: 'delegate_to_worktree', value: false,
-    })).toStrictEqual({ success: true, id: 'delegate_to_worktree', value: false });
-    expect(agents[0]!.threadFlags).toBeUndefined();
+    expect(coordinator.finishTurn('agent-dina'))
+      .toStrictEqual({ success: true, status: null });
+    expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
   });
 
   it('labels every backend status variant', () => {
@@ -400,24 +396,27 @@ describe('ClawMcpAgentCoordinator', () => {
     });
   });
 
-  it('validates, trims, and delegates spoken announcements without updating agent state', async () => {
+  it('updates status and delegates a validated spoken acknowledgment in one operation', async () => {
     const onAnnounce = vi.fn().mockResolvedValue({
       success: true,
       phase: 'start',
     });
     const { agents, coordinator, onAgentUpdated } = fixture({ onAnnounce });
 
-    await expect(coordinator.announce('agent-dina', 'start', '  I’ll take it.  ')).resolves.toStrictEqual({
+    await expect(coordinator.setStatus('agent-dina', '  Reviewing  ', {
+      phase: 'start', text: '  I’ll take it.  ',
+    })).resolves.toStrictEqual({
       success: true,
-      phase: 'start',
+      status: 'Reviewing',
+      announcement: { success: true, phase: 'start' },
     });
     expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'start', 'I’ll take it.');
-    expect(onAgentUpdated).not.toHaveBeenCalled();
-    await expect(coordinator.announce('agent-dina', 'finish', '   '))
+    expect(onAgentUpdated).toHaveBeenCalledWith(expect.objectContaining({ statusText: 'Reviewing' }));
+    await expect(coordinator.setStatus('agent-dina', 'Done', { phase: 'finish', text: '   ' }))
       .rejects.toThrowError('Announcement text must not be empty.');
-    await expect(coordinator.announce('agent-dina', 'finish', 'x'.repeat(161)))
+    await expect(coordinator.setStatus('agent-dina', 'Done', { phase: 'finish', text: 'x'.repeat(161) }))
       .rejects.toThrowError('Announcement text must be 160 characters or fewer.');
-    await expect(fixture().coordinator.announce('agent-dina', 'start', 'Hi'))
+    await expect(fixture().coordinator.setStatus('agent-dina', 'Starting', { phase: 'start', text: 'Hi' }))
       .rejects.toThrowError('Spoken announcements are not available.');
   });
 });

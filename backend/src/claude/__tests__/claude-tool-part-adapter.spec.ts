@@ -123,20 +123,27 @@ describe('Claude tool part adapter', () => {
   });
 
   it('preserves MCP identity for Claw-owned tool presentation', () => {
-    expect(claudeToolPart({
+    const part = claudeToolPart({
       type: 'tool_use',
       id: 'mcp-1',
       name: 'mcp__codex_claw__set_status',
-      input: { status: 'Testing' },
-    })).toMatchObject({
+      input: {
+        status: 'Testing',
+        announcement: { phase: 'start', text: 'A phrase that must not enter renderer state.' },
+      },
+    });
+
+    expect(part).toMatchObject({
       kind: 'mcp',
       title: 'codex_claw.set_status',
+      input: { status: 'Testing' },
       metadata: {
         provider: 'claude',
         server: 'codex_claw',
         tool: 'set_status',
       },
     });
+    expect(JSON.stringify(part)).not.toContain('phrase that must not');
   });
 
   it('projects announcement phases without retaining the spoken phrase', () => {

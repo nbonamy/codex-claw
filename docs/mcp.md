@@ -384,42 +384,47 @@ Updates the caller's short collaboration status.
 Input:
 
 - `status`: short status text; an empty string clears the status early.
+- `announcement`: optional `{ phase, text }` spoken acknowledgment. Use `start`
+  on the first status update for a user task and reserve `finish` for genuine
+  completion.
 
 Effects:
 
 - stores `agent.statusText`;
 - emits `agent.updated`;
+- optionally queues the same best-effort native acknowledgment previously
+  exposed as a separate tool;
 - clears automatically when the current provider turn completes;
 - lets other agents understand who is working, idle, blocked, or ready.
 
-Developer instructions make this mandatory before starting work, changing
-direction, and finishing, while explicitly telling the model not to issue a
-second empty `set-status` call at final handoff.
+Developer instructions make the first `set-status` call the first action for a
+user task and include the start acknowledgment in that same round trip. Later
+direction updates omit `announcement`; a long-running task may include a finish
+acknowledgment in the final status update immediately before `finish_turn`.
 
-### `toggle_thread_flag`
+### `finish_turn`
 
-Sets or clears predefined, typed state for the caller's current conversation.
+Finishes the caller's visible turn state. It is the last tool action before the
+final response.
 
 Input:
 
-- `id`: an allowlisted flag identifier;
-- `value`: `true` to set the flag or `false` to clear it;
-- `payload`: optional kind-specific data, accepted only when that flag's
-  contract defines a payload.
+- `flag`: optional `delegate_to_worktree` or `ready_for_review` proposed action.
 
-The supported payload-free flags are `delegate_to_worktree` and
-`ready_for_review`. Claw renders each as a compact composer-shelf action.
-Activating delegation submits an app-owned prompt through the existing
-worktree/co-agent workflow. Activating review readiness opens Claw's review
-setup after the backend accepts and clears the flag. A failed action leaves its
-flag available for retry. The user can also dismiss either flag, and the agent
-can clear one by calling `toggle_thread_flag` with `value: false`.
+The operation always clears `agent.statusText` and emits one `agent.updated`
+event. Passing `flag` replaces the current proposal; omitting it leaves an
+existing proposal untouched. Claw renders a proposal as a compact
+composer-shelf action. Activating delegation submits an app-owned prompt
+through the existing worktree/co-agent workflow. Activating review readiness
+opens Claw's review setup after the backend accepts and clears the flag. A
+failed action leaves its flag available for retry. The user can dismiss either
+flag.
 
-Developer instructions reserve `ready_for_review` for pre-commit review. Agents
-set it only when the intended uncommitted diff is complete and validated, clear
-it when work resumes or before commit/push, and skip it for an explicit
-immediate commit/push request. Starting review clears the accepted flag through
-the normal app-owned action lifecycle.
+Developer instructions make `finish_turn` mandatory as the final tool action
+of a substantive turn. They forbid selecting `delegate_to_worktree` and then
+continuing the implementation, reserve `ready_for_review` for a complete and
+validated uncommitted diff, and omit a review proposal for an explicit
+immediate commit/push request.
 
 Flags are persisted app state and are cleared with the agent's conversation
 runtime when that conversation is restarted or replaced. Clients may present,

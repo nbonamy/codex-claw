@@ -82,7 +82,8 @@ code never calls MCP directly.
 
 ### Agent collaboration status
 
-`set-status` changes the agent itself:
+`set-status` changes the agent itself and may queue a spoken acknowledgment in
+the same operation:
 
 ```text
 set-status
@@ -95,7 +96,8 @@ The service clears the status automatically when the provider turn completes.
 An empty value remains available for an intentional early clear. `statusText`
 is independent from the agent's runtime state (`idle`, `working`,
 `awaitingInput`, or `error`). It should remain short and describe the current
-activity, not repeat a transcript.
+activity, not repeat a transcript. The optional `announcement` object carries a
+bounded `start` or `finish` phrase through the existing native audio path.
 
 If a new tool changes agent state, make the state transition explicit and emit
 the matching app-owned event. Do not infer agent state from how a tool row is
@@ -174,11 +176,14 @@ expanded content or logs.
 
 ### `set-status`: state-changing tool
 
-`set-status` demonstrates the shortest durable path:
+`set-status` demonstrates a durable state change with an optional transient
+effect in one model round trip:
 
 - schema and behavioral description in `backend/src/mcp/tools.ts`;
 - normalization and state mutation in `ClawMcpAgentCoordinator.setStatus()`;
 - `agent.updated` emission in `ClawMcpService`;
+- optional bounded announcement validation and native queueing through the same
+  coordinator call;
 - automatic cleanup from the provider-independent `turn.completed` lifecycle;
 - a special completed title for clearing status in
   `vue/src/tool-title-presenter.ts`.
@@ -186,23 +191,23 @@ expanded content or logs.
 Its MCP result confirms the operation. The visible agent status comes from the
 app event, not from the result text.
 
-### `toggle_thread_flag`: durable typed thread state
+### `finish_turn`: atomic end-of-turn state
 
-`toggle_thread_flag` exposes a generic `{ id, value, payload? }` shape while Claw keeps a
-strict allowlist and validates each flag's payload contract. Flags describe
+`finish_turn` clears collaboration status and optionally selects one flag in a
+single agent update. Claw keeps a strict flag allowlist in Core. Flags describe
 typed thread state rather than presentation. The payload-free flags are:
 
 - `delegate_to_worktree`, which submits a fixed delegation prompt through the
   normal app-owned prompt path when the user accepts it;
 - `ready_for_review`, a pre-commit affordance set only when the intended
   uncommitted diff is complete, validated, and ready for user review. Agents
-  clear it when work resumes or before commit/push and skip it for explicit
-  immediate commit/push requests.
+  skip it for explicit immediate commit/push requests.
 
-Claw clears a flag after its accepted action succeeds, on manual dismissal, or
-when the agent calls `toggle_thread_flag` with `value: false`. Failed actions
-keep the flag active for retry. Headless clients can ignore or act on the same
-durable state without a UI-specific contract.
+Passing a new flag replaces the current proposal; omitting it preserves any
+existing proposal. Claw clears a flag after its accepted action succeeds or on
+manual dismissal. Failed actions keep the flag active for retry. Headless
+clients can ignore or act on the same durable state without a UI-specific
+contract.
 
 ### `celebrate`: transient visual tool
 
@@ -218,17 +223,18 @@ durable state without a UI-specific contract.
 - the presenter reads the bounded `kind` value and renders a phase-aware row;
 - the Debug menu exposes the same effect variants for deterministic visual QA.
 
-### `announce`: transient native audio tool
+### Spoken acknowledgments through `set-status`
 
-`announce` follows the transient-effect path without changing agent state:
+`set-status` owns the transient native audio option alongside its durable agent
+status update:
 
-- the tool is always exposed and stable developer instructions require one
-  short sentence as the agent's very first action on every user task, with one
-  additional completion sentence permitted only for long-running work;
-- the MCP schema accepts `phase: start | finish` and trims text to 1–160
-  characters;
-- the coordinator validates the caller and delegates without touching
-  `agent.statusText`;
+- stable developer instructions require the first status update to include one
+  short start acknowledgment, with one finish acknowledgment permitted only for
+  long-running work;
+- the optional nested schema accepts `phase: start | finish` and trims text to
+  1–160 characters;
+- the coordinator validates the caller, updates `agent.statusText`, and
+  delegates the optional acknowledgment;
 - the service applies backend-owned global enablement and dictated-input policy,
   then sends the provider-neutral `client/spokenAnnouncement/queue` request
   without a voice or client-selection assumption;
@@ -238,13 +244,13 @@ durable state without a UI-specific contract.
 - Electron returns as soon as its bounded global queue accepts the request,
   coalesces pending phrases, rate-limits repeated phases, and owns native helper
   cancellation;
-- the MCP result exposes only the bounded presentation outcome (`queued` or
-  `skipped`), allowing the tool row to stay truthful while the phrase and
-  detailed suppression reason remain private;
-- Vue renders the Voice settings section, rail mute control, and a phase-aware
-  tool row. The section owns enablement, selected-agent and foreground scope, a
-  curated Kokoro voice picker, and a local preview action. The spoken text and
-  playback result are excluded from renderer projections.
+- the MCP result confirms the requested status and optional phase while the
+  phrase and detailed suppression reason remain private;
+- Vue renders the Voice settings section and rail mute control. The section
+  owns enablement, selected-agent and foreground scope, a
+  curated Kokoro voice picker, and a local preview action. Claw-owned normalized
+  renderer projections omit the spoken text and playback result; provider-native
+  conversation replicas remain provider-owned.
 
 The macOS helper uses FluidAudio 0.15.5 with Kokoro 82M Core ML audio and
 `AVAudioPlayer`; it does not use `AVSpeechSynthesizer`. The helper binary is

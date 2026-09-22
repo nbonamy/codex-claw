@@ -75,7 +75,7 @@ const COMPUTER_USE_TOOLS = new Set([
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
 const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding']);
-const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
+const AGENT_TOOLS = new Set(['create-agent', 'finish-turn', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
 const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
 
 export function presentClawTool(

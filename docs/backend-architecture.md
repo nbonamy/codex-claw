@@ -231,7 +231,8 @@ Current implementation checkpoint:
 - `clawd` owns client request ownership and response routing. Electron forwards
   renderer approval/user-input responses as `agent/request/respond`; the backend
   remembers which provider emitted the request and dispatches to that provider.
-- `clawd` owns spoken-announcement MCP policy and persisted settings checks.
+- `clawd` owns the optional `set-status` spoken-acknowledgment policy and
+  persisted settings checks.
   Electron rechecks volatile selected-agent and foreground eligibility, cancels
   queued playback when those conditions change, and owns the serialized audio
   queue and signed native helper process. Playback delivery does not enter the

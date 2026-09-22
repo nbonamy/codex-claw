@@ -960,6 +960,11 @@ export const messages = {
               failed: 'Failed updating status',
               running: 'Updating status',
             },
+            finishTurn: {
+              completed: 'Finished turn',
+              failed: 'Failed finishing turn',
+              running: 'Finishing turn',
+            },
             toggleThreadFlag: {
               completed: 'Updated thread flag',
               failed: 'Failed updating thread flag',

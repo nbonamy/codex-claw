@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
 import { featureStages } from '@codex-claw/core/missions';
+import { threadFlagIds } from '@codex-claw/core/thread-flags';
 import { logMain, warnMain } from '../log';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { McpToolError } from './agent-coordinator';
@@ -116,29 +117,41 @@ export function createCodexClawMcpServer(
   }, () => coordinator.broadcastMessage(callerAgentId, content)));
 
   server.registerTool('set-status', {
-    description: "MANDATORY: Set your status so other agents know what you are doing. Call before starting any task, after completing it, and when changing direction. Keep it short and specific (e.g. 'Implementing auth module', 'Running tests', 'Done - PR ready'). Status clears automatically when the turn ends; use an empty string only to clear it earlier.",
+    description: "MANDATORY: Set your status so other agents know what you are doing. At the start of a user task, include one short spoken acknowledgment in announcement. Call again only when changing direction; omit announcement except for the initial acknowledgment and an optional genuine completion acknowledgment immediately before finish_turn. Keep status short and specific.",
     inputSchema: {
-      status: z.string().describe('Short status text describing what you are currently doing. It clears automatically when the turn ends; use an empty string only to clear it earlier.'),
+      status: z.string().describe('Short status text describing what you are currently doing. finish_turn or the provider turn lifecycle clears it.'),
+      announcement: z.object({
+        phase: z.enum(['start', 'finish']).describe('Whether this acknowledges starting or genuinely finishing the user task.'),
+        text: z.string().trim().min(1).max(160).describe('One brief natural phrase, at most 160 characters.'),
+      }).optional().describe('Optional spoken acknowledgment. Include phase start on the first status update for each user task; reserve phase finish for genuine completion.'),
     },
-  }, ({ status }) => toolResult('set-status', {
+  }, ({ status, announcement }) => toolResult('set-status', {
     agentId: callerAgentId,
     statusLength: status.length,
-  }, () => coordinator.setStatus(callerAgentId, status)));
+    ...(announcement ? {
+      announcementPhase: announcement.phase,
+      announcementTextLength: announcement.text.length,
+    } : {}),
+  }, () => coordinator.setStatus(callerAgentId, status, announcement)));
 
-  if (!missionContext) {
-    server.registerTool('toggle_thread_flag', {
-      description: 'Set or clear a predefined, typed thread flag that Codex Claw may present as a native affordance. Set delegate_to_worktree when implementation can be delegated to a dedicated worktree/co-agent. ready_for_review is a pre-commit affordance: set it only when the intended uncommitted diff is complete, validated, and ready for user review; clear it if work resumes or before commit/push, and skip it for an explicit immediate commit/push request. Clear a flag when it is no longer appropriate. These flags take no payload.',
-      inputSchema: {
-        id: z.enum(['delegate_to_worktree', 'ready_for_review']).describe('Predefined semantic thread flag.'),
-        value: z.boolean().describe('True sets the flag; false clears it.'),
-        payload: z.unknown().optional().describe('Optional kind-specific payload. Current flags do not accept one.'),
-      },
-    }, ({ id, value, payload }) => toolResult('toggle_thread_flag', {
+  const finishTurnDescription = 'MANDATORY final tool action for a substantive user turn. Call exactly once immediately before the final response, after any completion acknowledgment or celebration. It clears the current status. An optional flag replaces the current proposed action; omitting flag leaves any existing proposal unchanged. Select delegate_to_worktree only when work should be delegated instead of continued here, or ready_for_review only for a complete validated uncommitted diff.';
+  if (missionContext) {
+    server.registerTool('finish_turn', {
+      description: `${finishTurnDescription} Mission agents do not expose proposed-action flags.`,
+      inputSchema: {},
+    }, () => toolResult('finish_turn', {
       agentId: callerAgentId,
-      id,
-      value,
-      hasPayload: payload !== undefined,
-    }, () => coordinator.toggleThreadFlag(callerAgentId, { id, value, payload })));
+    }, () => coordinator.finishTurn(callerAgentId)));
+  } else {
+    server.registerTool('finish_turn', {
+      description: finishTurnDescription,
+      inputSchema: {
+        flag: z.enum(threadFlagIds).optional().describe('Optional single proposed action to show after this turn. Omit to leave any existing proposal unchanged.'),
+      },
+    }, ({ flag }) => toolResult('finish_turn', {
+      agentId: callerAgentId,
+      flag: flag ?? null,
+    }, () => coordinator.finishTurn(callerAgentId, flag)));
   }
 
   server.registerTool('celebrate', {
@@ -150,18 +163,6 @@ export function createCodexClawMcpServer(
     agentId: callerAgentId,
     kind,
   }, () => coordinator.celebrate(callerAgentId, kind)));
-
-  server.registerTool('announce', {
-    description: 'Queue one brief spoken acknowledgment when spoken acknowledgments are enabled by the user. The text must be one short, natural sentence, never intermediate reasoning, command output, code, secrets, or the full answer. This is best-effort and returns as soon as playback is queued.',
-    inputSchema: {
-      phase: z.enum(['start', 'finish']).describe('Whether this acknowledges starting or genuinely finishing the user task.'),
-      text: z.string().trim().min(1).max(160).describe('One brief natural phrase, at most 160 characters.'),
-    },
-  }, ({ phase, text }) => toolResult('announce', {
-    agentId: callerAgentId,
-    phase,
-    textLength: text.length,
-  }, () => coordinator.announce(callerAgentId, phase, text)));
 
   server.registerTool('update-work-item', {
     description: 'Update the lifecycle of a backlog work item assigned to you through Codex Claw. Use blocked with a note when you need help, inProgress when work resumes, readyForReview when the user can review the outcome, or completed when the assignment explicitly requires completion.',

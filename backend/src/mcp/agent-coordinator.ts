@@ -3,7 +3,7 @@ import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/mission
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { parseToggleThreadFlagInput, type ToggleThreadFlagInput } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
 
 export type McpAgentInfo = {
   id: string;
@@ -72,6 +72,23 @@ export type CelebrationResponse = {
 export type AnnouncementResponse = {
   success: true;
   phase: AnnouncementPhase;
+};
+
+export type StatusAnnouncementInput = {
+  phase: AnnouncementPhase;
+  text: string;
+};
+
+export type SetStatusResponse = {
+  success: true;
+  status: string | null;
+  announcement?: AnnouncementResponse;
+};
+
+export type FinishTurnResponse = {
+  success: true;
+  status: null;
+  flag?: ThreadFlagId;
 };
 
 export type UpdateWorkItemResponse =
@@ -250,13 +267,22 @@ export class ClawMcpAgentCoordinator {
     };
   }
 
-  setStatus(agentId: string, status: string): string {
+  async setStatus(agentId: string, status: string, announcement?: StatusAnnouncementInput): Promise<SetStatusResponse> {
     const agent = this.requireAgent(agentId);
+    const normalizedAnnouncement = announcement
+      ? this.normalizedAnnouncement(announcement)
+      : undefined;
     agent.statusText = status.trim() || undefined;
     agent.updatedAt = this.now().toISOString();
     this.onAgentUpdated?.(agent);
 
-    return 'Status updated';
+    return {
+      success: true,
+      status: agent.statusText ?? null,
+      ...(normalizedAnnouncement
+        ? { announcement: await this.onAnnounce!(agent, normalizedAnnouncement.phase, normalizedAnnouncement.text) }
+        : {}),
+    };
   }
 
   clearStatus(agentId: string): boolean {
@@ -268,23 +294,20 @@ export class ClawMcpAgentCoordinator {
     return true;
   }
 
-  toggleThreadFlag(agentId: string, input: ToggleThreadFlagInput): {
-    success: true;
-    id: ToggleThreadFlagInput['id'];
-    value: boolean;
-  } {
+  finishTurn(agentId: string, flag?: ThreadFlagId): FinishTurnResponse {
     const agent = this.requireAgent(agentId);
-    const flag = parseToggleThreadFlagInput(input);
-    if (flag.id === 'delegate_to_worktree' && flag.value && agent.delegatedByAgentId) {
+    if (flag === 'delegate_to_worktree' && agent.delegatedByAgentId) {
       throw new McpToolError('delegate_to_worktree is unavailable because this agent is already a delegated co-agent.');
     }
-    const threadFlags = { ...agent.threadFlags };
-    if (flag.value) threadFlags[flag.id] = true;
-    else delete threadFlags[flag.id];
-    agent.threadFlags = Object.keys(threadFlags).length > 0 ? threadFlags : undefined;
+    delete agent.statusText;
+    if (flag) agent.threadFlags = { [flag]: true };
     agent.updatedAt = this.now().toISOString();
     this.onAgentUpdated?.(agent);
-    return { success: true, id: flag.id, value: flag.value };
+    return {
+      success: true,
+      status: null,
+      ...(flag ? { flag } : {}),
+    };
   }
 
   async displayMarkdown(agentId: string, input: DisplayMarkdownInput): Promise<DisplayMarkdownResponse> {
@@ -314,9 +337,8 @@ export class ClawMcpAgentCoordinator {
     return this.onCelebrate(agent, kind);
   }
 
-  async announce(agentId: string, phase: AnnouncementPhase, text: string): Promise<AnnouncementResponse> {
-    const agent = this.requireAgent(agentId);
-    const normalizedText = text.trim();
+  private normalizedAnnouncement(input: StatusAnnouncementInput): StatusAnnouncementInput {
+    const normalizedText = input.text.trim();
     if (!normalizedText) {
       throw new McpToolError('Announcement text must not be empty.');
     }
@@ -326,7 +348,7 @@ export class ClawMcpAgentCoordinator {
     if (!this.onAnnounce) {
       throw new McpToolError('Spoken announcements are not available.');
     }
-    return this.onAnnounce(agent, phase, normalizedText);
+    return { phase: input.phase, text: normalizedText };
   }
 
   async submitMissionResult(agentId: string, input: MissionResultInput) {

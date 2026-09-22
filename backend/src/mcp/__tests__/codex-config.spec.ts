@@ -88,11 +88,11 @@ describe('codex-config', () => {
     expect(config.config?.['mcp_servers.node_repl.enabled']).toBe(true);
   });
 
-  it('always adds spoken acknowledgment policy', () => {
+  it('adds the unified status and spoken acknowledgment policy', () => {
     const config = buildCodexClawThreadConfig(agent, 'http://127.0.0.1:8767/mcp');
 
-    expect(config.developerInstructions).toContain('call announce exactly once');
-    expect(config.developerInstructions).toContain('must be your very first action');
+    expect(config.developerInstructions).toContain('call set-status exactly once as your very first action');
+    expect(config.developerInstructions).toContain('announcement containing phase start');
   });
 
   it('adds celebration policy only when the setting is enabled', () => {

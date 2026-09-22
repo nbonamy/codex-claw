@@ -33,6 +33,7 @@ describe('Claw tool presentation', () => {
     ['send-message', MessageIcon, 'Sent message to codex-app-sdk'],
     ['report-finding', MessageReportIcon, 'Reported finding'],
     ['list-agents', UsersIcon, 'Listed agents'],
+    ['finish_turn', UsersIcon, 'Finished turn'],
     ['toggle_thread_flag', UsersIcon, 'Updated thread flag'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],

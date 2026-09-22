@@ -59,6 +59,8 @@ const TOOL_KEYS: Record<string, string> = {
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',
   'set-status': 'setStatus',
+  'finish-turn': 'finishTurn',
+  // Retained so older conversations keep a useful title after the tool rename.
   'toggle-thread-flag': 'toggleThreadFlag',
   'update-finding': 'updateFinding',
 };

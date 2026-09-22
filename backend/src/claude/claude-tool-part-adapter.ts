@@ -165,9 +165,12 @@ export function claudeToolPart(
 
   const mcp = mcpToolName(block.name);
   if (mcp) {
-    const presentedInput = mcp.server === 'codex_claw' && mcp.tool.replaceAll('_', '-') === 'announce'
+    const clawTool = mcp.server === 'codex_claw' ? mcp.tool.replaceAll('_', '-') : '';
+    const presentedInput = clawTool === 'announce'
       ? announcementInput(input)
-      : input;
+      : clawTool === 'set-status'
+        ? statusInput(input)
+        : input;
     return toolPart(block, {
       kind: 'mcp',
       title: `${mcp.server}.${mcp.tool}`,
@@ -192,6 +195,10 @@ export function claudeToolPart(
 
 function announcementInput(input: Record<string, unknown>): Record<string, unknown> {
   return input.phase === 'start' || input.phase === 'finish' ? { phase: input.phase } : {};
+}
+
+function statusInput(input: Record<string, unknown>): Record<string, unknown> {
+  return typeof input.status === 'string' ? { status: input.status } : {};
 }
 
 export function claudeToolPartInputUpdate(toolPart: RendererToolPart): RendererToolPartUpdate {

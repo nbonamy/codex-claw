@@ -54,7 +54,7 @@ describe('BackendDriverRpc', () => {
     expect(pluginSettings).toHaveBeenCalledOnce();
   });
 
-  it('uses the live celebration setting while keeping announcement instructions stable', async () => {
+  it('uses the live celebration setting while keeping unified presence instructions stable', async () => {
     const celebrationsEnabled = vi.fn().mockReturnValue(false);
     const options = codexClawSurfaceOptions({
       clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
@@ -64,8 +64,8 @@ describe('BackendDriverRpc', () => {
     const extension = await configureConversation?.({ extensionContext: createAgent() } as never);
 
     expect(celebrationsEnabled).toHaveBeenCalledOnce();
-    expect(extension?.developerInstructions).toContain('call announce exactly once');
-    expect(extension?.developerInstructions).toContain('must be your very first action');
+    expect(extension?.developerInstructions).toContain('call set-status exactly once as your very first action');
+    expect(extension?.developerInstructions).toContain('announcement containing phase start');
     expect(extension?.developerInstructions).not.toContain('call celebrate');
   });
 

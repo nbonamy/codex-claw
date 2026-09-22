@@ -527,10 +527,10 @@ describe('ClaudeBackendDriver', () => {
       appendSystemPrompt: expect.stringContaining('Use the codex_claw MCP server for agent collaboration.'),
     });
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain(
-      'call announce exactly once',
+      'call set-status exactly once as your very first action',
     );
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain(
-      'must be your very first action',
+      'announcement containing phase start',
     );
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).not.toContain('call celebrate');
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain('<context>\nMission contract\n</context>');

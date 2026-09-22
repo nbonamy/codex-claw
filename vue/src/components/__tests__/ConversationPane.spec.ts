@@ -436,19 +436,19 @@ describe('ConversationPane', () => {
         createdAt: '2026-06-05T00:00:01.000Z',
         parts: [{
           type: 'tool',
-          id: 'call-set-status',
+          id: 'call-finish-turn',
           kind: 'mcp',
-          title: 'codex_claw.set-status',
+          title: 'codex_claw.finish_turn',
           status: 'completed',
-          input: { status: 'Reviewing changes' },
-          metadata: { server: 'codex_claw', tool: 'set-status' },
+          input: { flag: 'ready_for_review' },
+          metadata: { server: 'codex_claw', tool: 'finish_turn' },
         }],
       }]),
       agent,
     });
 
-    expect(wrapper.text()).toContain('Updated status');
-    expect(wrapper.text()).not.toContain('codex_claw.set-status');
+    expect(wrapper.text()).toContain('Finished turn');
+    expect(wrapper.text()).not.toContain('codex_claw.finish_turn');
     expect(wrapper.find('.tabler-icon-users').exists()).toBe(true);
   });
 
