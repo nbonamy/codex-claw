@@ -214,6 +214,22 @@ the explicit Review stage remains the user gate.
 | `agent/goal/clear` | `{ agentId }` | `AppSnapshot` | Clears provider goal metadata and agent goal state. |
 | `agent/approvalPreset/update` | `{ agentId, preset: ApprovalPreset }` | `AppSnapshot` | Applies app-owned approval preset through the backend driver. |
 
+## Client To `clawd`: Visualize
+
+Visualize state belongs to the agent's current provider conversation. The
+snapshot stores compact suggestions and complete Mermaid, SVG, or generated
+image visualization records; generated image bytes remain backend-owned and
+are read through the asset method.
+
+| Method | Params | Result | Notes |
+| --- | --- | --- | --- |
+| `agent/visualize/start` | `{ agentId, input?: { prompt? } }` | `AppSnapshot` | Opens or creates the conversation's Visualize session. Without a prompt, a new empty session asks the agent for suggestions; with a prompt, it asks for one direct visualization. |
+| `agent/visualize/open/set` | `{ agentId, input: { open } }` | `AppSnapshot` | Opens or closes the existing conversation-scoped Visualize pane. Closing removes the contextual MCP tool surface without deleting its visualizations. |
+| `agent/visualize/suggestion/generate` | `{ agentId, input: { suggestionId } }` | `AppSnapshot` | Validates the current suggestion and submits the corresponding generation prompt to the owning conversation. |
+| `agent/visualize/visualization/select` | `{ agentId, input: { visualizationId } }` | `AppSnapshot` | Selects an existing visualization for the pane and subsequent edit requests. |
+| `agent/visualize/visualization/delete` | `{ agentId, input: { visualizationId } }` | `AppSnapshot` | Deletes an existing visualization, clears matching suggestion links, and selects the nearest remaining item. |
+| `agent/visualize/asset/get` | `{ agentId, visualizationId }` | `VisualizationAsset` | Returns one generated image as a bounded MIME-typed data URL after revalidating that its path remains inside Claw's generated-images root. |
+
 ## Client To `clawd`: Teams
 
 | Method | Params | Result | Notes |

@@ -819,6 +819,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   display: flex;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-6) 0;
+  margin-bottom: var(--space-6);
   overflow-x: auto;
 }
 
@@ -843,6 +844,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   grid-auto-columns: 1fr;
   gap: 1px;
   margin: var(--space-4) var(--space-6);
+  margin-top: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;

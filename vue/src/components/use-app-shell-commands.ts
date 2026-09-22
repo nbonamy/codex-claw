@@ -334,6 +334,13 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       return;
     }
 
+    if (command.type === 'debug-open-visualize') {
+      if (!currentAgent.value) return;
+      options.actions.openAgentSurface();
+      options.actions.openRightWorkspaceTab('visualize');
+      return;
+    }
+
     if (command.type === 'debug-celebrate') {
       useConfetti().celebrate({ kind: command.kind });
       return;

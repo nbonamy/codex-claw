@@ -59,6 +59,7 @@ const callbacks = (): AppMenuCallbacks => ({
   toggleDeveloperTools: vi.fn(),
   toggleDebugExecutionPlan: vi.fn(),
   injectDebugPlanReview: vi.fn(),
+  populateDebugVisualize: vi.fn(),
   getDebugMissionStage: vi.fn(() => 'tickets' as const),
   setDebugMissionStage: vi.fn(),
   injectDebugCodeReview: vi.fn(),
@@ -273,6 +274,7 @@ describe('app menu', () => {
     expect(debugItems.map((item) => item.type === 'separator' ? 'separator' : item.label)).toStrictEqual([
       'Agent Fixtures',
       'Mission Fixtures',
+      'Visualize Fixtures',
       'Review',
       'Thread Flags',
       'UI Previews',
@@ -294,6 +296,10 @@ describe('app menu', () => {
       'Implementation',
       'Review',
       'Ship',
+    ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'Visualize Fixtures')).toStrictEqual([
+      'Populate Suggestions',
+      'Populate Diagrams',
     ]);
     expect(nestedMenuItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets')).toMatchObject({
       type: 'radio',
@@ -362,6 +368,8 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Implementation');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Ship');
+    clickNestedItem(debugMenu, 'Debug', 'Visualize Fixtures', 'Populate Suggestions');
+    clickNestedItem(debugMenu, 'Debug', 'Visualize Fixtures', 'Populate Diagrams');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings While Reviewing');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings Ready for Selection');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Remediation Mix');
@@ -437,6 +445,8 @@ describe('app menu', () => {
     expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(3, 'implementation');
     expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(4, 'review');
     expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(5, 'ship');
+    expect(debugCallbacks.populateDebugVisualize).toHaveBeenNthCalledWith(1, 'suggestions');
+    expect(debugCallbacks.populateDebugVisualize).toHaveBeenNthCalledWith(2, 'complete');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(1, 'reviewing');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(2, 'ready');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(3, 'fixing');

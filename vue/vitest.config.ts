@@ -50,6 +50,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'components',
+          include: ['src/**/*.spec.ts'],
           exclude: logicTestFiles,
           setupFiles: [path.resolve(__dirname, 'src/test/setup.ts')],
         },

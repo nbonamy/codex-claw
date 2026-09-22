@@ -14,6 +14,12 @@
     :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
     :respond-to-thread-flag-action="respondToThreadFlag"
+    :start-visualize="startVisualize"
+    :set-visualize-open="setVisualizeOpen"
+    :generate-visualization-suggestion="generateVisualizationSuggestion"
+    :select-visualization="selectVisualization"
+    :delete-visualization="deleteVisualization"
+    :read-visualization-asset="readVisualizationAsset"
     :start-code-review="startCodeReview"
     :decide-code-review-finding="decideCodeReviewFinding"
     :discuss-code-review-finding="discussCodeReviewFinding"
@@ -395,6 +401,12 @@ const {
   sendPrompt,
   respondToPlanReview,
   respondToThreadFlag,
+  startVisualize,
+  setVisualizeOpen,
+  generateVisualizationSuggestion,
+  selectVisualization,
+  deleteVisualization,
+  readVisualizationAsset,
   startCodeReview,
   decideCodeReviewFinding,
   discussCodeReviewFinding,

@@ -6,6 +6,12 @@ import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/e
 const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
 
 const api: CodexClawApi = {
+  startVisualize: (agentId, input) => ipc.invoke(ipcChannels.startVisualize, agentId, input),
+  setVisualizeOpen: (agentId, input) => ipc.invoke(ipcChannels.setVisualizeOpen, agentId, input),
+  generateVisualizationSuggestion: (agentId, input) => ipc.invoke(ipcChannels.generateVisualizationSuggestion, agentId, input),
+  selectVisualization: (agentId, input) => ipc.invoke(ipcChannels.selectVisualization, agentId, input),
+  deleteVisualization: (agentId, input) => ipc.invoke(ipcChannels.deleteVisualization, agentId, input),
+  readVisualizationAsset: (agentId, visualizationId) => ipc.invoke(ipcChannels.readVisualizationAsset, agentId, visualizationId),
   startCodeReview: (agentId, input) => ipc.invoke(ipcChannels.startCodeReview, agentId, input),
   decideCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.decideCodeReviewFinding, agentId, input),
   discussCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.discussCodeReviewFinding, agentId, input),

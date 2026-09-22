@@ -416,6 +416,42 @@ describe('ClawBackendServer', () => {
     expect((readyCleared as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
   });
 
+  it('persists a populated Visualize fixture through the debug protocol', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
+      status: { type: 'idle' }, createdAt: '2026-09-19T00:00:00.000Z', updatedAt: '2026-09-19T00:00:00.000Z',
+      backendSession: { kind: 'codex', threadId: 'thread-design' },
+    }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.activeAgentId = 'agent-dina';
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
+
+    const result = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-visualize', method: backendMethods.debugVisualizePopulate,
+      params: { agentId: 'agent-dina' },
+    });
+
+    const visualize = (result as { result: AppSnapshot }).result.agents[0]!.visualize!;
+    expect(visualize.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-design' });
+    expect(visualize.selectedVisualizationId).toBe('debug-visualization-workflow');
+    expect(visualize.visualizations.map(visualization => visualization.content.kind)).toStrictEqual(['mermaid', 'svg']);
+    expect(visualize.suggestions.map(suggestion => suggestion.id)).toContain('debug-suggestion-state');
+    expect(visualize.suggestions.find(suggestion => suggestion.id === 'debug-suggestion-state'))
+      .not.toHaveProperty('visualizationId');
+
+    const suggestionsResult = await server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-visualize-suggestions', method: backendMethods.debugVisualizePopulate,
+      params: { agentId: 'agent-dina', scenario: 'suggestions' },
+    });
+    const suggestions = (suggestionsResult as { result: AppSnapshot }).result.agents[0]!.visualize!;
+    expect(suggestions.suggestions).toHaveLength(4);
+    expect(suggestions.visualizations).toStrictEqual([]);
+    expect(suggestions.selectedVisualizationId).toBeNull();
+    expect(saveSnapshot).toHaveBeenCalledTimes(2);
+  });
+
   it('persists a populated Mission stage fixture through the debug protocol', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{

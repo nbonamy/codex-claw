@@ -70,6 +70,30 @@ export type ClawSnapshotGetResult = {
 };
 
 export type ClawBackendRequestMap = {
+  [backendMethods.agentVisualizeStart]: {
+    params: { agentId: string; input?: import('../visualize').StartVisualizeInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizeOpenSet]: {
+    params: { agentId: string; input: import('../visualize').SetVisualizeOpenInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizationSuggestionGenerate]: {
+    params: { agentId: string; input: import('../visualize').GenerateVisualizationSuggestionInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizationSelect]: {
+    params: { agentId: string; input: import('../visualize').SelectVisualizationInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizationDelete]: {
+    params: { agentId: string; input: import('../visualize').DeleteVisualizationInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizationAssetGet]: {
+    params: { agentId: string; visualizationId: string };
+    result: import('../visualize').VisualizationAsset;
+  };
   [backendMethods.agentThreadFlagRespond]: {
     params: { agentId: string; response: import('../thread-flags').ThreadFlagResponse };
     result: AppSnapshot;

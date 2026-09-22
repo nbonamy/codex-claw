@@ -284,6 +284,11 @@
         :finish-code-review="props.finishCodeReview"
         :discard-code-review="props.discardCodeReview"
         :review-code-again="props.reviewCodeAgain"
+        :set-visualize-open="props.setVisualizeOpen"
+        :generate-visualization-suggestion="props.generateVisualizationSuggestion"
+        :select-visualization="props.selectVisualization"
+        :delete-visualization="props.deleteVisualization"
+        :read-visualization-asset="props.readVisualizationAsset"
         @close-agent="$emit('close-agent', $event)"
         @clarify-code-review-finding="clarifyCodeReviewFinding"
         @expand-sidebar="agentSidebarCollapsed = false"
@@ -532,6 +537,7 @@ import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
 import { useRepositorySession } from './use-repository-session';
 import { useRightWorkspaceState } from './use-right-workspace-state';
+import type { RightWorkspaceTab } from './right-workspace';
 import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
@@ -674,6 +680,12 @@ const props = withDefaults(defineProps<{
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  startVisualize?: (agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
+  setVisualizeOpen?: (agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
+  generateVisualizationSuggestion?: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  selectVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset?: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   approvals: () => [],
@@ -713,6 +725,12 @@ const props = withDefaults(defineProps<{
   finishCodeReview: async () => { throw new Error('Code review is not available.'); },
   discardCodeReview: async () => { throw new Error('Code review is not available.'); },
   reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
+  startVisualize: async () => { throw new Error('Visualize is not available.'); },
+  setVisualizeOpen: async () => { throw new Error('Visualize is not available.'); },
+  generateVisualizationSuggestion: async () => { throw new Error('Visualize is not available.'); },
+  selectVisualization: async () => { throw new Error('Visualize is not available.'); },
+  deleteVisualization: async () => { throw new Error('Visualize is not available.'); },
+  readVisualizationAsset: async () => { throw new Error('Visualize is not available.'); },
   daemonStatus: null,
   daemonStatusError: null,
   codexResourceSharingMigrationRequired: false,
@@ -1273,9 +1291,9 @@ const rightWorkspaceState = useRightWorkspaceState({
   workspaceBody: () => agentWorkspace.value?.workspaceBodyElement() ?? null,
 });
 const {
-  closeTab: closeRightWorkspaceTab,
+  closeTab: closeRightWorkspaceTabLocal,
   isVisible: isRightWorkspaceVisible,
-  openTab: openRightWorkspaceTab,
+  openTab: openRightWorkspaceTabLocal,
   rightWorkspaceVisible,
   selectTab: selectRightWorkspaceTab,
   startResize: startRightWorkspaceResize,
@@ -1284,6 +1302,36 @@ const {
   workspaceFor: rightWorkspaceFor,
   workspaces: rightWorkspaces,
 } = rightWorkspaceState;
+
+function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {
+  openRightWorkspaceTabLocal(tab, agentId);
+}
+
+function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
+  closeRightWorkspaceTabLocal(agentId, tab);
+  const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
+  if (tab === 'visualize' && visualize?.isOpen) {
+    void props.setVisualizeOpen(agentId, { open: false }).catch(error => {
+      openRightWorkspaceTabLocal('visualize', agentId);
+      ElMessage.error(localizedErrorMessage(error, t));
+    });
+  }
+}
+
+watch(
+  () => props.snapshot.agents.map(agent => ({ agentId: agent.id, visualize: agent.visualize })),
+  entries => {
+    for (const entry of entries) {
+      const workspace = rightWorkspaceFor(entry.agentId);
+      if (entry.visualize?.isOpen && !workspace.tabs.includes('visualize')) {
+        openRightWorkspaceTabLocal('visualize', entry.agentId);
+      } else if (!entry.visualize?.isOpen && workspace.tabs.includes('visualize')) {
+        closeRightWorkspaceTabLocal(entry.agentId, 'visualize');
+      }
+    }
+  },
+  { immediate: true, flush: 'sync' },
+);
 const workspacePreviews = useWorkspacePreviews({
   closeTab: closeRightWorkspaceTab,
   currentAgent: () => currentAgent.value,
@@ -2333,6 +2381,12 @@ function clarifyCodeReviewFinding(payload: {
 }
 
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
+  const visualizeCommand = prompt.match(/^\/visualize(?:\s+([\s\S]*))?$/u);
+  if (visualizeCommand && !options?.attachments?.length && currentAgent.value) {
+    const direction = visualizeCommand[1]?.trim();
+    openRightWorkspaceTab('visualize');
+    return props.startVisualize(currentAgent.value.id, direction ? { prompt: direction } : undefined).then(() => undefined);
+  }
   if (prompt.trim() === '/review' && !options?.attachments?.length) {
     openRightWorkspaceTab('codeReview');
     return Promise.resolve();

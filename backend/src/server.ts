@@ -1,6 +1,7 @@
 import { readWorktreeHead } from './git-worktrees';
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
+import { createVisualizeDebugFixture } from './visualize-debug-fixtures';
 import { FileMissionSkillStore } from './mission-skill-store';
 import { featureStages, type Mission, type MissionStage } from '@codex-claw/core/missions';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
@@ -62,6 +63,8 @@ import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
+import { VisualizeService, directVisualizationPrompt, generateVisualizationSuggestionPrompt, initialVisualizePrompt } from './visualize-service';
+import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@codex-claw/core/visualize';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -88,6 +91,7 @@ export type ClawBackendServerOptions = {
   missionArtifactStore?: MissionArtifactStorage;
   codeReviewTools?: CodeReviewToolPort;
   agentCreation?: AgentCreationService;
+  visualizeService?: VisualizeService;
 };
 
 export type SystemPermissionsPort = {
@@ -151,6 +155,7 @@ export class ClawBackendServer {
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private readonly codeReviews?: CodeReviewService;
   private readonly agentCreation: AgentCreationService;
+  private readonly visualize: VisualizeService;
   private readonly deleteMissionHome: (missionId: string) => Promise<void>;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -204,6 +209,12 @@ export class ClawBackendServer {
       persistSnapshot: () => this.persistSnapshotOnly(),
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
       onPromptStarting: options.onPromptStarting,
+    });
+    this.visualize = options.visualizeService ?? new VisualizeService({
+      snapshot: this.snapshot,
+      generatedImagesRoot: path.join(os.tmpdir(), 'codex-claw-generated-images'),
+      persist: async () => { await this.persistSnapshotOnly(); },
+      publish: () => { void this.emitProjectedSnapshot(); },
     });
     const ensureMissionHome = options.ensureMissionHome ?? (async (missionId: string) => {
       const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
@@ -622,6 +633,20 @@ export class ClawBackendServer {
         agent.codeReview = createDebugCodeReviewSession(agent, scenario);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case backendMethods.debugVisualizePopulate: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const scenario = params.scenario ?? 'complete';
+        if (typeof scenario !== 'string' || !visualizeDebugScenarios.includes(scenario as VisualizeDebugScenario)) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'scenario must be a supported Visualize debug scenario');
+        }
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        agent.visualize = createVisualizeDebugFixture(agent, new Date().toISOString(), scenario as VisualizeDebugScenario);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.debugThreadFlagSet: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -1021,6 +1046,82 @@ export class ClawBackendServer {
           folder: requireAgentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
         }));
+      }
+      case backendMethods.agentVisualizeStart: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const params = requireRecord(message.params);
+        const input = isRecord(params.input) ? params.input : undefined;
+        const prompt = typeof input?.prompt === 'string' ? input.prompt.trim() : '';
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          ...(input ? { input: { ...(prompt ? { prompt } : {}) } } : {}),
+        }, async () => {
+          const result = await this.visualize.enter(agentId);
+          if (prompt) this.agentPrompts.send(agentId, directVisualizationPrompt(prompt));
+          else if (result.created) this.agentPrompts.send(agentId, initialVisualizePrompt());
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentVisualizeOpenSet: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        const open = input.open;
+        if (typeof open !== 'boolean') {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'open must be a boolean');
+        }
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          input: { open },
+        }, async () => {
+          await this.visualize.setOpen(agentId, open);
+          return this.remoteTeams.clientSnapshot();
+        });
+      }
+      case backendMethods.agentVisualizationSuggestionGenerate: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        const suggestionId = requireString(input.suggestionId, 'suggestionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          input: { suggestionId },
+        }, async () => {
+          const session = this.visualize.contextForAgent(agentId);
+          if (!session) throw new Error('Visualize mode is not active for this conversation.');
+          this.agentPrompts.send(agentId, generateVisualizationSuggestionPrompt(session, suggestionId));
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentVisualizationSelect: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        const visualizationId = requireString(input.visualizationId, 'visualizationId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          input: { visualizationId },
+        }, async () => {
+          await this.visualize.select(agentId, visualizationId);
+          return this.remoteTeams.clientSnapshot();
+        });
+      }
+      case backendMethods.agentVisualizationDelete: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        const visualizationId = requireString(input.visualizationId, 'visualizationId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          input: { visualizationId },
+        }, async () => {
+          await this.visualize.delete(agentId, visualizationId);
+          return this.remoteTeams.clientSnapshot();
+        });
+      }
+      case backendMethods.agentVisualizationAssetGet: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const visualizationId = requireStringParam(message.params, 'visualizationId');
+        return this.routeAgentResultRequest(message.id, agentId, message.method, {
+          agentId,
+          visualizationId,
+        }, () => this.visualize.readAsset(agentId, visualizationId));
       }
       case backendMethods.agentModelsList: {
         const agentId = requireAgentId(message.params);
