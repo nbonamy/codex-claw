@@ -34,7 +34,7 @@ describe('Claw web backend process', () => {
     await backend.start();
     expect(spawnMock).toHaveBeenCalledOnce();
 
-    const request = backend.request('thing/get', { value: 2 });
+    const request = backend.request(backendMethods.settingsUpdate, { value: 2 });
     const requestMessage = child.writtenMessage(1);
     child.send({ jsonrpc: '2.0', id: requestMessage.id, result: { value: 3 } });
     await expect(request).resolves.toStrictEqual({ value: 3 });
@@ -132,11 +132,11 @@ describe('Claw web backend process', () => {
     child.send({ jsonrpc: '2.0', id: 1, result: { ok: true } });
     await starting;
 
-    const failed = backend.request('thing/fail');
+    const failed = backend.request(backendMethods.settingsUpdate);
     child.send({ jsonrpc: '2.0', id: 2, error: { code: -32000, message: 'failed' } });
     await expect(failed).rejects.toThrow('failed');
 
-    const pending = backend.request('thing/pending');
+    const pending = backend.request(backendMethods.snapshotGet);
     child.emit('exit', 7, null);
     await expect(pending).rejects.toThrow('clawd exited (code=7, signal=null).');
     await expect(backend.request('thing/stopped')).rejects.toThrow('Claw web backend is not running.');
@@ -147,7 +147,7 @@ describe('Claw web backend process', () => {
     vi.useFakeTimers();
     const child = new FakeChild();
     spawnMock.mockReturnValueOnce(child);
-    const backend = new ClawWebBackendProcess({ command: 'clawd', args: [], requestTimeoutMs: 5 });
+    const backend = new ClawWebBackendProcess({ command: 'clawd', args: [] });
     const starting = backend.start();
     child.send({ jsonrpc: '2.0', id: 1, result: { ok: true } });
     await starting;
@@ -156,9 +156,9 @@ describe('Claw web backend process', () => {
     child.stdout.emit('data', '{"jsonrpc":"1.0","method":"invalid"}\n');
     child.send({ jsonrpc: '2.0', method: 'other/event', params: {} });
     child.send({ jsonrpc: '2.0', id: 999, result: 'ignored' });
-    const pending = backend.request('thing/slow');
-    const rejection = expect(pending).rejects.toThrow('clawd request timed out: thing/slow');
-    await vi.advanceTimersByTimeAsync(5);
+    const pending = backend.request(backendMethods.settingsUpdate);
+    const rejection = expect(pending).rejects.toThrow(`clawd request timed out: ${backendMethods.settingsUpdate}`);
+    await vi.advanceTimersByTimeAsync(10_000);
     await rejection;
     expect(stderr).toHaveBeenCalledTimes(2);
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Ignored invalid clawd response'));

@@ -86,7 +86,7 @@ describe('ClawBackendProcessClient', () => {
     await expect(response).resolves.toStrictEqual({ ok: true });
   });
 
-  it('rejects requests when the backend returns a JSON-RPC error', async () => {
+  it('rejects requests without an explicit timeout policy before sending them', async () => {
     const child = createFakeChildProcess();
     const client = new ClawBackendProcessClient({
       command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
@@ -94,18 +94,8 @@ describe('ClawBackendProcessClient', () => {
     });
 
     await client.start();
-    const requestPromise = client.request('missing/method');
-    const request = JSON.parse(child.stdin.writes[0]);
-    child.stdout.write(`${JSON.stringify({
-      jsonrpc: '2.0',
-      id: request.id,
-      error: {
-        code: -32601,
-        message: 'Unknown backend method: missing/method',
-      },
-    })}\n`);
-
-    await expect(requestPromise).rejects.toThrow('Unknown backend method: missing/method');
+    await expect(client.request('missing/method')).rejects.toThrow('No backend request timeout configured for missing/method.');
+    expect(child.stdin.writes).toHaveLength(0);
   });
 
   it('passes configured backend environment to the spawned process', async () => {

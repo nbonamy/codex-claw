@@ -16,7 +16,6 @@ export type ClawBackendProcessClientOptions = {
   command: ClawBackendProcessCommand;
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   spawnProcess?: typeof spawn;
-  requestTimeoutMs?: number;
   watchFile?: string | null;
   watchFileSystem?: WatchBackendFile;
 };
@@ -43,7 +42,6 @@ export class ClawBackendProcessClient {
     this.watchFileSystem = options.watchFileSystem ?? ((filePath, listener) => watch(filePath, listener));
     this.rpc = new BackendRpcSession({
       requestHandlers: options.requestHandlers,
-      requestTimeoutMs: options.requestTimeoutMs,
     });
   }
 

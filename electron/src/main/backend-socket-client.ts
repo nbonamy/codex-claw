@@ -8,7 +8,6 @@ import { BackendRpcSession } from './backend-rpc-session';
 export type ClawBackendSocketClientOptions = {
   connectSocket?: typeof net.createConnection;
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
-  requestTimeoutMs?: number;
   socketPath: string;
 };
 
@@ -21,7 +20,6 @@ export class ClawBackendSocketClient {
     this.connectSocket = options.connectSocket ?? net.createConnection;
     this.rpc = new BackendRpcSession({
       requestHandlers: options.requestHandlers ?? createRuntimeClientRequestHandlers(),
-      requestTimeoutMs: options.requestTimeoutMs,
     });
   }
 

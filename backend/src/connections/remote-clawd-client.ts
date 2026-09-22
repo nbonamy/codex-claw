@@ -25,7 +25,6 @@ import { sshStdioTransport } from './ssh-connections';
 export type RemoteClawdClientOptions = {
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   spawnProcess?: typeof spawn;
-  requestTimeoutMs?: number;
 };
 
 type PendingRequest = {
@@ -175,13 +174,14 @@ class RemoteClawdClient {
       throw new Error('remote clawd is not running.');
     }
 
+    const requestTimeoutMs = backendRequestTimeoutMs(method);
     const id = this.nextRequestId++;
     const message = createClawRpcRequest(id, method, params);
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`remote clawd request timed out: ${method}`));
-      }, backendRequestTimeoutMs(method, this.options.requestTimeoutMs ?? 15_000));
+      }, requestTimeoutMs);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),

@@ -26,13 +26,11 @@ type PendingRequest = {
 
 export type BackendRpcSessionOptions = {
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
-  requestTimeoutMs?: number;
 };
 
 /** Owns JSON-RPC framing and request lifecycle independently of the active transport. */
 export class BackendRpcSession {
   private readonly requestHandlers: Record<string, (params: unknown) => unknown | Promise<unknown>>;
-  private readonly requestTimeoutMs: number;
   private readonly pending = new Map<ClawRpcId, PendingRequest>();
   private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
   private readonly connectionStateListeners = new Set<(state: 'connected' | 'disconnected', error?: Error) => void>();
@@ -42,7 +40,6 @@ export class BackendRpcSession {
 
   constructor(options: BackendRpcSessionOptions = {}) {
     this.requestHandlers = options.requestHandlers ?? {};
-    this.requestTimeoutMs = options.requestTimeoutMs ?? 5_000;
   }
 
   connected(write: (message: string) => void): void {
@@ -79,6 +76,7 @@ export class BackendRpcSession {
   request<Result>(method: string, params?: unknown): Promise<Result> {
     if (!this.write) throw new Error('clawd is not connected.');
 
+    const requestTimeoutMs = backendRequestTimeoutMs(method);
     const id = this.nextRequestId++;
     const message = params === undefined
       ? { jsonrpc: '2.0' as const, id, method }
@@ -88,7 +86,7 @@ export class BackendRpcSession {
         this.pending.delete(id);
         warnMain('clawd', 'request timed out', { method, id });
         reject(new Error(`clawd request timed out: ${method}`));
-      }, backendRequestTimeoutMs(method, this.requestTimeoutMs));
+      }, requestTimeoutMs);
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),
         reject,

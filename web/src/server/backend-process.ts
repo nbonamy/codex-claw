@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendRequestTimeoutMs } from '@codex-claw/core/backend-protocol/request-timeout';
 import {
   decodeClawBackendEvent,
   type ClawBackendEvent,
@@ -20,7 +21,6 @@ export type ClawWebBackendProcessOptions = {
   args: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
-  requestTimeoutMs?: number;
 };
 
 type PendingRequest = {
@@ -59,6 +59,7 @@ export class ClawWebBackendProcess {
   request<Result>(method: string, params?: unknown): Promise<Result> {
     const child = this.child;
     if (!child) return Promise.reject(new Error('Claw web backend is not running.'));
+    const requestTimeoutMs = backendRequestTimeoutMs(method);
     const id = ++this.sequence;
     const message = params === undefined
       ? { jsonrpc: '2.0' as const, id, method }
@@ -67,7 +68,7 @@ export class ClawWebBackendProcess {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`clawd request timed out: ${method}`));
-      }, this.options.requestTimeoutMs ?? 60_000);
+      }, requestTimeoutMs);
       this.pending.set(id, { resolve: (value) => resolve(value as Result), reject, timeout });
     });
     child.stdin.write(`${JSON.stringify(message)}\n`);
