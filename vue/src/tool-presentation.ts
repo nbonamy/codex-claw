@@ -70,7 +70,7 @@ const COMPUTER_USE_TOOLS = new Set([
   'computer-use-type-text',
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
-const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding']);
+const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding', 'report-mission-review-finding', 'update-mission-review-finding']);
 const AGENT_TOOLS = new Set(['create-agent', 'finish-turn', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
 const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
 

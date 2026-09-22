@@ -179,87 +179,17 @@
         <span>{{ $t('surface.codeReviewPanel.noFindingsDescription') }}</span>
       </div>
 
-      <ol v-else-if="findings.length" class="code-review-panel__findings">
-        <li
-          v-for="finding in findings"
-          :id="`finding-${finding.id}`"
-          :key="`${selectedRound?.id}:${finding.id}`"
-          class="review-finding"
-          :data-priority="finding.priority"
-          :data-state="findingState(finding)"
-          :data-decision="finding.decision.state"
-        >
-          <div class="review-finding__title-row">
-            <button
-              class="review-finding__toggle"
-              type="button"
-              :aria-expanded="isFindingExpanded(finding.id)"
-              :aria-controls="`finding-details-${finding.id}`"
-              @click="toggleFinding(finding.id)"
-            >
-              <span class="review-finding__priority">{{
-                finding.priority.toUpperCase()
-              }}</span>
-              <span class="review-finding__title">
-                <strong>{{ finding.title }}</strong>
-              </span>
-              <span v-if="findingStateLabel(finding)" class="review-finding__state">{{ findingStateLabel(finding) }}</span>
-              <IconChevronDown
-                class="review-finding__chevron"
-                aria-hidden="true"
-              />
-            </button>
-
-            <div v-if="canArbitrate" class="review-finding__quick-actions">
-              <button
-                class="claw-button claw-button--tertiary review-finding__quick-action"
-                type="button"
-                :aria-label="$t('surface.codeReviewPanel.clarify')"
-                :title="$t('surface.codeReviewPanel.clarify')"
-                :disabled="busy"
-                @click="clarifyFinding(finding)"
-              >
-                <IconMessageQuestion aria-hidden="true" />
-              </button>
-              <el-switch
-                class="review-finding__selection"
-                size="small"
-                :model-value="finding.decision.state !== 'rejected'"
-                :aria-label="$t('surface.codeReviewPanel.includeFinding')"
-                :title="$t('surface.codeReviewPanel.includeFinding')"
-                :disabled="busy"
-                @click.stop
-                @change="setFindingSelected(finding, $event)"
-              />
-            </div>
-          </div>
-
-          <div
-            v-if="isFindingExpanded(finding.id)"
-            :id="`finding-details-${finding.id}`"
-            class="review-finding__body"
-          >
-            <button
-              v-if="finding.location"
-              class="review-finding__location"
-              type="button"
-              @click="emit('openFile', finding.location.file)"
-            >
-              {{ locationLabel(finding) }}
-            </button>
-            <div class="review-finding__description" v-html="renderMarkdown(finding.body)" />
-
-            <blockquote
-              v-if="finding.decision.state === 'rejected' && finding.decision.reason"
-              class="review-finding__decision"
-            >
-              <strong>{{ $t('surface.codeReviewPanel.stateRejected') }}</strong>
-              {{ finding.decision.reason }}
-            </blockquote>
-
-          </div>
-        </li>
-      </ol>
+      <ReviewFindingList
+        v-else-if="findings.length"
+        class="code-review-panel__findings"
+        :findings="findingItems"
+        :selectable="canArbitrate"
+        :clarifiable="canArbitrate"
+        :busy="busy"
+        @select="setFindingSelected"
+        @clarify="clarifyFinding"
+        @open-file="emit('openFile', $event)"
+      />
 
       <footer
         v-if="selectedRoundId === session.activeRoundId && session.status !== 'reviewing' && session.status !== 'fixing'"
@@ -325,13 +255,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   IconChecklist,
-  IconChevronDown,
   IconCircleCheck,
-  IconMessageQuestion,
   IconSparkles,
 } from "@tabler/icons-vue";
 import {
@@ -347,7 +275,7 @@ import {
   type CodeReviewThreadMode,
 } from "@codex-claw/core/code-review";
 import type { Agent, AgentGitStatus, AppSnapshot } from "@codex-claw/core/contracts";
-import { renderMarkdown } from "@codex-app-sdk/vue";
+import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 
 const props = defineProps<{
   agent: Agent;
@@ -379,7 +307,6 @@ const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
 const threadMode = ref<CodeReviewThreadMode>("independent");
 const selectedRoundId = ref("");
-const expandedFindingId = ref<string | null>(null);
 const session = computed(() => props.agent.codeReview ?? null);
 const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
 const scopeCatalogReady = computed(() => Boolean(props.gitStatus?.diffCatalog) && props.gitStatus?.state !== "unknown");
@@ -417,6 +344,18 @@ const findings = computed(() =>
     (a, b) => priorityRank(a.priority) - priorityRank(b.priority),
   ),
 );
+const findingItems = computed<ReviewFindingListItem[]>(() => findings.value.map(finding => ({
+  id: finding.id,
+  priority: finding.priority,
+  title: finding.title,
+  body: finding.body,
+  ...(finding.location ? { location: finding.location } : {}),
+  selected: finding.decision.state !== 'rejected',
+  state: finding.remediation.state,
+  stateLabel: findingStateLabel(finding),
+  ...(finding.decision.state === 'rejected' && finding.decision.reason ? { decisionReason: finding.decision.reason } : {}),
+  ...(finding.remediation.state === 'fixed' && finding.remediation.evidence ? { evidence: finding.remediation.evidence } : {}),
+})));
 const progress = computed(() =>
   session.value
     ? codeReviewProgress(session.value)
@@ -491,7 +430,6 @@ watch(
   () => session.value?.activeRoundId,
   (roundId) => {
     if (roundId) selectedRoundId.value = roundId;
-    expandedFindingId.value = null;
   },
   { immediate: true },
 );
@@ -517,27 +455,25 @@ async function run(action: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function setFindingSelected(
-  finding: CodeReviewFinding,
-  value: string | number | boolean,
-): void {
+function setFindingSelected(findingId: string, selected: boolean): void {
   const round = selectedRound.value;
   if (!session.value || !round) return;
   error.value = null;
   void props.decideFinding(props.agent.id, {
     sessionId: session.value!.id,
     roundId: round.id,
-    findingId: finding.id,
-    decision: value === true ? "select" : "reject",
+    findingId,
+    decision: selected ? "select" : "reject",
   })
     .catch((caught) => {
       error.value = caught instanceof Error ? caught.message : String(caught);
     });
 }
 
-function clarifyFinding(finding: CodeReviewFinding): void {
+function clarifyFinding(findingId: string): void {
   const round = selectedRound.value;
-  if (!session.value || !round) return;
+  const finding = findings.value.find(candidate => candidate.id === findingId);
+  if (!session.value || !round || !finding) return;
   emit("clarifyFinding", {
     sessionId: session.value.id,
     roundId: round.id,
@@ -587,29 +523,6 @@ function findingStateLabel(finding: CodeReviewFinding): string {
       } as Record<string, string>
     )[state] ?? state
   );
-}
-
-function isFindingExpanded(findingId: string): boolean {
-  return expandedFindingId.value === findingId;
-}
-
-function toggleFinding(findingId: string): void {
-  expandedFindingId.value =
-    expandedFindingId.value === findingId ? null : findingId;
-  if (expandedFindingId.value) {
-    void nextTick(() => {
-      document
-        .getElementById(`finding-${findingId}`)
-        ?.scrollIntoView?.({ block: "nearest" });
-    });
-  }
-}
-
-function locationLabel(finding: CodeReviewFinding): string {
-  if (!finding.location) return "";
-  const { file, line, endLine } = finding.location;
-  if (!line) return file;
-  return `${file}:${line}${endLine && endLine !== line ? `–${endLine}` : ""}`;
 }
 
 function priorityRank(priority: CodeReviewFinding["priority"]): number {
@@ -799,8 +712,7 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   letter-spacing: 0.08em;
 }
 
-.code-review-panel__status,
-.review-finding__state {
+.code-review-panel__status {
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--color-surface-low);
@@ -958,179 +870,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   margin: 0;
   padding: 0 var(--space-6) var(--space-6);
   list-style: none;
-}
-
-.review-finding {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--color-surface);
-}
-
-.review-finding[data-state="skipped"] {
-  opacity: 0.74;
-}
-
-.review-finding[data-state="skipped"] .review-finding__state {
-  color: var(--color-text-muted);
-  background-color: var(--color-surface-high);
-}
-
-.review-finding[data-state="fixing"] .review-finding__state {
-  color: var(--color-primary);
-  background-color: var(--color-primary-container);
-}
-
-.review-finding[data-state="fixed"] .review-finding__state {
-  color: var(--color-success);
-  background-color: var(--color-success-container);
-}
-
-.review-finding__title-row {
-  display: flex;
-  align-items: stretch;
-  min-width: 0;
-}
-
-.review-finding__toggle {
-  flex: 1;
-  min-width: 0;
-  min-height: 46px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.review-finding__toggle:hover,
-.review-finding__toggle:focus-visible {
-  background: var(--color-surface-low);
-}
-
-.review-finding__title {
-  flex: 1;
-  min-width: 0;
-}
-
-.review-finding__title strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.review-finding__priority {
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  background-color: var(--color-error-container);
-  color: var(--color-error);
-  font-weight: 700;
-  font-size: var(--font-size-11);
-}
-
-.review-finding[data-priority="p0"] .review-finding__priority {
-  background-color: var(--color-error);
-  color: var(--color-on-error);
-}
-
-.review-finding[data-priority="p2"] .review-finding__priority {
-  background-color: var(--color-warning-container);
-  color: var(--color-warning);
-}
-
-.review-finding[data-priority="p3"] .review-finding__priority {
-  background-color: var(--color-surface-high);
-  color: var(--color-text-muted);
-}
-
-.review-finding[data-decision="rejected"] .review-finding__title {
-  color: var(--color-text-muted);
-}
-
-.review-finding[data-decision="rejected"] .review-finding__priority {
-  opacity: 0.55;
-}
-
-.review-finding__chevron {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--color-text-muted);
-  transition: transform 120ms ease;
-}
-
-.review-finding__toggle[aria-expanded="true"] .review-finding__chevron {
-  transform: rotate(180deg);
-}
-
-.review-finding__quick-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) var(--space-2) 0;
-}
-
-.review-finding__quick-action {
-  width: 28px;
-  min-height: 28px;
-  padding: 0;
-}
-
-.review-finding__quick-action svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-}
-
-.review-finding__selection {
-  flex: 0 0 auto;
-}
-
-.review-finding__location {
-  justify-self: start;
-  max-width: 100%;
-  padding: 0;
-  border: 0;
-  color: var(--color-primary);
-  background: transparent;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-12);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.review-finding__body {
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
-  border-top: 1px solid var(--color-border);
-}
-
-.review-finding__description :deep(p) {
-  margin: 0;
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-20);
-}
-
-.review-finding__decision {
-  margin: 0;
-  padding: var(--space-3);
-  border-left: 3px solid var(--color-text-muted);
-  background: var(--color-surface-low);
-}
-
-.review-finding__decision strong {
-  display: block;
-  margin-bottom: var(--space-1);
 }
 
 .code-review-panel__footer {

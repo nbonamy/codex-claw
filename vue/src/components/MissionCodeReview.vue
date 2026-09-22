@@ -16,6 +16,7 @@
       </el-select>
       <button class="claw-button" type="button" @click="refresh">{{ t('missions.refreshDiff') }}</button>
     </header>
+    <MissionReviewFindings v-if="mission && executeMission" :mission="mission" :execute-mission="executeMission" />
     <GitDiffPreviewPanel :diff="diff" :state="state" :error="error" />
   </section>
 </template>
@@ -23,7 +24,10 @@
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitStatus, CodexClawApi, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { Mission } from '@codex-claw/core/missions';
+import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
+import MissionReviewFindings from './MissionReviewFindings.vue';
 import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 const props = withDefaults(defineProps<{
   agent: Agent;
@@ -33,6 +37,8 @@ const props = withDefaults(defineProps<{
   openInAvailable?: boolean;
   openInApplications?: OpenInApplicationCatalog;
   workspacePath?: string;
+  mission?: Mission;
+  executeMission?: (input: MissionExecutionInput) => Promise<void>;
 }>(), {
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
 });

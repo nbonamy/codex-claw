@@ -29,7 +29,8 @@
               v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal && !debugFixture"
               class="claw-button claw-button--primary"
               type="button"
-              :disabled="busy"
+              :disabled="busy || reviewApprovalBlocked"
+              :title="reviewApprovalBlocked ? t('missions.unresolvedReviewFindings') : undefined"
               @click="approveProposal"
             >
               {{ t('missions.approveAndContinue') }}
@@ -42,6 +43,7 @@
 
         <div class="mission-workspace__workbench-scroll">
           <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
+          <p v-if="reviewApprovalBlocked && viewedStage === 'review'" class="mission-workspace__error" role="status">{{ t('missions.unresolvedReviewFindings') }}</p>
 
           <MissionImplementationBoard
             v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
@@ -85,6 +87,10 @@
               :reset-key="feedbackReset"
               @send-comments="sendRequirementComments"
             />
+            <template v-else-if="viewedStage === 'review' && debugFixture">
+              <MissionReviewFindings :mission="mission" read-only />
+              <MarkdownPanel :content="artifactMarkdown" />
+            </template>
             <MarkdownPanel v-else :content="artifactMarkdown" />
             <footer v-if="viewedStage !== 'requirements'" class="mission-workspace__review-hint">
               <MessageCircleIcon aria-hidden="true" />
@@ -139,6 +145,7 @@ import MarkdownPanel from './MarkdownPanel.vue';
 import MissionConversationRail from './MissionConversationRail.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
+import MissionReviewFindings from './MissionReviewFindings.vue';
 import MissionStageRail from './MissionStageRail.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
 import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
@@ -171,6 +178,9 @@ const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
+const reviewApprovalBlocked = computed(() => props.mission.stage === 'review' && (props.mission.artifacts.review.findings ?? []).some(finding => (
+  finding.remediation.state !== 'fixed' && (finding.selected || finding.priority === 'p0' || finding.priority === 'p1')
+)));
 const activeStageRun = computed(() => {
   if (viewedStage.value !== props.mission.stage) return undefined;
   return props.mission.execution?.runs.slice().reverse().find(run => (

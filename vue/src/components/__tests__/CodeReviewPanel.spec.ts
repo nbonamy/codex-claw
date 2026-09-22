@@ -360,43 +360,6 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.text()).toContain('Expected by contract.');
   });
 
-  it('keeps fixed findings neutral while styling remediation badges by state', () => {
-    const { wrapper } = mountPanel(session([
-      finding({ id: 'skipped', remediation: { state: 'skipped', startedAt: 'now' } }),
-      finding({ id: 'fixing', remediation: { state: 'fixing', startedAt: 'now' } }),
-      finding({ id: 'fixed', remediation: { state: 'fixed', completedAt: 'now' } }),
-    ], 'fixing'));
-
-    const badges = wrapper.findAll('.review-finding__state')
-      .map((badge) => getComputedStyle(badge.element));
-    expect(badges.map((badge) => [badge.color, badge.backgroundColor])).toEqual([
-      ['var(--color-text-muted)', 'var(--color-surface-high)'],
-      ['var(--color-primary)', 'var(--color-primary-container)'],
-      ['var(--color-success)', 'var(--color-success-container)'],
-    ]);
-    expect(getComputedStyle(wrapper.findAll('.review-finding')[2]!.element).borderColor)
-      .not.toBe('var(--color-success)');
-    expect(wrapper.find('.code-review-panel__footer').exists()).toBe(false);
-  });
-
-  it('colors priority labels by severity', () => {
-    const { wrapper } = mountPanel(session([
-      finding({ id: 'p3', priority: 'p3' }),
-      finding({ id: 'p1', priority: 'p1' }),
-      finding({ id: 'p0', priority: 'p0' }),
-      finding({ id: 'p2', priority: 'p2' }),
-    ]));
-
-    const badges = wrapper.findAll('.review-finding__priority')
-      .map((badge) => getComputedStyle(badge.element));
-    expect(badges.map((badge) => [badge.color, badge.backgroundColor])).toEqual([
-      ['var(--color-on-error)', 'var(--color-error)'],
-      ['var(--color-error)', 'var(--color-error-container)'],
-      ['var(--color-warning)', 'var(--color-warning-container)'],
-      ['var(--color-text-muted)', 'var(--color-surface-high)'],
-    ]);
-  });
-
   it('offers the exact finish and repeat actions after fixes complete', async () => {
     const { wrapper, actions } = mountPanel(session([], 'readyToFinish'));
     const buttons = wrapper.findAll('.code-review-panel__footer button');

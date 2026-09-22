@@ -60,6 +60,25 @@ function mountWorkspace(mission: Mission, options: {
 }
 
 describe('MissionWorkspace', () => {
+  it('blocks Review approval while a selected or blocking finding is unresolved', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    mission.stage = 'review';
+    mission.execution!.runs[0]!.stage = 'review';
+    mission.execution!.runs[0]!.proposal!.review.summary = 'Reviewed';
+    mission.artifacts.review.findings = [{
+      id: 'finding-1', priority: 'p1', title: 'Fix persistence', body: 'Selection is lost.', repositoryPath: '/repo', selected: false,
+      remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
+    }];
+    const wrapper = mountWorkspace(mission);
+    const approve = wrapper.findAll('button').find(button => button.text().includes('Approve and continue'))!;
+    expect(approve.attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('Resolve selected and blocking findings before continuing to Ship.');
+
+    mission.artifacts.review.findings[0]!.remediation = { state: 'fixed', completedAt: 'later', evidence: 'Tests pass.' };
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.findAll('button').find(button => button.text().includes('Approve and continue'))!.attributes('disabled')).toBeUndefined();
+  });
+
   it('frames a running mission as a five-stage process with the orchestrator conversation always present', async () => {
     const mission = missionWithRun('running');
     const wrapper = mountWorkspace(mission);
