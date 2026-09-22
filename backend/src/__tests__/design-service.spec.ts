@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { DesignService } from '../design-service';
+import { DesignService, generateDesignSuggestionPrompt } from '../design-service';
 
 let temporaryDirectory: string | null = null;
 
@@ -36,6 +36,7 @@ describe('DesignService', () => {
     const entered = await service.enter(agent.id);
     expect(entered.created).toBe(true);
     expect(entered.design.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-design' });
+    expect(service.developerInstructionsForAgent(agent.id)).toMatch(/Do not browse,[\s\S]*background research/u);
 
     const suggested = await service.suggest(agent.id, [
       { title: 'System map', description: 'Show services and data movement.' },
@@ -73,6 +74,52 @@ describe('DesignService', () => {
     });
     expect(persist).toHaveBeenCalledTimes(6);
     expect(publish).toHaveBeenCalledTimes(6);
+  });
+
+  it('keeps diagram suggestions compact for the Design pane', async () => {
+    const snapshot = createInitialSnapshot();
+    const service = new DesignService({
+      snapshot,
+      generatedImagesRoot: os.tmpdir(),
+      persist: () => Promise.resolve(),
+      publish: () => undefined,
+    });
+    await service.enter(snapshot.agents[0].id);
+
+    const result = await service.suggest(snapshot.agents[0].id, [{
+      title: '  System\nmap  ',
+      description: '  Services,\n boundaries,   and data flow.  ',
+    }]);
+
+    expect(result.suggestions[0]).toMatchObject({
+      title: 'System map',
+      description: 'Services, boundaries, and data flow.',
+    });
+    await expect(service.suggest(snapshot.agents[0].id, [{
+      title: 'System map',
+      description: 'x'.repeat(121),
+    }])).rejects.toThrow('Suggestion description');
+  });
+
+  it('splits a generated-diagram request into visible copy and model-only context', () => {
+    const prompt = generateDesignSuggestionPrompt({
+      id: 'design-1',
+      conversationRef: null,
+      suggestions: [{
+        id: 'suggestion-flow',
+        title: 'Deployment flow',
+        description: 'Show the deployment path.',
+      }],
+      diagrams: [],
+      selectedDiagramId: null,
+      createdAt: '2026-09-21T12:00:00.000Z',
+      updatedAt: '2026-09-21T12:00:00.000Z',
+    }, 'suggestion-flow');
+
+    expect(prompt.slice(0, prompt.indexOf('<context>')).trim()).toBe('Generate the “Deployment flow” diagram.');
+    expect(prompt).toContain('suggestion-flow');
+    expect(prompt).toMatch(/Do not browse,[\s\S]*background research/u);
+    expect(prompt).toMatch(/<context>[\s\S]*<\/context>$/u);
   });
 
   it('rejects stale replacement revisions and generated images outside the owned folder', async () => {

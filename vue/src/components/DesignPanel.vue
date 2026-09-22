@@ -41,7 +41,7 @@
           @click="emit('generate', suggestion.id)"
         >
           <span>{{ suggestion.title }}</span>
-          <p>{{ suggestion.description }}</p>
+          <p :title="suggestion.description">{{ compactDescription(suggestion.description) }}</p>
           <small>{{ translate(suggestion.diagramId ? 'design.generated' : 'design.generateDiagram') }}</small>
         </button>
       </div>
@@ -116,6 +116,11 @@ function kindLabel(diagram: DesignDiagram): string {
     : diagram.content.kind === 'svg'
       ? translate('design.kind.svg')
       : translate('design.kind.image');
+}
+
+function compactDescription(description: string): string {
+  const compact = description.replace(/\s+/gu, ' ').trim();
+  return compact.length <= 120 ? compact : `${compact.slice(0, 117).trimEnd()}…`;
 }
 </script>
 
@@ -272,8 +277,12 @@ function kindLabel(diagram: DesignDiagram): string {
 .design-panel__suggestion p {
   flex: 1 1 auto;
   margin: var(--space-4) 0 var(--space-8);
+  display: -webkit-box;
+  overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .design-panel__suggestion small {

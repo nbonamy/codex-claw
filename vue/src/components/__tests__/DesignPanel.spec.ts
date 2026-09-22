@@ -63,6 +63,18 @@ describe('DesignPanel', () => {
     expect(wrapper.emitted('select')).toStrictEqual([['diagram-image']]);
   });
 
+  it('keeps legacy long suggestion descriptions compact while preserving the full text on hover', () => {
+    const design = designSession();
+    const description = `Map ${'every relevant system boundary '.repeat(12)}`.trim();
+    design.suggestions[0].description = description;
+    const wrapper = mount(DesignPanel, { props: { design, readAsset: vi.fn() } });
+    const rendered = wrapper.findAll('.design-panel__suggestion p')[0];
+
+    expect(rendered.text()).toHaveLength(118);
+    expect(rendered.text()).toMatch(/…$/u);
+    expect(rendered.attributes('title')).toBe(description);
+  });
+
   it('sanitizes unsafe SVG before displaying it as an image', () => {
     const design = designSession();
     design.diagrams = [{

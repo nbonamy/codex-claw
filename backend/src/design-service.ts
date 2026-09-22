@@ -9,7 +9,7 @@ import type {
   DesignDiagramContent,
   DesignSession,
 } from '@codex-claw/core/design';
-import { cloneDesignSession } from '@codex-claw/core/design';
+import { cloneDesignSession, designSuggestionLimits } from '@codex-claw/core/design';
 import { createEntityId } from '@codex-claw/core/ids';
 
 const MAX_DIAGRAM_SOURCE_BYTES = 250_000;
@@ -64,6 +64,7 @@ export class DesignService {
     const selected = design.diagrams.find(diagram => diagram.id === design.selectedDiagramId);
     return [
       'Codex Claw Design mode is active. Diagrams and suggestions must be published through the Design MCP tools; keep chat secondary.',
+      'Use the current conversation and existing diagrams as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research unless the user explicitly asks for outside evidence.',
       selected
         ? `The user currently has Design diagram "${selected.title}" (${selected.id}, revision ${selected.revision}) selected. Interpret edit requests as targeting it: read it first, then replace it with optimistic revision checking.`
         : 'No Design diagram is selected yet. Use add-design-diagram when the user asks for a new diagram.',
@@ -101,8 +102,8 @@ export class DesignService {
     this.bindConversation(agentId, design);
     design.suggestions = suggestions.map(suggestion => ({
       id: this.createId('design-suggestion'),
-      title: boundedText(suggestion.title, 'Suggestion title', 200),
-      description: boundedText(suggestion.description, 'Suggestion description', 2_000),
+      title: boundedText(compactText(suggestion.title), 'Suggestion title', designSuggestionLimits.title),
+      description: boundedText(compactText(suggestion.description), 'Suggestion description', designSuggestionLimits.description),
     }));
     design.updatedAt = this.now().toISOString();
     await this.commit();
@@ -296,25 +297,41 @@ export class DesignService {
 }
 
 export function initialDesignPrompt(userPrompt?: string): string {
-  return [
+  const instructions = [
     'Enter Codex Claw Design mode for this conversation.',
     'Review the current conversation and call codex_claw.suggest-design-diagrams exactly once with 1 to 4 diagrams that would materially help the user.',
+    `Keep every title under ${designSuggestionLimits.title} characters and every description to one short sentence under ${designSuggestionLimits.description} characters.`,
+    'Use only the current conversation and existing Design context. Do not browse, search the repository, inspect files, run commands, or do background research to choose suggestions.',
     'Do not provide the suggestions only as prose. The Design pane is the source of truth.',
     'When asked to generate a suggestion or add a diagram, use Mermaid or SVG, or use image generation and then register its saved path with codex_claw.add-design-diagram.',
     'When asked to edit a diagram, read it with codex_claw.get-design-diagram and publish the replacement with codex_claw.replace-design-diagram.',
-    userPrompt?.trim() ? `Use this additional direction when choosing suggestions: ${userPrompt.trim()}` : '',
+    userPrompt?.trim() ? `Additional direction from the user: ${contextJson(userPrompt.trim())}` : '',
   ].filter(Boolean).join(' ');
+  return injectedPrompt('Suggest useful diagrams for this conversation.', instructions);
 }
 
 export function generateDesignSuggestionPrompt(session: DesignSession, suggestionId: string): string {
   const suggestion = session.suggestions.find(candidate => candidate.id === suggestionId);
   if (!suggestion) throw new Error(`Design suggestion not found: ${suggestionId}`);
-  return [
-    `Generate the Design suggestion "${suggestion.title}" (${suggestion.id}).`,
-    suggestion.description,
+  const instructions = [
+    `Generate this Design suggestion: ${contextJson({ id: suggestion.id, title: suggestion.title, description: suggestion.description })}.`,
+    'Use the current conversation and suggestion as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research; make the best diagram the existing context supports.',
     'Choose Mermaid, SVG, or image generation based on what communicates it best.',
     'Publish the finished result with codex_claw.add-design-diagram and pass this suggestion ID. Keep chat commentary brief because the Design pane is the primary output.',
   ].join(' ');
+  return injectedPrompt(`Generate the “${suggestion.title}” diagram.`, instructions);
+}
+
+function injectedPrompt(message: string, instructions: string): string {
+  return `${message}\n\n<context>\n${instructions}\n</context>`;
+}
+
+function contextJson(value: unknown): string {
+  return JSON.stringify(value).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e');
+}
+
+function compactText(value: string): string {
+  return value.replace(/\s+/gu, ' ').trim();
 }
 
 function cloneConversationRef(ref: BackendConversationRef | null): BackendConversationRef | null {

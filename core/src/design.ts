@@ -2,6 +2,11 @@ import type { BackendConversationRef } from './contracts';
 
 export const designDiagramKinds = ['mermaid', 'svg', 'image'] as const;
 
+export const designSuggestionLimits = {
+  title: 80,
+  description: 120,
+} as const;
+
 export type DesignDiagramKind = typeof designDiagramKinds[number];
 
 export type DesignSuggestion = {

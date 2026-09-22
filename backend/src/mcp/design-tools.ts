@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
+import { designSuggestionLimits } from '@codex-claw/core/design';
 import type { DesignService } from '../design-service';
 import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
 
@@ -27,11 +28,11 @@ export function createDesignToolModuleProvider(designs: DesignService): ClawMcpT
 
 function registerDesignTools(server: McpServer, designs: DesignService, agentId: string): void {
   server.registerTool('suggest-design-diagrams', {
-    description: 'Publish 1 to 4 durable diagram suggestions for the active Design conversation. Use this instead of listing suggestions only in chat.',
+    description: 'Publish 1 to 4 compact diagram suggestions for the active Design conversation. Use short titles and one-sentence descriptions instead of listing suggestions only in chat.',
     inputSchema: {
       suggestions: z.array(z.object({
-        title: z.string().trim().min(1).max(200),
-        description: z.string().trim().min(1).max(2_000),
+        title: z.string().trim().min(1).max(designSuggestionLimits.title),
+        description: z.string().trim().min(1).max(designSuggestionLimits.description),
       })).min(1).max(4),
     },
   }, ({ suggestions }) => loggedToolResult(

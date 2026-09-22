@@ -38,8 +38,12 @@ describe('ClawBackendServer Design workflow', () => {
 
     await request(server, { agentId: agent.id, input: { prompt: 'Focus on deployment.' } });
     await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledTimes(1));
-    expect(sendPrompt.mock.calls[0][1]).toContain('suggest-design-diagrams exactly once');
-    expect(sendPrompt.mock.calls[0][1]).toContain('Focus on deployment.');
+    const startPrompt = sendPrompt.mock.calls[0][1];
+    expect(startPrompt.slice(0, startPrompt.indexOf('<context>')).trim()).toBe('Suggest useful diagrams for this conversation.');
+    expect(startPrompt).toContain('suggest-design-diagrams exactly once');
+    expect(startPrompt).toContain('Focus on deployment.');
+    expect(startPrompt).toMatch(/Do not browse,[\s\S]*background research/u);
+    expect(startPrompt).toMatch(/<context>[\s\S]*<\/context>$/u);
     expect(snapshot.agents[0].design).toMatchObject({
       suggestions: [], diagrams: [], selectedDiagramId: null,
     });
