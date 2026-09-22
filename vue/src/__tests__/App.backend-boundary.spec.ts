@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it } from 'vitest';
 import App from '../App.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
@@ -11,12 +10,12 @@ import { approvalAgentRequest } from '@codex-claw/core/agent-request';
 afterEach(() => { delete window.codexClaw; });
 
 describe('Unified backend → mounted application', () => {
-  it('submits worktree delegation through the complete client seam and clears only on success', async () => {
+  it('handles app-owned thread flag execution, dismissal, and review routing through the client seam', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.threadFlags = { delegate_to_worktree: true };
-    const { api } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const { api, emit } = installBackendFixture(snapshot);
+    const wrapper = mount(App);
     await flushPromises();
 
     api.respondToThreadFlag.mockRejectedValueOnce(new Error('backend unavailable'));
@@ -34,55 +33,34 @@ describe('Unified backend → mounted application', () => {
     await flushPromises();
     expect(api.respondToThreadFlag).toHaveBeenCalledTimes(2);
     expect(wrapper.find('.thread-flag-affordance').exists()).toBe(false);
-  });
 
-  it('dismisses worktree delegation without using the prompt API', async () => {
-    const snapshot = createInitialSnapshot();
-    const agent = snapshot.agents[0]!;
-    agent.threadFlags = { delegate_to_worktree: true };
-    const { api } = installBackendFixture(snapshot);
-    const cleared = structuredClone(snapshot);
-    delete cleared.agents[0]!.threadFlags;
-    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    emit({ type: 'agent.updated', agentId: agent.id, payload: { id: agent.id, threadFlags: { delegate_to_worktree: true } } });
     await flushPromises();
-
+    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
     await wrapper.get('.thread-flag-affordance__dismiss').trigger('click');
     await flushPromises();
-
-    expect(api.respondToThreadFlag).toHaveBeenCalledWith(agent.id, {
+    expect(api.respondToThreadFlag).toHaveBeenNthCalledWith(3, agent.id, {
       id: 'delegate_to_worktree', action: 'dismiss',
     });
     expect(api.sendPrompt).not.toHaveBeenCalled();
-    expect(wrapper.find('.thread-flag-affordance').exists()).toBe(false);
-  });
 
-  it('opens review after accepting the app-owned ready-for-review flag', async () => {
-    const snapshot = createInitialSnapshot();
-    const agent = snapshot.agents[0]!;
-    agent.threadFlags = { ready_for_review: true };
-    const { api } = installBackendFixture(snapshot);
-    const cleared = structuredClone(snapshot);
-    delete cleared.agents[0]!.threadFlags;
-    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    emit({ type: 'agent.updated', agentId: agent.id, payload: { id: agent.id, threadFlags: { ready_for_review: true } } });
     await flushPromises();
-
+    api.respondToThreadFlag.mockResolvedValueOnce(cleared);
     await wrapper.get('[aria-label="Open code review"]').trigger('click');
     await flushPromises();
-
-    expect(api.respondToThreadFlag).toHaveBeenCalledWith(agent.id, {
+    expect(api.respondToThreadFlag).toHaveBeenNthCalledWith(4, agent.id, {
       id: 'ready_for_review', action: 'execute',
     });
     expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
   });
 
-  it('shows, updates and clears execution progress without opening a review', async () => {
+  it('reflects execution progress and queued work from backend events without inventing review state', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.backendSession = { kind: 'codex', threadId: 'thread-1' };
     const { emit } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
     const executionPlan = { turnId: 'turn', explanation: 'Implementing', steps: [{ step: 'Verify boundary behavior', status: 'inProgress' as const }], markdown: '- [ ] Verify boundary behavior', updatedAt: '2026-09-16T00:00:00Z' };
     emit({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: agent.id, threadId: 'thread-1', payload: { revision: 1, snapshot: codexConversationSnapshot([], { activeTurnId: 'turn', executionPlan, busy: true }) } });
@@ -96,13 +74,21 @@ describe('Unified backend → mounted application', () => {
     await flushPromises();
     expect(wrapper.find('.conversation-plan').exists()).toBe(false);
     expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
+
+    emit({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: agent.id, threadId: 'thread-1', payload: { revision: 4, snapshot: codexConversationSnapshot() } });
+    emit({ type: 'agent.promptQueued', agentId: agent.id, payload: { id: 'queued', text: 'Review the other agent change.' } });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Review the other agent change.');
+    emit({ type: 'agent.promptDequeued', agentId: agent.id, payload: { ids: ['queued'] } });
+    await flushPromises();
+    expect(wrapper.text()).not.toContain('Review the other agent change.');
   });
 
   it('enforces advertised composer capabilities in the visible menu and submitted options', async () => {
     const snapshot = createInitialSnapshot();
     const { api, emit } = installBackendFixture(snapshot);
     api.sendPrompt.mockResolvedValue(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
     const capabilities = { ...codexBackendCapabilities, attachments: false, planMode: 'unsupported' as const };
     emit({ type: 'backend.statusChanged', backend: 'codex', payload: { backend: 'codex', status: 'running', capabilities } });
@@ -134,7 +120,7 @@ describe('Unified backend → mounted application', () => {
     agent.backendSession = undefined;
     agent.backendDefaults = undefined;
     const { api, emit } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
     const request = approvalAgentRequest({ id: 'permission', kind: 'permissions', conversationId: 'session', turnId: 'turn', itemId: 'item', title: 'Allow test workspace access', requestedPermissions: [{ kind: 'filesystem', access: 'write', path: '/tmp/project' }], allowedScopes: ['once'], canDeny: true });
     emit({ type: 'agentRequest.created', backend: 'claude', agentId: agent.id, payload: { request } });
@@ -147,39 +133,6 @@ describe('Unified backend → mounted application', () => {
     expect(api.respondToClientRequest).not.toHaveBeenCalled();
   });
 
-  it('cancels a restored plan through the review command without sending a prompt', async () => {
-    const snapshot = createInitialSnapshot();
-    const agent = snapshot.agents[0]!;
-    agent.planReview = { id: 'restored', conversationId: null, turnId: 'turn', markdown: '# Cancel this proposal', status: 'pending' };
-    const { api } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
-    await flushPromises();
-    const resolved = structuredClone(snapshot);
-    resolved.agents[0]!.planReview!.status = 'cancel';
-    api.respondToPlanReview.mockResolvedValueOnce(resolved);
-    await wrapper.get('.plan-review-footer__button--cancel').trigger('click');
-    await flushPromises();
-    expect(api.respondToPlanReview).toHaveBeenCalledExactlyOnceWith(agent.id, { reviewId: 'restored', resolution: 'cancel' });
-    expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
-    expect(api.sendPrompt).not.toHaveBeenCalled();
-  });
-
-  it('shows and removes backend-admitted queued work above the real composer', async () => {
-    const snapshot = createInitialSnapshot();
-    const agent = snapshot.agents[0]!;
-    agent.backendSession = { kind: 'codex', threadId: 'thread-1' };
-    const { emit } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
-    await flushPromises();
-    emit({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: agent.id, threadId: 'thread-1', payload: { revision: 1, snapshot: codexConversationSnapshot() } });
-    emit({ type: 'agent.promptQueued', agentId: agent.id, payload: { id: 'queued', text: 'Review the other agent change.' } });
-    await flushPromises();
-    expect(wrapper.text()).toContain('Review the other agent change.');
-    emit({ type: 'agent.promptDequeued', agentId: agent.id, payload: { ids: ['queued'] } });
-    await flushPromises();
-    expect(wrapper.text()).not.toContain('Review the other agent change.');
-  });
-
   it.each(['codex', 'claude'] as const)('reviews a %s agent plan using only the common contract', async (backend) => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
@@ -187,7 +140,7 @@ describe('Unified backend → mounted application', () => {
     agent.backendSession = undefined;
     agent.backendDefaults = undefined;
     const { api, emit } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
     emit({ type: 'plan.readyForReview', agentId: agent.id, turnId: 'turn', payload: { itemId: 'proposal', markdown: '# Review this\n\nKeep the backend independent.' } });
     await flushPromises();
@@ -206,12 +159,13 @@ describe('Unified backend → mounted application', () => {
     expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
   });
 
-  it('keeps a failed decision reviewable and permits retry', async () => {
+  it('keeps failed plan decisions reviewable and handles local and remote resolution paths', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.planReview = { id: 'restored', conversationId: null, turnId: 'turn', markdown: '# Restored proposal', status: 'pending' };
-    const { api } = installBackendFixture(snapshot);
+    const agent = snapshot.agents[0]!;
+    const { api, emit } = installBackendFixture(snapshot);
     api.respondToPlanReview.mockRejectedValueOnce(new Error('backend unavailable'));
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
     expect(wrapper.get('[aria-label="Right workspace"]').text()).toContain('Restored proposal');
     await wrapper.get('.plan-review-footer__button--primary').trigger('click');
@@ -224,20 +178,25 @@ describe('Unified backend → mounted application', () => {
     await flushPromises();
     expect(api.respondToPlanReview).toHaveBeenCalledTimes(2);
     expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
-  });
 
-  it('dismisses review when a different client resolves it, without submitting a prompt', async () => {
-    const snapshot = createInitialSnapshot();
-    const agent = snapshot.agents[0]!;
-    agent.planReview = { id: 'restored', conversationId: null, turnId: 'turn', markdown: '# Remote decision', status: 'pending' };
-    const { api, emit } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    emit({ type: 'plan.readyForReview', agentId: agent.id, turnId: 'remote-turn', payload: { itemId: 'remote', markdown: '# Remote decision' } });
     await flushPromises();
     expect(wrapper.find('.plan-review-footer').exists()).toBe(true);
-    emit({ type: 'plan.reviewResolved', agentId: agent.id, payload: { reviewId: 'restored', resolution: 'cancel' } });
+    const remoteReviewId = JSON.stringify([agent.id, null, 'remote-turn', 'remote']);
+    emit({ type: 'plan.reviewResolved', agentId: agent.id, payload: { reviewId: remoteReviewId, resolution: 'cancel' } });
     await flushPromises();
     expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
-    expect(api.respondToPlanReview).not.toHaveBeenCalled();
+
+    emit({ type: 'plan.readyForReview', agentId: agent.id, turnId: 'cancel-turn', payload: { itemId: 'cancel', markdown: '# Cancel this proposal' } });
+    await flushPromises();
+    const cancelReviewId = JSON.stringify([agent.id, null, 'cancel-turn', 'cancel']);
+    const cancelled = structuredClone(accepted);
+    cancelled.agents[0]!.planReview = { id: cancelReviewId, conversationId: null, turnId: 'cancel-turn', itemId: 'cancel', markdown: '# Cancel this proposal', status: 'cancel' };
+    api.respondToPlanReview.mockResolvedValueOnce(cancelled);
+    await wrapper.get('.plan-review-footer__button--cancel').trigger('click');
+    await flushPromises();
+    expect(api.respondToPlanReview).toHaveBeenNthCalledWith(3, agent.id, { reviewId: cancelReviewId, resolution: 'cancel' });
+    expect(wrapper.find('.plan-review-footer').exists()).toBe(false);
     expect(api.sendPrompt).not.toHaveBeenCalled();
   });
 
@@ -245,7 +204,7 @@ describe('Unified backend → mounted application', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     const { api } = installBackendFixture(snapshot);
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
 
     await wrapper.findAll('.right-workspace-panel__launcher button')

@@ -1,5 +1,4 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import type {
   CodexConversationPaneActions,
   CodexConversationPaneController,
@@ -75,6 +74,24 @@ const AgentSidebarStub = defineComponent({
     'update-repository-icon',
   ],
   template: '<aside class="agent-sidebar" />',
+});
+
+const AgentWorkspaceStub = defineComponent({
+  name: 'AgentWorkspace',
+  props: ['conversationPaneController', 'currentAgent'],
+  setup(_props, { expose }) {
+    expose({
+      focusComposer: vi.fn(),
+      handleBrowserOpenCommand: vi.fn(),
+      showDebugGitOperationProgress: vi.fn(),
+    });
+  },
+  template: '<section class="agent-workspace"><ConversationPane v-if="currentAgent" :agent="currentAgent" :agents="[currentAgent]" :controller="conversationPaneController" :has-visible-messages="false" /></section>',
+});
+
+const TeamRailStub = defineComponent({
+  name: 'TeamRail',
+  template: '<aside class="team-rail" />',
 });
 
 export function pointerEvent(type: string, clientX: number): PointerEvent {
@@ -155,6 +172,9 @@ export function mountShell(overrides: Partial<{
   workItemsByRepository: Record<string, WorkItem[]>;
   realConversationPane: boolean;
   realAgentSidebar: boolean;
+  stubAgentWorkspace: boolean;
+  stubRightWorkspacePanel: boolean;
+  stubTeamRail: boolean;
   isConversationLoadFailed: boolean;
   retryAgentHistory: () => Promise<void>;
   sendPromptAction: (prompt: string, options?: import('@codex-claw/core/contracts').RendererSendPromptOptions) => Promise<void>;
@@ -258,10 +278,12 @@ export function mountShell(overrides: Partial<{
       quit: overrides.quit ?? vi.fn().mockResolvedValue(undefined),
     },
     global: {
-      plugins: [ElementPlus],
       stubs: {
+        AgentWorkspace: overrides.stubAgentWorkspace ? AgentWorkspaceStub : false,
         AgentSidebar: overrides.realAgentSidebar ? false : AgentSidebarStub,
         ConversationPane: overrides.realConversationPane ? false : ConversationPaneStub,
+        RightWorkspacePanel: overrides.stubRightWorkspacePanel ?? false,
+        TeamRail: overrides.stubTeamRail ? TeamRailStub : false,
         ElDialog: {
           props: ['modelValue'],
           template: `

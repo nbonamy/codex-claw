@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import AgentAvatarCropDialog from '../AgentAvatarCropDialog.vue';
@@ -18,7 +17,6 @@ describe('AgentAvatarCropDialog', () => {
         visible: true,
       },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             props: ['modelValue'],
@@ -55,7 +53,6 @@ describe('AgentAvatarCropDialog', () => {
         visible: true,
       },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             props: ['modelValue'],
@@ -95,7 +92,6 @@ describe('AgentAvatarCropDialog', () => {
         visible: true,
       },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             props: ['modelValue'],
@@ -118,7 +114,6 @@ describe('AgentAvatarCropDialog', () => {
         visible: true,
       },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             props: ['modelValue'],

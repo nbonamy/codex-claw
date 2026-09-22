@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import CockpitAgentsView from '../CockpitAgentsView.vue';
@@ -12,7 +11,6 @@ describe('CockpitAgentsView', () => {
         agents: snapshot.agents,
         teams: snapshot.teams,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.findAll('.cockpit-view__agent-card')).toHaveLength(2);
@@ -34,7 +32,6 @@ describe('CockpitAgentsView', () => {
         agents: snapshot.agents,
         teams: snapshot.teams,
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await wrapper.get('.cockpit-view__add-card').trigger('click');
@@ -50,7 +47,6 @@ describe('CockpitAgentsView', () => {
     }));
     const wrapper = mount(CockpitAgentsView, {
       props: { agents, mode: 'recent', teams: snapshot.teams },
-      global: { plugins: [ElementPlus] },
     });
 
     expect(wrapper.findAll('.cockpit-agents__team')).toHaveLength(1);

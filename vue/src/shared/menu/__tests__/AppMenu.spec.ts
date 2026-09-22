@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import { PencilIcon, SwitchHorizontalIcon } from '../../icons/app-icons';
 import AppMenu from '../AppMenu.vue';
@@ -93,7 +92,6 @@ function mountMenu(items: AppMenuItem[]) {
       items,
     },
     global: {
-      plugins: [ElementPlus],
-    },
+      },
   });
 }

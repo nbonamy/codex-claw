@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import NewAgentButton from '../NewAgentButton.vue';
 
@@ -40,6 +39,5 @@ function mountButton(props: {
 } = {}) {
   return mount(NewAgentButton, {
     props,
-    global: { plugins: [ElementPlus] },
   });
 }

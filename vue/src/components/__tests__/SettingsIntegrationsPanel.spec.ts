@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
 
@@ -122,7 +121,6 @@ function mountPanel(props: Record<string, unknown>) {
       ...props,
     },
     global: {
-      plugins: [ElementPlus],
-    },
+      },
   });
 }

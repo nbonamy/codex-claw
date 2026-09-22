@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MissionTicket } from '@codex-claw/core/missions';
 import MissionTicketBoard from '../MissionTicketBoard.vue';
@@ -116,7 +115,6 @@ function mountBoard(props: InstanceType<typeof MissionTicketBoard>['$props']) {
   return mount(MissionTicketBoard, {
     props,
     attachTo: document.body,
-    global: { plugins: [ElementPlus] },
   });
 }
 

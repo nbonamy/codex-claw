@@ -14,8 +14,13 @@ import {
   clickPortaledMenuItem,
   conversationControllerActions,
   conversationControllerState,
-  mountShell,
+  mountShell as mountRealShell,
 } from './app-shell-test-harness';
+
+const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
+  stubAgentWorkspace: true,
+  ...overrides,
+});
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -53,7 +58,7 @@ describe('AppShell dialogs and commands', () => {
     };
     const startVisualize = vi.fn().mockResolvedValue(next);
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, startVisualize, sendPromptAction });
+    const wrapper = mountShell({ snapshot, startVisualize, sendPromptAction, stubAgentWorkspace: false });
 
     const forwardPrompt = wrapper.getComponent({ name: 'AgentWorkspace' }).props('forwardPrompt') as (prompt: string) => Promise<void>;
     await forwardPrompt('/visualize focus on the deployment flow');
@@ -85,7 +90,7 @@ describe('AppShell dialogs and commands', () => {
       createdAt: '2026-09-21T12:00:00.000Z',
       updatedAt: '2026-09-21T12:00:00.000Z',
     };
-    const wrapper = mountShell({ snapshot });
+    const wrapper = mountShell({ snapshot, stubAgentWorkspace: false });
 
     listener({ type: 'debug-open-visualize' });
     await nextTick();
@@ -108,7 +113,7 @@ describe('AppShell dialogs and commands', () => {
       updatedAt: '2026-09-21T12:00:00.000Z',
     };
     const setVisualizeOpen = vi.fn().mockResolvedValue(snapshot);
-    const wrapper = mountShell({ snapshot, setVisualizeOpen });
+    const wrapper = mountShell({ snapshot, setVisualizeOpen, stubAgentWorkspace: false });
 
     await wrapper.get('button[aria-label="Close Visualize tab"]').trigger('click');
     await flushPromises();
@@ -131,7 +136,7 @@ describe('AppShell dialogs and commands', () => {
       updatedAt: '2026-09-21T12:00:00.000Z',
     };
     const setVisualizeOpen = vi.fn().mockRejectedValue(new Error('Cannot close Visualize'));
-    const wrapper = mountShell({ snapshot, setVisualizeOpen });
+    const wrapper = mountShell({ snapshot, setVisualizeOpen, stubAgentWorkspace: false });
 
     await wrapper.get('button[aria-label="Close Visualize tab"]').trigger('click');
     await flushPromises();
@@ -215,7 +220,7 @@ describe('AppShell dialogs and commands', () => {
       agentIds: [],
     });
     const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, getAgentGitDiff });
+    const wrapper = mountRealShell({ snapshot, getAgentGitDiff });
     await flushPromises();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
@@ -243,7 +248,7 @@ describe('AppShell dialogs and commands', () => {
     const previewAgentFile = vi.fn().mockResolvedValue({
       path: 'src/main.ts', size: 12, kind: 'text', content: 'export {}',
     });
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       agentFiles: [{ name: 'main.ts', path: 'src/main.ts' }],
       previewAgentFile,
     });
@@ -408,7 +413,7 @@ describe('AppShell dialogs and commands', () => {
     });
     const quit = vi.fn().mockResolvedValue(undefined);
     const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, quit, getAgentGitDiff });
+    const wrapper = mountRealShell({ snapshot, quit, getAgentGitDiff });
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);
@@ -526,7 +531,7 @@ describe('AppShell dialogs and commands', () => {
       }),
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
-    const wrapper = mountShell();
+    const wrapper = mountRealShell();
 
     useConfetti().clear();
     listener({ type: 'debug-celebrate', kind: 'stars' });
@@ -635,7 +640,7 @@ describe('AppShell dialogs and commands', () => {
     await nextTick();
 
     const dialog = wrapper.findAllComponents({ name: 'AgentCreationProgressDialog' })
-      .find(candidate => candidate.props('progress') !== null);
+      .find((candidate) => candidate.props('progress') !== null);
     if (!dialog) throw new Error('Expected active agent creation progress dialog.');
     expect(dialog.props('progress')).toMatchObject({
       state: 'running',
@@ -683,7 +688,7 @@ describe('AppShell dialogs and commands', () => {
       state: 'clean',
       updatedAt: '2026-09-03T00:00:00.000Z',
     };
-    const wrapper = mountShell({ snapshot });
+    const wrapper = mountRealShell({ snapshot });
 
     listener({ type: 'debug-operation-progress', kind: 'pullRequest' });
     await flushPromises();
@@ -876,7 +881,7 @@ describe('AppShell dialogs and commands', () => {
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const snapshot = createInitialSnapshot();
-    const wrapper = mountShell({ snapshot });
+    const wrapper = mountRealShell({ snapshot });
 
     listener({
       type: 'open-browser',

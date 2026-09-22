@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent, ConversationSummary } from '@codex-claw/core/contracts';
 import ConversationHistoryDialog from '../ConversationHistoryDialog.vue';
@@ -55,7 +54,6 @@ describe('ConversationHistoryDialog', () => {
         listConversations: vi.fn().mockResolvedValue(sessions),
         resumeConversation,
       },
-      global: { plugins: [ElementPlus] },
     });
     await flushPromises();
 

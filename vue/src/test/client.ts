@@ -20,11 +20,23 @@ export function configureElectronTestClient(overrides?: Partial<CodexClawApi>): 
 }
 
 export function installElectronTestClientAccessor(): void {
-  let api = configureElectronTestClient(window.codexClaw ?? {});
-  assignClient = (value) => { api = configureElectronTestClient(value); };
+  const existing = window.codexClaw;
+  let api: CodexClawApi | undefined;
+  let initialized = false;
+  const initialize = () => {
+    if (!initialized) {
+      api = configureElectronTestClient(existing ?? {});
+      initialized = true;
+    }
+    return api;
+  };
+  assignClient = (value) => {
+    api = configureElectronTestClient(value);
+    initialized = true;
+  };
   Object.defineProperty(window, 'codexClaw', {
     configurable: true,
-    get: () => api,
+    get: initialize,
     set: assignClient,
   });
 }

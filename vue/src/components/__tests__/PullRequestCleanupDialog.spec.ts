@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@codex-claw/core/contracts';
 import PullRequestCleanupDialog from '../PullRequestCleanupDialog.vue';
@@ -33,7 +32,6 @@ describe('PullRequestCleanupDialog', () => {
     const wrapper = mount(PullRequestCleanupDialog, {
       props: { agent, visible: true },
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElDialog: {
             props: ['modelValue'],

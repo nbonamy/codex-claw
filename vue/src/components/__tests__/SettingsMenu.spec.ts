@@ -1,9 +1,9 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import SettingsMenu from '../SettingsMenu.vue';
 import type { AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
+import { setElectronTestClient } from '../../test/client';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -50,6 +50,7 @@ describe('SettingsMenu', () => {
   });
 
   it('always exposes logout in the lower-left menu and emits menu actions', async () => {
+    setElectronTestClient({});
     const wrapper = mountMenu();
 
     await openMenu(wrapper);
@@ -119,7 +120,6 @@ function mountMenu(rateLimits?: AccountRateLimits, props: { active?: boolean; ac
       rateLimits,
     },
     global: {
-      plugins: [ElementPlus],
       stubs: {
         ElPopover: {
           props: ['visible'],

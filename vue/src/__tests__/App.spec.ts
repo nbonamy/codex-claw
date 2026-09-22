@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import AppShell from '../components/AppShell.vue';
@@ -21,7 +20,7 @@ describe('App', () => {
       getSnapshot: vi.fn().mockResolvedValue(snapshot),
       onEvent: (listener) => { emitEvent = listener; return () => undefined; },
     });
-    const wrapper = mount(App, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(App);
     await flushPromises();
 
     emitEvent({
@@ -53,7 +52,6 @@ describe('App', () => {
 
     const wrapper = mount(App, {
       global: {
-        plugins: [ElementPlus],
         stubs: {
           ElPopover: {
             template: '<div><slot name="reference" /><slot /></div>',
@@ -78,7 +76,7 @@ describe('App', () => {
       sendPrompt,
     });
     const wrapper = mount(App, {
-      global: { plugins: [ElementPlus] },
+      global: { stubs: { AppShell: true } },
     });
     await flushPromises();
 
@@ -100,7 +98,7 @@ describe('App', () => {
       sendPrompt,
     });
     const wrapper = mount(App, {
-      global: { plugins: [ElementPlus] },
+      global: { stubs: { AppShell: true } },
     });
     await flushPromises();
 
@@ -129,8 +127,8 @@ describe('App', () => {
     });
     const wrapper = mount(App, {
       global: {
-        plugins: [ElementPlus],
         stubs: {
+          AppShell: true,
           ElPopover: {
             template: '<div><slot name="reference" /><slot /></div>',
           },
@@ -146,8 +144,8 @@ describe('App', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.get('[data-testid="backend-restart-overlay"]').text()).toContain('Restarting the backend and reconnecting your chats.');
-    expect(wrapper.get('.app-shell').attributes('inert')).toBe('');
-    expect(wrapper.get('.app-shell').attributes('aria-hidden')).toBe('true');
+    expect(wrapper.getComponent(AppShell).attributes('inert')).toBe('');
+    expect(wrapper.getComponent(AppShell).attributes('aria-hidden')).toBe('true');
 
     resolveSharing(snapshot);
     await operation;
@@ -173,7 +171,7 @@ describe('App', () => {
       installUpdate,
     });
     const wrapper = mount(App, {
-      global: { plugins: [ElementPlus] },
+      global: { stubs: { AppShell: true } },
     });
     await flushPromises();
 
@@ -219,8 +217,8 @@ describe('App', () => {
     });
     const wrapper = mount(App, {
       global: {
-        plugins: [ElementPlus],
         stubs: {
+          AppShell: true,
           ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
         },
       },
@@ -267,8 +265,8 @@ describe('App', () => {
     });
     const wrapper = mount(App, {
       global: {
-        plugins: [ElementPlus],
         stubs: {
+          AppShell: true,
           ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
         },
       },
@@ -327,8 +325,8 @@ describe('App', () => {
     });
     const wrapper = mount(App, {
       global: {
-        plugins: [ElementPlus],
         stubs: {
+          AppShell: true,
           ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
         },
       },
@@ -366,8 +364,10 @@ describe('App', () => {
     });
     const wrapper = mount(App, {
       global: {
-        plugins: [ElementPlus],
-        stubs: { ElPopover: { template: '<div><slot name="reference" /><slot /></div>' } },
+        stubs: {
+          AppShell: true,
+          ElPopover: { template: '<div><slot name="reference" /><slot /></div>' },
+        },
       },
     });
     await flushPromises();

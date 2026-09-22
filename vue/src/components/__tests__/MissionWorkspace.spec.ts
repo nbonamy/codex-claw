@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission, type Mission } from '@codex-claw/core/missions';
@@ -55,7 +54,6 @@ function mountWorkspace(mission: Mission, options: {
       'code-review': '<div class="code-review-slot">Code for {{ params.agentId }}</div>',
       ship: '<div class="ship-slot">Repository delivery</div>',
     },
-    global: { plugins: [ElementPlus] },
   });
 }
 

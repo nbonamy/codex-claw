@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { nextTick } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent, WorkItem } from '@codex-claw/core/contracts';
@@ -486,7 +485,7 @@ function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPane
   return mount(RepositoryBacklogPanel, {
     props,
     global: {
-      plugins: [ElementPlus, i18n],
+      plugins: [i18n],
       stubs: {
         ElPopover: {
           name: 'ElPopover',

@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import MissionCodeReview from '../MissionCodeReview.vue';
@@ -20,7 +19,7 @@ describe('MissionCodeReview', () => {
         },
         workspacePath: '/src/billing-mission',
       },
-      global: { plugins: [ElementPlus], stubs: { GitWorkflowControl: true } },
+      global: { stubs: { GitWorkflowControl: true } },
     });
     await flushPromises();
     await wrapper.get('[aria-label="Open in VS Code"]').trigger('click');
@@ -45,7 +44,7 @@ it('pins branch review to the mission baseline and ignores late results after th
   const agents = createInitialSnapshot().agents;
   let resolveFirst!: (result: unknown) => void;
   const getDiff = vi.fn().mockReturnValueOnce(new Promise(resolve => { resolveFirst = resolve; })).mockRejectedValueOnce(new Error('Current worker cannot read diff'));
-  const wrapper = mount(MissionCodeReview, { props: { agent: agents[0]!, baseSha: 'a'.repeat(40), getDiff }, global: { plugins: [ElementPlus], stubs: { GitWorkflowControl: true } } });
+  const wrapper = mount(MissionCodeReview, { props: { agent: agents[0]!, baseSha: 'a'.repeat(40), getDiff }, global: { stubs: { GitWorkflowControl: true } } });
   expect(getDiff).toHaveBeenLastCalledWith(agents[0]!.id, { type: 'branch', baseRef: 'a'.repeat(40) });
   await wrapper.setProps({ agent: agents[1]! });
   await flushPromises();

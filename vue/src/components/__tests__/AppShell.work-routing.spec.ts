@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus, { ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import type {
   CodexNativeRendererApi,
 } from '@codex-app-sdk/vue';
@@ -10,13 +10,19 @@ import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/sna
 import type { Agent, CreateAgentInput, SourceRepository, Team, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { useConfetti } from '../../shared/confetti/use-confetti';
+import { setElectronTestClient } from '../../test/client';
 
 import {
   clickPortaledMenuItem,
-  mountShell,
+  mountShell as mountRealShell,
   workItem,
   workItemAssignment,
 } from './app-shell-test-harness';
+
+const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
+  ...overrides,
+  stubAgentWorkspace: true,
+});
 
 vi.mock('../image-annotation', async (importOriginal) => ({
   ...await importOriginal<typeof import('../image-annotation')>(),
@@ -268,7 +274,7 @@ describe('AppShell work routing', () => {
     };
     const createSourceRepository = vi.fn().mockResolvedValue(repository);
     const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, createSourceRepository, createAgent });
+    const wrapper = mountRealShell({ snapshot, createSourceRepository, createAgent });
 
     wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'new');
     await flushPromises();
@@ -298,7 +304,7 @@ describe('AppShell work routing', () => {
     };
     const createSourceRepository = vi.fn().mockResolvedValue(repository);
     const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, createSourceRepository, createAgent });
+    const wrapper = mountRealShell({ snapshot, createSourceRepository, createAgent });
 
     wrapper.getComponent({ name: 'AgentEmptyState' }).vm.$emit('start-work', 'new');
     await flushPromises();
@@ -328,7 +334,7 @@ describe('AppShell work routing', () => {
     });
     const listSourceBranches = vi.fn().mockResolvedValue([]);
     const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       snapshot,
       chooseAgentFolder,
       createAgent,
@@ -380,7 +386,7 @@ describe('AppShell work routing', () => {
     const listSourceBranches = vi.fn().mockResolvedValue([
       { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/new-project' },
     ]);
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       snapshot,
       sourceRepositories: [{
         name: 'new-project',
@@ -428,7 +434,7 @@ describe('AppShell work routing', () => {
     const listSourceBranches = vi.fn().mockResolvedValue([
       { name: 'main', isDefault: true, worktreePath: '/home/nicolas/src/new-project' },
     ]);
-    const wrapper = mountShell({
+    const wrapper = mountRealShell({
       snapshot,
       sourceRepositories: [{
         name: 'local-match-that-must-be-ignored',
@@ -622,8 +628,7 @@ describe('AppShell work routing', () => {
         connectWorkProvider,
       },
       global: {
-        plugins: [ElementPlus],
-      },
+        },
     });
 
     expect(wrapper.text()).toContain('Welcome to Codex Claw');
@@ -888,6 +893,7 @@ describe('AppShell work routing', () => {
   });
 
   it('opens settings on General, remembers the last settings pane, updates appearance, and quits', async () => {
+    setElectronTestClient({});
     const snapshot = createInitialSnapshot();
     snapshot.accountRateLimits = {
       limitId: 'codex',

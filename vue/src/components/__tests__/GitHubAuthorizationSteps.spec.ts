@@ -1,5 +1,4 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import GitHubAuthorizationSteps from '../GitHubAuthorizationSteps.vue';
 
@@ -20,7 +19,6 @@ describe('GitHubAuthorizationSteps', () => {
           expiresAt: '2026-06-09T12:05:00.000Z',
         },
       },
-      global: { plugins: [ElementPlus] },
     });
 
     await wrapper.get('[aria-label="Copy GitHub device code ABCD-1234"]').trigger('click');
