@@ -17,6 +17,7 @@
           >
             <BacklogIcon v-if="tab === 'backlog'" aria-hidden="true" />
             <IconChecklist v-if="tab === 'codeReview'" aria-hidden="true" />
+            <IconSitemap v-else-if="tab === 'design'" aria-hidden="true" />
             <FileDiffIcon v-else-if="tab === 'review'" aria-hidden="true" />
             <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
             <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
@@ -91,6 +92,10 @@
         <IconChecklist aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.review') }}</span>
       </button>
+      <button v-if="agent.design" type="button" @click="emit('openTab', 'design')">
+        <IconSitemap aria-hidden="true" />
+        <span>{{ $t('surface.rightWorkspacePanel.design') }}</span>
+      </button>
       <button type="button" @click="emit('openTab', 'review')">
         <FileDiffIcon aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.changes') }}</span>
@@ -129,6 +134,16 @@
       :review-again="reviewCodeAgain"
       @clarify-finding="emit('clarifyFinding', $event)"
       @open-file="emit('previewFile', $event)"
+    />
+
+    <DesignPanel
+      v-if="tabs.includes('design') && agent.design"
+      v-show="activeTab === 'design'"
+      :busy="agent.status.type === 'working' || agent.status.type === 'awaitingInput'"
+      :design="agent.design"
+      :read-asset="diagramId => readDesignDiagramAsset(agent.id, diagramId)"
+      @generate="generateDesignSuggestion(agent.id, { suggestionId: $event })"
+      @select="selectDesignDiagram(agent.id, { diagramId: $event })"
     />
 
     <RepositoryBacklogPanel
@@ -276,7 +291,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IconChecklist, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconWorld } from '@tabler/icons-vue';
+import { IconChecklist, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { BacklogIcon, CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
@@ -286,6 +301,7 @@ import OpenInControl from '../shared/OpenInControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 import BrowserPanel from './BrowserPanel.vue';
 import CodeReviewPanel from './CodeReviewPanel.vue';
+import DesignPanel from './DesignPanel.vue';
 import FileExplorerPanel from './FileExplorerPanel.vue';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import GitReviewPanel from './GitReviewPanel.vue';
@@ -355,6 +371,9 @@ const props = withDefaults(defineProps<{
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  generateDesignSuggestion?: (agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => Promise<AppSnapshot>;
+  selectDesignDiagram?: (agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => Promise<AppSnapshot>;
+  readDesignDiagramAsset?: (agentId: string, diagramId: string) => Promise<import('@codex-claw/core/design').DesignDiagramAsset>;
 }>(), {
   filesPaneWidth: 280,
   backlogItems: () => [],
@@ -368,6 +387,9 @@ const props = withDefaults(defineProps<{
   submitCodeReviewRound: async () => { throw new Error('Code review is not available.'); },
   finishCodeReview: async () => { throw new Error('Code review is not available.'); },
   reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
+  generateDesignSuggestion: async () => { throw new Error('Design is not available.'); },
+  selectDesignDiagram: async () => { throw new Error('Design is not available.'); },
+  readDesignDiagramAsset: async () => { throw new Error('Design is not available.'); },
 });
 
 const emit = defineEmits<{
@@ -419,6 +441,7 @@ const activeProjectFilePath = computed(() => {
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'codeReview', type: 'action', label: translate('surface.rightWorkspacePanel.review'), icon: IconChecklist },
+  ...(props.agent.design ? [{ id: 'design', type: 'action', label: translate('surface.rightWorkspacePanel.design'), icon: IconSitemap } satisfies AppMenuItem] : []),
   { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.changes'), icon: FileDiffIcon },
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },
@@ -460,6 +483,7 @@ function stopFilesPaneResize(): void {
 function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'backlog') return translate('surface.rightWorkspacePanel.backlog');
   if (tab === 'codeReview') return translate('surface.rightWorkspacePanel.review');
+  if (tab === 'design') return translate('surface.rightWorkspacePanel.design');
   if (tab === 'review') return translate('surface.rightWorkspacePanel.changes');
   if (tab === 'browser') return props.browserVisualization?.title || 'Browser';
   if (tab === 'files') return translate('surface.rightWorkspacePanel.openFile');
@@ -499,7 +523,7 @@ function sourceFilePanel(tab: RightWorkspaceFileTab): SidePanelSourceState | nul
 
 function openTabFromMenu(tab: string): void {
   addMenuOpen.value = false;
-  if ((tab === 'backlog' && props.githubRepository) || tab === 'codeReview' || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
+  if ((tab === 'backlog' && props.githubRepository) || tab === 'codeReview' || (tab === 'design' && props.agent.design) || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
     emit('openTab', tab);
   }
 }

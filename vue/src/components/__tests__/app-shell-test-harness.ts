@@ -166,6 +166,10 @@ export function mountShell(overrides: Partial<{
     agentId: string,
     input: import('@codex-claw/core/code-review').CodeReviewStartInput,
   ) => Promise<AppSnapshot>;
+  startDesign: (agentId: string, input?: import('@codex-claw/core/design').StartDesignInput) => Promise<AppSnapshot>;
+  generateDesignSuggestion: (agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => Promise<AppSnapshot>;
+  selectDesignDiagram: (agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => Promise<AppSnapshot>;
+  readDesignDiagramAsset: (agentId: string, diagramId: string) => Promise<import('@codex-claw/core/design').DesignDiagramAsset>;
   discussCodeReviewFinding: (
     agentId: string,
     input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput,
@@ -193,6 +197,10 @@ export function mountShell(overrides: Partial<{
       editTurnAction: overrides.editTurnAction,
       retryTurnAction: overrides.retryTurnAction,
       startCodeReview: overrides.startCodeReview,
+      startDesign: overrides.startDesign,
+      generateDesignSuggestion: overrides.generateDesignSuggestion,
+      selectDesignDiagram: overrides.selectDesignDiagram,
+      readDesignDiagramAsset: overrides.readDesignDiagramAsset,
       discussCodeReviewFinding: overrides.discussCodeReviewFinding,
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],

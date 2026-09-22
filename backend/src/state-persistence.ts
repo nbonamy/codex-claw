@@ -15,6 +15,7 @@ import { appText } from '@codex-claw/core/app-text';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
 import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/code-review';
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
+import { cloneDesignSession, isDesignSession } from '@codex-claw/core/design';
 
 type PersistedState = {
   missions?: AppSnapshot['missions'];
@@ -51,6 +52,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   codeReview?: import('@codex-claw/core/code-review').CodeReviewSession;
   threadFlags?: import('@codex-claw/core/thread-flags').ThreadFlags;
   goal?: ThreadGoal;
+  design?: import('@codex-claw/core/design').DesignSession;
   statusText?: string;
   lastActivityAt?: string;
   teamId?: string;
@@ -180,6 +182,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.codeReview ? { codeReview: cloneCodeReviewSession(agent.codeReview) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
+    ...(agent.design ? { design: cloneDesignSession(agent.design) } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
     ...(agent.lastActivityAt ? { lastActivityAt: agent.lastActivityAt } : {}),
@@ -410,6 +413,7 @@ function sanitizeAgent(value: unknown): Agent | null {
       ? { codeReview: cloneCodeReviewSession(value.codeReview) }
       : {}),
     ...(goal ? { goal } : {}),
+    ...(isDesignSession(value.design) ? { design: cloneDesignSession(value.design) } : {}),
     ...(typeof value.statusText === 'string' ? { statusText: value.statusText } : {}),
     status: { type: 'idle' },
     createdAt,

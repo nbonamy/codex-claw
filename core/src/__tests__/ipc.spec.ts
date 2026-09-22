@@ -37,6 +37,10 @@ import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from 
 describe('ipc channels', () => {
   it('keeps renderer bridge channels explicit', () => {
     expect(ipcChannels).toStrictEqual({
+      startDesign: 'agent:design:start',
+      generateDesignSuggestion: 'agent:design:suggestion:generate',
+      selectDesignDiagram: 'agent:design:diagram:select',
+      readDesignDiagramAsset: 'agent:design:asset:read',
       startCodeReview: 'agent:code-review:start',
       decideCodeReviewFinding: 'agent:code-review:finding:decide',
       discussCodeReviewFinding: 'agent:code-review:finding:discuss',

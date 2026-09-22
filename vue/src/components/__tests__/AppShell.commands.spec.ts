@@ -38,6 +38,61 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('routes /design into the dedicated workspace without sending prose to chat', async () => {
+    const snapshot = createInitialSnapshot();
+    const next = structuredClone(snapshot);
+    next.agents[0].design = {
+      id: 'design-1',
+      conversationRef: null,
+      suggestions: [],
+      diagrams: [],
+      selectedDiagramId: null,
+      createdAt: '2026-09-21T12:00:00.000Z',
+      updatedAt: '2026-09-21T12:00:00.000Z',
+    };
+    const startDesign = vi.fn().mockResolvedValue(next);
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, startDesign, sendPromptAction });
+
+    const forwardPrompt = wrapper.getComponent({ name: 'AgentWorkspace' }).props('forwardPrompt') as (prompt: string) => Promise<void>;
+    await forwardPrompt('/design focus on the deployment flow');
+    await flushPromises();
+
+    expect(startDesign).toHaveBeenCalledExactlyOnceWith('agent-dina', { prompt: 'focus on the deployment flow' });
+    expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Design');
+    wrapper.unmount();
+  });
+
+  it('opens the populated Design pane from the native debug command', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return vi.fn();
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.design = {
+      id: 'debug-design',
+      conversationRef: null,
+      suggestions: [{ id: 'suggestion-1', title: 'Architecture', description: 'Show the system.' }],
+      diagrams: [],
+      selectedDiagramId: null,
+      createdAt: '2026-09-21T12:00:00.000Z',
+      updatedAt: '2026-09-21T12:00:00.000Z',
+    };
+    const wrapper = mountShell({ snapshot });
+
+    listener({ type: 'debug-open-design' });
+    await nextTick();
+
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Design');
+    expect(wrapper.text()).toContain('Architecture');
+    wrapper.unmount();
+  });
+
   it('loads existing remote teams for the Team dialog from the selected connection backend', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.remoteConnections.connections = [{

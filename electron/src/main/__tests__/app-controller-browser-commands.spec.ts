@@ -74,6 +74,27 @@ describe('AppController', () => {
     ));
   });
 
+  it('populates Design through clawd and opens the real Design pane', async () => {
+    const snapshot = createInitialSnapshot();
+    const request = vi.fn().mockResolvedValue(snapshot);
+    const controller = new AppController(snapshot, createBackendClient({ request }));
+    const send = vi.fn();
+    setMainWindowSend(controller, send);
+    const options = (controller as unknown as {
+      debugMenuOptions(): { populateDebugDesign(): void };
+    }).debugMenuOptions();
+
+    options.populateDebugDesign();
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+      backendMethods.debugDesignPopulate,
+      { agentId: 'agent-dina' },
+    ));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith('app:command', {
+      type: 'debug-open-design',
+    }));
+  });
+
   it('queues valid deep links until the renderer is ready, then focuses and dispatches them', () => {
     const controller = new AppController(createInitialSnapshot(), null);
     const send = vi.fn();

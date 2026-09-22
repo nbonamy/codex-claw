@@ -1,6 +1,7 @@
 import { readWorktreeHead } from './git-worktrees';
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
+import { createDesignDebugFixture } from './design-debug-fixtures';
 import { FileMissionSkillStore } from './mission-skill-store';
 import { featureStages, type Mission, type MissionStage } from '@codex-claw/core/missions';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
@@ -62,6 +63,7 @@ import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
+import { DesignService, generateDesignSuggestionPrompt, initialDesignPrompt } from './design-service';
 
 export type ClawBackendServerOptions = {
   version: string;
@@ -88,6 +90,7 @@ export type ClawBackendServerOptions = {
   missionArtifactStore?: MissionArtifactStorage;
   codeReviewTools?: CodeReviewToolPort;
   agentCreation?: AgentCreationService;
+  designService?: DesignService;
 };
 
 export type SystemPermissionsPort = {
@@ -151,6 +154,7 @@ export class ClawBackendServer {
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private readonly codeReviews?: CodeReviewService;
   private readonly agentCreation: AgentCreationService;
+  private readonly designs: DesignService;
   private readonly deleteMissionHome: (missionId: string) => Promise<void>;
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
@@ -204,6 +208,12 @@ export class ClawBackendServer {
       persistSnapshot: () => this.persistSnapshotOnly(),
       setNewConversationTitle: (agentId, wasNewSession) => this.agentConversations.setNewTitle(agentId, wasNewSession),
       onPromptStarting: options.onPromptStarting,
+    });
+    this.designs = options.designService ?? new DesignService({
+      snapshot: this.snapshot,
+      generatedImagesRoot: path.join(os.tmpdir(), 'codex-claw-generated-images'),
+      persist: async () => { await this.persistSnapshotOnly(); },
+      publish: () => { void this.emitProjectedSnapshot(); },
     });
     const ensureMissionHome = options.ensureMissionHome ?? (async (missionId: string) => {
       const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
@@ -622,6 +632,15 @@ export class ClawBackendServer {
         agent.codeReview = createDebugCodeReviewSession(agent, scenario);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
+      case backendMethods.debugDesignPopulate: {
+        const agentId = requireAgentId(message.params);
+        const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
+        if (!agent) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+        }
+        agent.design = createDesignDebugFixture(agent);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+      }
       case backendMethods.debugThreadFlagSet: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
@@ -1021,6 +1040,55 @@ export class ClawBackendServer {
           folder: requireAgentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
         }));
+      }
+      case backendMethods.agentDesignStart: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const params = requireRecord(message.params);
+        const input = isRecord(params.input) ? params.input : undefined;
+        const prompt = typeof input?.prompt === 'string' ? input.prompt.trim() : '';
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          ...(input ? { input: { ...(prompt ? { prompt } : {}) } } : {}),
+        }, async () => {
+          const result = await this.designs.enter(agentId);
+          if (result.created) this.agentPrompts.send(agentId, initialDesignPrompt(prompt));
+          else if (prompt) this.agentPrompts.send(agentId, prompt);
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentDesignSuggestionGenerate: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        const suggestionId = requireString(input.suggestionId, 'suggestionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          input: { suggestionId },
+        }, async () => {
+          const session = this.designs.contextForAgent(agentId);
+          if (!session) throw new Error('Design mode is not active for this conversation.');
+          this.agentPrompts.send(agentId, generateDesignSuggestionPrompt(session, suggestionId));
+          return this.persistAndEmitSnapshot();
+        });
+      }
+      case backendMethods.agentDesignDiagramSelect: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input');
+        const diagramId = requireString(input.diagramId, 'diagramId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
+          agentId,
+          input: { diagramId },
+        }, async () => {
+          await this.designs.select(agentId, diagramId);
+          return this.remoteTeams.clientSnapshot();
+        });
+      }
+      case backendMethods.agentDesignAssetGet: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const diagramId = requireStringParam(message.params, 'diagramId');
+        return this.routeAgentResultRequest(message.id, agentId, message.method, {
+          agentId,
+          diagramId,
+        }, () => this.designs.readAsset(agentId, diagramId));
       }
       case backendMethods.agentModelsList: {
         const agentId = requireAgentId(message.params);

@@ -204,6 +204,32 @@ export function useAppState() {
     return next;
   }
 
+  async function startDesign(agentId: string, input?: import('@codex-claw/core/design').StartDesignInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.startDesign(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function generateDesignSuggestion(agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.generateDesignSuggestion(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function selectDesignDiagram(agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.selectDesignDiagram(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function readDesignDiagramAsset(agentId: string, diagramId: string): Promise<import('@codex-claw/core/design').DesignDiagramAsset> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    return codexClawApi.readDesignDiagramAsset(agentId, diagramId);
+  }
+
   async function decideCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
     const next = await codexClawApi.decideCodeReviewFinding(agentId, input);
@@ -1458,6 +1484,10 @@ export function useAppState() {
     respondToPlanReview,
     respondToThreadFlag,
     startCodeReview,
+    startDesign,
+    generateDesignSuggestion,
+    selectDesignDiagram,
+    readDesignDiagramAsset,
     decideCodeReviewFinding,
     discussCodeReviewFinding,
     submitCodeReviewRound,

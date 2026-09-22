@@ -284,6 +284,9 @@
         :finish-code-review="props.finishCodeReview"
         :discard-code-review="props.discardCodeReview"
         :review-code-again="props.reviewCodeAgain"
+        :generate-design-suggestion="props.generateDesignSuggestion"
+        :select-design-diagram="props.selectDesignDiagram"
+        :read-design-diagram-asset="props.readDesignDiagramAsset"
         @close-agent="$emit('close-agent', $event)"
         @clarify-code-review-finding="clarifyCodeReviewFinding"
         @expand-sidebar="agentSidebarCollapsed = false"
@@ -674,6 +677,10 @@ const props = withDefaults(defineProps<{
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  startDesign?: (agentId: string, input?: import('@codex-claw/core/design').StartDesignInput) => Promise<AppSnapshot>;
+  generateDesignSuggestion?: (agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => Promise<AppSnapshot>;
+  selectDesignDiagram?: (agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => Promise<AppSnapshot>;
+  readDesignDiagramAsset?: (agentId: string, diagramId: string) => Promise<import('@codex-claw/core/design').DesignDiagramAsset>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   approvals: () => [],
@@ -713,6 +720,10 @@ const props = withDefaults(defineProps<{
   finishCodeReview: async () => { throw new Error('Code review is not available.'); },
   discardCodeReview: async () => { throw new Error('Code review is not available.'); },
   reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
+  startDesign: async () => { throw new Error('Design is not available.'); },
+  generateDesignSuggestion: async () => { throw new Error('Design is not available.'); },
+  selectDesignDiagram: async () => { throw new Error('Design is not available.'); },
+  readDesignDiagramAsset: async () => { throw new Error('Design is not available.'); },
   daemonStatus: null,
   daemonStatusError: null,
   codexResourceSharingMigrationRequired: false,
@@ -1284,6 +1295,18 @@ const {
   workspaceFor: rightWorkspaceFor,
   workspaces: rightWorkspaces,
 } = rightWorkspaceState;
+const observedDesignSessionIds = new Set<string>();
+watch(
+  () => props.snapshot.agents.map(agent => ({ agentId: agent.id, designId: agent.design?.id ?? null })),
+  entries => {
+    for (const entry of entries) {
+      if (!entry.designId || observedDesignSessionIds.has(entry.designId)) continue;
+      observedDesignSessionIds.add(entry.designId);
+      openRightWorkspaceTab('design', entry.agentId);
+    }
+  },
+  { immediate: true, flush: 'sync' },
+);
 const workspacePreviews = useWorkspacePreviews({
   closeTab: closeRightWorkspaceTab,
   currentAgent: () => currentAgent.value,
@@ -2333,6 +2356,12 @@ function clarifyCodeReviewFinding(payload: {
 }
 
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
+  const designCommand = prompt.match(/^\/design(?:\s+([\s\S]*))?$/u);
+  if (designCommand && !options?.attachments?.length && currentAgent.value) {
+    const direction = designCommand[1]?.trim();
+    openRightWorkspaceTab('design');
+    return props.startDesign(currentAgent.value.id, direction ? { prompt: direction } : undefined).then(() => undefined);
+  }
   if (prompt.trim() === '/review' && !options?.attachments?.length) {
     openRightWorkspaceTab('codeReview');
     return Promise.resolve();

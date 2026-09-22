@@ -334,6 +334,13 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       return;
     }
 
+    if (command.type === 'debug-open-design') {
+      if (!currentAgent.value) return;
+      options.actions.openAgentSurface();
+      options.actions.openRightWorkspaceTab('design');
+      return;
+    }
+
     if (command.type === 'debug-celebrate') {
       useConfetti().celebrate({ kind: command.kind });
       return;

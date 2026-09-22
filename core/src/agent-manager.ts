@@ -181,6 +181,7 @@ function clearAgentRuntimeState(agent: Agent): void {
   delete agent.planReview;
   delete agent.threadFlags;
   delete agent.goal;
+  delete agent.design;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
   delete agent.statusText;
@@ -585,6 +586,7 @@ function clearRuntimeState(agent: Agent): void {
   delete agent.planReview;
   delete agent.threadFlags;
   delete agent.goal;
+  delete agent.design;
   delete agent.isRegistered;
   delete agent.mcpSessionId;
   delete agent.statusText;

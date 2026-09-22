@@ -20,6 +20,7 @@ export type AppMenuCallbacks = {
   sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
+  populateDebugDesign?: () => void;
   getDebugMissionStage?: () => MissionStage | undefined;
   setDebugMissionStage?: (stage: MissionStage) => void;
   injectDebugCodeReview?: (scenario: DebugCodeReviewScenario) => void;
@@ -30,7 +31,7 @@ export type AppMenuCallbacks = {
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugDesign' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -43,6 +44,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
+    populateDebugDesign: options.populateDebugDesign,
     getDebugMissionStage: options.getDebugMissionStage,
     setDebugMissionStage: options.setDebugMissionStage,
     injectDebugCodeReview: options.injectDebugCodeReview,
@@ -93,6 +95,16 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
       {
         label: 'Mission Fixtures',
         submenu: buildDebugMissionFixtures(callbacks),
+      },
+      {
+        label: 'Design Fixtures',
+        submenu: [
+          {
+            label: 'Populate Design Pane',
+            enabled: Boolean(callbacks.populateDebugDesign),
+            click: () => callbacks.populateDebugDesign?.(),
+          },
+        ],
       },
       {
         label: 'Review',

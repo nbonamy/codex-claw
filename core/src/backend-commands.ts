@@ -20,6 +20,15 @@ export const codexBackendCommands: BackendCommandSummary[] = [
     submitOnSelect: true,
   },
   {
+    id: 'claw.design',
+    backend: 'codex',
+    name: 'design',
+    displayName: 'Design',
+    description: 'Open Claw Design mode for diagrams.',
+    slashName: 'design',
+    submitOnSelect: true,
+  },
+  {
     id: 'codex.plan',
     backend: 'codex',
     name: 'plan',
@@ -56,6 +65,15 @@ export const claudeBackendCommands: BackendCommandSummary[] = [
     displayName: 'Review',
     description: 'Open Claw\'s code review workflow.',
     slashName: 'review',
+    submitOnSelect: true,
+  },
+  {
+    id: 'claw.design',
+    backend: 'claude',
+    name: 'design',
+    displayName: 'Design',
+    description: 'Open Claw Design mode for diagrams.',
+    slashName: 'design',
     submitOnSelect: true,
   },
   {

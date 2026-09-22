@@ -9,6 +9,7 @@ import {
   IconMessageReport as MessageReportIcon,
   IconSquareCheck as SquareCheck,
   IconTargetArrow as TargetArrowIcon,
+  IconSitemap as SitemapIcon,
   IconUsers as UsersIcon,
 } from '@tabler/icons-vue';
 import { messages } from '../i18n/messages';
@@ -16,6 +17,7 @@ import { presentClawTool } from '../tool-presentation';
 
 describe('Claw tool presentation', () => {
   it.each([
+    ['add-design-diagram', SitemapIcon, 'Created diagram'],
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
     ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],

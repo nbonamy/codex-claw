@@ -107,6 +107,9 @@
       :submit-code-review-round="submitCodeReviewRound"
       :finish-code-review="finishCodeReview"
       :review-code-again="reviewCodeAgain"
+      :generate-design-suggestion="generateDesignSuggestion"
+      :select-design-diagram="selectDesignDiagram"
+      :read-design-diagram-asset="readDesignDiagramAsset"
       @close-tab="closeWorkspaceTab(agent, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
@@ -271,6 +274,9 @@ const props = defineProps<{
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  generateDesignSuggestion: (agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => Promise<AppSnapshot>;
+  selectDesignDiagram: (agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => Promise<AppSnapshot>;
+  readDesignDiagramAsset: (agentId: string, diagramId: string) => Promise<import('@codex-claw/core/design').DesignDiagramAsset>;
 }>();
 
 const agentHeader = ref<{
@@ -334,6 +340,9 @@ const {
   finishCodeReview,
   discardCodeReview,
   reviewCodeAgain,
+  generateDesignSuggestion,
+  selectDesignDiagram,
+  readDesignDiagramAsset,
   startRightWorkspaceResize,
   toggleFileExplorer,
   toggleRightWorkspace,

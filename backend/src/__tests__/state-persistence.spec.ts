@@ -99,6 +99,31 @@ describe('AppStatePersistence', () => {
     expect(isAppSnapshot(restored)).toBe(true);
   });
 
+  it('round-trips the Design session owned by an agent conversation', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].design = {
+      id: 'design-1',
+      conversationRef: { backend: 'codex', threadId: 'thread-design' },
+      suggestions: [{ id: 'suggestion-1', title: 'System map', description: 'Show the architecture.', diagramId: 'diagram-1' }],
+      diagrams: [{
+        id: 'diagram-1',
+        title: 'System map',
+        content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
+        revision: 1,
+        createdAt: '2026-09-21T12:00:00.000Z',
+        updatedAt: '2026-09-21T12:00:00.000Z',
+      }],
+      selectedDiagramId: 'diagram-1',
+      createdAt: '2026-09-21T12:00:00.000Z',
+      updatedAt: '2026-09-21T12:00:00.000Z',
+    };
+
+    const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
+
+    expect(restored.agents[0].design).toStrictEqual(snapshot.agents[0].design);
+    expect(restored.agents[0].design).not.toBe(snapshot.agents[0].design);
+  });
+
   it('round-trips the agent that delegated a worker', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].delegatedByAgentId = 'agent-main';

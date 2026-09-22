@@ -70,6 +70,22 @@ export type ClawSnapshotGetResult = {
 };
 
 export type ClawBackendRequestMap = {
+  [backendMethods.agentDesignStart]: {
+    params: { agentId: string; input?: import('../design').StartDesignInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentDesignSuggestionGenerate]: {
+    params: { agentId: string; input: import('../design').GenerateDesignSuggestionInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentDesignDiagramSelect]: {
+    params: { agentId: string; input: import('../design').SelectDesignDiagramInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentDesignAssetGet]: {
+    params: { agentId: string; diagramId: string };
+    result: import('../design').DesignDiagramAsset;
+  };
   [backendMethods.agentThreadFlagRespond]: {
     params: { agentId: string; response: import('../thread-flags').ThreadFlagResponse };
     result: AppSnapshot;

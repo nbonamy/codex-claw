@@ -523,6 +523,18 @@ export class AppController {
     ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
     });
+    ipc.handle(ipcChannels.startDesign, async (_event, agentId: string, input?: import('@codex-claw/core/design').StartDesignInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDesignStart, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.generateDesignSuggestion, async (_event, agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDesignSuggestionGenerate, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.selectDesignDiagram, async (_event, agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDesignDiagramSelect, { agentId, input }))
+    ));
+    ipc.handle(ipcChannels.readDesignDiagramAsset, (_event, agentId: string, diagramId: string) => (
+      this.requireBackendClient().request(backendMethods.agentDesignAssetGet, { agentId, diagramId })
+    ));
     ipc.handle(ipcChannels.startCodeReview, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewStart, { agentId, input }))
     ));
@@ -1561,11 +1573,12 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugDesign' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
+      populateDebugDesign: () => this.populateDebugDesign(),
       getDebugMissionStage: () => this.debugMission()?.stage,
       setDebugMissionStage: (stage) => this.setDebugMissionStage(stage),
       injectDebugCodeReview: (scenario) => this.injectDebugCodeReview(scenario),
@@ -1667,6 +1680,23 @@ export class AppController {
       .catch((error) => warnMain('debug', 'failed to inject code review fixture', {
         agentId,
         scenario,
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+  }
+
+  private populateDebugDesign(): void {
+    const agentId = this.snapshot?.activeAgentId;
+    if (!agentId || !this.backendClient || app?.isPackaged) return;
+
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugDesignPopulate, { agentId })
+      .then(async (snapshot) => {
+        await this.adoptBackendSnapshot(snapshot);
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          sendAppCommand(this.mainWindow.webContents, { type: 'debug-open-design' });
+        }
+      })
+      .catch((error) => warnMain('debug', 'failed to populate Design fixture', {
+        agentId,
         detail: error instanceof Error ? error.message : String(error),
       }));
   }

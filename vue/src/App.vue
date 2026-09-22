@@ -14,6 +14,10 @@
     :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
     :respond-to-thread-flag-action="respondToThreadFlag"
+    :start-design="startDesign"
+    :generate-design-suggestion="generateDesignSuggestion"
+    :select-design-diagram="selectDesignDiagram"
+    :read-design-diagram-asset="readDesignDiagramAsset"
     :start-code-review="startCodeReview"
     :decide-code-review-finding="decideCodeReviewFinding"
     :discuss-code-review-finding="discussCodeReviewFinding"
@@ -395,6 +399,10 @@ const {
   sendPrompt,
   respondToPlanReview,
   respondToThreadFlag,
+  startDesign,
+  generateDesignSuggestion,
+  selectDesignDiagram,
+  readDesignDiagramAsset,
   startCodeReview,
   decideCodeReviewFinding,
   discussCodeReviewFinding,
