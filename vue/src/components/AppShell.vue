@@ -192,8 +192,8 @@
         @select-agent="selectAgentFromCockpit"
       />
       <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
-        <template #code-review="{ agentId }">
-          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :base-sha="selectedMission.execution?.workspace?.baseSha" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :git-status="snapshot.agentGitStatuses[agentId]" :get-diff="props.getAgentGitDiff" :mission="selectedMission" :execute-mission="executeMission" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" :workspace-path="missionWorkspacePathForAgent(agentId)" @open-worktree="openMissionWorktree" />
+        <template #code-review="{ agentId, reviewSummary }">
+          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :agents="snapshot.agents" :git-statuses="snapshot.agentGitStatuses" :get-diff="props.getAgentGitDiff" :mission="selectedMission" :review-summary="reviewSummary" :execute-mission="executeMission" :read-only="selectedMission.execution?.debugFixture === true" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @open-worktree="openMissionWorktree" />
         </template>
         <template #ship="{ openConversation }">
           <MissionShipBoard
@@ -883,11 +883,6 @@ const missionOpenInAvailable = computed(() => {
   const team = props.snapshot.teams.find(candidate => candidate.id === mission.teamId);
   return !!team && !team.remoteConnectionId;
 });
-function missionWorkspacePathForAgent(agentId: string): string | undefined {
-  const folder = props.snapshot.agents.find(agent => agent.id === agentId)?.folder;
-  return selectedMission.value?.execution?.workspaces?.find(workspace => workspace.path === folder)?.path
-    ?? selectedMission.value?.execution?.workspace?.path;
-}
 function openMissionWorktree(request: MissionWorkspaceOpenRequest): void {
   void openAgentIn(request.agentId, request.application, request.path);
 }

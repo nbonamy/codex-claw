@@ -107,7 +107,7 @@ export function applyMissionDebugFixture(snapshot: AppSnapshot, missionId: strin
         },
         {
           id: 'mission-finding-debug-2', priority: 'p2', title: 'Show verification evidence after remediation',
-          body: 'Fixed findings should retain concise evidence so delivery approval is auditable.', repositoryPath: repositories[0]!, selected: false,
+          body: 'Fixed findings should retain concise evidence so delivery approval is auditable.', repositoryPath: repositories[1] ?? repositories[0]!, selected: false,
           remediation: { state: 'fixed', completedAt: now, evidence: 'Focused Mission workflow tests passed.' }, createdAt: now, updatedAt: now,
         },
       ],

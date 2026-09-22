@@ -142,7 +142,7 @@ function buildDebugMissionFixtures(callbacks: AppMenuCallbacks): MenuItemConstru
     requirements: 'Requirements',
     tickets: 'Tickets',
     implementation: 'Implementation',
-    review: 'Review',
+    review: 'Review (Findings + Changes)',
     ship: 'Ship',
   };
   return featureStages.map(stage => ({

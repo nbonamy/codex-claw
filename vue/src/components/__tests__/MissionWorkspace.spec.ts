@@ -52,7 +52,7 @@ function mountWorkspace(mission: Mission, options: {
     },
     slots: {
       conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
-      'code-review': '<div class="code-review-slot">Code for {{ params.agentId }}</div>',
+      'code-review': '<div class="code-review-slot">Code for {{ params.agentId }}: {{ params.reviewSummary }}</div>',
       ship: '<div class="ship-slot">Repository delivery</div>',
     },
     global: { plugins: [ElementPlus] },
@@ -575,9 +575,27 @@ describe('MissionWorkspace', () => {
     mission.stage = 'review';
     mission.status = 'completed';
     await wrapper.setProps({ mission: structuredClone(mission) });
-    expect(wrapper.get('[aria-label="Accepted artifact"]').text()).toContain('Acceptance verified');
+    expect(wrapper.find('[aria-label="Accepted artifact"]').exists()).toBe(false);
     expect(wrapper.get('.code-review-slot').text()).toContain('agent-dina');
+    expect(wrapper.get('.code-review-slot').text()).toContain('Acceptance verified');
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100');
+  });
+
+  it('renders the real review surface slot for debug Mission fixtures', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    mission.stage = 'review';
+    mission.execution!.debugFixture = true;
+    mission.execution!.runs[0]!.stage = 'review';
+    mission.execution!.runs[0]!.proposal!.review.summary = 'Debug review summary';
+    mission.artifacts.review.findings = [{
+      id: 'finding-debug', priority: 'p1', title: 'Debug finding', body: 'Use the composed review surface.', repositoryPath: '/repo', selected: true,
+      remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
+    }];
+
+    const wrapper = mountWorkspace(mission);
+
+    expect(wrapper.get('.code-review-slot').text()).toContain('Debug review summary');
+    expect(wrapper.findComponent({ name: 'MissionReviewFindings' }).exists()).toBe(false);
   });
 
   it('shows orchestration failures without replacing the process', async () => {

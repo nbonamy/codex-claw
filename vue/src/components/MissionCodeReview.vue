@@ -1,71 +1,80 @@
 <template>
   <section class="mission-code-review" :aria-label="t('missions.codeReview')">
-    <header>
-      <h2>{{ t('missions.codeReview') }}</h2>
-      <MissionWorkspaceOpenIn
-        v-if="workspacePath"
-        :agent="agent"
-        :available="openInAvailable"
-        :catalog="openInApplications"
-        :workspace-path="workspacePath"
-        @open="emit('open-worktree', $event)"
-      />
-      <el-select v-model="target" :aria-label="t('missions.diffScope')" @change="refresh">
-        <el-option value="branch" :label="t('missions.branchDiff')" />
-        <el-option value="uncommitted" :label="t('missions.uncommittedDiff')" />
-      </el-select>
-      <button class="claw-button" type="button" @click="refresh">{{ t('missions.refreshDiff') }}</button>
-    </header>
-    <MissionReviewFindings v-if="mission && executeMission" :mission="mission" :execute-mission="executeMission" />
-    <GitDiffPreviewPanel :diff="diff" :state="state" :error="error" />
+    <el-tabs v-model="activeTab" class="mission-code-review__tabs">
+      <el-tab-pane name="review" :label="t('missions.reviewTab')">
+        <MissionReviewFindings v-if="mission" :mission="mission" :execute-mission="executeMission" :read-only="readOnly" />
+        <section v-if="reviewSummary" class="mission-code-review__summary" :aria-label="t('missions.reviewSummary')">
+          <MarkdownPanel :content="reviewSummary" />
+        </section>
+      </el-tab-pane>
+
+      <el-tab-pane name="changes" :label="t('missions.changesTab')">
+        <MissionReviewChanges
+          :active="activeTab === 'changes'"
+          :agent="agent"
+          :agents="agents"
+          :base-sha="baseSha"
+          :git-status="gitStatus"
+          :git-statuses="gitStatuses"
+          :get-diff="getDiff"
+          :mission="mission"
+          :open-in-available="openInAvailable"
+          :open-in-applications="openInApplications"
+          :workspace-path="workspacePath"
+          @open-worktree="emit('open-worktree', $event)"
+        />
+      </el-tab-pane>
+    </el-tabs>
   </section>
 </template>
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitStatus, CodexClawApi, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import type { Mission } from '@codex-claw/core/missions';
 import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
-import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
+import MarkdownPanel from './MarkdownPanel.vue';
+import MissionReviewChanges from './MissionReviewChanges.vue';
 import MissionReviewFindings from './MissionReviewFindings.vue';
-import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
+import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 const props = withDefaults(defineProps<{
   agent: Agent;
+  agents?: Agent[];
   baseSha?: string;
   gitStatus?: AgentGitStatus | null;
-  getDiff: CodexClawApi['getAgentGitDiff'];
+  gitStatuses?: Record<string, AgentGitStatus>;
+  getDiff: (agentId: string, target?: AgentGitDiffTarget) => Promise<AgentGitDiff>;
   openInAvailable?: boolean;
   openInApplications?: OpenInApplicationCatalog;
+  readOnly?: boolean;
   workspacePath?: string;
   mission?: Mission;
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
+  reviewSummary?: string;
 }>(), {
+  agents: () => [],
+  gitStatuses: () => ({}),
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
 });
 const emit = defineEmits<{ 'open-worktree': [request: MissionWorkspaceOpenRequest] }>();
 const { t } = useI18n();
-const target = ref<'branch' | 'uncommitted'>('branch');
-const diff = ref('');
-const state = ref<'idle' | 'loading' | 'error'>('idle');
-const error = ref<string | null>(null);
-let request = 0;
-async function refresh() {
-  const current = ++request;
-  state.value = 'loading'; error.value = null;
-  try {
-    const result = await props.getDiff(props.agent.id, target.value === 'branch' ? { type: 'branch', ...(props.baseSha ? { baseRef: props.baseSha } : {}) } : { type: 'uncommitted' });
-    if (current !== request) return;
-    diff.value = result.diff; state.value = 'idle';
-  } catch (e) {
-    if (current !== request) return;
-    error.value = e instanceof Error ? e.message : String(e); state.value = 'error';
-  }
-}
-watch(() => [props.agent.id, props.gitStatus?.updatedAt], refresh, { immediate: true });
+const activeTab = ref<'review' | 'changes'>(props.mission ? 'review' : 'changes');
 </script>
 <style scoped>
-.mission-code-review { display: flex; flex-direction: column; min-height: 240px; max-height: 600px; margin-bottom: 20px; }
-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-header h2 { margin: 0 auto 0 0; }
-header .el-select { width: 200px; }
+.mission-code-review {
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+  margin-bottom: var(--space-8);
+}
+
+.mission-code-review__tabs {
+  min-height: 0;
+}
+
+.mission-code-review__summary {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}
 </style>

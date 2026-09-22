@@ -2,7 +2,9 @@ import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import { createMission } from '@codex-claw/core/missions';
 import MissionCodeReview from '../MissionCodeReview.vue';
+import MissionReviewChanges from '../MissionReviewChanges.vue';
 
 describe('MissionCodeReview', () => {
   it('loads actual branch and uncommitted diffs for the mission worker and exposes read errors', async () => {
@@ -29,7 +31,7 @@ describe('MissionCodeReview', () => {
     ]]);
     expect(getDiff).toHaveBeenLastCalledWith(agent.id, { type: 'branch' });
     expect(wrapper.text()).toContain('billing.ts');
-    const select = wrapper.findComponent({ name: 'ElSelect' });
+    const select = wrapper.getComponent(MissionReviewChanges).findAllComponents({ name: 'ElSelect' })[1]!;
     await select.vm.$emit('update:modelValue', 'uncommitted');
     await select.vm.$emit('change', 'uncommitted');
     await flushPromises();
@@ -53,4 +55,73 @@ it('pins branch review to the mission baseline and ignores late results after th
   await flushPromises();
   expect(wrapper.text()).toContain('Current worker cannot read diff');
   expect(wrapper.text()).not.toContain('stale result');
+});
+
+it('switches repository-scoped diffs and Open In targets from the Mission Changes tab', async () => {
+  const snapshot = createInitialSnapshot();
+  const agents = snapshot.agents.slice(0, 2).map(agent => structuredClone(agent));
+  agents[0]!.folder = '/repo/api';
+  agents[1]!.folder = '/repo/web';
+  agents[1]!.openInApplication = 'vscode';
+  const mission = createMission(snapshot, {
+    outcome: 'Review two repositories',
+    workflowType: 'shapeAndShipFeature',
+    teamId: snapshot.teams[0]!.id,
+    orchestratorMemberId: agents[0]!.id,
+  });
+  mission.stage = 'review';
+  mission.artifacts.review.findings = [{
+    id: 'finding-1', priority: 'p1', title: 'Persist selections', body: 'Selections must survive reload.', repositoryPath: '/repo/api', selected: true,
+    remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
+  }];
+  mission.execution = {
+    teamId: mission.teamId,
+    memberIds: agents.map(agent => agent.id),
+    workspaces: [
+      { repositoryPath: '/repo/api', path: '/mission/api', branch: 'mission/review', baseSha: 'a'.repeat(40) },
+      { repositoryPath: '/repo/web', path: '/mission/web', branch: 'mission/review', baseSha: 'b'.repeat(40) },
+    ],
+    runs: [
+      { id: 'run-api', stage: 'implementation', memberId: agents[0]!.id, workerId: agents[0]!.id, repositoryPath: '/repo/api', status: 'accepted', skills: [], feedback: '', startedAt: 'now' },
+      { id: 'run-web', stage: 'implementation', memberId: agents[1]!.id, workerId: agents[1]!.id, repositoryPath: '/repo/web', status: 'accepted', skills: [], feedback: '', startedAt: 'now' },
+    ],
+  };
+  const getDiff = vi.fn().mockResolvedValue({
+    diff: 'diff --git a/file.ts b/file.ts\n--- a/file.ts\n+++ b/file.ts\n@@ -1 +1 @@\n-old\n+new',
+    summary: { addedLines: 1, removedLines: 1, changedFiles: 1 }, sections: [], target: { type: 'branch' },
+  });
+  const wrapper = mount(MissionCodeReview, {
+    props: {
+      agent: agents[0]!,
+      agents,
+      getDiff,
+      mission,
+      reviewSummary: 'The implementation matches the approved scope.',
+      openInAvailable: true,
+      openInApplications: {
+        defaultApplication: 'finder',
+        applications: [{ id: 'vscode', label: 'VS Code' }, { id: 'finder', label: 'Finder' }],
+      },
+    },
+    global: { plugins: [ElementPlus] },
+  });
+
+  await flushPromises();
+  expect(wrapper.text()).toContain('Persist selections');
+  expect(wrapper.text()).toContain('The implementation matches the approved scope.');
+  expect(getDiff).not.toHaveBeenCalled();
+
+  await wrapper.findAll('[role="tab"]').find(tab => tab.text() === 'Changes')!.trigger('click');
+  await flushPromises();
+  expect(getDiff).toHaveBeenLastCalledWith(agents[0]!.id, { type: 'branch', baseRef: 'a'.repeat(40) });
+
+  const repositorySelect = wrapper.getComponent(MissionReviewChanges).findAllComponents({ name: 'ElSelect' })[0]!;
+  repositorySelect.vm.$emit('update:modelValue', '/repo/web');
+  await flushPromises();
+  expect(getDiff).toHaveBeenLastCalledWith(agents[1]!.id, { type: 'branch', baseRef: 'b'.repeat(40) });
+
+  await wrapper.get('[aria-label="Open in VS Code"]').trigger('click');
+  expect(wrapper.emitted('open-worktree')).toStrictEqual([[
+    { agentId: agents[1]!.id, application: 'vscode', path: '/mission/web' },
+  ]]);
 });

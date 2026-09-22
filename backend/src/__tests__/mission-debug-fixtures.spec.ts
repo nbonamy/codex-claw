@@ -43,6 +43,11 @@ describe('Mission debug fixtures', () => {
       } else if (stage === 'review') {
         expect(currentRun).toMatchObject({ stage, status: 'awaitingReview', proposal: { review: { summary: expect.stringContaining('approved requirements') } } });
         expect(mission.artifacts.tickets.every(ticket => ticket.done)).toBe(true);
+        expect(mission.artifacts.review.findings).toMatchObject([
+          { priority: 'p1', repositoryPath: '/repo/api', selected: true, remediation: { state: 'open' } },
+          { priority: 'p2', repositoryPath: '/repo/web', selected: false, remediation: { state: 'fixed' } },
+        ]);
+        expect(mission.execution!.workspaces?.map(workspace => workspace.repositoryPath)).toStrictEqual(['/repo/api', '/repo/web']);
       } else {
         expect(currentRun).toMatchObject({ stage: 'review', status: 'accepted' });
         expect(mission.execution!.deliveries).toStrictEqual([

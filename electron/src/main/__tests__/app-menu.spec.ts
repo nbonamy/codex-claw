@@ -292,7 +292,7 @@ describe('app menu', () => {
       'Requirements',
       'Tickets',
       'Implementation',
-      'Review',
+      'Review (Findings + Changes)',
       'Ship',
     ]);
     expect(nestedMenuItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets')).toMatchObject({
@@ -360,7 +360,7 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Requirements');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Implementation');
-    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review (Findings + Changes)');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Ship');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings While Reviewing');
     clickNestedItem(debugMenu, 'Debug', 'Review', 'Findings Ready for Selection');

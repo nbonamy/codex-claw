@@ -61,7 +61,14 @@
 
           <slot v-else-if="viewedStage === 'ship'" name="ship" :open-conversation="selectConversation" />
 
-          <section v-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
+          <slot
+            v-if="codeAgentId && viewedStage === 'review'"
+            name="code-review"
+            :agent-id="codeAgentId"
+            :review-summary="artifactMarkdown"
+          />
+
+          <section v-else-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
             <MissionTicketBoard
               :tickets="visibleTickets"
               annotatable
@@ -87,11 +94,7 @@
               :reset-key="feedbackReset"
               @send-comments="sendRequirementComments"
             />
-            <template v-else-if="viewedStage === 'review' && debugFixture">
-              <MissionReviewFindings :mission="mission" read-only />
-              <MarkdownPanel :content="artifactMarkdown" />
-            </template>
-            <MarkdownPanel v-else :content="artifactMarkdown" />
+            <MarkdownPanel v-else-if="viewedStage !== 'review'" :content="artifactMarkdown" />
             <footer v-if="viewedStage !== 'requirements'" class="mission-workspace__review-hint">
               <MessageCircleIcon aria-hidden="true" />
               <span>{{ t('missions.reviewInConversation') }}</span>
@@ -100,7 +103,7 @@
 
           <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && artifactMarkdown" class="mission-workspace__artifact" :aria-label="t('missions.acceptedArtifact')">
             <MissionTicketBoard v-if="viewedStage === 'tickets' && visibleTickets.length" :tickets="visibleTickets" />
-            <MarkdownPanel v-else :content="artifactMarkdown" />
+            <MarkdownPanel v-else-if="viewedStage !== 'review'" :content="artifactMarkdown" />
           </section>
 
           <section v-else-if="!['implementation', 'ship'].includes(viewedStage) && !activeStageRun" class="mission-workspace__empty-artifact">
@@ -117,8 +120,6 @@
               <PlayerPlayIcon aria-hidden="true" />{{ t('missions.continueMission') }}
             </button>
           </section>
-
-          <slot v-if="codeAgentId && viewedStage === 'review' && !debugFixture" name="code-review" :agent-id="codeAgentId" />
         </div>
       </main>
 
@@ -145,7 +146,6 @@ import MarkdownPanel from './MarkdownPanel.vue';
 import MissionConversationRail from './MissionConversationRail.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
-import MissionReviewFindings from './MissionReviewFindings.vue';
 import MissionStageRail from './MissionStageRail.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
 import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
