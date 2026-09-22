@@ -8,6 +8,7 @@ import { BackendDriverRpc } from '../../driver-rpc';
 import { WorktreeManager } from '../../worktrees/worktree-manager';
 import { ClawMcpService } from '../service';
 import { HostedMcpGateway } from '../hosted-mcp-gateway';
+import { structuredToolResult } from '../tool-result';
 
 describe('ClawMcpService', () => {
   let service: ClawMcpService | null = null;
@@ -382,6 +383,36 @@ describe('ClawMcpService', () => {
     });
     expect(inactiveTools.result.tools.map((tool: { name: string }) => tool.name))
       .not.toEqual(expect.arrayContaining(missionTools));
+  });
+
+  it('attaches a mode-specific tool module through the service extension seam', async () => {
+    const snapshot = createInitialSnapshot();
+    service = new ClawMcpService({
+      snapshot,
+      toolModuleProviders: [{
+        id: 'design',
+        resolve: ({ agentId }) => agentId === 'agent-dina' ? {
+          id: 'design',
+          register: server => server.registerTool('record-design-decision', {
+            description: 'Record a decision in the active design.',
+            inputSchema: {},
+          }, () => structuredToolResult({ success: true })),
+        } : undefined,
+      }],
+    });
+    const url = await service.start();
+
+    const designAgent = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    const ordinaryAgent = await postJson(agentUrl(url, 'agent-jesse'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
+    });
+
+    expect(designAgent.result.tools.map((tool: { name: string }) => tool.name))
+      .toContain('record-design-decision');
+    expect(ordinaryAgent.result.tools.map((tool: { name: string }) => tool.name))
+      .not.toContain('record-design-decision');
   });
 
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {

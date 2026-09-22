@@ -43,6 +43,7 @@ import type { HostedMcpGateway } from './hosted-mcp-gateway';
 import path from 'node:path';
 import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 import { AgentCreationService } from '../agents/agent-creation-service';
+import type { ClawMcpToolModuleProvider } from './tool-modules';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -59,6 +60,7 @@ export type ClawMcpServiceOptions = {
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
+  toolModuleProviders?: readonly ClawMcpToolModuleProvider[];
 };
 
 export class ClawMcpService {
@@ -120,6 +122,7 @@ export class ClawMcpService {
       browser: options.browser,
       hostedMcpGateway: options.hostedMcpGateway,
       reviewTools: this.reviewTools,
+      toolModuleProviders: options.toolModuleProviders,
     });
   }
 

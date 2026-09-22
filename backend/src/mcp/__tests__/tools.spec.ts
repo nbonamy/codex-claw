@@ -31,7 +31,12 @@ vi.mock('../../log', () => ({
   warnMain: mocks.warnMain,
 }));
 
-import { createCodexClawMcpServer } from '../tools';
+import { createClawMcpServer } from '../tools';
+import { createCollaborationToolModuleProvider } from '../collaboration-tools';
+import { createMissionToolModuleProvider } from '../mission-tools';
+import { createBrowserToolModuleProvider, createComputerUseToolModuleProvider } from '../adapter-tool-modules';
+import type { ComputerUseClient } from '../computer-use-tools';
+import type { InAppBrowserClient } from '../browser-tools';
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 
@@ -77,12 +82,7 @@ describe('Codex Claw MCP tool registration', () => {
       execute: vi.fn(),
     };
     const browser = { open: vi.fn(), execute: vi.fn() };
-    const server = createCodexClawMcpServer(
-      coordinator as unknown as ClawMcpAgentCoordinator,
-      'agent-dina',
-      computerUse,
-      browser,
-    );
+    const server = createServer(computerUse, browser);
 
     expect([...handlers.keys()]).toStrictEqual([
       'list-agents',
@@ -179,6 +179,8 @@ describe('Codex Claw MCP tool registration', () => {
       'set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result',
     ]));
     expect([...handlers.keys()]).not.toContain('set-mission-execution-policy');
+    const finishTurnDefinition = mocks.registerTool.mock.calls.find(([name]) => name === 'finish_turn')![1] as { inputSchema: z.ZodRawShape };
+    expect(Object.keys(finishTurnDefinition.inputSchema)).not.toContain('flag');
     coordinator.setMissionTitle.mockResolvedValue({ success: true, title: 'Add team billing' });
     expect(await handlers.get('set-mission-title')!({ title: 'Add team billing' })).toMatchObject({
       structuredContent: { success: true, title: 'Add team billing' },
@@ -270,10 +272,16 @@ describe('Codex Claw MCP tool registration', () => {
     });
   });
 
-  function createServer() {
-    return createCodexClawMcpServer(
-      coordinator as unknown as ClawMcpAgentCoordinator,
-      'agent-dina',
-    );
+  function createServer(computerUse?: ComputerUseClient, browser?: InAppBrowserClient) {
+    const typedCoordinator = coordinator as unknown as ClawMcpAgentCoordinator;
+    return createClawMcpServer({
+      agentId: 'agent-dina',
+      url: new URL('http://127.0.0.1/mcp?agentId=agent-dina'),
+    }, [
+      createCollaborationToolModuleProvider(typedCoordinator),
+      createMissionToolModuleProvider(typedCoordinator),
+      createComputerUseToolModuleProvider(computerUse, () => true),
+      createBrowserToolModuleProvider(browser),
+    ]);
   }
 });

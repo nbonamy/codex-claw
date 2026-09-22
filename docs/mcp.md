@@ -356,7 +356,10 @@ smallest equivalent enablement path for that backend.
 ## Tools
 
 Collaboration tool names are app-owned, and caller identity is inferred from
-the backend session.
+the backend session. The server composes self-contained tool modules for each
+request. Module providers decide whether their family applies to the current
+agent and scoped URL, so adding a workflow-specific family does not add mode
+branches to the server composer.
 
 See [Custom MCP Tools](custom-tools.md) for the implementation path, structured
 results, agent status updates, tool-row lifecycle presentation, and required

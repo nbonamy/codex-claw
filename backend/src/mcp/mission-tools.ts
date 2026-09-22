@@ -1,0 +1,75 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import * as z from 'zod/v4';
+import { featureStages } from '@codex-claw/core/missions';
+import type { ClawMcpAgentCoordinator } from './agent-coordinator';
+import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+
+export function createMissionToolModuleProvider(
+  coordinator: ClawMcpAgentCoordinator,
+): ClawMcpToolModuleProvider {
+  return {
+    id: 'mission',
+    resolve: ({ agentId }) => coordinator.missionContext(agentId) ? {
+      id: 'mission',
+      owns: { proposedActions: true },
+      register: server => registerMissionTools(server, coordinator, agentId),
+    } : undefined,
+  };
+}
+
+function registerMissionTools(
+  server: McpServer,
+  coordinator: ClawMcpAgentCoordinator,
+  callerAgentId: string,
+): void {
+  server.registerTool('set-mission-title', {
+    description: 'Rename the active Mission once its intended outcome is clear. Use a concise outcome-oriented title. The active Mission and run are inferred from your authenticated agent identity.',
+    inputSchema: {
+      title: z.string().trim().min(1).max(200),
+    },
+  }, ({ title }) => loggedToolResult('set-mission-title', { callerAgentId }, () => coordinator.setMissionTitle(callerAgentId, title)));
+
+  server.registerTool('list-mission-artifacts', {
+    description: 'List canonical artifact files already written for the active Mission. The Mission is inferred from your authenticated agent identity.',
+    inputSchema: {},
+  }, () => loggedToolResult('list-mission-artifacts', { callerAgentId }, () => coordinator.listMissionArtifacts(callerAgentId)));
+
+  server.registerTool('read-mission-artifact', {
+    description: 'Read a canonical artifact file from the active Mission so work can move between agents and workflow stages.',
+    inputSchema: { stage: z.enum(featureStages) },
+  }, ({ stage }) => loggedToolResult('read-mission-artifact', { callerAgentId, stage }, () => coordinator.readMissionArtifact(callerAgentId, stage)));
+
+  server.registerTool('write-mission-artifact', {
+    description: 'Create or revise the canonical Markdown artifact for your assigned Mission stage. Read the current revision before overwriting an existing artifact.',
+    inputSchema: {
+      stage: z.enum(featureStages),
+      content: z.string().trim().min(1).max(500_000),
+      expectedRevision: z.number().int().nonnegative().optional(),
+    },
+  }, input => loggedToolResult('write-mission-artifact', { callerAgentId, stage: input.stage }, () => coordinator.writeMissionArtifact(callerAgentId, input)));
+
+  server.registerTool('upsert-mission-ticket', {
+    description: 'Create or revise one ticket in the active Mission Tickets stage. Assign exactly one represented repository path. Call once per ticket and again after each revision so the user sees the backlog emerge live. Omit ticketId to create; pass the returned Mission ticket ID to revise. Use blockedByTicketIds for dependencies. A tracker issue number is optional and belongs in reference only after publication.',
+    inputSchema: {
+      ticketId: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(),
+      title: z.string().trim().min(1).max(500),
+      body: z.string().trim().min(1).max(100000),
+      repositoryPath: z.string().trim().min(1),
+      reference: z.string().trim().min(1).max(100000).optional(),
+      blockedByTicketIds: z.array(z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/)).max(200).optional(),
+    },
+  }, input => loggedToolResult('upsert-mission-ticket', { callerAgentId, ticketId: input.ticketId }, () => coordinator.upsertMissionTicket(callerAgentId, input)));
+
+  server.registerTool('submit-mission-result', {
+    description: 'Submit the structured result of your active Mission stage. The Mission and run are inferred from your authenticated agent identity. This never approves a user-reviewed stage or completes a mission. Include actual verification evidence for implementation work.',
+    inputSchema: {
+      summary: z.string().min(1).max(20000),
+      artifacts: z.object({
+        requirements: z.object({ problem: z.string().max(100000), acceptance: z.string().max(100000) }),
+        tickets: z.array(z.object({ id: z.string().regex(/^mission-ticket-[a-zA-Z0-9-]+$/).optional(), title: z.string().max(100000), body: z.string().max(100000).optional(), repositoryPath: z.string().trim().min(1).optional(), done: z.boolean(), reference: z.string().min(1).max(100000).optional(), dependsOn: z.array(z.number().int().nonnegative()).max(200).optional() })).max(200),
+        implementation: z.object({ changes: z.string().max(100000), tests: z.string().max(100000) }),
+        review: z.object({ summary: z.string().max(100000), pullRequestUrl: z.string().max(100000) }),
+      }),
+    },
+  }, input => loggedToolResult('submit-mission-result', { callerAgentId }, () => coordinator.submitMissionResult(callerAgentId, input)));
+}

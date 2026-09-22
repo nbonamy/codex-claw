@@ -4,11 +4,19 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { logMain, warnMain } from '../log';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
-import { createCodexClawMcpServer } from './tools';
+import { createClawMcpServer } from './tools';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway, HostedMcpServerId } from './hosted-mcp-gateway';
 import type { ReviewToolRegistry } from '../review/review-tool-registry';
+import { createCollaborationToolModuleProvider } from './collaboration-tools';
+import { createMissionToolModuleProvider } from './mission-tools';
+import {
+  createBrowserToolModuleProvider,
+  createComputerUseToolModuleProvider,
+  createReviewToolModuleProvider,
+} from './adapter-tool-modules';
+import type { ClawMcpToolModuleProvider } from './tool-modules';
 
 const maxBodyBytes = 1024 * 1024;
 
@@ -19,17 +27,15 @@ export type ClawMcpHttpServerOptions = {
   browser?: InAppBrowserClient;
   hostedMcpGateway?: HostedMcpGateway;
   reviewTools?: ReviewToolRegistry;
+  toolModuleProviders?: readonly ClawMcpToolModuleProvider[];
   host?: string;
   port?: number;
 };
 
 export class ClawMcpHttpServer {
   private readonly coordinator: ClawMcpAgentCoordinator;
-  private readonly computerUse: ComputerUseClient | undefined;
-  private readonly computerUseEnabled: () => boolean;
-  private readonly browser: InAppBrowserClient | undefined;
   private readonly hostedMcpGateway: HostedMcpGateway | undefined;
-  private readonly reviewTools: ReviewToolRegistry | undefined;
+  private readonly toolModuleProviders: readonly ClawMcpToolModuleProvider[];
   private readonly host: string;
   private readonly port: number;
   private server: http.Server | null = null;
@@ -37,11 +43,16 @@ export class ClawMcpHttpServer {
 
   constructor(options: ClawMcpHttpServerOptions) {
     this.coordinator = options.coordinator;
-    this.computerUse = options.computerUse;
-    this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
-    this.browser = options.browser;
     this.hostedMcpGateway = options.hostedMcpGateway;
-    this.reviewTools = options.reviewTools;
+    const computerUseEnabled = options.computerUseEnabled ?? (() => true);
+    this.toolModuleProviders = [
+      createCollaborationToolModuleProvider(this.coordinator),
+      createMissionToolModuleProvider(this.coordinator),
+      createComputerUseToolModuleProvider(options.computerUse, computerUseEnabled),
+      createBrowserToolModuleProvider(options.browser),
+      createReviewToolModuleProvider(options.reviewTools),
+      ...(options.toolModuleProviders ?? []),
+    ];
     this.host = options.host ?? '127.0.0.1';
     this.port = options.port ?? 0;
   }
@@ -165,13 +176,7 @@ export class ClawMcpHttpServer {
     }
 
     this.coordinator.connectAgent(agentId);
-    const mcpServer = createCodexClawMcpServer(
-      this.coordinator,
-      agentId,
-      this.computerUseEnabled() ? this.computerUse : undefined,
-      this.browser,
-      this.reviewTools?.resolve(agentId, url.searchParams.get('reviewContextId')) ?? undefined,
-    );
+    const mcpServer = createClawMcpServer({ agentId, url }, this.toolModuleProviders);
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,
       sessionIdGenerator: undefined,

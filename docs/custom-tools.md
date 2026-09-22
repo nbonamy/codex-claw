@@ -37,19 +37,33 @@ tool rows render the same meaning.
 
 ## Registering a tool
 
-Register core collaboration tools in `backend/src/mcp/tools.ts`. Keep larger
-families such as Browser or Computer Use in a focused registration module.
+Tool families are self-contained modules resolved for each authenticated MCP
+request. `backend/src/mcp/tools.ts` only creates the server and composes the
+modules returned by the configured providers. Core collaboration, Missions,
+Review, Browser, and Computer Use each own their registration module.
+
+Add a tool to the module that owns its product behavior. For a new contextual
+family such as Design, create one `ClawMcpToolModuleProvider` whose `resolve`
+method returns a module only for an agent in that context, then attach the
+provider through `ClawMcpServiceOptions.toolModuleProviders`. Do not add a
+Design branch to the server composer or to unrelated tool modules.
+
+Providers and resolved modules have stable unique IDs. Composition rejects
+duplicate IDs so two independently configured families cannot silently shadow
+one another. Modules may also declare ownership of a shared workflow capability;
+the composer derives the shared tool surface from those declarations. For
+example, Mission owns proposed actions, so the collaboration module exposes a
+`finish_turn` schema without generic proposal flags. A module registers all of
+the tools for its family:
 
 ```ts
-server.registerTool('example-tool', {
-  description: 'Describe when the model should use the tool and what it does.',
-  inputSchema: {
-    target: z.string().describe('Stable target identifier.'),
-  },
-}, ({ target }) => toolResult('example-tool', {
-  agentId: callerAgentId,
-  targetLength: target.length,
-}, () => coordinator.exampleTool(callerAgentId, target)));
+const designTools: ClawMcpToolModuleProvider = {
+  id: 'design',
+  resolve: ({ agentId }) => designs.contextForAgent(agentId) ? {
+    id: 'design',
+    register: server => registerDesignTools(server, designs, agentId),
+  } : undefined,
+};
 ```
 
 The description is behavioral policy available to the model. State the trigger,
@@ -60,9 +74,9 @@ reliable place for session-wide policy.
 Caller identity comes from the agent-scoped MCP URL. Do not add a caller agent
 ID to the input schema.
 
-Use `toolResult()` for normal registrations so logging and error conversion stay
-consistent. Return deliberate domain errors with `McpToolError`; unexpected
-errors still become MCP results with `isError: true`.
+Use `loggedToolResult()` for normal registrations so logging and error
+conversion stay consistent. Return deliberate domain errors with
+`McpToolError`; unexpected errors still become MCP results with `isError: true`.
 
 ## Domain behavior and effects
 
