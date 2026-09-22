@@ -1,8 +1,8 @@
 import { createEntityId } from '@codex-claw/core/ids';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { isMissionArtifacts, type Mission, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
+import { isMissionArtifacts, type Mission, type MissionReviewFinding, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
 import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { missionTeamRepositories } from './mission-execution-policy';
 
@@ -168,11 +168,78 @@ export class MissionAgentTools {
     return { success: true, repoPath: normalized };
   }
 
+  async reportReviewFinding(agentId: string, input: MissionReviewFindingInput): Promise<MissionReviewFinding> {
+    const context = this.requireReviewContext(agentId);
+    const title = input.title.trim();
+    const body = input.body.trim();
+    const repositoryPath = input.repositoryPath.trim();
+    if (!title || title.length > 80 || !body || !repositoryPath) throw new Error('Mission review finding is invalid.');
+    const mission = this.requireMission(context.missionId);
+    if (!mission.execution?.workspaces?.some(workspace => workspace.repositoryPath === repositoryPath)) {
+      throw new Error('Choose a repository represented in this Mission.');
+    }
+    let finding!: MissionReviewFinding;
+    await this.ports.missions.change(context.missionId, current => {
+      this.requireOwnedReviewRun(current, context.runId, agentId);
+      const now = new Date().toISOString();
+      finding = {
+        id: createEntityId('mission-finding'),
+        priority: input.priority,
+        title,
+        body,
+        repositoryPath,
+        ...(input.location ? { location: { ...input.location } } : {}),
+        selected: true,
+        remediation: { state: 'open' },
+        createdAt: now,
+        updatedAt: now,
+      };
+      (current.artifacts.review.findings ??= []).push(finding);
+    });
+    await this.ports.publish();
+    return structuredClone(finding);
+  }
+
+  async updateReviewFinding(agentId: string, input: MissionReviewFindingUpdateInput): Promise<MissionReviewFinding> {
+    const context = this.requireReviewContext(agentId);
+    let updated!: MissionReviewFinding;
+    await this.ports.missions.change(context.missionId, current => {
+      this.requireOwnedReviewRun(current, context.runId, agentId);
+      const finding = current.artifacts.review.findings?.find(candidate => candidate.id === input.findingId);
+      if (!finding) throw new Error('Mission review finding was not found.');
+      if (input.status === 'fixed' && finding.remediation.state !== 'fixing') throw new Error('Only a finding being remediated can be marked fixed.');
+      if (input.priority) finding.priority = input.priority;
+      if (input.title?.trim()) finding.title = input.title.trim();
+      if (input.body?.trim()) finding.body = input.body.trim();
+      if (input.repositoryPath?.trim()) finding.repositoryPath = input.repositoryPath.trim();
+      if (input.location) finding.location = { ...input.location };
+      const now = new Date().toISOString();
+      if (input.status === 'fixed') finding.remediation = { state: 'fixed', completedAt: now, ...(input.evidence?.trim() ? { evidence: input.evidence.trim() } : {}) };
+      finding.updatedAt = now;
+      updated = structuredClone(finding);
+    });
+    await this.ports.publish();
+    return updated;
+  }
+
 
   private requireContext(agentId: string): MissionToolContext {
     const context = this.contextForAgent(agentId);
     if (!context) throw new Error('This agent is not working on an active mission run.');
     return context;
+  }
+
+  private requireReviewContext(agentId: string): MissionToolContext {
+    const context = this.requireContext(agentId);
+    if (context.stage !== 'review') throw new Error('Mission review finding tools are available only during Review.');
+    return context;
+  }
+
+  private requireOwnedReviewRun(mission: Mission, runId: string, agentId: string): void {
+    const run = mission.execution?.runs.find(candidate => candidate.id === runId);
+    if (!run || run.workerId !== agentId || run.stage !== 'review' || !['running', 'awaitingReview'].includes(run.status) || mission.stage !== 'review') {
+      throw new Error('This agent is not working on the active Mission Review stage.');
+    }
   }
 
   private requireMission(id: string): Mission {

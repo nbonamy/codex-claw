@@ -33,6 +33,49 @@ function setup() {
 }
 
 describe('mission execution', () => {
+  it('persists structured Review findings, remediates the selected set, and gates Ship', async () => {
+    const h = setup();
+    const repositoryPath = h.originalAgents[0]!.folder!;
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'review';
+      mission.artifacts.requirements = { problem: 'Billing', acceptance: 'Owner pays' };
+      mission.artifacts.tickets = [{ title: 'Checkout', repositoryPath, done: true }];
+      mission.artifacts.implementation = { changes: 'Checkout implemented', tests: 'Tests pass' };
+      mission.execution!.workspaces = [{ repositoryPath, path: '/mission/billing', branch: 'mission/billing' }];
+      mission.execution!.runs = [{
+        id: 'implementation-run', stage: 'implementation', memberId: h.originalAgents[0]!.id, workerId: h.originalAgents[0]!.id,
+        ticketIndex: 0, repositoryPath, status: 'accepted', skills: [], feedback: '', startedAt: 'before', finishedAt: 'before',
+      }, {
+        id: 'review-run', stage: 'review', memberId: h.originalAgents[0]!.id, workerId: h.originalAgents[0]!.id,
+        status: 'running', skills: [], feedback: '', startedAt: 'now',
+      }];
+    });
+
+    const finding = await h.service.reportReviewFinding(h.originalAgents[0]!.id, {
+      priority: 'p1', title: 'Persist the selected findings', body: 'A reload loses the remediation set.', repositoryPath,
+      location: { file: 'src/review.ts', line: 42 },
+    });
+    expect(h.current().artifacts.review.findings).toStrictEqual([expect.objectContaining({ id: finding.id, selected: true, remediation: { state: 'open' } })]);
+    await expect(h.service.updateReviewFinding(h.originalAgents[0]!.id, { findingId: finding.id, status: 'fixed' })).rejects.toThrow('being remediated');
+
+    await h.service.writeArtifact(h.originalAgents[0]!.id, { stage: 'review', content: '# Review\nBlocking finding reported.' });
+    const submitted = structuredClone(h.current().artifacts);
+    submitted.review.summary = 'One finding requires remediation.';
+    await h.service.submit(h.originalAgents[0]!.id, { artifacts: submitted, summary: 'Review ready' });
+    await expect(h.command({ action: 'accept', runId: 'review-run' })).rejects.toThrow('Resolve selected and blocking findings');
+    expect(h.current().stage).toBe('review');
+
+    h.ports.continueStage.mockRejectedValueOnce(new Error('Provider unavailable'));
+    await expect(h.command({ action: 'fixSelectedReviewFindings' })).rejects.toThrow('Provider unavailable');
+    expect(h.current().artifacts.review.findings![0]!.remediation.state).toBe('open');
+    await h.command({ action: 'fixSelectedReviewFindings' });
+    expect(h.current().artifacts.review.findings![0]!.remediation.state).toBe('fixing');
+    expect(h.ports.continueStage).toHaveBeenLastCalledWith(h.originalAgents[0]!.id, expect.stringContaining(finding.id));
+    await h.service.updateReviewFinding(h.originalAgents[0]!.id, { findingId: finding.id, status: 'fixed', evidence: 'Focused tests pass.' });
+    expect(h.current().artifacts.review.findings![0]!.remediation).toMatchObject({ state: 'fixed', evidence: 'Focused tests pass.' });
+    await h.command({ action: 'accept', runId: 'review-run' });
+    expect(h.current().stage).toBe('ship');
+  });
   it('replaces an active installed workflow skill with the Claw-owned Mission skill', async () => {
     const h = setup(); await h.configure();
     await h.command({ action: 'run' }); await h.service.waitForLaunches();

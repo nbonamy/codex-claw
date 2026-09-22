@@ -84,18 +84,34 @@ export function applyMissionDebugFixture(snapshot: AppSnapshot, missionId: strin
     currentArtifacts.requirements = { problem: '', acceptance: '' };
     currentArtifacts.tickets = [];
     currentArtifacts.implementation = { changes: '', tests: '' };
-    currentArtifacts.review = { summary: '', pullRequestUrl: '' };
+    currentArtifacts.review = { summary: '', pullRequestUrl: '', findings: [] };
   } else if (stage === 'tickets') {
     currentArtifacts.tickets = [];
     currentArtifacts.implementation = { changes: '', tests: '' };
-    currentArtifacts.review = { summary: '', pullRequestUrl: '' };
+    currentArtifacts.review = { summary: '', pullRequestUrl: '', findings: [] };
   } else if (stage === 'implementation') {
     currentArtifacts.tickets = currentArtifacts.tickets.map((ticket, index) => ({ ...ticket, done: index === 0 }));
     currentArtifacts.implementation = { changes: 'The first repository slice is implemented.', tests: 'Its focused tests pass.' };
-    currentArtifacts.review = { summary: '', pullRequestUrl: '' };
+    currentArtifacts.review = { summary: '', pullRequestUrl: '', findings: [] };
   } else if (stage === 'review') {
     currentArtifacts.tickets = currentArtifacts.tickets.map(ticket => ({ ...ticket, done: true }));
-    currentArtifacts.review = { summary: '', pullRequestUrl: '' };
+    currentArtifacts.review = {
+      summary: '',
+      pullRequestUrl: '',
+      findings: [
+        {
+          id: 'mission-finding-debug-1', priority: 'p1', title: 'Restore the persisted review selection',
+          body: 'Reloading the Mission currently loses which findings the user selected for remediation.', repositoryPath: repositories[0]!,
+          location: { file: 'backend/src/mission-execution-service.ts', line: 112 }, selected: true,
+          remediation: { state: 'open' }, createdAt: now, updatedAt: now,
+        },
+        {
+          id: 'mission-finding-debug-2', priority: 'p2', title: 'Show verification evidence after remediation',
+          body: 'Fixed findings should retain concise evidence so delivery approval is auditable.', repositoryPath: repositories[0]!, selected: false,
+          remediation: { state: 'fixed', completedAt: now, evidence: 'Focused Mission workflow tests passed.' }, createdAt: now, updatedAt: now,
+        },
+      ],
+    };
   } else if (stage === 'ship') {
     currentArtifacts.tickets = currentArtifacts.tickets.map(ticket => ({ ...ticket, done: true }));
   }
@@ -166,6 +182,7 @@ function debugArtifacts(tickets: MissionTicket[]): MissionArtifacts {
     review: {
       summary: 'The implementation matches the approved requirements. Repository delivery remains explicit and independently retryable.',
       pullRequestUrl: '',
+      findings: [],
     },
   };
 }

@@ -34,6 +34,8 @@ describe('ClawMcpAgentCoordinator', () => {
       listArtifacts: onListMissionArtifacts,
       readArtifact: onReadMissionArtifact,
       writeArtifact: onWriteMissionArtifact,
+      reportReviewFinding: vi.fn(),
+      updateReviewFinding: vi.fn(),
     } }).coordinator;
     expect(() => enabled.missionContext('missing')).toThrow();
     await expect(enabled.submitMissionResult('missing', input)).rejects.toThrow();

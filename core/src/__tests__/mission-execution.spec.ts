@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, isMission, isMissionArtifacts, missionTicketReady, updateMission } from '../missions';
 import { missionDeveloperInstructions, pendingMissionRun, type MissionRun } from '../mission-execution';
+import { missionWorkflow } from '../mission-workflows';
 
 it('carries the assigned stage, accepted artifacts, workspace, skills and revision feedback into the provider handoff', () => {
   const snapshot = createInitialSnapshot();
@@ -39,6 +40,27 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toContain('already visible in the Mission workspace');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('no agent-run skill');
   }
+});
+
+it('keeps Review blocked while selected or high-priority findings remain unresolved', () => {
+  const snapshot = createInitialSnapshot();
+  const artifacts = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id }).artifacts;
+  artifacts.review = {
+    summary: 'Reviewed',
+    pullRequestUrl: '',
+    findings: [{
+      id: 'finding-1', priority: 'p2', title: 'Keep selection durable', body: 'Selection is lost on reload.', repositoryPath: '/repo', selected: true,
+      remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
+    }],
+  };
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(false);
+  artifacts.review.findings![0]!.selected = false;
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  artifacts.review.findings![0]!.priority = 'p1';
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(false);
+  artifacts.review.findings![0]!.remediation = { state: 'fixed', completedAt: 'later', evidence: 'Test passed.' };
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  expect(isMissionArtifacts(artifacts)).toBe(true);
 });
 
 it('validates persisted execution records and dependency graphs before admitting them into app state', () => {

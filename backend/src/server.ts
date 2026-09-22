@@ -360,6 +360,14 @@ export class ClawBackendServer {
     return this.missionExecution.writeArtifact(agentId, input);
   }
 
+  reportMissionReviewFinding(agentId: string, input: import('@codex-claw/core/mission-execution').MissionReviewFindingInput) {
+    return this.missionExecution.reportReviewFinding(agentId, input);
+  }
+
+  updateMissionReviewFinding(agentId: string, input: import('@codex-claw/core/mission-execution').MissionReviewFindingUpdateInput) {
+    return this.missionExecution.updateReviewFinding(agentId, input);
+  }
+
   missionContext(agentId: string) {
     return this.missionExecution.contextForAgent(agentId);
   }

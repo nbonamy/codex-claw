@@ -1,4 +1,4 @@
-import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionReviewFindingInput, MissionReviewFindingUpdateInput, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/missions';
 import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
@@ -147,6 +147,8 @@ export type MissionToolPort = {
   listArtifacts(agentId: string): Array<{ stage: MissionStage } & MissionArtifactFile>;
   readArtifact(agentId: string, stage: MissionStage): Promise<MissionArtifactReadResult>;
   writeArtifact(agentId: string, input: MissionArtifactWriteInput): Promise<MissionArtifactReadResult>;
+  reportReviewFinding(agentId: string, input: MissionReviewFindingInput): Promise<unknown>;
+  updateReviewFinding(agentId: string, input: MissionReviewFindingUpdateInput): Promise<unknown>;
 };
 
 export type ClawMcpAgentCoordinatorOptions = {
@@ -412,6 +414,18 @@ export class ClawMcpAgentCoordinator {
     this.requireAgent(agentId);
     if (!this.missionTools) throw new McpToolError('Mission artifact writing is unavailable.');
     return this.missionTools.writeArtifact(agentId, input);
+  }
+
+  async reportMissionReviewFinding(agentId: string, input: MissionReviewFindingInput) {
+    this.requireAgent(agentId);
+    if (!this.missionTools) throw new McpToolError('Mission review finding reporting is unavailable.');
+    return this.missionTools.reportReviewFinding(agentId, input);
+  }
+
+  async updateMissionReviewFinding(agentId: string, input: MissionReviewFindingUpdateInput) {
+    this.requireAgent(agentId);
+    if (!this.missionTools) throw new McpToolError('Mission review finding updates are unavailable.');
+    return this.missionTools.updateReviewFinding(agentId, input);
   }
 
   async updateWorkItem(agentId: string, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string): Promise<UpdateWorkItemResponse> {

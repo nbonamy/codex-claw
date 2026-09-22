@@ -351,6 +351,8 @@ describe('ClawMcpService', () => {
         listArtifacts: vi.fn().mockReturnValue([]),
         readArtifact: vi.fn(),
         writeArtifact: vi.fn(),
+        reportReviewFinding: vi.fn(),
+        updateReviewFinding: vi.fn(),
       },
     });
     const url = await service.start();

@@ -1,11 +1,11 @@
 import { pendingMissionRun } from './mission-execution';
 import type { AppSnapshot } from './contracts';
 import { createEntityId } from './ids';
-import type { Mission, MissionArtifacts, MissionExecution, MissionStage, MissionTicket } from './mission-types';
+import type { Mission, MissionArtifacts, MissionExecution, MissionReviewFinding, MissionStage, MissionTicket } from './mission-types';
 import { featureStages, findMissionWorkflow, missionWorkflow } from './mission-workflows';
 
 export { featureStages } from './mission-workflows';
-export type { CreateMissionInput, DeleteMissionInput, Mission, MissionArtifactFile, MissionArtifacts, MissionStage, MissionTicket, UpdateMissionInput } from './mission-types';
+export type { CreateMissionInput, DeleteMissionInput, Mission, MissionArtifactFile, MissionArtifacts, MissionReviewFinding, MissionStage, MissionTicket, UpdateMissionInput } from './mission-types';
 
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 100_000;
@@ -14,7 +14,23 @@ export function isMissionArtifacts(v: unknown): v is MissionArtifacts {
     && Array.isArray(v.tickets) && v.tickets.length <= 200 && v.tickets.every(t => record(t) && (t.id === undefined || (text(t.id) && /^mission-ticket-[a-zA-Z0-9-]+$/.test(t.id))) && text(t.title) && (t.body === undefined || text(t.body)) && (t.repositoryPath === undefined || (text(t.repositoryPath) && !!t.repositoryPath.trim())) && typeof t.done === 'boolean' && (t.reference === undefined || (text(t.reference) && !!t.reference.trim())) && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.every(n => Number.isInteger(n) && n >= 0)))) && validTicketDependencies(v.tickets as MissionTicket[])
     && record(v.implementation) && text(v.implementation.changes) && text(v.implementation.tests)
     && record(v.review) && text(v.review.summary) && text(v.review.pullRequestUrl)
+    && (v.review.findings === undefined || (Array.isArray(v.review.findings) && v.review.findings.length <= 500 && v.review.findings.every(isMissionReviewFinding)))
     && (!v.review.pullRequestUrl || /^https?:\/\//.test(v.review.pullRequestUrl));
+}
+function isMissionReviewFinding(v: unknown): v is MissionReviewFinding {
+  return record(v) && text(v.id) && !!v.id.trim()
+    && ['p0', 'p1', 'p2', 'p3'].includes(v.priority as string)
+    && text(v.title) && !!v.title.trim() && v.title.length <= 80
+    && text(v.body) && !!v.body.trim()
+    && text(v.repositoryPath) && !!v.repositoryPath.trim()
+    && (v.location === undefined || (record(v.location) && text(v.location.file) && !!v.location.file.trim()
+      && (v.location.line === undefined || (Number.isInteger(v.location.line) && (v.location.line as number) > 0))
+      && (v.location.endLine === undefined || (Number.isInteger(v.location.endLine) && (v.location.endLine as number) > 0))))
+    && typeof v.selected === 'boolean'
+    && record(v.remediation) && ['open', 'fixing', 'fixed'].includes(v.remediation.state as string)
+    && (v.remediation.state !== 'fixing' || text(v.remediation.startedAt))
+    && (v.remediation.state !== 'fixed' || (text(v.remediation.completedAt) && (v.remediation.evidence === undefined || text(v.remediation.evidence))))
+    && text(v.createdAt) && text(v.updatedAt);
 }
 function validTicketDependencies(tickets: MissionTicket[]): boolean {
   const visited = new Set<number>();

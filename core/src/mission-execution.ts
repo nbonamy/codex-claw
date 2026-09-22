@@ -8,6 +8,8 @@ export type {
   MissionExecutionInput,
   MissionResultInput,
   MissionRun,
+  MissionReviewFindingInput,
+  MissionReviewFindingUpdateInput,
   MissionTicketDraftInput,
   MissionTicketDraftResult,
   MissionToolContext,
@@ -23,7 +25,7 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
     requirements: "Treat the user's first message as the beginning of requirements shaping. Follow the assigned Mission skill to interview the user, use the provider's structured question tool for bounded choices, title the Mission, and prepare the requirements proposal. Repository attachment remains optional during shaping. Do not implement code.",
     tickets: 'Continue as the same Mission orchestrator. Tell the user that the requirements are approved and follow the assigned Mission skill to create the backlog. Repository issue-tracker instructions provide labels and publication details only when a tracker is already configured. Mission tickets remain canonical and tracker references remain optional. You may delegate repository research to agents in represented repositories. Do not implement code.',
     implementation: `Implement ONLY ticket ${(run.ticketIndex ?? 0) + 1} in ${run.repositoryPath ?? 'the assigned repository'}. Read the assigned ticket from its canonical reference when present, including tracker comments and configured label meanings. Mission done flags mean accepted implementation, not tracker issue closure. Read repository instructions and follow its test strategy. Run relevant tests and inspect the actual diff. Leave the ticket as one or more coherent local commits in this mission worktree for review. Do not merge, push, or open a PR. Mark only your ticket done after it meets acceptance; record changed paths, commit SHAs, and exact verification commands/results in submit-mission-result. Do not write the shared Implementation artifact directly; Claw aggregates accepted ticket evidence. If blocked, explain it in the conversation rather than claim completion.`,
-    review: 'Review the mission branch changes against the approved requirements and tickets. Inspect actual commits, remaining diffs, and run appropriate checks. Report concrete findings, risks, and a delivery recommendation. Do not silently fix findings, merge, push, or create a PR. The user controls delivery from the workflow.',
+    review: 'Review the mission branch changes against the approved requirements and tickets. Inspect actual commits, remaining diffs, and run appropriate checks. Report every actionable issue with codex_claw.report-mission-review-finding, then write the review artifact and submit a delivery recommendation. Do not silently fix findings, merge, push, or create a PR. The user controls selection, remediation, and delivery from the workflow.',
     ship: 'Shipping is controlled by the Mission workspace. Do not start an agent run for this stage.',
   };
   const context = [
