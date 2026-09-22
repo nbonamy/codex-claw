@@ -166,10 +166,10 @@ export function claudeToolPart(
   const mcp = mcpToolName(block.name);
   if (mcp) {
     const clawTool = mcp.server === 'codex_claw' ? mcp.tool.replaceAll('_', '-') : '';
-    const presentedInput = clawTool === 'announce'
-      ? announcementInput(input)
-      : clawTool === 'set-status'
-        ? statusInput(input)
+    const presentedInput = clawTool === 'set-status'
+      ? statusInput(input)
+      : clawTool === 'finish-turn'
+        ? finishTurnInput(input)
         : input;
     return toolPart(block, {
       kind: 'mcp',
@@ -193,12 +193,18 @@ export function claudeToolPart(
   });
 }
 
-function announcementInput(input: Record<string, unknown>): Record<string, unknown> {
-  return input.phase === 'start' || input.phase === 'finish' ? { phase: input.phase } : {};
-}
-
 function statusInput(input: Record<string, unknown>): Record<string, unknown> {
   return typeof input.status === 'string' ? { status: input.status } : {};
+}
+
+function finishTurnInput(input: Record<string, unknown>): Record<string, unknown> {
+  const celebration = recordValue(input.celebration);
+  return {
+    ...(typeof input.flag === 'string' ? { flag: input.flag } : {}),
+    ...(celebration && typeof celebration.kind === 'string'
+      ? { celebration: { kind: celebration.kind } }
+      : {}),
+  };
 }
 
 export function claudeToolPartInputUpdate(toolPart: RendererToolPart): RendererToolPartUpdate {

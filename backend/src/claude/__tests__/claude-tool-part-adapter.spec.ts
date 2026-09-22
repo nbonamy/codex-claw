@@ -146,20 +146,25 @@ describe('Claude tool part adapter', () => {
     expect(JSON.stringify(part)).not.toContain('phrase that must not');
   });
 
-  it('projects announcement phases without retaining the spoken phrase', () => {
+  it('keeps finish-turn effects while removing the spoken phrase from renderer state', () => {
     const part = claudeToolPart({
       type: 'tool_use',
-      id: 'announce-1',
-      name: 'mcp__codex_claw__announce',
-      input: { phase: 'finish', text: 'A phrase that must not enter renderer state.' },
+      id: 'mcp-finish',
+      name: 'mcp__codex_claw__finish_turn',
+      input: {
+        flag: 'ready_for_review',
+        announcement: { text: 'A private completion phrase.' },
+        celebration: { kind: 'stars' },
+      },
     });
 
     expect(part).toMatchObject({
-      kind: 'mcp',
-      input: { phase: 'finish' },
-      metadata: { server: 'codex_claw', tool: 'announce' },
+      input: {
+        flag: 'ready_for_review',
+        celebration: { kind: 'stars' },
+      },
     });
-    expect(JSON.stringify(part)).not.toContain('phrase that must not');
+    expect(JSON.stringify(part)).not.toContain('private completion phrase');
   });
 
   it('updates streamed inputs and completed semantic phases', () => {

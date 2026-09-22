@@ -11,11 +11,9 @@ import {
   IconMarkdown as MarkdownIcon,
   IconMessage as MessageIcon,
   IconMessageReport as MessageReportIcon,
-  IconSparkles as SparklesIcon,
   IconSquareCheck as SquareCheck,
   IconTargetArrow as TargetArrowIcon,
   IconUsers as UsersIcon,
-  IconVolume as VolumeIcon,
 } from '@tabler/icons-vue';
 import { clawMcpToolName, presentClawToolTitle } from './tool-title-presenter';
 
@@ -33,8 +31,6 @@ const icons = {
   markdown: MarkdownIcon as unknown as ToolIcon,
   messages: MessageIcon as unknown as ToolIcon,
   review: MessageReportIcon as unknown as ToolIcon,
-  celebration: SparklesIcon as unknown as ToolIcon,
-  announcement: VolumeIcon as unknown as ToolIcon,
   workItem: SquareCheck as unknown as ToolIcon,
   mission: TargetArrowIcon as unknown as ToolIcon,
   workspace: GitBranchIcon as unknown as ToolIcon,
@@ -109,8 +105,6 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (REVIEW_TOOLS.has(tool)) return icons.review;
   if (AGENT_TOOLS.has(tool)) return icons.agents;
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
-  if (tool === 'celebrate') return icons.celebration;
-  if (tool === 'announce') return icons.announcement;
   if (tool === 'display-markdown' || tool === 'list-mission-artifacts' || tool === 'read-mission-artifact') return icons.markdown;
   if (tool === 'set-mission-title') return icons.mission;
   if (tool === 'update-work-item' || tool === 'write-mission-artifact' || tool === 'submit-mission-result' || tool === 'upsert-mission-ticket') return icons.workItem;

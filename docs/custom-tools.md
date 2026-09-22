@@ -159,9 +159,9 @@ Add the tool to `TOOL_KEYS`, assign its semantic icon group, and provide all
 three lifecycle strings. Titles should describe the action and a short target:
 
 ```text
-Celebrating with school pride
-Celebrated with school pride
-Failed to celebrate with school pride
+Creating worktree feature/review-flow
+Created worktree feature/review-flow
+Failed creating worktree feature/review-flow
 ```
 
 The presenter may resolve a target from bounded tool arguments or structured
@@ -191,11 +191,12 @@ effect in one model round trip:
 Its MCP result confirms the operation. The visible agent status comes from the
 app event, not from the result text.
 
-### `finish_turn`: atomic end-of-turn state
+### `finish_turn`: atomic end-of-turn state and effects
 
-`finish_turn` clears collaboration status and optionally selects one flag in a
-single agent update. Claw keeps a strict flag allowlist in Core. Flags describe
-typed thread state rather than presentation. The payload-free flags are:
+`finish_turn` clears collaboration status and can select one flag, queue one
+finish acknowledgment, and request one celebration in the same final model
+call. Claw keeps a strict flag allowlist in Core. Flags describe typed thread
+state rather than presentation. The payload-free flags are:
 
 - `delegate_to_worktree`, which submits a fixed delegation prompt through the
   normal app-owned prompt path when the user accepts it;
@@ -207,32 +208,29 @@ Passing a new flag replaces the current proposal; omitting it preserves any
 existing proposal. Claw clears a flag after its accepted action succeeds or on
 manual dismissal. Failed actions keep the flag active for retry. Headless
 clients can ignore or act on the same durable state without a UI-specific
-contract.
+contract. Its optional effects remain transient:
 
-### `celebrate`: transient visual tool
-
-`celebrate` demonstrates a client effect:
-
-- the MCP schema limits the effect names;
+- `announcement.text` is trimmed and bounded to 160 characters; its phase is
+  always `finish`;
+- `celebration.kind` is limited to the supported visual effects;
 - the coordinator validates the caller and delegates the effect;
 - the service emits `client.celebrationRequested` without consulting shared navigation;
 - Vue applies the receiving client's selection/settings and handles the transient
   event without persisting it in app state;
 - the tool result confirms `requested`, not `displayed`: emitting an effect does
   not prove any receiving client chose to show it;
-- the presenter reads the bounded `kind` value and renders a phase-aware row;
 - the Debug menu exposes the same effect variants for deterministic visual QA.
 
-### Spoken acknowledgments through `set-status`
+### Spoken acknowledgments through status and completion
 
-`set-status` owns the transient native audio option alongside its durable agent
-status update:
+`set-status` and `finish_turn` own the transient native audio option alongside
+their durable lifecycle updates:
 
 - stable developer instructions require the first status update to include one
-  short start acknowledgment, with one finish acknowledgment permitted only for
-  long-running work;
-- the optional nested schema accepts `phase: start | finish` and trims text to
-  1–160 characters;
+  short start acknowledgment and reserve the optional finish acknowledgment for
+  `finish_turn`;
+- both nested schemas trim text to 1–160 characters and imply their lifecycle
+  phase from the owning tool;
 - the coordinator validates the caller, updates `agent.statusText`, and
   delegates the optional acknowledgment;
 - the service applies backend-owned global enablement and dictated-input policy,

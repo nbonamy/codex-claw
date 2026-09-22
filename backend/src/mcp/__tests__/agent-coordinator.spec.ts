@@ -84,35 +84,58 @@ describe('ClawMcpAgentCoordinator', () => {
     expect(onAgentUpdated).toHaveBeenCalledTimes(3);
   });
 
-  it('finishes a turn by clearing status and replacing the proposed action atomically', async () => {
-    const { agents, coordinator, onAgentUpdated } = fixture();
+  it('finishes a turn with status cleanup, a proposed action, and optional effects atomically', async () => {
+    const onAnnounce = vi.fn().mockResolvedValue({ success: true, phase: 'finish' });
+    const onCelebrate = vi.fn().mockResolvedValue({
+      success: true,
+      requested: true,
+      kind: 'stars',
+      message: 'Celebration requested.',
+    });
+    const { agents, coordinator, onAgentUpdated } = fixture({ onAnnounce, onCelebrate });
     await coordinator.setStatus('agent-dina', 'Reviewing changes');
 
-    expect(coordinator.finishTurn('agent-dina', 'delegate_to_worktree'))
-      .toStrictEqual({ success: true, status: null, flag: 'delegate_to_worktree' });
+    await expect(coordinator.finishTurn('agent-dina', {
+      flag: 'delegate_to_worktree',
+      announcement: { text: '  Ready to hand off.  ' },
+      celebration: { kind: 'stars' },
+    })).resolves.toStrictEqual({
+      success: true,
+      status: null,
+      flag: 'delegate_to_worktree',
+      announcement: { success: true, phase: 'finish' },
+      celebration: {
+        success: true,
+        requested: true,
+        kind: 'stars',
+        message: 'Celebration requested.',
+      },
+    });
+    expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'finish', 'Ready to hand off.');
+    expect(onCelebrate).toHaveBeenCalledWith(agents[0], 'stars');
     expect(agents[0]!.statusText).toBeUndefined();
     expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
-    expect(coordinator.finishTurn('agent-dina', 'ready_for_review'))
-      .toStrictEqual({ success: true, status: null, flag: 'ready_for_review' });
+    await expect(coordinator.finishTurn('agent-dina', { flag: 'ready_for_review' }))
+      .resolves.toStrictEqual({ success: true, status: null, flag: 'ready_for_review' });
     expect(agents[0]!.threadFlags).toStrictEqual({ ready_for_review: true });
-    expect(coordinator.finishTurn('agent-dina'))
-      .toStrictEqual({ success: true, status: null });
+    await expect(coordinator.finishTurn('agent-dina'))
+      .resolves.toStrictEqual({ success: true, status: null });
     expect(agents[0]!.threadFlags).toStrictEqual({ ready_for_review: true });
     expect(onAgentUpdated).toHaveBeenCalledTimes(4);
   });
 
-  it('rejects recursive worktree delegation suggestions from delegated co-agents', () => {
+  it('rejects recursive worktree delegation suggestions from delegated co-agents', async () => {
     const { agents, coordinator, onAgentUpdated } = fixture();
     agents[0]!.delegatedByAgentId = 'agent-parent';
 
-    expect(() => coordinator.finishTurn('agent-dina', 'delegate_to_worktree'))
-      .toThrow('already a delegated co-agent');
+    await expect(coordinator.finishTurn('agent-dina', { flag: 'delegate_to_worktree' }))
+      .rejects.toThrow('already a delegated co-agent');
     expect(agents[0]!.threadFlags).toBeUndefined();
     expect(onAgentUpdated).not.toHaveBeenCalled();
 
     agents[0]!.threadFlags = { delegate_to_worktree: true };
-    expect(coordinator.finishTurn('agent-dina'))
-      .toStrictEqual({ success: true, status: null });
+    await expect(coordinator.finishTurn('agent-dina'))
+      .resolves.toStrictEqual({ success: true, status: null });
     expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
   });
 

@@ -764,18 +764,6 @@ export const messages = {
               failed: 'Failed entering text on page',
               running: 'Entering text on page',
             },
-            celebrate: {
-              completed: 'Celebrated with {target}',
-              failed: 'Failed celebrating with {target}',
-              running: 'Celebrating with {target}',
-            },
-            announce: {
-              completed: 'Acknowledged {target}',
-              failed: 'Failed {target} acknowledgment',
-              queued: 'Voice acknowledgment queued',
-              running: 'Checking voice acknowledgment',
-              skipped: 'Voice acknowledgment skipped',
-            },
             checkMessages: {
               completed: 'Checked messages',
               failed: 'Failed checking messages',

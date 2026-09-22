@@ -384,9 +384,8 @@ Updates the caller's short collaboration status.
 Input:
 
 - `status`: short status text; an empty string clears the status early.
-- `announcement`: optional `{ phase, text }` spoken acknowledgment. Use `start`
-  on the first status update for a user task and reserve `finish` for genuine
-  completion.
+- `announcement`: optional `{ phase: "start", text }` spoken acknowledgment for
+  the first status update of a user task.
 
 Effects:
 
@@ -399,8 +398,7 @@ Effects:
 
 Developer instructions make the first `set-status` call the first action for a
 user task and include the start acknowledgment in that same round trip. Later
-direction updates omit `announcement`; a long-running task may include a finish
-acknowledgment in the final status update immediately before `finish_turn`.
+direction updates omit `announcement`; `finish_turn` owns completion effects.
 
 ### `finish_turn`
 
@@ -410,6 +408,9 @@ final response.
 Input:
 
 - `flag`: optional `delegate_to_worktree` or `ready_for_review` proposed action.
+- `announcement`: optional `{ text }` spoken completion acknowledgment; the
+  `finish` phase is implied.
+- `celebration`: optional `{ kind }` visual celebration request.
 
 The operation always clears `agent.statusText` and emits one `agent.updated`
 event. Passing `flag` replaces the current proposal; omitting it leaves an
@@ -421,7 +422,8 @@ failed action leaves its flag available for retry. The user can dismiss either
 flag.
 
 Developer instructions make `finish_turn` mandatory as the final tool action
-of a substantive turn. They forbid selecting `delegate_to_worktree` and then
+of a substantive turn and combine its optional completion effects into that
+single round trip. They forbid selecting `delegate_to_worktree` and then
 continuing the implementation, reserve `ready_for_review` for a complete and
 validated uncommitted diff, and omit a review proposal for an explicit
 immediate commit/push request.
@@ -430,27 +432,6 @@ Flags are persisted app state and are cleared with the agent's conversation
 runtime when that conversation is restarted or replaced. Clients may present,
 ignore, or programmatically respond to them without interpreting provider
 transcripts.
-
-### `celebrate`
-
-Requests a transient visual celebration in the Claw renderer after a
-meaningful user-visible accomplishment.
-
-Input:
-
-- `kind`: optional `confetti`, `stars`, `shapes`, or `schoolPride`; defaults to
-  `confetti`.
-
-When celebrations are enabled, developer instructions require one celebration
-before the final response for releases, hard fixes, major features, migrations,
-and other meaningful wins. Disabled celebrations are not advertised to the
-model.
-Agents choose the effect deliberately and vary it from the most recent visible
-celebration; `schoolPride` is reserved for major product or team milestones.
-The request emits `client.celebrationRequested`; it is not stored in conversation
-history or app state. Users can disable agent celebrations in General settings.
-The setting is enabled by default, and `clawd` suppresses the event when it is
-off.
 
 ### `send-message`
 

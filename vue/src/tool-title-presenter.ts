@@ -14,8 +14,6 @@ const TOOL_KEYS: Record<string, string> = {
   'browser-screenshot': 'browserScreenshot',
   'browser-scroll': 'browserScroll',
   'browser-type': 'browserType',
-  'celebrate': 'celebrate',
-  'announce': 'announce',
   'check-messages': 'checkMessages',
   'computer-use-click': 'computerUseClick',
   'computer-use-dismiss': 'computerUseDismiss',
@@ -81,10 +79,6 @@ export function presentClawToolTitle({
   if (identity.tool === 'set-status' && phase === 'completed' && args.status === '') {
     return translate('chat.tool.mcp.codexClaw.setStatus.cleared');
   }
-  if (identity.tool === 'announce' && phase === 'completed') {
-    const outcome = announcementOutcome(toolCall.result);
-    if (outcome) return translate(`chat.tool.mcp.codexClaw.announce.${outcome}`);
-  }
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
     target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
   });
@@ -139,15 +133,11 @@ function toolTarget(
         requestedRecipient ? resolveAgentName?.(requestedRecipient) : undefined,
         requestedRecipient,
       ]
-    : tool === 'announce'
-      ? [announcementPhase(args.phase), announcementPhase(resultString(result, 'phase'))]
-      : tool === 'browser-open'
+    : tool === 'browser-open'
       ? [args.url]
       : tool === 'display-markdown'
         ? [args.title, args.path]
-        : tool === 'celebrate'
-          ? [celebrationKind(args.kind), celebrationKind(resultString(result, 'kind'))]
-          : tool === 'create-agent'
+        : tool === 'create-agent'
             ? [phase === 'completed' ? resultString(result, 'agentName') : undefined, args.name, args.branchName, args.repoPath]
             : tool === 'create-worktree'
               ? [args.branchName, args.destinationPath]
@@ -159,15 +149,6 @@ function toolTarget(
 
   const target = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0);
   return target?.trim() ?? '';
-}
-
-function announcementPhase(value: unknown): string | undefined {
-  return value === 'start' ? 'start' : value === 'finish' ? 'finish' : undefined;
-}
-
-function announcementOutcome(result: unknown): 'queued' | 'skipped' | undefined {
-  const outcome = resultString(result, 'outcome');
-  return outcome === 'queued' || outcome === 'skipped' ? outcome : undefined;
 }
 
 function computerUseTarget(tool: string, args: Record<string, unknown>, result: unknown): string {
@@ -289,11 +270,6 @@ function resultString(result: unknown, key: string): string | undefined {
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
   return undefined;
-}
-
-function celebrationKind(value: unknown): string | undefined {
-  if (typeof value !== 'string' || !value.trim()) return undefined;
-  return value.trim() === 'schoolPride' ? 'school pride' : value.trim();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

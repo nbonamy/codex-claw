@@ -604,13 +604,17 @@ describe('ClawMcpService', () => {
 
     const celebrationResponse = await postJson(callerUrl, {
       jsonrpc: '2.0', id: 2, method: 'tools/call',
-      params: { name: 'celebrate', arguments: { kind: 'shapes' } },
+      params: { name: 'finish_turn', arguments: { celebration: { kind: 'shapes' } } },
     });
     expect(celebrationResponse.result.structuredContent).toStrictEqual({
       success: true,
-      requested: true,
-      kind: 'shapes',
-      message: 'Celebration requested; each client decides whether to display it.',
+      status: null,
+      celebration: {
+        success: true,
+        requested: true,
+        kind: 'shapes',
+        message: 'Celebration requested; each client decides whether to display it.',
+      },
     });
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
@@ -800,13 +804,19 @@ describe('ClawMcpService', () => {
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
-    const response = await callTool(url, 'agent-dina', 'celebrate', { kind: 'schoolPride' });
+    const response = await callTool(url, 'agent-dina', 'finish_turn', {
+      celebration: { kind: 'schoolPride' },
+    });
 
     expect(response.result.structuredContent).toStrictEqual({
       success: true,
-      requested: true,
-      kind: 'schoolPride',
-      message: 'Celebration requested; each client decides whether to display it.',
+      status: null,
+      celebration: {
+        success: true,
+        requested: true,
+        kind: 'schoolPride',
+        message: 'Celebration requested; each client decides whether to display it.',
+      },
     });
     expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested' }));
   });
@@ -818,13 +828,19 @@ describe('ClawMcpService', () => {
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
-    const response = await callTool(url, 'agent-jesse', 'celebrate', { kind: 'stars' });
+    const response = await callTool(url, 'agent-jesse', 'finish_turn', {
+      celebration: { kind: 'stars' },
+    });
 
     expect(response.result.structuredContent).toStrictEqual({
       success: true,
-      requested: true,
-      kind: 'stars',
-      message: 'Celebration requested; each client decides whether to display it.',
+      status: null,
+      celebration: {
+        success: true,
+        requested: true,
+        kind: 'stars',
+        message: 'Celebration requested; each client decides whether to display it.',
+      },
     });
     expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested', agentId: 'agent-jesse' }));
   });
@@ -862,27 +878,27 @@ describe('ClawMcpService', () => {
       text: 'On it.',
     });
 
-    const background = await callTool(url, 'agent-jesse', 'set-status', {
-      status: 'Done', announcement: { phase: 'finish', text: 'Done.' },
+    const background = await callTool(url, 'agent-jesse', 'finish_turn', {
+      announcement: { text: 'Done.' },
     });
     expect(background.result.structuredContent).toStrictEqual({
-      success: true, status: 'Done', announcement: { success: true, phase: 'finish' },
+      success: true, status: null, announcement: { success: true, phase: 'finish' },
     });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
 
     snapshot.general.spokenAnnouncementsMuted = true;
-    const muted = await callTool(url, 'agent-dina', 'set-status', {
-      status: 'Done', announcement: { phase: 'finish', text: 'Done.' },
+    const muted = await callTool(url, 'agent-dina', 'finish_turn', {
+      announcement: { text: 'Done.' },
     });
     expect(muted.result.structuredContent).toStrictEqual({
-      success: true, status: 'Done', announcement: { success: true, phase: 'finish' },
+      success: true, status: null, announcement: { success: true, phase: 'finish' },
     });
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(3);
 
     snapshot.general.spokenAnnouncementsMuted = false;
     snapshot.general.spokenAnnouncementScope = 'all';
-    await callTool(url, 'agent-jesse', 'set-status', {
-      status: 'Done', announcement: { phase: 'finish', text: 'Done.' },
+    await callTool(url, 'agent-jesse', 'finish_turn', {
+      announcement: { text: 'Done.' },
     });
     expect(queueSpokenAnnouncement).toHaveBeenLastCalledWith({
       agentId: 'agent-jesse',
@@ -913,15 +929,15 @@ describe('ClawMcpService', () => {
     const dictatedStart = await callTool(url, 'agent-dina', 'set-status', {
       status: 'Starting', announcement: { phase: 'start', text: 'On it.' },
     });
-    const dictatedFinish = await callTool(url, 'agent-dina', 'set-status', {
-      status: 'Done', announcement: { phase: 'finish', text: 'Done.' },
+    const dictatedFinish = await callTool(url, 'agent-dina', 'finish_turn', {
+      announcement: { text: 'Done.' },
     });
 
     expect(dictatedStart.result.structuredContent).toStrictEqual({
       success: true, status: 'Starting', announcement: { success: true, phase: 'start' },
     });
     expect(dictatedFinish.result.structuredContent).toStrictEqual({
-      success: true, status: 'Done', announcement: { success: true, phase: 'finish' },
+      success: true, status: null, announcement: { success: true, phase: 'finish' },
     });
 
     expect(queueSpokenAnnouncement).toHaveBeenCalledTimes(2);
@@ -936,12 +952,12 @@ describe('ClawMcpService', () => {
     service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
     const url = await service.start();
 
-    const failed = await callTool(url, 'agent-dina', 'set-status', {
-      status: 'Done', announcement: { phase: 'finish', text: 'Done.' },
+    const failed = await callTool(url, 'agent-dina', 'finish_turn', {
+      announcement: { text: 'Done.' },
     });
     expect(failed.result.isError).toBe(false);
     expect(failed.result.structuredContent).toStrictEqual({
-      success: true, status: 'Done', announcement: { success: true, phase: 'finish' },
+      success: true, status: null, announcement: { success: true, phase: 'finish' },
     });
 
     const invalid = await callTool(url, 'agent-dina', 'set-status', {
@@ -979,9 +995,14 @@ describe('ClawMcpService', () => {
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
-    const response = await callTool(url, 'agent-dina', 'celebrate', { kind: 'confetti' });
+    const response = await callTool(url, 'agent-dina', 'finish_turn', {
+      celebration: { kind: 'confetti' },
+    });
 
-    expect(response.result.structuredContent).toMatchObject({ requested: true, kind: 'confetti' });
+    expect(response.result.structuredContent).toMatchObject({
+      status: null,
+      celebration: { requested: true, kind: 'confetti' },
+    });
     expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested' }));
   });
 

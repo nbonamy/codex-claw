@@ -46,10 +46,6 @@ describe('Claw tool title presenter', () => {
     ['mcp__codex_claw__computer_use_screenshot', { displayId: 42, scope: 'screen' }, 'completed', 'Captured display 42 screenshot'],
     ['mcp__codex_claw__computer_use_request_screen_recording', {}, 'completed', 'Requested macOS Screen Recording access for Computer Use'],
     ['codex_claw.create-worktree', { branchName: 'feature/tool-labels' }, 'error', 'Failed creating worktree feature/tool-labels'],
-    ['codex_claw.celebrate', { kind: 'schoolPride' }, 'running', 'Celebrating with school pride'],
-    ['codex_claw.celebrate', { kind: 'schoolPride' }, 'completed', 'Celebrated with school pride'],
-    ['codex_claw.announce', { phase: 'start', text: 'I am on it.' }, 'running', 'Checking voice acknowledgment'],
-    ['codex_claw.announce', { phase: 'finish', text: 'The secret is hunter2.' }, 'completed', 'Acknowledged finish'],
   ])('presents %s as user-facing activity text', (functionName, args, state, expected) => {
     expect(presentClawToolTitle(context(
       functionName,
@@ -134,36 +130,6 @@ describe('Claw tool title presenter', () => {
     expect(presentClawToolTitle(inspection)).not.toContain('74070');
   });
 
-  it('uses the completed celebration result when the renderer did not retain its arguments', () => {
-    const celebration = context('codex_claw.celebrate', undefined, 'completed');
-    celebration.toolCall = {
-      ...celebration.toolCall,
-      result: {
-        structuredContent: {
-          displayed: true,
-          kind: 'schoolPride',
-          message: 'Celebration started.',
-          success: true,
-        },
-      },
-    };
-
-    expect(presentClawToolTitle(celebration)).toBe('Celebrated with school pride');
-  });
-
-  it.each([
-    ['queued', 'Voice acknowledgment queued'],
-    ['skipped', 'Voice acknowledgment skipped'],
-  ])('presents the %s announcement outcome without exposing the phrase', (outcome, title) => {
-    const announcement = context('codex_claw.announce', { phase: 'start', text: 'private phrase' }, 'completed');
-    announcement.toolCall = {
-      ...announcement.toolCall,
-      result: { structuredContent: { outcome, phase: 'start' } },
-    };
-
-    expect(presentClawToolTitle(announcement)).toBe(title);
-    expect(presentClawToolTitle(announcement)).not.toContain('private phrase');
-  });
 });
 
 function context(

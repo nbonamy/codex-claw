@@ -250,14 +250,18 @@ app-owned capability / clawd client callback when orchestration needs it
 
 ### MCP surface
 
-Expose the product behavior as an optional acknowledgment on
-`codex_claw.set-status`, not as an unrestricted general-purpose `tts` tool or a
-second standalone MCP call. The nested schema communicates the actual intent:
+Expose the product behavior as lifecycle-bound optional acknowledgments on
+`codex_claw.set-status` and `codex_claw.finish_turn`, not as an unrestricted
+general-purpose `tts` tool or a second standalone MCP call. The schemas
+communicate the actual intent:
 
 ```text
 set-status({
   status: string,
-  announcement?: { phase: "start" | "finish", text: string <= 160 characters }
+  announcement?: { phase: "start", text: string <= 160 characters }
+})
+finish_turn({
+  announcement?: { text: string <= 160 characters }
 })
 ```
 
@@ -270,7 +274,7 @@ set-status({
 - Gate the effect behind an opt-in user setting. With several agents running,
   default to the selected agent so the computer does not become a room full of
   overlapping voices.
-- Model the optional audio side after the existing transient `celebrate` path:
+- Model the optional audio side after the transient celebration path:
   MCP handling in `clawd`, app-owned client effect, native helper playback, and
   a bounded tool result. The same operation also updates `agent.statusText`.
 

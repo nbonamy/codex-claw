@@ -89,6 +89,14 @@ export type FinishTurnResponse = {
   success: true;
   status: null;
   flag?: ThreadFlagId;
+  announcement?: AnnouncementResponse;
+  celebration?: CelebrationResponse;
+};
+
+export type FinishTurnInput = {
+  flag?: ThreadFlagId;
+  announcement?: { text: string };
+  celebration?: { kind: CelebrationKind };
 };
 
 export type UpdateWorkItemResponse =
@@ -294,19 +302,35 @@ export class ClawMcpAgentCoordinator {
     return true;
   }
 
-  finishTurn(agentId: string, flag?: ThreadFlagId): FinishTurnResponse {
+  async finishTurn(agentId: string, input: FinishTurnInput = {}): Promise<FinishTurnResponse> {
     const agent = this.requireAgent(agentId);
-    if (flag === 'delegate_to_worktree' && agent.delegatedByAgentId) {
+    if (input.flag === 'delegate_to_worktree' && agent.delegatedByAgentId) {
       throw new McpToolError('delegate_to_worktree is unavailable because this agent is already a delegated co-agent.');
     }
+    const normalizedAnnouncement = input.announcement
+      ? this.normalizedAnnouncement({ phase: 'finish', text: input.announcement.text })
+      : undefined;
+    if (input.celebration && !this.onCelebrate) {
+      throw new McpToolError('Celebrations are not available.');
+    }
     delete agent.statusText;
-    if (flag) agent.threadFlags = { [flag]: true };
+    if (input.flag) agent.threadFlags = { [input.flag]: true };
     agent.updatedAt = this.now().toISOString();
     this.onAgentUpdated?.(agent);
+    const [announcement, celebration] = await Promise.all([
+      normalizedAnnouncement
+        ? this.onAnnounce!(agent, normalizedAnnouncement.phase, normalizedAnnouncement.text)
+        : undefined,
+      input.celebration
+        ? this.onCelebrate!(agent, input.celebration.kind)
+        : undefined,
+    ]);
     return {
       success: true,
       status: null,
-      ...(flag ? { flag } : {}),
+      ...(input.flag ? { flag: input.flag } : {}),
+      ...(announcement ? { announcement } : {}),
+      ...(celebration ? { celebration } : {}),
     };
   }
 
@@ -327,14 +351,6 @@ export class ClawMcpAgentCoordinator {
       ...(filePath ? { path: filePath } : {}),
       ...(title ? { title } : {}),
     });
-  }
-
-  async celebrate(agentId: string, kind: CelebrationKind): Promise<CelebrationResponse> {
-    const agent = this.requireAgent(agentId);
-    if (!this.onCelebrate) {
-      throw new McpToolError('Celebrations are not available.');
-    }
-    return this.onCelebrate(agent, kind);
   }
 
   private normalizedAnnouncement(input: StatusAnnouncementInput): StatusAnnouncementInput {

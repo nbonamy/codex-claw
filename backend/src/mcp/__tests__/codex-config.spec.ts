@@ -104,8 +104,8 @@ describe('codex-config', () => {
       { celebrationsEnabled: false },
     );
 
-    expect(enabled.developerInstructions).toContain('call celebrate exactly once');
-    expect(disabled.developerInstructions).not.toContain('call celebrate');
+    expect(enabled.developerInstructions).toContain('celebration in finish_turn');
+    expect(disabled.developerInstructions).not.toContain('celebration in finish_turn');
   });
 
   it('preserves existing query params when scoping an MCP URL to an agent', () => {

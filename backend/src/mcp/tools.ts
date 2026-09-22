@@ -117,13 +117,13 @@ export function createCodexClawMcpServer(
   }, () => coordinator.broadcastMessage(callerAgentId, content)));
 
   server.registerTool('set-status', {
-    description: "MANDATORY: Set your status so other agents know what you are doing. At the start of a user task, include one short spoken acknowledgment in announcement. Call again only when changing direction; omit announcement except for the initial acknowledgment and an optional genuine completion acknowledgment immediately before finish_turn. Keep status short and specific.",
+    description: 'MANDATORY: Set your status so other agents know what you are doing. At the start of a user task, include one short spoken acknowledgment in announcement. Call again only when changing direction and omit announcement. Keep status short and specific; finish_turn owns completion effects.',
     inputSchema: {
       status: z.string().describe('Short status text describing what you are currently doing. finish_turn or the provider turn lifecycle clears it.'),
       announcement: z.object({
-        phase: z.enum(['start', 'finish']).describe('Whether this acknowledges starting or genuinely finishing the user task.'),
+        phase: z.literal('start').describe('Marks the acknowledgment as the start of the user task.'),
         text: z.string().trim().min(1).max(160).describe('One brief natural phrase, at most 160 characters.'),
-      }).optional().describe('Optional spoken acknowledgment. Include phase start on the first status update for each user task; reserve phase finish for genuine completion.'),
+      }).optional().describe('Optional spoken start acknowledgment for the first status update of each user task.'),
     },
   }, ({ status, announcement }) => toolResult('set-status', {
     agentId: callerAgentId,
@@ -134,35 +134,38 @@ export function createCodexClawMcpServer(
     } : {}),
   }, () => coordinator.setStatus(callerAgentId, status, announcement)));
 
-  const finishTurnDescription = 'MANDATORY final tool action for a substantive user turn. Call exactly once immediately before the final response, after any completion acknowledgment or celebration. It clears the current status. An optional flag replaces the current proposed action; omitting flag leaves any existing proposal unchanged. Select delegate_to_worktree only when work should be delegated instead of continued here, or ready_for_review only for a complete validated uncommitted diff.';
-  if (missionContext) {
-    server.registerTool('finish_turn', {
-      description: `${finishTurnDescription} Mission agents do not expose proposed-action flags.`,
-      inputSchema: {},
-    }, () => toolResult('finish_turn', {
-      agentId: callerAgentId,
-    }, () => coordinator.finishTurn(callerAgentId)));
-  } else {
+  const finishTurnDescription = 'MANDATORY final tool action for a substantive user turn. Call exactly once immediately before the final response. It clears the current status and can atomically request one finish announcement, one celebration, and one proposed-action flag. Omitted options leave those effects absent and preserve any existing proposal. Select delegate_to_worktree only when work should be delegated instead of continued here, or ready_for_review only for a complete validated uncommitted diff.';
+  const finishTurnEffectsSchema = {
+    announcement: z.object({
+      text: z.string().trim().min(1).max(160).describe('One brief natural completion phrase, at most 160 characters.'),
+    }).optional().describe('Optional spoken completion acknowledgment. The finish phase is implied.'),
+    celebration: z.object({
+      kind: z.enum(['confetti', 'stars', 'shapes', 'schoolPride']).default('confetti'),
+    }).optional().describe('Optional visual celebration for a meaningful win.'),
+  };
+  if (!missionContext) {
     server.registerTool('finish_turn', {
       description: finishTurnDescription,
       inputSchema: {
         flag: z.enum(threadFlagIds).optional().describe('Optional single proposed action to show after this turn. Omit to leave any existing proposal unchanged.'),
+        ...finishTurnEffectsSchema,
       },
-    }, ({ flag }) => toolResult('finish_turn', {
+    }, input => toolResult('finish_turn', {
       agentId: callerAgentId,
-      flag: flag ?? null,
-    }, () => coordinator.finishTurn(callerAgentId, flag)));
+      flag: input.flag ?? null,
+      announcementTextLength: input.announcement?.text.length ?? null,
+      celebration: input.celebration?.kind ?? null,
+    }, () => coordinator.finishTurn(callerAgentId, input)));
+  } else {
+    server.registerTool('finish_turn', {
+      description: `${finishTurnDescription} Mission agents do not expose proposed-action flags.`,
+      inputSchema: finishTurnEffectsSchema,
+    }, input => toolResult('finish_turn', {
+      agentId: callerAgentId,
+      announcementTextLength: input.announcement?.text.length ?? null,
+      celebration: input.celebration?.kind ?? null,
+    }, () => coordinator.finishTurn(callerAgentId, input)));
   }
-
-  server.registerTool('celebrate', {
-    description: 'Request a transient visual celebration in Codex Claw when celebrations are enabled by the user. Confetti, stars, and shapes fit ordinary wins, while schoolPride marks a major team achievement.',
-    inputSchema: {
-      kind: z.enum(['confetti', 'stars', 'shapes', 'schoolPride']).default('confetti').describe('Visual celebration style; choose deliberately and vary it across wins.'),
-    },
-  }, ({ kind }) => toolResult('celebrate', {
-    agentId: callerAgentId,
-    kind,
-  }, () => coordinator.celebrate(callerAgentId, kind)));
 
   server.registerTool('update-work-item', {
     description: 'Update the lifecycle of a backlog work item assigned to you through Codex Claw. Use blocked with a note when you need help, inProgress when work resumes, readyForReview when the user can review the outcome, or completed when the assignment explicitly requires completion.',
