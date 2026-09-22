@@ -65,6 +65,7 @@ const error = computed(() => rendering.value.error);
 const minScale = 0.5;
 const maxScale = 4;
 const zoomStep = 0.25;
+const wheelZoomSensitivity = 0.001;
 const scale = ref(1);
 const offsetX = ref(0);
 const offsetY = ref(0);
@@ -78,7 +79,7 @@ watch(() => `${props.diagram.id}:${props.diagram.revision}`, resetView);
 
 function zoomBy(delta: number): void {
   if (props.compact) return;
-  scale.value = Math.min(maxScale, Math.max(minScale, Number((scale.value + delta).toFixed(2))));
+  scale.value = Math.min(maxScale, Math.max(minScale, Number((scale.value + delta).toFixed(3))));
   if (scale.value <= 1) {
     offsetX.value = 0;
     offsetY.value = 0;
@@ -88,7 +89,13 @@ function zoomBy(delta: number): void {
 function handleWheel(event: WheelEvent): void {
   if (props.compact) return;
   event.preventDefault();
-  zoomBy(event.deltaY < 0 ? zoomStep : -zoomStep);
+  const modeMultiplier = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+    ? 16
+    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+      ? 100
+      : 1;
+  const delta = Math.max(-60, Math.min(60, event.deltaY * modeMultiplier));
+  zoomBy(-delta * wheelZoomSensitivity);
 }
 
 function startPan(event: PointerEvent): void {

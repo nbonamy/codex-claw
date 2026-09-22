@@ -80,9 +80,6 @@ export const messages = {
     design: {
       diagrams: 'Design diagrams',
       revision: '{kind} · revision {revision}',
-      editHint: 'Ask in chat to edit this diagram or add another.',
-      remainingSuggestions: 'Remaining diagram suggestions',
-      alsoSuggested: 'Also suggested',
       mode: 'Design mode',
       chooseDiagram: 'Choose a diagram to generate',
       findingDiagrams: 'Looking for useful diagrams…',

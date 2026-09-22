@@ -57,6 +57,8 @@ describe('DesignPanel', () => {
     await flushPromises();
 
     expect(wrapper.get('.design-panel__heading').text()).toContain('System map');
+    expect(wrapper.text()).not.toContain('Also suggested');
+    expect(wrapper.text()).not.toContain('Ask in chat to edit this diagram or add another.');
     expect(wrapper.findAll('.design-panel__thumbnail')).toHaveLength(2);
     expect(readAsset).toHaveBeenCalledWith('diagram-image');
     await wrapper.findAll('.design-panel__thumbnail')[1].trigger('click');
@@ -135,5 +137,11 @@ describe('DesignPanel', () => {
 
     await wrapper.get('button[aria-label="Reset view"]').trigger('click');
     expect(image.attributes('style')).toContain('translate(0px, 0px) scale(1)');
+
+    viewport.element.dispatchEvent(new WheelEvent('wheel', {
+      bubbles: true, cancelable: true, deltaY: -100,
+    }));
+    await flushPromises();
+    expect(wrapper.get('button[aria-label="Reset view"]').text()).toBe('106%');
   });
 });

@@ -6,17 +6,6 @@
           <h2>{{ selectedDiagram.title }}</h2>
           <span>{{ translate('design.revision', { kind: kindLabel(selectedDiagram), revision: selectedDiagram.revision }) }}</span>
         </div>
-        <span class="design-panel__hint">{{ translate('design.editHint') }}</span>
-      </div>
-      <div v-if="remainingSuggestions.length" class="design-panel__remaining" :aria-label="translate('design.remainingSuggestions')">
-        <span>{{ translate('design.alsoSuggested') }}</span>
-        <button
-          v-for="suggestion in remainingSuggestions"
-          :key="suggestion.id"
-          type="button"
-          :disabled="busy"
-          @click="emit('generate', suggestion.id)"
-        >{{ suggestion.title }}</button>
       </div>
       <DesignDiagramView
         class="design-panel__diagram"
@@ -87,7 +76,6 @@ const imageRevisions = reactive<Record<string, number>>({});
 const selectedDiagram = computed(() => props.design.diagrams.find(
   diagram => diagram.id === props.design.selectedDiagramId,
 ) ?? props.design.diagrams.at(-1) ?? null);
-const remainingSuggestions = computed(() => props.design.suggestions.filter(suggestion => !suggestion.diagramId));
 
 watch(
   () => props.design.diagrams.map(diagram => `${diagram.id}:${diagram.revision}:${diagram.content.kind}`).join('|'),
@@ -163,15 +151,9 @@ function compactDescription(description: string): string {
 }
 
 .design-panel__heading span,
-.design-panel__hint,
 .design-panel__intro p {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
-}
-
-.design-panel__hint {
-  max-width: 220px;
-  text-align: right;
 }
 
 .design-panel__diagram {
@@ -180,35 +162,6 @@ function compactDescription(description: string): string {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-surface-low);
-}
-
-.design-panel__remaining {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-  overflow-x: auto;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-}
-
-.design-panel__remaining > span {
-  flex: 0 0 auto;
-}
-
-.design-panel__remaining button {
-  flex: 0 0 auto;
-  padding: var(--space-3) var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  color: var(--color-text);
-  background: var(--color-surface-low);
-  font: inherit;
-  cursor: pointer;
-}
-
-.design-panel__remaining button:hover:not(:disabled) {
-  border-color: var(--color-primary);
 }
 
 .design-panel__suggestions {
