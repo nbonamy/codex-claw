@@ -360,7 +360,7 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.text()).toContain('Expected by contract.');
   });
 
-  it('colors skipped, fixing, and fixed remediation badges by state', () => {
+  it('keeps fixed findings neutral while styling remediation badges by state', () => {
     const { wrapper } = mountPanel(session([
       finding({ id: 'skipped', remediation: { state: 'skipped', startedAt: 'now' } }),
       finding({ id: 'fixing', remediation: { state: 'fixing', startedAt: 'now' } }),
@@ -374,6 +374,8 @@ describe('CodeReviewPanel', () => {
       ['var(--color-primary)', 'var(--color-primary-container)'],
       ['var(--color-success)', 'var(--color-success-container)'],
     ]);
+    expect(getComputedStyle(wrapper.findAll('.review-finding')[2]!.element).borderColor)
+      .not.toBe('var(--color-success)');
     expect(wrapper.find('.code-review-panel__footer').exists()).toBe(false);
   });
 

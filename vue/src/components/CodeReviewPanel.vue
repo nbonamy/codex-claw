@@ -983,10 +983,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   background-color: var(--color-primary-container);
 }
 
-.review-finding[data-state="fixed"] {
-  border-color: var(--color-success);
-}
-
 .review-finding[data-state="fixed"] .review-finding__state {
   color: var(--color-success);
   background-color: var(--color-success-container);
