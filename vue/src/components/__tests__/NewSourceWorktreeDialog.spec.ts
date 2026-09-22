@@ -71,11 +71,50 @@ describe('NewSourceWorktreeDialog', () => {
       repoPath: '/Users/nbonamy/src/codex-claw',
       branchName: 'Fix/source folder!!',
     });
+    const progress = wrapper.getComponent({ name: 'StagedOperationProgress' });
+    expect(progress.props('state')).toBe('success');
+    expect(progress.props('completeTitle')).toBe('Fix/source folder!! is ready');
+    progress.vm.$emit('complete');
+    await wrapper.vm.$nextTick();
     expect(wrapper.emitted('created')).toStrictEqual([[{
       name: 'fix-source-folder',
       path: '/Users/nbonamy/src/codex-claw-fix-source-folder',
     }]]);
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
+  it('replaces the branch form with staged progress while creating the worktree', async () => {
+    let resolveCreation!: (worktree: { name: string; path: string }) => void;
+    const createWorktree = vi.fn().mockImplementation(() => new Promise((resolve) => {
+      resolveCreation = resolve;
+    }));
+    const wrapper = mountDialog({ createWorktree });
+
+    await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/progress');
+    await flushPromises();
+    await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+
+    expect(wrapper.find('.new-source-worktree-dialog__branch-input').exists()).toBe(false);
+    const progress = wrapper.getComponent({ name: 'StagedOperationProgress' });
+    expect(progress.props()).toMatchObject({
+      state: 'running',
+      title: 'Creating a worktree in codex-claw…',
+    });
+    expect(progress.text()).toContain('Creating isolated worktree');
+    expect(progress.text()).toContain('feature/progress');
+
+    resolveCreation({ name: 'feature/progress', path: '/tmp/codex-claw-feature-progress' });
+    await flushPromises();
+
+    expect(progress.props('state')).toBe('success');
+    expect(wrapper.emitted('created')).toBeUndefined();
+    progress.vm.$emit('complete');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('created')).toStrictEqual([[{
+      name: 'feature/progress',
+      path: '/tmp/codex-claw-feature-progress',
+    }]]);
   });
 
   it('lets the user override the resolved destination with the folder picker', async () => {

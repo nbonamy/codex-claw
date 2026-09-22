@@ -1,11 +1,26 @@
 <template>
   <FormDialog
-    class="new-source-worktree-dialog"
+    :class="[
+      'new-source-worktree-dialog',
+      { 'new-source-worktree-dialog--progress': creationState },
+      { 'new-source-worktree-dialog--error': creationState === 'error' },
+    ]"
     :model-value="visible"
     :title="$t('surface.newSourceWorktreeDialog.newWorktree')"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="create()">
+    <StagedOperationProgress
+      v-if="creationState"
+      :state="creationState"
+      :eyebrow="$t('surface.newSourceWorktreeDialog.progressEyebrow')"
+      :title="$t('surface.newSourceWorktreeDialog.progressTitle', { repository: repo?.name ?? '' })"
+      :complete-title="$t('surface.newSourceWorktreeDialog.progressComplete', { branch: pendingBranchName })"
+      :error-title="$t('surface.newSourceWorktreeDialog.progressFailed')"
+      :minimum-duration-ms="800"
+      :steps="creationSteps"
+      @complete="completeCreation"
+    />
+    <form v-else class="claw-form-dialog" @submit.prevent="create()">
       <WorktreeReusePrompt
         v-if="existingWorktree"
         :branch="existingWorktree.name"
@@ -79,21 +94,23 @@
           </div>
         </FormDialogField>
 
-        <el-alert
-          v-if="errorMessage"
-          :title="errorMessage"
-          type="error"
-          :closable="false"
-          show-icon
-        />
       </template>
     </form>
 
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
+      <button
+        v-if="creationState === 'error'"
+        class="claw-button claw-button--tertiary"
+        type="button"
+        @click="close"
+      >
+        {{ $t('common.close') }}
+      </button>
+      <button v-else class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
         {{ existingWorktree ? $t('common.back') : $t('surface.newSourceWorktreeDialog.cancel') }}
       </button>
       <button
+        v-if="!creationState"
         class="claw-button claw-button--primary"
         type="button"
         :aria-busy="creating"
@@ -106,10 +123,12 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import StagedOperationProgress, { type StagedOperationStep } from './StagedOperationProgress.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 
 const props = withDefaults(defineProps<{
@@ -132,13 +151,16 @@ const emit = defineEmits<{
   close: [];
   created: [worktree: SourceWorktree];
 }>();
+const { t } = useI18n();
 
 const branchName = ref('');
 const baseBranch = ref('');
 const customDestinationPath = ref('');
 const suggestedDestinationPath = ref('');
 const creating = ref(false);
-const errorMessage = ref<string | null>(null);
+const creationState = ref<'running' | 'success' | 'error' | null>(null);
+const createdWorktree = ref<SourceWorktree | null>(null);
+const pendingBranchName = ref('');
 const existingWorktree = ref<SourceWorktree | null>(null);
 let suggestionRequestId = 0;
 
@@ -153,6 +175,10 @@ const canCreate = computed(() => Boolean(
   && !creating.value,
 ));
 const destinationPath = computed(() => customDestinationPath.value || suggestedDestinationPath.value);
+const creationSteps = computed<StagedOperationStep[]>(() => [{
+  title: t('surface.newSourceWorktreeDialog.progressStep'),
+  detail: pendingBranchName.value,
+}]);
 
 watch(() => props.visible, (visible) => {
   if (visible) {
@@ -160,7 +186,9 @@ watch(() => props.visible, (visible) => {
     baseBranch.value = orderedBranches.value[0]?.name ?? '';
     customDestinationPath.value = '';
     suggestedDestinationPath.value = '';
-    errorMessage.value = null;
+    creationState.value = null;
+    createdWorktree.value = null;
+    pendingBranchName.value = '';
     existingWorktree.value = null;
     creating.value = false;
   }
@@ -209,7 +237,10 @@ async function create(reuseExisting = false): Promise<void> {
   }
 
   creating.value = true;
-  errorMessage.value = null;
+  pendingBranchName.value = branchName.value.trim();
+  if (!reuseExisting) {
+    creationState.value = 'running';
+  }
   try {
     const worktree = await props.createWorktree({
       repoPath: props.repo.path,
@@ -221,19 +252,31 @@ async function create(reuseExisting = false): Promise<void> {
             ...(customDestinationPath.value ? { destinationPath: customDestinationPath.value } : {}),
           }),
     });
-    emit('created', worktree);
-    close();
+    if (reuseExisting) {
+      emit('created', worktree);
+      close();
+    } else {
+      createdWorktree.value = worktree;
+      creationState.value = 'success';
+    }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
+    creationState.value = 'error';
+    pendingBranchName.value = error instanceof Error ? error.message : String(error);
   } finally {
     creating.value = false;
   }
 }
 
 function onVisibilityChanged(visible: boolean): void {
-  if (!visible) {
+  if (!visible && creationState.value !== 'running' && creationState.value !== 'success') {
     close();
   }
+}
+
+function completeCreation(): void {
+  if (!createdWorktree.value) return;
+  emit('created', createdWorktree.value);
+  close();
 }
 
 function backOrClose(): void {
@@ -273,6 +316,14 @@ async function refreshSuggestedDestinationPath(): Promise<void> {
 </script>
 
 <style scoped>
+:global(.new-source-worktree-dialog--progress .el-dialog__header) {
+  display: none;
+}
+
+:global(.new-source-worktree-dialog--progress:not(.new-source-worktree-dialog--error) .el-dialog__footer) {
+  display: none;
+}
+
 .new-source-worktree-dialog__base-select {
   width: 100%;
 }

@@ -48,6 +48,7 @@ const props = defineProps<{
   completeTitle: string;
   eyebrow: string;
   errorTitle?: string;
+  minimumDurationMs?: number;
   state: 'running' | 'success' | 'error';
   steps: StagedOperationStep[];
   title: string;
@@ -90,7 +91,8 @@ onBeforeUnmount(clearTimers);
 function finish(): void {
   if (completionScheduled) return;
   completionScheduled = true;
-  const minimumDuration = 3_800 + (Math.max(0, props.steps.length - 3) * 1_700);
+  const minimumDuration = props.minimumDurationMs
+    ?? 3_800 + (Math.max(0, props.steps.length - 3) * 1_700);
   timers.push(globalThis.setTimeout(() => {
     displayStep.value = props.steps.length;
     timers.push(globalThis.setTimeout(() => emit('complete'), 600));
