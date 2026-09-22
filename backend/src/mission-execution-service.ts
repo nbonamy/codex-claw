@@ -23,6 +23,7 @@ export type MissionExecutionPorts = {
   refreshWorkspace(agentId: string): Promise<void>;
   refreshConversationContext(agent: Agent): Promise<void>;
   continueStage(agentId: string, prompt: string): Promise<void>;
+  startRemediation(agentId: string, prompt: string): Promise<void>;
   interrupt(agent: Agent): Promise<unknown>;
 };
 
@@ -30,6 +31,8 @@ export type MissionExecutionPorts = {
 export class MissionExecutionService {
   private readonly launches = new Map<string, Promise<void>>();
   private readonly postTurnLaunches = new Map<string, { missionId: string; runIds: string[] }>();
+  private readonly remediationDispatches = new Set<string>();
+  private readonly remediationTurns = new Map<string, { missionId: string; findingIds: string[] }>();
   private readonly nonResultTurns = new Set<string>();
   private readonly agentTools: MissionAgentTools;
   private readonly workspaces: MissionWorkspaceService;
@@ -97,6 +100,9 @@ export class MissionExecutionService {
       return;
     }
     if (input.action === 'selectReviewFinding') {
+      if (typeof input.findingId !== 'string' || !input.findingId.trim() || typeof input.selected !== 'boolean') {
+        throw new Error('Invalid Mission review finding selection.');
+      }
       await this.change(input, current => {
         if (current.stage !== 'review') throw new Error('Review findings can be selected only during Review.');
         const finding = current.artifacts.review.findings?.find(candidate => candidate.id === input.findingId);
@@ -108,32 +114,47 @@ export class MissionExecutionService {
       return;
     }
     if (input.action === 'fixSelectedReviewFindings') {
-      let workerId = '';
+      const reviewRun = mission.execution?.runs.slice().reverse().find(candidate => (
+        candidate.stage === 'review' && candidate.status === 'awaitingReview' && candidate.workerId
+      ));
+      if (!reviewRun?.workerId) throw new Error('Submit the Review result before fixing findings.');
+      const workerId = reviewRun.workerId;
+      if (this.remediationDispatches.has(workerId) || this.remediationTurns.has(workerId)) {
+        throw new Error('Review finding remediation is already running.');
+      }
+      this.remediationDispatches.add(workerId);
       let findings: MissionReviewFinding[] = [];
-      await this.change(input, current => {
-        if (current.stage !== 'review') throw new Error('Findings can be fixed only during Review.');
-        const run = current.execution?.runs.slice().reverse().find(candidate => candidate.stage === 'review' && candidate.status === 'awaitingReview' && candidate.workerId);
-        if (!run?.workerId) throw new Error('Submit the Review result before fixing findings.');
-        findings = (current.artifacts.review.findings ?? []).filter(finding => finding.selected && finding.remediation.state === 'open');
-        if (!findings.length) throw new Error('Select at least one unresolved finding.');
-        const startedAt = new Date().toISOString();
-        for (const finding of findings) {
-          finding.remediation = { state: 'fixing', startedAt };
-          finding.updatedAt = startedAt;
-        }
-        workerId = run.workerId;
-      });
+      let findingsMarked = false;
       try {
-        await this.ports.continueStage(workerId, missionFindingFixPrompt(findings));
-      } catch (error) {
-        const findingIds = new Set(findings.map(finding => finding.id));
-        await this.ports.missions.change(input.id, current => {
-          for (const finding of current.artifacts.review.findings ?? []) {
-            if (findingIds.has(finding.id) && finding.remediation.state === 'fixing') finding.remediation = { state: 'open' };
+        await this.change(input, current => {
+          if (current.stage !== 'review') throw new Error('Findings can be fixed only during Review.');
+          const run = current.execution?.runs.slice().reverse().find(candidate => candidate.stage === 'review' && candidate.status === 'awaitingReview' && candidate.workerId === workerId);
+          if (!run) throw new Error('Submit the Review result before fixing findings.');
+          findings = (current.artifacts.review.findings ?? []).filter(finding => finding.selected && finding.remediation.state === 'open');
+          if (!findings.length) throw new Error('Select at least one unresolved finding.');
+          const startedAt = new Date().toISOString();
+          for (const finding of findings) {
+            finding.remediation = { state: 'fixing', startedAt };
+            finding.updatedAt = startedAt;
           }
         });
-        await this.ports.publish();
+        findingsMarked = true;
+        const findingIds = findings.map(finding => finding.id);
+        await this.ports.startRemediation(workerId, missionFindingFixPrompt(mission, findings));
+        this.remediationTurns.set(workerId, { missionId: input.id, findingIds });
+      } catch (error) {
+        if (findingsMarked) {
+          const selectedFindingIds = new Set(findings.map(finding => finding.id));
+          await this.ports.missions.change(input.id, current => {
+            for (const finding of current.artifacts.review.findings ?? []) {
+              if (selectedFindingIds.has(finding.id) && finding.remediation.state === 'fixing') finding.remediation = { state: 'open' };
+            }
+          });
+          await this.ports.publish();
+        }
         throw error;
+      } finally {
+        this.remediationDispatches.delete(workerId);
       }
       return;
     }
@@ -196,6 +217,20 @@ export class MissionExecutionService {
   }
 
   async recoverInterruptedRuns(): Promise<void> {
+    for (const mission of this.ports.snapshot.missions ?? []) {
+      if (mission.execution?.debugFixture) continue;
+      const fixing = mission.artifacts.review.findings?.filter(finding => finding.remediation.state === 'fixing') ?? [];
+      if (!fixing.length) continue;
+      await this.ports.missions.change(mission.id, current => {
+        const updatedAt = new Date().toISOString();
+        for (const finding of current.artifacts.review.findings ?? []) {
+          if (finding.remediation.state !== 'fixing') continue;
+          finding.remediation = { state: 'open' };
+          finding.updatedAt = updatedAt;
+        }
+      });
+      await this.ports.publish();
+    }
     for (const mission of this.ports.snapshot.missions ?? []) {
       if (mission.execution?.debugFixture || mission.stage !== 'implementation') continue;
       const legacyReviews = mission.execution?.runs.filter(run => (
@@ -312,6 +347,24 @@ export class MissionExecutionService {
   attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }> { return this.agentTools.attachRepository(agentId, repoPath); }
 
   async agentFinished(agentId: string): Promise<void> {
+    const remediationTurn = this.remediationTurns.get(agentId);
+    if (remediationTurn) {
+      this.remediationTurns.delete(agentId);
+      const mission = this.ports.snapshot.missions?.find(candidate => candidate.id === remediationTurn.missionId);
+      const findingIds = new Set(remediationTurn.findingIds);
+      if (mission?.artifacts.review.findings?.some(finding => findingIds.has(finding.id) && finding.remediation.state === 'fixing')) {
+        await this.ports.missions.change(remediationTurn.missionId, current => {
+          const updatedAt = new Date().toISOString();
+          for (const finding of current.artifacts.review.findings ?? []) {
+            if (!findingIds.has(finding.id) || finding.remediation.state !== 'fixing') continue;
+            finding.remediation = { state: 'open' };
+            finding.updatedAt = updatedAt;
+          }
+        });
+        await this.ports.publish();
+      }
+      return;
+    }
     const postTurnLaunch = this.postTurnLaunches.get(agentId);
     if (postTurnLaunch) {
       this.postTurnLaunches.delete(agentId);
@@ -521,18 +574,20 @@ export class MissionExecutionService {
   }
 }
 
-function missionFindingFixPrompt(findings: MissionReviewFinding[]): string {
+function missionFindingFixPrompt(mission: Mission, findings: MissionReviewFinding[]): string {
+  const workspacePaths = new Map((mission.execution?.workspaces ?? []).map(workspace => [workspace.repositoryPath, workspace.path]));
   return [
     `Fix the ${findings.length} selected Mission Review finding${findings.length === 1 ? '' : 's'}.`,
     '',
     ...findings.flatMap(finding => [
       `${finding.id}: [${finding.priority.toUpperCase()}] ${finding.title}`,
       `Repository: ${finding.repositoryPath}`,
+      `Mission worktree: ${workspacePaths.get(finding.repositoryPath) ?? 'unavailable'}`,
       ...(finding.location ? [`Location: ${finding.location.file}${finding.location.line ? `:${finding.location.line}` : ''}`] : []),
       finding.body,
       '',
     ]),
-    'Keep fixes focused and verify each one. After each finding is fixed, call codex_claw.update-mission-review-finding with its ID, status "fixed", and concise verification evidence. Do not submit another Review result or start another review round.',
+    'Apply each fix only inside the Mission worktree mapped to its repository. Keep fixes focused and verify each one. After each finding is fixed, call codex_claw.update-mission-review-finding with its ID, status "fixed", and concise verification evidence. Do not submit another Review result or start another review round.',
   ].join('\n');
 }
 

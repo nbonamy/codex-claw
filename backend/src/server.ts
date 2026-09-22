@@ -234,6 +234,11 @@ export class ClawBackendServer {
         await this.requireDriverRpc().refreshConversationContext(agent);
       },
       continueStage: async (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
+      startRemediation: async (agentId, prompt) => {
+        const agent = this.snapshot.agents.find(candidate => candidate.id === agentId);
+        if (!agent) throw new Error('Mission Review worker is unavailable.');
+        await this.agentPrompts.sendAndWaitForAcceptance(agent, prompt);
+      },
       interrupt: agent => this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }),
     });
     this.planReviews = new AgentPlanReviewService({

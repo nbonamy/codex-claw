@@ -33,7 +33,9 @@ export function missionDeveloperInstructions(mission: Mission, run: MissionRun, 
     `Stage: ${run.stage}.`,
     `Repositories currently represented in the team: ${repositories.length ? repositories.join(', ') : 'none'}. Repository attachment is optional during shaping.`,
     mission.execution?.workspaces?.length
-      ? `Mission workspace ${mission.execution.workspaceName ?? ''}:\n${mission.execution.workspaces.map(workspace => `- ${workspace.repositoryPath} -> ${workspace.path} at ${workspace.baseSha ?? 'unavailable'}`).join('\n')}\nWork only in your assigned isolated worktree. Do not edit source checkouts or other Mission worktrees.`
+      ? `Mission workspace ${mission.execution.workspaceName ?? ''}:\n${mission.execution.workspaces.map(workspace => `- ${workspace.repositoryPath} -> ${workspace.path} at ${workspace.baseSha ?? 'unavailable'}`).join('\n')}\n${run.stage === 'review'
+        ? 'During Review, you may inspect every listed isolated Mission worktree. When remediation is requested, edit only the listed Mission worktree matching each finding repository. Do not edit source checkouts or unrelated worktrees.'
+        : 'Work only in your assigned isolated worktree. Do not edit source checkouts or other Mission worktrees.'}`
       : mission.execution?.workspace
         ? `Mission baseline commit: ${mission.execution.workspace.baseSha ?? 'unavailable'}. Work only in the isolated mission worktree: ${mission.execution.workspace.path}. Do not edit the source checkout or other worktrees.`
       : 'This stage runs from the Claw-owned mission home. No Git worktree is attached yet.',

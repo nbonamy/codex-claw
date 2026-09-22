@@ -34,6 +34,10 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
       expect(prompt).toContain('coherent local commits');
       expect(prompt).toContain('commit SHAs');
     }
+    if (stage === 'review') {
+      expect(prompt).toContain('may inspect every listed isolated Mission worktree');
+      expect(prompt).not.toContain('Do not edit source checkouts or other Mission worktrees');
+    }
     if (stage === 'implementation') expect(prompt).toContain('explicit Review stage');
     else expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Claw-owned Mission skill');

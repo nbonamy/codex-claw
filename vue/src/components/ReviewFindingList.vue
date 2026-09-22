@@ -49,9 +49,12 @@
       </div>
       <div v-if="expandedFindingId === finding.id" :id="`finding-details-${finding.id}`" class="review-finding__body">
         <span v-if="finding.repositoryPath" class="review-finding__repository">{{ finding.repositoryPath }}</span>
-        <button v-if="finding.location" class="review-finding__location" type="button" @click="emit('openFile', finding.location.file)">
+        <button v-if="finding.location && finding.locationInteractive !== false" class="review-finding__location" type="button" @click="emit('openFile', finding.location.file)">
           {{ locationLabel(finding.location) }}
         </button>
+        <span v-else-if="finding.location" class="review-finding__location review-finding__location--text">
+          {{ locationLabel(finding.location) }}
+        </span>
         <div class="review-finding__description" v-html="renderMarkdown(finding.body)" />
         <blockquote v-if="finding.decisionReason" class="review-finding__decision">
           <strong>{{ $t('surface.codeReviewPanel.stateRejected') }}</strong>
@@ -74,6 +77,7 @@ export type ReviewFindingListItem = {
   title: string;
   body: string;
   location?: CodeReviewLocation;
+  locationInteractive?: boolean;
   repositoryPath?: string;
   selected: boolean;
   selectable?: boolean;
@@ -127,6 +131,7 @@ function locationLabel(location: CodeReviewLocation): string {
 .review-finding__selection { flex: 0 0 auto; }
 .review-finding__repository { color: var(--color-text-muted); font-family: var(--font-family-mono); font-size: var(--font-size-12); }
 .review-finding__location { justify-self: start; max-width: 100%; padding: 0; border: 0; color: var(--color-primary); background: transparent; font-family: var(--font-family-mono); font-size: var(--font-size-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.review-finding__location--text { cursor: default; }
 .review-finding__body { display: grid; gap: var(--space-4); padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); }
 .review-finding__description p { margin: 0; font-size: var(--font-size-13); line-height: var(--line-height-20); }
 .review-finding__decision { margin: 0; padding: var(--space-3); border-left: 3px solid var(--color-text-muted); background: var(--color-surface-low); }

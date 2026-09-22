@@ -100,6 +100,7 @@ const selectedRepository = computed(() => (
 ));
 
 async function refresh(): Promise<void> {
+  const current = ++request;
   const repository = selectedRepository.value;
   if (!repository?.agent) {
     diff.value = '';
@@ -107,7 +108,6 @@ async function refresh(): Promise<void> {
     state.value = 'error';
     return;
   }
-  const current = ++request;
   state.value = 'loading';
   error.value = null;
   try {

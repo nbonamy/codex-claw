@@ -20,6 +20,7 @@ function setup() {
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
     refreshConversationContext: vi.fn().mockResolvedValue(undefined),
     continueStage: vi.fn().mockResolvedValue(undefined),
+    startRemediation: vi.fn().mockResolvedValue(undefined),
     ensureStageSkills: vi.fn(async (_missionId: string, stage) => [{
       name: `mission-${stage}`,
       path: `/claw/missions/mission/skills/mission-${stage}/SKILL.md`,
@@ -57,6 +58,10 @@ describe('mission execution', () => {
     });
     expect(h.current().artifacts.review.findings).toStrictEqual([expect.objectContaining({ id: finding.id, selected: true, remediation: { state: 'open' } })]);
     await expect(h.service.updateReviewFinding(h.originalAgents[0]!.id, { findingId: finding.id, status: 'fixed' })).rejects.toThrow('being remediated');
+    await expect(h.service.updateReviewFinding(h.originalAgents[0]!.id, { findingId: finding.id, repositoryPath: '/other/repo' })).rejects.toThrow('represented in this Mission');
+    expect(h.current().artifacts.review.findings![0]!.repositoryPath).toBe(repositoryPath);
+    await expect(h.command({ action: 'selectReviewFinding', findingId: finding.id, selected: 'false' })).rejects.toThrow('Invalid Mission review finding selection');
+    expect(h.current().artifacts.review.findings![0]!.selected).toBe(true);
 
     await h.service.writeArtifact(h.originalAgents[0]!.id, { stage: 'review', content: '# Review\nBlocking finding reported.' });
     const submitted = structuredClone(h.current().artifacts);
@@ -65,16 +70,85 @@ describe('mission execution', () => {
     await expect(h.command({ action: 'accept', runId: 'review-run' })).rejects.toThrow('Resolve selected and blocking findings');
     expect(h.current().stage).toBe('review');
 
-    h.ports.continueStage.mockRejectedValueOnce(new Error('Provider unavailable'));
+    h.ports.startRemediation.mockRejectedValueOnce(new Error('Provider unavailable'));
     await expect(h.command({ action: 'fixSelectedReviewFindings' })).rejects.toThrow('Provider unavailable');
     expect(h.current().artifacts.review.findings![0]!.remediation.state).toBe('open');
     await h.command({ action: 'fixSelectedReviewFindings' });
     expect(h.current().artifacts.review.findings![0]!.remediation.state).toBe('fixing');
-    expect(h.ports.continueStage).toHaveBeenLastCalledWith(h.originalAgents[0]!.id, expect.stringContaining(finding.id));
+    expect(h.ports.startRemediation).toHaveBeenLastCalledWith(h.originalAgents[0]!.id, expect.stringContaining(finding.id));
     await h.service.updateReviewFinding(h.originalAgents[0]!.id, { findingId: finding.id, status: 'fixed', evidence: 'Focused tests pass.' });
     expect(h.current().artifacts.review.findings![0]!.remediation).toMatchObject({ state: 'fixed', evidence: 'Focused tests pass.' });
     await h.command({ action: 'accept', runId: 'review-run' });
     expect(h.current().stage).toBe('ship');
+  });
+
+  it('maps every selected Review finding to its isolated repository worktree', async () => {
+    const h = setup();
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'review';
+      mission.execution!.workspaces = [
+        { repositoryPath: '/repo/api', path: '/mission/api', branch: 'mission/billing' },
+        { repositoryPath: '/repo/web', path: '/mission/web', branch: 'mission/billing' },
+      ];
+      mission.execution!.runs = [{
+        id: 'review-run', stage: 'review', memberId: h.originalAgents[0]!.id, workerId: h.originalAgents[0]!.id,
+        status: 'awaitingReview', skills: [], feedback: '', startedAt: 'now', proposal: structuredClone(mission.artifacts),
+      }];
+      mission.artifacts.review.findings = [
+        { id: 'finding-api', priority: 'p1', title: 'Fix API', body: 'API issue.', repositoryPath: '/repo/api', selected: true, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now' },
+        { id: 'finding-web', priority: 'p2', title: 'Fix web', body: 'Web issue.', repositoryPath: '/repo/web', selected: true, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now' },
+      ];
+    });
+
+    await h.command({ action: 'fixSelectedReviewFindings' });
+
+    expect(h.ports.startRemediation).toHaveBeenCalledWith(h.originalAgents[0]!.id, expect.stringContaining('Repository: /repo/api\nMission worktree: /mission/api'));
+    expect(h.ports.startRemediation).toHaveBeenCalledWith(h.originalAgents[0]!.id, expect.stringContaining('Repository: /repo/web\nMission worktree: /mission/web'));
+    expect(h.current().artifacts.review.findings?.map(finding => finding.remediation.state)).toStrictEqual(['fixing', 'fixing']);
+  });
+
+  it('tracks only an accepted remediation turn and rejects overlapping batches', async () => {
+    const h = setup();
+    const workerId = h.originalAgents[0]!.id;
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'review';
+      mission.execution!.workspaces = [{ repositoryPath: '/repo', path: '/mission/repo', branch: 'mission/billing' }];
+      mission.execution!.runs = [{
+        id: 'review-run', stage: 'review', memberId: workerId, workerId,
+        status: 'awaitingReview', skills: [], feedback: '', startedAt: 'now', proposal: structuredClone(mission.artifacts),
+      }];
+      mission.artifacts.review.findings = [
+        { id: 'finding-1', priority: 'p1', title: 'Fix it', body: 'Still broken.', repositoryPath: '/repo', selected: true, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now' },
+        { id: 'finding-2', priority: 'p2', title: 'Fix this later', body: 'Also broken.', repositoryPath: '/repo', selected: false, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now' },
+      ];
+    });
+
+    let acceptRemediation!: () => void;
+    h.ports.startRemediation.mockImplementationOnce(() => new Promise<void>(resolve => { acceptRemediation = resolve; }));
+    const dispatch = h.command({ action: 'fixSelectedReviewFindings' });
+    await vi.waitFor(() => expect(acceptRemediation).toBeTypeOf('function'));
+    expect(h.current().artifacts.review.findings?.[0]?.remediation.state).toBe('fixing');
+
+    // The Review proposal's preceding turn may finish while remediation is still waiting for prompt admission.
+    await h.service.agentFinished(workerId);
+    expect(h.current().artifacts.review.findings?.[0]?.remediation.state).toBe('fixing');
+
+    acceptRemediation();
+    await dispatch;
+    await h.store.change(h.current().id, mission => {
+      mission.artifacts.review.findings![1]!.selected = true;
+    });
+    await expect(h.command({ action: 'fixSelectedReviewFindings' })).rejects.toThrow('already running');
+    expect(h.current().artifacts.review.findings?.map(finding => finding.remediation.state)).toStrictEqual(['fixing', 'open']);
+
+    await h.service.agentFinished(workerId);
+    expect(h.current().artifacts.review.findings?.map(finding => finding.remediation.state)).toStrictEqual(['open', 'open']);
+
+    await h.store.change(h.current().id, mission => {
+      mission.artifacts.review.findings![0]!.remediation = { state: 'fixing', startedAt: 'before-restart' };
+    });
+    await h.service.recoverInterruptedRuns();
+    expect(h.current().artifacts.review.findings?.[0]?.remediation.state).toBe('open');
   });
   it('replaces an active installed workflow skill with the Claw-owned Mission skill', async () => {
     const h = setup(); await h.configure();
@@ -97,6 +171,10 @@ describe('mission execution', () => {
       mission.execution!.debugFixture = true;
       mission.execution!.runs[0]!.status = 'preparing';
       mission.execution!.runs[0]!.skills = [];
+      mission.artifacts.review.findings = [{
+        id: 'debug-finding', priority: 'p1', title: 'Keep fixture state', body: 'Fixture state is intentional.', repositoryPath: '/repo',
+        selected: true, remediation: { state: 'fixing', startedAt: 'now' }, createdAt: 'now', updatedAt: 'now',
+      }];
     });
     h.ports.ensureStageSkills.mockClear();
 
@@ -105,6 +183,7 @@ describe('mission execution', () => {
 
     expect(h.ports.ensureStageSkills).not.toHaveBeenCalled();
     expect(h.current().execution!.runs[0]).toMatchObject({ status: 'preparing', skills: [] });
+    expect(h.current().artifacts.review.findings?.[0]?.remediation.state).toBe('fixing');
   });
 
   it('moves legacy ticket approvals into the explicit Review stage during recovery', async () => {

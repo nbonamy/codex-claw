@@ -36,7 +36,7 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
       readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
       writeArtifact: async (_missionId, stage, content) => { artifactContents.set(stage, content); return { size: content.length }; },
-      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {}, continueStage: async () => {},
+      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {}, continueStage: async () => {}, startRemediation: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       ensureStageSkills: (missionId, stage) => missionSkills.ensure(missionId, stage),
       interrupt: async () => {},

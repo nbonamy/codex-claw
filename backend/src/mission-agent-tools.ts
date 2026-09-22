@@ -202,16 +202,21 @@ export class MissionAgentTools {
 
   async updateReviewFinding(agentId: string, input: MissionReviewFindingUpdateInput): Promise<MissionReviewFinding> {
     const context = this.requireReviewContext(agentId);
+    const repositoryPath = input.repositoryPath?.trim();
+    if (input.repositoryPath !== undefined && !repositoryPath) throw new Error('Mission review finding repository is invalid.');
     let updated!: MissionReviewFinding;
     await this.ports.missions.change(context.missionId, current => {
       this.requireOwnedReviewRun(current, context.runId, agentId);
       const finding = current.artifacts.review.findings?.find(candidate => candidate.id === input.findingId);
       if (!finding) throw new Error('Mission review finding was not found.');
       if (input.status === 'fixed' && finding.remediation.state !== 'fixing') throw new Error('Only a finding being remediated can be marked fixed.');
+      if (repositoryPath && !current.execution?.workspaces?.some(workspace => workspace.repositoryPath === repositoryPath)) {
+        throw new Error('Choose a repository represented in this Mission.');
+      }
       if (input.priority) finding.priority = input.priority;
       if (input.title?.trim()) finding.title = input.title.trim();
       if (input.body?.trim()) finding.body = input.body.trim();
-      if (input.repositoryPath?.trim()) finding.repositoryPath = input.repositoryPath.trim();
+      if (repositoryPath) finding.repositoryPath = repositoryPath;
       if (input.location) finding.location = { ...input.location };
       const now = new Date().toISOString();
       if (input.status === 'fixed') finding.remediation = { state: 'fixed', completedAt: now, ...(input.evidence?.trim() ? { evidence: input.evidence.trim() } : {}) };

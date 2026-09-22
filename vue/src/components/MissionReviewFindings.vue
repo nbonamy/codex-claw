@@ -6,7 +6,7 @@
         <span>{{ t('missions.reviewFindingCount', { count: findings.length }) }}</span>
       </div>
       <button
-        v-if="openSelectedCount && !readOnly"
+        v-if="openSelectedCount && canArbitrate"
         class="claw-button claw-button--primary"
         type="button"
         :disabled="busy"
@@ -22,7 +22,7 @@
     <ReviewFindingList
       v-else
       :findings="findingItems"
-      :selectable="!readOnly"
+      :selectable="canArbitrate"
       :busy="busy"
       @select="selectFinding"
     />
@@ -46,13 +46,16 @@ const busy = ref(false);
 const error = ref('');
 const findings = computed(() => [...(props.mission.artifacts.review.findings ?? [])].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority)));
 const openSelectedCount = computed(() => findings.value.filter(finding => finding.selected && finding.remediation.state === 'open').length);
+const canArbitrate = computed(() => !props.readOnly && props.mission.stage === 'review' && Boolean(
+  props.mission.execution?.runs.slice().reverse().find(run => run.stage === 'review' && run.status === 'awaitingReview' && run.proposal),
+));
 const findingItems = computed<ReviewFindingListItem[]>(() => findings.value.map(finding => ({
   id: finding.id,
   priority: finding.priority,
   title: finding.title,
   body: finding.body,
   repositoryPath: finding.repositoryPath,
-  ...(finding.location ? { location: finding.location } : {}),
+  ...(finding.location ? { location: finding.location, locationInteractive: false } : {}),
   selected: finding.selected,
   selectable: finding.remediation.state === 'open',
   state: finding.remediation.state,
