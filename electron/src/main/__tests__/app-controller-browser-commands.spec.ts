@@ -74,24 +74,24 @@ describe('AppController', () => {
     ));
   });
 
-  it('populates Design through clawd and opens the real Design pane', async () => {
+  it('populates Visualize through clawd and opens the real Visualize pane', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockResolvedValue(snapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const send = vi.fn();
     setMainWindowSend(controller, send);
     const options = (controller as unknown as {
-      debugMenuOptions(): { populateDebugDesign(scenario: 'complete' | 'suggestions'): void };
+      debugMenuOptions(): { populateDebugVisualize(scenario: 'complete' | 'suggestions'): void };
     }).debugMenuOptions();
 
-    options.populateDebugDesign('suggestions');
+    options.populateDebugVisualize('suggestions');
 
     await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
-      backendMethods.debugDesignPopulate,
+      backendMethods.debugVisualizePopulate,
       { agentId: 'agent-dina', scenario: 'suggestions' },
     ));
     await vi.waitFor(() => expect(send).toHaveBeenCalledWith('app:command', {
-      type: 'debug-open-design',
+      type: 'debug-open-visualize',
     }));
   });
 

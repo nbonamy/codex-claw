@@ -17,7 +17,8 @@ import { presentClawTool } from '../tool-presentation';
 
 describe('Claw tool presentation', () => {
   it.each([
-    ['add-design-diagram', SitemapIcon, 'Created diagram'],
+    ['add-visualization', SitemapIcon, 'Created diagram'],
+    ['delete-visualization', SitemapIcon, 'Deleted diagram'],
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
     ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],

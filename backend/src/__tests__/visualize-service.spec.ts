@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { DesignService, generateDesignSuggestionPrompt } from '../design-service';
+import { VisualizeService, generateVisualizationSuggestionPrompt } from '../visualize-service';
 
 let temporaryDirectory: string | null = null;
 
@@ -12,19 +12,19 @@ afterEach(async () => {
   temporaryDirectory = null;
 });
 
-describe('DesignService', () => {
+describe('VisualizeService', () => {
   it('runs the durable suggest, add, select, read, and replace workflow', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
-    agent.backendSession = { kind: 'codex', threadId: 'thread-design' };
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-design-'));
+    agent.backendSession = { kind: 'codex', threadId: 'thread-visualize' };
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
     await mkdir(generatedImagesRoot);
-    await writeFile(path.join(generatedImagesRoot, 'system.png'), Buffer.from('diagram'));
+    await writeFile(path.join(generatedImagesRoot, 'system.png'), Buffer.from('visualization'));
     const persist = vi.fn().mockResolvedValue(undefined);
     const publish = vi.fn();
     let sequence = 0;
-    const service = new DesignService({
+    const service = new VisualizeService({
       snapshot,
       generatedImagesRoot,
       createId: prefix => `${prefix}-${++sequence}`,
@@ -35,7 +35,8 @@ describe('DesignService', () => {
 
     const entered = await service.enter(agent.id);
     expect(entered.created).toBe(true);
-    expect(entered.design.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-design' });
+    expect(entered.visualize.isOpen).toBe(true);
+    expect(entered.visualize.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-visualize' });
     expect(service.developerInstructionsForAgent(agent.id)).toMatch(/Do not browse,[\s\S]*background research/u);
 
     const suggested = await service.suggest(agent.id, [
@@ -50,24 +51,24 @@ describe('DesignService', () => {
     });
     await service.add(agent.id, {
       title: 'Generated concept',
-      content: { kind: 'image', generatedImagePath: 'system.png', alt: 'A system concept diagram' },
+      content: { kind: 'image', generatedImagePath: 'system.png', alt: 'A system concept visualization' },
     });
-    await service.select(agent.id, added.diagramId);
+    await service.select(agent.id, added.visualizationId);
     const replaced = await service.replace(agent.id, {
-      diagramId: added.diagramId,
+      visualizationId: added.visualizationId,
       expectedRevision: 1,
       title: 'System map, revised',
       content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>' },
     });
 
     expect(replaced.revision).toBe(2);
-    expect(service.get(agent.id, added.diagramId).diagram).toMatchObject({
+    expect(service.get(agent.id, added.visualizationId).visualization).toMatchObject({
       title: 'System map, revised',
       revision: 2,
       content: { kind: 'svg' },
     });
-    expect(agent.design?.suggestions[0].diagramId).toBe(added.diagramId);
-    const image = agent.design?.diagrams.find(diagram => diagram.content.kind === 'image');
+    expect(agent.visualize?.suggestions[0].visualizationId).toBe(added.visualizationId);
+    const image = agent.visualize?.visualizations.find(visualization => visualization.content.kind === 'image');
     await expect(service.readAsset(agent.id, image!.id)).resolves.toMatchObject({
       mimeType: 'image/png',
       dataUrl: expect.stringMatching(/^data:image\/png;base64,/u),
@@ -76,9 +77,55 @@ describe('DesignService', () => {
     expect(publish).toHaveBeenCalledTimes(6);
   });
 
-  it('keeps diagram suggestions compact for the Design pane', async () => {
+  it('lists and deletes visualizations, hides tools when closed, and restarts suggestions after the last deletion', async () => {
     const snapshot = createInitialSnapshot();
-    const service = new DesignService({
+    const persist = vi.fn().mockResolvedValue(undefined);
+    const service = new VisualizeService({
+      snapshot,
+      generatedImagesRoot: os.tmpdir(),
+      persist,
+      publish: () => undefined,
+    });
+    const agentId = snapshot.agents[0].id;
+
+    await service.enter(agentId);
+    const suggestions = await service.suggest(agentId, [{ title: 'System', description: 'Show the system.' }]);
+    const first = await service.add(agentId, {
+      title: 'System',
+      suggestionId: suggestions.suggestions[0].id,
+      content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
+    });
+    const second = await service.add(agentId, {
+      title: 'Sequence',
+      content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg" />' },
+    });
+
+    expect(service.list(agentId).visualizations).toStrictEqual([
+      { id: first.visualizationId, title: 'System', kind: 'mermaid', revision: 1, selected: false },
+      { id: second.visualizationId, title: 'Sequence', kind: 'svg', revision: 1, selected: true },
+    ]);
+    await expect(service.delete(agentId, second.visualizationId)).resolves.toMatchObject({
+      selectedVisualizationId: first.visualizationId,
+    });
+    await service.delete(agentId, first.visualizationId);
+    expect(snapshot.agents[0].visualize).toMatchObject({
+      visualizations: [],
+      selectedVisualizationId: null,
+    });
+    expect(snapshot.agents[0].visualize?.suggestions[0]).not.toHaveProperty('visualizationId');
+
+    await service.setOpen(agentId, false);
+    expect(service.contextForAgent(agentId)).toBeUndefined();
+    expect(service.developerInstructionsForAgent(agentId)).toBeUndefined();
+
+    const reopened = await service.enter(agentId);
+    expect(reopened).toMatchObject({ created: true, visualize: { isOpen: true, suggestions: [] } });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('keeps visualization suggestions compact for the Visualize pane', async () => {
+    const snapshot = createInitialSnapshot();
+    const service = new VisualizeService({
       snapshot,
       generatedImagesRoot: os.tmpdir(),
       persist: () => Promise.resolve(),
@@ -101,22 +148,23 @@ describe('DesignService', () => {
     }])).rejects.toThrow('Suggestion description');
   });
 
-  it('splits a generated-diagram request into visible copy and model-only context', () => {
-    const prompt = generateDesignSuggestionPrompt({
-      id: 'design-1',
+  it('splits a generated-visualization request into visible copy and model-only context', () => {
+    const prompt = generateVisualizationSuggestionPrompt({
+      id: 'visualize-1',
       conversationRef: null,
+      isOpen: true,
       suggestions: [{
         id: 'suggestion-flow',
         title: 'Deployment flow',
         description: 'Show the deployment path.',
       }],
-      diagrams: [],
-      selectedDiagramId: null,
+      visualizations: [],
+      selectedVisualizationId: null,
       createdAt: '2026-09-21T12:00:00.000Z',
       updatedAt: '2026-09-21T12:00:00.000Z',
     }, 'suggestion-flow');
 
-    expect(prompt.slice(0, prompt.indexOf('<context>')).trim()).toBe('Generate the “Deployment flow” diagram.');
+    expect(prompt.slice(0, prompt.indexOf('<context>')).trim()).toBe('Generate the “Deployment flow” visualization.');
     expect(prompt).toContain('suggestion-flow');
     expect(prompt).toMatch(/Do not browse,[\s\S]*background research/u);
     expect(prompt).toMatch(/<context>[\s\S]*<\/context>$/u);
@@ -124,12 +172,12 @@ describe('DesignService', () => {
 
   it('rejects stale replacement revisions and generated images outside the owned folder', async () => {
     const snapshot = createInitialSnapshot();
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-design-'));
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
     await mkdir(generatedImagesRoot);
     const outside = path.join(temporaryDirectory, 'outside.png');
     await writeFile(outside, Buffer.from('outside'));
-    const service = new DesignService({
+    const service = new VisualizeService({
       snapshot,
       generatedImagesRoot,
       persist: () => Promise.resolve(),
@@ -142,7 +190,7 @@ describe('DesignService', () => {
     });
 
     await expect(service.replace(snapshot.agents[0].id, {
-      diagramId: added.diagramId,
+      visualizationId: added.visualizationId,
       expectedRevision: 9,
       title: 'Stale',
       content: { kind: 'mermaid', source: 'flowchart LR\n A --> C' },
@@ -153,14 +201,14 @@ describe('DesignService', () => {
     })).rejects.toThrow('inside the Codex Claw generated-images folder');
   });
 
-  it('does not expose a Design session after its owning conversation is released', async () => {
+  it('does not expose a Visualize session after its owning conversation is released', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
-    agent.backendSession = { kind: 'codex', threadId: 'thread-design' };
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-design-'));
+    agent.backendSession = { kind: 'codex', threadId: 'thread-visualize' };
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
     await mkdir(generatedImagesRoot);
-    const service = new DesignService({
+    const service = new VisualizeService({
       snapshot,
       generatedImagesRoot,
       persist: () => Promise.resolve(),

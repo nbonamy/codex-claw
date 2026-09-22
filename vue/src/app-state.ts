@@ -204,30 +204,44 @@ export function useAppState() {
     return next;
   }
 
-  async function startDesign(agentId: string, input?: import('@codex-claw/core/design').StartDesignInput): Promise<AppSnapshot> {
+  async function startVisualize(agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.startDesign(agentId, input);
+    const next = await codexClawApi.startVisualize(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function generateDesignSuggestion(agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput): Promise<AppSnapshot> {
+  async function setVisualizeOpen(agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.generateDesignSuggestion(agentId, input);
+    const next = await codexClawApi.setVisualizeOpen(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function selectDesignDiagram(agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput): Promise<AppSnapshot> {
+  async function generateVisualizationSuggestion(agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.selectDesignDiagram(agentId, input);
+    const next = await codexClawApi.generateVisualizationSuggestion(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function readDesignDiagramAsset(agentId: string, diagramId: string): Promise<import('@codex-claw/core/design').DesignDiagramAsset> {
+  async function selectVisualization(agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput): Promise<AppSnapshot> {
     if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    return codexClawApi.readDesignDiagramAsset(agentId, diagramId);
+    const next = await codexClawApi.selectVisualization(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function deleteVisualization(agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput): Promise<AppSnapshot> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    const next = await codexClawApi.deleteVisualization(agentId, input);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
+  async function readVisualizationAsset(agentId: string, visualizationId: string): Promise<import('@codex-claw/core/visualize').VisualizationAsset> {
+    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
+    return codexClawApi.readVisualizationAsset(agentId, visualizationId);
   }
 
   async function decideCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
@@ -1484,10 +1498,12 @@ export function useAppState() {
     respondToPlanReview,
     respondToThreadFlag,
     startCodeReview,
-    startDesign,
-    generateDesignSuggestion,
-    selectDesignDiagram,
-    readDesignDiagramAsset,
+    startVisualize,
+    setVisualizeOpen,
+    generateVisualizationSuggestion,
+    selectVisualization,
+    deleteVisualization,
+    readVisualizationAsset,
     decideCodeReviewFinding,
     discussCodeReviewFinding,
     submitCodeReviewRound,

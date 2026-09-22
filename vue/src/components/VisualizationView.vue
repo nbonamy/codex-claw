@@ -1,10 +1,10 @@
 <template>
-  <div class="design-diagram-view" :class="{ 'design-diagram-view--compact': compact }">
+  <div class="visualization-view" :class="{ 'visualization-view--compact': compact }">
     <div
-      class="design-diagram-view__viewport"
-      :class="{ 'design-diagram-view__viewport--pannable': !compact && scale > 1, 'design-diagram-view__viewport--panning': panning }"
+      class="visualization-view__viewport"
+      :class="{ 'visualization-view__viewport--pannable': !compact && scale > 1, 'visualization-view__viewport--panning': panning }"
       :tabindex="compact ? undefined : 0"
-      :aria-label="compact ? undefined : translate('design.canvasInteraction')"
+      :aria-label="compact ? undefined : translate('visualize.canvasInteraction')"
       @wheel="handleWheel"
       @pointerdown="startPan"
       @pointermove="movePan"
@@ -12,22 +12,22 @@
       @pointercancel="stopPan"
       @keydown="handleKeydown"
     >
-      <div v-if="error" class="design-diagram-view__error" role="alert">{{ error }}</div>
-      <div v-else-if="diagram.content.kind === 'image' && !imageSource" class="design-diagram-view__loading">{{ translate('common.loading') }}</div>
+      <div v-if="error" class="visualization-view__error" role="alert">{{ error }}</div>
+      <div v-else-if="visualization.content.kind === 'image' && !imageSource" class="visualization-view__loading">{{ translate('common.loading') }}</div>
       <img
         v-else
-        class="design-diagram-view__image"
+        class="visualization-view__image"
         :src="source"
-        :alt="diagram.content.kind === 'image' ? diagram.content.alt : diagram.title"
+        :alt="visualization.content.kind === 'image' ? visualization.content.alt : visualization.title"
         :style="imageTransform"
         draggable="false"
       />
     </div>
-    <div v-if="!compact" class="design-diagram-view__controls">
-      <button type="button" :aria-label="translate('design.zoomOut')" :disabled="scale <= minScale" @click="zoomBy(-zoomStep)">−</button>
-      <button type="button" :aria-label="translate('design.resetView')" @click="resetView">{{ Math.round(scale * 100) }}%</button>
-      <button type="button" :aria-label="translate('design.zoomIn')" :disabled="scale >= maxScale" @click="zoomBy(zoomStep)">+</button>
-      <span class="sr-only" aria-live="polite">{{ translate('design.zoomLevel', { percent: Math.round(scale * 100) }) }}</span>
+    <div v-if="!compact" class="visualization-view__controls">
+      <button type="button" :aria-label="translate('visualize.zoomOut')" :disabled="scale <= minScale" @click="zoomBy(-zoomStep)">−</button>
+      <button type="button" :aria-label="translate('visualize.resetView')" @click="resetView">{{ Math.round(scale * 100) }}%</button>
+      <button type="button" :aria-label="translate('visualize.zoomIn')" :disabled="scale >= maxScale" @click="zoomBy(zoomStep)">+</button>
+      <span class="sr-only" aria-live="polite">{{ translate('visualize.zoomLevel', { percent: Math.round(scale * 100) }) }}</span>
     </div>
   </div>
 </template>
@@ -35,12 +35,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { renderMermaidSVG } from 'beautiful-mermaid';
-import type { DesignDiagram } from '@codex-claw/core/design';
+import type { Visualization } from '@codex-claw/core/visualize';
 import { translate } from '../i18n';
 
 const props = withDefaults(defineProps<{
   compact?: boolean;
-  diagram: DesignDiagram;
+  visualization: Visualization;
   imageSource?: string;
 }>(), {
   compact: false,
@@ -49,10 +49,10 @@ const props = withDefaults(defineProps<{
 
 const rendering = computed(() => {
   try {
-    if (props.diagram.content.kind === 'image') return { source: props.imageSource, error: '' };
-    const raw = props.diagram.content.kind === 'mermaid'
-      ? renderMermaidSVG(props.diagram.content.source, { transparent: true })
-      : props.diagram.content.source;
+    if (props.visualization.content.kind === 'image') return { source: props.imageSource, error: '' };
+    const raw = props.visualization.content.kind === 'mermaid'
+      ? renderMermaidSVG(props.visualization.content.source, { transparent: true })
+      : props.visualization.content.source;
     const svg = sanitizeSvg(raw);
     return { source: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, error: '' };
   } catch (error) {
@@ -75,7 +75,7 @@ const imageTransform = computed(() => ({
   transform: `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`,
 }));
 
-watch(() => `${props.diagram.id}:${props.diagram.revision}`, resetView);
+watch(() => `${props.visualization.id}:${props.visualization.revision}`, resetView);
 
 function zoomBy(delta: number): void {
   if (props.compact) return;
@@ -147,7 +147,7 @@ function resetView(): void {
 function sanitizeSvg(source: string): string {
   const document = new DOMParser().parseFromString(source, 'image/svg+xml');
   if (document.querySelector('parsererror') || document.documentElement.tagName.toLowerCase() !== 'svg') {
-    throw new Error('The diagram did not produce valid SVG.');
+    throw new Error('The visualization did not produce valid SVG.');
   }
   document.querySelectorAll('script, foreignObject, iframe, object, embed').forEach(element => element.remove());
   document.querySelectorAll('style').forEach(element => {
@@ -174,14 +174,14 @@ function sanitizeSvg(source: string): string {
 </script>
 
 <style scoped>
-.design-diagram-view {
+.visualization-view {
   position: relative;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-.design-diagram-view__viewport {
+.visualization-view__viewport {
   width: 100%;
   height: 100%;
   display: grid;
@@ -191,19 +191,19 @@ function sanitizeSvg(source: string): string {
   touch-action: none;
 }
 
-.design-diagram-view__viewport:focus-visible {
+.visualization-view__viewport:focus-visible {
   box-shadow: inset 0 0 0 2px var(--color-primary);
 }
 
-.design-diagram-view__viewport--pannable {
+.visualization-view__viewport--pannable {
   cursor: grab;
 }
 
-.design-diagram-view__viewport--panning {
+.visualization-view__viewport--panning {
   cursor: grabbing;
 }
 
-.design-diagram-view__image {
+.visualization-view__image {
   display: block;
   width: 100%;
   height: 100%;
@@ -215,20 +215,20 @@ function sanitizeSvg(source: string): string {
   user-select: none;
 }
 
-.design-diagram-view__viewport--panning .design-diagram-view__image {
+.visualization-view__viewport--panning .visualization-view__image {
   transition: none;
 }
 
-.design-diagram-view--compact {
+.visualization-view--compact {
   overflow: hidden;
 }
 
-.design-diagram-view--compact .design-diagram-view__image {
+.visualization-view--compact .visualization-view__image {
   width: 100%;
   height: 100%;
 }
 
-.design-diagram-view__controls {
+.visualization-view__controls {
   position: absolute;
   right: var(--space-8);
   bottom: var(--space-8);
@@ -243,7 +243,7 @@ function sanitizeSvg(source: string): string {
   box-shadow: var(--shadow-sm);
 }
 
-.design-diagram-view__controls button {
+.visualization-view__controls button {
   min-width: 30px;
   height: 28px;
   padding: 0 var(--space-6);
@@ -255,11 +255,11 @@ function sanitizeSvg(source: string): string {
   cursor: pointer;
 }
 
-.design-diagram-view__controls button:hover:not(:disabled) {
+.visualization-view__controls button:hover:not(:disabled) {
   background: var(--color-surface-high);
 }
 
-.design-diagram-view__controls button:disabled {
+.visualization-view__controls button:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -276,15 +276,15 @@ function sanitizeSvg(source: string): string {
   border: 0;
 }
 
-.design-diagram-view__loading,
-.design-diagram-view__error {
+.visualization-view__loading,
+.visualization-view__error {
   padding: var(--space-8);
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   text-align: center;
 }
 
-.design-diagram-view__error {
+.visualization-view__error {
   color: var(--color-error);
 }
 </style>

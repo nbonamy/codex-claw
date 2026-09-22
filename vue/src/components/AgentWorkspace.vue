@@ -107,9 +107,10 @@
       :submit-code-review-round="submitCodeReviewRound"
       :finish-code-review="finishCodeReview"
       :review-code-again="reviewCodeAgain"
-      :generate-design-suggestion="generateDesignSuggestion"
-      :select-design-diagram="selectDesignDiagram"
-      :read-design-diagram-asset="readDesignDiagramAsset"
+      :generate-visualization-suggestion="generateVisualizationSuggestion"
+      :select-visualization="selectVisualization"
+      :delete-visualization="deleteVisualization"
+      :read-visualization-asset="readVisualizationAsset"
       @close-tab="closeWorkspaceTab(agent, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
@@ -274,9 +275,11 @@ const props = defineProps<{
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
-  generateDesignSuggestion: (agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => Promise<AppSnapshot>;
-  selectDesignDiagram: (agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => Promise<AppSnapshot>;
-  readDesignDiagramAsset: (agentId: string, diagramId: string) => Promise<import('@codex-claw/core/design').DesignDiagramAsset>;
+  generateVisualizationSuggestion: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  setVisualizeOpen: (agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
+  selectVisualization: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
 }>();
 
 const agentHeader = ref<{
@@ -340,9 +343,10 @@ const {
   finishCodeReview,
   discardCodeReview,
   reviewCodeAgain,
-  generateDesignSuggestion,
-  selectDesignDiagram,
-  readDesignDiagramAsset,
+  generateVisualizationSuggestion,
+  selectVisualization,
+  deleteVisualization,
+  readVisualizationAsset,
   startRightWorkspaceResize,
   toggleFileExplorer,
   toggleRightWorkspace,
@@ -643,6 +647,10 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
     rightWorkspaceFor(agentId).filesPaneOpen = true;
   }
   openRightWorkspaceTab(tab, agentId);
+  const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
+  if (tab === 'visualize' && visualize && !visualize.isOpen) {
+    void props.setVisualizeOpen(agentId, { open: true });
+  }
 }
 
 async function openRepositoryBacklog(agentId: string): Promise<void> {

@@ -7,7 +7,7 @@ describe('backend command catalog', () => {
     expect(codexBackendCommands.map((command) => command.slashName)).toStrictEqual([
       'compact',
       'review',
-      'design',
+      'visualize',
       'plan',
       'goal',
     ]);
@@ -35,12 +35,12 @@ describe('backend command catalog', () => {
         submitOnSelect: true,
       },
       {
-        id: 'claw.design',
+        id: 'claw.visualize',
         backend: 'claude',
-        name: 'design',
-        displayName: 'Design',
-        description: 'Open Claw Design mode for diagrams.',
-        slashName: 'design',
+        name: 'visualize',
+        displayName: 'Visualize',
+        description: 'Open Claw Visualize mode for diagrams.',
+        slashName: 'visualize',
         submitOnSelect: true,
       },
       {

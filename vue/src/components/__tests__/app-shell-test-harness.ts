@@ -166,10 +166,12 @@ export function mountShell(overrides: Partial<{
     agentId: string,
     input: import('@codex-claw/core/code-review').CodeReviewStartInput,
   ) => Promise<AppSnapshot>;
-  startDesign: (agentId: string, input?: import('@codex-claw/core/design').StartDesignInput) => Promise<AppSnapshot>;
-  generateDesignSuggestion: (agentId: string, input: import('@codex-claw/core/design').GenerateDesignSuggestionInput) => Promise<AppSnapshot>;
-  selectDesignDiagram: (agentId: string, input: import('@codex-claw/core/design').SelectDesignDiagramInput) => Promise<AppSnapshot>;
-  readDesignDiagramAsset: (agentId: string, diagramId: string) => Promise<import('@codex-claw/core/design').DesignDiagramAsset>;
+  startVisualize: (agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
+  setVisualizeOpen: (agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
+  generateVisualizationSuggestion: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  selectVisualization: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
   discussCodeReviewFinding: (
     agentId: string,
     input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput,
@@ -197,10 +199,12 @@ export function mountShell(overrides: Partial<{
       editTurnAction: overrides.editTurnAction,
       retryTurnAction: overrides.retryTurnAction,
       startCodeReview: overrides.startCodeReview,
-      startDesign: overrides.startDesign,
-      generateDesignSuggestion: overrides.generateDesignSuggestion,
-      selectDesignDiagram: overrides.selectDesignDiagram,
-      readDesignDiagramAsset: overrides.readDesignDiagramAsset,
+      startVisualize: overrides.startVisualize,
+      setVisualizeOpen: overrides.setVisualizeOpen,
+      generateVisualizationSuggestion: overrides.generateVisualizationSuggestion,
+      selectVisualization: overrides.selectVisualization,
+      deleteVisualization: overrides.deleteVisualization,
+      readVisualizationAsset: overrides.readVisualizationAsset,
       discussCodeReviewFinding: overrides.discussCodeReviewFinding,
       isSending: false,
       composerAttachments: overrides.composerAttachments ?? [],

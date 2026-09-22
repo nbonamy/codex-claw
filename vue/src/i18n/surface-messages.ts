@@ -646,7 +646,7 @@ export const surfaceMessages = {
     "openAWorkspaceTab": "Open a workspace tab",
     "backlog": "Backlog",
     "review": "Review",
-    "design": "Design",
+    "visualize": "Visualize",
     "changes": "Changes",
     "g": "⌘G",
     "browser": "Browser",

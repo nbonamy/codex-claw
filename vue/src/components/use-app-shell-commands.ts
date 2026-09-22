@@ -334,10 +334,10 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       return;
     }
 
-    if (command.type === 'debug-open-design') {
+    if (command.type === 'debug-open-visualize') {
       if (!currentAgent.value) return;
       options.actions.openAgentSurface();
-      options.actions.openRightWorkspaceTab('design');
+      options.actions.openRightWorkspaceTab('visualize');
       return;
     }
 

@@ -34,7 +34,7 @@ const icons = {
   review: MessageReportIcon as unknown as ToolIcon,
   workItem: SquareCheck as unknown as ToolIcon,
   mission: TargetArrowIcon as unknown as ToolIcon,
-  design: SitemapIcon as unknown as ToolIcon,
+  visualize: SitemapIcon as unknown as ToolIcon,
   workspace: GitBranchIcon as unknown as ToolIcon,
 };
 
@@ -73,7 +73,7 @@ const COMPUTER_USE_TOOLS = new Set([
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
 const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding']);
-const DESIGN_TOOLS = new Set(['suggest-design-diagrams', 'add-design-diagram', 'get-design-diagram', 'replace-design-diagram']);
+const VISUALIZE_TOOLS = new Set(['suggest-visualizations', 'add-visualization', 'get-visualization', 'list-visualizations', 'delete-visualization', 'replace-visualization']);
 const AGENT_TOOLS = new Set(['create-agent', 'finish-turn', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
 const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
 
@@ -106,7 +106,7 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (COMPUTER_USE_TOOLS.has(tool)) return icons.computerUse;
   if (MESSAGE_TOOLS.has(tool)) return icons.messages;
   if (REVIEW_TOOLS.has(tool)) return icons.review;
-  if (DESIGN_TOOLS.has(tool)) return icons.design;
+  if (VISUALIZE_TOOLS.has(tool)) return icons.visualize;
   if (AGENT_TOOLS.has(tool)) return icons.agents;
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'display-markdown' || tool === 'list-mission-artifacts' || tool === 'read-mission-artifact') return icons.markdown;

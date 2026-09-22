@@ -70,21 +70,29 @@ export type ClawSnapshotGetResult = {
 };
 
 export type ClawBackendRequestMap = {
-  [backendMethods.agentDesignStart]: {
-    params: { agentId: string; input?: import('../design').StartDesignInput };
+  [backendMethods.agentVisualizeStart]: {
+    params: { agentId: string; input?: import('../visualize').StartVisualizeInput };
     result: AppSnapshot;
   };
-  [backendMethods.agentDesignSuggestionGenerate]: {
-    params: { agentId: string; input: import('../design').GenerateDesignSuggestionInput };
+  [backendMethods.agentVisualizeOpenSet]: {
+    params: { agentId: string; input: import('../visualize').SetVisualizeOpenInput };
     result: AppSnapshot;
   };
-  [backendMethods.agentDesignDiagramSelect]: {
-    params: { agentId: string; input: import('../design').SelectDesignDiagramInput };
+  [backendMethods.agentVisualizationSuggestionGenerate]: {
+    params: { agentId: string; input: import('../visualize').GenerateVisualizationSuggestionInput };
     result: AppSnapshot;
   };
-  [backendMethods.agentDesignAssetGet]: {
-    params: { agentId: string; diagramId: string };
-    result: import('../design').DesignDiagramAsset;
+  [backendMethods.agentVisualizationSelect]: {
+    params: { agentId: string; input: import('../visualize').SelectVisualizationInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizationDelete]: {
+    params: { agentId: string; input: import('../visualize').DeleteVisualizationInput };
+    result: AppSnapshot;
+  };
+  [backendMethods.agentVisualizationAssetGet]: {
+    params: { agentId: string; visualizationId: string };
+    result: import('../visualize').VisualizationAsset;
   };
   [backendMethods.agentThreadFlagRespond]: {
     params: { agentId: string; response: import('../thread-flags').ThreadFlagResponse };

@@ -29,8 +29,8 @@ import { AgentGitService } from './git/agent-git-service';
 import { PullRequestMonitor } from './git/pull-request-monitor';
 import { WorktreeManager } from './worktrees/worktree-manager';
 import { AgentCreationService } from './agents/agent-creation-service';
-import { DesignService } from './design-service';
-import { createDesignToolModuleProvider } from './mcp/design-tools';
+import { VisualizeService } from './visualize-service';
+import { createVisualizeToolModuleProvider } from './mcp/visualize-tools';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -79,7 +79,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
   let server!: ClawBackendServer;
-  const designService = new DesignService({
+  const visualizeService = new VisualizeService({
     snapshot,
     generatedImagesRoot: path.join(backendCodexHomeDir(), 'generated_images'),
     persist: () => saveBackendSnapshot(snapshot),
@@ -113,7 +113,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
     worktreeManager,
     agentCreation,
-    toolModuleProviders: [createDesignToolModuleProvider(designService)],
+    toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService)],
   });
   const mcpServerUrl = await mcpService.start();
   const backendDrivers = createDefaultBackendDrivers({
@@ -124,7 +124,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
     additionalDeveloperInstructions: (agent) => [
       server?.missionDeveloperInstructions(agent.id),
-      designService.developerInstructionsForAgent(agent.id),
+      visualizeService.developerInstructionsForAgent(agent.id),
     ].filter(Boolean).join('\n\n') || undefined,
   });
   const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
@@ -219,7 +219,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     snapshot,
     agentGitService,
     agentCreation,
-    designService,
+    visualizeService,
     driverRpc,
     onEvent: options.emitEvent,
     onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),

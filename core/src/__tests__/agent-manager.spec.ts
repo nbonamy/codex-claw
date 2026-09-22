@@ -339,9 +339,9 @@ describe('agent-manager', () => {
     agent.isRegistered = true;
     agent.mcpSessionId = 'mcp-session';
     agent.statusText = 'Registered';
-    agent.design = {
-      id: 'design-old', conversationRef: { backend: 'codex', threadId: 'thread-old' },
-      suggestions: [], diagrams: [], selectedDiagramId: null,
+    agent.visualize = {
+      id: 'visualize-old', conversationRef: { backend: 'codex', threadId: 'thread-old' }, isOpen: true,
+      suggestions: [], visualizations: [], selectedVisualizationId: null,
       createdAt: '2026-06-05T00:00:00.000Z', updatedAt: '2026-06-05T00:00:00.000Z',
     };
 
@@ -357,7 +357,7 @@ describe('agent-manager', () => {
     expect(snapshot.agents[0].isRegistered).toBeUndefined();
     expect(snapshot.agents[0].mcpSessionId).toBeUndefined();
     expect(snapshot.agents[0].statusText).toBeUndefined();
-    expect(snapshot.agents[0].design).toBeUndefined();
+    expect(snapshot.agents[0].visualize).toBeUndefined();
   });
 
   it('resumes an idle agent with the selected provider session', () => {

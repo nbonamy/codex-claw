@@ -5,10 +5,12 @@ import { presentClawToolTitle } from '../tool-title-presenter';
 
 describe('Claw tool title presenter', () => {
   it.each([
-    ['codex_claw.suggest-design-diagrams', { suggestions: [] }, 'completed', 'Suggested diagrams'],
-    ['codex_claw.add-design-diagram', { title: 'System map' }, 'completed', 'Created diagram'],
-    ['codex_claw.get-design-diagram', { diagramId: 'diagram-1' }, 'completed', 'Read diagram'],
-    ['codex_claw.replace-design-diagram', { diagramId: 'diagram-1' }, 'completed', 'Updated diagram'],
+    ['codex_claw.suggest-visualizations', { suggestions: [] }, 'completed', 'Suggested diagrams'],
+    ['codex_claw.add-visualization', { title: 'System map' }, 'completed', 'Created diagram'],
+    ['codex_claw.get-visualization', { visualizationId: 'diagram-1' }, 'completed', 'Read diagram'],
+    ['codex_claw.list-visualizations', {}, 'completed', 'Listed diagrams'],
+    ['codex_claw.delete-visualization', { visualizationId: 'diagram-1' }, 'completed', 'Deleted diagram'],
+    ['codex_claw.replace-visualization', { visualizationId: 'diagram-1' }, 'completed', 'Updated diagram'],
     ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'running', 'Naming mission'],
     ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'completed', 'Named mission'],
     ['codex_claw.set-mission-title', { title: 'Add team billing' }, 'error', 'Could not name mission'],

@@ -416,7 +416,7 @@ describe('ClawBackendServer', () => {
     expect((readyCleared as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
   });
 
-  it('persists a populated Design fixture through the debug protocol', async () => {
+  it('persists a populated Visualize fixture through the debug protocol', async () => {
     const snapshot = createTestSnapshot();
     snapshot.agents = [{
       id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo', backend: 'codex',
@@ -429,26 +429,26 @@ describe('ClawBackendServer', () => {
     const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
 
     const result = await server.handleMessage({
-      jsonrpc: '2.0', id: 'debug-design', method: backendMethods.debugDesignPopulate,
+      jsonrpc: '2.0', id: 'debug-visualize', method: backendMethods.debugVisualizePopulate,
       params: { agentId: 'agent-dina' },
     });
 
-    const design = (result as { result: AppSnapshot }).result.agents[0]!.design!;
-    expect(design.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-design' });
-    expect(design.selectedDiagramId).toBe('debug-diagram-workflow');
-    expect(design.diagrams.map(diagram => diagram.content.kind)).toStrictEqual(['mermaid', 'svg']);
-    expect(design.suggestions.map(suggestion => suggestion.id)).toContain('debug-suggestion-state');
-    expect(design.suggestions.find(suggestion => suggestion.id === 'debug-suggestion-state'))
-      .not.toHaveProperty('diagramId');
+    const visualize = (result as { result: AppSnapshot }).result.agents[0]!.visualize!;
+    expect(visualize.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-design' });
+    expect(visualize.selectedVisualizationId).toBe('debug-visualization-workflow');
+    expect(visualize.visualizations.map(visualization => visualization.content.kind)).toStrictEqual(['mermaid', 'svg']);
+    expect(visualize.suggestions.map(suggestion => suggestion.id)).toContain('debug-suggestion-state');
+    expect(visualize.suggestions.find(suggestion => suggestion.id === 'debug-suggestion-state'))
+      .not.toHaveProperty('visualizationId');
 
     const suggestionsResult = await server.handleMessage({
-      jsonrpc: '2.0', id: 'debug-design-suggestions', method: backendMethods.debugDesignPopulate,
+      jsonrpc: '2.0', id: 'debug-visualize-suggestions', method: backendMethods.debugVisualizePopulate,
       params: { agentId: 'agent-dina', scenario: 'suggestions' },
     });
-    const suggestions = (suggestionsResult as { result: AppSnapshot }).result.agents[0]!.design!;
+    const suggestions = (suggestionsResult as { result: AppSnapshot }).result.agents[0]!.visualize!;
     expect(suggestions.suggestions).toHaveLength(4);
-    expect(suggestions.diagrams).toStrictEqual([]);
-    expect(suggestions.selectedDiagramId).toBeNull();
+    expect(suggestions.visualizations).toStrictEqual([]);
+    expect(suggestions.selectedVisualizationId).toBeNull();
     expect(saveSnapshot).toHaveBeenCalledTimes(2);
   });
 

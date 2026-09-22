@@ -1,43 +1,44 @@
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import type { Agent } from '@codex-claw/core/contracts';
-import type { DesignDebugScenario, DesignSession } from '@codex-claw/core/design';
+import type { VisualizeDebugScenario, VisualizeSession } from '@codex-claw/core/visualize';
 
-export function createDesignDebugFixture(
+export function createVisualizeDebugFixture(
   agent: Agent,
   now = new Date().toISOString(),
-  scenario: DesignDebugScenario = 'complete',
-): DesignSession {
-  const fixture: DesignSession = {
-    id: 'debug-design-session',
+  scenario: VisualizeDebugScenario = 'complete',
+): VisualizeSession {
+  const fixture: VisualizeSession = {
+    id: 'debug-visualize-session',
     conversationRef: conversationRefFromAgent(agent),
+    isOpen: true,
     suggestions: [
       {
         id: 'debug-suggestion-system',
-        title: 'Design workflow',
-        description: 'Show how suggestions become generated diagrams and later revisions.',
-        diagramId: 'debug-diagram-workflow',
+        title: 'Visualize workflow',
+        description: 'Show how suggestions become generated visualizations and later revisions.',
+        visualizationId: 'debug-visualization-workflow',
       },
       {
         id: 'debug-suggestion-architecture',
         title: 'Provider-independent architecture',
-        description: 'Map the renderer, app-owned backend seam, provider driver, and Design MCP tools.',
-        diagramId: 'debug-diagram-architecture',
+        description: 'Map the renderer, app-owned backend seam, provider driver, and Visualize MCP tools.',
+        visualizationId: 'debug-visualization-architecture',
       },
       {
         id: 'debug-suggestion-state',
         title: 'Persistence lifecycle',
-        description: 'Trace how Design state is scoped to an agent conversation and restored after reload.',
+        description: 'Trace how Visualize state is scoped to an agent conversation and restored after reload.',
       },
       {
         id: 'debug-suggestion-edit',
-        title: 'Diagram edit loop',
+        title: 'Visualization edit loop',
         description: 'Illustrate select, inspect, request an edit, and replace with revision checking.',
       },
     ],
-    diagrams: [
+    visualizations: [
       {
-        id: 'debug-diagram-workflow',
-        title: 'Design workflow',
+        id: 'debug-visualization-workflow',
+        title: 'Visualize workflow',
         content: {
           kind: 'mermaid',
           source: [
@@ -53,19 +54,19 @@ export function createDesignDebugFixture(
         updatedAt: now,
       },
       {
-        id: 'debug-diagram-architecture',
+        id: 'debug-visualization-architecture',
         title: 'Provider-independent architecture',
         content: {
           kind: 'svg',
           source: [
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" role="img" aria-label="Design architecture">',
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" role="img" aria-label="Visualize architecture">',
             '<rect width="760" height="260" rx="24" fill="#f5f7fb"/>',
             '<g font-family="system-ui, sans-serif" text-anchor="middle">',
             '<rect x="36" y="86" width="164" height="88" rx="16" fill="#dbeafe" stroke="#2563eb"/>',
-            '<text x="118" y="124" font-size="18" fill="#172554">Design pane</text>',
+            '<text x="118" y="124" font-size="18" fill="#172554">Visualize pane</text>',
             '<text x="118" y="150" font-size="13" fill="#1e3a8a">Vue workspace</text>',
             '<rect x="298" y="86" width="164" height="88" rx="16" fill="#dcfce7" stroke="#16a34a"/>',
-            '<text x="380" y="124" font-size="18" fill="#14532d">Design service</text>',
+            '<text x="380" y="124" font-size="18" fill="#14532d">Visualize service</text>',
             '<text x="380" y="150" font-size="13" fill="#166534">App-owned state</text>',
             '<rect x="560" y="86" width="164" height="88" rx="16" fill="#fef3c7" stroke="#d97706"/>',
             '<text x="642" y="124" font-size="18" fill="#78350f">MCP tools</text>',
@@ -81,7 +82,7 @@ export function createDesignDebugFixture(
         updatedAt: now,
       },
     ],
-    selectedDiagramId: 'debug-diagram-workflow',
+    selectedVisualizationId: 'debug-visualization-workflow',
     createdAt: now,
     updatedAt: now,
   };
@@ -91,8 +92,8 @@ export function createDesignDebugFixture(
       title: suggestion.title,
       description: suggestion.description,
     }));
-    fixture.diagrams = [];
-    fixture.selectedDiagramId = null;
+    fixture.visualizations = [];
+    fixture.selectedVisualizationId = null;
   }
   return fixture;
 }

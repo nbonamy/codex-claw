@@ -1,123 +1,133 @@
 import type { BackendConversationRef } from './contracts';
 
-export const designDiagramKinds = ['mermaid', 'svg', 'image'] as const;
+export const visualizationKinds = ['mermaid', 'svg', 'image'] as const;
 
-export const designSuggestionLimits = {
+export const visualizationSuggestionLimits = {
   title: 80,
   description: 120,
 } as const;
 
-export const designDebugScenarios = ['complete', 'suggestions'] as const;
-export type DesignDebugScenario = typeof designDebugScenarios[number];
+export const visualizeDebugScenarios = ['complete', 'suggestions'] as const;
+export type VisualizeDebugScenario = typeof visualizeDebugScenarios[number];
 
-export type DesignDiagramKind = typeof designDiagramKinds[number];
+export type VisualizationKind = typeof visualizationKinds[number];
 
-export type DesignSuggestion = {
+export type VisualizationSuggestion = {
   id: string;
   title: string;
   description: string;
-  diagramId?: string;
+  visualizationId?: string;
 };
 
-export type DesignTextDiagramContent = {
+export type VisualizationTextContent = {
   kind: 'mermaid' | 'svg';
   source: string;
 };
 
-export type DesignImageDiagramContent = {
+export type VisualizationImageContent = {
   kind: 'image';
   assetPath: string;
   mimeType: 'image/gif' | 'image/jpeg' | 'image/png' | 'image/webp';
   alt: string;
 };
 
-export type DesignDiagramContent = DesignTextDiagramContent | DesignImageDiagramContent;
+export type VisualizationContent = VisualizationTextContent | VisualizationImageContent;
 
-export type DesignDiagram = {
+export type Visualization = {
   id: string;
   title: string;
-  content: DesignDiagramContent;
+  content: VisualizationContent;
   revision: number;
   createdAt: string;
   updatedAt: string;
 };
 
-export type DesignSession = {
+export type VisualizeSession = {
   id: string;
   conversationRef: BackendConversationRef | null;
-  suggestions: DesignSuggestion[];
-  diagrams: DesignDiagram[];
-  selectedDiagramId: string | null;
+  isOpen: boolean;
+  suggestions: VisualizationSuggestion[];
+  visualizations: Visualization[];
+  selectedVisualizationId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type StartDesignInput = {
+export type StartVisualizeInput = {
   prompt?: string;
 };
 
-export type GenerateDesignSuggestionInput = {
+export type GenerateVisualizationSuggestionInput = {
   suggestionId: string;
 };
 
-export type SelectDesignDiagramInput = {
-  diagramId: string;
+export type SelectVisualizationInput = {
+  visualizationId: string;
 };
 
-export type DesignDiagramAsset = {
-  diagramId: string;
-  mimeType: DesignImageDiagramContent['mimeType'];
+export type DeleteVisualizationInput = {
+  visualizationId: string;
+};
+
+export type SetVisualizeOpenInput = {
+  open: boolean;
+};
+
+export type VisualizationAsset = {
+  visualizationId: string;
+  mimeType: VisualizationImageContent['mimeType'];
   dataUrl: string;
 };
 
-export function isDesignSession(value: unknown): value is DesignSession {
+export function isVisualizeSession(value: unknown): value is VisualizeSession {
   if (!record(value)) return false;
   return typeof value.id === 'string'
     && (value.conversationRef === null || isConversationRef(value.conversationRef))
+    && typeof value.isOpen === 'boolean'
     && Array.isArray(value.suggestions)
     && value.suggestions.length <= 4
-    && value.suggestions.every(isDesignSuggestion)
-    && Array.isArray(value.diagrams)
-    && value.diagrams.length <= 50
-    && value.diagrams.every(isDesignDiagram)
-    && (value.selectedDiagramId === null || typeof value.selectedDiagramId === 'string')
-    && (value.selectedDiagramId === null || value.diagrams.some(diagram => diagram.id === value.selectedDiagramId))
+    && value.suggestions.every(isVisualizationSuggestion)
+    && Array.isArray(value.visualizations)
+    && value.visualizations.length <= 50
+    && value.visualizations.every(isVisualization)
+    && (value.selectedVisualizationId === null || typeof value.selectedVisualizationId === 'string')
+    && (value.selectedVisualizationId === null || value.visualizations.some(visualization => visualization.id === value.selectedVisualizationId))
     && typeof value.createdAt === 'string'
     && typeof value.updatedAt === 'string';
 }
 
-export function cloneDesignSession(session: DesignSession): DesignSession {
+export function cloneVisualizeSession(session: VisualizeSession): VisualizeSession {
   return {
     ...session,
     conversationRef: session.conversationRef ? { ...session.conversationRef } : null,
     suggestions: session.suggestions.map(suggestion => ({ ...suggestion })),
-    diagrams: session.diagrams.map(diagram => ({
-      ...diagram,
-      content: { ...diagram.content },
+    visualizations: session.visualizations.map(visualization => ({
+      ...visualization,
+      content: { ...visualization.content },
     })),
   };
 }
 
-function isDesignSuggestion(value: unknown): value is DesignSuggestion {
+function isVisualizationSuggestion(value: unknown): value is VisualizationSuggestion {
   return record(value)
     && typeof value.id === 'string'
     && typeof value.title === 'string'
     && typeof value.description === 'string'
-    && (value.diagramId === undefined || typeof value.diagramId === 'string');
+    && (value.visualizationId === undefined || typeof value.visualizationId === 'string');
 }
 
-function isDesignDiagram(value: unknown): value is DesignDiagram {
+function isVisualization(value: unknown): value is Visualization {
   return record(value)
     && typeof value.id === 'string'
     && typeof value.title === 'string'
-    && isDesignDiagramContent(value.content)
+    && isVisualizationContent(value.content)
     && Number.isInteger(value.revision)
     && (value.revision as number) > 0
     && typeof value.createdAt === 'string'
     && typeof value.updatedAt === 'string';
 }
 
-function isDesignDiagramContent(value: unknown): value is DesignDiagramContent {
+function isVisualizationContent(value: unknown): value is VisualizationContent {
   if (!record(value)) return false;
   if (value.kind === 'mermaid' || value.kind === 'svg') {
     return typeof value.source === 'string';

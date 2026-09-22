@@ -357,7 +357,7 @@ export type Agent = {
   codeReview?: import('./code-review').CodeReviewSession;
   threadFlags?: import('./thread-flags').ThreadFlags;
   goal?: ThreadGoal;
-  design?: import('./design').DesignSession;
+  visualize?: import('./visualize').VisualizeSession;
   isRegistered?: boolean;
   mcpSessionId?: string;
   statusText?: string;
@@ -646,7 +646,7 @@ export type AppCommand =
   | { type: 'debug-image-annotation'; imageDataUrl?: string; pixelRatio?: 1 | 2 }
   | { type: 'debug-mark-unread' }
   | { type: 'debug-open-code-review' }
-  | { type: 'debug-open-design' }
+  | { type: 'debug-open-visualize' }
   | { type: 'debug-open-markdown' }
   | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
@@ -739,10 +739,12 @@ export type DesktopUpdateStatus = {
 };
 
 export type CodexClawApi = {
-  startDesign(agentId: string, input?: import('./design').StartDesignInput): Promise<AppSnapshot>;
-  generateDesignSuggestion(agentId: string, input: import('./design').GenerateDesignSuggestionInput): Promise<AppSnapshot>;
-  selectDesignDiagram(agentId: string, input: import('./design').SelectDesignDiagramInput): Promise<AppSnapshot>;
-  readDesignDiagramAsset(agentId: string, diagramId: string): Promise<import('./design').DesignDiagramAsset>;
+  startVisualize(agentId: string, input?: import('./visualize').StartVisualizeInput): Promise<AppSnapshot>;
+  setVisualizeOpen(agentId: string, input: import('./visualize').SetVisualizeOpenInput): Promise<AppSnapshot>;
+  generateVisualizationSuggestion(agentId: string, input: import('./visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot>;
+  selectVisualization(agentId: string, input: import('./visualize').SelectVisualizationInput): Promise<AppSnapshot>;
+  deleteVisualization(agentId: string, input: import('./visualize').DeleteVisualizationInput): Promise<AppSnapshot>;
+  readVisualizationAsset(agentId: string, visualizationId: string): Promise<import('./visualize').VisualizationAsset>;
   startCodeReview(agentId: string, input: import('./code-review').CodeReviewStartInput): Promise<AppSnapshot>;
   decideCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDecisionInput): Promise<AppSnapshot>;
   discussCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDiscussionInput): Promise<AppSnapshot>;

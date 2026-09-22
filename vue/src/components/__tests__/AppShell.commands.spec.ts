@@ -38,33 +38,34 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
-  it('routes /design into the dedicated workspace without sending prose to chat', async () => {
+  it('routes /visualize into the dedicated workspace without sending prose to chat', async () => {
     const snapshot = createInitialSnapshot();
     const next = structuredClone(snapshot);
-    next.agents[0].design = {
-      id: 'design-1',
+    next.agents[0].visualize = {
+      id: 'visualize-1',
       conversationRef: null,
+      isOpen: true,
       suggestions: [],
-      diagrams: [],
-      selectedDiagramId: null,
+      visualizations: [],
+      selectedVisualizationId: null,
       createdAt: '2026-09-21T12:00:00.000Z',
       updatedAt: '2026-09-21T12:00:00.000Z',
     };
-    const startDesign = vi.fn().mockResolvedValue(next);
+    const startVisualize = vi.fn().mockResolvedValue(next);
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountShell({ snapshot, startDesign, sendPromptAction });
+    const wrapper = mountShell({ snapshot, startVisualize, sendPromptAction });
 
     const forwardPrompt = wrapper.getComponent({ name: 'AgentWorkspace' }).props('forwardPrompt') as (prompt: string) => Promise<void>;
-    await forwardPrompt('/design focus on the deployment flow');
+    await forwardPrompt('/visualize focus on the deployment flow');
     await flushPromises();
 
-    expect(startDesign).toHaveBeenCalledExactlyOnceWith('agent-dina', { prompt: 'focus on the deployment flow' });
+    expect(startVisualize).toHaveBeenCalledExactlyOnceWith('agent-dina', { prompt: 'focus on the deployment flow' });
     expect(sendPromptAction).not.toHaveBeenCalled();
-    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Design');
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Visualize');
     wrapper.unmount();
   });
 
-  it('opens the populated Design pane from the native debug command', async () => {
+  it('opens the populated Visualize pane from the native debug command', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     window.codexClaw = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
@@ -74,22 +75,46 @@ describe('AppShell dialogs and commands', () => {
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0]!.design = {
-      id: 'debug-design',
+    snapshot.agents[0]!.visualize = {
+      id: 'debug-visualize',
       conversationRef: null,
+      isOpen: true,
       suggestions: [{ id: 'suggestion-1', title: 'Architecture', description: 'Show the system.' }],
-      diagrams: [],
-      selectedDiagramId: null,
+      visualizations: [],
+      selectedVisualizationId: null,
       createdAt: '2026-09-21T12:00:00.000Z',
       updatedAt: '2026-09-21T12:00:00.000Z',
     };
     const wrapper = mountShell({ snapshot });
 
-    listener({ type: 'debug-open-design' });
+    listener({ type: 'debug-open-visualize' });
     await nextTick();
 
-    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Design');
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Visualize');
     expect(wrapper.text()).toContain('Architecture');
+    wrapper.unmount();
+  });
+
+  it('marks Visualize closed when the user closes its workspace tab', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.visualize = {
+      id: 'visualize-open',
+      conversationRef: null,
+      isOpen: true,
+      suggestions: [],
+      visualizations: [],
+      selectedVisualizationId: null,
+      createdAt: '2026-09-21T12:00:00.000Z',
+      updatedAt: '2026-09-21T12:00:00.000Z',
+    };
+    const setVisualizeOpen = vi.fn().mockResolvedValue(snapshot);
+    const wrapper = mountShell({ snapshot, setVisualizeOpen });
+
+    await wrapper.get('button[aria-label="Close Visualize tab"]').trigger('click');
+    await flushPromises();
+
+    expect(setVisualizeOpen).toHaveBeenCalledExactlyOnceWith('agent-dina', { open: false });
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).not.toContain('Visualize');
     wrapper.unmount();
   });
 
@@ -571,19 +596,24 @@ describe('AppShell dialogs and commands', () => {
   it('previews the real worktree initialization progress from a Debug command', async () => {
     vi.useFakeTimers();
     let listener: (command: AppCommand) => void = () => undefined;
+    const onAppCommand = vi.fn((nextListener: (command: AppCommand) => void) => {
+      listener = nextListener;
+      return () => undefined;
+    });
     window.codexClaw = {
-      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
-        listener = nextListener;
-        return () => undefined;
-      }),
+      onAppCommand,
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const wrapper = mountShell();
+    await nextTick();
+    expect(onAppCommand).toHaveBeenCalledOnce();
 
     listener({ type: 'debug-operation-progress', kind: 'worktreeInitialization' });
     await nextTick();
 
-    const dialog = wrapper.getComponent({ name: 'AgentCreationProgressDialog' });
+    const dialog = wrapper.findAllComponents({ name: 'AgentCreationProgressDialog' })
+      .find(candidate => candidate.props('progress') !== null);
+    if (!dialog) throw new Error('Expected active agent creation progress dialog.');
     expect(dialog.props('progress')).toMatchObject({
       state: 'running',
       createWorktree: true,

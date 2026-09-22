@@ -1,6 +1,6 @@
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
-import type { DesignDebugScenario } from '@codex-claw/core/design';
+import type { VisualizeDebugScenario } from '@codex-claw/core/visualize';
 import { featureStages, type MissionStage } from '@codex-claw/core/missions';
 import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
 import { cycleTeamsAccelerator } from './app-shortcuts';
@@ -21,7 +21,7 @@ export type AppMenuCallbacks = {
   sendDebugAgentMessage?: () => void;
   toggleDebugExecutionPlan?: () => void;
   injectDebugPlanReview?: () => void;
-  populateDebugDesign?: (scenario: DesignDebugScenario) => void;
+  populateDebugVisualize?: (scenario: VisualizeDebugScenario) => void;
   getDebugMissionStage?: () => MissionStage | undefined;
   setDebugMissionStage?: (stage: MissionStage) => void;
   injectDebugCodeReview?: (scenario: DebugCodeReviewScenario) => void;
@@ -32,7 +32,7 @@ export type AppMenuCallbacks = {
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugDesign' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -45,7 +45,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     sendDebugAgentMessage: options.sendDebugAgentMessage,
     toggleDebugExecutionPlan: options.toggleDebugExecutionPlan,
     injectDebugPlanReview: options.injectDebugPlanReview,
-    populateDebugDesign: options.populateDebugDesign,
+    populateDebugVisualize: options.populateDebugVisualize,
     getDebugMissionStage: options.getDebugMissionStage,
     setDebugMissionStage: options.setDebugMissionStage,
     injectDebugCodeReview: options.injectDebugCodeReview,
@@ -98,17 +98,17 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         submenu: buildDebugMissionFixtures(callbacks),
       },
       {
-        label: 'Design Fixtures',
+        label: 'Visualize Fixtures',
         submenu: [
           {
-            label: 'Populate Design Pane',
-            enabled: Boolean(callbacks.populateDebugDesign),
-            click: () => callbacks.populateDebugDesign?.('complete'),
+            label: 'Populate Suggestions',
+            enabled: Boolean(callbacks.populateDebugVisualize),
+            click: () => callbacks.populateDebugVisualize?.('suggestions'),
           },
           {
-            label: 'Populate Suggestions',
-            enabled: Boolean(callbacks.populateDebugDesign),
-            click: () => callbacks.populateDebugDesign?.('suggestions'),
+            label: 'Populate Diagrams',
+            enabled: Boolean(callbacks.populateDebugVisualize),
+            click: () => callbacks.populateDebugVisualize?.('complete'),
           },
         ],
       },

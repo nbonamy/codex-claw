@@ -4,7 +4,7 @@ import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
 import { spokenAnnouncementVoices } from './contracts';
 import { isPlanReview } from './plan-review';
-import { isDesignSession } from './design';
+import { isVisualizeSession } from './visualize';
 import { isCodeReviewSession } from './code-review';
 import {
   isSubagentActivityKind,
@@ -118,7 +118,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'codeReview', isCodeReviewSession) &&
     optional(value, 'threadFlags', isThreadFlags) &&
     optional(value, 'goal', isThreadGoal) &&
-    optional(value, 'design', isDesignSession) &&
+    optional(value, 'visualize', isVisualizeSession) &&
     optional(value, 'isRegistered', isBoolean) &&
     optional(value, 'mcpSessionId', isString) &&
     optional(value, 'statusText', isString) &&
