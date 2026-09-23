@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.20.0",
+  "currentVersion": "0.20.1",
   "releases": [
+    {
+      "version": "0.20.1",
+      "releasedAt": "2026-09-23",
+      "sourceSha256": "332325427d78217321b0880068c449680bc2c45fe0372369838c5f90e3ae5463",
+      "markdown": "### New features\n\n- Start a Mission from an open GitHub issue in any repository represented by its\n  team. The issue picker opens on the first available repository, and the issue\n  details become the Mission's starting context.\n\n### Improvements and fixes\n\n- Missions now belong to their team. Closing a team also removes its Missions\n  and workers while leaving Mission worktrees on disk, with the effect stated\n  in the confirmation dialog.\n- Restarting Codex Claw restores the selected Mission workspace instead of\n  showing its lead as an ordinary agent thread."
+    },
     {
       "version": "0.20.0",
       "releasedAt": "2026-09-22",

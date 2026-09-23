@@ -4,6 +4,22 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.1] - 2026-09-23
+
+### New features
+
+- Start a Mission from an open GitHub issue in any repository represented by its
+  team. The issue picker opens on the first available repository, and the issue
+  details become the Mission's starting context.
+
+### Improvements and fixes
+
+- Missions now belong to their team. Closing a team also removes its Missions
+  and workers while leaving Mission worktrees on disk, with the effect stated
+  in the confirmation dialog.
+- Restarting Codex Claw restores the selected Mission workspace instead of
+  showing its lead as an ordinary agent thread.
+
 ## [0.20.0] - 2026-09-22
 
 ### New features
