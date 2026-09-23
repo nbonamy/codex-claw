@@ -38,15 +38,6 @@
       </div>
       <div class="mission-implementation__summary-meta">
         <span>{{ t("missions.repositoryCount", { count: lanes.length }) }}</span>
-        <button
-          v-if="hasImplementationEvidence"
-          type="button"
-          class="mission-implementation__view-evidence"
-          :aria-label="t('missions.viewImplementationEvidence')"
-          @click="evidenceOpen = true"
-        >
-          <FileTextIcon aria-hidden="true" />{{ t("missions.viewEvidence") }}
-        </button>
       </div>
     </header>
 
@@ -93,43 +84,6 @@
         </TransitionGroup>
       </section>
     </div>
-
-    <el-dialog
-      v-if="hasImplementationEvidence"
-      class="claw-dialog mission-implementation__evidence-dialog"
-      :model-value="evidenceOpen"
-      :show-close="false"
-      destroy-on-close
-      width="min(720px, calc(100vw - 48px))"
-      @update:model-value="evidenceOpen = $event"
-    >
-      <template #header>
-        <div class="mission-implementation__evidence-header">
-          <span><FileTextIcon aria-hidden="true" /></span>
-          <div>
-            <small>{{ t("missions.implementation") }}</small>
-            <h3>{{ t("missions.artifactTitle.implementation") }}</h3>
-          </div>
-          <button
-            type="button"
-            :aria-label="t('common.close')"
-            @click="evidenceOpen = false"
-          >
-            <X aria-hidden="true" />
-          </button>
-        </div>
-      </template>
-      <article class="mission-implementation__aggregate" :aria-label="t('missions.acceptedArtifact')">
-        <div>
-          <strong>{{ t("missions.changes") }}</strong>
-          <p>{{ mission.artifacts.implementation.changes }}</p>
-        </div>
-        <div>
-          <strong>{{ t("missions.tests") }}</strong>
-          <p>{{ mission.artifacts.implementation.tests }}</p>
-        </div>
-      </article>
-    </el-dialog>
 
     <MissionTicketDialog
       :model-value="Boolean(selected)"
@@ -184,12 +138,7 @@ import { useI18n } from "vue-i18n";
 import type { Agent, OpenInApplicationCatalog } from "@codex-claw/core/contracts";
 import type { Mission } from "@codex-claw/core/missions";
 import type { MissionRun } from "@codex-claw/core/mission-execution";
-import {
-  FileTextIcon,
-  FolderIcon,
-  GitBranchIcon,
-  X,
-} from "../shared/icons/app-icons";
+import { FolderIcon, GitBranchIcon } from "../shared/icons/app-icons";
 import MissionImplementationTicketCard from "./MissionImplementationTicketCard.vue";
 import MissionTicketDialog from "./MissionTicketDialog.vue";
 import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from "./MissionWorkspaceOpenIn.vue";
@@ -216,11 +165,6 @@ const emit = defineEmits<{
 }>();
 const { t } = useI18n();
 const selectedIndex = ref(-1);
-const evidenceOpen = ref(false);
-const hasImplementationEvidence = computed(() => Boolean(
-  props.mission.artifacts.implementation.changes.trim()
-  || props.mission.artifacts.implementation.tests.trim(),
-));
 const implementationRuns = computed(
   () =>
     props.mission.execution?.runs.filter(

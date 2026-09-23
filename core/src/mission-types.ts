@@ -1,5 +1,6 @@
 export type MissionWorkflowType = 'shapeAndShipFeature';
 export type MissionStage = 'requirements' | 'tickets' | 'implementation' | 'review' | 'ship';
+export type MissionReviewDebugState = 'identified' | 'remediated';
 
 export type MissionTicket = {
   id?: string;
@@ -18,7 +19,7 @@ export type MissionReviewFinding = {
   repositoryPath: string;
   location?: import('./code-review').CodeReviewLocation;
   selected: boolean;
-  remediation: { state: 'open' } | { state: 'fixing'; startedAt: string } | { state: 'fixed'; completedAt: string; evidence?: string };
+  remediation: { state: 'open' } | { state: 'skipped'; startedAt: string } | { state: 'fixing'; startedAt: string } | { state: 'fixed'; completedAt: string; evidence?: string };
   createdAt: string;
   updatedAt: string;
 };
@@ -106,6 +107,7 @@ export type MissionExecutionInput = { id: string; revision: number } & (
   | { action: 'cancel'; runId: string }
   | { action: 'selectReviewFinding'; findingId: string; selected: boolean }
   | { action: 'fixSelectedReviewFindings' }
+  | { action: 'rerunReview' }
   | { action: 'recordDelivery'; repositoryPath: string; result: { kind: 'pullRequest'; number: number; url: string } | { kind: 'merge' } }
   | { action: 'reopen'; stage: MissionStage }
 );

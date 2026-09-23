@@ -46,7 +46,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
   }
 });
 
-it('keeps Review blocked while selected or high-priority findings remain unresolved', () => {
+it('allows Review approval independently of optional finding remediation', () => {
   const snapshot = createInitialSnapshot();
   const artifacts = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id }).artifacts;
   artifacts.review = {
@@ -57,13 +57,17 @@ it('keeps Review blocked while selected or high-priority findings remain unresol
       remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
     }],
   };
-  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(false);
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
   artifacts.review.findings![0]!.selected = false;
   expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
   artifacts.review.findings![0]!.priority = 'p1';
-  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(false);
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  artifacts.review.findings![0]!.selected = true;
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
   artifacts.review.findings![0]!.remediation = { state: 'fixed', completedAt: 'later', evidence: 'Test passed.' };
   expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  expect(isMissionArtifacts(artifacts)).toBe(true);
+  artifacts.review.findings![0]!.remediation = { state: 'skipped', startedAt: 'later' };
   expect(isMissionArtifacts(artifacts)).toBe(true);
 });
 

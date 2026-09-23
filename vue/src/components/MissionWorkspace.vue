@@ -26,25 +26,22 @@
               <span>{{ activeStageStatus }}</span>
             </div>
             <button
-              v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal && !debugFixture"
+              v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal"
               class="claw-button claw-button--primary"
               type="button"
-              :disabled="busy || reviewApprovalBlocked"
-              :title="reviewApprovalBlocked ? t('missions.unresolvedReviewFindings') : undefined"
+              :aria-busy="busy"
+              :disabled="busy"
               @click="approveProposal"
             >
               {{ t('missions.approveAndContinue') }}
               <ArrowRightIcon aria-hidden="true" />
             </button>
-            <span v-else-if="viewedStage === mission.stage && activeRun?.proposal && debugFixture" class="mission-workspace__review-status">{{ t('missions.readyForReview') }}</span>
             <span v-else-if="showAcceptedArtifactStatus" class="mission-workspace__accepted-status"><CheckIcon aria-hidden="true" />{{ t('missions.accepted') }}</span>
           </div>
         </header>
 
         <div class="mission-workspace__workbench-scroll">
           <p v-if="error || artifactError" class="mission-workspace__error" role="alert">{{ error || artifactError }}</p>
-          <p v-if="reviewApprovalBlocked && viewedStage === 'review'" class="mission-workspace__error" role="status">{{ t('missions.unresolvedReviewFindings') }}</p>
-
           <MissionImplementationBoard
             v-if="viewedStage === 'implementation' && mission.artifacts.tickets.length"
             :agents="agents"
@@ -66,6 +63,7 @@
             name="code-review"
             :agent-id="codeAgentId"
             :review-summary="artifactMarkdown"
+            :chat-about-finding="chatAboutReviewFinding"
           />
 
           <section v-else-if="viewedStage === 'tickets' && activeRun?.draftTickets?.length && !activeRun.proposal" class="mission-workspace__artifact" :aria-label="t('missions.draftTickets')" aria-live="polite">
@@ -114,6 +112,7 @@
               v-if="mission.execution && !activeRun && mission.status !== 'completed'"
               class="claw-button claw-button--primary"
               type="button"
+              :aria-busy="busy"
               :disabled="busy || !executeMission"
               @click="continueMission"
             >
@@ -132,19 +131,26 @@
       </MissionConversationRail>
     </div>
   </section>
+  <MissionImplementationStartDialog
+    v-if="implementationStarting"
+    :phase="implementationStartProgress?.missionId === mission.id ? implementationStartProgress.phase : undefined"
+    :repositories="implementationStartRepositories"
+    :ticket-count="implementationStartTicketCount"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import type { Mission, MissionArtifacts, MissionStage } from '@codex-claw/core/missions';
+import type { Mission, MissionArtifacts, MissionReviewFinding, MissionStage } from '@codex-claw/core/missions';
 import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput, type MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
 import MissionConversationRail from './MissionConversationRail.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
+import MissionImplementationStartDialog from './MissionImplementationStartDialog.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
 import MissionStageRail from './MissionStageRail.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
@@ -154,6 +160,7 @@ const props = withDefaults(defineProps<{
   agents?: Agent[];
   sidebarCollapsed?: boolean;
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
+  implementationStartProgress?: MissionImplementationStartProgress | null;
   mission: Mission;
   readMissionArtifact?: (missionId: string, stage: MissionStage) => Promise<MissionArtifactReadResult>;
   sendMissionPrompt?: (prompt: string) => Promise<void> | void;
@@ -165,6 +172,7 @@ const props = withDefaults(defineProps<{
 });
 const emit = defineEmits<{
   'open-conversation': [agentId: string];
+  'chat-about-review-finding': [payload: { agentId: string; finding: MissionReviewFinding }];
   'expand-sidebar': [];
   'open-worktree': [request: MissionWorkspaceOpenRequest];
 }>();
@@ -174,13 +182,13 @@ const error = ref('');
 const artifactError = ref('');
 const feedbackBusy = ref(false);
 const feedbackReset = ref(0);
+const implementationStarting = ref(false);
+const implementationStartRepositories = ref<string[]>([]);
+const implementationStartTicketCount = ref(0);
 const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
-const reviewApprovalBlocked = computed(() => props.mission.stage === 'review' && (props.mission.artifacts.review.findings ?? []).some(finding => (
-  finding.remediation.state !== 'fixed' && (finding.selected || finding.priority === 'p0' || finding.priority === 'p1')
-)));
 const activeStageRun = computed(() => {
   if (viewedStage.value !== props.mission.stage) return undefined;
   return props.mission.execution?.runs.slice().reverse().find(run => (
@@ -227,6 +235,12 @@ watch(
 
 function selectConversation(agentId: string): void {
   conversationAgentId.value = agentId;
+}
+function chatAboutReviewFinding(finding: MissionReviewFinding): void {
+  const agentId = codeAgentId.value;
+  if (!agentId) return;
+  selectConversation(agentId);
+  emit('chat-about-review-finding', { agentId, finding });
 }
 
 function stageState(stage: MissionStage): 'complete' | 'current' | 'upcoming' {
@@ -275,11 +289,22 @@ function stageMarkdown(stage: MissionStage, artifacts: MissionArtifacts): string
 async function approveProposal(): Promise<void> {
   const run = activeRun.value;
   if (!run?.proposal || !props.executeMission) return;
+  const startsImplementation = props.mission.stage === 'tickets';
   busy.value = true; error.value = '';
+  if (startsImplementation) {
+    implementationStartRepositories.value = [...new Set(visibleTickets.value.flatMap(ticket => (
+      ticket.repositoryPath ? [ticket.repositoryPath] : []
+    )))];
+    implementationStartTicketCount.value = visibleTickets.value.length;
+    implementationStarting.value = true;
+  }
   try {
     await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'accept', runId: run.id });
   } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
-  finally { busy.value = false; }
+  finally {
+    busy.value = false;
+    implementationStarting.value = false;
+  }
 }
 async function retryImplementationTicket(ticketIndex: number): Promise<void> {
   if (!props.executeMission) return;

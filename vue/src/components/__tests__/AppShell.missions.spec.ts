@@ -210,10 +210,19 @@ describe('AppShell missions', () => {
     await flushPromises();
 
     const review = wrapper.getComponent({ name: 'MissionCodeReview' });
-    expect(review.props('readOnly')).toBe(true);
+    expect(review.props('readOnly')).toBe(false);
     expect(review.text()).toContain('Persist review state');
     expect(review.text()).toContain('Debug review prose.');
     expect(review.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['Review', 'Changes']);
+    expect(review.findComponent({ name: 'ElSwitch' }).exists()).toBe(true);
+    expect(review.findAll('button').some(button => button.text().includes('Fix 1 selected'))).toBe(true);
+
+    await review.get('[aria-label="Chat about finding"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.emitted('update:composerState')).toStrictEqual([[expect.objectContaining({
+      agentId: apiAgent.id,
+      state: expect.objectContaining({ text: expect.stringContaining('Persist review state') }),
+    })]]);
     expect(getAgentGitDiff).not.toHaveBeenCalled();
   });
 

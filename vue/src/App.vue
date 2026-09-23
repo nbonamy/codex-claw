@@ -3,6 +3,7 @@
     :inert="backendRestartInProgress || pendingSessionCompression !== null ? '' : undefined"
     :aria-hidden="backendRestartInProgress || pendingSessionCompression !== null ? 'true' : undefined"
     :snapshot="snapshot"
+    :mission-implementation-start-progress="missionImplementationStartProgress"
     :active-agent="activeAgent"
     :unread-agent-ids="unreadAgentIds"
     :codex-conversation-snapshot="activeCodexConversationSnapshot"
@@ -294,6 +295,7 @@ const {
   codexResourceSharingStatus,
   backendRestartInProgress,
   agentCreationProgress,
+  missionImplementationStartProgress,
   sourceRepositories,
   openInApplications,
   loadBackendModels,

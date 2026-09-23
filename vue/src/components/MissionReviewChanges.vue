@@ -13,19 +13,28 @@
           :label="repositoryLabel(repository.repositoryPath)"
         />
       </el-select>
+      <el-select v-model="target" :aria-label="t('missions.diffScope')">
+        <el-option value="branch" :label="t('missions.branchDiff')" />
+        <el-option value="uncommitted" :label="t('missions.uncommittedDiff')" />
+      </el-select>
       <MissionWorkspaceOpenIn
         v-if="selectedRepository?.workspacePath && selectedRepository.agent"
         :agent="selectedRepository.agent"
         :available="openInAvailable"
         :catalog="openInApplications"
+        show-unavailable
         :workspace-path="selectedRepository.workspacePath"
         @open="emit('open-worktree', $event)"
       />
-      <el-select v-model="target" :aria-label="t('missions.diffScope')">
-        <el-option value="branch" :label="t('missions.branchDiff')" />
-        <el-option value="uncommitted" :label="t('missions.uncommittedDiff')" />
-      </el-select>
-      <button class="claw-button" type="button" @click="refresh">{{ t('missions.refreshDiff') }}</button>
+      <button
+        class="mission-review-changes__refresh"
+        type="button"
+        :aria-label="t('missions.refreshDiff')"
+        :title="t('missions.refreshDiff')"
+        @click="refresh"
+      >
+        <RefreshIcon aria-hidden="true" />
+      </button>
     </header>
     <GitDiffPreviewPanel :diff="diff" :state="state" :error="error" />
   </section>
@@ -36,6 +45,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import type { Mission } from '@codex-claw/core/missions';
+import { RefreshIcon } from '../shared/icons/app-icons';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 
@@ -139,6 +149,7 @@ watch(repositories, available => {
 watch(
   () => [
     props.active,
+    selectedRepositoryPath.value,
     selectedRepository.value?.agent?.id,
     selectedRepository.value?.gitStatus?.updatedAt,
     target.value,
@@ -165,5 +176,28 @@ watch(
 
 .mission-review-changes__header .el-select {
   width: 200px;
+}
+
+.mission-review-changes__refresh {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  place-items: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.mission-review-changes__refresh:hover,
+.mission-review-changes__refresh:focus-visible {
+  background: var(--color-surface-low);
+}
+
+.mission-review-changes__refresh svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 </style>

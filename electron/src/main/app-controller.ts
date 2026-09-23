@@ -1,5 +1,5 @@
 import { registerMissionIpcHandlers } from './mission-ipc';
-import type { MissionStage } from '@codex-claw/core/missions';
+import type { MissionReviewDebugState, MissionStage } from '@codex-claw/core/missions';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
 import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
@@ -1579,14 +1579,15 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
     return {
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
       populateDebugVisualize: (scenario) => this.populateDebugVisualize(scenario),
       getDebugMissionStage: () => this.debugMission()?.stage,
-      setDebugMissionStage: (stage) => this.setDebugMissionStage(stage),
+      getDebugMissionReviewState: () => this.debugMissionReviewState(),
+      setDebugMissionStage: (stage, reviewState) => this.setDebugMissionStage(stage, reviewState),
       injectDebugCodeReview: (scenario) => this.injectDebugCodeReview(scenario),
       isDebugThreadFlagSet: (id) => this.isDebugThreadFlagSet(id),
       setDebugThreadFlag: (id, value) => this.setDebugThreadFlag(id, value),
@@ -1605,15 +1606,25 @@ export class AppController {
     this.refreshAppMenu();
   }
 
-  private setDebugMissionStage(stage: MissionStage): void {
+  private debugMissionReviewState(): MissionReviewDebugState | undefined {
+    const mission = this.debugMission();
+    if (mission?.stage !== 'review') return undefined;
+    const findings = mission.artifacts.review.findings ?? [];
+    return findings.length > 0 && findings.every(finding => finding.remediation.state === 'fixed' || finding.remediation.state === 'skipped')
+      ? 'remediated'
+      : 'identified';
+  }
+
+  private setDebugMissionStage(stage: MissionStage, reviewState?: MissionReviewDebugState): void {
     const mission = this.debugMission();
     if (!mission || !this.backendClient || app?.isPackaged) return;
-    void this.backendClient.request<AppSnapshot>(backendMethods.debugMissionStageSet, { missionId: mission.id, stage })
+    void this.backendClient.request<AppSnapshot>(backendMethods.debugMissionStageSet, { missionId: mission.id, stage, ...(reviewState ? { reviewState } : {}) })
       .then(snapshot => this.adoptBackendSnapshot(snapshot))
       .then(() => this.refreshAppMenu())
       .catch((error) => warnMain('debug', 'failed to load mission fixture', {
         missionId: mission.id,
         stage,
+        reviewState,
         detail: error instanceof Error ? error.message : String(error),
       }));
   }

@@ -27,6 +27,15 @@ export class MissionAgentTools {
         run.workerId === agentId && ['running', 'awaitingReview'].includes(run.status) && run.stage === mission.stage
       ));
       if (run) return { missionId: mission.id, runId: run.id, stage: run.stage };
+      if (mission.stage !== 'review') continue;
+      const remediationRepository = mission.artifacts.review.findings?.find(finding => (
+        finding.remediation.state === 'fixing' && this.implementationWorkerId(mission, finding.repositoryPath) === agentId
+      ))?.repositoryPath;
+      if (!remediationRepository) continue;
+      const reviewRun = mission.execution?.runs.slice().reverse().find(candidate => (
+        candidate.stage === 'review' && ['running', 'awaitingReview'].includes(candidate.status)
+      ));
+      if (reviewRun) return { missionId: mission.id, runId: reviewRun.id, stage: 'review' };
     }
     return undefined;
   }
@@ -206,9 +215,16 @@ export class MissionAgentTools {
     if (input.repositoryPath !== undefined && !repositoryPath) throw new Error('Mission review finding repository is invalid.');
     let updated!: MissionReviewFinding;
     await this.ports.missions.change(context.missionId, current => {
-      this.requireOwnedReviewRun(current, context.runId, agentId);
       const finding = current.artifacts.review.findings?.find(candidate => candidate.id === input.findingId);
       if (!finding) throw new Error('Mission review finding was not found.');
+      const ownsReview = this.ownsReviewRun(current, context.runId, agentId);
+      const ownsRemediation = current.stage === 'review' && finding.remediation.state === 'fixing'
+        && this.implementationWorkerId(current, finding.repositoryPath) === agentId;
+      if (!ownsReview && !ownsRemediation) throw new Error('This agent cannot update this Mission Review finding.');
+      if (ownsRemediation && !ownsReview && (input.status !== 'fixed' || input.priority !== undefined || input.title !== undefined
+        || input.body !== undefined || input.repositoryPath !== undefined || input.location !== undefined)) {
+        throw new Error('A remediation worker can only mark its assigned finding fixed with evidence.');
+      }
       if (input.status === 'fixed' && finding.remediation.state !== 'fixing') throw new Error('Only a finding being remediated can be marked fixed.');
       if (repositoryPath && !current.execution?.workspaces?.some(workspace => workspace.repositoryPath === repositoryPath)) {
         throw new Error('Choose a repository represented in this Mission.');
@@ -241,10 +257,21 @@ export class MissionAgentTools {
   }
 
   private requireOwnedReviewRun(mission: Mission, runId: string, agentId: string): void {
-    const run = mission.execution?.runs.find(candidate => candidate.id === runId);
-    if (!run || run.workerId !== agentId || run.stage !== 'review' || !['running', 'awaitingReview'].includes(run.status) || mission.stage !== 'review') {
+    if (!this.ownsReviewRun(mission, runId, agentId)) {
       throw new Error('This agent is not working on the active Mission Review stage.');
     }
+  }
+
+  private ownsReviewRun(mission: Mission, runId: string, agentId: string): boolean {
+    const run = mission.execution?.runs.find(candidate => candidate.id === runId);
+    return !!run && run.workerId === agentId && run.stage === 'review'
+      && ['running', 'awaitingReview'].includes(run.status) && mission.stage === 'review';
+  }
+
+  private implementationWorkerId(mission: Mission, repositoryPath: string): string | undefined {
+    return mission.execution?.runs.slice().reverse().find(run => (
+      run.stage === 'implementation' && run.repositoryPath === repositoryPath && run.status === 'accepted' && run.workerId
+    ))?.workerId;
   }
 
   private requireMission(id: string): Mission {

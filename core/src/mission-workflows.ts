@@ -23,9 +23,7 @@ export const shapeAndShipFeatureWorkflow: MissionWorkflowDefinition = {
       case 'requirements': return !!artifacts.requirements.problem.trim() && !!artifacts.requirements.acceptance.trim();
       case 'tickets': return artifacts.tickets.length > 0 && artifacts.tickets.every(ticket => !!ticket.title.trim() && !!ticket.repositoryPath?.trim());
       case 'implementation': return artifacts.tickets.length > 0 && artifacts.tickets.every(ticket => ticket.done) && !!artifacts.implementation.changes.trim() && !!artifacts.implementation.tests.trim();
-      case 'review': return !!artifacts.review.summary.trim() && !(artifacts.review.findings ?? []).some(finding => (
-        finding.remediation.state !== 'fixed' && (finding.selected || finding.priority === 'p0' || finding.priority === 'p1')
-      ));
+      case 'review': return !!artifacts.review.summary.trim();
       case 'ship': return false;
     }
   },

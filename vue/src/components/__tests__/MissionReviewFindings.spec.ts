@@ -16,8 +16,8 @@ describe('MissionReviewFindings', () => {
         location: { file: 'src/review.ts', line: 42 }, selected: true, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
       },
       {
-        id: 'finding-fixed', priority: 'p2', title: 'Show evidence', body: 'Evidence was hidden.', repositoryPath: '/repo',
-        selected: true, remediation: { state: 'fixed', completedAt: 'later', evidence: 'Mission tests pass.' }, createdAt: 'now', updatedAt: 'later',
+        id: 'finding-skipped', priority: 'p2', title: 'Show evidence', body: 'Evidence was hidden.', repositoryPath: '/repo',
+        selected: false, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
       },
     ];
     mission.stage = 'review';
@@ -29,20 +29,35 @@ describe('MissionReviewFindings', () => {
     const wrapper = mount(MissionReviewFindings, { props: { mission, executeMission }, global: { plugins: [ElementPlus, i18n] } });
 
     expect(wrapper.findAll('.review-finding')).toHaveLength(2);
-    expect(wrapper.findAll('.review-finding__quick-action')).toHaveLength(0);
+    expect(wrapper.findAll('.review-finding__quick-action')).toHaveLength(2);
+    await wrapper.findAll('.review-finding__quick-action')[0]!.trigger('click');
+    expect(wrapper.emitted('chat-about-finding')).toStrictEqual([[mission.artifacts.review.findings[0]]]);
     await wrapper.findAll('.review-finding__toggle')[0]!.trigger('click');
     const location = wrapper.get('.review-finding__location');
     expect(location.element.tagName).toBe('SPAN');
     expect(getComputedStyle(location.element).color).toBe('var(--color-primary)');
     expect(getComputedStyle(location.element).cursor).toBe('default');
-    await wrapper.findAll('.review-finding__toggle')[1]!.trigger('click');
-    expect(wrapper.text()).toContain('Mission tests pass.');
     await wrapper.findComponent({ name: 'ElSwitch' }).vm.$emit('change', false);
     await flushPromises();
     expect(executeMission).toHaveBeenCalledWith({ id: mission.id, revision: mission.revision, action: 'selectReviewFinding', findingId: 'finding-open', selected: false });
     await wrapper.findAll('button').find(button => button.text().includes('Fix 1 selected'))!.trigger('click');
     await flushPromises();
     expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'fixSelectedReviewFindings' });
+
+    const readOnlyMission = structuredClone(mission);
+    readOnlyMission.artifacts.review.findings![0]!.selected = true;
+    readOnlyMission.artifacts.review.findings![0]!.remediation = { state: 'fixed', completedAt: 'later', evidence: 'Mission tests pass.' };
+    readOnlyMission.artifacts.review.findings![1]!.remediation = { state: 'skipped', startedAt: 'later' };
+    await wrapper.setProps({ mission: readOnlyMission });
+    expect(wrapper.findComponent({ name: 'ElSwitch' }).exists()).toBe(false);
+    expect(wrapper.findAll('.review-finding__quick-action')).toHaveLength(0);
+    expect(wrapper.findAll('button').some(button => button.text().includes('Fix 1 selected'))).toBe(false);
+    await wrapper.findAll('button').find(button => button.text().includes('Re-run review'))!.trigger('click');
+    await flushPromises();
+    expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'rerunReview' });
+    expect(wrapper.text()).toContain('Fixed');
+    expect(wrapper.text()).toContain('Skipped');
+    expect(wrapper.text()).toContain('Mission tests pass.');
   });
 
   it('offers finding actions only while a Review proposal awaits arbitration', async () => {

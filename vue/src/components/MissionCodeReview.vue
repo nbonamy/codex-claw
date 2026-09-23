@@ -2,9 +2,15 @@
   <section class="mission-code-review" :aria-label="t('missions.codeReview')">
     <el-tabs v-model="activeTab" class="mission-code-review__tabs">
       <el-tab-pane name="review" :label="t('missions.reviewTab')">
-        <MissionReviewFindings v-if="mission" :mission="mission" :execute-mission="executeMission" :read-only="readOnly" />
+        <MissionReviewFindings
+          v-if="mission"
+          :mission="mission"
+          :execute-mission="executeMission"
+          :read-only="readOnly"
+          @chat-about-finding="emit('chat-about-finding', $event)"
+        />
         <section v-if="reviewSummary" class="mission-code-review__summary" :aria-label="t('missions.reviewSummary')">
-          <MarkdownPanel :content="reviewSummary" />
+          <MarkdownPanel class="mission-code-review__summary-panel" :content="reviewSummary" />
         </section>
       </el-tab-pane>
 
@@ -31,7 +37,7 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import type { Mission } from '@codex-claw/core/missions';
+import type { Mission, MissionReviewFinding } from '@codex-claw/core/missions';
 import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import MarkdownPanel from './MarkdownPanel.vue';
 import MissionReviewChanges from './MissionReviewChanges.vue';
@@ -56,7 +62,10 @@ const props = withDefaults(defineProps<{
   gitStatuses: () => ({}),
   openInApplications: () => ({ defaultApplication: 'finder', applications: [] }),
 });
-const emit = defineEmits<{ 'open-worktree': [request: MissionWorkspaceOpenRequest] }>();
+const emit = defineEmits<{
+  'chat-about-finding': [finding: MissionReviewFinding];
+  'open-worktree': [request: MissionWorkspaceOpenRequest];
+}>();
 const { t } = useI18n();
 const activeTab = ref<'review' | 'changes'>(props.mission ? 'review' : 'changes');
 </script>
@@ -76,5 +85,9 @@ const activeTab = ref<'review' | 'changes'>(props.mission ? 'review' : 'changes'
   display: grid;
   gap: var(--space-3);
   margin-top: var(--space-8);
+}
+
+.mission-code-review__summary-panel {
+  padding-inline: 0;
 }
 </style>

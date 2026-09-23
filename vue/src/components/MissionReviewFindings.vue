@@ -6,13 +6,22 @@
         <span>{{ t('missions.reviewFindingCount', { count: findings.length }) }}</span>
       </div>
       <button
-        v-if="openSelectedCount && canArbitrate"
+        v-if="openSelectedCount && canRemediate"
         class="claw-button claw-button--primary"
         type="button"
         :disabled="busy"
         @click="fixSelected"
       >
         {{ t('missions.fixSelected', { count: openSelectedCount }) }}
+      </button>
+      <button
+        v-else-if="canRerunReview"
+        class="claw-button claw-button--primary"
+        type="button"
+        :disabled="busy"
+        @click="rerunReview"
+      >
+        {{ t('missions.rerunReview') }}
       </button>
     </header>
 
@@ -23,8 +32,11 @@
       v-else
       :findings="findingItems"
       :selectable="canArbitrate"
+      :clarifiable="canArbitrate"
+      :clarify-label="t('missions.chatAboutReviewFinding')"
       :busy="busy"
       @select="selectFinding"
+      @clarify="chatAboutFinding"
     />
   </section>
 </template>
@@ -41,6 +53,7 @@ const props = defineProps<{
   executeMission?: (input: MissionExecutionInput) => Promise<void>;
   readOnly?: boolean;
 }>();
+const emit = defineEmits<{ 'chat-about-finding': [finding: MissionReviewFinding] }>();
 const { t } = useI18n();
 const busy = ref(false);
 const error = ref('');
@@ -48,7 +61,11 @@ const findings = computed(() => [...(props.mission.artifacts.review.findings ?? 
 const openSelectedCount = computed(() => findings.value.filter(finding => finding.selected && finding.remediation.state === 'open').length);
 const canArbitrate = computed(() => !props.readOnly && props.mission.stage === 'review' && Boolean(
   props.mission.execution?.runs.slice().reverse().find(run => run.stage === 'review' && run.status === 'awaitingReview' && run.proposal),
-));
+) && findings.value.every(finding => finding.remediation.state === 'open'));
+const canRemediate = computed(() => canArbitrate.value);
+const canRerunReview = computed(() => !props.readOnly && props.mission.stage === 'review' && findings.value.length > 0 && findings.value.every(finding => (
+  finding.remediation.state === 'fixed' || finding.remediation.state === 'skipped'
+)));
 const findingItems = computed<ReviewFindingListItem[]>(() => findings.value.map(finding => ({
   id: finding.id,
   priority: finding.priority,
@@ -78,6 +95,13 @@ function selectFinding(findingId: string, selected: boolean): void {
 }
 function fixSelected(): void {
   void run({ id: props.mission.id, revision: props.mission.revision, action: 'fixSelectedReviewFindings' });
+}
+function rerunReview(): void {
+  void run({ id: props.mission.id, revision: props.mission.revision, action: 'rerunReview' });
+}
+function chatAboutFinding(findingId: string): void {
+  const finding = findings.value.find(candidate => candidate.id === findingId);
+  if (finding) emit('chat-about-finding', finding);
 }
 </script>
 

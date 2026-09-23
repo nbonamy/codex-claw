@@ -25,6 +25,8 @@ describe('Mission skill store', () => {
       expect(ticketSkill).toContain('codex_claw.upsert-mission-ticket');
       expect(ticketSkill).toContain('without tracker setup');
       expect(ticketSkill).toContain('explicit Review stage');
+      expect(ticketSkill).toContain('User review happens manually in the Mission workspace after submission');
+      expect(ticketSkill).not.toContain('user has reviewed the breakdown');
       expect(ticketSkill).not.toContain('set-mission-execution-policy');
       expect(ticketSkill).not.toContain('/setup-matt-pocock-skills');
       expect(tickets[0]!.path).toBe(path.join(root, 'mission-test', 'skills', 'mission-to-tickets', 'SKILL.md'));

@@ -33,16 +33,21 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
     (controller as unknown as { selectMission(missionId: string | null): void }).selectMission(mission.id);
     const options = (controller as unknown as {
-      debugMenuOptions(): { getDebugMissionStage(): MissionStage | undefined; setDebugMissionStage(stage: MissionStage): void };
+      debugMenuOptions(): { getDebugMissionStage(): MissionStage | undefined; setDebugMissionStage(stage: MissionStage, reviewState?: 'identified' | 'remediated'): void };
     }).debugMenuOptions();
 
     expect(options.getDebugMissionStage()).toBe('requirements');
     options.setDebugMissionStage('implementation');
+    options.setDebugMissionStage('review', 'remediated');
 
     await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
       backendMethods.debugMissionStageSet,
       { missionId: mission.id, stage: 'implementation' },
     ));
+    expect(request).toHaveBeenCalledWith(
+      backendMethods.debugMissionStageSet,
+      { missionId: mission.id, stage: 'review', reviewState: 'remediated' },
+    );
   });
 
   it('routes Review fixtures through clawd and opens the real Review pane', async () => {

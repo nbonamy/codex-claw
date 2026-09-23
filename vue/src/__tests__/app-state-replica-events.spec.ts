@@ -251,6 +251,40 @@ describe('useAppState', () => {
     expect(state.agentCreationProgress.value).toBeNull();
   });
 
+  it('tracks aggregate Mission Implementation startup progress', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    stubElectronTestWindow({
+      codexClaw: {
+        getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
+        onEvent: vi.fn((listener) => {
+          listeners.push(listener);
+          return () => undefined;
+        }),
+      } satisfies Partial<CodexClawApi>,
+    });
+    const state = useAppState();
+    await state.loadSnapshot();
+
+    listeners[0]?.({
+      seq: 1,
+      type: 'mission.implementationStartProgress',
+      payload: {
+        missionId: 'mission-1',
+        phase: 'initializingWorkspaces',
+        repositoryCount: 2,
+        ticketCount: 3,
+      },
+      occurredAt: '2026-09-22T00:00:00.000Z',
+    });
+
+    expect(state.missionImplementationStartProgress.value).toEqual({
+      missionId: 'mission-1',
+      phase: 'initializingWorkspaces',
+      repositoryCount: 2,
+      ticketCount: 3,
+    });
+  });
+
   it('ignores celebration events when the user disabled them', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
@@ -344,6 +378,7 @@ describe('useAppState', () => {
       'remoteControl.statusChanged',
       'workspace.fileActivityDetected',
       'git.operationProgress',
+      'mission.implementationStartProgress',
       'models.changed',
       'client.markdownDisplayRequested',
       'skills.changed',

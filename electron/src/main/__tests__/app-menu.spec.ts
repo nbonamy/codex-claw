@@ -61,6 +61,7 @@ const callbacks = (): AppMenuCallbacks => ({
   injectDebugPlanReview: vi.fn(),
   populateDebugVisualize: vi.fn(),
   getDebugMissionStage: vi.fn(() => 'tickets' as const),
+  getDebugMissionReviewState: vi.fn(() => 'identified' as const),
   setDebugMissionStage: vi.fn(),
   injectDebugCodeReview: vi.fn(),
   isDebugThreadFlagSet: vi.fn(() => false),
@@ -294,7 +295,8 @@ describe('app menu', () => {
       'Requirements',
       'Tickets',
       'Implementation',
-      'Review (Findings + Changes)',
+      'Review — Findings Identified',
+      'Review — Findings Remediated',
       'Ship',
     ]);
     expect(submenuLabels(debugMenu, 'Debug', 'Visualize Fixtures')).toStrictEqual([
@@ -366,7 +368,8 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Requirements');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Tickets');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Implementation');
-    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review (Findings + Changes)');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review — Findings Identified');
+    clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Review — Findings Remediated');
     clickNestedItem(debugMenu, 'Debug', 'Mission Fixtures', 'Ship');
     clickNestedItem(debugMenu, 'Debug', 'Visualize Fixtures', 'Populate Suggestions');
     clickNestedItem(debugMenu, 'Debug', 'Visualize Fixtures', 'Populate Diagrams');
@@ -440,11 +443,12 @@ describe('app menu', () => {
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });
     expect(debugCallbacks.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
     expect(debugCallbacks.injectDebugPlanReview).toHaveBeenCalledOnce();
-    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(1, 'requirements');
-    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(2, 'tickets');
-    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(3, 'implementation');
-    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(4, 'review');
-    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(5, 'ship');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(1, 'requirements', undefined);
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(2, 'tickets', undefined);
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(3, 'implementation', undefined);
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(4, 'review', 'identified');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(5, 'review', 'remediated');
+    expect(debugCallbacks.setDebugMissionStage).toHaveBeenNthCalledWith(6, 'ship', undefined);
     expect(debugCallbacks.populateDebugVisualize).toHaveBeenNthCalledWith(1, 'suggestions');
     expect(debugCallbacks.populateDebugVisualize).toHaveBeenNthCalledWith(2, 'complete');
     expect(debugCallbacks.injectDebugCodeReview).toHaveBeenNthCalledWith(1, 'reviewing');

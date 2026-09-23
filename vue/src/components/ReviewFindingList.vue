@@ -27,8 +27,8 @@
             v-if="clarifiable"
             class="claw-button claw-button--tertiary review-finding__quick-action"
             type="button"
-            :aria-label="$t('surface.codeReviewPanel.clarify')"
-            :title="$t('surface.codeReviewPanel.clarify')"
+            :aria-label="clarifyLabel || $t('surface.codeReviewPanel.clarify')"
+            :title="clarifyLabel || $t('surface.codeReviewPanel.clarify')"
             :disabled="busy"
             @click="emit('clarify', finding.id)"
           >
@@ -93,7 +93,7 @@ import { nextTick, ref } from 'vue';
 import { IconChevronDown, IconMessageQuestion } from '@tabler/icons-vue';
 import { renderMarkdown } from '@codex-app-sdk/vue';
 
-defineProps<{ findings: ReviewFindingListItem[]; selectable?: boolean; clarifiable?: boolean; busy?: boolean }>();
+defineProps<{ findings: ReviewFindingListItem[]; selectable?: boolean; clarifiable?: boolean; clarifyLabel?: string; busy?: boolean }>();
 const emit = defineEmits<{ select: [findingId: string, selected: boolean]; clarify: [findingId: string]; openFile: [path: string] }>();
 const expandedFindingId = ref<string | null>(null);
 

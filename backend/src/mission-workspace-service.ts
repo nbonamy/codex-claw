@@ -1,5 +1,6 @@
 import type { AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
 import type { Mission } from '@codex-claw/core/missions';
+import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
 import { missionTeamRepositories, missionWorkspaceName } from './mission-execution-policy';
 
 export type MissionWorkspacePorts = {
@@ -12,23 +13,41 @@ export type MissionWorkspacePorts = {
 export class MissionWorkspaceService {
   constructor(private readonly ports: MissionWorkspacePorts) {}
 
-  async provisionImplementationWorkspaces(mission: Mission): Promise<void> {
+  async provisionImplementationWorkspaces(
+    mission: Mission,
+    onPhase?: (phase: MissionImplementationStartProgress['phase']) => void,
+  ): Promise<void> {
     const execution = mission.execution!;
     execution.workspaceName ??= missionWorkspaceName(mission);
     execution.workspaces ??= [];
     const branch = `mission/${execution.workspaceName}`;
-    const repositoryPaths = [...new Set(mission.artifacts.tickets.map(ticket => ticket.repositoryPath))];
     const representedRepositories = missionTeamRepositories(this.ports.snapshot, mission);
-    for (const repositoryPath of repositoryPaths) {
-      if (!repositoryPath || !representedRepositories.includes(repositoryPath)) {
-        throw new Error('Every ticket must target a repository represented in this Mission team.');
-      }
-      if (execution.workspaces.some(workspace => workspace.repositoryPath === repositoryPath)) continue;
-      await this.ports.validateRepository(repositoryPath);
-      const worktree = await this.ports.createWorktree({ repoPath: repositoryPath, branchName: branch, reuseExisting: true });
-      const baseSha = await this.ports.getHead(worktree.path);
-      execution.workspaces.push({ repositoryPath, path: worktree.path, branch, baseSha });
+    const assignedRepositoryPaths = mission.artifacts.tickets.map(ticket => ticket.repositoryPath);
+    if (assignedRepositoryPaths.some(repositoryPath => (
+      !repositoryPath || !representedRepositories.includes(repositoryPath)
+    ))) {
+      throw new Error('Every ticket must target a repository represented in this Mission team.');
     }
+    const repositoryPaths = [...new Set(assignedRepositoryPaths.filter(
+      (repositoryPath): repositoryPath is string => Boolean(repositoryPath),
+    ))];
+    const pendingRepositoryPaths = repositoryPaths.filter(repositoryPath => (
+      !execution.workspaces!.some(workspace => workspace.repositoryPath === repositoryPath)
+    ));
+    onPhase?.('creatingWorktrees');
+    await Promise.all(pendingRepositoryPaths.map(repositoryPath => this.ports.validateRepository(repositoryPath)));
+    const worktrees = await Promise.all(pendingRepositoryPaths.map(async repositoryPath => ({
+      repositoryPath,
+      worktree: await this.ports.createWorktree({ repoPath: repositoryPath, branchName: branch, reuseExisting: true }),
+    })));
+    onPhase?.('initializingWorkspaces');
+    const workspaces = await Promise.all(worktrees.map(async ({ repositoryPath, worktree }) => ({
+      repositoryPath,
+      path: worktree.path,
+      branch,
+      baseSha: await this.ports.getHead(worktree.path),
+    })));
+    execution.workspaces.push(...workspaces);
   }
 
   prepareDeliveries(mission: Mission): void {

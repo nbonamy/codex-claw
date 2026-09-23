@@ -5,7 +5,7 @@ import type { Mission, MissionArtifacts, MissionExecution, MissionReviewFinding,
 import { featureStages, findMissionWorkflow, missionWorkflow } from './mission-workflows';
 
 export { featureStages } from './mission-workflows';
-export type { CreateMissionInput, DeleteMissionInput, Mission, MissionArtifactFile, MissionArtifacts, MissionReviewFinding, MissionStage, MissionTicket, UpdateMissionInput } from './mission-types';
+export type { CreateMissionInput, DeleteMissionInput, Mission, MissionArtifactFile, MissionArtifacts, MissionReviewDebugState, MissionReviewFinding, MissionStage, MissionTicket, UpdateMissionInput } from './mission-types';
 
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 100_000;
@@ -27,7 +27,8 @@ function isMissionReviewFinding(v: unknown): v is MissionReviewFinding {
       && (v.location.line === undefined || (Number.isInteger(v.location.line) && (v.location.line as number) > 0))
       && (v.location.endLine === undefined || (Number.isInteger(v.location.endLine) && (v.location.endLine as number) > 0))))
     && typeof v.selected === 'boolean'
-    && record(v.remediation) && ['open', 'fixing', 'fixed'].includes(v.remediation.state as string)
+    && record(v.remediation) && ['open', 'skipped', 'fixing', 'fixed'].includes(v.remediation.state as string)
+    && (v.remediation.state !== 'skipped' || text(v.remediation.startedAt))
     && (v.remediation.state !== 'fixing' || text(v.remediation.startedAt))
     && (v.remediation.state !== 'fixed' || (text(v.remediation.completedAt) && (v.remediation.evidence === undefined || text(v.remediation.evidence))))
     && text(v.createdAt) && text(v.updatedAt);

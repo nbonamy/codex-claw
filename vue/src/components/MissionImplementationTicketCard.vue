@@ -27,7 +27,9 @@
     <button
       type="button"
       class="mission-implementation__ticket-details"
-      :aria-label="t('missions.openTicketDetails', { title: item.ticket.title })"
+      :aria-label="item.run?.implementationResult
+        ? t('missions.viewTicketEvidence', { title: item.ticket.title })
+        : t('missions.openTicketDetails', { title: item.ticket.title })"
       :aria-expanded="selected"
       aria-controls="mission-ticket-details"
       @click="emit('open-details')"

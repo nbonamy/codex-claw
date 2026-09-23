@@ -94,7 +94,8 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     expect(current().execution!.runs[0]!.workerId).toBe(current().execution!.runs[1]!.workerId);
     expect(current().execution!.runs[2]!.workerId).toBe(current().execution!.runs[3]!.workerId);
     expect(current().execution!.runs[2]!.workerId).not.toBe(current().execution!.runs[1]!.workerId);
-    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(3);
+    expect(current().execution!.runs[4]!.workerId).toBe(current().execution!.runs[1]!.workerId);
+    expect(new Set(current().execution!.runs.map(run => run.workerId)).size).toBe(2);
     expect(await readWorktreeHead(repo)).toBe(baseline);
     expect(await readFile(join(repo, 'billing.txt'), 'utf8')).toBe('original\n');
     expect((await git(repo, ['status', '--porcelain'])).stdout).toBe('');

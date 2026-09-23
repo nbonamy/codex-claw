@@ -16,6 +16,13 @@ export type {
   MissionWorkspace,
 } from './mission-types';
 
+export type MissionImplementationStartProgress = {
+  missionId: string;
+  phase: 'creatingWorktrees' | 'initializingWorkspaces' | 'startingAgents';
+  repositoryCount: number;
+  ticketCount: number;
+};
+
 export function pendingMissionRun(mission: Mission): MissionRun | undefined {
   return mission.execution?.runs.slice().reverse().find(run => ['preparing', 'running', 'awaitingReview'].includes(run.status));
 }

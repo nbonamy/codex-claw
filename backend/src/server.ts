@@ -3,7 +3,7 @@ import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
 import { createVisualizeDebugFixture } from './visualize-debug-fixtures';
 import { FileMissionSkillStore } from './mission-skill-store';
-import { featureStages, type Mission, type MissionStage } from '@codex-claw/core/missions';
+import { featureStages, type Mission, type MissionReviewDebugState, type MissionStage } from '@codex-claw/core/missions';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
 import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
@@ -231,6 +231,14 @@ export class ClawBackendServer {
       snapshot: this.snapshot,
       missions: this.missions,
       publish: () => this.emitProjectedSnapshot(),
+      reportImplementationStartProgress: payload => {
+        this.onEvent?.({
+          seq: this.nextEventSeq(),
+          type: 'mission.implementationStartProgress',
+          payload,
+          occurredAt: new Date().toISOString(),
+        });
+      },
       ensureMissionHome,
       readArtifact: (missionId, stage) => this.missionArtifacts.read(missionId, stage),
       writeArtifact: (missionId, stage, content) => this.missionArtifacts.write(missionId, stage, content),
@@ -625,6 +633,10 @@ export class ClawBackendServer {
         if (typeof stage !== 'string' || !featureStages.includes(stage as MissionStage)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'stage must be a supported Mission stage');
         }
+        const reviewState = params.reviewState;
+        if (reviewState !== undefined && (stage !== 'review' || !['identified', 'remediated'].includes(reviewState as string))) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'reviewState must be identified or remediated for Review');
+        }
         const mission = this.snapshot.missions?.find(candidate => candidate.id === missionId);
         for (const workerId of new Set(mission?.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? [])) {
           const worker = this.snapshot.agents.find(agent => agent.id === workerId);
@@ -632,7 +644,7 @@ export class ClawBackendServer {
             await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
           }
         }
-        applyMissionDebugFixture(this.snapshot, missionId, stage as MissionStage);
+        applyMissionDebugFixture(this.snapshot, missionId, stage as MissionStage, undefined, reviewState as MissionReviewDebugState | undefined);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugCodeReviewSet: {
@@ -855,7 +867,7 @@ export class ClawBackendServer {
             for (const folder of workspacePaths) {
               const sharedAgent = this.snapshot.agents.find(agent => !workerIds.has(agent.id) && agent.folder === folder);
               if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
-              await this.agentGitService.validateLinkedWorktreeDeletion(folder);
+              await this.agentGitService.validateLinkedWorktreeDeletion(folder, false, undefined, true);
             }
           }
           for (const worker of workers) {
@@ -868,7 +880,7 @@ export class ClawBackendServer {
             }
           }
           if (input.deleteWorktrees) {
-            for (const folder of workspacePaths) await this.agentGitService.deleteLinkedWorktree(folder);
+            for (const folder of workspacePaths) await this.agentGitService.deleteLinkedWorktree(folder, false, undefined, true);
           }
           await this.deleteMissionHome(mission.id);
         });

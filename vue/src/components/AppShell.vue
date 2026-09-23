@@ -191,9 +191,9 @@
         @select-work-repository="selectWorkRepositoryForCockpit"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
-        <template #code-review="{ agentId, reviewSummary }">
-          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :agents="snapshot.agents" :git-statuses="snapshot.agentGitStatuses" :get-diff="props.getAgentGitDiff" :mission="selectedMission" :review-summary="reviewSummary" :execute-mission="executeMission" :read-only="selectedMission.execution?.debugFixture === true" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @open-worktree="openMissionWorktree" />
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :implementation-start-progress="missionImplementationStartProgress" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-review-finding="prepareMissionReviewDiscussion" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
+        <template #code-review="{ agentId, reviewSummary, chatAboutFinding }">
+          <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :agents="snapshot.agents" :git-statuses="snapshot.agentGitStatuses" :get-diff="props.getAgentGitDiff" :mission="selectedMission" :review-summary="reviewSummary" :execute-mission="executeMission" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-finding="chatAboutFinding" @open-worktree="openMissionWorktree" />
         </template>
         <template #ship="{ openConversation }">
           <MissionShipBoard
@@ -214,7 +214,7 @@
           />
         </template>
         <template #conversation="{ agentId }">
-          <ConversationPane v-if="currentAgent?.id === agentId" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory" />
+          <ConversationPane v-if="currentAgent?.id === agentId" ref="missionConversationPane" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory" />
         </template>
       </MissionWorkspace>
       <AgentWorkspace
@@ -501,6 +501,7 @@ import MissionDeleteDialog from './MissionDeleteDialog.vue';
 import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 import ConversationPane from './ConversationPane.vue';
 import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
+import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -622,6 +623,7 @@ const props = withDefaults(defineProps<{
   deleteMission?: (input: DeleteMissionInput) => Promise<void>;
   readMissionArtifact?: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
   executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
+  missionImplementationStartProgress?: MissionImplementationStartProgress | null;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
   updateTeam?: (input: UpdateTeamInput) => Promise<void>;
@@ -868,10 +870,15 @@ type PendingReviewClarification = {
   findingId: string;
   finding: import('@codex-claw/core/code-review').CodeReviewFinding;
 };
+type PendingMissionReviewDiscussion = {
+  agentId: string;
+  finding: import('@codex-claw/core/missions').MissionReviewFinding;
+};
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
+const missionConversationPane = ref<{ focusComposer(): void } | null>(null);
 const activeReviewFindingAttachment = computed(() => {
   const clarification = pendingReviewClarification.value;
   return clarification && clarification.agentId === currentAgent.value?.id
@@ -2375,6 +2382,15 @@ function clarifyCodeReviewFinding(payload: {
   void nextTick(() => agentWorkspace.value?.focusComposer());
 }
 
+function prepareMissionReviewDiscussion(payload: PendingMissionReviewDiscussion): void {
+  const text = missionReviewDiscussionPrompt(payload.finding);
+  emit('update:composerState', {
+    agentId: payload.agentId,
+    state: { text, selectionStart: text.length, selectionEnd: text.length },
+  });
+  void nextTick(() => missionConversationPane.value?.focusComposer());
+}
+
 function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
   const visualizeCommand = prompt.match(/^\/visualize(?:\s+([\s\S]*))?$/u);
   if (visualizeCommand && !options?.attachments?.length && currentAgent.value) {
@@ -2409,6 +2425,23 @@ function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): voi
   } else {
     emit('sendPrompt', prompt);
   }
+}
+
+function missionReviewDiscussionPrompt(
+  finding: import('@codex-claw/core/missions').MissionReviewFinding,
+): string {
+  const location = finding.location
+    ? `${finding.location.file}${finding.location.line ? `:${finding.location.line}` : ''}`
+    : '';
+  return [
+    'Discuss this Mission Review finding:',
+    `[${finding.priority.toUpperCase()}] ${finding.title}`,
+    `Repository: ${finding.repositoryPath}`,
+    ...(location ? [`Location: ${location}`] : []),
+    finding.body,
+    '',
+    'Question: ',
+  ].join('\n');
 }
 
 function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions): void {

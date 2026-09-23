@@ -2,9 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { createMission, type Mission } from '@codex-claw/core/missions';
-import type { MissionArtifactReadResult, MissionExecutionInput, MissionRun } from '@codex-claw/core/mission-execution';
+import type { MissionArtifactReadResult, MissionExecutionInput, MissionImplementationStartProgress, MissionRun } from '@codex-claw/core/mission-execution';
 import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
+import MissionImplementationStartDialog from '../MissionImplementationStartDialog.vue';
 import MissionTicketBoard, { type MissionTicketComment } from '../MissionTicketBoard.vue';
 
 function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
@@ -38,6 +39,7 @@ function mountWorkspace(mission: Mission, options: {
   sendMissionPrompt?: (prompt: string) => Promise<void>;
   openInAvailable?: boolean;
   openInApplications?: OpenInApplicationCatalog;
+  implementationStartProgress?: MissionImplementationStartProgress;
 } = {}) {
   return mount(MissionWorkspace, {
     props: {
@@ -48,6 +50,7 @@ function mountWorkspace(mission: Mission, options: {
       sendMissionPrompt: options.sendMissionPrompt,
       openInAvailable: options.openInAvailable,
       openInApplications: options.openInApplications,
+      implementationStartProgress: options.implementationStartProgress,
     },
     slots: {
       conversation: '<div class="conversation-slot">Conversation for {{ params.agentId }}</div>',
@@ -58,7 +61,7 @@ function mountWorkspace(mission: Mission, options: {
 }
 
 describe('MissionWorkspace', () => {
-  it('blocks Review approval while a selected or blocking finding is unresolved', async () => {
+  it('keeps Review approval available when selected findings remain unresolved', async () => {
     const mission = missionWithRun('awaitingReview', true);
     mission.stage = 'review';
     mission.execution!.runs[0]!.stage = 'review';
@@ -68,11 +71,10 @@ describe('MissionWorkspace', () => {
       remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
     }];
     const wrapper = mountWorkspace(mission);
-    const approve = wrapper.findAll('button').find(button => button.text().includes('Approve and continue'))!;
-    expect(approve.attributes('disabled')).toBeDefined();
-    expect(wrapper.text()).toContain('Resolve selected and blocking findings before continuing to Ship.');
+    expect(wrapper.findAll('button').find(button => button.text().includes('Approve and continue'))!.attributes('disabled')).toBeUndefined();
 
-    mission.artifacts.review.findings[0]!.remediation = { state: 'fixed', completedAt: 'later', evidence: 'Tests pass.' };
+    mission.artifacts.review.findings[0]!.selected = true;
+    mission.execution!.debugFixture = true;
     await wrapper.setProps({ mission: structuredClone(mission) });
     expect(wrapper.findAll('button').find(button => button.text().includes('Approve and continue'))!.attributes('disabled')).toBeUndefined();
   });
@@ -132,6 +134,43 @@ describe('MissionWorkspace', () => {
       runId: 'run-requirements',
     });
     expect(executeMission).toHaveBeenCalledOnce();
+  });
+
+  it('shows button and worktree progress while approved tickets start Implementation', async () => {
+    const mission = missionWithRun('awaitingReview', true);
+    mission.stage = 'tickets';
+    mission.execution!.runs[0]!.stage = 'tickets';
+    mission.execution!.runs[0]!.proposal!.tickets = [
+      { title: 'Build API', repositoryPath: '/src/billing-api', done: false },
+      { title: 'Build web', repositoryPath: '/src/billing-web', done: false },
+    ];
+    let finish!: () => void;
+    const executeMission = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const wrapper = mountWorkspace(mission, {
+      executeMission,
+      implementationStartProgress: {
+        missionId: mission.id,
+        phase: 'initializingWorkspaces',
+        repositoryCount: 2,
+        ticketCount: 2,
+      },
+    });
+    const continueButton = wrapper.get('.mission-workspace__stage-header .claw-button');
+
+    await continueButton.trigger('click');
+
+    expect(continueButton.attributes('aria-busy')).toBe('true');
+    const progress = wrapper.getComponent(MissionImplementationStartDialog);
+    expect(progress.text()).toContain('Preparing Mission worktrees');
+    expect(progress.text()).toContain('2 repositories');
+    expect(progress.text()).toContain('billing-api, billing-web');
+    expect(progress.text()).toContain('2 tickets');
+    expect(progress.props('phase')).toBe('initializingWorkspaces');
+
+    finish();
+    await flushPromises();
+
+    expect(wrapper.findComponent(MissionImplementationStartDialog).exists()).toBe(false);
   });
 
   it('sends selected requirement comments to the stage conversation as one revision request', async () => {
@@ -404,13 +443,15 @@ describe('MissionWorkspace', () => {
     const board = wrapper.get('[aria-label="Implementation by repository"]');
     expect(board.text()).toContain('2 affected repositories');
     expect(board.get('.mission-implementation__summary').text()).not.toContain('mission/add-team-billing');
+    expect(board.find('[aria-label="View implementation evidence"]').exists()).toBe(false);
     expect(board.findAll('.mission-implementation__workspace').map(workspace => workspace.text())).toStrictEqual([
       'mission/add-team-billing',
       'mission/add-team-billing',
     ]);
+    expect(getComputedStyle(board.get('.mission-implementation__workspace').element).alignSelf).toBe('center');
     expect(board.text()).toContain('billing-service');
     expect(board.text()).toContain('invoice-app');
-    expect(board.text()).toContain('Accepted');
+    expect(board.text()).toContain('Done');
     expect(board.text()).toContain('Building');
     expect(board.get('[aria-label="Execution status"]').text()).toContain('1 active');
     expect(board.get('[aria-label="Execution status"]').text()).toContain('1 complete');
@@ -419,6 +460,7 @@ describe('MissionWorkspace', () => {
       'aria-valuenow': '1',
     });
     expect(board.findAll('.mission-implementation__agent').map(agent => agent.text())).toStrictEqual(['Builder', 'Builder']);
+    expect(board.findAll('.mission-implementation__ticket-details')[0]!.attributes('aria-label')).toBe('View evidence for Checkout');
 
     await board.findAll('.mission-implementation__ticket')[0]!.trigger('click');
     expect(wrapper.get('.conversation-slot').text()).toContain('agent-dina');
@@ -435,29 +477,6 @@ describe('MissionWorkspace', () => {
     expect(ticketDialog.text()).toContain('checkout integration test passes');
 
     expect(wrapper.find('.mission-implementation__dialog-footer .claw-button').exists()).toBe(false);
-  });
-
-  it('keeps aggregate implementation evidence in a review dialog', async () => {
-    const mission = missionWithRun('accepted', true);
-    mission.stage = 'implementation';
-    mission.artifacts.tickets = [{ title: 'Checkout', repositoryPath: '/src/billing-service', done: true }];
-    mission.artifacts.implementation = {
-      changes: 'Checkout now completes payment in the isolated worktree.',
-      tests: 'Checkout integration tests pass.',
-    };
-    mission.execution!.runs = [];
-    const wrapper = mountWorkspace(mission);
-
-    const evidenceDialog = wrapper.findAllComponents({ name: 'ElDialog' })[0]!;
-    expect(evidenceDialog.props('modelValue')).toBe(false);
-    expect(wrapper.find('.mission-implementation__aggregate').exists()).toBe(false);
-
-    await wrapper.get('[aria-label="View implementation evidence"]').trigger('click');
-    await flushPromises();
-
-    expect(evidenceDialog.props('modelValue')).toBe(true);
-    expect(evidenceDialog.text()).toContain('Checkout now completes payment in the isolated worktree.');
-    expect(evidenceDialog.text()).toContain('Checkout integration tests pass.');
   });
 
   it('keeps failed and running implementation tickets recoverable from their repository lane', async () => {
@@ -550,6 +569,7 @@ describe('MissionWorkspace', () => {
     mission.execution!.runs = [{
       id: 'run-implementation', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
       repositoryPath: '/src/billing-service', status: 'accepted', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+      implementationResult: { changes: 'billing.ts changed', tests: 'billing integration passes' },
     }];
     const wrapper = mountWorkspace(mission);
 
@@ -565,7 +585,7 @@ describe('MissionWorkspace', () => {
     mission.stage = 'implementation';
     await wrapper.setProps({ mission: structuredClone(mission) });
     expect(wrapper.find('[aria-label="Accepted artifact"]').exists()).toBe(false);
-    await wrapper.get('[aria-label="View implementation evidence"]').trigger('click');
+    await wrapper.get('[aria-label="View evidence for Create billing foundation"]').trigger('click');
     await flushPromises();
     expect(wrapper.findAllComponents({ name: 'ElDialog' })[0]!.text()).toContain('billing integration passes');
     expect(wrapper.find('.code-review-slot').exists()).toBe(false);
