@@ -4,6 +4,46 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.0] - 2026-09-22
+
+### New features
+
+- Missions guide work from requirements and tickets through implementation,
+  Review, and Ship in a dedicated workspace. Stage artifacts, agent progress,
+  repository worktrees, and delivery actions stay together. Mission Review
+  presents selectable findings, repository-specific fixes, a Changes tab, and
+  a fresh review run; shipping does not require fixing every finding.
+- The new Review pane can review uncommitted or branch changes with the current
+  agent or an independent reviewer. Triage findings, discuss them in chat,
+  apply selected fixes as a batch, and run another round that remembers skipped
+  findings and checks accepted fixes for regressions.
+- `/visualize` opens a persistent diagram workspace beside the conversation.
+  Agents can suggest, create, edit, and delete Mermaid, SVG, or generated-image
+  visualizations; thumbnails, zoom, and pan make them easy to inspect.
+- Agents can propose moving implementation into a dedicated worktree through
+  an inline action that the user can accept or dismiss. Co-agents inherit the
+  originating model and reasoning effort unless explicitly changed.
+- Worktree branches can be updated with the latest base-branch changes before
+  merging, with progress and a conflict-resolution handoff to the agent.
+
+### Improvements and fixes
+
+- The Git diff indicator now defaults to uncommitted changes, remembers its
+  selected mode per agent, and changes mode without opening the diff pane.
+- Manual worktree creation uses the same staged progress experience as agent
+  creation. Merge and cleanup report retained folders without losing the
+  completed work, and shared worktrees are not offered for deletion while
+  another agent still uses them.
+- Agent status clears at turn completion, and status, announcements,
+  celebrations, and proposed actions can complete together with fewer tool
+  steps. Review invitations appear when uncommitted work is ready for review.
+- Generated images remain visible outside collapsed assistant work and can be
+  copied directly. Codex questions now use an in-conversation answer composer
+  with simpler choices and an explicit cancel action.
+- Visualize tools remain discoverable throughout an agent session while their
+  actions still require the matching open pane. Long-running backend requests
+  use operation-specific timeouts to avoid premature failures.
+
 ## [0.19.5] - 2026-09-18
 
 ### Improvements and fixes

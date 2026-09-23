@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/electron",
-  "version": "0.19.5",
+  "version": "0.20.0",
   "private": true,
   "productName": "Codex Claw",
   "description": "Native Codex team desktop app.",
@@ -25,8 +25,8 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/core": "0.19.5",
-    "@codex-claw/vue": "0.19.5",
+    "@codex-claw/core": "0.20.0",
+    "@codex-claw/vue": "0.20.0",
     "autolib": "github:nbonamy/witsy-autolib#v1.2.3",
     "@codex-app-sdk/electron": "latest",
     "electron-log": "^5.4.4",

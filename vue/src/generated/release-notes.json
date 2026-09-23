@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.19.5",
+  "currentVersion": "0.20.0",
   "releases": [
+    {
+      "version": "0.20.0",
+      "releasedAt": "2026-09-22",
+      "sourceSha256": "ed47f6b952dc69caf8c574be470c4165dc9d96015aea24eeb18798f035a6bef5",
+      "markdown": "### New features\n\n- Missions guide work from requirements and tickets through implementation,\n  Review, and Ship in a dedicated workspace. Stage artifacts, agent progress,\n  repository worktrees, and delivery actions stay together. Mission Review\n  presents selectable findings, repository-specific fixes, a Changes tab, and\n  a fresh review run; shipping does not require fixing every finding.\n- The new Review pane can review uncommitted or branch changes with the current\n  agent or an independent reviewer. Triage findings, discuss them in chat,\n  apply selected fixes as a batch, and run another round that remembers skipped\n  findings and checks accepted fixes for regressions.\n- `/visualize` opens a persistent diagram workspace beside the conversation.\n  Agents can suggest, create, edit, and delete Mermaid, SVG, or generated-image\n  visualizations; thumbnails, zoom, and pan make them easy to inspect.\n- Agents can propose moving implementation into a dedicated worktree through\n  an inline action that the user can accept or dismiss. Co-agents inherit the\n  originating model and reasoning effort unless explicitly changed.\n- Worktree branches can be updated with the latest base-branch changes before\n  merging, with progress and a conflict-resolution handoff to the agent.\n\n### Improvements and fixes\n\n- The Git diff indicator now defaults to uncommitted changes, remembers its\n  selected mode per agent, and changes mode without opening the diff pane.\n- Manual worktree creation uses the same staged progress experience as agent\n  creation. Merge and cleanup report retained folders without losing the\n  completed work, and shared worktrees are not offered for deletion while\n  another agent still uses them.\n- Agent status clears at turn completion, and status, announcements,\n  celebrations, and proposed actions can complete together with fewer tool\n  steps. Review invitations appear when uncommitted work is ready for review.\n- Generated images remain visible outside collapsed assistant work and can be\n  copied directly. Codex questions now use an in-conversation answer composer\n  with simpler choices and an explicit cancel action.\n- Visualize tools remain discoverable throughout an agent session while their\n  actions still require the matching open pane. Long-running backend requests\n  use operation-specific timeouts to avoid premature failures."
+    },
     {
       "version": "0.19.5",
       "releasedAt": "2026-09-18",
