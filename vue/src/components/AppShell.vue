@@ -1820,6 +1820,9 @@ const conversationPaneState: CodexConversationPaneState = {
   },
   thread: {
     get approvals() { return effectiveApprovals.value; },
+    get clientRequests() {
+      return currentAgent.value?.backend === 'codex' ? props.codexConversationSnapshot?.clientRequests ?? [] : [];
+    },
     get answeredClientRequestIds() {
       return providerConversation.value
         ? new Set(providerConversation.value.answeredClientRequestIds)

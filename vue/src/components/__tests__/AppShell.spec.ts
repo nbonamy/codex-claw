@@ -4,6 +4,7 @@ import type {
   CodexNativeAttachment,
   CodexNativeRendererApi,
 } from '@codex-app-sdk/vue';
+import type { CodexSurfaceClientRequest } from '@codex-app-sdk/core/surface';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
@@ -93,6 +94,52 @@ describe('AppShell authentication and conversation', () => {
     expect(state.identity.busy).toBe(true);
     expect(state.thread?.approvals).toStrictEqual(providerSnapshot.approvals);
     expect(wrapper.getComponent({ name: 'ConversationPane' }).props('hasVisibleMessages')).toBe(true);
+  });
+
+  it('presents a blocking provider question through the controlled pane and forwards its answer', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-question' };
+    const question: CodexSurfaceClientRequest = {
+      id: 'request-framework', kind: 'ask_user', conversationId: 'thread-question',
+      turnId: 'turn-question', itemId: 'item-framework',
+      payload: { request: { itemId: 'item-framework', delivery: 'tool', blocking: true,
+        questions: [{ id: 'framework', header: 'Framework', question: 'Which framework should I use?',
+          isOther: false, isSecret: false,
+          options: [{ label: 'Vue', description: 'Use the SDK component package.' }],
+        }],
+      } },
+    };
+    const wrapper = mountShell({
+      snapshot,
+      stubAgentWorkspace: false,
+      realConversationPane: true,
+      codexConversationSnapshot: codexConversationSnapshot([{
+        id: 'assistant-question', role: 'assistant', status: 'streaming', turnId: 'turn-question',
+        parts: [{ type: 'tool', id: 'item-framework', kind: 'generic', title: 'ask_user_question',
+          status: 'running', metadata: { requestId: question.id },
+          statusText: JSON.stringify({ source: 'codex', action: 'ask_user_question', phase: 'running',
+            params: { requestId: question.id, questions: question.payload.request.questions } }),
+        }],
+      }], {
+        activeConversationId: 'thread-question',
+        activeTurnId: 'turn-question',
+        turnIds: ['turn-question'],
+        turns: [{ id: 'turn-question', status: 'inProgress', error: null, willRetry: false,
+          startedAt: null, completedAt: null, durationMs: null }],
+        clientRequests: [question],
+        busy: true,
+      }),
+    });
+
+    expect(wrapper.get('.codex-conversation-pane__footer').text()).toContain('Which framework should I use?');
+    expect(wrapper.find('.codex-composer').exists()).toBe(false);
+    expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
+    await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
+    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([[
+      { id: question.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
+    ]]);
   });
 
   it('uses the provider-owned Claude conversation', () => {

@@ -679,9 +679,16 @@ export class CodexSurfaceAgentAdapter {
       return;
     }
     const requestOwner = key ? this.clientRequestOwners.get(key) : undefined;
-    if (requestOwner) {
+    // A message-derived async question can remain pending in the SDK snapshot
+    // even if its clientRequest.requested event was missed during transport.
+    const projectedOwner = agentId ? this.sessionsByAgentId.get(agentId) : undefined;
+    const pendingQuestionOwner = projectedOwner?.handle.getSnapshot().clientRequests.some(
+      (request) => request.id === response.id,
+    ) ? projectedOwner : undefined;
+    const owner = requestOwner ?? pendingQuestionOwner;
+    if (owner) {
       await invokeCodexConversationBridgeOperation(
-        this.surface, requestOwner.handle.id, 'respondToClientRequest', [nativeResponse],
+        this.surface, owner.handle.id, 'respondToClientRequest', [nativeResponse],
       );
       return;
     }

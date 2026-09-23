@@ -106,4 +106,34 @@ describe('Codex SDK → Claw backend event contract', () => {
     else expect(b.respondToClientRequest).toHaveBeenCalledWith({ id: '0', payload: { answers: {} } });
     expect(surface.respondToClientRequest).not.toHaveBeenCalled();
   });
+
+  it('routes a projected async question when its request event was missed', async () => {
+    const { driver, conversation, surface } = setup();
+    await driver.loadConversation(sdkAgent());
+    const request = {
+      id: 'async-question:question-1', conversationId: 'conversation-a', turnId: 'turn-a',
+      itemId: 'question-1', kind: 'ask_user' as const,
+      payload: { request: { itemId: 'question-1', delivery: 'async' as const, blocking: false,
+        questions: [{ id: 'choice', header: 'Choice', question: 'Which one?', isOther: false, isSecret: false, options: null }],
+      } },
+    };
+    conversation('conversation-a').setSnapshot({
+      activeTurnId: null,
+      clientRequests: [request],
+      messages: [{ id: 'question-message', role: 'assistant', status: 'complete', turnId: 'turn-a',
+        parts: [{ type: 'question', request }] }],
+    });
+    conversation('conversation-a').emit({ ...metadata, type: 'message.appended', payload: {
+      message: { id: 'question-message', role: 'assistant', status: 'complete', turnId: 'turn-a',
+        parts: [{ type: 'question', request }] },
+    } });
+
+    await driver.respondToAgentRequest({ agentId: 'agent-a', id: request.id,
+      outcome: { kind: 'answered', answers: { choice: { answers: ['First'] } } } });
+
+    expect(conversation('conversation-a').handle.respondToClientRequest).toHaveBeenCalledExactlyOnceWith({
+      id: request.id, payload: { answers: { choice: { answers: ['First'] } } },
+    });
+    expect(surface.respondToClientRequest).not.toHaveBeenCalled();
+  });
 });
