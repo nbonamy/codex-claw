@@ -37,6 +37,7 @@ describe('MissionShipBoard', () => {
     expect(cards[1]!.get('a').attributes('href')).toBe('https://github.com/acme/repo/pull/42');
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1');
     expect(getComputedStyle(wrapper.get('.mission-ship').element).display).toBe('flex');
+    expect(getComputedStyle(wrapper.get('.mission-ship__grid').element).gridTemplateColumns).toBe('minmax(0, 1fr)');
     const actionsStyle = getComputedStyle(cards[0]!.get('.mission-ship__actions').element);
     expect({ display: actionsStyle.display, justifyContent: actionsStyle.justifyContent }).toStrictEqual({
       display: 'flex',

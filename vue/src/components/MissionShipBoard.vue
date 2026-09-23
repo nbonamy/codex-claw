@@ -154,7 +154,7 @@ async function recordDelivery(repositoryPath: string, result: { kind: 'pullReque
 
 .mission-ship__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
 }
 
