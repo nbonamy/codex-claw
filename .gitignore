@@ -10,3 +10,7 @@ coverage/
 electron/.computer-use-artifacts/
 electron/.tts/
 native/**/.build/
+
+# Rebuild promo video renders from videos/*.html and videos/render-mission-film.mjs.
+/videos/assets/*.mp4
+/videos/assets/*-poster.png

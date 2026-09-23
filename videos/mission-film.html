@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex Claw — A Mission from idea to delivery</title>
+    <link rel="icon" href="../website/assets/claw-icon.png" />
+    <link rel="stylesheet" href="mission-film.css" />
+  </head>
+  <body>
+    <main class="preview">
+      <header class="preview-header">
+        <div>
+          <p>Codex Claw / product film</p>
+          <h1>A Mission from idea to delivery</h1>
+        </div>
+        <span>Illustrative UI walkthrough · 48 seconds</span>
+      </header>
+
+      <div class="film-viewport">
+        <div
+          id="film"
+          class="film"
+          aria-label="Animated Codex Claw Mission walkthrough"
+        >
+          <div class="film-glow film-glow--one"></div>
+          <div class="film-glow film-glow--two"></div>
+
+          <section class="opening" aria-label="Opening title">
+            <div class="opening-mark">
+              <img src="../website/assets/claw-icon.png" alt="" /> Codex
+              <b>Claw</b>
+            </div>
+            <p class="opening-eyebrow">
+              A workspace for agentic software engineering
+            </p>
+            <h2>
+              An idea is only<br />the beginning<span class="opening-period"
+                >.</span
+              >
+            </h2>
+            <div class="opening-rule"><span></span></div>
+            <p class="opening-subtitle">
+              See one Mission move from intent to delivered code.
+            </p>
+          </section>
+
+          <section class="walkthrough" aria-label="Mission workflow animation">
+            <div class="film-chapter">
+              <span id="chapter-index">01 / 06</span>
+              <div>
+                <h2 id="chapter-title"></h2>
+                <p id="chapter-detail"></p>
+              </div>
+              <span class="film-chapter__brand"
+                ><img src="../website/assets/claw-icon.png" alt="" /> Codex
+                Claw</span
+              >
+            </div>
+
+            <div
+              class="app-window"
+              aria-label="Illustrative Codex Claw desktop interface"
+            >
+              <div class="app-titlebar">
+                <div class="traffic-lights" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                </div>
+                <span
+                  ><img src="../website/assets/claw-icon.png" alt="" /> Codex
+                  Claw</span
+                >
+                <small>ILLUSTRATIVE MISSION / SHAPE AND SHIP A FEATURE</small>
+              </div>
+              <div class="app-main">
+                <nav class="team-rail" aria-label="Teams">
+                  <span class="team-rail__cockpit">⌘</span>
+                  <span class="team-rail__active">N</span>
+                  <span class="team-rail__other">C</span>
+                  <span class="team-rail__plus">+</span>
+                </nav>
+                <aside class="sidebar" aria-label="Sessions">
+                  <header><strong>Sessions</strong><span>‹</span></header>
+                  <div class="sidebar-actions">
+                    <span><b>＋</b> Start work</span
+                    ><span><b>◌</b> Quick Chat</span>
+                  </div>
+                  <div class="sidebar-group">
+                    <div class="sidebar-group__heading">
+                      <span>◎</span><strong>Missions</strong><b>＋</b>
+                    </div>
+                    <div class="sidebar-session sidebar-session--active">
+                      <span>Cloud-based agents</span><i></i>
+                    </div>
+                  </div>
+                  <div class="sidebar-group">
+                    <div class="sidebar-group__heading">
+                      <span>◫</span><strong>codex-claw</strong><b>＋</b>
+                    </div>
+                    <div class="sidebar-session"><span>main</span><i></i></div>
+                    <div class="sidebar-session">
+                      <span>mission/cloud-agents</span
+                      ><i class="sidebar-session__working"></i>
+                    </div>
+                  </div>
+                </aside>
+                <div class="mission">
+                  <header class="mission-header">
+                    <div>
+                      <small>Shape and ship a feature</small
+                      ><strong>Add support for cloud-based agents</strong>
+                    </div>
+                    <span id="mission-status">In progress</span>
+                  </header>
+                  <div class="mission-main">
+                    <aside class="stage-rail" aria-label="Mission stages">
+                      <header><span>◎</span><strong>Workflow</strong></header>
+                      <ol id="stage-list"></ol>
+                      <div class="stage-progress">
+                        <div>
+                          <span id="stage-count">0 of 5 stages</span
+                          ><strong id="stage-percent">0%</strong>
+                        </div>
+                        <div class="stage-progress__track">
+                          <i id="stage-progress-fill"></i>
+                        </div>
+                      </div>
+                    </aside>
+                    <section class="workbench">
+                      <header class="workbench-header">
+                        <h3 id="artifact-title"></h3>
+                        <span id="artifact-action"></span>
+                      </header>
+                      <div id="artifact-body" class="artifact-body"></div>
+                    </section>
+                    <aside class="conversation" aria-label="Stage conversation">
+                      <header>
+                        <div class="conversation-avatar">◎</div>
+                        <div>
+                          <strong id="conversation-name">Mission lead</strong
+                          ><small id="conversation-role"
+                            >Requirements · guiding the mission with you</small
+                          >
+                        </div>
+                      </header>
+                      <div
+                        id="conversation-body"
+                        class="conversation-body"
+                      ></div>
+                      <div class="conversation-composer">
+                        Ask for follow-up changes <span>↑</span>
+                      </div>
+                    </aside>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="motion-layer" aria-hidden="true">
+              <div id="film-pointer" class="film-pointer">
+                <svg viewBox="0 0 27 31">
+                  <path d="M3 2v23l6.1-6.2 4.1 9.1 4.1-1.9-4.2-9.2H23z" />
+                </svg>
+              </div>
+              <div id="pointer-ring" class="pointer-ring"></div>
+            </div>
+            <div class="film-footer">
+              <span id="film-footer-stage">MISSION / REQUIREMENTS</span>
+              <div class="film-footer__rule"><i id="film-progress"></i></div>
+              <span>CODEX CLAW</span>
+            </div>
+          </section>
+
+          <section
+            class="github-scene"
+            aria-label="Illustrative pull request ready for review"
+          >
+            <div class="pr-eyebrow">
+              <span class="pr-github-mark">⑂</span><strong>GitHub</strong><i></i
+              ><span>PULL REQUEST #142</span>
+            </div>
+            <h2 class="pr-headline">
+              Pull request<br /><em>ready for review.</em>
+            </h2>
+            <div class="pr-card">
+              <div class="pr-card__heading">
+                <span>nbonamy / codex-claw</span><b>OPEN</b>
+              </div>
+              <h3>Add support for cloud-based agents</h3>
+              <p>
+                <code>mission/cloud-agents</code><span>→</span><code>main</code>
+              </p>
+              <div class="pr-card__footer">
+                <div class="pr-review-status">
+                  <i>✓</i>
+                  <div>
+                    <strong>Ready for review</strong
+                    ><small>Review requested from the team</small>
+                  </div>
+                </div>
+                <div class="pr-check-status">
+                  <i>✓</i><span>8 checks passed</span>
+                </div>
+              </div>
+            </div>
+            <div class="pr-caption">
+              <span>CODEX CLAW → GITHUB</span><i></i
+              ><span>ILLUSTRATIVE HANDOFF</span>
+            </div>
+          </section>
+
+          <section class="ending" aria-label="Closing title">
+            <div class="ending-mark">
+              <img src="../website/assets/claw-icon.png" alt="" /><span
+                >Codex <b>Claw</b></span
+              >
+            </div>
+            <h2>Build with agents.<br /><em>From idea to delivery.</em></h2>
+            <p>A native workspace for agentic software engineering.</p>
+            <span>codex-claw.nabocorp.com</span>
+          </section>
+        </div>
+      </div>
+
+      <div class="controls" aria-label="Film controls">
+        <button id="play-toggle" type="button" aria-label="Play film">
+          Play
+        </button>
+        <button id="restart" type="button" aria-label="Restart film">↺</button>
+        <input
+          id="scrubber"
+          type="range"
+          min="0"
+          max="48"
+          step="0.01"
+          value="0"
+          aria-label="Film position"
+        />
+        <output id="timecode" for="scrubber">00:00 / 00:48</output>
+        <a class="download-film" href="assets/mission-film.mp4" download
+          >Download MP4 ↓</a
+        >
+      </div>
+      <p class="preview-note">
+        This is a scripted product illustration, not a captured live run. Use
+        the timeline to inspect each scene. The video export uses the same
+        deterministic frame renderer.
+      </p>
+    </main>
+    <script type="module" src="mission-film.mjs"></script>
+  </body>
+</html>

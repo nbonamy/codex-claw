@@ -32,6 +32,26 @@ Run the static-site checks with:
 npm run test:website
 ```
 
+## Mission product film
+
+`videos/mission-film.html` is an editable 48-second HTML/CSS/JavaScript illustration of a Mission moving from prompt through Requirements, Tickets, Implementation, Review, and Ship. After the PR action, it cuts to a clear promotional handoff showing the pull request ready for review, then returns to the closing title. The Mission scenes follow the desktop app's three-pane layout and current light-theme tokens. The cloud-agent feature and PR shown are an illustrative scenario, not a claim that cloud-agent support has shipped or a recording of a live run.
+
+Preview both films from the repository root with `python3 -m http.server 4174 --directory .`, then open <http://127.0.0.1:4174/videos/mission-film.html>. The pages have play, pause, restart, and scrub controls. To export a silent, caption-led 1600×900 MP4 and poster image, install Chrome and FFmpeg, then run:
+
+```bash
+node videos/render-mission-film.mjs
+```
+
+The render writes `videos/assets/mission-film.mp4` and `videos/assets/mission-film-poster.png`. These rebuildable outputs are ignored by Git; run the renderer for each film when you need an MP4 or poster. The thumbnails remain as source artwork, and the viewers reuse the website's Claw icon. Set `CODEX_CLAW_FILM_CHROME` if Chrome is not at the default macOS path. The deterministic `window.seekFilm(seconds)` renderer drives both the preview and frame export, so the encoded video matches the editable source.
+
+## Code Review product film
+
+`videos/review-film.html` is a separate, illustrative 50-second walkthrough of Claw's standalone `/review` command: open Review, choose branch scope and an independent reviewer, inspect structured findings, remediate the selected issues, run a second round, and finish. It is not the Mission Review stage or a captured live review. Preview it at <http://127.0.0.1:4174/videos/review-film.html> and export its MP4 and poster with:
+
+```bash
+node videos/render-mission-film.mjs review-film
+```
+
 ## Deploy
 
 The deploy helper streams the static site over SSH, provisions the Let’s Encrypt certificate if this is the first deploy, and installs the matching nginx site on `joshua`:
