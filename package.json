@@ -1,6 +1,6 @@
 {
   "name": "codex-claw",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "private": true,
   "overrides": {
     "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",
@@ -13,6 +13,7 @@
     "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
+    "jsdom": "29.0.1",
     "knip": "6.33.0",
     "postcss-html": "^1.8.1",
     "prettier": "^3.8.3",

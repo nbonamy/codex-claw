@@ -4,6 +4,20 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.2] - 2026-09-23
+
+### Improvements and fixes
+
+- Codex blocking questions now use the conversation composer instead of a narrow
+  inline tool card. Answering restores the composer and leaves the completed
+  answer in the transcript.
+- Asynchronous questions return the normal composer after their turn and remain
+  available through a Pending question control. They can be reopened or
+  dismissed, and a new prompt no longer revives an obsolete question.
+- Question responses still reach their conversation if a request event was
+  missed, and review invitations clear when the user submits a new prompt
+  without clearing other proposed actions.
+
 ## [0.20.1] - 2026-09-23
 
 ### New features
