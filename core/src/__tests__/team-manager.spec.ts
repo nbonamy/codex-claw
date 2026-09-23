@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, teamInitials, updateTeamInSnapshot } from '../team-manager';
+import { createMission } from '../missions';
 
 describe('team-manager', () => {
   it('creates a team with initials, selected color, and no default agent', () => {
@@ -177,6 +178,23 @@ describe('team-manager', () => {
     expect(snapshot.activeTeamId).toBe('team-codex-claw');
     expect(snapshot.activeAgentId).toBe('agent-dina');
     expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-dina', 'agent-jesse']);
+  });
+
+  it('removes only the closed team’s missions', () => {
+    const snapshot = createInitialSnapshot();
+    const otherTeam = createTeamInSnapshot(snapshot, { name: 'Other', color: '#46A857' }, '2026-06-05T10:11:12.000Z');
+    const otherAgent = structuredClone(snapshot.agents[0]!);
+    otherAgent.id = 'agent-other';
+    otherAgent.teamId = otherTeam.id;
+    snapshot.agents.push(otherAgent);
+    otherTeam.agentIds.push(otherAgent.id);
+    const closedMission = createMission(snapshot, { outcome: 'Closed', workflowType: 'shapeAndShipFeature', teamId: 'team-codex-claw', orchestratorMemberId: snapshot.agents[0]!.id });
+    const retainedMission = createMission(snapshot, { outcome: 'Retained', workflowType: 'shapeAndShipFeature', teamId: otherTeam.id, orchestratorMemberId: otherAgent.id });
+
+    closeTeamInSnapshot(snapshot, 'team-codex-claw');
+
+    expect(snapshot.missions?.map(mission => mission.id)).toStrictEqual([retainedMission.id]);
+    expect(snapshot.missions).not.toContainEqual(closedMission);
   });
 
   it('keeps one team open and returns null for missing teams', () => {

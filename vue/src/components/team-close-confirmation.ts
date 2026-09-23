@@ -8,8 +8,8 @@ export async function confirmCloseTeam(team: Team): Promise<boolean> {
     const isRemoteTeam = Boolean(team.remoteConnectionId);
     await ElMessageBox.confirm(
       isRemoteTeam
-        ? `${team.name} will be deleted on the remote backend. Its agents and conversations will stop there.`
-        : `Agents and messages in ${team.name} will be removed from Codex Claw.`,
+        ? 'Agents, missions and quick chats will be deleted on the remote backend. Mission worktrees will not be deleted.'
+        : 'Agents, missions and quick chats will be removed from Codex Claw. Mission worktrees will not be deleted.',
       isRemoteTeam ? `Delete ${team.name}?` : `Close ${team.name}?`,
       {
         cancelButtonText: translate('common.cancel'),

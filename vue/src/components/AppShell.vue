@@ -214,7 +214,11 @@
           />
         </template>
         <template #conversation="{ agentId }">
-          <ConversationPane v-if="currentAgent?.id === agentId" ref="missionConversationPane" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory" />
+          <ConversationPane v-if="currentAgent?.id === agentId" ref="missionConversationPane" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory">
+            <template v-if="selectedMission.stage === 'requirements' && conversationMessages.length === 0" #empty-actions>
+              <AppMenu class="app-menu--embedded" :ariaLabel="t('missions.chooseIssue')" :items="missionSourceMenuItems" @select="openMissionIssuePicker" />
+            </template>
+          </ConversationPane>
         </template>
       </MissionWorkspace>
       <AgentWorkspace
@@ -314,6 +318,19 @@
       @custom-work-item="customizeRepositorySessionWork"
       @preparation-complete="completePreparedRepositorySession"
       @start-work-item="startRepositorySessionWork"
+    />
+    <RepositorySessionSourceDialog
+      :visible="missionIssuePickerVisible"
+      purpose="missionIssue"
+      repository-name=""
+      :repositories="missionIssueRepositories"
+      :selected-repository-id="missionIssueRepositoryId"
+      :work-items="missionIssueItems"
+      :loading="missionIssueLoading"
+      :error="missionIssueError"
+      @close="closeMissionIssuePicker"
+      @select-repository="selectMissionIssueRepository"
+      @select-work-item="chooseMissionIssue"
     />
     <NewSourceWorktreeDialog
       :allow-destination-override="false"
@@ -500,8 +517,11 @@ import MissionWorkspace from './MissionWorkspace.vue';
 import MissionDeleteDialog from './MissionDeleteDialog.vue';
 import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 import ConversationPane from './ConversationPane.vue';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import { IconCircleDot as IssueIcon } from '@tabler/icons-vue';
 import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
 import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
+import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -902,6 +922,119 @@ const missionDeletePending = ref(false);
 const missionDeleteError = ref('');
 const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
+const missionIssuePickerVisible = ref(false);
+const missionIssueRepositories = ref<WorkRepository[]>([]);
+const missionIssueRepositoryId = ref<string | null>(null);
+const missionIssueItems = ref<WorkItem[]>([]);
+const missionIssueLoading = ref(false);
+const missionIssueError = ref<string | null>(null);
+let missionIssueRequestId = 0;
+const missionSourceMenuItems = computed(() => [{ id: 'issue', type: 'action' as const, label: t('missions.chooseIssue'), icon: IssueIcon }]);
+
+function missionIssueLocation(): AutomationLocation | undefined {
+  const team = props.snapshot.teams.find(candidate => candidate.id === selectedMission.value?.teamId);
+  return team?.remoteConnectionId ? { kind: 'remote', remoteConnectionId: team.remoteConnectionId } : undefined;
+}
+
+function missionIssueRepositoryIdentities(mission: Mission): Set<string> {
+  const team = props.snapshot.teams.find(candidate => candidate.id === mission.teamId);
+  const workerIds = new Set((props.snapshot.missions ?? []).flatMap(candidate => (
+    candidate.execution?.runs.flatMap(run => run.workerId && run.workerId !== run.memberId ? [run.workerId] : []) ?? []
+  )));
+  const representedPaths = new Set<string>();
+  const identities = new Set<string>();
+  for (const agentId of team?.agentIds ?? []) {
+    if (workerIds.has(agentId)) continue;
+    const agent = props.snapshot.agents.find(candidate => candidate.id === agentId && candidate.teamId === team?.id);
+    if (!agent) continue;
+    if (agent.folder) representedPaths.add(agent.folder);
+    if (agent.workspace?.kind === 'git') {
+      representedPaths.add(agent.workspace.primaryWorktreeRoot);
+      representedPaths.add(agent.workspace.repositoryRoot);
+      const identity = agent.workspace.originUrl && canonicalGitRemoteIdentity(agent.workspace.originUrl);
+      if (identity) identities.add(identity.toLocaleLowerCase());
+    }
+    const githubRepository = props.snapshot.agentGitStatuses[agentId]?.githubRepository;
+    if (githubRepository) identities.add(`github.com/${githubRepository}`.toLocaleLowerCase());
+  }
+  for (const repository of props.sourceRepositories) {
+    if (repository.remoteIdentity && repository.worktrees.some(worktree => representedPaths.has(worktree.path))) {
+      identities.add(repository.remoteIdentity.toLocaleLowerCase());
+    }
+  }
+  return identities;
+}
+
+async function openMissionIssuePicker(): Promise<void> {
+  const mission = selectedMission.value;
+  if (!mission) return;
+  const requestId = ++missionIssueRequestId;
+  missionIssuePickerVisible.value = true;
+  missionIssueRepositoryId.value = null;
+  missionIssueItems.value = [];
+  missionIssueRepositories.value = [];
+  missionIssueError.value = null;
+  missionIssueLoading.value = true;
+  try {
+    const repositories = await props.loadWorkRepositories('github', missionIssueLocation()) ?? [];
+    if (requestId === missionIssueRequestId) {
+      const represented = missionIssueRepositoryIdentities(mission);
+      missionIssueRepositories.value = repositories.filter(repository => {
+        const identity = canonicalGitRemoteIdentity(repository.url);
+        return identity && represented.has(identity.toLocaleLowerCase());
+      });
+    }
+  } catch (caught) {
+    if (requestId === missionIssueRequestId) missionIssueError.value = localizedErrorMessage(caught, t);
+  } finally {
+    if (requestId === missionIssueRequestId) missionIssueLoading.value = false;
+  }
+}
+
+async function selectMissionIssueRepository(repositoryId: string): Promise<void> {
+  if (!missionIssueRepositories.value.some(repository => repository.id === repositoryId)) return;
+  const requestId = ++missionIssueRequestId;
+  missionIssueRepositoryId.value = repositoryId;
+  missionIssueItems.value = [];
+  missionIssueError.value = null;
+  missionIssueLoading.value = true;
+  try {
+    const items = await props.loadWorkItems('github', repositoryId, missionIssueLocation(), { kind: 'issue', state: 'open' }) ?? [];
+    if (requestId === missionIssueRequestId) missionIssueItems.value = items;
+  } catch (caught) {
+    if (requestId === missionIssueRequestId) missionIssueError.value = localizedErrorMessage(caught, t);
+  } finally {
+    if (requestId === missionIssueRequestId) missionIssueLoading.value = false;
+  }
+}
+
+function closeMissionIssuePicker(): void {
+  ++missionIssueRequestId;
+  missionIssuePickerVisible.value = false;
+}
+
+async function chooseMissionIssue(item: WorkItem): Promise<void> {
+  const mission = selectedMission.value;
+  if (!mission || mission.stage !== 'requirements' || missionIssueLoading.value
+    || item.kind === 'pullRequest' || item.repositoryId !== missionIssueRepositoryId.value) return;
+  missionIssueLoading.value = true;
+  missionIssueError.value = null;
+  try {
+    const issueContext = t('missions.issueMissionPrompt', {
+      repository: item.repositoryFullName,
+      number: item.number,
+      title: item.title,
+      url: item.url,
+    });
+    const issueBody = item.body?.trim().slice(0, 16_000);
+    await forwardPrompt(issueBody ? `${issueContext}\n\n${issueBody}` : issueContext);
+    closeMissionIssuePicker();
+  } catch (caught) {
+    missionIssueError.value = localizedErrorMessage(caught, t);
+  } finally {
+    missionIssueLoading.value = false;
+  }
+}
 const missionOpenInAvailable = computed(() => {
   const mission = selectedMission.value;
   if (!mission || props.openInApplications.applications.length === 0) return false;
@@ -912,10 +1045,13 @@ function openMissionWorktree(request: MissionWorkspaceOpenRequest): void {
   void openAgentIn(request.agentId, request.application, request.path);
 }
 const missionDeleteTarget = computed(() => props.snapshot.missions?.find(m => m.id === missionDeleteTargetId.value) ?? null);
-function selectMissionSurface(id: string): void { selectedMissionId.value = id; activeSurface.value = 'mission'; }
+function selectMissionSurface(id: string): void {
+  selectedMissionId.value = id;
+  activeSurface.value = 'mission';
+}
 watch(
   () => activeSurface.value === 'mission' ? selectedMissionId.value : null,
-  missionId => { void props.selectMission(missionId); },
+  missionId => { closeMissionIssuePicker(); void props.selectMission(missionId); },
 );
 function missionTeamContext(): { team: Team; orchestrator: Agent } {
   const team = activeTeam.value;
@@ -927,6 +1063,7 @@ function missionTeamContext(): { team: Team; orchestrator: Agent } {
   return { team, orchestrator };
 }
 async function selectMission(id: string): Promise<void> {
+  if (!props.snapshot.missions?.some(mission => mission.id === id && mission.teamId === activeTeam.value?.id)) return;
   selectMissionSurface(id);
 }
 async function createNewMission() {
@@ -1055,6 +1192,12 @@ const activeTeam = computed<Team | null>(() => {
   }
 
   return props.snapshot.teams[0] ?? null;
+});
+watch([selectedMission, activeTeam], ([mission, team], [previousMission]) => {
+  if (activeSurface.value === 'mission' && ((previousMission && !mission) || (mission && mission.teamId !== team?.id))) {
+    selectedMissionId.value = null;
+    activeSurface.value = 'agent';
+  }
 });
 const workItemRouting = useWorkItemRouting({
   actions: {

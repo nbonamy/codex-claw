@@ -451,7 +451,7 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-jesse']]);
     expect(wrapper.emitted('close-agent')).toStrictEqual([['agent-dina']]);
     expect(confirm).toHaveBeenCalledWith(
-      'Agents and messages in Codex Claw will be removed from Codex Claw.',
+      expect.stringContaining('missions and quick chats will be removed'),
       'Close Codex Claw?',
       {
         cancelButtonText: 'Cancel',

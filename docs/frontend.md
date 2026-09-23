@@ -71,7 +71,9 @@ through the conversation; do not add setup or artifact-editing forms to this
 surface. Mission-owned execution agents stay out of the global agent sidebar;
 the mission conversation pane owns switching among their provider conversations.
 Before the requirements conversation has messages, its empty state asks “What
-do you want to build?” and the composer invites the user to describe the outcome.
+do you want to build?” and offers an issue picker using the same embedded menu
+pattern as the empty-team screen. The composer remains available for a direct
+description of the outcome.
 Accepted artifacts remain navigable after the workflow advances.
 
 Shells coordinate focused modules; they do not implement multi-step workflows.

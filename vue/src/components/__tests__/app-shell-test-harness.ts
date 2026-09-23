@@ -21,7 +21,7 @@ const ConversationPaneStub = defineComponent({
   setup(_props, { expose }) {
     expose({ focusComposer: vi.fn() });
   },
-  template: '<section class="conversation-pane" />',
+  template: '<section class="conversation-pane"><slot name="empty-actions" /></section>',
 });
 
 const AgentSidebarStub = defineComponent({

@@ -989,7 +989,7 @@ describe('AppShell work routing', () => {
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
-      'Agents and messages in Skwad will be removed from Codex Claw.',
+      'Agents, missions and quick chats will be removed from Codex Claw. Mission worktrees will not be deleted.',
       'Close Skwad?',
       {
         cancelButtonText: 'Cancel',

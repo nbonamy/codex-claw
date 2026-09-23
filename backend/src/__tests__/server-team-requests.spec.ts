@@ -4,6 +4,7 @@ import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities'
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import { createMission } from '@codex-claw/core/missions';
 import {
   createTestSnapshot,
   readyRemoteConnection,
@@ -143,6 +144,84 @@ describe('ClawBackendServer', () => {
 
     expect(archiveAgentConversation).toHaveBeenCalledWith(agent);
     expect(releaseConversation).toHaveBeenCalledWith(agent.id);
+    await server.close();
+  });
+
+  it('deletes a local team’s missions and private homes while retaining other teams’ missions', async () => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-mission', teamId: 'team-test', name: 'Mission lead', folder: '/repo', backend: 'codex' as const,
+      status: { type: 'idle' as const }, createdAt: '2026-09-08T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z',
+    };
+    snapshot.agents.push(agent);
+    snapshot.teams[0]!.agentIds.push(agent.id);
+    const mission = createMission(snapshot, { outcome: 'Scoped work', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: agent.id });
+    mission.execution!.workspaces = [{ repositoryPath: '/repo', path: '/repo-worktree', branch: 'mission/scoped' }];
+    const retainedAgent = { ...agent, id: 'agent-keep', teamId: 'team-keep' };
+    snapshot.agents.push(retainedAgent);
+    snapshot.teams.push({ id: 'team-keep', name: 'Keep', color: '#7158D4', agentIds: [retainedAgent.id] });
+    const retainedMission = createMission(snapshot, { outcome: 'Retained', workflowType: 'shapeAndShipFeature', teamId: 'team-keep', orchestratorMemberId: retainedAgent.id });
+    const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({ version: 'test-version', snapshot, deleteMissionHome });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'delete-mission-team', method: backendMethods.teamDelete, params: { teamId: 'team-test' },
+    })).resolves.toMatchObject({ result: { teams: [{ id: 'team-keep' }], missions: [{ id: retainedMission.id }] } });
+
+    expect(deleteMissionHome).toHaveBeenCalledExactlyOnceWith(mission.id);
+    expect(snapshot.missions?.map(candidate => candidate.id)).toStrictEqual([retainedMission.id]);
+    await server.close();
+  });
+
+  it('rejects deleting the last local team without touching its missions', async () => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-mission', teamId: 'team-test', name: 'Mission lead', folder: '/repo', backend: 'codex' as const,
+      status: { type: 'idle' as const }, createdAt: '2026-09-08T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z',
+    };
+    snapshot.agents.push(agent);
+    snapshot.teams[0]!.agentIds.push(agent.id);
+    const mission = createMission(snapshot, { outcome: 'Keep work', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: agent.id });
+    const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({ version: 'test-version', snapshot, deleteMissionHome });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'delete-last-team', method: backendMethods.teamDelete, params: { teamId: 'team-test' },
+    })).rejects.toThrow('At least one team must remain open.');
+
+    expect(snapshot.teams.map(team => team.id)).toStrictEqual(['team-test']);
+    expect(snapshot.missions?.map(candidate => candidate.id)).toStrictEqual([mission.id]);
+    expect(deleteMissionHome).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('publishes the remaining missions when team cleanup stops partway through', async () => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-mission', teamId: 'team-test', name: 'Mission lead', folder: '/repo', backend: 'codex' as const,
+      status: { type: 'idle' as const }, createdAt: '2026-09-08T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z',
+    };
+    snapshot.agents.push(agent);
+    snapshot.teams[0]!.agentIds.push(agent.id);
+    snapshot.teams.push({ id: 'team-keep', name: 'Keep', color: '#7158D4', agentIds: [] });
+    const first = createMission(snapshot, { outcome: 'First', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: agent.id });
+    const second = createMission(snapshot, { outcome: 'Second', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: agent.id });
+    const events: Array<{ type: string; payload?: unknown }> = [];
+    const deleteMissionHome = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Disk unavailable'));
+    const server = new ClawBackendServer({ version: 'test-version', snapshot, deleteMissionHome, onEvent: event => events.push(event) });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'delete-team-partial', method: backendMethods.teamDelete, params: { teamId: 'team-test' },
+    })).rejects.toThrow('Team deletion stopped after removing 1 of 2 Missions. The team remains');
+
+    expect(snapshot.teams.map(team => team.id)).toStrictEqual(['team-test', 'team-keep']);
+    expect(snapshot.missions?.map(mission => mission.id)).toStrictEqual([second.id]);
+    expect(deleteMissionHome).toHaveBeenCalledTimes(2);
+    expect(deleteMissionHome).toHaveBeenNthCalledWith(1, first.id);
+    expect(events).toEqual([expect.objectContaining({
+      type: 'snapshot.updated',
+      payload: expect.objectContaining({ missions: [expect.objectContaining({ id: second.id })] }),
+    })]);
     await server.close();
   });
 

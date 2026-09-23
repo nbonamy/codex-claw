@@ -36,7 +36,7 @@
       :forkable-agent-ids="forkableAgentIds"
       :summary-replacement-agent-ids="summaryReplacementAgentIds"
       :active-agent-id="activeMissionId ? null : currentAgent?.id ?? null"
-      :missions="snapshot.missions"
+      :missions="teamMissions"
       :active-mission-id="activeMissionId"
       :mission-creation-error="missionCreationError"
       :mission-creation-pending="missionCreationPending"
@@ -187,6 +187,7 @@ const missionAgentIds = computed(() => new Set(
   )),
 ));
 const sidebarAgents = computed(() => props.activeTeamAgents.filter(agent => !missionAgentIds.value.has(agent.id)));
+const teamMissions = computed(() => (props.snapshot.missions ?? []).filter(mission => mission.teamId === props.activeTeam?.id));
 
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;

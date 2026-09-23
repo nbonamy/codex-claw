@@ -1,6 +1,7 @@
 import { shallowMount } from '@vue/test-utils';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { createMission } from '@codex-claw/core/missions';
+import { createTeamInSnapshot } from '@codex-claw/core/team-manager';
 import { describe, expect, it, vi } from 'vitest';
 import AppShellNavigation from '../AppShellNavigation.vue';
 
@@ -94,5 +95,21 @@ describe('AppShellNavigation', () => {
     expect(sidebar.props('agents').map((agent: { id: string }) => agent.id))
       .toStrictEqual([snapshot.agents[0]!.id]);
     expect(sidebar.props('missions')).toStrictEqual([mission]);
+  });
+
+  it('shows only missions from the active team', () => {
+    const snapshot = createInitialSnapshot();
+    const activeMission = createMission(snapshot, { outcome: 'Active', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    const otherTeam = createTeamInSnapshot(snapshot, { name: 'Other', color: '#46A857' }, '2026-06-05T10:11:12.000Z');
+    const otherAgent = structuredClone(snapshot.agents[0]!);
+    otherAgent.id = 'agent-other';
+    otherAgent.teamId = otherTeam.id;
+    snapshot.agents.push(otherAgent);
+    otherTeam.agentIds.push(otherAgent.id);
+    createMission(snapshot, { outcome: 'Other', workflowType: 'shapeAndShipFeature', teamId: otherTeam.id, orchestratorMemberId: otherAgent.id });
+    snapshot.activeTeamId = activeMission.teamId;
+
+    const wrapper = mountNavigation(snapshot);
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('missions')).toStrictEqual([activeMission]);
   });
 });

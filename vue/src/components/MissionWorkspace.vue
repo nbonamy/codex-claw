@@ -120,7 +120,7 @@
             <h3>{{ t('missions.noArtifactYet') }}</h3>
             <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.missionLeadStarting') }}</p>
             <button
-              v-if="mission.execution && !activeRun && mission.status !== 'completed'"
+              v-if="!initialRequirements && mission.execution && !activeRun && mission.status !== 'completed'"
               class="claw-button claw-button--primary"
               type="button"
               :aria-busy="busy"
@@ -205,6 +205,8 @@ const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
 const activeRun = computed(() => pendingMissionRun(props.mission));
+const initialRequirements = computed(() => props.mission.stage === 'requirements' && viewedStage.value === 'requirements'
+  && !conversationAgentId.value && !props.mission.execution?.runs.length);
 const activeStageRun = computed(() => {
   if (viewedStage.value !== props.mission.stage) return undefined;
   return props.mission.execution?.runs.slice().reverse().find(run => (

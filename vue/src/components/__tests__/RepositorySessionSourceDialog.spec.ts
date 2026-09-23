@@ -2,6 +2,7 @@ import { nextTick } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
+import '../../styles/base.css';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
 
 const branches: SourceBranch[] = [
@@ -72,6 +73,41 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.get('[aria-label="Search session sources"]').attributes('placeholder'))
       .toBe('Search by title, number, author, or URL');
     expect(wrapper.text()).toContain('Recent pull requests');
+  });
+
+  it('reuses the source dialog as a cross-repository issue picker without branch or PR actions', async () => {
+    const pullRequest: WorkItem = { ...issue, id: 'github:nbonamy/codex-claw#25', number: 25, kind: 'pullRequest', title: 'Update UI' };
+    const wrapper = mount(RepositorySessionSourceDialog, {
+      props: {
+        visible: true,
+        purpose: 'missionIssue',
+        repositoryName: '',
+        repositories: [
+          { provider: 'github', id: 'first', owner: 'nbonamy', name: 'codex-claw', fullName: 'nbonamy/codex-claw', url: 'https://github.com/nbonamy/codex-claw', isPrivate: false },
+          { provider: 'github', id: 'second', owner: 'nbonamy', name: 'other', fullName: 'nbonamy/other', url: 'https://github.com/nbonamy/other', isPrivate: false },
+        ],
+        selectedRepositoryId: 'first',
+        branches,
+        workItems: [issue, pullRequest],
+      },
+    });
+    await flushPromises();
+
+    // The compact dialog removes Element Plus's default header padding. Reserve
+    // its 48px close-button hit target before placing the repository selector.
+    expect(getComputedStyle(wrapper.get('.el-dialog__header').element).paddingRight).toBe('48px');
+
+    expect(wrapper.find('[role="tab"]').exists()).toBe(false);
+    expect(wrapper.findAll('.repository-session-source-dialog__result')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain('Update UI');
+    wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'second');
+    expect(wrapper.emitted('select-repository')).toStrictEqual([['second']]);
+    await wrapper.get('[aria-label="Search issues"]').setValue('not found');
+    expect(wrapper.find('.repository-session-source-dialog__result').exists()).toBe(false);
+    await wrapper.get('[aria-label="Search issues"]').setValue('Repository-first');
+    await wrapper.get('.repository-session-source-dialog__result').trigger('click');
+    expect(wrapper.emitted('select-work-item')).toStrictEqual([[issue]]);
+    expect(wrapper.findComponent({ name: 'WorkItemAssignmentPicker' }).exists()).toBe(false);
   });
 
   it('opens the shared assignment picker for repository work items', async () => {

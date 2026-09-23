@@ -53,9 +53,12 @@ Ship persists one delivery result per affected repository and completes only
 after every repository has either produced a pull request or merged. Core owns
 its pure validation and transition policy;
 `clawd` serializes mission writes and publishes snapshots only after saving.
-Mission navigation is client-local; missions themselves are backend-wide, not
-team members or provider threads. Existing provider conversation panes can be
-opened as secondary stage support, without transferring transcript ownership.
+Mission navigation is client-local; each persisted mission belongs to exactly
+one team but is not a team member or provider thread. The active team's sidebar
+shows only its missions, and its eligible repositories come from all agents in
+that team, regardless of which members are selected for mission execution.
+Existing provider conversation panes can be opened as secondary stage support,
+without transferring transcript ownership.
 Mission navigation uses the same compact workspace-group and session-row
 patterns as project and quick-chat navigation. Sidebar creation persists a
 team-scoped placeholder `New mission`, selects it, and immediately starts the
@@ -73,6 +76,8 @@ and archiving their provider conversations. It always removes the Mission-owned
 artifact and skill directory. When the Mission created Git worktrees, the user
 chooses whether to keep them or delete every clean worktree and its local branch;
 unsafe worktrees keep the Mission intact and surface the cleanup error.
+Deleting a team also deletes its missions and their private homes and workers,
+but leaves Mission Git worktrees on disk; the confirmation warns about both.
 The selected mission has persistent stages on the left, the current or
 previously accepted artifact in the central work surface, and the stage's
 orchestrator conversation on the right. The conversation drives

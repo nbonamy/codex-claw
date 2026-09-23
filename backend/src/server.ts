@@ -3,7 +3,7 @@ import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
 import { createVisualizeDebugFixture } from './visualize-debug-fixtures';
 import { FileMissionSkillStore } from './mission-skill-store';
-import { featureStages, type Mission, type MissionReviewDebugState, type MissionStage } from '@codex-claw/core/missions';
+import { featureStages, type DeleteMissionInput, type Mission, type MissionReviewDebugState, type MissionStage } from '@codex-claw/core/missions';
 import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
 import { MissionService } from './mission-service';
 import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
@@ -406,6 +406,33 @@ export class ClawBackendServer {
 
   async attachMissionRepository(agentId: string, repoPath: string) {
     return this.missionExecution.attachRepository(agentId, repoPath);
+  }
+
+  private async deleteMission(input: DeleteMissionInput): Promise<void> {
+    await this.missions.remove(input, async (deleted, workers) => {
+      const workspacePaths = missionWorktreePaths(deleted);
+      if (input.deleteWorktrees) {
+        const workerIds = new Set(workers.map(worker => worker.id));
+        for (const folder of workspacePaths) {
+          const sharedAgent = this.snapshot.agents.find(agent => !workerIds.has(agent.id) && agent.folder === folder);
+          if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
+          await this.agentGitService.validateLinkedWorktreeDeletion(folder, false, undefined, true);
+        }
+      }
+      for (const worker of workers) {
+        if (worker.status.type === 'working' || worker.status.type === 'awaitingInput') {
+          await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
+        }
+        if (worker.backendSession) {
+          await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent: worker });
+          await this.driverRpc?.handle(backendMethods.driverConversationRelease, { backend: worker.backend, agentId: worker.id });
+        }
+      }
+      if (input.deleteWorktrees) {
+        for (const folder of workspacePaths) await this.agentGitService.deleteLinkedWorktree(folder, false, undefined, true);
+      }
+      await this.deleteMissionHome(deleted.id);
+    });
   }
 
   private async disposeAndReleaseReviewConversation(agent: Agent): Promise<void> {
@@ -859,31 +886,8 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, snapshot);
       }
       case backendMethods.missionDelete: {
-        const input = requireRecord(message.params).input as import('@codex-claw/core/missions').DeleteMissionInput;
-        await this.missions.remove(input, async (mission, workers) => {
-          const workspacePaths = missionWorktreePaths(mission);
-          if (input.deleteWorktrees) {
-            const workerIds = new Set(workers.map(worker => worker.id));
-            for (const folder of workspacePaths) {
-              const sharedAgent = this.snapshot.agents.find(agent => !workerIds.has(agent.id) && agent.folder === folder);
-              if (sharedAgent) throw new Error(`The worktree is also used by ${sharedAgent.name}.`);
-              await this.agentGitService.validateLinkedWorktreeDeletion(folder, false, undefined, true);
-            }
-          }
-          for (const worker of workers) {
-            if (worker.status.type === 'working' || worker.status.type === 'awaitingInput') {
-              await this.handleAgentDriverRequest(worker, backendMethods.driverInterrupt, { agent: worker });
-            }
-            if (worker.backendSession) {
-              await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent: worker });
-              await this.driverRpc?.handle(backendMethods.driverConversationRelease, { backend: worker.backend, agentId: worker.id });
-            }
-          }
-          if (input.deleteWorktrees) {
-            for (const folder of workspacePaths) await this.agentGitService.deleteLinkedWorktree(folder, false, undefined, true);
-          }
-          await this.deleteMissionHome(mission.id);
-        });
+        const input = requireRecord(message.params).input as DeleteMissionInput;
+        await this.deleteMission(input);
         const snapshot = await this.remoteTeams.clientSnapshot();
         this.emitSnapshotUpdated(snapshot);
         return createClawRpcResult(message.id, snapshot);
@@ -1725,17 +1729,31 @@ export class ClawBackendServer {
           this.remoteTeams.rememberSnapshot(pointer.connectionId, remoteSnapshot);
           this.ensureLocalFallbackBeforeRemovingTeam(teamId);
         } else if (existingTeam) {
-          const agents = existingTeam.agentIds
-            .map((agentId) => this.snapshot.agents.find((candidate) => candidate.id === agentId))
-            .filter((agent): agent is Agent => agent !== undefined && agent.backendSession !== undefined);
-          for (const agent of agents) {
-            await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
-          }
-          for (const agent of agents) {
-            await this.driverRpc?.handle(backendMethods.driverConversationRelease, {
-              backend: agent.backend,
-              agentId: agent.id,
-            });
+          if (this.snapshot.teams.length <= 1) throw new Error('At least one team must remain open.');
+          const missions = this.snapshot.missions?.filter(candidate => candidate.teamId === teamId) ?? [];
+          let deletedMissions = 0;
+          try {
+            for (const mission of missions) {
+              await this.deleteMission({ id: mission.id, revision: mission.revision, confirmed: true, deleteWorktrees: false });
+              deletedMissions++;
+            }
+            const agents = existingTeam.agentIds
+              .map((agentId) => this.snapshot.agents.find((candidate) => candidate.id === agentId))
+              .filter((agent): agent is Agent => agent !== undefined && agent.backendSession !== undefined);
+            for (const agent of agents) {
+              await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+            }
+            for (const agent of agents) {
+              await this.driverRpc?.handle(backendMethods.driverConversationRelease, {
+                backend: agent.backend,
+                agentId: agent.id,
+              });
+            }
+          } catch (error) {
+            if (deletedMissions === 0) throw error;
+            await this.emitProjectedSnapshot();
+            const reason = error instanceof Error ? error.message : String(error);
+            throw new Error(`Team deletion stopped after removing ${deletedMissions} of ${missions.length} Missions. The team remains; retry deletion to finish cleanup. ${reason}`, { cause: error });
           }
         }
         const team = closeTeamInSnapshot(this.snapshot, teamId);

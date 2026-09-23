@@ -22,6 +22,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toContain('a'.repeat(40));
     expect(prompt).toContain(`/mission/skills/mission-${stage}/SKILL.md`);
     expect(prompt).toContain('Check permissions');
+    expect(prompt).toContain('User-provided context and feedback:');
     expect(prompt).toContain('Only owners');
     expect(prompt).toContain('codex_claw.submit-mission-result');
     expect(prompt).toContain('codex_claw.list-mission-artifacts');

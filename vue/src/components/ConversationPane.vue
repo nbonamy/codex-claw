@@ -19,6 +19,9 @@
         <div class="conversation-pane__empty">
           <h1>{{ heroHeadline }}</h1>
           <p v-if="heroSubhead">{{ heroSubhead }}</p>
+          <div v-if="$slots['empty-actions']" class="conversation-pane__empty-actions">
+            <slot name="empty-actions" />
+          </div>
         </div>
       </template>
       <template #message-header="{ message }">
@@ -316,6 +319,22 @@ defineExpose({ focusComposer });
   gap: var(--space-2);
   max-width: var(--conversation-content-width);
   text-align: center;
+}
+
+.conversation-pane__empty-actions {
+  width: min(360px, 100%);
+  margin: var(--space-8) auto 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-sm);
+}
+
+.conversation-pane__empty-actions :deep(.app-menu__item) {
+  min-height: 42px;
+  padding-inline: var(--space-6);
+  border-radius: var(--radius-lg);
 }
 
 .conversation-pane__message-header {

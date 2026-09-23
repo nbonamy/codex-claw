@@ -366,7 +366,7 @@ describe('TeamRail', () => {
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
-      'Agents and messages in Codex Claw will be removed from Codex Claw.',
+      'Agents, missions and quick chats will be removed from Codex Claw. Mission worktrees will not be deleted.',
       'Close Codex Claw?',
       {
         cancelButtonText: 'Cancel',
@@ -429,7 +429,7 @@ describe('TeamRail', () => {
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
-      'Codex Claw will be deleted on the remote backend. Its agents and conversations will stop there.',
+      'Agents, missions and quick chats will be deleted on the remote backend. Mission worktrees will not be deleted.',
       'Delete Codex Claw?',
       {
         cancelButtonText: 'Cancel',

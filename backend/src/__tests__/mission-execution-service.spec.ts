@@ -664,6 +664,43 @@ describe('mission execution', () => {
     expect(h.ports.validateRepository).toHaveBeenCalledWith(h.originalAgents[0]!.folder);
   });
 
+  it('does not treat a Mission worker home as a represented team repository', async () => {
+    const h = setup();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const workerId = h.current().execution!.runs[0]!.workerId!;
+
+    await expect(h.service.attachRepository(workerId, '/claw/missions/mission')).rejects.toThrow('represented');
+    expect(h.ports.validateRepository).not.toHaveBeenCalledWith('/claw/missions/mission');
+    await expect(h.service.attachRepository(workerId, h.originalAgents[0]!.folder!)).resolves.toMatchObject({
+      success: true, repoPath: h.originalAgents[0]!.folder,
+    });
+  });
+
+  it('allows repositories from any team member even when that member is not selected for the mission', async () => {
+    const h = setup();
+    const teamId = h.current().teamId;
+    const otherRepository = '/team/other-repository';
+    h.snapshot.agents[1]!.folder = otherRepository;
+    await h.command({ action: 'configure', teamId, memberIds: [h.originalAgents[0]!.id] });
+    await h.command({ action: 'attachRepository', repoPath: otherRepository });
+
+    expect(h.current().execution!.repoPath).toBe(otherRepository);
+    expect(h.ports.validateRepository).toHaveBeenCalledWith(otherRepository);
+  });
+
+  it('does not reassign an existing mission to another team', async () => {
+    const h = setup();
+    h.snapshot.teams.push({ id: 'team-other', name: 'Other', color: '#7158D4', agentIds: [] });
+    const moved = structuredClone(h.snapshot.agents[1]!);
+    moved.id = 'agent-other';
+    moved.teamId = 'team-other';
+    h.snapshot.agents.push(moved);
+    h.snapshot.teams[1]!.agentIds.push(moved.id);
+
+    await expect(h.command({ action: 'configure', teamId: 'team-other', memberIds: [moved.id] })).rejects.toThrow('local team');
+    expect(h.current().teamId).toBe('team-codex-claw');
+  });
+
   it('keeps the backlog reviewable when an affected repository worktree cannot be created', async () => {
     const h = setup();
     await h.store.change(h.current().id, mission => {

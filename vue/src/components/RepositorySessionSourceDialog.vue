@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     class="claw-dialog claw-dialog--compact repository-session-source-dialog"
-    :class="{ 'repository-session-source-dialog--assignment': selectedWorkItem }"
+    :class="{ 'repository-session-source-dialog--assignment': selectedWorkItem, 'repository-session-source-dialog--issue-picker': purpose === 'missionIssue' }"
     :model-value="visible"
     :teleported="false"
     :style="{ width: selectedWorkItem ? '440px' : '720px' }"
@@ -15,10 +15,21 @@
           ref="searchInput"
           v-model="query"
           :placeholder="searchPlaceholder"
-          :aria-label="t('repositories.sessionSource.search')"
+          :aria-label="t(purpose === 'missionIssue' ? 'repositories.sessionSource.searchIssues' : 'repositories.sessionSource.search')"
           autocomplete="off"
           spellcheck="false"
         >
+        <el-select
+          v-if="purpose === 'missionIssue'"
+          class="repository-session-source-dialog__repository-select"
+          :model-value="selectedRepositoryId"
+          :placeholder="t('repositories.sessionSource.chooseRepository')"
+          :aria-label="t('repositories.sessionSource.chooseRepository')"
+          filterable
+          @update:model-value="emit('select-repository', $event)"
+        >
+          <el-option v-for="repository in repositories" :key="repository.id" :label="repository.fullName" :value="repository.id" />
+        </el-select>
       </div>
       <div v-else class="repository-session-source-dialog__assignment-header">
         <button type="button" :aria-label="t('common.back')" :disabled="preparationVisible" @click="selectedWorkItem = null">
@@ -28,7 +39,7 @@
       </div>
     </template>
 
-    <div v-if="!selectedWorkItem" class="repository-session-source-dialog__toolbar">
+    <div v-if="!selectedWorkItem && purpose === 'session'" class="repository-session-source-dialog__toolbar">
       <el-tabs v-model="tab" class="repository-session-source-dialog__tabs" :aria-label="t('repositories.sessionSource.type')">
         <el-tab-pane v-for="option in tabs" :key="option.id" :name="option.id" :label="option.label" />
       </el-tabs>
@@ -36,6 +47,7 @@
     </div>
 
     <section class="repository-session-source-dialog__results" aria-live="polite">
+      <p v-if="purpose === 'missionIssue' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
       <template v-if="selectedWorkItem">
         <StagedOperationProgress
           v-if="preparationVisible && assignmentState !== 'error'"
@@ -58,8 +70,10 @@
         />
       </template>
       <p v-else-if="loading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
-      <p v-else-if="error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
-      <template v-else-if="tab === 'branches'">
+      <p v-else-if="purpose === 'session' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
+      <p v-else-if="purpose === 'missionIssue' && repositories.length === 0" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.noRepositories') }}</p>
+      <p v-else-if="purpose === 'missionIssue' && !selectedRepositoryId" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.chooseRepositoryToSeeIssues') }}</p>
+      <template v-else-if="tab === 'branches' && purpose === 'session'">
         <h3>{{ t('repositories.sessionSource.recentBranches') }}</h3>
         <button v-for="branch in filteredBranches" :key="branch.name" class="repository-session-source-dialog__result" type="button" @click="emit('select-branch', branch)">
           <GitBranchIcon
@@ -81,7 +95,7 @@
       </template>
       <template v-else>
         <h3>{{ tab === 'pullRequests' ? t('repositories.sessionSource.recentPullRequests') : t('repositories.sessionSource.recentIssues') }}</h3>
-        <button v-for="item in filteredWorkItems" :key="item.id" class="repository-session-source-dialog__result" type="button" @click="selectedWorkItem = item">
+        <button v-for="item in filteredWorkItems" :key="item.id" class="repository-session-source-dialog__result" type="button" @click="selectWorkItem(item)">
           <GitPullRequestIcon v-if="item.kind === 'pullRequest'" class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <IssueIcon v-else class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <span class="repository-session-source-dialog__result-copy">
@@ -105,7 +119,7 @@ import {
   IconGitPullRequest as GitPullRequestIcon,
   IconSearch as SearchIcon,
 } from '@tabler/icons-vue';
-import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
+import type { SourceBranch, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import StagedOperationProgress from './StagedOperationProgress.vue';
@@ -120,6 +134,9 @@ const props = withDefaults(defineProps<{
   error?: string | null;
   loading?: boolean;
   repositoryName: string;
+  purpose?: 'session' | 'missionIssue';
+  repositories?: WorkRepository[];
+  selectedRepositoryId?: string | null;
   sessions?: WorkItemAssignmentSession[];
   visible: boolean;
   workItems?: WorkItem[];
@@ -131,6 +148,9 @@ const props = withDefaults(defineProps<{
   loading: false,
   sessions: () => [],
   workItems: () => [],
+  purpose: 'session',
+  repositories: () => [],
+  selectedRepositoryId: null,
 });
 
 const emit = defineEmits<{
@@ -138,6 +158,8 @@ const emit = defineEmits<{
   'custom-work-item': [selection: Omit<WorkItemAssignmentSelection, 'action'>];
   'preparation-complete': [];
   'select-branch': [branch: SourceBranch];
+  'select-repository': [repositoryId: string];
+  'select-work-item': [item: WorkItem];
   'start-work-item': [selection: WorkItemAssignmentSelection];
 }>();
 
@@ -160,6 +182,7 @@ const searchPlaceholder = computed(() => tab.value === 'branches'
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredBranches = computed(() => props.branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery.value)));
 const filteredWorkItems = computed(() => props.workItems.filter((item) => {
+  if (props.purpose === 'missionIssue' && item.kind === 'pullRequest') return false;
   if (tab.value === 'pullRequests' && item.kind !== 'pullRequest') return false;
   if (tab.value === 'issues' && item.kind === 'pullRequest') return false;
   const haystack = `${item.number} ${item.title} ${item.authorName ?? ''} ${item.url}`.toLocaleLowerCase();
@@ -203,7 +226,7 @@ const preparationTitle = computed(() => {
 watch(() => props.visible, async (visible) => {
   if (!visible) return;
   query.value = '';
-  tab.value = 'branches';
+  tab.value = props.purpose === 'missionIssue' ? 'issues' : 'branches';
   selectedWorkItem.value = null;
   resetPreparation();
   await nextTick();
@@ -222,6 +245,11 @@ watch(() => props.assignmentState, (state) => {
 
 function onVisibilityChanged(visible: boolean): void {
   if (!visible) emit('close');
+}
+
+function selectWorkItem(item: WorkItem): void {
+  if (props.purpose === 'missionIssue') emit('select-work-item', item);
+  else selectedWorkItem.value = item;
 }
 
 function startWorkItem(selection: WorkItemAssignmentSelection): void {
@@ -271,6 +299,25 @@ function resetPreparation(clearSelection = true): void {
   color: var(--color-text);
   background: transparent;
   font: inherit;
+}
+
+.repository-session-source-dialog--issue-picker .repository-session-source-dialog__search-row {
+  grid-template-columns: var(--icon-md) minmax(0, 1fr) minmax(160px, 220px);
+}
+
+/* The compact dialog otherwise puts the selector beneath Element Plus's 48px close button. */
+:global(.repository-session-source-dialog--issue-picker.claw-dialog--compact .el-dialog__header) {
+  padding-right: 48px;
+}
+
+.repository-session-source-dialog__repository-select { min-width: 0; }
+
+@media (max-width: 680px) {
+  .repository-session-source-dialog--issue-picker .repository-session-source-dialog__search-row {
+    grid-template-columns: var(--icon-md) minmax(0, 1fr);
+  }
+
+  .repository-session-source-dialog__repository-select { grid-column: 1 / -1; }
 }
 
 .repository-session-source-dialog__assignment-header {

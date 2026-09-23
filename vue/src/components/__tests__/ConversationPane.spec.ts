@@ -302,6 +302,17 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).not.toContain(agent.folder);
   });
 
+  it('renders supplied empty actions alongside the headline and composer', () => {
+    const wrapper = mount(ConversationPane, {
+      props: { controller: controllerFor([]), agent, emptyHeadline: 'What do you want to build?', emptySubhead: '' },
+      slots: { 'empty-actions': '<button type="button" class="issue-choice">Choose an issue</button>' },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.get('.issue-choice').text()).toBe('Choose an issue');
+    expect(wrapper.get('.conversation-pane__empty h1').text()).toBe('What do you want to build?');
+    expect(wrapper.find('.conversation-pane__surface').exists()).toBe(true);
+  });
+
   it('renders persisted agent mentions with the app-owned bot treatment', () => {
     const mentionGroup = {
       id: 'agents',
