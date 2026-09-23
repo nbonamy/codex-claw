@@ -1,8 +1,10 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMission } from '@codex-claw/core/missions';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
 import { conversationControllerActions, conversationControllerState, mountShell, workItem } from './app-shell-test-harness';
+
+const missionStorageKey = 'codexClaw.activeMissionId';
 
 function prepareMissionLead(mission: ReturnType<typeof createMission>, workerId: string): void {
   mission.execution!.runs.push({
@@ -20,6 +22,43 @@ function representGitHubRepository(agent: ReturnType<typeof createInitialSnapsho
 }
 
 describe('AppShell missions', () => {
+  afterEach(() => window.localStorage.removeItem(missionStorageKey));
+
+  it('restores the Mission workspace after reopening the app on a selected Mission', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'Restore work', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    prepareMissionLead(mission, snapshot.agents[0]!.id);
+    const firstWindow = mountShell({ snapshot });
+    firstWindow.getComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
+    expect(firstWindow.find('.mission-workspace').exists()).toBe(true);
+    firstWindow.unmount();
+
+    const reopenedWindow = mountShell({ snapshot: createEmptySnapshot(), connectionState: { status: 'connecting' } });
+    await flushPromises();
+    expect(reopenedWindow.find('.mission-workspace').exists()).toBe(false);
+    await reopenedWindow.setProps({ snapshot, activeAgent: snapshot.agents[0], connectionState: { status: 'connected' } });
+    await flushPromises();
+    expect(reopenedWindow.find('.mission-workspace').exists()).toBe(true);
+    expect(reopenedWindow.getComponent({ name: 'AppShellNavigation' }).props('activeMissionId')).toBe(mission.id);
+
+    reopenedWindow.getComponent({ name: 'AppShellNavigation' }).vm.$emit('select-agent', snapshot.agents[0]!.id);
+    await flushPromises();
+    reopenedWindow.unmount();
+    const reopenedOnAgent = mountShell({ snapshot });
+    await flushPromises();
+    expect(reopenedOnAgent.find('.mission-workspace').exists()).toBe(false);
+  });
+
+  it('discards a saved Mission that no longer exists after restart', async () => {
+    window.localStorage.setItem(missionStorageKey, 'deleted-mission');
+    const wrapper = mountShell({ snapshot: createInitialSnapshot() });
+    await flushPromises();
+
+    expect(wrapper.find('.mission-workspace').exists()).toBe(false);
+    expect(window.localStorage.getItem(missionStorageKey)).toBeNull();
+  });
+
   it('leaves the Mission surface when its team and Mission are removed', async () => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, { outcome: 'Scoped work', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });

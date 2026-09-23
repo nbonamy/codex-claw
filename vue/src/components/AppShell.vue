@@ -913,6 +913,23 @@ const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((a
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
+const missionSurfaceStorageKey = 'codexClaw.activeMissionId';
+function rememberedMissionId(): string | null {
+  try {
+    return window.localStorage.getItem(missionSurfaceStorageKey)?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+function rememberMissionId(id: string | null): void {
+  try {
+    if (id) window.localStorage.setItem(missionSurfaceStorageKey, id);
+    else window.localStorage.removeItem(missionSurfaceStorageKey);
+  } catch {
+    // Client-local navigation still works when browser storage is unavailable.
+  }
+}
+let pendingMissionRestoreId = rememberedMissionId();
 const activeSurface = ref<AppSurface>('agent');
 const missionCreationError = ref('');
 const missionCreationPending = ref(false);
@@ -1052,7 +1069,7 @@ function selectMissionSurface(id: string): void {
 }
 watch(
   () => activeSurface.value === 'mission' ? selectedMissionId.value : null,
-  missionId => { closeMissionIssuePicker(); void props.selectMission(missionId); },
+  missionId => { closeMissionIssuePicker(); rememberMissionId(missionId); void props.selectMission(missionId); },
 );
 function missionTeamContext(): { team: Team; orchestrator: Agent } {
   const team = activeTeam.value;
@@ -1200,6 +1217,14 @@ watch([selectedMission, activeTeam], ([mission, team], [previousMission]) => {
     activeSurface.value = 'agent';
   }
 });
+watch(() => props.connectionState.status, (status) => {
+  if (status !== 'connected' || !pendingMissionRestoreId) return;
+  const missionId = pendingMissionRestoreId;
+  pendingMissionRestoreId = null;
+  const mission = props.snapshot.missions?.find(candidate => candidate.id === missionId);
+  if (mission?.teamId === activeTeam.value?.id) selectMissionSurface(missionId);
+  else rememberMissionId(null);
+}, { immediate: true });
 const workItemRouting = useWorkItemRouting({
   actions: {
     assign: (payload) => props.assignWorkItemAction(payload),
